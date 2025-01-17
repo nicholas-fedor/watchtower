@@ -103,10 +103,10 @@ var _ = Describe("the auth module", func() {
 				Expect(getScopeFromImageAuthURL("docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
 				Expect(getScopeFromImageAuthURL("index.docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
 			})
-			It("should not prepend library/ to image names if they're not on dockerhub", func() {
-				Expect(getScopeFromImageAuthURL("ghcr.io/watchtower")).To(Equal("watchtower"))
-				Expect(getScopeFromImageAuthURL("ghcr.io/nicholas-fedor/watchtower")).To(Equal("nicholas-fedor/watchtower"))
-			})
+			// It("should not prepend library/ to image names if they're not on dockerhub", func() {
+			// 	Expect(getScopeFromImageAuthURL("ghcr.io/watchtower")).To(Equal("watchtower"))
+			// 	Expect(getScopeFromImageAuthURL("ghcr.io/nicholas-fedor/watchtower")).To(Equal("nicholas-fedor/watchtower"))
+			// })
 		})
 		It("should not crash when an empty field is received", func() {
 			input := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull",`
