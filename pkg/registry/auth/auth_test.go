@@ -45,7 +45,7 @@ var _ = Describe("the auth module", func() {
 	mockName := "mock-container"
 	mockImage := "ghcr.io/k6io/operator:latest"
 	mockCreated := time.Now()
-	mockDigest := "ghcr.io/k6io/operator@sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"
+	mockDigest := "ghcr.io/k6io/operator@sha256:d6d356ad6ec80e6765b99921babb8580ca0dee21c27abc3f0197c9441d83d680"
 
 	mockContainer := mocks.CreateMockContainerWithDigest(
 		mockId,
