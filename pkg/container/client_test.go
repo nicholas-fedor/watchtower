@@ -1,8 +1,10 @@
 package container
 
 import (
-	"github.com/docker/docker/api/types/network"
 	"time"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -270,7 +272,7 @@ var _ = Describe("the client", func() {
 					// API.ContainerExecCreate
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("POST", HaveSuffix("containers/%v/exec", containerID)),
-						ghttp.VerifyJSONRepresenting(types.ExecConfig{
+						ghttp.VerifyJSONRepresenting(container.ExecOptions{
 							User:   user,
 							Detach: false,
 							Tty:    true,
@@ -285,7 +287,7 @@ var _ = Describe("the client", func() {
 					// API.ContainerExecStart
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("POST", HaveSuffix("exec/%v/start", execID)),
-						ghttp.VerifyJSONRepresenting(types.ExecStartCheck{
+						ghttp.VerifyJSONRepresenting(container.ExecStartOptions{
 							Detach: false,
 							Tty:    true,
 						}),
