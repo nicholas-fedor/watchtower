@@ -11,8 +11,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 
-	wtTypes "github.com/nicholas-fedor/watchtower/pkg/types"
 	ref "github.com/distribution/reference"
+	wtTypes "github.com/nicholas-fedor/watchtower/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -100,8 +100,8 @@ var _ = Describe("the auth module", func() {
 				Expect(getScopeFromImageAuthURL("index.docker.io/registry")).To(Equal("library/registry"))
 			})
 			It("should not include vanity hosts\"", func() {
-				Expect(getScopeFromImageAuthURL("docker.io/nicholas-fedor/watchtower")).To(Equal("nicholas-fedor/watchtower"))
-				Expect(getScopeFromImageAuthURL("index.docker.io/nicholas-fedor/watchtower")).To(Equal("nicholas-fedor/watchtower"))
+				Expect(getScopeFromImageAuthURL("docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
+				Expect(getScopeFromImageAuthURL("index.docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
 			})
 			It("should not destroy three segment image names\"", func() {
 				Expect(getScopeFromImageAuthURL("piksel/nicholas-fedor/watchtower")).To(Equal("piksel/nicholas-fedor/watchtower"))
@@ -138,12 +138,12 @@ var _ = Describe("the auth module", func() {
 		})
 		It("should assume Docker Hub for image refs with no explicit registry", func() {
 			expected := url.URL{Host: "index.docker.io", Scheme: "https", Path: "/v2/"}
-			imageRef, _ := ref.ParseNormalizedNamed("nicholas-fedor/watchtower:latest")
+			imageRef, _ := ref.ParseNormalizedNamed("nickfedor/watchtower:latest")
 			Expect(auth.GetChallengeURL(imageRef)).To(Equal(expected))
 		})
 		It("should use index.docker.io if the image ref specifies docker.io", func() {
 			expected := url.URL{Host: "index.docker.io", Scheme: "https", Path: "/v2/"}
-			imageRef, _ := ref.ParseNormalizedNamed("docker.io/nicholas-fedor/watchtower:latest")
+			imageRef, _ := ref.ParseNormalizedNamed("docker.io/nickfedor/watchtower:latest")
 			Expect(auth.GetChallengeURL(imageRef)).To(Equal(expected))
 		})
 	})

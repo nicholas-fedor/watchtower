@@ -4,8 +4,8 @@ on:
   workflow_dispatch: {}
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - '**/v[0-9]+.[0-9]+.[0-9]+'
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "**/v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
   lint:
@@ -52,7 +52,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: 
+    needs:
       - test
       - lint
     env:
@@ -93,11 +93,11 @@ jobs:
         run: |
           export DH_TAG=$(git tag --points-at HEAD | sed 's/^v*//')
           docker manifest create \
-            NickFedor/watchtower:$DH_TAG \
-            NickFedor/watchtower:amd64-$DH_TAG \
-            NickFedor/watchtower:i386-$DH_TAG \
-            NickFedor/watchtower:armhf-$DH_TAG \
-            NickFedor/watchtower:arm64v8-$DH_TAG
+            nickfedor/watchtower:$DH_TAG \
+            nickfedor/watchtower:amd64-$DH_TAG \
+            nickfedor/watchtower:i386-$DH_TAG \
+            nickfedor/watchtower:armhf-$DH_TAG \
+            nickfedor/watchtower:arm64v8-$DH_TAG
           docker manifest create \
             ghcr.io/nicholas-fedor/watchtower:$DH_TAG \
             ghcr.io/nicholas-fedor/watchtower:amd64-$DH_TAG \
@@ -107,19 +107,19 @@ jobs:
       - name: Annotate manifest for version
         run: |
           for REPO in '' ghcr.io/ ; do
-          
+
           docker manifest annotate \
             ${REPO}nicholas-fedor/watchtower:$(echo $TAG | sed 's/^v*//') \
             ${REPO}nicholas-fedor/watchtower:i386-$(echo $TAG | sed 's/^v*//') \
             --os linux \
             --arch 386
-          
+
           docker manifest annotate \
             ${REPO}nicholas-fedor/watchtower:$(echo $TAG | sed 's/^v*//') \
             ${REPO}nicholas-fedor/watchtower:armhf-$(echo $TAG | sed 's/^v*//') \
             --os linux \
             --arch arm
-      
+
           docker manifest annotate \
             ${REPO}nicholas-fedor/watchtower:$(echo $TAG | sed 's/^v*//') \
             ${REPO}nicholas-fedor/watchtower:arm64v8-$(echo $TAG | sed 's/^v*//') \
@@ -131,11 +131,11 @@ jobs:
       - name: Create manifest for latest
         run: |
           docker manifest create \
-            NickFedor/watchtower:latest \
-            NickFedor/watchtower:amd64-latest \
-            NickFedor/watchtower:i386-latest \
-            NickFedor/watchtower:armhf-latest \
-            NickFedor/watchtower:arm64v8-latest
+            nickfedor/watchtower:latest \
+            nickfedor/watchtower:amd64-latest \
+            nickfedor/watchtower:i386-latest \
+            nickfedor/watchtower:armhf-latest \
+            nickfedor/watchtower:arm64v8-latest
           docker manifest create \
             ghcr.io/nicholas-fedor/watchtower:latest \
             ghcr.io/nicholas-fedor/watchtower:amd64-latest \
@@ -151,7 +151,7 @@ jobs:
             ${REPO}nicholas-fedor/watchtower:i386-latest \
             --os linux \
             --arch 386
-      
+
           docker manifest annotate \
             ${REPO}nicholas-fedor/watchtower:latest \
             ${REPO}nicholas-fedor/watchtower:armhf-latest \
@@ -172,8 +172,8 @@ jobs:
           DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           docker login -u $DOCKER_USER -p $DOCKER_TOKEN && \
-            docker manifest push NickFedor/watchtower:$(echo $TAG | sed 's/^v*//') && \
-            docker manifest push NickFedor/watchtower:latest
+            docker manifest push nickfedor/watchtower:$(echo $TAG | sed 's/^v*//') && \
+            docker manifest push nickfedor/watchtower:latest
       - name: Push manifests to GitHub Container Registry
         env:
           DOCKER_USER: ${{ secrets.BOT_USERNAME }}
@@ -188,10 +188,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - name: Pull new module version
-      uses: andrewslotin/go-proxy-pull-action@89382de145eeb7a85de72f8a27f686a50727bc7a #master@2022-10-14
+      - name: Pull new module version
+        uses: andrewslotin/go-proxy-pull-action@89382de145eeb7a85de72f8a27f686a50727bc7a #master@2022-10-14
 
-  
-  
-
-  

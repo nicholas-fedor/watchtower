@@ -12,8 +12,7 @@ build:
   ldflags:
     - -s -w -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{.Version}}
 archives:
-  - 
-    name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
+  - name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
     format: tar.gz
     replacements:
       arm: armhf
@@ -28,58 +27,54 @@ archives:
     files:
       - LICENSE.md
 dockers:
-  -
-    use_buildx: true
-    build_flag_templates: [ "--platform=linux/amd64" ]
+  - use_buildx: true
+    build_flag_templates: ["--platform=linux/amd64"]
     goos: linux
     goarch: amd64
-    goarm: ''
+    goarm: ""
     dockerfile: dockerfiles/Dockerfile
     image_templates:
-      - NickFedor/watchtower:amd64-{{ .Version }}
-      - NickFedor/watchtower:amd64-latest
+      - nickfedor/watchtower:amd64-{{ .Version }}
+      - nickfedor/watchtower:amd64-latest
       - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:amd64-latest
     binaries:
       - watchtower
-  - 
-    use_buildx: true
-    build_flag_templates: [ "--platform=linux/386" ]
+  - use_buildx: true
+    build_flag_templates: ["--platform=linux/386"]
     goos: linux
     goarch: 386
-    goarm: ''
+    goarm: ""
     dockerfile: dockerfiles/Dockerfile
     image_templates:
-      - NickFedor/watchtower:i386-{{ .Version }}
-      - NickFedor/watchtower:i386-latest
+      - nickfedor/watchtower:i386-{{ .Version }}
+      - nickfedor/watchtower:i386-latest
       - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:i386-latest
     binaries:
       - watchtower
-  - 
-    use_buildx: true
-    build_flag_templates: [ "--platform=linux/arm/v6" ]
+  - use_buildx: true
+    build_flag_templates: ["--platform=linux/arm/v6"]
     goos: linux
     goarch: arm
     goarm: 6
     dockerfile: dockerfiles/Dockerfile
     image_templates:
-      - NickFedor/watchtower:armhf-{{ .Version }}
-      - NickFedor/watchtower:armhf-latest
+      - nickfedor/watchtower:armhf-{{ .Version }}
+      - nickfedor/watchtower:armhf-latest
       - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
     binaries:
       - watchtower
-  - 
-    use_buildx: true
-    build_flag_templates: [ "--platform=linux/arm64/v8" ]
+  - use_buildx: true
+    build_flag_templates: ["--platform=linux/arm64/v8"]
     goos: linux
     goarch: arm64
-    goarm: ''
+    goarm: ""
     dockerfile: dockerfiles/Dockerfile
     image_templates:
-      - NickFedor/watchtower:amd64-/watchtower:arm64v8-{{ .Version }}
-      - NickFedor/watchtower:amd64-/watchtower:arm64v8-latest
+      - nickfedor/watchtower:amd64-/watchtower:arm64v8-{{ .Version }}
+      - nickfedor/watchtower:amd64-/watchtower:arm64v8-latest
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
     binaries:
