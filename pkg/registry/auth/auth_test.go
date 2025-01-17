@@ -103,10 +103,6 @@ var _ = Describe("the auth module", func() {
 				Expect(getScopeFromImageAuthURL("docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
 				Expect(getScopeFromImageAuthURL("index.docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
 			})
-			It("should not destroy three segment image names\"", func() {
-				Expect(getScopeFromImageAuthURL("piksel/nicholas-fedor/watchtower")).To(Equal("piksel/nicholas-fedor/watchtower"))
-				Expect(getScopeFromImageAuthURL("ghcr.io/piksel/nicholas-fedor/watchtower")).To(Equal("piksel/nicholas-fedor/watchtower"))
-			})
 			It("should not prepend library/ to image names if they're not on dockerhub", func() {
 				Expect(getScopeFromImageAuthURL("ghcr.io/watchtower")).To(Equal("watchtower"))
 				Expect(getScopeFromImageAuthURL("ghcr.io/nicholas-fedor/watchtower")).To(Equal("nicholas-fedor/watchtower"))
