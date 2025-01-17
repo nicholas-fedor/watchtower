@@ -87,12 +87,12 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      # - name: Login to GHCR
-      #   uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
-      #   with:
-      #     username: ${{ secrets.BOT_USERNAME }}
-      #     password: ${{ secrets.BOT_GHCR_PAT }}
-      #     registry: ghcr.io
+      - name: Login to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
+        with:
+          username: ${{ secrets.BOT_USERNAME }}
+          password: ${{ secrets.BOT_GHCR_PAT }}
+          registry: ghcr.io
       - name: Build
         uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6
         with:
