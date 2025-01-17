@@ -1,6 +1,6 @@
 module github.com/nicholas-fedor/watchtower
 
-go 1.23.5
+go 1.23
 
 require (
 	github.com/containrrr/shoutrrr v0.8.0
