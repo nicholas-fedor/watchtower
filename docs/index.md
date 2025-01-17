@@ -32,8 +32,8 @@
   <a href="https://github.com/nicholas-fedor/watchtower/#contributors">
     <img alt="All Contributors" src="https://img.shields.io/github/all-contributors/nicholas-fedor/watchtower" />
   </a>
-  <a href="https://hub.docker.com/r/NickFedor/watchtower">
-    <img alt="Pulls from DockerHub" src="https://img.shields.io/docker/pulls/NickFedor/watchtower.svg" />
+  <a href="https://hub.docker.com/r/nickfedor/watchtower">
+    <img alt="Pulls from DockerHub" src="https://img.shields.io/docker/pulls/nickfedor/watchtower.svg" />
   </a>
 </p>
 
@@ -50,7 +50,7 @@ the following command:
     $ docker run -d \
     --name watchtower \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    NickFedor/watchtower
+    nickfedor/watchtower
     ```
 
 === "docker-compose.yml"
@@ -59,7 +59,7 @@ the following command:
     version: "3"
     services:
       watchtower:
-        image: NickFedor/watchtower
+        image: nickfedor/watchtower
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
     ```

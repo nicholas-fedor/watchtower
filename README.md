@@ -1,7 +1,7 @@
 <div align="center">
   <img src="./logo.png" width="450" />
   
-  # Watchtower
+# Watchtower
   
   A process for automating Docker container base image updates.
   <br/><br/>
@@ -14,13 +14,13 @@
   [![Apache-2.0 License](https://img.shields.io/github/license/nicholas-fedor/watchtower.svg)](https://www.apache.org/licenses/LICENSE-2.0)
   [![Codacy Badge](https://app.codacy.com/project/badge/Grade/1c48cfb7646d4009aa8c6f71287670b8)](https://www.codacy.com/gh/nicholas-fedor/watchtower/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=nicholas-fedor/watchtower&amp;utm_campaign=Badge_Grade)
   [![All Contributors](https://img.shields.io/github/all-contributors/nicholas-fedor/watchtower)](#contributors)
-  [![Pulls from DockerHub](https://img.shields.io/docker/pulls/NickFedor/watchtower.svg)](https://hub.docker.com/r/NickFedor/watchtower)
+  [![Pulls from DockerHub](https://img.shields.io/docker/pulls/nickfedor/watchtower.svg)](https://hub.docker.com/r/nickfedor/watchtower)
 
 </div>
 
 ## Quick Start
 
-With watchtower you can update the running version of your containerized app simply by pushing a new image to the Docker Hub or your own image registry. 
+With watchtower you can update the running version of your containerized app simply by pushing a new image to the Docker Hub or your own image registry.
 
 Watchtower will pull down your new image, gracefully shut down your existing container and restart it with the same options that were used when it was deployed initially. Run the watchtower container with the following command:
 
@@ -28,13 +28,14 @@ Watchtower will pull down your new image, gracefully shut down your existing con
 $ docker run --detach \
     --name watchtower \
     --volume /var/run/docker.sock:/var/run/docker.sock \
-    NickFedor/watchtower
+    nickfedor/watchtower
 ```
 
-Watchtower is intended to be used in homelabs, media centers, local dev environments, and similar. We do **not** recommend using Watchtower in a commercial or production environment. If that is you, you should be looking into using Kubernetes. If that feels like too big a step for you, please look into solutions like [MicroK8s](https://microk8s.io/) and [k3s](https://k3s.io/) that take away a lot of the toil of running a Kubernetes cluster. 
+Watchtower is intended to be used in homelabs, media centers, local dev environments, and similar. We do **not** recommend using Watchtower in a commercial or production environment. If that is you, you should be looking into using Kubernetes. If that feels like too big a step for you, please look into solutions like [MicroK8s](https://microk8s.io/) and [k3s](https://k3s.io/) that take away a lot of the toil of running a Kubernetes cluster.
 
 ## Documentation
-The full documentation is available at https://containrrr.dev/watchtower.
+
+The full documentation is available at <https://containrrr.dev/watchtower>.
 
 ## Contributors
 

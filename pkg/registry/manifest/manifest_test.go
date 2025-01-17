@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
+	apiTypes "github.com/docker/docker/api/types"
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
-	apiTypes "github.com/docker/docker/api/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -27,16 +27,16 @@ var _ = Describe("the manifest module", func() {
 			Expect(URL).To(Equal(expected))
 		})
 		It("should assume Docker Hub for image refs with no explicit registry", func() {
-			imageRef := "NickFedor/watchtower:latest"
-			expected := "https://index.docker.io/v2/NickFedor/watchtower/manifests/latest"
+			imageRef := "nickfedor/watchtower:latest"
+			expected := "https://index.docker.io/v2/nickfedor/watchtower/manifests/latest"
 
 			URL, err := buildMockContainerManifestURL(imageRef)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(URL).To(Equal(expected))
 		})
 		It("should assume latest for image refs with no explicit tag", func() {
-			imageRef := "NickFedor/watchtower"
-			expected := "https://index.docker.io/v2/NickFedor/watchtower/manifests/latest"
+			imageRef := "nickfedor/watchtower"
+			expected := "https://index.docker.io/v2/nickfedor/watchtower/manifests/latest"
 
 			URL, err := buildMockContainerManifestURL(imageRef)
 			Expect(err).NotTo(HaveOccurred())
