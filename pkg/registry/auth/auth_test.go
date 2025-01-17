@@ -74,7 +74,7 @@ var _ = Describe("the auth module", func() {
 				Host:     "ghcr.io",
 				Scheme:   "https",
 				Path:     "/token",
-				RawQuery: "scope=repository%3Acontainrrr%2Fwatchtower%3Apull&service=ghcr.io",
+				RawQuery: "scope=repository%3Anicholas-fedor%2Fwatchtower%3Apull&service=ghcr.io",
 			}
 
 			URL, err := auth.GetAuthURL(challenge, imageRef)
