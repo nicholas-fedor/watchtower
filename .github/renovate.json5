@@ -195,14 +195,13 @@
   ],
   customManagers: [
     {
-      customType: 'regex',
-      description: [
-        'Process custom dependencies',
-      ],
+      customType: "regex",
+      description: ["Process custom Docker dependencies"],
+      fileMatch: ["^Dockerfile$"], // Match only Dockerfile for Watchtower
       matchStrings: [
-        'datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( repository=(?<registryUrl>\\S+))?\\n.+: (&\\S+\\s)?(?<currentValue>\\S+)',
+        "FROM (?<depName>[^\\s]+)(?<currentValue>:[^\\s]+)?\\s*", // Simplified for Docker images
       ],
-      datasourceTemplate: '{{#if datasource}}{{{datasource}}}{{else}}github-releases{{/if}}',
+      datasourceTemplate: "docker",
     },
   ],
 }
