@@ -38,7 +38,7 @@ dockers:
       - nickfedor/watchtower:amd64-latest
       - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:amd64-latest
-    binaries:
+    ids:
       - watchtower
   - use_buildx: true
     build_flag_templates: ["--platform=linux/386"]
@@ -73,7 +73,7 @@ dockers:
     goarm: ""
     dockerfile: dockerfiles/Dockerfile
     image_templates:
-      - nickfedor/watchtower:amd64-/watchtower:arm64v8-{{ .Version }}
+      # - nickfedor/watchtower:amd64-/watchtower:arm64v8-{{ .Version }}
       - nickfedor/watchtower:amd64-/watchtower:arm64v8-latest
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
