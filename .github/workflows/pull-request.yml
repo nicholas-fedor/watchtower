@@ -22,7 +22,8 @@ jobs:
       - uses: dominikh/staticcheck-action@fe1dd0c3658873b46f8c9bb3291096a617310ca6 # v1.3.1
         with:
           version: "2024.1.1"
-          install-go: "false" # StaticCheck uses go v1.17 which does not support `any`
+          install-go: "true"
+          #install-go: "false" # StaticCheck uses go v1.17 which does not support `any`
   test:
     name: Test
     strategy:
