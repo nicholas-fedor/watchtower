@@ -18,10 +18,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.x
-      - uses: dominikh/staticcheck-action@fe1dd0c3658873b46f8c9bb3291096a617310ca6 # v1.3.1
+          go-version: 1.22.x
+      - uses: dominikh/staticcheck-action@v1.3.1
         with:
-          version: "2024.1.1"
+          #version: "2024.1.1"
           install-go: "false" # StaticCheck uses go v1.17 which does not support `any`
   test:
     name: Test
@@ -29,7 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - 1.23.x
+          - 1.22.x
         platform:
           - macos-latest
           - windows-latest
@@ -43,7 +43,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.x
+          go-version: 1.22.x
       - name: Run tests
         run: |
           go test -v -coverprofile coverage.out -covermode atomic ./... 
@@ -62,7 +62,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.x
+          go-version: 1.22.x
       - name: Build
         uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6
         with:
