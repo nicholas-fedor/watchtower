@@ -6,7 +6,6 @@
   A process for automating Docker container base image updates.
   <br/><br/>
   
-  [![Circle CI](https://circleci.com/gh/nicholas-fedor/watchtower.svg?style=shield)](https://circleci.com/gh/nicholas-fedor/watchtower)
   [![codecov](https://codecov.io/gh/nicholas-fedor/watchtower/branch/main/graph/badge.svg)](https://codecov.io/gh/nicholas-fedor/watchtower)
   [![GoDoc](https://godoc.org/github.com/nicholas-fedor/watchtower?status.svg)](https://godoc.org/github.com/nicholas-fedor/watchtower)
   [![Go Report Card](https://goreportcard.com/badge/github.com/nicholas-fedor/watchtower)](https://goreportcard.com/report/github.com/nicholas-fedor/watchtower)
@@ -24,7 +23,7 @@ With watchtower you can update the running version of your containerized app sim
 
 Watchtower will pull down your new image, gracefully shut down your existing container and restart it with the same options that were used when it was deployed initially. Run the watchtower container with the following command:
 
-```
+```console
 $ docker run --detach \
     --name watchtower \
     --volume /var/run/docker.sock:/var/run/docker.sock \
@@ -35,7 +34,7 @@ Watchtower is intended to be used in homelabs, media centers, local dev environm
 
 ## Documentation
 
-The full documentation is available at <https://containrrr.dev/watchtower>.
+The full documentation is available at <https://nicholas-fedor.github.io/watchtower/>.
 
 ## Contributors
 

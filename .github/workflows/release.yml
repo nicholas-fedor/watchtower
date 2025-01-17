@@ -90,8 +90,8 @@ jobs:
       - name: Login to GHCR
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
-          username: ${{ secrets.BOT_USERNAME }}
-          password: ${{ secrets.BOT_GHCR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
       - name: Build
         uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6
@@ -191,8 +191,8 @@ jobs:
             docker manifest push nickfedor/watchtower:latest
       - name: Push manifests to GitHub Container Registry
         env:
-          DOCKER_USER: ${{ secrets.BOT_USERNAME }}
-          DOCKER_TOKEN: ${{ secrets.BOT_GHCR_PAT }}
+          DOCKER_USER: ${{ github.actor }}
+          DOCKER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker login -u $DOCKER_USER -p $DOCKER_TOKEN ghcr.io && \
             docker manifest push ghcr.io/nicholas-fedor/watchtower:$(echo $TAG | sed 's/^v*//') && \
