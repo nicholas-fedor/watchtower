@@ -4,7 +4,7 @@
     "Names": [
       "/watchtower-stopped"
     ],
-    "Image": "containrrr/watchtower:latest",
+    "Image": "NickFedor/watchtower:latest",
     "ImageID": "sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa",
     "Command": "/watchtower",
     "Created": 1554925882,
@@ -52,7 +52,7 @@
     "Names": [
       "/watchtower-running"
     ],
-    "Image": "containrrr/watchtower:latest",
+    "Image": "NickFedor/watchtower:latest",
     "ImageID": "sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa",
     "Command": "/watchtower",
     "Created": 1554925882,

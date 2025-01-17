@@ -34,5 +34,5 @@ To build a Watchtower image of your own, use the self-contained Dockerfiles. As 
 
 e.g.:
 ```bash
-sudo docker build . -f dockerfiles/Dockerfile.dev-self-contained -t containrrr/watchtower # to build an image from local files
+sudo docker build . -f dockerfiles/Dockerfile.dev-self-contained -t NickFedor/watchtower # to build an image from local files
 ```

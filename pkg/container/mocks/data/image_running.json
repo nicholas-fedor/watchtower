@@ -1,7 +1,7 @@
 {
   "Id": "sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa",
   "RepoTags": [
-    "containrrr/watchtower:latest"
+    "NickFedor/watchtower:latest"
   ],
   "RepoDigests": [],
   "Parent": "sha256:2753b9621e0d76153e1725d0cea015baf0ae4d829782a463b4ea9532ec976447",

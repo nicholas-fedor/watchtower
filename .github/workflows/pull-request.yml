@@ -21,7 +21,7 @@ jobs:
           go-version: 1.20.x
       - uses: dominikh/staticcheck-action@fe1dd0c3658873b46f8c9bb3291096a617310ca6 # v1.3.1
         with:
-          version: "2023.1.6"
+          version: "2024.1.1"
           install-go: "false" # StaticCheck uses go v1.17 which does not support `any`
   test:
     name: Test
@@ -66,5 +66,5 @@ jobs:
       - name: Build
         uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6
         with:
-          version: v0.155.0
+          version: '~> v2'
           args: --snapshot --skip-publish --debug
