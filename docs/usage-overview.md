@@ -1,4 +1,4 @@
-Watchtower is itself packaged as a Docker container so installation is as simple as pulling the `nickfedor/watchtower` image. If you are using ARM based architecture, pull the appropriate `nickfedor/watchtower:armhf-<tag>` image from the [containrrr Docker Hub](https://hub.docker.com/r/nickfedor/watchtower/tags/).
+Watchtower is itself packaged as a Docker container so installation is as simple as pulling the `nickfedor/watchtower` image. If you are using ARM based architecture, pull the appropriate `nickfedor/watchtower:armhf-<tag>` image from the [nickfedor Docker Hub](https://hub.docker.com/r/nickfedor/watchtower/tags/).
 
 Since the watchtower code needs to interact with the Docker API in order to monitor the running containers, you need to mount _/var/run/docker.sock_ into the container with the `-v` flag when you run it.
 
