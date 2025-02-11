@@ -1,71 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://containrrr.dev/watchtower/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/arguments/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/arguments/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/container-selection/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/container-selection/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/http-api-mode/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/http-api-mode/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/introduction/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/introduction/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/lifecycle-hooks/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/lifecycle-hooks/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/linked-containers/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/linked-containers/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/metrics/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/metrics/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/notifications/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/notifications/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/private-registries/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/private-registries/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/remote-hosts/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/remote-hosts/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/running-multiple-instances/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/running-multiple-instances/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/secure-connections/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/secure-connections/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/stop-signals/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/stop-signals/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/template-preview/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/template-preview/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/updating/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/updating/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
     <url>
-         <loc>https://containrrr.dev/watchtower/usage-overview/</loc>
+         <loc>https://nicholas-fedor.github.io/watchtower/usage-overview/</loc>
          <lastmod>2025-02-11</lastmod>
     </url>
 </urlset>
