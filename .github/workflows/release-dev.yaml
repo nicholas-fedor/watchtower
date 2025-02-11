@@ -16,21 +16,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
           go-version: 1.23.x
       - name: Build
         run: ./build.sh
+
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
           go-version: 1.23.x
       - name: Test
@@ -39,27 +40,45 @@ jobs:
         uses: codecov/codecov-action@4898080f15c09ae860fcec6796854d10a2e23de8
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
   publish:
     needs:
       - build
       - test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Publish to Docker Hub
-        uses: jerray/publish-docker-action@87d84711629b0dc9f6bb127b568413cc92a2088e #master@2022-10-14
+      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@327cd5a69de6c009b9ce71bce8395f28e651bf99
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          file: dockerfiles/Dockerfile.self-contained
-          repository: nickfedor/watchtower
-          tags: latest-dev
-      - name: Publish to GHCR
-        uses: jerray/publish-docker-action@87d84711629b0dc9f6bb127b568413cc92a2088e #master@2022-10-14
+
+      - name: Login to GHCR
+        uses: docker/login-action@327cd5a69de6c009b9ce71bce8395f28e651bf99
         with:
+          registry: ghcr.io
           username: ${{ secrets.BOT_USERNAME }}
           password: ${{ secrets.BOT_GHCR_PAT }}
+
+      - name: Build and push to Docker Hub
+        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991
+        with:
+          context: .
           file: dockerfiles/Dockerfile.self-contained
-          registry: ghcr.io
-          repository: nicholas-fedor/watchtower
-          tags: latest-dev
+          platforms: linux/amd64
+          push: true
+          tags: nickfedor/watchtower:latest-dev
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991
+        with:
+          context: .
+          file: dockerfiles/Dockerfile.self-contained
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/nicholas-fedor/watchtower:latest-dev
