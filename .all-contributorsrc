@@ -6,6 +6,18 @@
   "commit": false,
   "contributors": [
     {
+      "login": "nicholas-fedor",
+      "name": "Nicholas Fedor",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/71477161?v=4",
+      "profile": "https://github.com/nicholas-fedor",
+      "contributions": [
+        "code",
+        "doc",
+        "maintenance",
+        "review"
+      ]
+    },
+    {
       "login": "piksel",
       "name": "nils måsén",
       "avatar_url": "https://avatars2.githubusercontent.com/u/807383?v=4",
