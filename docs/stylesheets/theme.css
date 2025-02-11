@@ -1,4 +1,4 @@
-[data-md-color-scheme="containrrr"] {
+[data-md-color-scheme="watchtower"] {
   /* Primary and accent */
   --md-primary-fg-color: #406170;
   --md-primary-fg-color--light:#acbfc7;
@@ -10,7 +10,7 @@
   --md-typeset-a-color: var(--md-primary-fg-color);
 }
 
-[data-md-color-scheme="containrrr-dark"] {
+[data-md-color-scheme="watchtower-dark"] {
   --md-hue: 199;
 
   /* Primary and accent */
