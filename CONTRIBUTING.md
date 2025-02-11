@@ -10,7 +10,7 @@ You can check your current version of the go language as follows:
 
 ```bash
   ~ $ go version
-  go version go1.12.1 darwin/amd64
+  go version go1.23.6 linux/amd64
 ```
 
 ## Checking out the code
