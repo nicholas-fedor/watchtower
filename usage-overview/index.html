@@ -601,7 +601,7 @@
 
   <h1>Usage overview</h1>
 
-<p>Watchtower is itself packaged as a Docker container so installation is as simple as pulling the <code>nickfedor/watchtower</code> image. If you are using ARM based architecture, pull the appropriate <code>nickfedor/watchtower:armhf-&lt;tag&gt;</code> image from the <a href="https://hub.docker.com/r/nickfedor/watchtower/tags/">containrrr Docker Hub</a>.</p>
+<p>Watchtower is itself packaged as a Docker container so installation is as simple as pulling the <code>nickfedor/watchtower</code> image. If you are using ARM based architecture, pull the appropriate <code>nickfedor/watchtower:armhf-&lt;tag&gt;</code> image from the <a href="https://hub.docker.com/r/nickfedor/watchtower/tags/">nickfedor Docker Hub</a>.</p>
 <p>Since the watchtower code needs to interact with the Docker API in order to monitor the running containers, you need to mount <em>/var/run/docker.sock</em> into the container with the <code>-v</code> flag when you run it.</p>
 <p>Run the <code>watchtower</code> container with the following command:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
