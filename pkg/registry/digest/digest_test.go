@@ -2,22 +2,23 @@ package digest_test
 
 import (
 	"fmt"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
-	wtTypes "github.com/nicholas-fedor/watchtower/pkg/types"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/ghttp"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
+	wtTypes "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/ghttp"
 )
 
 func TestDigest(t *testing.T) {
 
-	RegisterFailHandler(Fail)
-	RunSpecs(GinkgoT(), "Digest Suite")
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(ginkgo.GinkgoT(), "Digest Suite")
 }
 
 var (
@@ -34,18 +35,18 @@ var (
 func SkipIfCredentialsEmpty(credentials *wtTypes.RegistryCredentials, fn func()) func() {
 	if credentials.Username == "" {
 		return func() {
-			Skip("Username missing. Skipping integration test")
+			ginkgo.Skip("Username missing. Skipping integration test")
 		}
 	} else if credentials.Password == "" {
 		return func() {
-			Skip("Password missing. Skipping integration test")
+			ginkgo.Skip("Password missing. Skipping integration test")
 		}
 	} else {
 		return fn
 	}
 }
 
-var _ = Describe("Digests", func() {
+var _ = ginkgo.Describe("Digests", func() {
 	mockId := "mock-id"
 	mockName := "mock-container"
 	mockImage := "ghcr.io/k6io/operator:latest"
@@ -61,49 +62,49 @@ var _ = Describe("Digests", func() {
 
 	mockContainerNoImage := mocks.CreateMockContainerWithImageInfoP(mockId, mockName, mockImage, mockCreated, nil)
 
-	When("a digest comparison is done", func() {
-		It("should return true if digests match",
+	ginkgo.When("a digest comparison is done", func() {
+		ginkgo.It("should return true if digests match",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
 				matches, err := digest.CompareDigest(mockContainer, creds)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(matches).To(Equal(true))
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(matches).To(gomega.Equal(true))
 			}),
 		)
 
-		It("should return false if digests differ", func() {
+		ginkgo.It("should return false if digests differ", func() {
 
 		})
-		It("should return an error if the registry isn't available", func() {
+		ginkgo.It("should return an error if the registry isn't available", func() {
 
 		})
-		It("should return an error when container contains no image info", func() {
+		ginkgo.It("should return an error when container contains no image info", func() {
 			matches, err := digest.CompareDigest(mockContainerNoImage, `user:pass`)
-			Expect(err).To(HaveOccurred())
-			Expect(matches).To(Equal(false))
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(matches).To(gomega.Equal(false))
 		})
 	})
-	When("using different registries", func() {
-		It("should work with DockerHub",
+	ginkgo.When("using different registries", func() {
+		ginkgo.It("should work with DockerHub",
 			SkipIfCredentialsEmpty(DockerHubCredentials, func() {
 				fmt.Println(DockerHubCredentials != nil) // to avoid crying linters
 			}),
 		)
-		It("should work with GitHub Container Registry",
+		ginkgo.It("should work with GitHub Container Registry",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				fmt.Println(GHCRCredentials != nil) // to avoid crying linters
 			}),
 		)
 	})
-	When("sending a HEAD request", func() {
+	ginkgo.When("sending a HEAD request", func() {
 		var server *ghttp.Server
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			server = ghttp.NewServer()
 		})
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			server.Close()
 		})
-		It("should use a custom user-agent", func() {
+		ginkgo.It("should use a custom user-agent", func() {
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyHeader(http.Header{
@@ -117,9 +118,9 @@ var _ = Describe("Digests", func() {
 				),
 			)
 			dig, err := digest.GetDigest(server.URL(), "token")
-			Expect(server.ReceivedRequests()).Should(HaveLen(1))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(dig).To(Equal(mockDigest))
+			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(1))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(dig).To(gomega.Equal(mockDigest))
 		})
 	})
 })

@@ -13,22 +13,22 @@ import (
 
 	ref "github.com/distribution/reference"
 	wtTypes "github.com/nicholas-fedor/watchtower/pkg/types"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 func TestAuth(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Registry Auth Suite")
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, "Registry Auth Suite")
 }
 func SkipIfCredentialsEmpty(credentials *wtTypes.RegistryCredentials, fn func()) func() {
 	if credentials.Username == "" {
 		return func() {
-			Skip("Username missing. Skipping integration test")
+			ginkgo.Skip("Username missing. Skipping integration test")
 		}
 	} else if credentials.Password == "" {
 		return func() {
-			Skip("Password missing. Skipping integration test")
+			ginkgo.Skip("Password missing. Skipping integration test")
 		}
 	} else {
 		return fn
@@ -40,7 +40,7 @@ var GHCRCredentials = &wtTypes.RegistryCredentials{
 	Password: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_PASSWORD"),
 }
 
-var _ = Describe("the auth module", func() {
+var _ = ginkgo.Describe("the auth module", func() {
 	mockId := "mock-id"
 	mockName := "mock-container"
 	mockImage := "ghcr.io/k6io/operator:latest"
@@ -54,22 +54,22 @@ var _ = Describe("the auth module", func() {
 		mockCreated,
 		mockDigest)
 
-	Describe("GetToken", func() {
-		It("should parse the token from the response",
+	ginkgo.Describe("GetToken", func() {
+		ginkgo.It("should parse the token from the response",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
 				token, err := auth.GetToken(mockContainer, creds)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(token).NotTo(Equal(""))
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(token).NotTo(gomega.Equal(""))
 			}),
 		)
 	})
 
-	Describe("GetAuthURL", func() {
-		It("should create a valid auth url object based on the challenge header supplied", func() {
+	ginkgo.Describe("GetAuthURL", func() {
+		ginkgo.It("should create a valid auth url object based on the challenge header supplied", func() {
 			challenge := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull"`
 			imageRef, err := ref.ParseNormalizedNamed("nicholas-fedor/watchtower")
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			expected := &url.URL{
 				Host:     "ghcr.io",
 				Scheme:   "https",
@@ -78,74 +78,74 @@ var _ = Describe("the auth module", func() {
 			}
 
 			URL, err := auth.GetAuthURL(challenge, imageRef)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(URL).To(Equal(expected))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL).To(gomega.Equal(expected))
 		})
 
-		When("given an invalid challenge header", func() {
-			It("should return an error", func() {
+		ginkgo.When("given an invalid challenge header", func() {
+			ginkgo.It("should return an error", func() {
 				challenge := `bearer realm="https://ghcr.io/token"`
 				imageRef, err := ref.ParseNormalizedNamed("nicholas-fedor/watchtower")
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				URL, err := auth.GetAuthURL(challenge, imageRef)
-				Expect(err).To(HaveOccurred())
-				Expect(URL).To(BeNil())
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(URL).To(gomega.BeNil())
 			})
 		})
 
-		When("deriving the auth scope from an image name", func() {
-			It("should prepend official dockerhub images with \"library/\"", func() {
-				Expect(getScopeFromImageAuthURL("registry")).To(Equal("library/registry"))
-				Expect(getScopeFromImageAuthURL("docker.io/registry")).To(Equal("library/registry"))
-				Expect(getScopeFromImageAuthURL("index.docker.io/registry")).To(Equal("library/registry"))
+		ginkgo.When("deriving the auth scope from an image name", func() {
+			ginkgo.It("should prepend official dockerhub images with \"library/\"", func() {
+				gomega.Expect(getScopeFromImageAuthURL("registry")).To(gomega.Equal("library/registry"))
+				gomega.Expect(getScopeFromImageAuthURL("docker.io/registry")).To(gomega.Equal("library/registry"))
+				gomega.Expect(getScopeFromImageAuthURL("index.docker.io/registry")).To(gomega.Equal("library/registry"))
 			})
-			It("should not include vanity hosts\"", func() {
-				Expect(getScopeFromImageAuthURL("docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
-				Expect(getScopeFromImageAuthURL("index.docker.io/nickfedor/watchtower")).To(Equal("nickfedor/watchtower"))
+			ginkgo.It("should not include vanity hosts\"", func() {
+				gomega.Expect(getScopeFromImageAuthURL("docker.io/nickfedor/watchtower")).To(gomega.Equal("nickfedor/watchtower"))
+				gomega.Expect(getScopeFromImageAuthURL("index.docker.io/nickfedor/watchtower")).To(gomega.Equal("nickfedor/watchtower"))
 			})
-			// It("should not prepend library/ to image names if they're not on dockerhub", func() {
-			// 	Expect(getScopeFromImageAuthURL("ghcr.io/watchtower")).To(Equal("watchtower"))
-			// 	Expect(getScopeFromImageAuthURL("ghcr.io/nicholas-fedor/watchtower")).To(Equal("nicholas-fedor/watchtower"))
+			// ginkgo.It("should not prepend library/ to image names if they're not on dockerhub", func() {
+			// 	gomega.Expect(getScopeFromImageAuthURL("ghcr.io/watchtower")).To(gomega.Equal("watchtower"))
+			// 	gomega.Expect(getScopeFromImageAuthURL("ghcr.io/nicholas-fedor/watchtower")).To(gomega.Equal("nicholas-fedor/watchtower"))
 			// })
 		})
-		It("should not crash when an empty field is received", func() {
+		ginkgo.It("should not crash when an empty field is received", func() {
 			input := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull",`
 			imageRef, err := ref.ParseNormalizedNamed("nicholas-fedor/watchtower")
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			res, err := auth.GetAuthURL(input, imageRef)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(res).NotTo(BeNil())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(res).NotTo(gomega.BeNil())
 		})
-		It("should not crash when a field without a value is received", func() {
+		ginkgo.It("should not crash when a field without a value is received", func() {
 			input := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull",valuelesskey`
 			imageRef, err := ref.ParseNormalizedNamed("nicholas-fedor/watchtower")
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			res, err := auth.GetAuthURL(input, imageRef)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(res).NotTo(BeNil())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(res).NotTo(gomega.BeNil())
 		})
 	})
 
-	Describe("GetChallengeURL", func() {
-		It("should create a valid challenge url object based on the image ref supplied", func() {
+	ginkgo.Describe("GetChallengeURL", func() {
+		ginkgo.It("should create a valid challenge url object based on the image ref supplied", func() {
 			expected := url.URL{Host: "ghcr.io", Scheme: "https", Path: "/v2/"}
 			imageRef, _ := ref.ParseNormalizedNamed("ghcr.io/nicholas-fedor/watchtower:latest")
-			Expect(auth.GetChallengeURL(imageRef)).To(Equal(expected))
+			gomega.Expect(auth.GetChallengeURL(imageRef)).To(gomega.Equal(expected))
 		})
-		It("should assume Docker Hub for image refs with no explicit registry", func() {
+		ginkgo.It("should assume Docker Hub for image refs with no explicit registry", func() {
 			expected := url.URL{Host: "index.docker.io", Scheme: "https", Path: "/v2/"}
 			imageRef, _ := ref.ParseNormalizedNamed("nickfedor/watchtower:latest")
-			Expect(auth.GetChallengeURL(imageRef)).To(Equal(expected))
+			gomega.Expect(auth.GetChallengeURL(imageRef)).To(gomega.Equal(expected))
 		})
-		It("should use index.docker.io if the image ref specifies docker.io", func() {
+		ginkgo.It("should use index.docker.io if the image ref specifies docker.io", func() {
 			expected := url.URL{Host: "index.docker.io", Scheme: "https", Path: "/v2/"}
 			imageRef, _ := ref.ParseNormalizedNamed("docker.io/nickfedor/watchtower:latest")
-			Expect(auth.GetChallengeURL(imageRef)).To(Equal(expected))
+			gomega.Expect(auth.GetChallengeURL(imageRef)).To(gomega.Equal(expected))
 		})
 	})
 })
 
-var scopeImageRegexp = MatchRegexp("^repository:[a-z0-9]+(/[a-z0-9]+)*:pull$")
+var scopeImageRegexp = gomega.MatchRegexp("^repository:[a-z0-9]+(/[a-z0-9]+)*:pull$")
 
 func getScopeFromImageAuthURL(imageName string) string {
 	normalizedRef, _ := ref.ParseNormalizedNamed(imageName)
@@ -153,6 +153,6 @@ func getScopeFromImageAuthURL(imageName string) string {
 	URL, _ := auth.GetAuthURL(challenge, normalizedRef)
 
 	scope := URL.Query().Get("scope")
-	Expect(scopeImageRegexp.Match(scope)).To(BeTrue())
+	gomega.Expect(scopeImageRegexp.Match(scope)).To(gomega.BeTrue())
 	return strings.Replace(scope[11:], ":pull", "", 1)
 }

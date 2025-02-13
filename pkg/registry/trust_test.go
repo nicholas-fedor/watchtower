@@ -3,47 +3,47 @@ package registry
 import (
 	"os"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = Describe("Registry credential helpers", func() {
-	Describe("EncodedAuth", func() {
-		It("should return repo credentials from env when set", func() {
+var _ = ginkgo.Describe("Registry credential helpers", func() {
+	ginkgo.Describe("EncodedAuth", func() {
+		ginkgo.It("should return repo credentials from env when set", func() {
 			var err error
 			expected := "eyJ1c2VybmFtZSI6ImNvbnRhaW5ycnItdXNlciIsInBhc3N3b3JkIjoiY29udGFpbnJyci1wYXNzIn0="
 
 			err = os.Setenv("REPO_USER", "containrrr-user")
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			err = os.Setenv("REPO_PASS", "containrrr-pass")
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			config, err := EncodedEnvAuth()
-			Expect(config).To(Equal(expected))
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(config).To(gomega.Equal(expected))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
 
-	Describe("EncodedEnvAuth", func() {
-		It("should return an error if repo envs are unset", func() {
+	ginkgo.Describe("EncodedEnvAuth", func() {
+		ginkgo.It("should return an error if repo envs are unset", func() {
 			_ = os.Unsetenv("REPO_USER")
 			_ = os.Unsetenv("REPO_PASS")
 
 			_, err := EncodedEnvAuth()
-			Expect(err).To(HaveOccurred())
+			gomega.Expect(err).To(gomega.HaveOccurred())
 		})
 	})
 
-	Describe("EncodedConfigAuth", func() {
-		It("should return an error if file is not present", func() {
+	ginkgo.Describe("EncodedConfigAuth", func() {
+		ginkgo.It("should return an error if file is not present", func() {
 			var err error
 
 			err = os.Setenv("DOCKER_CONFIG", "/dev/null/should-fail")
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			_, err = EncodedConfigAuth("")
-			Expect(err).To(HaveOccurred())
+			gomega.Expect(err).To(gomega.HaveOccurred())
 		})
 	})
 })

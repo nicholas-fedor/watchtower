@@ -18,7 +18,7 @@ You can check your current version of the go language as follows:
 Do not place your code in the go source path.
 
 ```bash
-git clone git@github.com:<yourfork>/watchtower.git
+git clone git@github.com:<your fork>/watchtower.git
 cd watchtower
 ```
 
@@ -32,7 +32,7 @@ go test ./... -v                       # runs tests with verbose output
 ./watchtower                           # runs the application (outside of a container)
 ```
 
-If you dont have it enabled, you'll either have to prefix each command with `GO111MODULE=on` or run `export GO111MODULE=on` before running the commands. [You can read more about modules here.](https://github.com/golang/go/wiki/Modules)
+If you don't have it enabled, you'll either have to prefix each command with `GO111MODULE=on` or run `export GO111MODULE=on` before running the commands. [You can read more about modules here.](https://github.com/golang/go/wiki/Modules)
 
 To build a Watchtower image of your own, use the self-contained Dockerfiles. As the main Dockerfile, they can be found in `dockerfiles/`:
 

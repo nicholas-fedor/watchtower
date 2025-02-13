@@ -9,37 +9,37 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 
-	. "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 func TestActions(t *testing.T) {
-	RegisterFailHandler(Fail)
-	logrus.SetOutput(GinkgoWriter)
-	RunSpecs(t, "Actions Suite")
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	logrus.SetOutput(ginkgo.GinkgoWriter)
+	ginkgo.RunSpecs(t, "Actions Suite")
 }
 
-var _ = Describe("the actions package", func() {
-	Describe("the check prerequisites method", func() {
-		When("given an empty array", func() {
-			It("should not do anything", func() {
-				client := CreateMockClient(
-					&TestData{},
+var _ = ginkgo.Describe("the actions package", func() {
+	ginkgo.Describe("the check prerequisites method", func() {
+		ginkgo.When("given an empty array", func() {
+			ginkgo.It("should not do anything", func() {
+				client := mocks.CreateMockClient(
+					&mocks.TestData{},
 					// pullImages:
 					false,
 					// removeVolumes:
 					false,
 				)
-				Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).To(Succeed())
+				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).To(gomega.Succeed())
 			})
 		})
-		When("given an array of one", func() {
-			It("should not do anything", func() {
-				client := CreateMockClient(
-					&TestData{
+		ginkgo.When("given an array of one", func() {
+			ginkgo.It("should not do anything", func() {
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
 						Containers: []types.Container{
-							CreateMockContainer(
+							mocks.CreateMockContainer(
 								"test-container",
 								"test-container",
 								"watchtower",
@@ -51,22 +51,22 @@ var _ = Describe("the actions package", func() {
 					// removeVolumes:
 					false,
 				)
-				Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).To(Succeed())
+				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).To(gomega.Succeed())
 			})
 		})
-		When("given multiple containers", func() {
-			var client MockClient
-			BeforeEach(func() {
-				client = CreateMockClient(
-					&TestData{
+		ginkgo.When("given multiple containers", func() {
+			var client mocks.MockClient
+			ginkgo.BeforeEach(func() {
+				client = mocks.CreateMockClient(
+					&mocks.TestData{
 						NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
-							CreateMockContainer(
+							mocks.CreateMockContainer(
 								"test-container-01",
 								"test-container-01",
 								"watchtower",
 								time.Now().AddDate(0, 0, -1)),
-							CreateMockContainer(
+							mocks.CreateMockContainer(
 								"test-container-02",
 								"test-container-02",
 								"watchtower",
@@ -80,23 +80,23 @@ var _ = Describe("the actions package", func() {
 				)
 			})
 
-			It("should stop all but the latest one", func() {
+			ginkgo.It("should stop all but the latest one", func() {
 				err := actions.CheckForMultipleWatchtowerInstances(client, false, "")
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 		})
-		When("deciding whether to cleanup images", func() {
-			var client MockClient
-			BeforeEach(func() {
-				client = CreateMockClient(
-					&TestData{
+		ginkgo.When("deciding whether to cleanup images", func() {
+			var client mocks.MockClient
+			ginkgo.BeforeEach(func() {
+				client = mocks.CreateMockClient(
+					&mocks.TestData{
 						Containers: []types.Container{
-							CreateMockContainer(
+							mocks.CreateMockContainer(
 								"test-container-01",
 								"test-container-01",
 								"watchtower",
 								time.Now().AddDate(0, 0, -1)),
-							CreateMockContainer(
+							mocks.CreateMockContainer(
 								"test-container-02",
 								"test-container-02",
 								"watchtower",
@@ -109,15 +109,15 @@ var _ = Describe("the actions package", func() {
 					false,
 				)
 			})
-			It("should try to delete the image if the cleanup flag is true", func() {
+			ginkgo.It("should try to delete the image if the cleanup flag is true", func() {
 				err := actions.CheckForMultipleWatchtowerInstances(client, true, "")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(client.TestData.TriedToRemoveImage()).To(BeTrue())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(client.TestData.TriedToRemoveImage()).To(gomega.BeTrue())
 			})
-			It("should not try to delete the image if the cleanup flag is false", func() {
+			ginkgo.It("should not try to delete the image if the cleanup flag is false", func() {
 				err := actions.CheckForMultipleWatchtowerInstances(client, false, "")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(client.TestData.TriedToRemoveImage()).To(BeFalse())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(client.TestData.TriedToRemoveImage()).To(gomega.BeFalse())
 			})
 		})
 	})

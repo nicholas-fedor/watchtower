@@ -11,7 +11,7 @@ type UpdateParams struct {
 	NoRestart       bool
 	Timeout         time.Duration
 	MonitorOnly     bool
-	NoPull			bool
+	NoPull          bool
 	LifecycleHooks  bool
 	RollingRestart  bool
 	LabelPrecedence bool
