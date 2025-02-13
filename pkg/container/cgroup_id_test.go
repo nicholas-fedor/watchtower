@@ -1,13 +1,13 @@
 package container
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = Describe("GetRunningContainerID", func() {
-	When("a matching container ID is found", func() {
-		It("should return that container ID", func() {
+var _ = ginkgo.Describe("GetRunningContainerID", func() {
+	ginkgo.When("a matching container ID is found", func() {
+		ginkgo.It("should return that container ID", func() {
 			cid := getRunningContainerIDFromString(`
 15:name=systemd:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
 14:misc:/
@@ -26,13 +26,13 @@ var _ = Describe("GetRunningContainerID", func() {
 1:memory:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
 0::/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
 			`)
-			Expect(cid).To(BeEquivalentTo(`991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377`))
+			gomega.Expect(cid).To(gomega.BeEquivalentTo(`991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377`))
 		})
 	})
-	When("no matching container ID could be found", func() {
-		It("should return that container ID", func() {
+	ginkgo.When("no matching container ID could be found", func() {
+		ginkgo.It("should return that container ID", func() {
 			cid := getRunningContainerIDFromString(`14:misc:/`)
-			Expect(cid).To(BeEmpty())
+			gomega.Expect(cid).To(gomega.BeEmpty())
 		})
 	})
 })

@@ -3,35 +3,35 @@ package registry_test
 import (
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	unit "github.com/nicholas-fedor/watchtower/pkg/registry"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	"time"
 )
 
-var _ = Describe("Registry", func() {
-	Describe("WarnOnAPIConsumption", func() {
-		When("Given a container with an image from ghcr.io", func() {
-			It("should want to warn", func() {
-				Expect(testContainerWithImage("ghcr.io/nicholas-fedor/watchtower")).To(BeTrue())
+var _ = ginkgo.Describe("Registry", func() {
+	ginkgo.Describe("WarnOnAPIConsumption", func() {
+		ginkgo.When("Given a container with an image from ghcr.io", func() {
+			ginkgo.It("should want to warn", func() {
+				gomega.Expect(testContainerWithImage("ghcr.io/nicholas-fedor/watchtower")).To(gomega.BeTrue())
 			})
 		})
-		When("Given a container with an image implicitly from dockerhub", func() {
-			It("should want to warn", func() {
-				Expect(testContainerWithImage("docker:latest")).To(BeTrue())
+		ginkgo.When("Given a container with an image implicitly from dockerhub", func() {
+			ginkgo.It("should want to warn", func() {
+				gomega.Expect(testContainerWithImage("docker:latest")).To(gomega.BeTrue())
 			})
 		})
-		When("Given a container with an image explicitly from dockerhub", func() {
-			It("should want to warn", func() {
-				Expect(testContainerWithImage("index.docker.io/docker:latest")).To(BeTrue())
-				Expect(testContainerWithImage("docker.io/docker:latest")).To(BeTrue())
+		ginkgo.When("Given a container with an image explicitly from dockerhub", func() {
+			ginkgo.It("should want to warn", func() {
+				gomega.Expect(testContainerWithImage("index.docker.io/docker:latest")).To(gomega.BeTrue())
+				gomega.Expect(testContainerWithImage("docker.io/docker:latest")).To(gomega.BeTrue())
 			})
 		})
-		When("Given a container with an image from some other registry", func() {
-			It("should not want to warn", func() {
-				Expect(testContainerWithImage("docker.fsf.org/docker:latest")).To(BeFalse())
-				Expect(testContainerWithImage("altavista.com/docker:latest")).To(BeFalse())
-				Expect(testContainerWithImage("gitlab.com/docker:latest")).To(BeFalse())
+		ginkgo.When("Given a container with an image from some other registry", func() {
+			ginkgo.It("should not want to warn", func() {
+				gomega.Expect(testContainerWithImage("docker.fsf.org/docker:latest")).To(gomega.BeFalse())
+				gomega.Expect(testContainerWithImage("altavista.com/docker:latest")).To(gomega.BeFalse())
+				gomega.Expect(testContainerWithImage("gitlab.com/docker:latest")).To(gomega.BeFalse())
 			})
 		})
 	})

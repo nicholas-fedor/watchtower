@@ -2,14 +2,14 @@ package notifications
 
 import (
 	s "github.com/nicholas-fedor/watchtower/pkg/session"
-	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("JSON template", func() {
-	When("using report templates", func() {
-		When("JSON template is used", func() {
-			It("should format the messages to the expected format", func() {
+var _ = ginkgo.Describe("JSON template", func() {
+	ginkgo.When("using report templates", func() {
+		ginkgo.When("JSON template is used", func() {
+			ginkgo.It("should format the messages to the expected format", func() {
 				expected := `{
 	"entries": [
 			{

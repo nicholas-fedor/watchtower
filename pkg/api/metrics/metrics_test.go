@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	"github.com/nicholas-fedor/watchtower/pkg/api"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
@@ -22,8 +22,8 @@ const (
 )
 
 func TestMetrics(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Metrics Suite")
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, "Metrics Suite")
 }
 
 func getWithToken(handler http.Handler) map[string]string {
@@ -49,16 +49,16 @@ func getWithToken(handler http.Handler) map[string]string {
 	return metricMap
 }
 
-var _ = Describe("the metrics API", func() {
+var _ = ginkgo.Describe("the metrics API", func() {
 	httpAPI := api.New(token)
 	m := metricsAPI.New()
 
 	handleReq := httpAPI.RequireToken(m.Handle)
 	tryGetMetrics := func() map[string]string { return getWithToken(handleReq) }
 
-	It("should serve metrics", func() {
+	ginkgo.It("should serve metrics", func() {
 
-		Expect(tryGetMetrics()).To(HaveKeyWithValue("watchtower_containers_updated", "0"))
+		gomega.Expect(tryGetMetrics()).To(gomega.HaveKeyWithValue("watchtower_containers_updated", "0"))
 
 		metric := &metrics.Metric{
 			Scanned: 4,
@@ -67,24 +67,24 @@ var _ = Describe("the metrics API", func() {
 		}
 
 		metrics.RegisterScan(metric)
-		Eventually(metrics.Default().QueueIsEmpty).Should(BeTrue())
+		gomega.Eventually(metrics.Default().QueueIsEmpty).Should(gomega.BeTrue())
 
-		Eventually(tryGetMetrics).Should(SatisfyAll(
-			HaveKeyWithValue("watchtower_containers_updated", "3"),
-			HaveKeyWithValue("watchtower_containers_failed", "1"),
-			HaveKeyWithValue("watchtower_containers_scanned", "4"),
-			HaveKeyWithValue("watchtower_scans_total", "1"),
-			HaveKeyWithValue("watchtower_scans_skipped", "0"),
+		gomega.Eventually(tryGetMetrics).Should(gomega.SatisfyAll(
+			gomega.HaveKeyWithValue("watchtower_containers_updated", "3"),
+			gomega.HaveKeyWithValue("watchtower_containers_failed", "1"),
+			gomega.HaveKeyWithValue("watchtower_containers_scanned", "4"),
+			gomega.HaveKeyWithValue("watchtower_scans_total", "1"),
+			gomega.HaveKeyWithValue("watchtower_scans_skipped", "0"),
 		))
 
 		for i := 0; i < 3; i++ {
 			metrics.RegisterScan(nil)
 		}
-		Eventually(metrics.Default().QueueIsEmpty).Should(BeTrue())
+		gomega.Eventually(metrics.Default().QueueIsEmpty).Should(gomega.BeTrue())
 
-		Eventually(tryGetMetrics).Should(SatisfyAll(
-			HaveKeyWithValue("watchtower_scans_total", "4"),
-			HaveKeyWithValue("watchtower_scans_skipped", "3"),
+		gomega.Eventually(tryGetMetrics).Should(gomega.SatisfyAll(
+			gomega.HaveKeyWithValue("watchtower_scans_total", "4"),
+			gomega.HaveKeyWithValue("watchtower_scans_skipped", "3"),
 		))
 	})
 })

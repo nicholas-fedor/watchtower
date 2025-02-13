@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -15,15 +15,15 @@ const (
 )
 
 func TestAPI(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "API Suite")
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, "API Suite")
 }
 
-var _ = Describe("API", func() {
+var _ = ginkgo.Describe("API", func() {
 	api := New(token)
 
-	Describe("RequireToken middleware", func() {
-		It("should return 401 Unauthorized when token is not provided", func() {
+	ginkgo.Describe("RequireToken middleware", func() {
+		ginkgo.It("should return 401 Unauthorized when token is not provided", func() {
 			handlerFunc := api.RequireToken(testHandler)
 
 			rec := httptest.NewRecorder()
@@ -31,10 +31,10 @@ var _ = Describe("API", func() {
 
 			handlerFunc(rec, req)
 
-			Expect(rec.Code).To(Equal(http.StatusUnauthorized))
+			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusUnauthorized))
 		})
 
-		It("should return 401 Unauthorized when token is invalid", func() {
+		ginkgo.It("should return 401 Unauthorized when token is invalid", func() {
 			handlerFunc := api.RequireToken(testHandler)
 
 			rec := httptest.NewRecorder()
@@ -43,10 +43,10 @@ var _ = Describe("API", func() {
 
 			handlerFunc(rec, req)
 
-			Expect(rec.Code).To(Equal(http.StatusUnauthorized))
+			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusUnauthorized))
 		})
 
-		It("should return 200 OK when token is valid", func() {
+		ginkgo.It("should return 200 OK when token is valid", func() {
 			handlerFunc := api.RequireToken(testHandler)
 
 			rec := httptest.NewRecorder()
@@ -55,7 +55,7 @@ var _ = Describe("API", func() {
 
 			handlerFunc(rec, req)
 
-			Expect(rec.Code).To(Equal(http.StatusOK))
+			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
 		})
 	})
 })
