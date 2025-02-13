@@ -6,11 +6,11 @@ import (
 	"errors"
 	"os"
 
-	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/config/credentials"
 	"github.com/docker/cli/cli/config/types"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,7 +36,7 @@ func EncodedEnvAuth() (string, error) {
 			Username: username,
 			Password: password,
 		}
-    
+
 		log.Debugf("Loaded auth credentials for registry user %s from environment", auth.Username)
 		// CREDENTIAL: Uncomment to log REPO_PASS environment variable
 		// log.Tracef("Using auth password %s", auth.Password)
