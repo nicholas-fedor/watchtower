@@ -36,7 +36,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 
 // CheckForMultipleWatchtowerInstances will ensure that there are not multiple instances of the
 // watchtower running simultaneously. If multiple watchtower containers are detected, this function
-// will stop and remove all but the most recently started container. This behaviour can be bypassed
+// will stop and remove all but the most recently started container. This behavior can be bypassed
 // if a scope UID is defined.
 func CheckForMultipleWatchtowerInstances(client container.Client, cleanup bool, scope string) error {
 	filter := filters.WatchtowerContainersFilter

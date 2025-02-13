@@ -24,11 +24,11 @@ var _ = ginkgo.Describe("notifications", func() {
 				"shoutrrr",
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			notif := notifications.NewNotifier(command)
+			notifier := notifications.NewNotifier(command)
 
-			gomega.Expect(notif.GetNames()).To(gomega.BeEmpty())
+			gomega.Expect(notifier.GetNames()).To(gomega.BeEmpty())
 		})
-		ginkgo.When("title is overriden in flag", func() {
+		ginkgo.When("title is overridden in flag", func() {
 			ginkgo.It("should use the specified hostname in the title", func() {
 				command := cmd.NewRootCommand()
 				flags.RegisterNotificationFlags(command)

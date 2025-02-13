@@ -293,7 +293,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		})
 
-		ginkgo.When("prupddate script returns 75", func() {
+		ginkgo.When("preupdate script returns 75", func() {
 			ginkgo.It("should not update those containers", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
@@ -325,7 +325,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		})
 
-		ginkgo.When("prupddate script returns 0", func() {
+		ginkgo.When("preupdate script returns 0", func() {
 			ginkgo.It("should update those containers", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
