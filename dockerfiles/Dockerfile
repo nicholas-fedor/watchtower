@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=alpine:3.21.2
+ARG BASE_IMAGE=alpine:3.21.3
 
 FROM --platform=$BUILDPLATFORM $BASE_IMAGE as alpine
 
