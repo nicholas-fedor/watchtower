@@ -23,7 +23,7 @@ jobs:
         with:
           go-version: stable
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@6a3fb764d508e4ba6bec7000b7c7a827384ec250
+        uses: golangci/golangci-lint-action@0e58f8e7ab750dc8bf4ac7eeb8a6993a2aaeef8c
         with:
           version: v1.60
 
