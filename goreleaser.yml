@@ -1,36 +1,37 @@
-build:
-  main: ./main.go
-  binary: watchtower
-  goos:
-    - linux
-    - windows
-  goarch:
-    - amd64
-    - "386"
-    - arm
-    - arm64
-  ldflags:
-    - -s -w -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
+builds:
+  - main: ./main.go
+    binary: watchtower
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - "386"
+      - arm
+      - arm64
+    ldflags:
+      - -s -w -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
 
 archives:
-  - 
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+  - name_template: >-
+      {{- .ProjectName }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}amd64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "arm" }}armhf
+      {{- else if eq .Arch "arm64" }}arm64v8
+      {{- else }}{{ .Arch }}{{ end }}_
+      {{- .Version -}}
     format: tar.gz
-    replacements:
-      arm: armhf
-      arm64: arm64v8
-      amd64: amd64
-      "386": "i386"
-      darwin: macOS
-      linux: linux
     format_overrides:
       - goos: windows
         format: zip
     files:
       - LICENSE.md
+
 dockers:
-  -
-    use_buildx: true
+  - use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -38,15 +39,14 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
     goos: linux
     goarch: amd64
-    goarm: ''
+    goarm: ""
     dockerfile: dockerfiles/Dockerfile
     image_templates:
       - nickfedor/watchtower:amd64-{{ .Version }}
       - nickfedor/watchtower:amd64-latest
       - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:amd64-latest
-  - 
-    use_buildx: true
+  - use: buildx
     build_flag_templates:
       - "--platform=linux/i386"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -54,15 +54,14 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
     goos: linux
     goarch: "386"
-    goarm: ''
+    goarm: ""
     dockerfile: dockerfiles/Dockerfile
     image_templates:
       - nickfedor/watchtower:i386-{{ .Version }}
       - nickfedor/watchtower:i386-latest
       - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:i386-latest
-  - 
-    use_buildx: true
+  - use: buildx
     build_flag_templates:
       - "--platform=linux/arm/v6"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -77,8 +76,7 @@ dockers:
       - nickfedor/watchtower:armhf-latest
       - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
-  - 
-    use_buildx: true
+  - use: buildx
     build_flag_templates:
       - "--platform=linux/arm64/v8"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -86,7 +84,7 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
     goos: linux
     goarch: arm64
-    goarm: ''
+    goarm: ""
     dockerfile: dockerfiles/Dockerfile
     image_templates:
       - nickfedor/watchtower:arm64v8-{{ .Version }}
