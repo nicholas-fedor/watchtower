@@ -45,7 +45,6 @@ jobs:
         uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
           go-version: ${{ matrix.go-version }}
-          cache-dependency-path: "**/go.sum"
       - name: Run tests
         run: |
           go test -v -coverprofile coverage.out -covermode atomic ./...
