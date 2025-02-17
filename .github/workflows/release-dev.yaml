@@ -12,6 +12,9 @@ permissions:
   packages: write
   id-token: write
 
+env:
+  GO_VERSION: 1.24.x
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,7 +25,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
-          go-version: 1.23.x
+          go-version: ${{ env.GO_VERSION }}
       - name: Build
         run: ./build.sh
 
@@ -33,7 +36,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
-          go-version: 1.23.x
+          go-version: ${{ env.GO_VERSION }}
       - name: Test
         run: go test -v -coverprofile coverage.out -covermode atomic ./...
       - name: Publish coverage

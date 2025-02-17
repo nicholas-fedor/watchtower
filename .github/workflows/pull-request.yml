@@ -9,24 +9,28 @@ on:
 permissions:
   contents: read
 
+env:
+  GO_VERSION: 1.24.x
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+      - uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
-          go-version: stable
+          go-version: ${{ env.GO_VERSION }}
       - name: golangci-lint
         uses: golangci/golangci-lint-action@fe19838e9e0ffa7eae178e20d30baba60002bab1
+
   test:
     name: Test
     strategy:
       fail-fast: false
       matrix:
         go-version:
-          - 1.23.x
+          - 1.24.x # Hardcode here or use a separate job to set matrix values
         platform:
           - macos-latest
           - windows-latest
@@ -34,34 +38,36 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
-          go-version: 1.23.x
+          go-version: ${{ matrix.go-version }}
+          cache-dependency-path: "**/go.sum"
       - name: Run tests
         run: |
-          go test -v -coverprofile coverage.out -covermode atomic ./... 
+          go test -v -coverprofile coverage.out -covermode atomic ./...
       - name: Publish coverage
         uses: codecov/codecov-action@4898080f15c09ae860fcec6796854d10a2e23de8
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
-          go-version: 1.23.x
+          go-version: ${{ env.GO_VERSION }}
       - name: Build
-        uses: goreleaser/goreleaser-action@90a3faa9d0182683851fbfa97ca1a2cb983bfca3 # v6
+        uses: goreleaser/goreleaser-action@90a3faa9d0182683851fbfa97ca1a2cb983bfca3
         with:
-          version: v0.155.0
-          args: --snapshot --debug
+          version: v2.7.0
+          args: --snapshot --verbose
