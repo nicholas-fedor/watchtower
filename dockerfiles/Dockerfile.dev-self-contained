@@ -2,7 +2,7 @@
 # Builder
 #
 
-FROM golang:alpine as builder
+FROM golang:alpine AS builder
 
 # use version (for example "v0.3.3") or "main"
 ARG WATCHTOWER_VERSION=main

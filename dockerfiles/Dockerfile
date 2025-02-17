@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=alpine:3.21.3
 
-FROM --platform=$BUILDPLATFORM $BASE_IMAGE as alpine
+FROM --platform=$BUILDPLATFORM $BASE_IMAGE AS alpine
 
 RUN apk add --no-cache \
     ca-certificates \
