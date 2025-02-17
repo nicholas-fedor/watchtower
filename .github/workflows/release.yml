@@ -8,7 +8,7 @@ on:
       - "**/v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
-  contents: read  # Needed for all jobs to checkout the repository
+  contents: read # Needed for all jobs to checkout the repository
   packages: write # For the build job to push to GHCR
   attestations: write # For managing attestations in the build job
   id-token: write # For OIDC token usage in the build and potentially in the renew-docs job
@@ -18,21 +18,21 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+      - uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
           go-version: stable
       - name: golangci-lint
         uses: golangci/golangci-lint-action@2226d7cb06a077cd73e56eedd38eecad18e5d837
         with:
-          version: v1.60
+          version: v1.64.5
 
   test:
     name: Test
     strategy:
       matrix:
         go-version:
-          - 1.23.x
+          - 1.24.x
         platform:
           - ubuntu-latest
           - macos-latest
@@ -40,13 +40,13 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
-          go-version: 1.23.x
+          go-version: 1.24.x
       - name: Run tests
         run: |
           go test ./... -coverprofile coverage.out
@@ -67,33 +67,33 @@ jobs:
       TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@5a083d0e9a84784eb32078397cf5459adecb4c40
         with:
-          go-version: 1.23.x
+          go-version: 1.24.x
 
       - name: Login to Docker Hub
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3
+        uses: docker/login-action@327cd5a69de6c009b9ce71bce8395f28e651bf99
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3
+        uses: docker/login-action@327cd5a69de6c009b9ce71bce8395f28e651bf99
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        uses: goreleaser/goreleaser-action@d28c98212f8e972575198214e0c3f2dbca157dc5 # v6.1
+        uses: goreleaser/goreleaser-action@90a3faa9d0182683851fbfa97ca1a2cb983bfca3
         with:
-          version: v0.155.0
-          args: --debug
+          version: v2.7.0
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_GHCR_PAT }}
 
@@ -211,5 +211,5 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - name: Pull new module version
-      uses: nicholas-fedor/go-proxy-pull-action@4678aed75a75576047e0bc4c15e10dd6eff95baf #master@v1.0.0
+      - name: Pull new module version
+        uses: nicholas-fedor/go-proxy-pull-action@4678aed75a75576047e0bc4c15e10dd6eff95baf
