@@ -11,7 +11,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	ref "github.com/distribution/reference"
+	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,7 +20,7 @@ const ChallengeHeader = "WWW-Authenticate"
 
 // GetToken fetches a token for the registry hosting the provided image
 func GetToken(container types.Container, registryAuth string) (string, error) {
-	normalizedRef, err := ref.ParseNormalizedNamed(container.ImageName())
+	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +73,7 @@ func GetChallengeRequest(URL url.URL) (*http.Request, error) {
 }
 
 // GetBearerHeader tries to fetch a bearer token from the registry based on the challenge instructions
-func GetBearerHeader(challenge string, imageRef ref.Named, registryAuth string) (string, error) {
+func GetBearerHeader(challenge string, imageRef reference.Named, registryAuth string) (string, error) {
 	client := http.Client{}
 	authURL, err := GetAuthURL(challenge, imageRef)
 
@@ -112,7 +112,7 @@ func GetBearerHeader(challenge string, imageRef ref.Named, registryAuth string) 
 }
 
 // GetAuthURL from the instructions in the challenge
-func GetAuthURL(challenge string, imageRef ref.Named) (*url.URL, error) {
+func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 	loweredChallenge := strings.ToLower(challenge)
 	raw := strings.TrimPrefix(loweredChallenge, "bearer")
 
@@ -138,7 +138,7 @@ func GetAuthURL(challenge string, imageRef ref.Named) (*url.URL, error) {
 	q := authURL.Query()
 	q.Add("service", values["service"])
 
-	scopeImage := ref.Path(imageRef)
+	scopeImage := reference.Path(imageRef)
 
 	scope := fmt.Sprintf("repository:%s:pull", scopeImage)
 	logrus.WithFields(logrus.Fields{"scope": scope, "image": imageRef.Name()}).Debug("Setting scope for auth token")
@@ -150,7 +150,7 @@ func GetAuthURL(challenge string, imageRef ref.Named) (*url.URL, error) {
 
 // GetChallengeURL returns the URL to check auth requirements
 // for access to a given image
-func GetChallengeURL(imageRef ref.Named) url.URL {
+func GetChallengeURL(imageRef reference.Named) url.URL {
 	host, _ := helpers.GetRegistryAddress(imageRef.Name())
 
 	URL := url.URL{

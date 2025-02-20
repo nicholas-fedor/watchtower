@@ -3,17 +3,17 @@ package registry
 import (
 	"context"
 
-	ref "github.com/distribution/reference"
+	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/image"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
-	watchtowerTypes "github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/sirupsen/logrus"
 )
 
 // GetPullOptions creates a struct with all options needed for pulling images from a registry
 func GetPullOptions(imageName string) (image.PullOptions, error) {
 	auth, err := EncodedAuth(imageName)
-	log.Debugf("Got image name: %s", imageName)
+	logrus.Debugf("Got image name: %s", imageName)
 	if err != nil {
 		return image.PullOptions{}, err
 	}
@@ -35,7 +35,7 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 // It could be used to return a new value for the "X-Registry-Auth" authentication header,
 // but there's no point trying again with the same value as used in AuthConfig
 func DefaultAuthHandler(context.Context) (string, error) {
-	log.Debug("Authentication request was rejected. Trying again without authentication")
+	logrus.Debug("Authentication request was rejected. Trying again without authentication")
 	return "", nil
 }
 
@@ -43,9 +43,9 @@ func DefaultAuthHandler(context.Context) (string, error) {
 // to respond well to HTTP HEAD in checking the container digest -- or if there
 // are problems parsing the container hostname.
 // Will return false if behavior for container is unknown.
-func WarnOnAPIConsumption(container watchtowerTypes.Container) bool {
+func WarnOnAPIConsumption(container types.Container) bool {
 
-	normalizedRef, err := ref.ParseNormalizedNamed(container.ImageName())
+	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
 		return true
 	}

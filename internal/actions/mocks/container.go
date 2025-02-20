@@ -6,17 +6,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
-	wt "github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // CreateMockContainer creates a container substitute valid for testing
-func CreateMockContainer(id string, name string, image string, created time.Time) wt.Container {
-	content := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+func CreateMockContainer(id string, name string, image string, created time.Time) types.Container {
+	content := dockerContainer.InspectResponse{
+		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:      id,
 			Image:   image,
 			Name:    name,
@@ -38,24 +38,24 @@ func CreateMockContainer(id string, name string, image string, created time.Time
 }
 
 // CreateMockImageInfo returns a mock image info struct based on the passed image
-func CreateMockImageInfo(image string) *types.ImageInspect {
-	return &types.ImageInspect{
-		ID: image,
+func CreateMockImageInfo(mockImage string) *image.InspectResponse {
+	return &image.InspectResponse{
+		ID: mockImage,
 		RepoDigests: []string{
-			image,
+			mockImage,
 		},
 	}
 }
 
 // CreateMockContainerWithImageInfo should only be used for testing
-func CreateMockContainerWithImageInfo(id string, name string, image string, created time.Time, imageInfo types.ImageInspect) wt.Container {
+func CreateMockContainerWithImageInfo(id string, name string, image string, created time.Time, imageInfo image.InspectResponse) types.Container {
 	return CreateMockContainerWithImageInfoP(id, name, image, created, &imageInfo)
 }
 
 // CreateMockContainerWithImageInfoP should only be used for testing
-func CreateMockContainerWithImageInfoP(id string, name string, image string, created time.Time, imageInfo *types.ImageInspect) wt.Container {
-	content := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+func CreateMockContainerWithImageInfoP(id string, name string, image string, created time.Time, imageInfo *image.InspectResponse) types.Container {
+	content := dockerContainer.InspectResponse{
+		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:      id,
 			Image:   image,
 			Name:    name,
@@ -73,20 +73,20 @@ func CreateMockContainerWithImageInfoP(id string, name string, image string, cre
 }
 
 // CreateMockContainerWithDigest should only be used for testing
-func CreateMockContainerWithDigest(id string, name string, image string, created time.Time, digest string) wt.Container {
+func CreateMockContainerWithDigest(id string, name string, image string, created time.Time, digest string) types.Container {
 	c := CreateMockContainer(id, name, image, created)
 	c.ImageInfo().RepoDigests = []string{digest}
 	return c
 }
 
 // CreateMockContainerWithConfig creates a container substitute valid for testing
-func CreateMockContainerWithConfig(id string, name string, image string, running bool, restarting bool, created time.Time, config *dockerContainer.Config) wt.Container {
-	content := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+func CreateMockContainerWithConfig(id string, name string, image string, running bool, restarting bool, created time.Time, config *dockerContainer.Config) types.Container {
+	content := dockerContainer.InspectResponse{
+		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:    id,
 			Image: image,
 			Name:  name,
-			State: &types.ContainerState{
+			State: &dockerContainer.State{
 				Running:    running,
 				Restarting: restarting,
 			},
@@ -104,7 +104,7 @@ func CreateMockContainerWithConfig(id string, name string, image string, running
 }
 
 // CreateContainerForProgress creates a container substitute for tracking session/update progress
-func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (wt.Container, wt.ImageID) {
+func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (types.Container, types.ImageID) {
 	indexStr := strconv.Itoa(idPrefix + index)
 	mockID := indexStr + strings.Repeat("0", 61-len(indexStr))
 	contID := "c79" + mockID
@@ -116,13 +116,13 @@ func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (wt.
 		Image: imageName,
 	}
 	c := CreateMockContainerWithConfig(contID, contName, oldImgID, true, false, time.Now(), config)
-	return c, wt.ImageID(newImgID)
+	return c, types.ImageID(newImgID)
 }
 
 // CreateMockContainerWithLinks should only be used for testing
-func CreateMockContainerWithLinks(id string, name string, image string, created time.Time, links []string, imageInfo *types.ImageInspect) wt.Container {
-	content := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+func CreateMockContainerWithLinks(id string, name string, image string, created time.Time, links []string, imageInfo *image.InspectResponse) types.Container {
+	content := dockerContainer.InspectResponse{
+		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:      id,
 			Image:   image,
 			Name:    name,

@@ -1,18 +1,18 @@
 package data
 
-import wt "github.com/nicholas-fedor/watchtower/pkg/types"
+import "github.com/nicholas-fedor/watchtower/pkg/types"
 
 type containerStatus struct {
-	containerID   wt.ContainerID
-	oldImage      wt.ImageID
-	newImage      wt.ImageID
+	containerID   types.ContainerID
+	oldImage      types.ImageID
+	newImage      types.ImageID
 	containerName string
 	imageName     string
 	error
 	state State
 }
 
-func (u *containerStatus) ID() wt.ContainerID {
+func (u *containerStatus) ID() types.ContainerID {
 	return u.containerID
 }
 
@@ -20,11 +20,11 @@ func (u *containerStatus) Name() string {
 	return u.containerName
 }
 
-func (u *containerStatus) CurrentImageID() wt.ImageID {
+func (u *containerStatus) CurrentImageID() types.ImageID {
 	return u.oldImage
 }
 
-func (u *containerStatus) LatestImageID() wt.ImageID {
+func (u *containerStatus) LatestImageID() types.ImageID {
 	return u.newImage
 }
 

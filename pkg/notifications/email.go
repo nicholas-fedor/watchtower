@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	shoutrrrSmtp "github.com/containrrr/shoutrrr/pkg/services/smtp"
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/containrrr/shoutrrr/pkg/services/smtp"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -19,11 +19,11 @@ type emailTypeNotifier struct {
 	Server, User, Password string
 	Port                   int
 	tlsSkipVerify          bool
-	entries                []*log.Entry
+	entries                []*logrus.Entry
 	delay                  time.Duration
 }
 
-func newEmailNotifier(c *cobra.Command) t.ConvertibleNotifier {
+func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
 	from, _ := flags.GetString("notification-email-from")
@@ -36,7 +36,7 @@ func newEmailNotifier(c *cobra.Command) t.ConvertibleNotifier {
 	delay, _ := flags.GetInt("notification-email-delay")
 
 	n := &emailTypeNotifier{
-		entries:       []*log.Entry{},
+		entries:       []*logrus.Entry{},
 		From:          from,
 		To:            to,
 		Server:        server,
@@ -51,7 +51,7 @@ func newEmailNotifier(c *cobra.Command) t.ConvertibleNotifier {
 }
 
 func (e *emailTypeNotifier) GetURL(c *cobra.Command) (string, error) {
-	conf := &shoutrrrSmtp.Config{
+	conf := &smtp.Config{
 		FromAddress: e.From,
 		FromName:    "Watchtower",
 		ToAddresses: []string{e.To},
@@ -61,17 +61,17 @@ func (e *emailTypeNotifier) GetURL(c *cobra.Command) (string, error) {
 		Password:    e.Password,
 		UseStartTLS: !e.tlsSkipVerify,
 		UseHTML:     false,
-		Encryption:  shoutrrrSmtp.EncMethods.Auto,
-		Auth:        shoutrrrSmtp.AuthTypes.None,
+		Encryption:  smtp.EncMethods.Auto,
+		Auth:        smtp.AuthTypes.None,
 		ClientHost:  "localhost",
 	}
 
 	if len(e.User) > 0 {
-		conf.Auth = shoutrrrSmtp.AuthTypes.Plain
+		conf.Auth = smtp.AuthTypes.Plain
 	}
 
 	if e.tlsSkipVerify {
-		conf.Encryption = shoutrrrSmtp.EncMethods.None
+		conf.Encryption = smtp.EncMethods.None
 	}
 
 	return conf.GetURL().String(), nil

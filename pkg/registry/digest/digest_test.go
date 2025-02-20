@@ -9,7 +9,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
-	wtTypes "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -22,17 +22,17 @@ func TestDigest(t *testing.T) {
 }
 
 var (
-	DockerHubCredentials = &wtTypes.RegistryCredentials{
+	DockerHubCredentials = &types.RegistryCredentials{
 		Username: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_DH_USERNAME"),
 		Password: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_DH_PASSWORD"),
 	}
-	GHCRCredentials = &wtTypes.RegistryCredentials{
+	GHCRCredentials = &types.RegistryCredentials{
 		Username: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_USERNAME"),
 		Password: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_PASSWORD"),
 	}
 )
 
-func SkipIfCredentialsEmpty(credentials *wtTypes.RegistryCredentials, fn func()) func() {
+func SkipIfCredentialsEmpty(credentials *types.RegistryCredentials, fn func()) func() {
 	if credentials.Username == "" {
 		return func() {
 			ginkgo.Skip("Username missing. Skipping integration test")

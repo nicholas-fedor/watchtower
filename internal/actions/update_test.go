@@ -3,8 +3,8 @@ package actions_test
 import (
 	"time"
 
-	dockerTypes "github.com/docker/docker/api/types"
-	dockerContainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -44,7 +44,7 @@ func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 		"fake-image1:latest",
 		time.Now().AddDate(0, 0, -1))
 
-	var imageInfo *dockerTypes.ImageInspect
+	var imageInfo *image.InspectResponse
 	if withImageInfo {
 		imageInfo = mocks.CreateMockImageInfo("test-container-02")
 	}
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								false,
 								false,
 								time.Now(),
-								&dockerContainer.Config{
+								&container.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.monitor-only": "true",
 									},
@@ -195,7 +195,7 @@ var _ = ginkgo.Describe("the update action", func() {
 									false,
 									false,
 									time.Now(),
-									&dockerContainer.Config{
+									&container.Config{
 										Labels: map[string]string{
 											"com.centurylinklabs.watchtower.monitor-only": "false",
 										},
@@ -221,7 +221,7 @@ var _ = ginkgo.Describe("the update action", func() {
 									false,
 									false,
 									time.Now(),
-									&dockerContainer.Config{
+									&container.Config{
 										Labels: map[string]string{
 											"com.centurylinklabs.watchtower.monitor-only": "true",
 										},
@@ -273,7 +273,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								true,
 								false,
 								time.Now(),
-								&dockerContainer.Config{
+								&container.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
@@ -306,7 +306,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								true,
 								false,
 								time.Now(),
-								&dockerContainer.Config{
+								&container.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn75.sh",
@@ -338,7 +338,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								true,
 								false,
 								time.Now(),
-								&dockerContainer.Config{
+								&container.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn0.sh",
@@ -366,7 +366,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					true,
 					false,
 					time.Now(),
-					&dockerContainer.Config{
+					&container.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
@@ -380,7 +380,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					true,
 					false,
 					time.Now(),
-					&dockerContainer.Config{
+					&container.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "test-container-provider",
 						},
@@ -417,7 +417,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								false,
 								false,
 								time.Now(),
-								&dockerContainer.Config{
+								&container.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
@@ -449,7 +449,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								false,
 								true,
 								time.Now(),
-								&dockerContainer.Config{
+								&container.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",

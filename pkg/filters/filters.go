@@ -4,22 +4,22 @@ import (
 	"regexp"
 	"strings"
 
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // WatchtowerContainersFilter filters only watchtower containers
-func WatchtowerContainersFilter(c t.FilterableContainer) bool { return c.IsWatchtower() }
+func WatchtowerContainersFilter(c types.FilterableContainer) bool { return c.IsWatchtower() }
 
 // NoFilter will not filter out any containers
-func NoFilter(t.FilterableContainer) bool { return true }
+func NoFilter(types.FilterableContainer) bool { return true }
 
 // FilterByNames returns all containers that match one of the specified names
-func FilterByNames(names []string, baseFilter t.Filter) t.Filter {
+func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 	if len(names) == 0 {
 		return baseFilter
 	}
 
-	return func(c t.FilterableContainer) bool {
+	return func(c types.FilterableContainer) bool {
 		for _, name := range names {
 			if name == c.Name() || name == c.Name()[1:] {
 				return baseFilter(c)
@@ -42,12 +42,12 @@ func FilterByNames(names []string, baseFilter t.Filter) t.Filter {
 }
 
 // FilterByDisableNames returns all containers that don't match any of the specified names
-func FilterByDisableNames(disableNames []string, baseFilter t.Filter) t.Filter {
+func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.Filter {
 	if len(disableNames) == 0 {
 		return baseFilter
 	}
 
-	return func(c t.FilterableContainer) bool {
+	return func(c types.FilterableContainer) bool {
 		for _, name := range disableNames {
 			if name == c.Name() || name == c.Name()[1:] {
 				return false
@@ -58,8 +58,8 @@ func FilterByDisableNames(disableNames []string, baseFilter t.Filter) t.Filter {
 }
 
 // FilterByEnableLabel returns all containers that have the enabled label set
-func FilterByEnableLabel(baseFilter t.Filter) t.Filter {
-	return func(c t.FilterableContainer) bool {
+func FilterByEnableLabel(baseFilter types.Filter) types.Filter {
+	return func(c types.FilterableContainer) bool {
 		// If label filtering is enabled, containers should only be considered
 		// if the label is specifically set.
 		_, ok := c.Enabled()
@@ -72,8 +72,8 @@ func FilterByEnableLabel(baseFilter t.Filter) t.Filter {
 }
 
 // FilterByDisabledLabel returns all containers that have the enabled label set to disable
-func FilterByDisabledLabel(baseFilter t.Filter) t.Filter {
-	return func(c t.FilterableContainer) bool {
+func FilterByDisabledLabel(baseFilter types.Filter) types.Filter {
+	return func(c types.FilterableContainer) bool {
 		enabledLabel, ok := c.Enabled()
 		if ok && !enabledLabel {
 			// If the label has been set and it demands a disable
@@ -85,8 +85,8 @@ func FilterByDisabledLabel(baseFilter t.Filter) t.Filter {
 }
 
 // FilterByScope returns all containers that belongs to a specific scope
-func FilterByScope(scope string, baseFilter t.Filter) t.Filter {
-	return func(c t.FilterableContainer) bool {
+func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
+	return func(c types.FilterableContainer) bool {
 		containerScope, containerHasScope := c.Scope()
 
 		if !containerHasScope || containerScope == "" {
@@ -102,12 +102,12 @@ func FilterByScope(scope string, baseFilter t.Filter) t.Filter {
 }
 
 // FilterByImage returns all containers that have a specific image
-func FilterByImage(images []string, baseFilter t.Filter) t.Filter {
+func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	if images == nil {
 		return baseFilter
 	}
 
-	return func(c t.FilterableContainer) bool {
+	return func(c types.FilterableContainer) bool {
 		image := strings.Split(c.ImageName(), ":")[0]
 		for _, targetImage := range images {
 			if image == targetImage {
@@ -120,7 +120,7 @@ func FilterByImage(images []string, baseFilter t.Filter) t.Filter {
 }
 
 // BuildFilter creates the needed filter of containers
-func BuildFilter(names []string, disableNames []string, enableLabel bool, scope string) (t.Filter, string) {
+func BuildFilter(names []string, disableNames []string, enableLabel bool, scope string) (types.Filter, string) {
 	sb := strings.Builder{}
 	filter := NoFilter
 	filter = FilterByNames(names, filter)

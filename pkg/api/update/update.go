@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -36,11 +36,11 @@ type Handler struct {
 
 // Handle is the actual http.Handle function doing all the heavy lifting
 func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
-	log.Info("Updates triggered by HTTP API request.")
+	logrus.Info("Updates triggered by HTTP API request.")
 
 	_, err := io.Copy(os.Stdout, r.Body)
 	if err != nil {
-		log.Println(err)
+		logrus.Println(err)
 		return
 	}
 
@@ -65,7 +65,7 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			defer func() { lock <- chanValue }()
 			handle.fn(images)
 		default:
-			log.Debug("Skipped. Another update already running.")
+			logrus.Debug("Skipped. Another update already running.")
 		}
 	}
 

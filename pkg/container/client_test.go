@@ -9,11 +9,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/backend"
-	cli "github.com/docker/docker/client"
+	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
@@ -21,20 +20,20 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	gt "github.com/onsi/gomega/types"
+	gomegaTypes "github.com/onsi/gomega/types"
 
 	"context"
 	"net/http"
 )
 
 var _ = ginkgo.Describe("the client", func() {
-	var docker *cli.Client
+	var docker *client.Client
 	var mockServer *ghttp.Server
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = cli.NewClientWithOpts(
-			cli.WithHost(mockServer.URL()),
-			cli.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+		docker, _ = client.NewClientWithOpts(
+			client.WithHost(mockServer.URL()),
+			client.WithHTTPClient(mockServer.HTTPTestServer.Client()))
 	})
 	ginkgo.AfterEach(func() {
 		mockServer.Close()
@@ -42,7 +41,6 @@ var _ = ginkgo.Describe("the client", func() {
 	ginkgo.Describe("WarnOnHeadPullFailed", func() {
 		containerUnknown := MockContainer(WithImageName("unknown.repo/prefix/imagename:latest"))
 		containerKnown := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
-
 		ginkgo.When(`warn on head failure is set to "always"`, func() {
 			c := dockerClient{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAlways}}
 			ginkgo.It("should always return true", func() {
@@ -78,34 +76,92 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 	})
 	ginkgo.When("removing a running container", func() {
-		ginkgo.When("the container still exist after stopping", func() {
+		ginkgo.When("the container still exists after stopping", func() {
 			ginkgo.It("should attempt to remove the container", func() {
-				container := MockContainer(WithContainerState(types.ContainerState{Running: true}))
-				containerStopped := MockContainer(WithContainerState(types.ContainerState{Running: false}))
-
-				cid := container.ContainerInfo().ID
+				mockContainer := MockContainer(WithContainerState(container.State{Running: true}))
+				containerStopped := MockContainer(WithContainerState(container.State{Running: false}))
+				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
-					mocks.GetContainerHandler(cid, containerStopped.ContainerInfo()),
+					mocks.GetContainerHandler(cid, containerStopped.ContainerInfo()), // First wait: stopped
 					mocks.RemoveContainerHandler(cid, mocks.Found),
-					mocks.GetContainerHandler(cid, nil),
+					ghttp.CombineHandlers( // Second wait: timeout after removal
+						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
+						ghttp.RespondWith(http.StatusNotFound, nil), // 404 treated as success
+					),
 				)
-
-				gomega.Expect(dockerClient{api: docker}.StopContainer(container, time.Minute)).To(gomega.Succeed())
+				err := dockerClient{api: docker}.StopContainer(mockContainer, time.Second)
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 		ginkgo.When("the container does not exist after stopping", func() {
 			ginkgo.It("should not cause an error", func() {
-				container := MockContainer(WithContainerState(types.ContainerState{Running: true}))
-
-				cid := container.ContainerInfo().ID
+				mockContainer := MockContainer(WithContainerState(container.State{Running: true}))
+				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
-					mocks.GetContainerHandler(cid, nil),
-					mocks.RemoveContainerHandler(cid, mocks.Missing),
+					ghttp.CombineHandlers( // First wait: already gone
+						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
+						ghttp.RespondWith(http.StatusNotFound, nil), // 404 treated as success
+					),
+					mocks.RemoveContainerHandler(cid, mocks.Missing), // Removal fails gracefully
 				)
-
-				gomega.Expect(dockerClient{api: docker}.StopContainer(container, time.Minute)).To(gomega.Succeed())
+				err := dockerClient{api: docker}.StopContainer(mockContainer, time.Second)
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+		ginkgo.When("the container fails to stop within timeout", func() {
+			ginkgo.It("should log a warning but proceed with removal", func() {
+				mockContainer := MockContainer(WithContainerState(container.State{Running: true}))
+				containerRunning := MockContainer(WithContainerState(container.State{Running: true}))
+				cid := mockContainer.ContainerInfo().ID
+				mockServer.AppendHandlers(
+					mocks.KillContainerHandler(cid, mocks.Found),
+					mocks.GetContainerHandler(cid, containerRunning.ContainerInfo()), // First wait: still running
+					mocks.RemoveContainerHandler(cid, mocks.Found),
+					ghttp.CombineHandlers( // Second wait: removed
+						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
+						ghttp.RespondWith(http.StatusNotFound, nil),
+					),
+				)
+				resetLogrus, logbuf := captureLogrus(logrus.WarnLevel)
+				defer resetLogrus()
+				err := dockerClient{api: docker}.StopContainer(mockContainer, 1*time.Millisecond) // Short timeout
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Eventually(logbuf).Should(gbytes.Say(`Container %s \(%s\) did not stop within %v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
+			})
+		})
+		ginkgo.When("waiting for stop fails with an unexpected error", func() {
+			ginkgo.It("should return an error", func() {
+				mockContainer := MockContainer(WithContainerState(container.State{Running: true}))
+				cid := mockContainer.ContainerInfo().ID
+				mockServer.AppendHandlers(
+					mocks.KillContainerHandler(cid, mocks.Found),
+					ghttp.CombineHandlers( // First wait fails
+						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
+						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+					),
+				)
+				err := dockerClient{api: docker}.StopContainer(mockContainer, time.Second)
+				gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("failed to wait for container %s (%s) to stop", mockContainer.Name(), mockContainer.ID().ShortID())))
+			})
+		})
+		ginkgo.When("waiting for removal fails with an unexpected error", func() {
+			ginkgo.It("should return an error", func() {
+				mockContainer := MockContainer(WithContainerState(container.State{Running: true}))
+				containerStopped := MockContainer(WithContainerState(container.State{Running: false}))
+				cid := mockContainer.ContainerInfo().ID
+				mockServer.AppendHandlers(
+					mocks.KillContainerHandler(cid, mocks.Found),
+					mocks.GetContainerHandler(cid, containerStopped.ContainerInfo()), // First wait: stopped
+					mocks.RemoveContainerHandler(cid, mocks.Found),
+					ghttp.CombineHandlers( // Second wait fails
+						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
+						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+					),
+				)
+				err := dockerClient{api: docker}.StopContainer(mockContainer, time.Second)
+				gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("failed to confirm removal of container %s (%s)", mockContainer.Name(), mockContainer.ID().ShortID())))
 			})
 		})
 	})
@@ -117,15 +173,11 @@ var _ = ginkgo.Describe("the client", func() {
 				images := map[string][]string{imageA: {imageAParent}}
 				mockServer.AppendHandlers(mocks.RemoveImageHandler(images))
 				c := dockerClient{api: docker}
-
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
-
-				gomega.Expect(c.RemoveImageByID(t.ImageID(imageA))).To(gomega.Succeed())
-
-				shortA := t.ImageID(imageA).ShortID()
-				shortAParent := t.ImageID(imageAParent).ShortID()
-
+				gomega.Expect(c.RemoveImageByID(types.ImageID(imageA))).To(gomega.Succeed())
+				shortA := types.ImageID(imageA).ShortID()
+				shortAParent := types.ImageID(imageAParent).ShortID()
 				gomega.Eventually(logbuf).Should(gbytes.Say(`deleted="%v, %v" untagged="?%v"?`, shortA, shortAParent, shortA))
 			})
 		})
@@ -134,8 +186,7 @@ var _ = ginkgo.Describe("the client", func() {
 				image := util.GenerateRandomSHA256()
 				mockServer.AppendHandlers(mocks.RemoveImageHandler(nil))
 				c := dockerClient{api: docker}
-
-				err := c.RemoveImageByID(t.ImageID(image))
+				err := c.RemoveImageByID(types.ImageID(image))
 				gomega.Expect(errdefs.IsNotFound(err)).To(gomega.BeTrue())
 			})
 		})
@@ -258,16 +309,13 @@ var _ = ginkgo.Describe("the client", func() {
 					api:           docker,
 					ClientOptions: ClientOptions{},
 				}
-
 				// Capture logrus output in buffer
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
-
 				user := ""
-				containerID := t.ContainerID("ex-cont-id")
+				containerID := types.ContainerID("ex-cont-id")
 				execID := "ex-exec-id"
 				cmd := "exec-cmd"
-
 				mockServer.AppendHandlers(
 					// API.ContainerExecCreate
 					ghttp.CombineHandlers(
@@ -282,7 +330,7 @@ var _ = ginkgo.Describe("the client", func() {
 								cmd,
 							},
 						}),
-						ghttp.RespondWithJSONEncoded(http.StatusOK, types.IDResponse{ID: execID}),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, container.CommitResponse{ID: execID}),
 					),
 					// API.ContainerExecStart
 					ghttp.CombineHandlers(
@@ -309,7 +357,6 @@ var _ = ginkgo.Describe("the client", func() {
 						}),
 					),
 				)
-
 				_, err := client.ExecuteCommand(containerID, cmd, 1)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Note: Since Execute requires opening up a raw TCP stream to the daemon for the output, this will fail
@@ -325,15 +372,14 @@ var _ = ginkgo.Describe("the client", func() {
 					api:           docker,
 					ClientOptions: ClientOptions{IncludeRestarting: false},
 				}
-				container := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
-
-				aliases := []string{"One", "Two", container.ID().ShortID(), "Four"}
+				mockContainer := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
+				aliases := []string{"One", "Two", mockContainer.ID().ShortID(), "Four"}
 				endpoints := map[string]*network.EndpointSettings{
 					`test`: {Aliases: aliases},
 				}
-				container.containerInfo.NetworkSettings = &types.NetworkSettings{Networks: endpoints}
-				gomega.Expect(container.ContainerInfo().NetworkSettings.Networks[`test`].Aliases).To(gomega.Equal(aliases))
-				gomega.Expect(client.GetNetworkConfig(container).EndpointsConfig[`test`].Aliases).To(gomega.Equal([]string{"One", "Two", "Four"}))
+				mockContainer.containerInfo.NetworkSettings = &container.NetworkSettings{Networks: endpoints}
+				gomega.Expect(mockContainer.ContainerInfo().NetworkSettings.Networks[`test`].Aliases).To(gomega.Equal(aliases))
+				gomega.Expect(client.GetNetworkConfig(mockContainer).EndpointsConfig[`test`].Aliases).To(gomega.Equal([]string{"One", "Two", "Four"}))
 			})
 		})
 	})
@@ -357,23 +403,22 @@ func captureLogrus(level logrus.Level) (func(), *gbytes.Buffer) {
 }
 
 // Gomega matcher helpers
-
-func withContainerImageName(matcher gt.GomegaMatcher) gt.GomegaMatcher {
+func withContainerImageName(matcher gomegaTypes.GomegaMatcher) gomegaTypes.GomegaMatcher {
 	return gomega.WithTransform(containerImageName, matcher)
 }
 
-func containerImageName(container t.Container) string {
+func containerImageName(container types.Container) string {
 	return container.ImageName()
 }
 
-func havingRestartingState(expected bool) gt.GomegaMatcher {
-	return gomega.WithTransform(func(container t.Container) bool {
+func havingRestartingState(expected bool) gomegaTypes.GomegaMatcher {
+	return gomega.WithTransform(func(container types.Container) bool {
 		return container.ContainerInfo().State.Restarting
 	}, gomega.Equal(expected))
 }
 
-func havingRunningState(expected bool) gt.GomegaMatcher {
-	return gomega.WithTransform(func(container t.Container) bool {
+func havingRunningState(expected bool) gomegaTypes.GomegaMatcher {
+	return gomega.WithTransform(func(container types.Container) bool {
 		return container.ContainerInfo().State.Running
 	}, gomega.Equal(expected))
 }

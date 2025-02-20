@@ -2,41 +2,41 @@ package notifications
 
 import (
 	"bytes"
-	stdlog "log"
+	"log"
 	"os"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/containrrr/shoutrrr"
-	"github.com/containrrr/shoutrrr/pkg/types"
+	shoutrrrTypes "github.com/containrrr/shoutrrr/pkg/types"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/sirupsen/logrus"
 )
 
 // LocalLog is a logrus logger that does not send entries as notifications
-var LocalLog = log.WithField("notify", "no")
+var LocalLog = logrus.WithField("notify", "no")
 
 const (
 	shoutrrrType = "shoutrrr"
 )
 
 type router interface {
-	Send(message string, params *types.Params) []error
+	Send(message string, params *shoutrrrTypes.Params) []error
 }
 
 // Implements Notifier, logrus.Hook
 type shoutrrrTypeNotifier struct {
 	Urls           []string
 	Router         router
-	entries        []*log.Entry
-	logLevel       log.Level
+	entries        []*logrus.Entry
+	logLevel       logrus.Level
 	template       *template.Template
 	messages       chan string
 	done           chan bool
 	legacyTemplate bool
-	params         *types.Params
+	params         *shoutrrrTypes.Params
 	data           StaticData
 	receiving      bool
 	delay          time.Duration
@@ -71,30 +71,30 @@ func (n *shoutrrrTypeNotifier) AddLogHook() {
 		return
 	}
 	n.receiving = true
-	log.AddHook(n)
+	logrus.AddHook(n)
 
 	// Do the sending in a separate goroutine, so we don't block the main process.
 	go sendNotifications(n)
 }
 
-func createNotifier(urls []string, level log.Level, tplString string, legacy bool, data StaticData, stdout bool, delay time.Duration) *shoutrrrTypeNotifier {
+func createNotifier(urls []string, level logrus.Level, tplString string, legacy bool, data StaticData, stdout bool, delay time.Duration) *shoutrrrTypeNotifier {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
 	if err != nil {
-		log.Errorf("Could not use configured notification template: %s. Using default template", err)
+		logrus.Errorf("Could not use configured notification template: %s. Using default template", err)
 	}
 
-	var logger types.StdLogger
+	var logger shoutrrrTypes.StdLogger
 	if stdout {
-		logger = stdlog.New(os.Stdout, ``, 0)
+		logger = log.New(os.Stdout, ``, 0)
 	} else {
-		logger = stdlog.New(log.StandardLogger().WriterLevel(log.TraceLevel), "Shoutrrr: ", 0)
+		logger = log.New(logrus.StandardLogger().WriterLevel(logrus.TraceLevel), "Shoutrrr: ", 0)
 	}
 	r, err := shoutrrr.NewSender(logger, urls...)
 	if err != nil {
-		log.Fatalf("Failed to initialize Shoutrrr notifications: %s\n", err.Error())
+		logrus.Fatalf("Failed to initialize Shoutrrr notifications: %s\n", err.Error())
 	}
 
-	params := &types.Params{}
+	params := &shoutrrrTypes.Params{}
 	if data.Title != "" {
 		params.SetTitle(data.Title)
 	}
@@ -122,7 +122,7 @@ func sendNotifications(n *shoutrrrTypeNotifier) {
 			if err != nil {
 				scheme := GetScheme(n.Urls[i])
 				// Use fmt so it doesn't trigger another notification.
-				LocalLog.WithFields(log.Fields{
+				LocalLog.WithFields(logrus.Fields{
 					"service": scheme,
 					"index":   i,
 				}).WithError(err).Error("Failed to send shoutrrr notification")
@@ -146,7 +146,7 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 	return body.String(), nil
 }
 
-func (n *shoutrrrTypeNotifier) sendEntries(entries []*log.Entry, report t.Report) {
+func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types.Report) {
 	msg, err := n.buildMessage(Data{n.data, entries, report})
 
 	if msg == "" {
@@ -166,12 +166,12 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*log.Entry, report t.Report
 // StartNotification begins queueing up messages to send them as a batch
 func (n *shoutrrrTypeNotifier) StartNotification() {
 	if n.entries == nil {
-		n.entries = make([]*log.Entry, 0, 10)
+		n.entries = make([]*logrus.Entry, 0, 10)
 	}
 }
 
 // SendNotification sends the queued up messages as a notification
-func (n *shoutrrrTypeNotifier) SendNotification(report t.Report) {
+func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	n.sendEntries(n.entries, report)
 	n.entries = nil
 }
@@ -187,12 +187,12 @@ func (n *shoutrrrTypeNotifier) Close() {
 }
 
 // Levels return what log levels trigger notifications
-func (n *shoutrrrTypeNotifier) Levels() []log.Level {
-	return log.AllLevels[:n.logLevel+1]
+func (n *shoutrrrTypeNotifier) Levels() []logrus.Level {
+	return logrus.AllLevels[:n.logLevel+1]
 }
 
 // Fire is the hook that logrus calls on a new log message
-func (n *shoutrrrTypeNotifier) Fire(entry *log.Entry) error {
+func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 	if entry.Data["notify"] == "no" {
 		// Skip logging if explicitly tagged as non-notify
 		return nil
@@ -201,7 +201,7 @@ func (n *shoutrrrTypeNotifier) Fire(entry *log.Entry) error {
 		n.entries = append(n.entries, entry)
 	} else {
 		// Log output generated outside a cycle is sent immediately.
-		n.sendEntries([]*log.Entry{entry}, nil)
+		n.sendEntries([]*logrus.Entry{entry}, nil)
 	}
 	return nil
 }
@@ -211,7 +211,7 @@ func getShoutrrrTemplate(tplString string, legacy bool) (tpl *template.Template,
 	tplBase := template.New("").Funcs(templates.Funcs)
 
 	if builtin, found := commonTemplates[tplString]; found {
-		log.WithField(`template`, tplString).Debug(`Using common template`)
+		logrus.WithField(`template`, tplString).Debug(`Using common template`)
 		tplString = builtin
 	}
 

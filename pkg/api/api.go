@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 const tokenMissingMsg = "api token is empty or has not been set. exiting"
@@ -32,7 +32,7 @@ func (api *API) RequireToken(fn http.HandlerFunc) http.HandlerFunc {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		log.Debug("Valid token found.")
+		logrus.Debug("Valid token found.")
 		fn(w, r)
 	}
 }
@@ -53,12 +53,12 @@ func (api *API) RegisterHandler(path string, handler http.Handler) {
 func (api *API) Start(block bool) error {
 
 	if !api.hasHandlers {
-		log.Debug("Watchtower HTTP API skipped.")
+		logrus.Debug("Watchtower HTTP API skipped.")
 		return nil
 	}
 
 	if api.Token == "" {
-		log.Fatal(tokenMissingMsg)
+		logrus.Fatal(tokenMissingMsg)
 	}
 
 	if block {
@@ -72,5 +72,5 @@ func (api *API) Start(block bool) error {
 }
 
 func runHTTPServer() {
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	logrus.Fatal(http.ListenAndServe(":8080", nil))
 }

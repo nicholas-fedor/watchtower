@@ -6,12 +6,12 @@ import (
 	"errors"
 	"os"
 
-	cliconfig "github.com/docker/cli/cli/config"
+	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/config/credentials"
 	"github.com/docker/cli/cli/config/types"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // EncodedAuth returns an encoded auth config for the given registry
@@ -37,7 +37,7 @@ func EncodedEnvAuth() (string, error) {
 			Password: password,
 		}
 
-		log.Debugf("Loaded auth credentials for registry user %s from environment", auth.Username)
+		logrus.Debugf("Loaded auth credentials for registry user %s from environment", auth.Username)
 		// CREDENTIAL: Uncomment to log REPO_PASS environment variable
 		// log.Tracef("Using auth password %s", auth.Password)
 
@@ -53,7 +53,7 @@ func EncodedEnvAuth() (string, error) {
 func EncodedConfigAuth(imageRef string) (string, error) {
 	server, err := helpers.GetRegistryAddress(imageRef)
 	if err != nil {
-		log.Errorf("Could not get registry from image ref %s", imageRef)
+		logrus.Errorf("Could not get registry from image ref %s", imageRef)
 		return "", err
 	}
 
@@ -61,19 +61,19 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 	if configDir == "" {
 		configDir = "/"
 	}
-	configFile, err := cliconfig.Load(configDir)
+	configFile, err := config.Load(configDir)
 	if err != nil {
-		log.Errorf("Unable to find default config file: %s", err)
+		logrus.Errorf("Unable to find default config file: %s", err)
 		return "", err
 	}
 	credStore := CredentialsStore(*configFile)
 	auth, _ := credStore.Get(server) // returns (types.AuthConfig{}) if server not in credStore
 
 	if auth == (types.AuthConfig{}) {
-		log.WithField("config_file", configFile.Filename).Debugf("No credentials for %s found", server)
+		logrus.WithField("config_file", configFile.Filename).Debugf("No credentials for %s found", server)
 		return "", nil
 	}
-	log.Debugf("Loaded auth credentials for user %s, on registry %s, from file %s", auth.Username, server, configFile.Filename)
+	logrus.Debugf("Loaded auth credentials for user %s, on registry %s, from file %s", auth.Username, server, configFile.Filename)
 	// CREDENTIAL: Uncomment to log docker config password
 	// log.Tracef("Using auth password %s", auth.Password)
 	return EncodeAuth(auth)
