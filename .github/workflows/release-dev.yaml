@@ -69,7 +69,7 @@ jobs:
           password: ${{ secrets.BOT_GHCR_PAT }}
 
       - name: Build and push to Docker Hub
-        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991
+        uses: docker/build-push-action@b16f42f92abaeb7610fd7fc99ab230d13e79e275
         with:
           context: .
           file: dockerfiles/Dockerfile.self-contained
@@ -78,7 +78,7 @@ jobs:
           tags: nickfedor/watchtower:latest-dev
 
       - name: Build and push to GHCR
-        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991
+        uses: docker/build-push-action@b16f42f92abaeb7610fd7fc99ab230d13e79e275
         with:
           context: .
           file: dockerfiles/Dockerfile.self-contained
