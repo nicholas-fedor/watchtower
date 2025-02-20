@@ -5,19 +5,19 @@ import (
 	"strings"
 	"time"
 
-	ty "github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // NewNotifier creates and returns a new Notifier, using global configuration.
-func NewNotifier(c *cobra.Command) ty.Notifier {
+func NewNotifier(c *cobra.Command) types.Notifier {
 	f := c.Flags()
 
 	level, _ := f.GetString("notifications-level")
-	logLevel, err := log.ParseLevel(level)
+	logLevel, err := logrus.ParseLevel(level)
 	if err != nil {
-		log.Fatalf("Notifications invalid log level: %s", err.Error())
+		logrus.Fatalf("Notifications invalid log level: %s", err.Error())
 	}
 
 	reportTemplate, _ := f.GetBool("notification-report")
@@ -34,17 +34,17 @@ func NewNotifier(c *cobra.Command) ty.Notifier {
 // AppendLegacyUrls creates shoutrrr equivalent URLs from legacy notification flags
 func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duration) {
 
-	// Parse types and create notifiers.
-	types, err := cmd.Flags().GetStringSlice("notifications")
+	// Parse notification notificationTypes and create notifiers.
+	notificationTypes, err := cmd.Flags().GetStringSlice("notifications")
 	if err != nil {
-		log.WithError(err).Fatal("could not read notifications argument")
+		logrus.WithError(err).Fatal("could not read notifications argument")
 	}
 
 	legacyDelay := time.Duration(0)
 
-	for _, t := range types {
+	for _, t := range notificationTypes {
 
-		var legacyNotifier ty.ConvertibleNotifier
+		var legacyNotifier types.ConvertibleNotifier
 		var err error
 
 		switch t {
@@ -59,22 +59,22 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 		case shoutrrrType:
 			continue
 		default:
-			log.Fatalf("Unknown notification type %q", t)
+			logrus.Fatalf("Unknown notification type %q", t)
 			// Not really needed, used for nil checking static analysis
 			continue
 		}
 
 		shoutrrrURL, err := legacyNotifier.GetURL(cmd)
 		if err != nil {
-			log.Fatal("failed to create notification config: ", err)
+			logrus.Fatal("failed to create notification config: ", err)
 		}
 		urls = append(urls, shoutrrrURL)
 
-		if delayNotifier, ok := legacyNotifier.(ty.DelayNotifier); ok {
+		if delayNotifier, ok := legacyNotifier.(types.DelayNotifier); ok {
 			legacyDelay = delayNotifier.GetDelay()
 		}
 
-		log.WithField("URL", shoutrrrURL).Trace("created Shoutrrr URL from legacy notifier")
+		logrus.WithField("URL", shoutrrrURL).Trace("created Shoutrrr URL from legacy notifier")
 	}
 
 	delay := GetDelay(cmd, legacyDelay)

@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	i "github.com/docker/docker/api/types/image"
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/docker/docker/api/types/image"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
-	O "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 )
 
@@ -30,7 +30,7 @@ func getMockJSONFile(relPath string) ([]byte, error) {
 // RespondWithJSONFile handles a request by returning the contents of the supplied file
 func RespondWithJSONFile(relPath string, statusCode int, optionalHeader ...http.Header) http.HandlerFunc {
 	handler, err := respondWithJSONFile(relPath, statusCode, optionalHeader...)
-	O.ExpectWithOffset(1, err).ShouldNot(O.HaveOccurred())
+	gomega.ExpectWithOffset(1, err).ShouldNot(gomega.HaveOccurred())
 	return handler
 }
 
@@ -72,7 +72,7 @@ func createFilterArgs(statuses []string) filters.Args {
 
 var defaultImage = imageRef{
 	// watchtower
-	id:   t.ImageID("sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa"),
+	id:   types.ImageID("sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa"),
 	file: "default",
 }
 
@@ -91,7 +91,7 @@ var Running = ContainerRef{
 	id:   "b978af0b858aa8855cce46b628817d4ed58e58f2c4f66c9b9c5449134ed4c008",
 	image: &imageRef{
 		// portainer
-		id:   t.ImageID("sha256:19d07168491a3f9e2798a9bed96544e34d57ddc4757a4ac5bb199dea896c87fd"),
+		id:   types.ImageID("sha256:19d07168491a3f9e2798a9bed96544e34d57ddc4757a4ac5bb199dea896c87fd"),
 		file: "running",
 	},
 }
@@ -106,7 +106,7 @@ var netSupplierOK = ContainerRef{
 	name: "net_supplier",
 	image: &imageRef{
 		// gluetun
-		id:   t.ImageID("sha256:c22b543d33bfdcb9992cbef23961677133cdf09da71d782468ae2517138bad51"),
+		id:   types.ImageID("sha256:c22b543d33bfdcb9992cbef23961677133cdf09da71d782468ae2517138bad51"),
 		file: "net_producer",
 	},
 }
@@ -122,7 +122,7 @@ var NetConsumerOK = ContainerRef{
 	id:   "1f6b79d2aff23244382026c76f4995851322bed5f9c50631620162f6f9aafbd6",
 	name: "net_consumer",
 	image: &imageRef{
-		id:   t.ImageID("sha256:904b8cb13b932e23230836850610fa45dce9eb0650d5618c2b1487c2a4f577b8"), // nginx
+		id:   types.ImageID("sha256:904b8cb13b932e23230836850610fa45dce9eb0650d5618c2b1487c2a4f577b8"), // nginx
 		file: "net_consumer",
 	},
 	references: []*ContainerRef{&netSupplierOK},
@@ -159,13 +159,13 @@ func getContainerFileHandler(cr *ContainerRef) http.HandlerFunc {
 
 func getContainerHandler(containerId string, responseHandler http.HandlerFunc) http.HandlerFunc {
 	return ghttp.CombineHandlers(
-		ghttp.VerifyRequest("GET", O.HaveSuffix("/containers/%v/json", containerId)),
+		ghttp.VerifyRequest("GET", gomega.HaveSuffix("/containers/%v/json", containerId)),
 		responseHandler,
 	)
 }
 
 // GetContainerHandler mocks the GET containers/{id}/json endpoint
-func GetContainerHandler(containerID string, containerInfo *types.ContainerJSON) http.HandlerFunc {
+func GetContainerHandler(containerID string, containerInfo *container.InspectResponse) http.HandlerFunc {
 	responseHandler := containerNotFoundResponse(containerID)
 	if containerInfo != nil {
 		responseHandler = ghttp.RespondWithJSONEncoded(http.StatusOK, containerInfo)
@@ -174,30 +174,30 @@ func GetContainerHandler(containerID string, containerInfo *types.ContainerJSON)
 }
 
 // GetImageHandler mocks the GET images/{id}/json endpoint
-func GetImageHandler(imageInfo *types.ImageInspect) http.HandlerFunc {
-	return getImageHandler(t.ImageID(imageInfo.ID), ghttp.RespondWithJSONEncoded(http.StatusOK, imageInfo))
+func GetImageHandler(imageInfo *image.InspectResponse) http.HandlerFunc {
+	return getImageHandler(types.ImageID(imageInfo.ID), ghttp.RespondWithJSONEncoded(http.StatusOK, imageInfo))
 }
 
 // ListContainersHandler mocks the GET containers/json endpoint, filtering the returned containers based on statuses
 func ListContainersHandler(statuses ...string) http.HandlerFunc {
 	filterArgs := createFilterArgs(statuses)
 	bytes, err := filterArgs.MarshalJSON()
-	O.ExpectWithOffset(1, err).ShouldNot(O.HaveOccurred())
+	gomega.ExpectWithOffset(1, err).ShouldNot(gomega.HaveOccurred())
 	query := url.Values{
 		"filters": []string{string(bytes)},
 	}
 	return ghttp.CombineHandlers(
-		ghttp.VerifyRequest("GET", O.HaveSuffix("containers/json"), query.Encode()),
+		ghttp.VerifyRequest("GET", gomega.HaveSuffix("containers/json"), query.Encode()),
 		respondWithFilteredContainers(filterArgs),
 	)
 }
 
 func respondWithFilteredContainers(filters filters.Args) http.HandlerFunc {
 	containersJSON, err := getMockJSONFile("./mocks/data/containers.json")
-	O.ExpectWithOffset(2, err).ShouldNot(O.HaveOccurred())
-	var filteredContainers []types.Container
-	var containers []types.Container
-	O.ExpectWithOffset(2, json.Unmarshal(containersJSON, &containers)).To(O.Succeed())
+	gomega.ExpectWithOffset(2, err).ShouldNot(gomega.HaveOccurred())
+	var filteredContainers []container.Summary
+	var containers []container.Summary
+	gomega.ExpectWithOffset(2, json.Unmarshal(containersJSON, &containers)).To(gomega.Succeed())
 	for _, v := range containers {
 		for _, key := range filters.Get("status") {
 			if v.State == key {
@@ -209,9 +209,9 @@ func respondWithFilteredContainers(filters filters.Args) http.HandlerFunc {
 	return ghttp.RespondWithJSONEncoded(http.StatusOK, filteredContainers)
 }
 
-func getImageHandler(imageId t.ImageID, responseHandler http.HandlerFunc) http.HandlerFunc {
+func getImageHandler(imageId types.ImageID, responseHandler http.HandlerFunc) http.HandlerFunc {
 	return ghttp.CombineHandlers(
-		ghttp.VerifyRequest("GET", O.HaveSuffix("/images/%s/json", imageId)),
+		ghttp.VerifyRequest("GET", gomega.HaveSuffix("/images/%s/json", imageId)),
 		responseHandler,
 	)
 }
@@ -223,7 +223,7 @@ func KillContainerHandler(containerID string, found FoundStatus) http.HandlerFun
 		responseHandler = containerNotFoundResponse(containerID)
 	}
 	return ghttp.CombineHandlers(
-		ghttp.VerifyRequest("POST", O.HaveSuffix("containers/%s/kill", containerID)),
+		ghttp.VerifyRequest("POST", gomega.HaveSuffix("containers/%s/kill", containerID)),
 		responseHandler,
 	)
 }
@@ -235,7 +235,7 @@ func RemoveContainerHandler(containerID string, found FoundStatus) http.HandlerF
 		responseHandler = containerNotFoundResponse(containerID)
 	}
 	return ghttp.CombineHandlers(
-		ghttp.VerifyRequest("DELETE", O.HaveSuffix("containers/%s", containerID)),
+		ghttp.VerifyRequest("DELETE", gomega.HaveSuffix("containers/%s", containerID)),
 		responseHandler,
 	)
 }
@@ -256,18 +256,18 @@ const (
 // RemoveImageHandler mocks the DELETE images/ID endpoint, simulating removal of the given imagesWithParents
 func RemoveImageHandler(imagesWithParents map[string][]string) http.HandlerFunc {
 	return ghttp.CombineHandlers(
-		ghttp.VerifyRequest("DELETE", O.MatchRegexp("/images/.*")),
+		ghttp.VerifyRequest("DELETE", gomega.MatchRegexp("/images/.*")),
 		func(w http.ResponseWriter, r *http.Request) {
 			parts := strings.Split(r.URL.Path, `/`)
-			image := parts[len(parts)-1]
+			targetImage := parts[len(parts)-1]
 
-			if parents, found := imagesWithParents[image]; found {
-				items := []i.DeleteResponse{
-					{Untagged: image},
-					{Deleted: image},
+			if parents, found := imagesWithParents[targetImage]; found {
+				items := []image.DeleteResponse{
+					{Untagged: targetImage},
+					{Deleted: targetImage},
 				}
 				for _, parent := range parents {
-					items = append(items, i.DeleteResponse{Deleted: parent})
+					items = append(items, image.DeleteResponse{Deleted: parent})
 				}
 				ghttp.RespondWithJSONEncoded(http.StatusOK, items)(w, r)
 			} else {

@@ -9,7 +9,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Update looks at the running Docker containers to see if any of the images
@@ -17,7 +17,7 @@ import (
 // any of the images, the associated containers are stopped and restarted with
 // the new image.
 func Update(client container.Client, params types.UpdateParams) (types.Report, error) {
-	log.Debug("Checking containers for updated images")
+	logrus.Debug("Checking containers for updated images")
 	progress := &session.Progress{}
 	staleCount := 0
 
@@ -39,18 +39,18 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 			// Check to make sure we have all the necessary information for recreating the container
 			err = targetContainer.VerifyConfiguration()
 			// If the image information is incomplete and trace logging is enabled, log it for further diagnosis
-			if err != nil && log.IsLevelEnabled(log.TraceLevel) {
+			if err != nil && logrus.IsLevelEnabled(logrus.TraceLevel) {
 				imageInfo := targetContainer.ImageInfo()
-				log.Tracef("Image info: %#v", imageInfo)
-				log.Tracef("Container info: %#v", targetContainer.ContainerInfo())
+				logrus.Tracef("Image info: %#v", imageInfo)
+				logrus.Tracef("Container info: %#v", targetContainer.ContainerInfo())
 				if imageInfo != nil {
-					log.Tracef("Image config: %#v", imageInfo.Config)
+					logrus.Tracef("Image config: %#v", imageInfo.Config)
 				}
 			}
 		}
 
 		if err != nil {
-			log.Infof("Unable to update container %q: %v. Proceeding to next.", targetContainer.Name(), err)
+			logrus.Infof("Unable to update container %q: %v. Proceeding to next.", targetContainer.Name(), err)
 			stale = false
 			staleCheckFailed++
 			progress.AddSkipped(targetContainer, err)
@@ -137,7 +137,7 @@ func stopContainersInReversedOrder(containers []types.Container, client containe
 
 func stopStaleContainer(container types.Container, client container.Client, params types.UpdateParams) error {
 	if container.IsWatchtower() {
-		log.Debugf("This is the watchtower container %s", container.Name())
+		logrus.Debugf("This is the watchtower container %s", container.Name())
 		return nil
 	}
 
@@ -155,18 +155,18 @@ func stopStaleContainer(container types.Container, client container.Client, para
 	if params.LifecycleHooks {
 		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(client, container)
 		if err != nil {
-			log.Error(err)
-			log.Info("Skipping container as the pre-update command failed")
+			logrus.Error(err)
+			logrus.Info("Skipping container as the pre-update command failed")
 			return err
 		}
 		if skipUpdate {
-			log.Debug("Skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
+			logrus.Debug("Skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
 			return errors.New("skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
 		}
 	}
 
 	if err := client.StopContainer(container, params.Timeout); err != nil {
-		log.Error(err)
+		logrus.Error(err)
 		return err
 	}
 	return nil
@@ -203,7 +203,7 @@ func cleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 			continue
 		}
 		if err := client.RemoveImageByID(imageID); err != nil {
-			log.Error(err)
+			logrus.Error(err)
 		}
 	}
 }
@@ -215,14 +215,14 @@ func restartStaleContainer(container types.Container, client container.Client, p
 	// instance so that the new one can adopt the old name.
 	if container.IsWatchtower() {
 		if err := client.RenameContainer(container, util.RandName()); err != nil {
-			log.Error(err)
+			logrus.Error(err)
 			return nil
 		}
 	}
 
 	if !params.NoRestart {
 		if newContainerID, err := client.StartContainer(container); err != nil {
-			log.Error(err)
+			logrus.Error(err)
 			return err
 		} else if container.ToRestart() && params.LifecycleHooks {
 			lifecycle.ExecutePostUpdateCommand(client, newContainerID)
@@ -242,7 +242,7 @@ func UpdateImplicitRestart(containers []types.Container) {
 		}
 
 		if link := linkedContainerMarkedForRestart(c.Links(), containers); link != "" {
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"restarting": link,
 				"linked":     c.Name(),
 			}).Debug("container is linked to restarting")

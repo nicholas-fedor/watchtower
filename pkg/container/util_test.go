@@ -1,7 +1,7 @@
 package container_test
 
 import (
-	wt "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -46,5 +46,5 @@ var _ = ginkgo.Describe("container utils", func() {
 
 func shortID(id string) string {
 	// Proxy to the types implementation, relocated due to package dependency resolution
-	return wt.ImageID(id).ShortID()
+	return types.ImageID(id).ShortID()
 }

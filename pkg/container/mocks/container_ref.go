@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 type imageRef struct {
-	id   t.ImageID
+	id   types.ImageID
 	file string
 }
 
@@ -18,7 +18,7 @@ func (ir *imageRef) getFileName() string {
 
 type ContainerRef struct {
 	name       string
-	id         t.ContainerID
+	id         types.ContainerID
 	image      *imageRef
 	file       string
 	references []*ContainerRef
@@ -37,6 +37,6 @@ func (cr *ContainerRef) getContainerFile() (containerFile string, err error) {
 	return containerFile, err
 }
 
-func (cr *ContainerRef) ContainerID() t.ContainerID {
+func (cr *ContainerRef) ContainerID() types.ContainerID {
 	return cr.id
 }

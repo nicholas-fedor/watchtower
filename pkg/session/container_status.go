@@ -1,6 +1,6 @@
 package session
 
-import wt "github.com/nicholas-fedor/watchtower/pkg/types"
+import "github.com/nicholas-fedor/watchtower/pkg/types"
 
 // State indicates what the current state is of the container
 type State int
@@ -19,9 +19,9 @@ const (
 
 // ContainerStatus contains the container state during a session
 type ContainerStatus struct {
-	containerID   wt.ContainerID
-	oldImage      wt.ImageID
-	newImage      wt.ImageID
+	containerID   types.ContainerID
+	oldImage      types.ImageID
+	newImage      types.ImageID
 	containerName string
 	imageName     string
 	error
@@ -29,7 +29,7 @@ type ContainerStatus struct {
 }
 
 // ID returns the container ID
-func (u *ContainerStatus) ID() wt.ContainerID {
+func (u *ContainerStatus) ID() types.ContainerID {
 	return u.containerID
 }
 
@@ -39,12 +39,12 @@ func (u *ContainerStatus) Name() string {
 }
 
 // CurrentImageID returns the image ID that the container used when the session started
-func (u *ContainerStatus) CurrentImageID() wt.ImageID {
+func (u *ContainerStatus) CurrentImageID() types.ImageID {
 	return u.oldImage
 }
 
 // LatestImageID returns the newest image ID found during the session
-func (u *ContainerStatus) LatestImageID() wt.ImageID {
+func (u *ContainerStatus) LatestImageID() types.ImageID {
 	return u.newImage
 }
 

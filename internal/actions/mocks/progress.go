@@ -4,16 +4,16 @@ import (
 	"errors"
 
 	"github.com/nicholas-fedor/watchtower/pkg/session"
-	wt "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // CreateMockProgressReport creates a mock report from a given set of container states
 // All containers will be given a unique ID and name based on its state and index
-func CreateMockProgressReport(states ...session.State) wt.Report {
+func CreateMockProgressReport(states ...session.State) types.Report {
 
 	stateNums := make(map[session.State]int)
 	progress := session.Progress{}
-	failed := make(map[wt.ContainerID]error)
+	failed := make(map[types.ContainerID]error)
 
 	for _, state := range states {
 		index := stateNums[state]

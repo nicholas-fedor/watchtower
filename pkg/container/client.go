@@ -11,42 +11,72 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
-	sdkClient "github.com/docker/docker/client"
-	log "github.com/sirupsen/logrus"
+	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// defaultStopSignal defines the default signal used to stop containers when no custom signal is specified.
+// This is set to "SIGTERM" to allow containers to terminate gracefully by default.
 const defaultStopSignal = "SIGTERM"
 
-// A Client is the interface through which watchtower interacts with the
-// Docker API.
+// Client defines the interface for interacting with the Docker API within Watchtower.
+// It provides methods for managing containers, images, and executing commands, abstracting the underlying Docker client operations.
 type Client interface {
-	ListContainers(t.Filter) ([]t.Container, error)
-	GetContainer(containerID t.ContainerID) (t.Container, error)
-	StopContainer(t.Container, time.Duration) error
-	StartContainer(t.Container) (t.ContainerID, error)
-	RenameContainer(t.Container, string) error
-	IsContainerStale(t.Container, t.UpdateParams) (stale bool, latestImage t.ImageID, err error)
-	ExecuteCommand(containerID t.ContainerID, command string, timeout int) (SkipUpdate bool, err error)
-	RemoveImageByID(t.ImageID) error
-	WarnOnHeadPullFailed(container t.Container) bool
+	// ListContainers retrieves a filtered list of containers running on the host.
+	// The provided filter determines which containers are included in the result.
+	ListContainers(types.Filter) ([]types.Container, error)
+
+	// GetContainer fetches detailed information about a specific container by its ID.
+	// Returns the container object or an error if the container cannot be retrieved.
+	GetContainer(containerID types.ContainerID) (types.Container, error)
+
+	// StopContainer stops and removes a specified container, respecting the given timeout.
+	// It ensures the container is no longer running or present on the host.
+	StopContainer(types.Container, time.Duration) error
+
+	// StartContainer creates and starts a new container based on the provided container's configuration.
+	// Returns the new container's ID or an error if creation or startup fails.
+	StartContainer(types.Container) (types.ContainerID, error)
+
+	// RenameContainer renames an existing container to the specified new name.
+	// Returns an error if the rename operation fails.
+	RenameContainer(types.Container, string) error
+
+	// IsContainerStale checks if a container's image is outdated compared to the latest available version.
+	// Returns whether the container is stale, the latest image ID, and any error encountered.
+	IsContainerStale(types.Container, types.UpdateParams) (stale bool, latestImage types.ImageID, err error)
+
+	// ExecuteCommand runs a command inside a container and returns whether to skip updates based on the result.
+	// The timeout specifies how long to wait for the command to complete.
+	ExecuteCommand(containerID types.ContainerID, command string, timeout int) (SkipUpdate bool, err error)
+
+	// RemoveImageByID deletes an image from the Docker host by its ID.
+	// Returns an error if the removal fails.
+	RemoveImageByID(types.ImageID) error
+
+	// WarnOnHeadPullFailed determines whether to log a warning when a HEAD request fails during image pulls.
+	// The decision is based on the configured warning strategy and container context.
+	WarnOnHeadPullFailed(container types.Container) bool
 }
 
-// NewClient returns a new Client instance which can be used to interact with
-// the Docker API.
-// The client reads its configuration from the following environment variables:
-//   - DOCKER_HOST			the docker-engine host to send api requests to
-//   - DOCKER_TLS_VERIFY		whether to verify tls certificates
-//   - DOCKER_API_VERSION	the minimum docker api version to work with
+// NewClient initializes a new Client instance for interacting with the Docker API.
+// It configures the client using environment variables and the provided options.
+// Environment variables used:
+//   - DOCKER_HOST: The Docker engine host to connect to (e.g., unix:///var/run/docker.sock).
+//   - DOCKER_TLS_VERIFY: Enables TLS verification if set to "1".
+//   - DOCKER_API_VERSION: Specifies the minimum Docker API version to use.
+//
+// Panics if the Docker client cannot be instantiated due to invalid configuration.
 func NewClient(opts ClientOptions) Client {
-	cli, err := sdkClient.NewClientWithOpts(sdkClient.FromEnv)
+	cli, err := client.NewClientWithOpts(client.FromEnv)
 
 	if err != nil {
-		log.Fatalf("Error instantiating Docker client: %s", err)
+		logrus.Fatalf("Error instantiating Docker client: %s", err)
 	}
 
 	return dockerClient{
@@ -55,367 +85,432 @@ func NewClient(opts ClientOptions) Client {
 	}
 }
 
-// ClientOptions contains the options for how the docker client wrapper should behave
+// ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
+// These options control container management and warning behaviors.
 type ClientOptions struct {
-	RemoveVolumes     bool
-	IncludeStopped    bool
-	ReviveStopped     bool
+	// RemoveVolumes specifies whether to remove volumes when deleting containers.
+	RemoveVolumes bool
+
+	// IncludeStopped determines if stopped containers are included in listings.
+	IncludeStopped bool
+
+	// ReviveStopped indicates whether stopped containers should be restarted during updates.
+	ReviveStopped bool
+
+	// IncludeRestarting includes containers in the "restarting" state in listings if true.
 	IncludeRestarting bool
-	WarnOnHeadFailed  WarningStrategy
+
+	// WarnOnHeadFailed sets the strategy for logging warnings on HEAD request failures during image pulls.
+	WarnOnHeadFailed WarningStrategy
 }
 
-// WarningStrategy is a value determining when to show warnings
+// WarningStrategy defines the policy for logging warnings when HEAD requests fail during image pulls.
+// It controls the verbosity of error reporting in various scenarios.
 type WarningStrategy string
 
 const (
-	// WarnAlways warns whenever the problem occurs
+	// WarnAlways triggers a warning whenever a HEAD request fails, regardless of context.
 	WarnAlways WarningStrategy = "always"
-	// WarnNever never warns when the problem occurs
+
+	// WarnNever suppresses warnings for HEAD request failures in all cases.
 	WarnNever WarningStrategy = "never"
-	// WarnAuto skips warning when the problem was expected
+
+	// WarnAuto logs warnings for HEAD failures only when unexpected, based on registry heuristics.
 	WarnAuto WarningStrategy = "auto"
 )
 
+// dockerClient is the concrete implementation of the Client interface.
+// It wraps the Docker API client and applies custom behavior via ClientOptions.
 type dockerClient struct {
-	api sdkClient.CommonAPIClient
+	// api is the underlying Docker API client used for all operations.
+	api client.APIClient
+
+	// ClientOptions holds configuration settings for this client instance.
 	ClientOptions
 }
 
-func (client dockerClient) WarnOnHeadPullFailed(container t.Container) bool {
-	if client.WarnOnHeadFailed == WarnAlways {
+// WarnOnHeadPullFailed decides whether to warn about failed HEAD requests during image pulls.
+// Returns true if a warning should be logged, based on the configured strategy:
+// - WarnAlways: Always returns true.
+// - WarnNever: Always returns false.
+// - WarnAuto: Delegates to registry.WarnOnAPIConsumption for context-aware decision.
+func (c dockerClient) WarnOnHeadPullFailed(targetContainer types.Container) bool {
+	if c.WarnOnHeadFailed == WarnAlways {
 		return true
 	}
-	if client.WarnOnHeadFailed == WarnNever {
+	if c.WarnOnHeadFailed == WarnNever {
 		return false
 	}
 
-	return registry.WarnOnAPIConsumption(container)
+	return registry.WarnOnAPIConsumption(targetContainer)
 }
 
-func (client dockerClient) ListContainers(fn t.Filter) ([]t.Container, error) {
-	cs := []t.Container{}
-	bg := context.Background()
+// ListContainers retrieves a list of containers from the Docker host, filtered by the provided function.
+// It respects the IncludeStopped and IncludeRestarting options to determine which container states to include.
+// Returns a slice of containers or an error if the listing fails.
+func (c dockerClient) ListContainers(fn types.Filter) ([]types.Container, error) {
+	hostContainers := []types.Container{}
+	ctx := context.Background()
 
-	if client.IncludeStopped && client.IncludeRestarting {
-		log.Debug("Retrieving running, stopped, restarting and exited containers")
-	} else if client.IncludeStopped {
-		log.Debug("Retrieving running, stopped and exited containers")
-	} else if client.IncludeRestarting {
-		log.Debug("Retrieving running and restarting containers")
+	// Log the scope of containers being retrieved based on configuration.
+	if c.IncludeStopped && c.IncludeRestarting {
+		logrus.Debug("Retrieving running, stopped, restarting and exited containers")
+	} else if c.IncludeStopped {
+		logrus.Debug("Retrieving running, stopped and exited containers")
+	} else if c.IncludeRestarting {
+		logrus.Debug("Retrieving running and restarting containers")
 	} else {
-		log.Debug("Retrieving running containers")
+		logrus.Debug("Retrieving running containers")
 	}
 
-	filter := client.createListFilter()
-	containers, err := client.api.ContainerList(
-		bg,
+	// Apply filters based on configured options.
+	filter := c.createListFilter()
+	containers, err := c.api.ContainerList(
+		ctx,
 		container.ListOptions{
 			Filters: filter,
-		})
-
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	// Fetch detailed info for each container and apply the user-provided filter.
 	for _, runningContainer := range containers {
-
-		c, err := client.GetContainer(t.ContainerID(runningContainer.ID))
+		c, err := c.GetContainer(types.ContainerID(runningContainer.ID))
 		if err != nil {
 			return nil, err
 		}
-
 		if fn(c) {
-			cs = append(cs, c)
+			hostContainers = append(hostContainers, c)
 		}
 	}
 
-	return cs, nil
+	return hostContainers, nil
 }
 
-func (client dockerClient) createListFilter() filters.Args {
+// createListFilter constructs a filter for container listing based on ClientOptions.
+// It always includes running containers and optionally adds stopped or restarting states.
+func (c dockerClient) createListFilter() filters.Args {
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("status", "running")
 
-	if client.IncludeStopped {
+	if c.IncludeStopped {
 		filterArgs.Add("status", "created")
 		filterArgs.Add("status", "exited")
 	}
 
-	if client.IncludeRestarting {
+	if c.IncludeRestarting {
 		filterArgs.Add("status", "restarting")
 	}
 
 	return filterArgs
 }
 
-func (client dockerClient) GetContainer(containerID t.ContainerID) (t.Container, error) {
-	bg := context.Background()
+// GetContainer retrieves detailed information about a container by its ID.
+// It also resolves network container references by replacing IDs with names when possible.
+// Returns a Container object or an error if inspection fails.
+func (c dockerClient) GetContainer(containerID types.ContainerID) (types.Container, error) {
+	ctx := context.Background()
 
-	containerInfo, err := client.api.ContainerInspect(bg, string(containerID))
+	// Fetch basic container information.
+	containerInfo, err := c.api.ContainerInspect(ctx, string(containerID))
 	if err != nil {
 		return &Container{}, err
 	}
 
+	// Handle container network mode dependencies.
 	netType, netContainerId, found := strings.Cut(string(containerInfo.HostConfig.NetworkMode), ":")
 	if found && netType == "container" {
-		parentContainer, err := client.api.ContainerInspect(bg, netContainerId)
+		parentContainer, err := c.api.ContainerInspect(ctx, netContainerId)
 		if err != nil {
-			log.WithFields(map[string]interface{}{
+			logrus.WithFields(map[string]interface{}{
 				"container":         containerInfo.Name,
 				"error":             err,
 				"network-container": netContainerId,
 			}).Warnf("Unable to resolve network container: %v", err)
-
 		} else {
-			// Replace the container ID with a container name to allow it to reference the re-created network container
+			// Update NetworkMode to use the parent container's name for stable references across recreations.
 			containerInfo.HostConfig.NetworkMode = container.NetworkMode(fmt.Sprintf("container:%s", parentContainer.Name))
 		}
 	}
 
-	imageInfo, _, err := client.api.ImageInspectWithRaw(bg, containerInfo.Image)
+	// Fetch associated image information.
+	imageInfo, err := c.api.ImageInspect(ctx, containerInfo.Image)
 	if err != nil {
-		log.Warnf("Failed to retrieve container image info: %v", err)
+		logrus.Warnf("Failed to retrieve container image info: %v", err)
 		return &Container{containerInfo: &containerInfo, imageInfo: nil}, nil
 	}
 
 	return &Container{containerInfo: &containerInfo, imageInfo: &imageInfo}, nil
 }
 
-func (client dockerClient) StopContainer(c t.Container, timeout time.Duration) error {
-	bg := context.Background()
-	signal := c.StopSignal()
+// StopContainer stops and removes the specified container within the given timeout.
+// It first attempts to stop the container gracefully, then removes it unless AutoRemove is enabled.
+// Returns an error if stopping or removal fails.
+func (c dockerClient) StopContainer(targetContainer types.Container, timeout time.Duration) error {
+	ctx := context.Background()
+	signal := targetContainer.StopSignal()
 	if signal == "" {
 		signal = defaultStopSignal
 	}
 
-	idStr := string(c.ID())
-	shortID := c.ID().ShortID()
+	idStr := string(targetContainer.ID())
+	shortID := targetContainer.ID().ShortID()
 
-	if c.IsRunning() {
-		log.Infof("Stopping %s (%s) with %s", c.Name(), shortID, signal)
-		if err := client.api.ContainerKill(bg, idStr, signal); err != nil {
+	// Stop the container if it’s running.
+	if targetContainer.IsRunning() {
+		logrus.Infof("Stopping %s (%s) with %s", targetContainer.Name(), shortID, signal)
+		if err := c.api.ContainerKill(ctx, idStr, signal); err != nil {
 			return err
 		}
 	}
 
-	// TODO: This should probably be checked.
-	_ = client.waitForStopOrTimeout(c, timeout)
+	// Wait for the container to stop or timeout.
+	stopped, err := c.waitForStopOrTimeout(targetContainer, timeout)
+	if err != nil {
+		return fmt.Errorf("failed to wait for container %s (%s) to stop: %w", targetContainer.Name(), shortID, err)
+	}
+	if !stopped {
+		logrus.Warnf("Container %s (%s) did not stop within %v", targetContainer.Name(), shortID, timeout)
+	}
 
-	if c.ContainerInfo().HostConfig.AutoRemove {
-		log.Debugf("AutoRemove container %s, skipping ContainerRemove call.", shortID)
+	// Handle removal based on AutoRemove setting.
+	if targetContainer.ContainerInfo().HostConfig.AutoRemove {
+		logrus.Debugf("AutoRemove container %s, skipping ContainerRemove call.", shortID)
 	} else {
-		log.Debugf("Removing container %s", shortID)
-
-		if err := client.api.ContainerRemove(bg, idStr, container.RemoveOptions{Force: true, RemoveVolumes: client.RemoveVolumes}); err != nil {
-			if sdkClient.IsErrNotFound(err) {
-				log.Debugf("Container %s not found, skipping removal.", shortID)
+		logrus.Debugf("Removing container %s", shortID)
+		if err := c.api.ContainerRemove(ctx, idStr, container.RemoveOptions{Force: true, RemoveVolumes: c.RemoveVolumes}); err != nil {
+			if client.IsErrNotFound(err) {
+				logrus.Debugf("Container %s not found, skipping removal.", shortID)
 				return nil
 			}
 			return err
 		}
 	}
 
-	// Wait for container to be removed. In this case an error is a good thing
-	if err := client.waitForStopOrTimeout(c, timeout); err == nil {
-		return fmt.Errorf("container %s (%s) could not be removed", c.Name(), shortID)
+	// Confirm the container is gone.
+	stopped, err = c.waitForStopOrTimeout(targetContainer, timeout)
+	if err != nil {
+		return fmt.Errorf("failed to confirm removal of container %s (%s): %w", targetContainer.Name(), shortID, err)
+	}
+	if !stopped { // Container still present after timeout
+		return fmt.Errorf("container %s (%s) could not be removed", targetContainer.Name(), shortID)
 	}
 
 	return nil
 }
 
-func (client dockerClient) GetNetworkConfig(c t.Container) *network.NetworkingConfig {
+// GetNetworkConfig constructs the network configuration for a container.
+// It filters out the container’s short ID from network aliases to prevent accumulation across updates.
+// Returns the updated network configuration.
+func (c dockerClient) GetNetworkConfig(targetContainer types.Container) *network.NetworkingConfig {
 	config := &network.NetworkingConfig{
-		EndpointsConfig: c.ContainerInfo().NetworkSettings.Networks,
+		EndpointsConfig: targetContainer.ContainerInfo().NetworkSettings.Networks,
 	}
 
 	for _, ep := range config.EndpointsConfig {
 		aliases := make([]string, 0, len(ep.Aliases))
-		cidAlias := c.ID().ShortID()
+		cidAlias := targetContainer.ID().ShortID()
 
-		// Remove the old container ID alias from the network aliases, as it would accumulate across updates otherwise
+		// Exclude the container’s short ID from aliases to avoid alias buildup.
 		for _, alias := range ep.Aliases {
 			if alias == cidAlias {
 				continue
 			}
 			aliases = append(aliases, alias)
 		}
-
 		ep.Aliases = aliases
 	}
 	return config
 }
 
-func (client dockerClient) StartContainer(c t.Container) (t.ContainerID, error) {
+// StartContainer creates and starts a new container based on the provided container’s configuration.
+// It reuses the original config, optionally reconnecting network settings, and respects ReviveStopped.
+// Returns the new container’s ID or an error if creation or startup fails.
+func (c dockerClient) StartContainer(targetContainer types.Container) (types.ContainerID, error) {
 	bg := context.Background()
-	config := c.GetCreateConfig()
-	hostConfig := c.GetCreateHostConfig()
-	networkConfig := client.GetNetworkConfig(c)
+	config := targetContainer.GetCreateConfig()
+	hostConfig := targetContainer.GetCreateHostConfig()
+	networkConfig := c.GetNetworkConfig(targetContainer)
 
 	// simpleNetworkConfig is a networkConfig with only 1 network.
-	// see: https://github.com/docker/docker/issues/29265
+	// See: https://github.com/docker/docker/issues/29265
 	simpleNetworkConfig := func() *network.NetworkingConfig {
 		oneEndpoint := make(map[string]*network.EndpointSettings)
 		for k, v := range networkConfig.EndpointsConfig {
 			oneEndpoint[k] = v
-			// we only need 1
+			// We only need 1
 			break
 		}
 		return &network.NetworkingConfig{EndpointsConfig: oneEndpoint}
-	}()
+	}
 
-	name := c.Name()
+	name := targetContainer.Name()
 
-	log.Infof("Creating %s", name)
+	logrus.Infof("Creating %s", name)
 
-	createdContainer, err := client.api.ContainerCreate(bg, config, hostConfig, simpleNetworkConfig, nil, name)
+	createdContainer, err := c.api.ContainerCreate(bg, config, hostConfig, simpleNetworkConfig(), nil, name)
 	if err != nil {
 		return "", err
 	}
 
 	if !(hostConfig.NetworkMode.IsHost()) {
-
-		for k := range simpleNetworkConfig.EndpointsConfig {
-			err = client.api.NetworkDisconnect(bg, k, createdContainer.ID, true)
+		for k := range simpleNetworkConfig().EndpointsConfig {
+			err = c.api.NetworkDisconnect(bg, k, createdContainer.ID, true)
 			if err != nil {
 				return "", err
 			}
 		}
 
 		for k, v := range networkConfig.EndpointsConfig {
-			err = client.api.NetworkConnect(bg, k, createdContainer.ID, v)
+			err = c.api.NetworkConnect(bg, k, createdContainer.ID, v)
 			if err != nil {
 				return "", err
 			}
 		}
-
 	}
 
-	createdContainerID := t.ContainerID(createdContainer.ID)
-	if !c.IsRunning() && !client.ReviveStopped {
+	createdContainerID := types.ContainerID(createdContainer.ID)
+	// Skip starting if the original wasn’t running and ReviveStopped is false.
+	if !targetContainer.IsRunning() && !c.ReviveStopped {
 		return createdContainerID, nil
 	}
 
-	return createdContainerID, client.doStartContainer(bg, c, createdContainer)
-
+	return createdContainerID, c.doStartContainer(bg, targetContainer, createdContainer)
 }
 
-func (client dockerClient) doStartContainer(bg context.Context, c t.Container, creation container.CreateResponse) error {
-	name := c.Name()
+// doStartContainer starts a newly created container.
+// It logs the action and returns an error if the start operation fails.
+func (c dockerClient) doStartContainer(ctx context.Context, targetContainer types.Container, creation container.CreateResponse) error {
+	name := targetContainer.Name()
 
-	log.Debugf("Starting container %s (%s)", name, t.ContainerID(creation.ID).ShortID())
-	err := client.api.ContainerStart(bg, creation.ID, container.StartOptions{})
+	logrus.Debugf("Starting container %s (%s)", name, types.ContainerID(creation.ID).ShortID())
+	err := c.api.ContainerStart(ctx, creation.ID, container.StartOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (client dockerClient) RenameContainer(c t.Container, newName string) error {
+// RenameContainer renames an existing container to the specified new name.
+// Logs the action and returns an error if the rename fails.
+func (c dockerClient) RenameContainer(target types.Container, newName string) error {
 	bg := context.Background()
-	log.Debugf("Renaming container %s (%s) to %s", c.Name(), c.ID().ShortID(), newName)
-	return client.api.ContainerRename(bg, string(c.ID()), newName)
+	logrus.Debugf("Renaming container %s (%s) to %s", target.Name(), target.ID().ShortID(), newName)
+	return c.api.ContainerRename(bg, string(target.ID()), newName)
 }
 
-func (client dockerClient) IsContainerStale(container t.Container, params t.UpdateParams) (stale bool, latestImage t.ImageID, err error) {
+// IsContainerStale determines if a container’s image is outdated.
+// It pulls the latest image if needed and compares it to the current image.
+// Returns whether the container is stale, the latest image ID, and any error encountered.
+func (c dockerClient) IsContainerStale(target types.Container, params types.UpdateParams) (stale bool, latestImage types.ImageID, err error) {
 	ctx := context.Background()
 
-	if container.IsNoPull(params) {
-		log.Debugf("Skipping image pull.")
-	} else if err := client.PullImage(ctx, container); err != nil {
-		return false, container.SafeImageID(), err
+	if target.IsNoPull(params) {
+		logrus.Debugf("Skipping image pull.")
+	} else if err := c.PullImage(ctx, target); err != nil {
+		return false, target.SafeImageID(), err
 	}
 
-	return client.HasNewImage(ctx, container)
+	return c.HasNewImage(ctx, target)
 }
 
-func (client dockerClient) HasNewImage(ctx context.Context, container t.Container) (hasNew bool, latestImage t.ImageID, err error) {
-	currentImageID := t.ImageID(container.ContainerInfo().ContainerJSONBase.Image)
-	imageName := container.ImageName()
+// HasNewImage checks if a newer image exists for the container’s image name.
+// Compares the current image ID with the latest available ID.
+// Returns whether a new image exists, the latest image ID, and any error.
+func (c dockerClient) HasNewImage(ctx context.Context, targetContainer types.Container) (hasNew bool, latestImage types.ImageID, err error) {
+	currentImageID := types.ImageID(targetContainer.ContainerInfo().ContainerJSONBase.Image)
+	imageName := targetContainer.ImageName()
 
-	newImageInfo, _, err := client.api.ImageInspectWithRaw(ctx, imageName)
+	newImageInfo, err := c.api.ImageInspect(ctx, imageName)
 	if err != nil {
 		return false, currentImageID, err
 	}
 
-	newImageID := t.ImageID(newImageInfo.ID)
+	newImageID := types.ImageID(newImageInfo.ID)
 	if newImageID == currentImageID {
-		log.Debugf("No new images found for %s", container.Name())
+		logrus.Debugf("No new images found for %s", targetContainer.Name())
 		return false, currentImageID, nil
 	}
 
-	log.Infof("Found new %s image (%s)", imageName, newImageID.ShortID())
+	logrus.Infof("Found new %s image (%s)", imageName, newImageID.ShortID())
 	return true, newImageID, nil
 }
 
-// PullImage pulls the latest image for the supplied container, optionally skipping if it's digest can be confirmed
-// to match the one that the registry reports via a HEAD request
-func (client dockerClient) PullImage(ctx context.Context, container t.Container) error {
-	containerName := container.Name()
-	imageName := container.ImageName()
+// PullImage fetches the latest image for a container, optionally skipping if digest matches.
+// It performs a HEAD request to compare digests and falls back to a full pull if needed.
+// Returns an error if the pull fails or if the image is pinned (sha256).
+func (c dockerClient) PullImage(ctx context.Context, targetContainer types.Container) error {
+	containerName := targetContainer.Name()
+	imageName := targetContainer.ImageName()
 
-	fields := log.Fields{
+	fields := logrus.Fields{
 		"image":     imageName,
 		"container": containerName,
 	}
 
+	// Prevent pulling pinned images.
 	if strings.HasPrefix(imageName, "sha256:") {
 		return fmt.Errorf("container uses a pinned image, and cannot be updated by watchtower")
 	}
 
-	log.WithFields(fields).Debugf("Trying to load authentication credentials.")
+	logrus.WithFields(fields).Debugf("Trying to load authentication credentials.")
 	opts, err := registry.GetPullOptions(imageName)
 	if err != nil {
-		log.Debugf("Error loading authentication credentials %s", err)
+		logrus.Debugf("Error loading authentication credentials %s", err)
 		return err
 	}
 	if opts.RegistryAuth != "" {
-		log.Debug("Credentials loaded")
+		logrus.Debug("Credentials loaded")
 	}
 
-	log.WithFields(fields).Debugf("Checking if pull is needed")
-
-	if match, err := digest.CompareDigest(container, opts.RegistryAuth); err != nil {
-		headLevel := log.DebugLevel
-		if client.WarnOnHeadPullFailed(container) {
-			headLevel = log.WarnLevel
+	logrus.WithFields(fields).Debugf("Checking if pull is needed")
+	if match, err := digest.CompareDigest(targetContainer, opts.RegistryAuth); err != nil {
+		headLevel := logrus.DebugLevel
+		if c.WarnOnHeadPullFailed(targetContainer) {
+			headLevel = logrus.WarnLevel
 		}
-		log.WithFields(fields).Logf(headLevel, "Could not do a head request for %q, falling back to regular pull.", imageName)
-		log.WithFields(fields).Log(headLevel, "Reason: ", err)
+		logrus.WithFields(fields).Logf(headLevel, "Could not do a head request for %q, falling back to regular pull.", imageName)
+		logrus.WithFields(fields).Log(headLevel, "Reason: ", err)
 	} else if match {
-		log.Debug("No pull needed. Skipping image.")
+		logrus.Debug("No pull needed. Skipping image.")
 		return nil
 	} else {
-		log.Debug("Digests did not match, doing a pull.")
+		logrus.Debug("Digests did not match, doing a pull.")
 	}
 
-	log.WithFields(fields).Debugf("Pulling image")
-
-	response, err := client.api.ImagePull(ctx, imageName, opts)
+	logrus.WithFields(fields).Debugf("Pulling image")
+	response, err := c.api.ImagePull(ctx, imageName, opts)
 	if err != nil {
-		log.Debugf("Error pulling image %s, %s", imageName, err)
+		logrus.Debugf("Error pulling image %s, %s", imageName, err)
 		return err
 	}
 
 	defer response.Close()
-	// the pull request will be aborted prematurely unless the response is read
+	// Read the response fully to avoid aborting the pull prematurely.
 	if _, err = io.ReadAll(response); err != nil {
-		log.Error(err)
+		logrus.Error(err)
 		return err
 	}
 	return nil
 }
 
-func (client dockerClient) RemoveImageByID(id t.ImageID) error {
-	log.Infof("Removing image %s", id.ShortID())
+// RemoveImageByID deletes an image from the Docker host by its ID.
+// Logs detailed removal info if debug logging is enabled.
+// Returns an error if removal fails.
+func (c dockerClient) RemoveImageByID(id types.ImageID) error {
+	logrus.Infof("Removing image %s", id.ShortID())
 
-	items, err := client.api.ImageRemove(
+	items, err := c.api.ImageRemove(
 		context.Background(),
 		string(id),
 		image.RemoveOptions{
 			Force: true,
-		})
+		},
+	)
 
-	if log.IsLevelEnabled(log.DebugLevel) {
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		deleted := strings.Builder{}
 		untagged := strings.Builder{}
 		for _, item := range items {
@@ -423,39 +518,43 @@ func (client dockerClient) RemoveImageByID(id t.ImageID) error {
 				if deleted.Len() > 0 {
 					deleted.WriteString(`, `)
 				}
-				deleted.WriteString(t.ImageID(item.Deleted).ShortID())
+				deleted.WriteString(types.ImageID(item.Deleted).ShortID())
 			}
 			if item.Untagged != "" {
 				if untagged.Len() > 0 {
 					untagged.WriteString(`, `)
 				}
-				untagged.WriteString(t.ImageID(item.Untagged).ShortID())
+				untagged.WriteString(types.ImageID(item.Untagged).ShortID())
 			}
 		}
-		fields := log.Fields{`deleted`: deleted.String(), `untagged`: untagged.String()}
-		log.WithFields(fields).Debug("Image removal completed")
+		fields := logrus.Fields{`deleted`: deleted.String(), `untagged`: untagged.String()}
+		logrus.WithFields(fields).Debug("Image removal completed")
 	}
 
 	return err
 }
 
-func (client dockerClient) ExecuteCommand(containerID t.ContainerID, command string, timeout int) (SkipUpdate bool, err error) {
-	bg := context.Background()
-	clog := log.WithField("containerID", containerID)
+// ExecuteCommand runs a command inside a container and evaluates its result.
+// It creates an exec instance, runs it, and waits for completion or timeout.
+// Returns whether to skip updates (based on exit code) and any error encountered.
+func (c dockerClient) ExecuteCommand(containerID types.ContainerID, command string, timeout int) (SkipUpdate bool, err error) {
+	ctx := context.Background()
+	clog := logrus.WithField("containerID", containerID)
 
-	// Create the exec
+	// Configure and create the exec instance.
 	execConfig := container.ExecOptions{
 		Tty:    true,
 		Detach: false,
 		Cmd:    []string{"sh", "-c", command},
 	}
 
-	exec, err := client.api.ContainerExecCreate(bg, string(containerID), execConfig)
+	exec, err := c.api.ContainerExecCreate(ctx, string(containerID), execConfig)
 	if err != nil {
 		return false, err
 	}
 
-	response, attachErr := client.api.ContainerExecAttach(bg, exec.ID, container.ExecStartOptions{
+	// Attach to the exec to capture output.
+	response, attachErr := c.api.ContainerExecAttach(ctx, exec.ID, container.ExecStartOptions{
 		Tty:    true,
 		Detach: false,
 	})
@@ -463,13 +562,14 @@ func (client dockerClient) ExecuteCommand(containerID t.ContainerID, command str
 		clog.Errorf("Failed to extract command exec logs: %v", attachErr)
 	}
 
-	// Run the exec
+	// Start the exec instance.
 	execStartCheck := container.ExecStartOptions{Detach: false, Tty: true}
-	err = client.api.ContainerExecStart(bg, exec.ID, execStartCheck)
+	err = c.api.ContainerExecStart(ctx, exec.ID, execStartCheck)
 	if err != nil {
 		return false, err
 	}
 
+	// Capture output if attachment succeeded.
 	var output string
 	if attachErr == nil {
 		defer response.Close()
@@ -482,9 +582,8 @@ func (client dockerClient) ExecuteCommand(containerID t.ContainerID, command str
 		}
 	}
 
-	// Inspect the exec to get the exit code and print a message if the
-	// exit code is not success.
-	skipUpdate, err := client.waitForExecOrTimeout(bg, exec.ID, output, timeout)
+	// Wait for completion and interpret the result.
+	skipUpdate, err := c.waitForExecOrTimeout(ctx, exec.ID, output, timeout)
 	if err != nil {
 		return true, err
 	}
@@ -492,23 +591,28 @@ func (client dockerClient) ExecuteCommand(containerID t.ContainerID, command str
 	return skipUpdate, nil
 }
 
-func (client dockerClient) waitForExecOrTimeout(bg context.Context, ID string, execOutput string, timeout int) (SkipUpdate bool, err error) {
+// waitForExecOrTimeout waits for an exec instance to complete or times out.
+// It checks the exit code: 75 (ExTempFail) skips updates, >0 indicates failure.
+// Returns whether to skip updates and any error encountered.
+func (c dockerClient) waitForExecOrTimeout(parentContext context.Context, ID string, execOutput string, timeout int) (SkipUpdate bool, err error) {
 	const ExTempFail = 75
 	var ctx context.Context
 	var cancel context.CancelFunc
 
+	// Set up context with timeout if specified.
 	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(bg, time.Duration(timeout)*time.Minute)
+		ctx, cancel = context.WithTimeout(parentContext, time.Duration(timeout)*time.Minute)
 		defer cancel()
 	} else {
-		ctx = bg
+		ctx = parentContext
 	}
 
 	for {
-		execInspect, err := client.api.ContainerExecInspect(ctx, ID)
+		execInspect, err := c.api.ContainerExecInspect(ctx, ID)
 
-		//goland:noinspection GoNilness
-		log.WithFields(log.Fields{
+		// Log exec status for debugging.
+		// goland:noinspection GoNilness
+		logrus.WithFields(logrus.Fields{
 			"exit-code":    execInspect.ExitCode,
 			"exec-id":      execInspect.ExecID,
 			"running":      execInspect.Running,
@@ -523,7 +627,7 @@ func (client dockerClient) waitForExecOrTimeout(bg context.Context, ID string, e
 			continue
 		}
 		if len(execOutput) > 0 {
-			log.Infof("Command output:\n%v", execOutput)
+			logrus.Infof("Command output:\n%v", execOutput)
 		}
 
 		if execInspect.ExitCode == ExTempFail {
@@ -538,19 +642,26 @@ func (client dockerClient) waitForExecOrTimeout(bg context.Context, ID string, e
 	return false, nil
 }
 
-func (client dockerClient) waitForStopOrTimeout(c t.Container, waitTime time.Duration) error {
-	bg := context.Background()
+// waitForStopOrTimeout waits for a container to stop or times out.
+// Returns true if stopped (or gone), false if still running after timeout, and any error.
+// Treats a 404 (not found) as stopped, indicating successful removal or prior stop.
+func (c dockerClient) waitForStopOrTimeout(targetContainer types.Container, waitTime time.Duration) (stopped bool, err error) {
+	ctx := context.Background()
 	timeout := time.After(waitTime)
-
 	for {
 		select {
 		case <-timeout:
-			return nil
+			return false, nil // Timed out, container still running
 		default:
-			if ci, err := client.api.ContainerInspect(bg, string(c.ID())); err != nil {
-				return err
-			} else if !ci.State.Running {
-				return nil
+			ci, err := c.api.ContainerInspect(ctx, string(targetContainer.ID()))
+			if err != nil {
+				if client.IsErrNotFound(err) {
+					return true, nil // Container gone, treat as stopped
+				}
+				return false, err // Other errors propagate
+			}
+			if !ci.State.Running {
+				return true, nil // Stopped successfully
 			}
 		}
 		time.Sleep(1 * time.Second)

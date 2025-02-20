@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -474,16 +474,16 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 	var timeout time.Duration
 
 	if cleanup, err = flags.GetBool("cleanup"); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	if noRestart, err = flags.GetBool("no-restart"); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	if monitorOnly, err = flags.GetBool("monitor-only"); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	if timeout, err = flags.GetDuration("stop-timeout"); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	return cleanup, noRestart, monitorOnly, timeout
@@ -522,7 +522,7 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 	}
 	for _, secret := range secrets {
 		if err := getSecretFromFile(flags, secret); err != nil {
-			log.Fatalf("failed to get secret from flag %v: %s", secret, err)
+			logrus.Fatalf("failed to get secret from flag %v: %s", secret, err)
 		}
 	}
 }
@@ -586,14 +586,14 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 
 	porcelain, err := flags.GetString(`porcelain`)
 	if err != nil {
-		log.Fatalf(`Failed to get flag: %v`, err)
+		logrus.Fatalf(`Failed to get flag: %v`, err)
 	}
 	if porcelain != "" {
 		if porcelain != "v1" {
-			log.Fatalf(`Unknown porcelain version %q. Supported values: "v1"`, porcelain)
+			logrus.Fatalf(`Unknown porcelain version %q. Supported values: "v1"`, porcelain)
 		}
 		if err = appendFlagValue(flags, `notification-url`, `logger://`); err != nil {
-			log.Errorf(`Failed to set flag: %v`, err)
+			logrus.Errorf(`Failed to set flag: %v`, err)
 		}
 		setFlagIfDefault(flags, `notification-log-stdout`, `true`)
 		setFlagIfDefault(flags, `notification-report`, `true`)
@@ -613,7 +613,7 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 	}
 
 	if intervalChanged && scheduleChanged {
-		log.Fatal(`Only schedule or interval can be defined, not both.`)
+		logrus.Fatal(`Only schedule or interval can be defined, not both.`)
 	}
 
 	// update schedule flag to match interval if it's set, or to the default if none of them are
@@ -640,20 +640,20 @@ func SetupLogging(f *pflag.FlagSet) error {
 	switch strings.ToLower(logFormat) {
 	case "auto":
 		// This will either use the "pretty" or "logfmt" format, based on whether the standard out is connected to a TTY
-		log.SetFormatter(&log.TextFormatter{
+		logrus.SetFormatter(&logrus.TextFormatter{
 			DisableColors: noColor,
 			// enable logrus built-in support for https://bixense.com/clicolors/
 			EnvironmentOverrideColors: true,
 		})
 	case "json":
-		log.SetFormatter(&log.JSONFormatter{})
+		logrus.SetFormatter(&logrus.JSONFormatter{})
 	case "logfmt":
-		log.SetFormatter(&log.TextFormatter{
+		logrus.SetFormatter(&logrus.TextFormatter{
 			DisableColors: true,
 			FullTimestamp: true,
 		})
 	case "pretty":
-		log.SetFormatter(&log.TextFormatter{
+		logrus.SetFormatter(&logrus.TextFormatter{
 			// "Pretty" format combined with `--no-color` will only change the timestamp to the time since start
 			ForceColors:   !noColor,
 			FullTimestamp: false,
@@ -663,10 +663,10 @@ func SetupLogging(f *pflag.FlagSet) error {
 	}
 
 	rawLogLevel, _ := f.GetString(`log-level`)
-	if logLevel, err := log.ParseLevel(rawLogLevel); err != nil {
+	if logLevel, err := logrus.ParseLevel(rawLogLevel); err != nil {
 		return fmt.Errorf("invalid log level: %e", err)
 	} else {
-		log.SetLevel(logLevel)
+		logrus.SetLevel(logLevel)
 	}
 
 	return nil
@@ -675,7 +675,7 @@ func SetupLogging(f *pflag.FlagSet) error {
 func flagIsEnabled(flags *pflag.FlagSet, name string) bool {
 	value, err := flags.GetBool(name)
 	if err != nil {
-		log.Fatalf(`The flag %q is not defined`, name)
+		logrus.Fatalf(`The flag %q is not defined`, name)
 	}
 	return value
 }
@@ -702,6 +702,6 @@ func setFlagIfDefault(flags *pflag.FlagSet, name string, value string) {
 		return
 	}
 	if err := flags.Set(name, value); err != nil {
-		log.Errorf(`Failed to set flag: %v`, err)
+		logrus.Errorf(`Failed to set flag: %v`, err)
 	}
 }

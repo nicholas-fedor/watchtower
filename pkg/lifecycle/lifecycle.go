@@ -3,7 +3,7 @@ package lifecycle
 import (
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // ExecutePreChecks tries to run the pre-check lifecycle hook for all containers included by the current filter.
@@ -30,7 +30,7 @@ func ExecutePostChecks(client container.Client, params types.UpdateParams) {
 
 // ExecutePreCheckCommand tries to run the pre-check lifecycle hook for a single container.
 func ExecutePreCheckCommand(client container.Client, container types.Container) {
-	clog := log.WithField("container", container.Name())
+	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePreCheckCommand()
 	if len(command) == 0 {
 		clog.Debug("No pre-check command supplied. Skipping")
@@ -46,7 +46,7 @@ func ExecutePreCheckCommand(client container.Client, container types.Container) 
 
 // ExecutePostCheckCommand tries to run the post-check lifecycle hook for a single container.
 func ExecutePostCheckCommand(client container.Client, container types.Container) {
-	clog := log.WithField("container", container.Name())
+	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePostCheckCommand()
 	if len(command) == 0 {
 		clog.Debug("No post-check command supplied. Skipping")
@@ -64,7 +64,7 @@ func ExecutePostCheckCommand(client container.Client, container types.Container)
 func ExecutePreUpdateCommand(client container.Client, container types.Container) (SkipUpdate bool, err error) {
 	timeout := container.PreUpdateTimeout()
 	command := container.GetLifecyclePreUpdateCommand()
-	clog := log.WithField("container", container.Name())
+	clog := logrus.WithField("container", container.Name())
 
 	if len(command) == 0 {
 		clog.Debug("No pre-update command supplied. Skipping")
@@ -86,10 +86,10 @@ func ExecutePostUpdateCommand(client container.Client, newContainerID types.Cont
 	timeout := newContainer.PostUpdateTimeout()
 
 	if err != nil {
-		log.WithField("containerID", newContainerID.ShortID()).Error(err)
+		logrus.WithField("containerID", newContainerID.ShortID()).Error(err)
 		return
 	}
-	clog := log.WithField("container", newContainer.Name())
+	clog := logrus.WithField("container", newContainer.Name())
 
 	command := newContainer.GetLifecyclePostUpdateCommand()
 	if len(command) == 0 {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	apiTypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types"
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/onsi/ginkgo/v2"
@@ -60,7 +60,7 @@ var _ = ginkgo.Describe("the manifest module", func() {
 })
 
 func buildMockContainerManifestURL(imageRef string) (string, error) {
-	imageInfo := apiTypes.ImageInspect{
+	imageInfo := types.ImageInspect{
 		RepoTags: []string{
 			imageRef,
 		},

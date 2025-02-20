@@ -5,8 +5,8 @@ import (
 
 	shoutrrrDisco "github.com/containrrr/shoutrrr/pkg/services/discord"
 	shoutrrrSlack "github.com/containrrr/shoutrrr/pkg/services/slack"
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ type slackTypeNotifier struct {
 	IconURL   string
 }
 
-func newSlackNotifier(c *cobra.Command) t.ConvertibleNotifier {
+func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
 	hookURL, _ := flags.GetString("notification-slack-hook-url")
@@ -47,7 +47,7 @@ func (s *slackTypeNotifier) GetURL(c *cobra.Command) (string, error) {
 	parts := strings.Split(trimmedURL, "/")
 
 	if parts[0] == "discord.com" || parts[0] == "discordapp.com" {
-		log.Debug("Detected a discord slack wrapper URL, using shoutrrr discord service")
+		logrus.Debug("Detected a discord slack wrapper URL, using shoutrrr discord service")
 		conf := &shoutrrrDisco.Config{
 			WebhookID:  parts[len(parts)-3],
 			Token:      parts[len(parts)-2],

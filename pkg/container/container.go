@@ -8,17 +8,17 @@ import (
 	"strings"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
-	wt "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/docker/api/types"
-	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
 )
 
 // NewContainer returns a new Container instance instantiated with the
 // specified ContainerInfo and ImageInfo structs.
-func NewContainer(containerInfo *types.ContainerJSON, imageInfo *types.ImageInspect) *Container {
+func NewContainer(containerInfo *container.InspectResponse, imageInfo *image.InspectResponse) *Container {
 	return &Container{
 		containerInfo: containerInfo,
 		imageInfo:     imageInfo,
@@ -30,8 +30,8 @@ type Container struct {
 	LinkedToRestarting bool
 	Stale              bool
 
-	containerInfo *types.ContainerJSON
-	imageInfo     *types.ImageInspect
+	containerInfo *container.InspectResponse
+	imageInfo     *image.InspectResponse
 }
 
 // IsLinkedToRestarting returns the current value of the LinkedToRestarting field for the container
@@ -55,13 +55,13 @@ func (c *Container) SetStale(value bool) {
 }
 
 // ContainerInfo fetches JSON info for the container
-func (c Container) ContainerInfo() *types.ContainerJSON {
+func (c Container) ContainerInfo() *container.InspectResponse {
 	return c.containerInfo
 }
 
 // ID returns the Docker container ID.
-func (c Container) ID() wt.ContainerID {
-	return wt.ContainerID(c.containerInfo.ID)
+func (c Container) ID() types.ContainerID {
+	return types.ContainerID(c.containerInfo.ID)
 }
 
 // IsRunning returns a boolean flag indicating whether or not the current
@@ -85,17 +85,17 @@ func (c Container) Name() string {
 
 // ImageID returns the ID of the Docker image that was used to start the
 // container. May cause nil dereference if imageInfo is not set!
-func (c Container) ImageID() wt.ImageID {
-	return wt.ImageID(c.imageInfo.ID)
+func (c Container) ImageID() types.ImageID {
+	return types.ImageID(c.imageInfo.ID)
 }
 
 // SafeImageID returns the ID of the Docker image that was used to start the container if available,
 // otherwise returns an empty string
-func (c Container) SafeImageID() wt.ImageID {
+func (c Container) SafeImageID() types.ImageID {
 	if c.imageInfo == nil {
 		return ""
 	}
-	return wt.ImageID(c.imageInfo.ID)
+	return types.ImageID(c.imageInfo.ID)
 }
 
 // ImageName returns the name of the Docker image that was used to start the
@@ -133,13 +133,13 @@ func (c Container) Enabled() (bool, bool) {
 
 // IsMonitorOnly returns whether the container should only be monitored based on values of
 // the monitor-only label, the monitor-only argument and the label-take-precedence argument.
-func (c Container) IsMonitorOnly(params wt.UpdateParams) bool {
+func (c Container) IsMonitorOnly(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.MonitorOnly, monitorOnlyLabel, params.LabelPrecedence)
 }
 
 // IsNoPull returns whether the image should be pulled based on values of
 // the no-pull label, the no-pull argument and the label-take-precedence argument.
-func (c Container) IsNoPull(params wt.UpdateParams) bool {
+func (c Container) IsNoPull(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
 }
 
@@ -280,7 +280,7 @@ func (c Container) StopSignal() string {
 // running container with the ContainerConfig from the image that container was
 // started from. This function returns a ContainerConfig which contains just
 // the options overridden at runtime.
-func (c Container) GetCreateConfig() *dockercontainer.Config {
+func (c Container) GetCreateConfig() *container.Config {
 	config := c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 	imageConfig := c.imageInfo.Config
@@ -349,7 +349,7 @@ func (c Container) GetCreateConfig() *dockercontainer.Config {
 
 // GetCreateHostConfig returns the container's current HostConfig with any links
 // re-written so that they can be re-submitted to the Docker create API.
-func (c Container) GetCreateHostConfig() *dockercontainer.HostConfig {
+func (c Container) GetCreateHostConfig() *container.HostConfig {
 	hostConfig := c.containerInfo.HostConfig
 
 	for i, link := range hostConfig.Links {
@@ -368,7 +368,7 @@ func (c Container) HasImageInfo() bool {
 }
 
 // ImageInfo fetches the ImageInspect data of the current container
-func (c Container) ImageInfo() *types.ImageInspect {
+func (c Container) ImageInfo() *image.InspectResponse {
 	return c.imageInfo
 }
 

@@ -2,11 +2,11 @@ package main
 
 import (
 	"github.com/nicholas-fedor/watchtower/cmd"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	log.SetLevel(log.InfoLevel)
+	logrus.SetLevel(logrus.InfoLevel)
 }
 
 func main() {

@@ -15,15 +15,15 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/api"
-	apiMetrics "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
+	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/robfig/cron"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )
@@ -37,7 +37,7 @@ var (
 	monitorOnly       bool
 	enableLabel       bool
 	disableContainers []string
-	notifier          t.Notifier
+	notifier          types.Notifier
 	timeout           time.Duration
 	lifecycleHooks    bool
 	rollingRestart    bool
@@ -73,7 +73,7 @@ func init() {
 func Execute() {
 	rootCmd.AddCommand(notifyUpgradeCommand)
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }
 
@@ -82,7 +82,7 @@ func PreRun(cmd *cobra.Command, _ []string) {
 	f := cmd.PersistentFlags()
 	flags.ProcessFlagAliases(f)
 	if err := flags.SetupLogging(f); err != nil {
-		log.Fatalf("Failed to initialize logging: %s", err.Error())
+		logrus.Fatalf("Failed to initialize logging: %s", err.Error())
 	}
 
 	scheduleSpec, _ = f.GetString("schedule")
@@ -91,7 +91,7 @@ func PreRun(cmd *cobra.Command, _ []string) {
 	cleanup, noRestart, monitorOnly, timeout = flags.ReadFlags(cmd)
 
 	if timeout < 0 {
-		log.Fatal("Please specify a positive value for timeout value.")
+		logrus.Fatal("Please specify a positive value for timeout value.")
 	}
 
 	enableLabel, _ = f.GetBool("label-enable")
@@ -102,13 +102,13 @@ func PreRun(cmd *cobra.Command, _ []string) {
 	labelPrecedence, _ = f.GetBool("label-take-precedence")
 
 	if scope != "" {
-		log.Debugf(`Using scope %q`, scope)
+		logrus.Debugf(`Using scope %q`, scope)
 	}
 
 	// configure environment vars for client
 	err := flags.EnvConfig(cmd)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	noPull, _ = f.GetBool("no-pull")
@@ -119,7 +119,7 @@ func PreRun(cmd *cobra.Command, _ []string) {
 	warnOnHeadPullFailed, _ := f.GetString("warn-on-head-failure")
 
 	if monitorOnly && noPull {
-		log.Warn("Using `WATCHTOWER_NO_PULL` and `WATCHTOWER_MONITOR_ONLY` simultaneously might lead to no action being taken at all. If this is intentional, you may safely ignore this message.")
+		logrus.Warn("Using `WATCHTOWER_NO_PULL` and `WATCHTOWER_MONITOR_ONLY` simultaneously might lead to no action being taken at all. If this is intentional, you may safely ignore this message.")
 	}
 
 	client = container.NewClient(container.ClientOptions{
@@ -148,13 +148,13 @@ func Run(c *cobra.Command, names []string) {
 		// health check should not have pid 1
 		if os.Getpid() == 1 {
 			time.Sleep(1 * time.Second)
-			log.Fatal("The health check flag should never be passed to the main watchtower container process")
+			logrus.Fatal("The health check flag should never be passed to the main watchtower container process")
 		}
 		os.Exit(0)
 	}
 
 	if rollingRestart && monitorOnly {
-		log.Fatal("Rolling restarts is not compatible with the global monitor only flag")
+		logrus.Fatal("Rolling restarts is not compatible with the global monitor only flag")
 	}
 
 	awaitDockerClient()
@@ -195,29 +195,29 @@ func Run(c *cobra.Command, names []string) {
 	}
 
 	if enableMetricsAPI {
-		metricsHandler := apiMetrics.New()
+		metricsHandler := metricsAPI.New()
 		httpAPI.RegisterHandler(metricsHandler.Path, metricsHandler.Handle)
 	}
 
 	if err := httpAPI.Start(enableUpdateAPI && !unblockHTTPAPI); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Error("failed to start API", err)
+		logrus.Error("failed to start API", err)
 	}
 
 	if err := runUpgradesOnSchedule(c, filter, filterDesc, updateLock); err != nil {
-		log.Error(err)
+		logrus.Error(err)
 	}
 
 	os.Exit(1)
 }
 
 func logNotifyExit(err error) {
-	log.Error(err)
+	logrus.Error(err)
 	notifier.Close()
 	os.Exit(1)
 }
 
 func awaitDockerClient() {
-	log.Debug("Sleeping for a second to ensure the docker api client has been properly initialized.")
+	logrus.Debug("Sleeping for a second to ensure the docker api client has been properly initialized.")
 	time.Sleep(1 * time.Second)
 }
 
@@ -264,11 +264,11 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
 	noStartupMessage, _ := c.PersistentFlags().GetBool("no-startup-message")
 	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
 
-	var startupLog *log.Entry
+	var startupLog *logrus.Entry
 	if noStartupMessage {
 		startupLog = notifications.LocalLog
 	} else {
-		startupLog = log.NewEntry(log.StandardLogger())
+		startupLog = logrus.NewEntry(logrus.StandardLogger())
 		// Batch up startup messages to send them as a single notification
 		notifier.StartNotification()
 	}
@@ -304,12 +304,12 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
 		notifier.SendNotification(nil)
 	}
 
-	if log.IsLevelEnabled(log.TraceLevel) {
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		startupLog.Warn("Trace level enabled: log will include sensitive information as credentials and tokens")
 	}
 }
 
-func runUpgradesOnSchedule(c *cobra.Command, filter t.Filter, filtering string, lock chan bool) error {
+func runUpgradesOnSchedule(c *cobra.Command, filter types.Filter, filtering string, lock chan bool) error {
 	if lock == nil {
 		lock = make(chan bool, 1)
 		lock <- true
@@ -327,12 +327,12 @@ func runUpgradesOnSchedule(c *cobra.Command, filter t.Filter, filtering string, 
 			default:
 				// Update was skipped
 				metrics.RegisterScan(nil)
-				log.Debug("Skipped another update already running.")
+				logrus.Debug("Skipped another update already running.")
 			}
 
 			nextRuns := scheduler.Entries()
 			if len(nextRuns) > 0 {
-				log.Debug("Scheduled next run: " + nextRuns[0].Next.String())
+				logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
 			}
 		})
 
@@ -351,14 +351,14 @@ func runUpgradesOnSchedule(c *cobra.Command, filter t.Filter, filtering string, 
 
 	<-interrupt
 	scheduler.Stop()
-	log.Info("Waiting for running update to be finished...")
+	logrus.Info("Waiting for running update to be finished...")
 	<-lock
 	return nil
 }
 
-func runUpdatesWithNotifications(filter t.Filter) *metrics.Metric {
+func runUpdatesWithNotifications(filter types.Filter) *metrics.Metric {
 	notifier.StartNotification()
-	updateParams := t.UpdateParams{
+	updateParams := types.UpdateParams{
 		Filter:          filter,
 		Cleanup:         cleanup,
 		NoRestart:       noRestart,
@@ -371,11 +371,11 @@ func runUpdatesWithNotifications(filter t.Filter) *metrics.Metric {
 	}
 	result, err := actions.Update(client, updateParams)
 	if err != nil {
-		log.Error(err)
+		logrus.Error(err)
 	}
 	notifier.SendNotification(result)
 	metricResults := metrics.NewMetric(result)
-	notifications.LocalLog.WithFields(log.Fields{
+	notifications.LocalLog.WithFields(logrus.Fields{
 		"Scanned": metricResults.Scanned,
 		"Updated": metricResults.Updated,
 		"Failed":  metricResults.Failed,

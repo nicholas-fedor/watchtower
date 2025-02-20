@@ -6,7 +6,7 @@ import (
 	"github.com/containrrr/shoutrrr/pkg/types"
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
-	s "github.com/nicholas-fedor/watchtower/pkg/session"
+	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -44,10 +44,10 @@ var mockDataMultipleEntries = Data{
 
 var mockDataAllFresh = Data{
 	Entries: []*logrus.Entry{},
-	Report:  mocks.CreateMockProgressReport(s.FreshState),
+	Report:  mocks.CreateMockProgressReport(session.FreshState),
 }
 
-func mockDataFromStates(states ...s.State) Data {
+func mockDataFromStates(states ...session.State) Data {
 	hostname := "Mock"
 	prefix := ""
 	return Data{
@@ -78,7 +78,7 @@ var _ = ginkgo.Describe("Shoutrrr", func() {
 			expected := `
 updt1 (mock/updt1:latest): Updated
 `[1:]
-			data := mockDataFromStates(s.UpdatedState)
+			data := mockDataFromStates(session.UpdatedState)
 			gomega.Expect(getTemplatedResult(`porcelain.v1.summary-no-log`, false, data)).To(gomega.Equal(expected))
 		})
 	})
@@ -210,7 +210,7 @@ updt1 (mock/updt1:latest): Updated
 - frsh1 (mock/frsh1:latest): Fresh
 - skip1 (mock/skip1:latest): Skipped: unpossible
 - fail1 (mock/fail1:latest): Failed: accidentally the whole container`
-				data := mockDataFromStates(s.UpdatedState, s.FreshState, s.FailedState, s.SkippedState, s.UpdatedState)
+				data := mockDataFromStates(session.UpdatedState, session.FreshState, session.FailedState, session.SkippedState, session.UpdatedState)
 				gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
 			})
 
@@ -219,7 +219,7 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.When("using a template referencing Title", func() {
 			ginkgo.It("should contain the title in the output", func() {
 				expected := `Watchtower updates on Mock`
-				data := mockDataFromStates(s.UpdatedState)
+				data := mockDataFromStates(session.UpdatedState)
 				gomega.Expect(getTemplatedResult(`{{ .Title }}`, false, data)).To(gomega.Equal(expected))
 			})
 		})
@@ -227,7 +227,7 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.When("using a template referencing Host", func() {
 			ginkgo.It("should contain the hostname in the output", func() {
 				expected := `Mock`
-				data := mockDataFromStates(s.UpdatedState)
+				data := mockDataFromStates(session.UpdatedState)
 				gomega.Expect(getTemplatedResult(`{{ .Host }}`, false, data)).To(gomega.Equal(expected))
 			})
 		})
@@ -242,7 +242,7 @@ updt1 (mock/updt1:latest): Updated
 				ginkgo.It("should send a report", func() {
 					expected := `1 Scanned, 1 Updated, 0 Failed
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000`
-					data := mockDataFromStates(s.UpdatedState)
+					data := mockDataFromStates(session.UpdatedState)
 					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
 				})
 			})
@@ -250,7 +250,7 @@ updt1 (mock/updt1:latest): Updated
 				ginkgo.It("should send a report", func() {
 					expected := `1 Scanned, 0 Updated, 1 Failed
 - fail1 (mock/fail1:latest): Failed: accidentally the whole container`
-					data := mockDataFromStates(s.FailedState)
+					data := mockDataFromStates(session.FailedState)
 					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
 				})
 			})

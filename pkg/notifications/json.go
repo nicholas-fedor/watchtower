@@ -3,7 +3,7 @@ package notifications
 import (
 	"encoding/json"
 
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 type jsonMap = map[string]interface{}
@@ -40,7 +40,7 @@ func (d Data) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func marshalReports(reports []t.ContainerReport) []jsonMap {
+func marshalReports(reports []types.ContainerReport) []jsonMap {
 	jsonReports := make([]jsonMap, len(reports))
 	for i, report := range reports {
 		jsonReports[i] = jsonMap{

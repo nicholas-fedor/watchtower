@@ -1,8 +1,8 @@
 package notifications
 
 import (
-	t "github.com/nicholas-fedor/watchtower/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/sirupsen/logrus"
 )
 
 // StaticData is the part of the notification template data model set upon initialization
@@ -14,6 +14,6 @@ type StaticData struct {
 // Data is the notification template data model
 type Data struct {
 	StaticData
-	Entries []*log.Entry
-	Report  t.Report
+	Entries []*logrus.Entry
+	Report  types.Report
 }
