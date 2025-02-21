@@ -40,7 +40,7 @@ jobs:
       - name: Test
         run: go test -v -coverprofile coverage.out -covermode atomic ./...
       - name: Publish coverage
-        uses: codecov/codecov-action@2e6e9c5a74ec004831b6d17edfb76c53a54d4d55
+        uses: codecov/codecov-action@1fecca8ce3a22284e70b371077fb5219f54095b8
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
