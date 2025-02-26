@@ -3,7 +3,7 @@ package notifications
 import (
 	"net/url"
 
-	"github.com/containrrr/shoutrrr/pkg/services/teams"
+	"github.com/nicholas-fedor/shoutrrr/pkg/services/teams"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

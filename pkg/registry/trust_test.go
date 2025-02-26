@@ -11,12 +11,12 @@ var _ = ginkgo.Describe("Registry credential helpers", func() {
 	ginkgo.Describe("EncodedAuth", func() {
 		ginkgo.It("should return repo credentials from env when set", func() {
 			var err error
-			expected := "eyJ1c2VybmFtZSI6ImNvbnRhaW5ycnItdXNlciIsInBhc3N3b3JkIjoiY29udGFpbnJyci1wYXNzIn0="
+			expected := "eyJ1c2VybmFtZSI6IndhdGNodG93ZXItdXNlciIsInBhc3N3b3JkIjoid2F0Y2h0b3dlci1wYXNzIn0="
 
-			err = os.Setenv("REPO_USER", "containrrr-user")
+			err = os.Setenv("REPO_USER", "watchtower-user")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			err = os.Setenv("REPO_PASS", "containrrr-pass")
+			err = os.Setenv("REPO_PASS", "watchtower-pass")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			config, err := EncodedEnvAuth()

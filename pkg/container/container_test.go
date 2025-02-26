@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("the container", func() {
 		})
 		ginkgo.It("should return its name on calls to .Name()", func() {
 			name := c.Name()
-			gomega.Expect(name).To(gomega.Equal("test-containrrr"))
+			gomega.Expect(name).To(gomega.Equal("test-watchtower"))
 			gomega.Expect(name).NotTo(gomega.Equal("wrong-name"))
 		})
 		ginkgo.It("should return its ID on calls to .ID()", func() {
@@ -294,8 +294,8 @@ var _ = ginkgo.Describe("the container", func() {
 			ginkgo.When("the depends on label is not present", func() {
 				ginkgo.It("should fetch depending containers from host config links", func() {
 					c = MockContainer(WithLinks([]string{
-						"redis:test-containrrr",
-						"postgres:test-containrrr",
+						"redis:test-watchtower",
+						"postgres:test-watchtower",
 					}))
 					links := c.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(gomega.ContainElement("redis"), gomega.ContainElement("postgres"), gomega.HaveLen(2)))

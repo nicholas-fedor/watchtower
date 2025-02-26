@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			token := "abvsihdbau"
 			color := notifications.ColorInt
 			username := "containrrrbot"
-			iconURL := "https://containrrr.dev/watchtower-sq180.png"
+			iconURL := "https://github.com/nicholas-fedor/watchtower/blob/main/watchtower-sq180.png"
 			expected := fmt.Sprintf("discord://%s@%s?color=0x%x&colordebug=0x0&colorerror=0x0&colorinfo=0x0&colorwarn=0x0&username=watchtower", token, channel, color)
 			buildArgs := func(url string) []string {
 				return []string{
@@ -196,7 +196,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			tokenB := "BBBBBBBBB"
 			tokenC := "123456789123456789123456"
 			color := url.QueryEscape(notifications.ColorHex)
-			iconURL := "https://containrrr.dev/watchtower-sq180.png"
+			iconURL := "https://github.com/nicholas-fedor/watchtower/blob/main/watchtower-sq180.png"
 			iconEmoji := "whale"
 
 			ginkgo.When("icon URL is specified", func() {
@@ -300,7 +300,7 @@ var _ = ginkgo.Describe("notifications", func() {
 		ginkgo.When("converting an email service config into a shoutrrr url", func() {
 			ginkgo.It("should set the from address in the URL", func() {
 				fromAddress := "lala@example.com"
-				expectedOutput := buildExpectedURL("containrrrbot", "secret-password", "mail.containrrr.dev", 25, fromAddress, "mail@example.com", "Plain")
+				expectedOutput := buildExpectedURL("containrrrbot", "secret-password", "mail.watchtower.dev", 25, fromAddress, "mail@example.com", "Plain")
 				expectedDelay := time.Duration(7) * time.Second
 
 				args := []string{
@@ -315,7 +315,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"--notification-email-server-password",
 					"secret-password",
 					"--notification-email-server",
-					"mail.containrrr.dev",
+					"mail.watchtower.dev",
 					"--notifications-delay",
 					fmt.Sprint(expectedDelay.Seconds()),
 				}
@@ -326,7 +326,7 @@ var _ = ginkgo.Describe("notifications", func() {
 
 				fromAddress := "sender@example.com"
 				toAddress := "receiver@example.com"
-				expectedOutput := buildExpectedURL("containrrrbot", "secret-password", "mail.containrrr.dev", 25, fromAddress, toAddress, "Plain")
+				expectedOutput := buildExpectedURL("containrrrbot", "secret-password", "mail.watchtower.dev", 25, fromAddress, toAddress, "Plain")
 				expectedDelay := time.Duration(7) * time.Second
 
 				args := []string{
@@ -341,7 +341,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"--notification-email-server-password",
 					"secret-password",
 					"--notification-email-server",
-					"mail.containrrr.dev",
+					"mail.watchtower.dev",
 					"--notification-email-delay",
 					fmt.Sprint(expectedDelay.Seconds()),
 				}
