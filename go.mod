@@ -9,7 +9,7 @@ require (
 	github.com/containrrr/shoutrrr v0.8.0
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.0.0+incompatible
-	github.com/docker/docker v28.0.0+incompatible
+	github.com/docker/docker v28.0.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.21.0
