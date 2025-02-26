@@ -3,8 +3,8 @@ package notifications
 import (
 	"strings"
 
-	shoutrrrDisco "github.com/containrrr/shoutrrr/pkg/services/discord"
-	shoutrrrSlack "github.com/containrrr/shoutrrr/pkg/services/slack"
+	shoutrrrDisco "github.com/nicholas-fedor/shoutrrr/pkg/services/discord"
+	shoutrrrSlack "github.com/nicholas-fedor/shoutrrr/pkg/services/slack"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

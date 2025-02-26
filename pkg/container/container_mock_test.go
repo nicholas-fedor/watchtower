@@ -13,7 +13,7 @@ func MockContainer(updates ...MockContainerUpdate) *Container {
 		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:         "container_id",
 			Image:      "image",
-			Name:       "test-containrrr",
+			Name:       "test-watchtower",
 			HostConfig: &container.HostConfig{},
 		},
 		Config: &container.Config{

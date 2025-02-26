@@ -24,13 +24,13 @@ system, [logrus](http://github.com/sirupsen/logrus).
 - `--notification-skip-title` (env. `WATCHTOWER_NOTIFICATION_SKIP_TITLE`): Do not pass the title param to notifications. This will not pass a dynamic title override to notification services. If no title is configured for the service, it will remove the title all together.
 - `--notification-log-stdout` (env. `WATCHTOWER_NOTIFICATION_LOG_STDOUT`): Enable output from `logger://` shoutrrr service to stdout.
 
-## [Shoutrrr](https://github.com/containrrr/shoutrrr) notifications
+## [Shoutrrr](https://github.com/nicholas-fedor/shoutrrr) notifications
 
 To send notifications via shoutrrr, the following command-line options, or their corresponding environment variables, can be set:
 
 - `--notification-url` (env. `WATCHTOWER_NOTIFICATION_URL`): The shoutrrr service URL to be used.  This option can also reference a file, in which case the contents of the file are used.
 
-Go to [containrrr.dev/shoutrrr/v0.8/services/overview](https://containrrr.dev/shoutrrr/v0.8/services/overview) to
+Go to [nicholas-fedor.github.io/shoutrrr/services/overview](https://nicholas-fedor.github.io/shoutrrr/services/overview) to
 learn more about the different service URLs you can use. You can define multiple services by space separating the
 URLs. (See example below)
 
