@@ -22,7 +22,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@d8648ac2edec95c7927c492e5cfb10276c5ea71d
+        uses: golangci/golangci-lint-action@b871b4f9de8b829c8d43b0e3bcdf9a8a3f141a3b
 
   test:
     name: Test
