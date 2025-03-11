@@ -15,9 +15,6 @@
     'prIgnoreNotification',
   ],
   rebaseWhen: 'conflicted',
-  schedule: [
-    'every weekend',
-  ],
   commitMessageAction: 'Update digest',
   commitMessageTopic: '{{depName}}',
   commitMessageExtra: 'to {{newVersion}}',
