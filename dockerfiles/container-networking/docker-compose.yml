@@ -1,6 +1,6 @@
 services:
   producer:
-    image: qmcgaw/gluetun:v3.40.0
+    image: qmcgaw/gluetun:v3.40.0@sha256:2b42bfa046757145a5155acece417b65b4443c8033fb88661a8e9dcf7fda5a00
     cap_add:
       - NET_ADMIN
     environment:
@@ -11,7 +11,7 @@ services:
   consumer:
     depends_on:
       - producer
-    image: nginx:1.27.4
+    image: nginx:1.27.4@sha256:9d6b58feebd2dbd3c56ab5853333d627cc6e281011cfd6050fa4bcf2072c9496
     network_mode: "service:producer"
     labels:
       - "com.centurylinklabs.watchtower.depends-on=/wt-contnet-producer-1"
