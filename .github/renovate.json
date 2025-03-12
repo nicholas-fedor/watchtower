@@ -1,4 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "helpers:pin GitHub Action Digests"]
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"]
 }
