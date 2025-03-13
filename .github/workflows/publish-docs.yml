@@ -31,7 +31,7 @@ jobs:
       - name: Build tplprev
         run: scripts/build-tplprev.sh
       - name: Setup python
-        uses: actions/setup-python@6fd11e170a18f6ae448d1080a4a63cc987aed84c
+        uses: actions/setup-python@19e4675e06535f6b54e894da5c1f044400bb4996
         with:
           python-version: "3.13.2"
           cache: "pip"
