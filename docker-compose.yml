@@ -30,7 +30,7 @@ services:
       - grafana:/var/lib/grafana
       - ./grafana:/etc/grafana/provisioning
   parent:
-    image: nginx@sha256:57a563126c0fd426346b02e5aa231ae9e5fd66f2248b36553207a0eca1403fde
+    image: nginx@sha256:124b44bfc9ccd1f3cedf4b592d4d1e8bddb78b51ec2ed5056c52d3692baebc19
     container_name: parent
   child:
     image: nginx:alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
