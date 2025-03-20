@@ -13,7 +13,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// CreateMockContainer creates a container substitute valid for testing
+// CreateMockContainer creates a container substitute valid for testing.
 func CreateMockContainer(id string, name string, image string, created time.Time) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -31,13 +31,14 @@ func CreateMockContainer(id string, name string, image string, created time.Time
 			ExposedPorts: map[nat.Port]struct{}{},
 		},
 	}
+
 	return container.NewContainer(
 		&content,
 		CreateMockImageInfo(image),
 	)
 }
 
-// CreateMockImageInfo returns a mock image info struct based on the passed image
+// CreateMockImageInfo returns a mock image info struct based on the passed image.
 func CreateMockImageInfo(mockImage string) *image.InspectResponse {
 	return &image.InspectResponse{
 		ID: mockImage,
@@ -47,12 +48,12 @@ func CreateMockImageInfo(mockImage string) *image.InspectResponse {
 	}
 }
 
-// CreateMockContainerWithImageInfo should only be used for testing
+// CreateMockContainerWithImageInfo should only be used for testing.
 func CreateMockContainerWithImageInfo(id string, name string, image string, created time.Time, imageInfo image.InspectResponse) types.Container {
 	return CreateMockContainerWithImageInfoP(id, name, image, created, &imageInfo)
 }
 
-// CreateMockContainerWithImageInfoP should only be used for testing
+// CreateMockContainerWithImageInfoP should only be used for testing.
 func CreateMockContainerWithImageInfoP(id string, name string, image string, created time.Time, imageInfo *image.InspectResponse) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -66,20 +67,22 @@ func CreateMockContainerWithImageInfoP(id string, name string, image string, cre
 			Labels: make(map[string]string),
 		},
 	}
+
 	return container.NewContainer(
 		&content,
 		imageInfo,
 	)
 }
 
-// CreateMockContainerWithDigest should only be used for testing
+// CreateMockContainerWithDigest should only be used for testing.
 func CreateMockContainerWithDigest(id string, name string, image string, created time.Time, digest string) types.Container {
 	c := CreateMockContainer(id, name, image, created)
 	c.ImageInfo().RepoDigests = []string{digest}
+
 	return c
 }
 
-// CreateMockContainerWithConfig creates a container substitute valid for testing
+// CreateMockContainerWithConfig creates a container substitute valid for testing.
 func CreateMockContainerWithConfig(id string, name string, image string, running bool, restarting bool, created time.Time, config *dockerContainer.Config) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -97,13 +100,14 @@ func CreateMockContainerWithConfig(id string, name string, image string, running
 		},
 		Config: config,
 	}
+
 	return container.NewContainer(
 		&content,
 		CreateMockImageInfo(image),
 	)
 }
 
-// CreateContainerForProgress creates a container substitute for tracking session/update progress
+// CreateContainerForProgress creates a container substitute for tracking session/update progress.
 func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (types.Container, types.ImageID) {
 	indexStr := strconv.Itoa(idPrefix + index)
 	mockID := indexStr + strings.Repeat("0", 61-len(indexStr))
@@ -116,10 +120,11 @@ func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (typ
 		Image: imageName,
 	}
 	c := CreateMockContainerWithConfig(contID, contName, oldImgID, true, false, time.Now(), config)
+
 	return c, types.ImageID(newImgID)
 }
 
-// CreateMockContainerWithLinks should only be used for testing
+// CreateMockContainerWithLinks should only be used for testing.
 func CreateMockContainerWithLinks(id string, name string, image string, created time.Time, links []string, imageInfo *image.InspectResponse) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -136,6 +141,7 @@ func CreateMockContainerWithLinks(id string, name string, image string, created 
 			Labels: make(map[string]string),
 		},
 	}
+
 	return container.NewContainer(
 		&content,
 		imageInfo,

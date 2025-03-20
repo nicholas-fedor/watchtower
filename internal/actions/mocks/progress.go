@@ -7,10 +7,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// CreateMockProgressReport creates a mock report from a given set of container states
-// All containers will be given a unique ID and name based on its state and index
+// All containers will be given a unique ID and name based on its state and index.
 func CreateMockProgressReport(states ...session.State) types.Report {
-
 	stateNums := make(map[session.State]int)
 	progress := session.Progress{}
 	failed := make(map[types.ContainerID]error)
@@ -32,13 +30,14 @@ func CreateMockProgressReport(states ...session.State) types.Report {
 		case session.FailedState:
 			c, newImage := CreateContainerForProgress(index, 21, "fail%d")
 			progress.AddScanned(c, newImage)
+
 			failed[c.ID()] = errors.New("accidentally the whole container")
 		}
 
 		stateNums[state] = index + 1
 	}
+
 	progress.UpdateFailed(failed)
 
 	return progress.Report()
-
 }

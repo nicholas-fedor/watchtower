@@ -8,6 +8,7 @@ import (
 )
 
 func TestContainer(t *testing.T) {
+	t.Parallel()
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "Container Suite")
 }

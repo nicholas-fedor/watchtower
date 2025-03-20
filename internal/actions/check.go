@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// CheckForSanity makes sure everything is sane before starting
+// CheckForSanity makes sure everything is sane before starting.
 func CheckForSanity(client container.Client, filter types.Filter, rollingRestarts bool) error {
 	logrus.Debug("Making sure everything is sane before starting")
 
@@ -22,6 +22,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 		if err != nil {
 			return err
 		}
+
 		for _, c := range containers {
 			if len(c.Links()) > 0 {
 				return fmt.Errorf(
@@ -31,6 +32,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -43,18 +45,20 @@ func CheckForMultipleWatchtowerInstances(client container.Client, cleanup bool, 
 	if scope != "" {
 		filter = filters.FilterByScope(scope, filter)
 	}
-	containers, err := client.ListContainers(filter)
 
+	containers, err := client.ListContainers(filter)
 	if err != nil {
 		return err
 	}
 
 	if len(containers) <= 1 {
 		logrus.Debug("There are no additional watchtower containers")
+
 		return nil
 	}
 
 	logrus.Info("Found multiple running watchtower instances. Cleaning up.")
+
 	return cleanupExcessWatchtowers(containers, client, cleanup)
 }
 
@@ -62,13 +66,17 @@ func cleanupExcessWatchtowers(containers []types.Container, client container.Cli
 	var stopErrors int
 
 	sort.Sort(sorter.ByCreated(containers))
+	logrus.Debugf("Sorted containers: %v", containers) // Log sorted order
 	allContainersExceptLast := containers[0 : len(containers)-1]
+	logrus.Debugf("Stopping containers: %v", allContainersExceptLast) // Log what’s being stopped
 
 	for _, c := range allContainersExceptLast {
 		if err := client.StopContainer(c, 10*time.Minute); err != nil {
 			// logging the original here as we're just returning a count
 			logrus.WithError(err).Error("Could not stop a previous watchtower instance.")
+
 			stopErrors++
+
 			continue
 		}
 

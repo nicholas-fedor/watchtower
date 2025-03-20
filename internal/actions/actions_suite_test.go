@@ -83,6 +83,8 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should stop all but the latest one", func() {
 				err := actions.CheckForMultipleWatchtowerInstances(client, false, "")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).To(gomega.BeFalse(), "test-container-01 should be stopped")
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).To(gomega.BeTrue(), "test-container-02 should remain running")
 			})
 		})
 		ginkgo.When("deciding whether to cleanup images", func() {

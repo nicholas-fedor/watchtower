@@ -18,6 +18,7 @@ import (
 // the new image.
 func Update(client container.Client, params types.UpdateParams) (types.Report, error) {
 	logrus.Debug("Checking containers for updated images")
+
 	progress := &session.Progress{}
 	staleCount := 0
 
@@ -35,6 +36,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	for i, targetContainer := range containers {
 		stale, newestImage, err := client.IsContainerStale(targetContainer, params)
 		shouldUpdate := stale && !params.NoRestart && !targetContainer.IsMonitorOnly(params)
+
 		if err == nil && shouldUpdate {
 			// Check to make sure we have all the necessary information for recreating the container
 			err = targetContainer.VerifyConfiguration()
@@ -43,6 +45,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 				imageInfo := targetContainer.ImageInfo()
 				logrus.Tracef("Image info: %#v", imageInfo)
 				logrus.Tracef("Container info: %#v", targetContainer.ContainerInfo())
+
 				if imageInfo != nil {
 					logrus.Tracef("Image config: %#v", imageInfo.Config)
 				}
@@ -51,12 +54,15 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 
 		if err != nil {
 			logrus.Infof("Unable to update container %q: %v. Proceeding to next.", targetContainer.Name(), err)
+
 			stale = false
 			staleCheckFailed++
+
 			progress.AddSkipped(targetContainer, err)
 		} else {
 			progress.AddScanned(targetContainer, newestImage)
 		}
+
 		containers[i].SetStale(stale)
 
 		if stale {
@@ -72,6 +78,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	UpdateImplicitRestart(containers)
 
 	var containersToUpdate []types.Container
+
 	for _, c := range containers {
 		if !c.IsMonitorOnly(params) {
 			containersToUpdate = append(containersToUpdate, c)
@@ -84,6 +91,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	} else {
 		failedStop, stoppedImages := stopContainersInReversedOrder(containersToUpdate, client, params)
 		progress.UpdateFailed(failedStop)
+
 		failedStart := restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages)
 		progress.UpdateFailed(failedStart)
 	}
@@ -91,6 +99,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	if params.LifecycleHooks {
 		lifecycle.ExecutePostChecks(client, params)
 	}
+
 	return progress.Report(), nil
 }
 
@@ -117,12 +126,14 @@ func performRollingRestart(containers []types.Container, client container.Client
 	if params.Cleanup {
 		cleanupImages(client, cleanupImageIDs)
 	}
+
 	return failed
 }
 
 func stopContainersInReversedOrder(containers []types.Container, client container.Client, params types.UpdateParams) (failed map[types.ContainerID]error, stopped map[types.ImageID]bool) {
 	failed = make(map[types.ContainerID]error, len(containers))
 	stopped = make(map[types.ImageID]bool, len(containers))
+
 	for i := len(containers) - 1; i >= 0; i-- {
 		if err := stopStaleContainer(containers[i], client, params); err != nil {
 			failed[containers[i].ID()] = err
@@ -130,14 +141,15 @@ func stopContainersInReversedOrder(containers []types.Container, client containe
 			// NOTE: If a container is restarted due to a dependency this might be empty
 			stopped[containers[i].SafeImageID()] = true
 		}
-
 	}
+
 	return
 }
 
 func stopStaleContainer(container types.Container, client container.Client, params types.UpdateParams) error {
 	if container.IsWatchtower() {
 		logrus.Debugf("This is the watchtower container %s", container.Name())
+
 		return nil
 	}
 
@@ -157,18 +169,23 @@ func stopStaleContainer(container types.Container, client container.Client, para
 		if err != nil {
 			logrus.Error(err)
 			logrus.Info("Skipping container as the pre-update command failed")
+
 			return err
 		}
+
 		if skipUpdate {
 			logrus.Debug("Skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
+
 			return errors.New("skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
 		}
 	}
 
 	if err := client.StopContainer(container, params.Timeout); err != nil {
 		logrus.Error(err)
+
 		return err
 	}
+
 	return nil
 }
 
@@ -180,6 +197,7 @@ func restartContainersInSortedOrder(containers []types.Container, client contain
 		if !c.ToRestart() {
 			continue
 		}
+
 		if stoppedImages[c.SafeImageID()] {
 			if err := restartStaleContainer(c, client, params); err != nil {
 				failed[c.ID()] = err
@@ -202,6 +220,7 @@ func cleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 		if imageID == "" {
 			continue
 		}
+
 		if err := client.RemoveImageByID(imageID); err != nil {
 			logrus.Error(err)
 		}
@@ -216,6 +235,7 @@ func restartStaleContainer(container types.Container, client container.Client, p
 	if container.IsWatchtower() {
 		if err := client.RenameContainer(container, util.RandName()); err != nil {
 			logrus.Error(err)
+
 			return nil
 		}
 	}
@@ -223,18 +243,18 @@ func restartStaleContainer(container types.Container, client container.Client, p
 	if !params.NoRestart {
 		if newContainerID, err := client.StartContainer(container); err != nil {
 			logrus.Error(err)
+
 			return err
 		} else if container.ToRestart() && params.LifecycleHooks {
 			lifecycle.ExecutePostUpdateCommand(client, newContainerID)
 		}
 	}
+
 	return nil
 }
 
-// UpdateImplicitRestart iterates through the passed containers, setting the
-// `LinkedToRestarting` flag if any of it's linked containers are marked for restart
+// `LinkedToRestarting` flag if any of it's linked containers are marked for restart.
 func UpdateImplicitRestart(containers []types.Container) {
-
 	for ci, c := range containers {
 		if c.ToRestart() {
 			// The container is already marked for restart, no need to check
@@ -249,12 +269,10 @@ func UpdateImplicitRestart(containers []types.Container) {
 			// NOTE: To mutate the array, the `c` variable cannot be used as it's a copy
 			containers[ci].SetLinkedToRestarting(true)
 		}
-
 	}
 }
 
-// linkedContainerMarkedForRestart returns the name of the first link that matches a
-// container marked for restart
+// container marked for restart.
 func linkedContainerMarkedForRestart(links []string, containers []types.Container) string {
 	for _, linkName := range links {
 		for _, candidate := range containers {
@@ -263,5 +281,6 @@ func linkedContainerMarkedForRestart(links []string, containers []types.Containe
 			}
 		}
 	}
+
 	return ""
 }
