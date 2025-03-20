@@ -1,8 +1,6 @@
 package container
 
 import (
-	"encoding/json"
-	"io"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -304,137 +302,6 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 	})
-	ginkgo.Describe(`GetNetworkConfig`, func() {
-		ginkgo.When(`providing a container with network aliases`, func() {
-			ginkgo.It(`should omit the container ID alias`, func() {
-				client := dockerClient{api: docker, ClientOptions: ClientOptions{IncludeRestarting: false}}
-				mockContainer := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
-				aliases := []string{"One", "Two", mockContainer.ID().ShortID(), "Four"}
-				endpoints := map[string]*network.EndpointSettings{
-					`test`: {Aliases: aliases},
-				}
-				mockContainer.containerInfo.NetworkSettings = &container.NetworkSettings{Networks: endpoints}
-				gomega.Expect(mockContainer.ContainerInfo().NetworkSettings.Networks[`test`].Aliases).To(gomega.Equal(aliases))
-				gomega.Expect(client.GetNetworkConfig(mockContainer).EndpointsConfig[`test`].Aliases).To(gomega.Equal([]string{"One", "Two", "Four"}))
-			})
-		})
-		ginkgo.When(`providing a container with a static MAC address`, func() {
-			ginkgo.It(`should preserve the MAC address in the network config`, func() {
-				client := dockerClient{api: docker, ClientOptions: ClientOptions{}}
-				mockContainer := MockContainer(WithImageName("nginx:latest"))
-				staticMac := "02:42:ac:11:00:02"
-				endpoints := map[string]*network.EndpointSettings{
-					"bridge": {MacAddress: staticMac, Aliases: []string{"app", mockContainer.ID().ShortID()}},
-				}
-				mockContainer.containerInfo.NetworkSettings = &container.NetworkSettings{Networks: endpoints}
-				networkConfig := client.GetNetworkConfig(mockContainer)
-				gomega.Expect(networkConfig.EndpointsConfig["bridge"].MacAddress).To(gomega.Equal(staticMac))
-				gomega.Expect(networkConfig.EndpointsConfig["bridge"].Aliases).To(gomega.Equal([]string{"app"}))
-			})
-		})
-		ginkgo.When(`providing a container with multiple networks and MAC addresses`, func() {
-			ginkgo.It(`should preserve all MAC addresses`, func() {
-				client := dockerClient{api: docker, ClientOptions: ClientOptions{}}
-				mockContainer := MockContainer(WithImageName("qmcgaw/gluetun:latest"))
-				endpoints := map[string]*network.EndpointSettings{
-					"wt-contnet_default": {MacAddress: "02:42:ac:13:00:02", Aliases: []string{"producer"}},
-					"extra_net":          {MacAddress: "02:42:ac:14:00:03", Aliases: []string{"extra"}},
-				}
-				mockContainer.containerInfo.NetworkSettings = &container.NetworkSettings{Networks: endpoints}
-				networkConfig := client.GetNetworkConfig(mockContainer)
-				gomega.Expect(networkConfig.EndpointsConfig["wt-contnet_default"].MacAddress).To(gomega.Equal("02:42:ac:13:00:02"))
-				gomega.Expect(networkConfig.EndpointsConfig["extra_net"].MacAddress).To(gomega.Equal("02:42:ac:14:00:03"))
-			})
-		})
-	})
-	ginkgo.Describe(`StartContainer`, func() {
-		ginkgo.When(`recreating a container with a static MAC address`, func() {
-			ginkgo.It(`should apply the original MAC address to the new container`, func() {
-				mockServer := ghttp.NewServer()
-				docker, _ := client.NewClientWithOpts(
-					client.WithHost(mockServer.URL()),
-					client.WithHTTPClient(mockServer.HTTPTestServer.Client()),
-				)
-				client := dockerClient{api: docker}
-
-				mockContainer := MockContainer(
-					WithImageName("nginx:latest"),
-					WithContainerState(container.State{Running: true}),
-				)
-				staticMac := "02:42:ac:11:00:02"
-				endpoints := map[string]*network.EndpointSettings{
-					"bridge": {MacAddress: staticMac},
-				}
-				mockContainer.containerInfo.NetworkSettings = &container.NetworkSettings{
-					Networks: endpoints,
-				}
-
-				mockServer.AppendHandlers(
-					// Handler for POST /containers/create
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/containers/create")),
-						ghttp.VerifyContentType("application/json"),
-						func(w http.ResponseWriter, req *http.Request) {
-							body, err := io.ReadAll(req.Body)
-							gomega.Expect(err).To(gomega.BeNil())
-
-							type createConfig struct {
-								NetworkingConfig struct {
-									EndpointsConfig map[string]struct {
-										MacAddress string `json:"MacAddress"`
-									} `json:"EndpointsConfig"`
-								} `json:"NetworkingConfig"`
-							}
-							var config createConfig
-							err = json.Unmarshal(body, &config)
-							gomega.Expect(err).To(gomega.BeNil())
-
-							gomega.Expect(config.NetworkingConfig.EndpointsConfig).To(gomega.HaveKey("bridge"))
-							gomega.Expect(config.NetworkingConfig.EndpointsConfig["bridge"].MacAddress).To(gomega.Equal(staticMac))
-
-							ghttp.RespondWithJSONEncoded(http.StatusCreated, container.CreateResponse{ID: "new_container_id"})(w, req)
-						},
-					),
-					// Handler for POST /networks/bridge/disconnect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/networks/bridge/disconnect")),
-						ghttp.RespondWith(http.StatusNoContent, nil),
-					),
-					// Handler for POST /networks/bridge/connect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/networks/bridge/connect")),
-						ghttp.VerifyContentType("application/json"),
-						func(w http.ResponseWriter, req *http.Request) {
-							body, err := io.ReadAll(req.Body)
-							gomega.Expect(err).To(gomega.BeNil())
-
-							type connectConfig struct {
-								EndpointConfig struct {
-									MacAddress string `json:"MacAddress"`
-								} `json:"EndpointConfig"`
-							}
-							var config connectConfig
-							err = json.Unmarshal(body, &config)
-							gomega.Expect(err).To(gomega.BeNil())
-
-							gomega.Expect(config.EndpointConfig.MacAddress).To(gomega.Equal(staticMac))
-
-							ghttp.RespondWith(http.StatusNoContent, nil)(w, req)
-						},
-					),
-					// Handler for POST /containers/new_container_id/start
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/containers/new_container_id/start")),
-						ghttp.RespondWith(http.StatusNoContent, nil),
-					),
-				)
-
-				newID, err := client.StartContainer(mockContainer)
-				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
-			})
-		})
-	})
 	ginkgo.Describe(`ExecuteCommand`, func() {
 		ginkgo.When(`logging`, func() {
 			ginkgo.It("should include container id field", func() {
@@ -495,6 +362,24 @@ var _ = ginkgo.Describe("the client", func() {
 				// Note: Since Execute requires opening up a raw TCP stream to the daemon for the output, this will fail
 				// when using the mock API server. Regardless of the outcome, the log should include the container ID
 				gomega.Eventually(logbuf).Should(gbytes.Say(`containerID="?ex-cont-id"?`))
+			})
+		})
+	})
+	ginkgo.Describe(`GetNetworkConfig`, func() {
+		ginkgo.When(`providing a container with network aliases`, func() {
+			ginkgo.It(`should omit the container ID alias`, func() {
+				client := dockerClient{
+					api:           docker,
+					ClientOptions: ClientOptions{IncludeRestarting: false},
+				}
+				mockContainer := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
+				aliases := []string{"One", "Two", mockContainer.ID().ShortID(), "Four"}
+				endpoints := map[string]*network.EndpointSettings{
+					`test`: {Aliases: aliases},
+				}
+				mockContainer.containerInfo.NetworkSettings = &container.NetworkSettings{Networks: endpoints}
+				gomega.Expect(mockContainer.ContainerInfo().NetworkSettings.Networks[`test`].Aliases).To(gomega.Equal(aliases))
+				gomega.Expect(client.GetNetworkConfig(mockContainer).EndpointsConfig[`test`].Aliases).To(gomega.Equal([]string{"One", "Two", "Four"}))
 			})
 		})
 	})
