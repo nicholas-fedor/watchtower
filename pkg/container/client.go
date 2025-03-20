@@ -306,29 +306,22 @@ func (c dockerClient) StopContainer(targetContainer types.Container, timeout tim
 // Returns the updated network configuration.
 func (c dockerClient) GetNetworkConfig(targetContainer types.Container) *network.NetworkingConfig {
 	config := &network.NetworkingConfig{
-		EndpointsConfig: make(map[string]*network.EndpointSettings),
+		EndpointsConfig: targetContainer.ContainerInfo().NetworkSettings.Networks,
 	}
 
-	// Iterate over the original container's network settings
-	for networkName, originalEndpoint := range targetContainer.ContainerInfo().NetworkSettings.Networks {
-		// Create a new EndpointSettings instance to avoid modifying the original
-		endpoint := &network.EndpointSettings{
-			MacAddress: originalEndpoint.MacAddress, // Explicitly preserve the MAC address
-			Aliases:    make([]string, 0, len(originalEndpoint.Aliases)),
-		}
-
-		// Filter out the container’s short ID from aliases
+	for _, ep := range config.EndpointsConfig {
+		aliases := make([]string, 0, len(ep.Aliases))
 		cidAlias := targetContainer.ID().ShortID()
-		for _, alias := range originalEndpoint.Aliases {
-			if alias != cidAlias {
-				endpoint.Aliases = append(endpoint.Aliases, alias)
+
+		// Exclude the container’s short ID from aliases to avoid alias buildup.
+		for _, alias := range ep.Aliases {
+			if alias == cidAlias {
+				continue
 			}
+			aliases = append(aliases, alias)
 		}
-
-		// Add the updated endpoint settings to the config
-		config.EndpointsConfig[networkName] = endpoint
+		ep.Aliases = aliases
 	}
-
 	return config
 }
 
