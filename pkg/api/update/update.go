@@ -9,11 +9,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	lock chan bool
-)
+var lock chan bool
 
-// New is a factory function creating a new  Handler instance
+// New is a factory function creating a new  Handler instance.
 func New(updateFn func(images []string), updateLock chan bool) *Handler {
 	if updateLock != nil {
 		lock = updateLock
@@ -28,29 +26,30 @@ func New(updateFn func(images []string), updateLock chan bool) *Handler {
 	}
 }
 
-// Handler is an API handler used for triggering container update scans
+// Handler is an API handler used for triggering container update scans.
 type Handler struct {
 	fn   func(images []string)
 	Path string
 }
 
-// Handle is the actual http.Handle function doing all the heavy lifting
+// Handle is the actual http.Handle function doing all the heavy lifting.
 func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	logrus.Info("Updates triggered by HTTP API request.")
 
 	_, err := io.Copy(os.Stdout, r.Body)
 	if err != nil {
 		logrus.Println(err)
+
 		return
 	}
 
 	var images []string
+
 	imageQueries, found := r.URL.Query()["image"]
 	if found {
 		for _, image := range imageQueries {
 			images = append(images, strings.Split(image, ",")...)
 		}
-
 	} else {
 		images = nil
 	}
@@ -68,5 +67,4 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			logrus.Debug("Skipped. Another update already running.")
 		}
 	}
-
 }

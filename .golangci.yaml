@@ -1,0 +1,159 @@
+linters:
+  enable-all: false
+  disable-all: false
+  fast: false
+  enable:
+    - asasalint # Check for pass []any as any in variadic func(...any).
+    - asciicheck # Checks that all code identifiers does not have non-ASCII symbols in the name. [fast]
+    - bidichk # Checks for dangerous unicode character sequences. [fast]
+    - bodyclose # Checks whether HTTP response body is closed successfully.
+    - canonicalheader # Canonicalheader checks whether net/http.Header uses canonical header. [auto-fix]
+    - containedctx # Containedctx is a linter that detects struct contained context.Context field.
+    - contextcheck # Check whether the function uses a non-inherited context.
+    - copyloopvar # A linter detects places where loop variables are copied. [fast, auto-fix]
+    - decorder # Check declaration order and count of types, constants, variables and functions. [fast]
+    - dogsled # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f()). [fast]
+    - dupl # Detects duplicate fragments of code. [fast]
+    - dupword # Checks for duplicate words in the source code. [fast, auto-fix]
+    - durationcheck # Check for two durations multiplied together.
+    - err113 # Go linter to check the errors handling expressions. [auto-fix]
+    - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
+    - errchkjson # Checks types passed to the json encoding functions. Reports unsupported types and reports occurrences where the check for the returned error can be omitted.
+    - errname # Checks that sentinel errors are prefixed with the `Err` and error types are suffixed with the `Error`.
+    - errorlint # Errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13. [auto-fix]
+    - exhaustive # Check exhaustiveness of enum switch statements.
+    - exhaustruct # Checks if all structure fields are initialized.
+    - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions. [auto-fix]
+    - fatcontext # Detects nested contexts in loops and function literals. [auto-fix]
+    - forbidigo # Forbids identifiers.
+    - forcetypeassert # Finds forced type assertions.
+    - ginkgolinter # Enforces standards of using ginkgo and gomega. [auto-fix]
+    - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid. [fast]
+    - gochecknoglobals # Check that no global variables exist.
+    - gochecksumtype # Run exhaustiveness checks on Go "sum types".
+    - goconst # Finds repeated strings that could be replaced by a constant. [fast]
+    - gocritic # Provides diagnostics that check for bugs, performance and style issues. [auto-fix]
+    - gocyclo # Computes and checks the cyclomatic complexity of functions. [fast]
+    - godot # Check if comments end in a period. [fast, auto-fix]
+    - godox # Detects usage of FIXME, TODO and other keywords inside comments. [fast]
+    - gofmt # Checks if the code is formatted according to 'gofmt' command. [fast, auto-fix]
+    - gofumpt # Checks if code and import statements are formatted, with additional rules. [fast, auto-fix]
+    - goheader # Checks if file header matches to pattern. [fast, auto-fix]
+    - goimports # Checks if the code and import statements are formatted according to the 'goimports' command. [fast, auto-fix]
+    - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod. [fast]
+    - gomodguard # Allow and block list linter for direct Go module dependencies. This is different from depguard where there are different block types for example version constraints and module recommendations. [fast]
+    - goprintffuncname # Checks that printf-like functions are named with `f` at the end. [fast]
+    - gosec # Inspects source code for security problems.
+    - gosimple # Linter for Go source code that specializes in simplifying code. [auto-fix]
+    - gosmopolitan # Report certain i18n/l10n anti-patterns in your Go codebase.
+    - govet # Vet examines Go source code and reports suspicious constructs. It is roughly the same as 'go vet' and uses its passes. [auto-fix]
+    - grouper # Analyze expression groups. [fast]
+    - iface # Detect the incorrect use of interfaces, helping developers avoid interface pollution. [auto-fix]
+    - importas # Enforces consistent import aliases. [auto-fix]
+    - inamedparam # Reports interfaces with unnamed method parameters. [fast]
+    - ineffassign # Detects when assignments to existing variables are not used. [fast]
+    - intrange # Intrange is a linter to find places where for loops could make use of an integer range. [auto-fix]
+    - loggercheck # Checks key value pairs for common logger libraries (kitlog,klog,logr,zap).
+    - maintidx # Maintidx measures the maintainability index of each function. [fast]
+    - makezero # Finds slice declarations with non-zero initial length.
+    - mirror # Reports wrong mirror patterns of bytes/strings usage. [auto-fix]
+    - misspell # Finds commonly misspelled English words. [fast, auto-fix]
+    - mnd # An analyzer to detect magic numbers. [fast]
+    - musttag # Enforce field tags in (un)marshaled structs.
+    - nakedret # Checks that functions with naked returns are not longer than a maximum size (can be zero). [fast, auto-fix]
+    - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
+    - nilnesserr # Reports constructs that checks for err != nil, but returns a different nil value error.
+    - nilnil # Checks that there is no simultaneous return of `nil` error and an invalid value.
+    - nlreturn # Nlreturn checks for a new line before return and branch statements to increase code clarity. [fast, auto-fix]
+    - noctx # Finds sending http request without context.Context.
+    - nolintlint # Reports ill-formed or insufficient nolint directives. [fast, auto-fix]
+    - nonamedreturns # Reports all named returns.
+    - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL. [fast]
+    - paralleltest # Detects missing usage of t.Parallel() method in your Go test.
+    - perfsprint # Checks that fmt.Sprintf can be replaced with a faster alternative. [auto-fix]
+    - prealloc # Finds slice declarations that could potentially be pre-allocated. [fast]
+    - predeclared # Find code that shadows one of Go's predeclared identifiers. [fast]
+    - promlinter # Check Prometheus metrics naming via promlint. [fast]
+    - protogetter # Reports direct reads from proto message fields when getters should be used. [auto-fix]
+    - reassign # Checks that package variables are not reassigned.
+    - recvcheck # Checks for receiver type consistency.
+    - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint. [auto-fix]
+    - rowserrcheck # Checks whether Rows.Err of rows is checked successfully.
+    - sloglint # Ensure consistent code style when using log/slog.
+    - spancheck # Checks for mistakes with OpenTelemetry/Census spans.
+    - sqlclosecheck # Checks that sql.Rows, sql.Stmt, sqlx.NamedStmt, pgx.Query are closed.
+    - staticcheck # It's a set of rules from staticcheck. It's not the same thing as the staticcheck binary. The author of staticcheck doesn't support or approve the use of staticcheck as a library inside golangci-lint. [auto-fix]
+    - stylecheck # Stylecheck is a replacement for golint. [auto-fix]
+    - tagalign # Check that struct tags are well aligned. [fast, auto-fix]
+    - tagliatelle # Checks the struct tags.
+    - testableexamples # Linter checks if examples are testable (have an expected output). [fast]
+    - testifylint # Checks usage of github.com/stretchr/testify. [auto-fix]
+    - thelper # Thelper detects tests helpers which is not start with t.Helper() method.
+    - tparallel # Tparallel detects inappropriate usage of t.Parallel() method in your Go test codes.
+    - unconvert # Remove unnecessary type conversions.
+    - unparam # Reports unused function parameters.
+    - unused # Checks Go code for unused constants, variables, functions and types.
+    - usestdlibvars # A linter that detect the possibility to use variables/constants from the Go standard library. [fast, auto-fix]
+    - usetesting # Reports uses of functions with replacement inside the testing package. [auto-fix]
+    - varnamelen # Checks that the length of a variable's name matches its scope.
+    - wastedassign # Finds wasted assignment statements.
+    - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc. [fast, auto-fix]
+    - wrapcheck # Checks that errors returned from external packages are wrapped.
+    - wsl # Add or remove empty lines. [fast, auto-fix]
+    - zerologlint # Detects the wrong usage of `zerolog` that a user forgets to dispatch with `Send` or `Msg`.
+  disable:
+    - cyclop
+    - depguard
+    - funlen
+    - gci
+    - gochecknoinits
+    - gocognit
+    - interfacebloat # A linter that checks the number of methods inside an interface. [fast]
+    - ireturn # Accept Interfaces, Return Concrete Types.
+    - lll
+    - nestif
+    - testpackage
+
+linters-settings:
+  gci:
+    skip-generated: true
+    no-inline-comments: true
+    no-prefix-comments: true
+    custom-order: false
+    no-lex-order: false
+    sections:
+      - standard
+      - default
+  gofmt:
+    simplify: true
+  varnamelen:
+    ignore-names:
+      - err
+      - c
+      - ctx
+      - i
+    ignore-decls:
+      - c echo.Context
+      - t testing.T
+      - f *foo.Bar
+      - e error
+      - i int
+      - const C
+      - T any
+      - m map[string]int
+      - w http.ResponseWriter
+      - r *http.Request
+      - r http.Request
+      - r *net/http/Request
+      - r *mux.Router
+
+issues:
+  exclude-files:
+    - FilterableContainer.go # FilterableContainer is an autogenerated mock type for the FilterableContainer type.
+
+output:
+  print-issued-lines: true
+  print-linter-name: false
+  path-prefix: ""
+  show-stats: false
+  sort-results: true

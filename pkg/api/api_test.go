@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	token  = "123123123"
+	token = "123123123"
 )
 
 func TestAPI(t *testing.T) {
+	t.Parallel()
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "API Suite")
 }
@@ -27,7 +28,7 @@ var _ = ginkgo.Describe("API", func() {
 			handlerFunc := api.RequireToken(testHandler)
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/hello", nil)
+			req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 
 			handlerFunc(rec, req)
 
@@ -38,7 +39,7 @@ var _ = ginkgo.Describe("API", func() {
 			handlerFunc := api.RequireToken(testHandler)
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/hello", nil)
+			req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 			req.Header.Set("Authorization", "Bearer 123")
 
 			handlerFunc(rec, req)
@@ -50,8 +51,8 @@ var _ = ginkgo.Describe("API", func() {
 			handlerFunc := api.RequireToken(testHandler)
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/hello", nil)
-			req.Header.Set("Authorization", "Bearer " + token)
+			req := httptest.NewRequest(http.MethodGet, "/hello", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
 
 			handlerFunc(rec, req)
 
@@ -60,6 +61,6 @@ var _ = ginkgo.Describe("API", func() {
 	})
 })
 
-func testHandler(w http.ResponseWriter, req *http.Request) {
+func testHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = io.WriteString(w, "Hello!")
 }
