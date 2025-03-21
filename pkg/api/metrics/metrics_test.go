@@ -38,7 +38,7 @@ func getWithToken(handler http.Handler) map[string]string {
 	res := respWriter.Result()
 	body, _ := io.ReadAll(res.Body)
 
-	for _, line := range strings.Split(string(body), "\n") {
+	for line := range strings.SplitSeq(string(body), "\n") {
 		if len(line) < 1 || line[0] == '#' {
 			continue
 		}

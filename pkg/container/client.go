@@ -1,3 +1,4 @@
+//go:generate mockery --name Client --output mocks
 package container
 
 import (

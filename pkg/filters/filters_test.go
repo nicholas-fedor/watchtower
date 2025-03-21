@@ -8,6 +8,8 @@ import (
 )
 
 func TestWatchtowerContainersFilter(t *testing.T) {
+	t.Parallel()
+
 	container := new(mocks.FilterableContainer)
 
 	container.On("IsWatchtower").Return(true)
@@ -18,6 +20,8 @@ func TestWatchtowerContainersFilter(t *testing.T) {
 }
 
 func TestNoFilter(t *testing.T) {
+	t.Parallel()
+
 	container := new(mocks.FilterableContainer)
 
 	assert.True(t, NoFilter(container))
@@ -26,6 +30,8 @@ func TestNoFilter(t *testing.T) {
 }
 
 func TestFilterByNames(t *testing.T) {
+	t.Parallel()
+
 	var names []string
 
 	filter := FilterByNames(names, nil)
@@ -48,6 +54,8 @@ func TestFilterByNames(t *testing.T) {
 }
 
 func TestFilterByNamesRegex(t *testing.T) {
+	t.Parallel()
+
 	names := []string{`ba(b|ll)oon`}
 
 	filter := FilterByNames(names, NoFilter)
@@ -70,6 +78,8 @@ func TestFilterByNamesRegex(t *testing.T) {
 }
 
 func TestFilterByEnableLabel(t *testing.T) {
+	t.Parallel()
+
 	filter := FilterByEnableLabel(NoFilter)
 	assert.NotNil(t, filter)
 
@@ -90,6 +100,8 @@ func TestFilterByEnableLabel(t *testing.T) {
 }
 
 func TestFilterByScope(t *testing.T) {
+	t.Parallel()
+
 	scope := "testscope"
 
 	filter := FilterByScope(scope, NoFilter)
@@ -112,6 +124,8 @@ func TestFilterByScope(t *testing.T) {
 }
 
 func TestFilterByNoneScope(t *testing.T) {
+	t.Parallel()
+
 	scope := "none"
 
 	filter := FilterByScope(scope, NoFilter)
@@ -139,6 +153,8 @@ func TestFilterByNoneScope(t *testing.T) {
 }
 
 func TestBuildFilterNoneScope(t *testing.T) {
+	t.Parallel()
+
 	filter, desc := BuildFilter(nil, nil, false, "none")
 
 	assert.Contains(t, desc, "without a scope")
@@ -159,6 +175,8 @@ func TestBuildFilterNoneScope(t *testing.T) {
 }
 
 func TestFilterByDisabledLabel(t *testing.T) {
+	t.Parallel()
+
 	filter := FilterByDisabledLabel(NoFilter)
 	assert.NotNil(t, filter)
 
@@ -179,9 +197,12 @@ func TestFilterByDisabledLabel(t *testing.T) {
 }
 
 func TestFilterByImage(t *testing.T) {
+	t.Parallel()
+
 	filterEmpty := FilterByImage(nil, NoFilter)
 	filterSingle := FilterByImage([]string{"registry"}, NoFilter)
 	filterMultiple := FilterByImage([]string{"registry", "bla"}, NoFilter)
+
 	assert.NotNil(t, filterSingle)
 	assert.NotNil(t, filterMultiple)
 
@@ -212,10 +233,11 @@ func TestFilterByImage(t *testing.T) {
 	assert.False(t, filterSingle(container))
 	assert.True(t, filterMultiple(container))
 	container.AssertExpectations(t)
-
 }
 
 func TestBuildFilter(t *testing.T) {
+	t.Parallel()
+
 	names := []string{"test", "valid"}
 
 	filter, desc := BuildFilter(names, []string{}, false, "")
@@ -254,6 +276,8 @@ func TestBuildFilter(t *testing.T) {
 }
 
 func TestBuildFilterEnableLabel(t *testing.T) {
+	t.Parallel()
+
 	var names []string
 	names = append(names, "test")
 
@@ -284,6 +308,8 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 }
 
 func TestBuildFilterDisableContainer(t *testing.T) {
+	t.Parallel()
+
 	filter, desc := BuildFilter([]string{}, []string{"excluded", "notfound"}, false, "")
 	assert.Contains(t, desc, "not named")
 	assert.Contains(t, desc, "excluded")

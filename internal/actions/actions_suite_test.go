@@ -15,11 +15,13 @@ import (
 )
 
 func TestActions(t *testing.T) {
+	t.Parallel()
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	logrus.SetOutput(ginkgo.GinkgoWriter)
 	ginkgo.RunSpecs(t, "Actions Suite")
 }
 
+//nolint:exhaustruct // Mock structs intentionally omit fields irrelevant to tests
 var _ = ginkgo.Describe("the actions package", func() {
 	ginkgo.Describe("the check prerequisites method", func() {
 		ginkgo.When("given an empty array", func() {

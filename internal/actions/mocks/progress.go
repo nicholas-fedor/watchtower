@@ -1,3 +1,4 @@
+// Package mocks provides mock implementations for testing Watchtower components.
 package mocks
 
 import (
@@ -7,8 +8,27 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// All containers will be given a unique ID and name based on its state and index.
+// errMockSkipped is a static error indicating a mock container was skipped.
+// It is used in CreateMockProgressReport for consistent error reporting.
+var errMockSkipped = errors.New("unpossible")
+
+// errMockFailed is a static error indicating a mock container update failed.
+// It is used in CreateMockProgressReport for consistent error reporting.
+var errMockFailed = errors.New("accidentally the whole container")
+
+// State ID prefixes for generating unique mock container IDs.
+const (
+	skippedIDPrefix = 41 // Prefix for SkippedState containers (e.g., "c7941...").
+	freshIDPrefix   = 31 // Prefix for FreshState containers (e.g., "c7931...").
+	updatedIDPrefix = 11 // Prefix for UpdatedState containers (e.g., "c7911...").
+	failedIDPrefix  = 21 // Prefix for FailedState containers (e.g., "c7921...").
+)
+
+// CreateMockProgressReport generates a mock report from a given set of container states.
+// It assigns each container a unique ID and name based on its state and index,
+// simulating various update outcomes for testing session progress reporting.
 func CreateMockProgressReport(states ...session.State) types.Report {
+	// Track the number of occurrences for each state to ensure unique IDs and names.
 	stateNums := make(map[session.State]int)
 	progress := session.Progress{}
 	failed := make(map[types.ContainerID]error)
@@ -18,20 +38,23 @@ func CreateMockProgressReport(states ...session.State) types.Report {
 
 		switch state {
 		case session.SkippedState:
-			c, _ := CreateContainerForProgress(index, 41, "skip%d")
-			progress.AddSkipped(c, errors.New("unpossible"))
+			c, _ := CreateContainerForProgress(index, skippedIDPrefix, "skip%d")
+			progress.AddSkipped(c, errMockSkipped)
 		case session.FreshState:
-			c, _ := CreateContainerForProgress(index, 31, "frsh%d")
+			c, _ := CreateContainerForProgress(index, freshIDPrefix, "frsh%d")
 			progress.AddScanned(c, c.ImageID())
 		case session.UpdatedState:
-			c, newImage := CreateContainerForProgress(index, 11, "updt%d")
+			c, newImage := CreateContainerForProgress(index, updatedIDPrefix, "updt%d")
 			progress.AddScanned(c, newImage)
 			progress.MarkForUpdate(c.ID())
 		case session.FailedState:
-			c, newImage := CreateContainerForProgress(index, 21, "fail%d")
+			c, newImage := CreateContainerForProgress(index, failedIDPrefix, "fail%d")
 			progress.AddScanned(c, newImage)
 
-			failed[c.ID()] = errors.New("accidentally the whole container")
+			failed[c.ID()] = errMockFailed
+		case session.UnknownState, session.ScannedState, session.StaleState:
+			// These states are not explicitly handled in this mock as they’re intermediate or unused here.
+			continue
 		}
 
 		stateNums[state] = index + 1

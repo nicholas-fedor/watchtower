@@ -14,6 +14,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
+//nolint:exhaustruct // Mock func intentionally omit fields irrelevant to tests
 func getCommonTestData(keepContainer string) *mocks.TestData {
 	return &mocks.TestData{
 		NameOfContainerToKeep: keepContainer,
@@ -37,6 +38,7 @@ func getCommonTestData(keepContainer string) *mocks.TestData {
 	}
 }
 
+//nolint:exhaustruct // Mock intentionally omit fields irrelevant to tests
 func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 	staleContainer := mocks.CreateMockContainer(
 		"test-container-01",
@@ -66,6 +68,7 @@ func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 	}
 }
 
+//nolint:exhaustruct // Mock intentionally omit fields irrelevant to tests
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("watchtower has been instructed to clean up", func() {
 		ginkgo.When("there are multiple containers using the same image", func() {

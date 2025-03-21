@@ -17,12 +17,12 @@ type Handler struct {
 
 // New is a factory function creating a new Metrics instance.
 func New() *Handler {
-	m := metrics.Default()
+	metrics := metrics.Default()
 	handler := promhttp.Handler()
 
 	return &Handler{
 		Path:    "/v1/metrics",
 		Handle:  handler.ServeHTTP,
-		Metrics: m,
+		Metrics: metrics,
 	}
 }
