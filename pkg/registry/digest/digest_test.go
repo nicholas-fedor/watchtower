@@ -16,7 +16,6 @@ import (
 )
 
 func TestDigest(t *testing.T) {
-
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(ginkgo.GinkgoT(), "Digest Suite")
 }
@@ -68,20 +67,18 @@ var _ = ginkgo.Describe("Digests", func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
 				matches, err := digest.CompareDigest(mockContainer, creds)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(matches).To(gomega.Equal(true))
+				gomega.Expect(matches).To(gomega.BeTrue())
 			}),
 		)
 
 		ginkgo.It("should return false if digests differ", func() {
-
 		})
 		ginkgo.It("should return an error if the registry isn't available", func() {
-
 		})
 		ginkgo.It("should return an error when container contains no image info", func() {
 			matches, err := digest.CompareDigest(mockContainerNoImage, `user:pass`)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(matches).To(gomega.Equal(false))
+			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 	})
 	ginkgo.When("using different registries", func() {
