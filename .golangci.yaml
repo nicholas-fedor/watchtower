@@ -22,7 +22,6 @@ linters:
     - errname # Checks that sentinel errors are prefixed with the `Err` and error types are suffixed with the `Error`.
     - errorlint # Errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13. [auto-fix]
     - exhaustive # Check exhaustiveness of enum switch statements.
-    - exhaustruct # Checks if all structure fields are initialized.
     - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions. [auto-fix]
     - fatcontext # Detects nested contexts in loops and function literals. [auto-fix]
     - forbidigo # Forbids identifiers.
@@ -68,7 +67,6 @@ linters:
     - nolintlint # Reports ill-formed or insufficient nolint directives. [fast, auto-fix]
     - nonamedreturns # Reports all named returns.
     - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL. [fast]
-    - paralleltest # Detects missing usage of t.Parallel() method in your Go test.
     - perfsprint # Checks that fmt.Sprintf can be replaced with a faster alternative. [auto-fix]
     - prealloc # Finds slice declarations that could potentially be pre-allocated. [fast]
     - predeclared # Find code that shadows one of Go's predeclared identifiers. [fast]
@@ -94,7 +92,6 @@ linters:
     - unused # Checks Go code for unused constants, variables, functions and types.
     - usestdlibvars # A linter that detect the possibility to use variables/constants from the Go standard library. [fast, auto-fix]
     - usetesting # Reports uses of functions with replacement inside the testing package. [auto-fix]
-    - varnamelen # Checks that the length of a variable's name matches its scope.
     - wastedassign # Finds wasted assignment statements.
     - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc. [fast, auto-fix]
     - wrapcheck # Checks that errors returned from external packages are wrapped.
@@ -103,6 +100,7 @@ linters:
   disable:
     - cyclop
     - depguard
+    - exhaustruct # Checks if all structure fields are initialized.
     - funlen
     - gci
     - gochecknoinits
@@ -112,7 +110,9 @@ linters:
     - ireturn # Accept Interfaces, Return Concrete Types.
     - lll
     - nestif
+    - paralleltest # Detects missing usage of t.Parallel() method in your Go test.
     - testpackage
+    - varnamelen # Checks that the length of a variable's name matches its scope.
 
 linters-settings:
   gci:
