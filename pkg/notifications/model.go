@@ -5,13 +5,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// StaticData is the part of the notification template data model set upon initialization
+// StaticData is the part of the notification template data model set upon initialization.
 type StaticData struct {
 	Title string
 	Host  string
 }
 
-// Data is the notification template data model
+// Data is the notification template data model.
 type Data struct {
 	StaticData
 	Entries []*logrus.Entry

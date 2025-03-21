@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("the metrics API", func() {
 			gomega.HaveKeyWithValue("watchtower_containers_failed", "1"),
 			gomega.HaveKeyWithValue("watchtower_containers_scanned", "4"),
 			gomega.HaveKeyWithValue("watchtower_scans_total", "1"),
-			gomega.HaveKeyWithValue("watchtower_scans_skipped", "0"),
+			gomega.HaveKeyWithValue("watchtower_scans_skipped_total", "0"),
 		))
 
 		for range 3 {
@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("the metrics API", func() {
 
 		gomega.Eventually(tryGetMetrics).Should(gomega.SatisfyAll(
 			gomega.HaveKeyWithValue("watchtower_scans_total", "4"),
-			gomega.HaveKeyWithValue("watchtower_scans_skipped", "3"),
+			gomega.HaveKeyWithValue("watchtower_scans_skipped_total", "3"),
 		))
 	})
 })
