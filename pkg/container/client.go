@@ -157,7 +157,7 @@ func (c dockerClient) ExecuteCommand(containerID types.ContainerID, command stri
 	ctx := context.Background()
 	clog := logrus.WithField("containerID", containerID)
 
-	// Configure and create the exec instance with all fields explicitly set.
+	// Configure and create the exec instance.
 	execConfig := container.ExecOptions{
 		Tty:          true,
 		Detach:       false,
@@ -178,51 +178,56 @@ func (c dockerClient) ExecuteCommand(containerID types.ContainerID, command stri
 		return false, fmt.Errorf("failed to create exec instance: %w", err)
 	}
 
-	// Attach to the exec to capture output.
-	response, attachErr := c.api.ContainerExecAttach(ctx, exec.ID, container.ExecStartOptions{
-		Tty:         true,
-		Detach:      false,
-		ConsoleSize: nil,
-	})
-	if attachErr != nil {
-		clog.Errorf("Failed to extract command exec logs: %v", attachErr)
-	}
-
 	// Start the exec instance.
 	execStartCheck := container.ExecStartOptions{
 		Detach:      false,
 		Tty:         true,
 		ConsoleSize: nil,
 	}
-
-	err = c.api.ContainerExecStart(ctx, exec.ID, execStartCheck)
-	if err != nil {
+	if err := c.api.ContainerExecStart(ctx, exec.ID, execStartCheck); err != nil {
 		return false, fmt.Errorf("failed to start exec instance: %w", err)
 	}
 
-	// Capture output if attachment succeeded.
-	var output string
-
-	if attachErr == nil {
-		defer response.Close()
-
-		var writer bytes.Buffer
-
-		written, err := writer.ReadFrom(response.Reader)
-		if err != nil {
-			clog.Error(err)
-		} else if written > 0 {
-			output = strings.TrimSpace(writer.String())
-		}
+	// Capture output and handle attachment.
+	output, err := c.captureExecOutput(ctx, exec.ID)
+	if err != nil {
+		clog.Warnf("Failed to capture command output: %v", err)
 	}
 
 	// Wait for completion and interpret the result.
 	skipUpdate, err := c.waitForExecOrTimeout(ctx, exec.ID, output, timeout)
 	if err != nil {
-		return true, err
+		return true, fmt.Errorf("failed to wait for exec completion: %w", err)
 	}
 
 	return skipUpdate, nil
+}
+
+// captureExecOutput attaches to an exec instance and captures its output.
+// It logs errors internally and returns the trimmed output or an error if attachment or reading fails.
+func (c dockerClient) captureExecOutput(ctx context.Context, execID string) (string, error) {
+	response, err := c.api.ContainerExecAttach(ctx, execID, container.ExecStartOptions{
+		Tty:         true,
+		Detach:      false,
+		ConsoleSize: nil,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to attach to exec instance: %w", err)
+	}
+	defer response.Close()
+
+	var writer bytes.Buffer
+
+	written, err := writer.ReadFrom(response.Reader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read exec output: %w", err)
+	}
+
+	if written > 0 {
+		return strings.TrimSpace(writer.String()), nil
+	}
+
+	return "", nil
 }
 
 // waitForExecOrTimeout waits for an exec instance to complete or times out.
