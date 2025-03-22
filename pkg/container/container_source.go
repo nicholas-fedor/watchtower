@@ -123,16 +123,15 @@ func GetSourceContainer(api client.APIClient, containerID types.ContainerID) (ty
 // Returns an error if stopping or removal fails.
 func StopSourceContainer(api client.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
 	ctx := context.Background()
+	idStr := string(sourceContainer.ID())
+	shortID := sourceContainer.ID().ShortID()
 
+	// Stop the container if it’s running.
 	signal := sourceContainer.StopSignal()
 	if signal == "" {
 		signal = defaultStopSignal
 	}
 
-	idStr := string(sourceContainer.ID())
-	shortID := sourceContainer.ID().ShortID()
-
-	// Stop the container if it’s running.
 	if sourceContainer.IsRunning() {
 		logrus.Infof("Stopping %s (%s) with %s", sourceContainer.Name(), shortID, signal)
 
@@ -140,6 +139,16 @@ func StopSourceContainer(api client.APIClient, sourceContainer types.Container, 
 			return fmt.Errorf("failed to stop container %s (%s): %w", sourceContainer.Name(), shortID, err)
 		}
 	}
+
+	return stopAndRemoveContainer(api, sourceContainer, timeout, removeVolumes)
+}
+
+// stopAndRemoveContainer waits for a container to stop and removes it if needed.
+// It respects AutoRemove and logs progress, returning an error if the process fails.
+func stopAndRemoveContainer(api client.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
+	ctx := context.Background()
+	idStr := string(sourceContainer.ID())
+	shortID := sourceContainer.ID().ShortID()
 
 	// Wait for the container to stop or timeout.
 	stopped, err := waitForStopOrTimeout(api, sourceContainer, timeout)
@@ -151,28 +160,30 @@ func StopSourceContainer(api client.APIClient, sourceContainer types.Container, 
 		logrus.Warnf("Container %s (%s) did not stop within %v", sourceContainer.Name(), shortID, timeout)
 	}
 
-	// Handle removal based on AutoRemove setting.
-	if sourceContainer.ContainerInfo().HostConfig.AutoRemove {
+	// If already gone and AutoRemove is enabled, no further action needed.
+	if stopped && sourceContainer.ContainerInfo().HostConfig.AutoRemove {
 		logrus.Debugf("AutoRemove container %s, skipping ContainerRemove call.", shortID)
-	} else {
-		logrus.Debugf("Removing container %s", shortID)
 
-		if err := api.ContainerRemove(ctx, idStr, container.RemoveOptions{
-			Force:         true,
-			RemoveVolumes: removeVolumes,
-			RemoveLinks:   false,
-		}); err != nil {
-			if client.IsErrNotFound(err) {
-				logrus.Debugf("Container %s not found, skipping removal.", shortID)
-
-				return nil
-			}
-
-			return fmt.Errorf("failed to remove container %s (%s): %w", sourceContainer.Name(), shortID, err)
-		}
+		return nil
 	}
 
-	// Confirm the container is gone.
+	// Attempt removal.
+	logrus.Debugf("Removing container %s", shortID)
+
+	err = api.ContainerRemove(ctx, idStr, container.RemoveOptions{
+		Force:         true,
+		RemoveVolumes: removeVolumes,
+	})
+	if err != nil && !client.IsErrNotFound(err) {
+		return fmt.Errorf("failed to remove container %s (%s): %w", sourceContainer.Name(), shortID, err)
+	}
+
+	if client.IsErrNotFound(err) {
+		// Container was already gone after removal attempt; no need for second wait.
+		return nil
+	}
+
+	// Confirm removal if it succeeded or container wasn’t gone before.
 	stopped, err = waitForStopOrTimeout(api, sourceContainer, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to confirm removal of container %s (%s): %w", sourceContainer.Name(), shortID, err)
