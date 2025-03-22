@@ -4,6 +4,7 @@ package auth
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
@@ -22,9 +24,28 @@ import (
 // ChallengeHeader is the HTTP Header containing challenge instructions.
 const ChallengeHeader = "WWW-Authenticate"
 
+// Constants for HTTP client configuration.
+// These values define timeouts and connection limits for registry requests.
+const (
+	DefaultTimeoutSeconds             = 30  // Default timeout for HTTP requests in seconds
+	DefaultMaxIdleConns               = 100 // Maximum number of idle connections in the pool
+	DefaultIdleConnTimeoutSeconds     = 90  // Timeout for idle connections in seconds
+	DefaultTLSHandshakeTimeoutSeconds = 10  // Timeout for TLS handshake in seconds
+	DefaultExpectContinueTimeout      = 1
+)
+
 // Client is the HTTP client used for making requests to registries.
 // It is exposed at the package level to allow customization (e.g., in tests).
-var Client = &http.Client{}
+var Client = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+		MaxIdleConns:          DefaultMaxIdleConns,
+		IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,
+		TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second,
+		ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,
+	},
+	Timeout: DefaultTimeoutSeconds * time.Second,
+}
 
 // Static errors for registry authentication failures.
 var (

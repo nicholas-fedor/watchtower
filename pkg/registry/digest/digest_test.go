@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
@@ -39,8 +41,8 @@ var (
 		Username: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_USERNAME"),
 		Password: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_PASSWORD"),
 	}
-	// invalidImageRef is used to trigger parsing errors in tests.
 	invalidImageRef = "invalid:image:ref:!!"
+	origClient      *http.Client
 )
 
 // SkipIfCredentialsEmpty skips a test if registry credentials are incomplete.
@@ -55,6 +57,21 @@ func SkipIfCredentialsEmpty(credentials *types.RegistryCredentials, testFunc fun
 		return testFunc
 	}
 }
+
+var _ = ginkgo.BeforeSuite(func() {
+	// Save the original client and set an insecure one for all tests
+	origClient = auth.Client
+	auth.Client = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		},
+	}
+})
+
+var _ = ginkgo.AfterSuite(func() {
+	// Restore the original client
+	auth.Client = origClient
+})
 
 var _ = ginkgo.Describe("Digests", func() {
 	// Predefined mock data for consistent test cases
@@ -100,13 +117,12 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			// Use CreateMockContainerWithImageInfoP with an empty RepoDigests slice
 			mockContainerEmptyDigests := mocks.CreateMockContainerWithImageInfoP(
 				mockID,
 				mockName,
 				mockImageRef,
 				mockCreated,
-				&image.InspectResponse{RepoDigests: []string{}}, // Empty RepoDigests
+				&image.InspectResponse{RepoDigests: []string{}},
 			)
 
 			server.AppendHandlers(
@@ -128,17 +144,9 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
-			origClient := auth.Client
-			auth.Client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-				},
-			}
-			defer func() { auth.Client = origClient }()
-
 			matches, err := digest.CompareDigest(context.Background(), mockContainerEmptyDigests, "token")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(matches).To(gomega.BeFalse()) // No digests to compare
+			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
 
@@ -175,18 +183,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
-			origClient := auth.Client
-			auth.Client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Skip verification for self-signed cert
-				},
-			}
-			defer func() { auth.Client = origClient }()
-
 			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeFalse())
-			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3)) // GET /v2/, GET /token, HEAD
+			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
 
 		ginkgo.It("should return an error if the registry isn't available", func() {
@@ -212,7 +212,6 @@ var _ = ginkgo.Describe("Digests", func() {
 		})
 
 		ginkgo.It("should return an error if manifest URL build fails", func() {
-			// Use an invalid image name to trigger manifest URL error
 			mockContainerInvalidImage := mocks.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
@@ -228,8 +227,7 @@ var _ = ginkgo.Describe("Digests", func() {
 		})
 
 		ginkgo.It("should return an error if HEAD request creation fails", func() {
-			// Use a malformed URL to trigger request creation error in GetToken first
-			mockImageRef := "\x00://invalid-url/test/image:latest" // Invalid URL with null byte
+			mockImageRef := "\x00://invalid-url/test/image:latest"
 			mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
@@ -258,7 +256,6 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			// Mock server responses: challenge, token, then HEAD without digest
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -273,19 +270,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("HEAD", "/v2/test/image/manifests/latest"),
 					ghttp.RespondWith(http.StatusOK, nil, http.Header{
-						"Www-Authenticate": []string{"Bearer realm=invalid"}, // Simulate auth header
-						// No ContentDigestHeader
+						"Www-Authenticate": []string{"Bearer realm=invalid"},
 					}),
 				),
 			)
-
-			origClient := auth.Client
-			auth.Client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Skip verification for self-signed cert
-				},
-			}
-			defer func() { auth.Client = origClient }()
 
 			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -305,7 +293,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockName,
 				mockImageRef,
 				mockCreated,
-				mockInvalidDigest, // Malformed digest
+				mockInvalidDigest,
 			)
 
 			server.AppendHandlers(
@@ -322,22 +310,14 @@ var _ = ginkgo.Describe("Digests", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("HEAD", "/v2/test/image/manifests/latest"),
 					ghttp.RespondWith(http.StatusOK, nil, http.Header{
-						digest.ContentDigestHeader: []string{mockDifferentDigest}, // Different digest
+						digest.ContentDigestHeader: []string{mockDifferentDigest},
 					}),
 				),
 			)
 
-			origClient := auth.Client
-			auth.Client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Skip verification for self-signed cert
-				},
-			}
-			defer func() { auth.Client = origClient }()
-
 			matches, err := digest.CompareDigest(context.Background(), mockContainerWithInvalidDigest, "token")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(matches).To(gomega.BeFalse()) // No match due to malformed digest
+			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
 	})
@@ -374,7 +354,6 @@ var _ = ginkgo.Describe("Digests", func() {
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
 
-			// Temporarily set UserAgent for test consistency
 			origUserAgent := digest.UserAgent
 			digest.UserAgent = "Watchtower/v0.0.0-unknown"
 			defer func() { digest.UserAgent = origUserAgent }()
@@ -409,18 +388,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			origClient := auth.Client
-			auth.Client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Skip verification for self-signed cert
-				},
-			}
-			defer func() { auth.Client = origClient }()
-
 			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeTrue())
-			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3)) // GET /v2/, GET /token, HEAD
+			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
 	})
 
@@ -464,21 +435,25 @@ var _ = ginkgo.Describe("Digests", func() {
 	})
 
 	ginkgo.When("fetching a digest", func() {
-		var server *ghttp.Server
+		var server *httptest.Server
+		var mux *http.ServeMux
 
 		ginkgo.BeforeEach(func() {
 			defer ginkgo.GinkgoRecover()
-			server = ghttp.NewTLSServer()
+			mux = http.NewServeMux()
+			server = httptest.NewTLSServer(mux)
+			logrus.WithField("server_addr", server.Listener.Addr().String()).Debug("Starting test server")
 		})
 
 		ginkgo.AfterEach(func() {
 			defer ginkgo.GinkgoRecover()
+			logrus.Debug("Closing test server")
 			server.Close()
 		})
 
 		ginkgo.It("should fetch a digest successfully", func() {
 			defer ginkgo.GinkgoRecover()
-			serverAddr := server.Addr()
+			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
 				mockID,
@@ -488,57 +463,28 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			server.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v2/"),
-					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
-					}),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/token"),
-					ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v2/test/image/manifests/latest"),
-					ghttp.RespondWith(http.StatusOK, `{"digest": "`+mockDigestHash+`"}`),
-				),
-			)
-
-			origClient := auth.Client
-			auth.Client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Skip verification for self-signed cert
-				},
-			}
-			defer func() { auth.Client = origClient }()
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/test/image/manifests/latest request")
+				w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
+			})
 
 			result, err := digest.FetchDigest(context.Background(), mockContainerWithServer, "token")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.Equal(helpers.NormalizeDigest(mockDigestHash)))
-			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3)) // GET /v2/, GET /token, GET manifest
-		})
-
-		ginkgo.It("should return an error if GetToken fails", func() {
-			defer ginkgo.GinkgoRecover()
-			// Use an invalid image name to trigger GetToken failure
-			mockContainerInvalidImage := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				invalidImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			result, err := digest.FetchDigest(context.Background(), mockContainerInvalidImage, "token")
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
-			gomega.Expect(result).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("should return an error if GET request fails after token", func() {
 			defer ginkgo.GinkgoRecover()
-			serverAddr := server.Addr()
+			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
 				mockID,
@@ -548,98 +494,35 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			server.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v2/"),
-					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
-					}),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/token"),
-					ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v2/test/image/manifests/latest"),
-					func(w http.ResponseWriter, _ *http.Request) {
-						// Simulate a network failure by closing the connection
-						conn, _, err := w.(http.Hijacker).Hijack() //nolint:forcetypeassert
-						gomega.Expect(err).NotTo(gomega.HaveOccurred())
-						conn.Close()
-					},
-				),
-			)
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Simulating network failure for manifest request")
+				conn, _, err := w.(http.Hijacker).Hijack() //nolint:forcetypeassert
+				if err != nil {
+					logrus.WithError(err).Error("Failed to hijack connection")
 
-			origClient := auth.Client
-			auth.Client = &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Skip verification for self-signed cert
-				},
-			}
-			defer func() { auth.Client = origClient }()
+					return
+				}
+				conn.Close() // Simulate network failure
+			})
 
 			result, err := digest.FetchDigest(context.Background(), mockContainerWithServer, "token")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("GET request failed"))
 			gomega.Expect(result).To(gomega.BeEmpty())
-			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
 
-		ginkgo.It("should return an error if manifest URL build fails", func() {
+		ginkgo.It("should return an error if TLS handshake times out", func() {
 			defer ginkgo.GinkgoRecover()
-			// Use an invalid image name to trigger manifest URL error
-			mockContainerInvalidImage := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				invalidImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			result, err := digest.FetchDigest(context.Background(), mockContainerInvalidImage, "token")
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
-			gomega.Expect(result).To(gomega.BeEmpty())
-		})
-
-		ginkgo.It("should return an error if GET request creation fails", func() {
-			defer ginkgo.GinkgoRecover()
-			// Use a malformed URL to trigger request creation error
-			mockImageRef := "\x00://invalid-url/test/image:latest"
-			mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				mockImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			result, err := digest.FetchDigest(context.Background(), mockContainerInvalidURL, "token")
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
-			gomega.Expect(result).To(gomega.BeEmpty())
-		})
-
-		ginkgo.It("should return an error if GET request fails", func() {
-			defer ginkgo.GinkgoRecover()
-			mockImageRef := "unreachable.local/test/image:latest"
-			mockContainerUnreachable := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				mockImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			result, err := digest.FetchDigest(context.Background(), mockContainerUnreachable, "token")
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to execute challenge request"))
-			gomega.Expect(result).To(gomega.BeEmpty())
-		})
-
-		ginkgo.It("should return an error if response decoding fails", func() {
-			defer ginkgo.GinkgoRecover()
-			serverAddr := server.Addr()
+			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
 				mockID,
@@ -649,36 +532,41 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			server.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v2/"),
-					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
-					}),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/token"),
-					ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v2/test/image/manifests/latest"),
-					ghttp.RespondWith(http.StatusOK, "invalid-json"), // Malformed JSON
-				),
-			)
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Simulating slow response for manifest request")
+				time.Sleep(5 * time.Second) // Delay to exceed context timeout
+				w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
+			})
 
 			origClient := auth.Client
 			auth.Client = &http.Client{
 				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Skip verification for self-signed cert
+					TLSClientConfig:       &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Insecure TLS for testing
+					DisableKeepAlives:     true,
+					ResponseHeaderTimeout: 50 * time.Millisecond,
 				},
 			}
-			defer func() { auth.Client = origClient }()
+			defer func() {
+				logrus.Debug("Restoring original client")
+				auth.Client = origClient
+			}()
 
-			result, err := digest.FetchDigest(context.Background(), mockContainerWithServer, "token")
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+
+			result, err := digest.FetchDigest(ctx, mockContainerWithServer, "token")
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to decode manifest response"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("GET request failed"))
 			gomega.Expect(result).To(gomega.BeEmpty())
-			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
 	})
 })

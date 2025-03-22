@@ -5,14 +5,12 @@ package digest
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -25,15 +23,6 @@ import (
 // UserAgent is the User-Agent header value used in HTTP requests.
 // It can be set at build time (e.g., via -ldflags) or defaults to "Watchtower/unknown".
 var UserAgent = "Watchtower/unknown"
-
-// Constants for HTTP client configuration.
-// These values define timeouts and connection limits for registry requests.
-const (
-	defaultTimeoutSeconds             = 30  // Default timeout for HTTP requests in seconds
-	defaultMaxIdleConns               = 100 // Maximum number of idle connections in the pool
-	defaultIdleConnTimeoutSeconds     = 90  // Timeout for idle connections in seconds
-	defaultTLSHandshakeTimeoutSeconds = 10  // Timeout for TLS handshake in seconds
-)
 
 // ContentDigestHeader is the key for the key-value pair containing the digest header.
 // It is used to extract the digest from registry HEAD responses.
@@ -84,29 +73,28 @@ func CompareDigest(ctx context.Context, container types.Container, registryAuth 
 		return false, fmt.Errorf("failed to create HEAD request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", token)
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 	req.Header.Set("User-Agent", UserAgent) // Use dynamic User-Agent
 
-	transport := &http.Transport{
-		//nolint:gosec // G402: InsecureSkipVerify is intentional for broad registry compatibility
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-		MaxIdleConns:          defaultMaxIdleConns,
-		IdleConnTimeout:       defaultIdleConnTimeoutSeconds * time.Second,
-		TLSHandshakeTimeout:   defaultTLSHandshakeTimeoutSeconds * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
+	logrus.WithFields(logrus.Fields{
+		"method":  req.Method,
+		"url":     req.URL.String(),
+		"headers": req.Header,
+	}).Debug("Sending HEAD request")
 
-	client := &http.Client{
-		Timeout:   defaultTimeoutSeconds * time.Second,
-		Transport: transport,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := auth.Client.Do(req) // Use auth.Client
 	if err != nil {
+		logrus.WithError(err).Debug("HEAD request failed")
+
 		return false, fmt.Errorf("HEAD request failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	logrus.WithFields(logrus.Fields{
+		"status":  resp.Status,
+		"headers": resp.Header,
+	}).Debug("Received HEAD response")
 
 	currentDigest := container.ImageInfo().RepoDigests
 
@@ -179,26 +167,20 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 		return "", fmt.Errorf("failed to create GET request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", token)
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 	req.Header.Set("User-Agent", UserAgent)
 
-	transport := &http.Transport{
-		//nolint:gosec // G402: InsecureSkipVerify is intentional for broad registry compatibility
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-		MaxIdleConns:          defaultMaxIdleConns,
-		IdleConnTimeout:       defaultIdleConnTimeoutSeconds * time.Second,
-		TLSHandshakeTimeout:   defaultTLSHandshakeTimeoutSeconds * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
+	logrus.WithFields(logrus.Fields{
+		"method":  req.Method,
+		"url":     req.URL.String(),
+		"headers": req.Header,
+	}).Debug("Sending GET request")
 
-	client := &http.Client{
-		Timeout:   defaultTimeoutSeconds * time.Second,
-		Transport: transport,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := auth.Client.Do(req)
 	if err != nil {
+		logrus.WithError(err).Debug("GET request failed")
+
 		return "", fmt.Errorf("GET request failed: %w", err)
 	}
 	defer resp.Body.Close()
@@ -207,6 +189,8 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
+		logrus.WithError(err).Debug("Failed to decode manifest response")
+
 		return "", fmt.Errorf("failed to decode manifest response: %w", err)
 	}
 

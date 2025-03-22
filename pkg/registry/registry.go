@@ -35,7 +35,9 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 	}, nil
 }
 
-// but there's no point trying again with the same value as used in AuthConfig.
+// DefaultAuthHandler is a privilege function called when initial authentication fails.
+// It logs the rejection and returns an empty string to retry the request without authentication,
+// as retrying with the same credentials used in AuthConfig is unlikely to succeed.
 func DefaultAuthHandler(context.Context) (string, error) {
 	logrus.Debug("Authentication request was rejected. Trying again without authentication")
 
