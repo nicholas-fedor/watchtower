@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -90,6 +89,20 @@ var labelPrecedence bool
 // rootCmd represents the root command for the Watchtower CLI.
 // It serves as the parent for all subcommands and is initialized with default behavior.
 var rootCmd = NewRootCommand()
+
+// RunConfig encapsulates configuration for the runMain function.
+type RunConfig struct {
+	Command          *cobra.Command
+	Names            []string
+	Filter           types.Filter
+	FilterDesc       string
+	RunOnce          bool
+	EnableUpdateAPI  bool
+	EnableMetricsAPI bool
+	UnblockHTTPAPI   bool
+	APIToken         string
+	APIPort          string
+}
 
 // NewRootCommand creates and configures the root command for Watchtower.
 // It defines the base usage, description, and lifecycle hooks for execution.
@@ -226,8 +239,21 @@ func run(c *cobra.Command, names []string) {
 		return // Exit early without os.Exit to allow defer in caller if needed.
 	}
 
+	cfg := RunConfig{
+		Command:          c,
+		Names:            names,
+		Filter:           filter,
+		FilterDesc:       filterDesc,
+		RunOnce:          runOnce,
+		EnableUpdateAPI:  enableUpdateAPI,
+		EnableMetricsAPI: enableMetricsAPI,
+		UnblockHTTPAPI:   unblockHTTPAPI,
+		APIToken:         apiToken,
+		APIPort:          apiPort,
+	}
+
 	// Run the main logic and handle exit status.
-	if exitCode := runMain(c, names, filter, filterDesc, runOnce, enableUpdateAPI, enableMetricsAPI, unblockHTTPAPI, apiToken, apiPort); exitCode != 0 {
+	if exitCode := runMain(cfg); exitCode != 0 {
 		os.Exit(exitCode)
 	}
 }
@@ -235,9 +261,9 @@ func run(c *cobra.Command, names []string) {
 // runMain contains the core Watchtower logic after early exits are handled.
 // It sets up the HTTP API and scheduled updates with proper context management,
 // returning an exit code (0 for success, 1 for failure).
-func runMain(c *cobra.Command, names []string, filter types.Filter, filterDesc string, runOnce, enableUpdateAPI, enableMetricsAPI, unblockHTTPAPI bool, apiToken, apiPort string) int {
+func runMain(cfg RunConfig) int {
 	// Log the container names for debugging, ensuring 'names' is used.
-	logrus.Debugf("Processing containers: %v", names)
+	logrus.Debugf("Processing containers: %v", cfg.Names)
 
 	// Validate flag compatibility.
 	if rollingRestart && monitorOnly {
@@ -247,16 +273,16 @@ func runMain(c *cobra.Command, names []string, filter types.Filter, filterDesc s
 	awaitDockerClient()
 
 	// Perform sanity checks on the container environment.
-	if err := actions.CheckForSanity(client, filter, rollingRestart); err != nil {
+	if err := actions.CheckForSanity(client, cfg.Filter, rollingRestart); err != nil {
 		logNotify(err)
 
 		return 1
 	}
 
 	// Execute a one-time update and exit if specified.
-	if runOnce {
-		writeStartupMessage(c, time.Time{}, filterDesc)
-		runUpdatesWithNotifications(filter)
+	if cfg.RunOnce {
+		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc)
+		runUpdatesWithNotifications(cfg.Filter)
 		notifier.Close()
 
 		return 0
@@ -274,24 +300,24 @@ func runMain(c *cobra.Command, names []string, filter types.Filter, filterDesc s
 	updateLock <- true
 
 	// Initialize the HTTP API with the configured port.
-	httpAPI := api.New(apiToken)
-	httpAPI.Addr = ":" + apiPort
+	httpAPI := api.New(cfg.APIToken)
+	httpAPI.Addr = ":" + cfg.APIPort
 
 	// Set up the update API endpoint if enabled.
-	if enableUpdateAPI {
+	if cfg.EnableMetricsAPI {
 		updateHandler := update.New(func(images []string) {
-			metric := runUpdatesWithNotifications(filters.FilterByImage(images, filter))
+			metric := runUpdatesWithNotifications(filters.FilterByImage(images, cfg.Filter))
 			metrics.RegisterScan(metric)
 		}, updateLock)
 		httpAPI.RegisterFunc(updateHandler.Path, updateHandler.Handle)
 
-		if !unblockHTTPAPI {
-			writeStartupMessage(c, time.Time{}, filterDesc)
+		if !cfg.UnblockHTTPAPI {
+			writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc)
 		}
 	}
 
 	// Set up the metrics API endpoint if enabled.
-	if enableMetricsAPI {
+	if cfg.EnableMetricsAPI {
 		metricsHandler := metricsAPI.New()
 		httpAPI.RegisterHandler(metricsHandler.Path, metricsHandler.Handle)
 	}
@@ -301,12 +327,12 @@ func runMain(c *cobra.Command, names []string, filter types.Filter, filterDesc s
 	defer cancel()
 
 	// Start the HTTP API, logging errors unless it’s a clean shutdown.
-	if err := httpAPI.Start(ctx, enableUpdateAPI && !unblockHTTPAPI); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := httpAPI.Start(ctx, cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logrus.Error("failed to start API", err)
 	}
 
 	// Run updates on the specified schedule, handling any errors.
-	if err := runUpgradesOnSchedule(ctx, c, filter, filterDesc, updateLock); err != nil {
+	if err := runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock); err != nil {
 		logrus.Error(err)
 
 		return 1
@@ -332,47 +358,45 @@ func awaitDockerClient() {
 // formatDuration converts a time.Duration to a human-readable string.
 // It handles hours, minutes, and seconds, ensuring proper grammar and formatting.
 func formatDuration(duration time.Duration) string {
-	durationBuilder := strings.Builder{}
-
 	const (
-		minutesPerHour = 60
-		secondsPerHour = 60 * minutesPerHour
+		minutesPerHour   = 60 // Number of minutes in an hour
+		secondsPerMinute = 60 // Number of seconds in a minute
 	)
+
+	type timeUnit struct {
+		value    int64
+		singular string
+		plural   string
+	}
 
 	hours := int64(duration.Hours())
 	minutes := int64(math.Mod(duration.Minutes(), minutesPerHour))
-	seconds := int64(math.Mod(duration.Seconds(), secondsPerHour))
+	seconds := int64(math.Mod(duration.Seconds(), secondsPerMinute))
 
-	if hours == 1 {
-		durationBuilder.WriteString("1 hour")
-	} else if hours != 0 {
-		durationBuilder.WriteString(strconv.FormatInt(hours, 10))
-		durationBuilder.WriteString(" hours")
+	units := []timeUnit{
+		{hours, "hour", "hours"},
+		{minutes, "minute", "minutes"},
+		{seconds, "second", "seconds"},
 	}
 
-	if hours != 0 && (seconds != 0 || minutes != 0) {
-		durationBuilder.WriteString(", ")
+	var parts []string
+	for _, unit := range units {
+		if unit.value == 0 && len(parts) == 0 && &unit != &units[len(units)-1] {
+			continue // Skip leading zeros, but include seconds if nothing else
+		}
+
+		if unit.value == 1 {
+			parts = append(parts, "1 "+unit.singular)
+		} else if unit.value != 0 || (len(parts) == 0 && &unit == &units[len(units)-1]) {
+			parts = append(parts, fmt.Sprintf("%d %s", unit.value, unit.plural))
+		}
 	}
 
-	if minutes == 1 {
-		durationBuilder.WriteString("1 minute")
-	} else if minutes != 0 {
-		durationBuilder.WriteString(strconv.FormatInt(minutes, 10))
-		durationBuilder.WriteString(" minutes")
+	if len(parts) == 0 {
+		return "0 seconds"
 	}
 
-	if minutes != 0 && seconds != 0 {
-		durationBuilder.WriteString(", ")
-	}
-
-	if seconds == 1 {
-		durationBuilder.WriteString("1 second")
-	} else if seconds != 0 || (hours == 0 && minutes == 0) {
-		durationBuilder.WriteString(strconv.FormatInt(seconds, 10))
-		durationBuilder.WriteString(" seconds")
-	}
-
-	return durationBuilder.String()
+	return strings.Join(parts, ", ")
 }
 
 // writeStartupMessage logs or notifies startup information based on configuration.
