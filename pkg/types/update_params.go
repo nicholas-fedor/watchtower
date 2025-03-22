@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// UpdateParams contains all different options available to alter the behavior of the Update func
+// UpdateParams contains all different options available to alter the behavior of the Update func.
 type UpdateParams struct {
 	Filter          Filter
 	Cleanup         bool

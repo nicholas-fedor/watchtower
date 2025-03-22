@@ -1,3 +1,5 @@
+// Package notifications provides mechanisms for sending notifications via various services.
+// This file implements Slack notification functionality with webhook support.
 package notifications
 
 import (
@@ -14,6 +16,8 @@ const (
 	slackType = "slack"
 )
 
+// slackTypeNotifier handles Slack notifications via webhook.
+// It supports customization with username, channel, and icon settings.
 type slackTypeNotifier struct {
 	HookURL   string
 	Username  string
@@ -22,6 +26,8 @@ type slackTypeNotifier struct {
 	IconURL   string
 }
 
+// newSlackNotifier creates a new Slack notifier from command-line flags.
+// It initializes webhook URL, username, channel, and icon preferences.
 func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
@@ -38,16 +44,20 @@ func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 		IconEmoji: emoji,
 		IconURL:   iconURL,
 	}
+
 	return n
 }
 
-func (s *slackTypeNotifier) GetURL(c *cobra.Command) (string, error) {
+// GetURL generates the Slack webhook URL for the notifier.
+// It detects Discord wrappers and constructs the appropriate service URL.
+func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	trimmedURL := strings.TrimRight(s.HookURL, "/")
 	trimmedURL = strings.TrimPrefix(trimmedURL, "https://")
 	parts := strings.Split(trimmedURL, "/")
 
 	if parts[0] == "discord.com" || parts[0] == "discordapp.com" {
 		logrus.Debug("Detected a discord slack wrapper URL, using shoutrrr discord service")
+
 		conf := &shoutrrrDisco.Config{
 			WebhookID:  parts[len(parts)-3],
 			Token:      parts[len(parts)-2],

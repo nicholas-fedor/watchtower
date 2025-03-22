@@ -1,13 +1,15 @@
+// Package util provides utility functions for Watchtower operations.
 package util
 
-// SliceEqual compares two slices and checks whether they have equal content
-func SliceEqual(s1, s2 []string) bool {
-	if len(s1) != len(s2) {
+// SliceEqual compares two string slices for equality.
+// It returns true if both slices have identical content in the same order.
+func SliceEqual(slice1, slice2 []string) bool {
+	if len(slice1) != len(slice2) {
 		return false
 	}
 
-	for i := range s1 {
-		if s1[i] != s2[i] {
+	for i := range slice1 {
+		if slice1[i] != slice2[i] {
 			return false
 		}
 	}
@@ -15,54 +17,58 @@ func SliceEqual(s1, s2 []string) bool {
 	return true
 }
 
-// SliceSubtract subtracts the content of slice a2 from slice a1
-func SliceSubtract(a1, a2 []string) []string {
-	a := []string{}
+// SliceSubtract removes elements in subtractFrom from slice.
+// It returns a new slice containing only elements unique to the first slice.
+func SliceSubtract(slice, subtractFrom []string) []string {
+	result := []string{}
 
-	for _, e1 := range a1 {
+	for _, element1 := range slice {
 		found := false
 
-		for _, e2 := range a2 {
-			if e1 == e2 {
+		for _, element2 := range subtractFrom {
+			if element1 == element2 {
 				found = true
+
 				break
 			}
 		}
 
 		if !found {
-			a = append(a, e1)
+			result = append(result, element1)
 		}
 	}
 
-	return a
+	return result
 }
 
-// StringMapSubtract subtracts the content of structmap m2 from structmap m1
-func StringMapSubtract(m1, m2 map[string]string) map[string]string {
-	m := map[string]string{}
+// StringMapSubtract removes matching key-value pairs from map1 based on map2.
+// It returns a new map with keys from map1 that are absent or differ in map2.
+func StringMapSubtract(map1, map2 map[string]string) map[string]string {
+	result := map[string]string{}
 
-	for k1, v1 := range m1 {
-		if v2, ok := m2[k1]; ok {
-			if v2 != v1 {
-				m[k1] = v1
+	for key1, value1 := range map1 {
+		if value2, ok := map2[key1]; ok {
+			if value2 != value1 {
+				result[key1] = value1
 			}
 		} else {
-			m[k1] = v1
+			result[key1] = value1
 		}
 	}
 
-	return m
+	return result
 }
 
-// StructMapSubtract subtracts the content of structmap m2 from structmap m1
-func StructMapSubtract(m1, m2 map[string]struct{}) map[string]struct{} {
-	m := map[string]struct{}{}
+// StructMapSubtract removes keys from map1 that exist in map2.
+// It returns a new map with keys unique to map1.
+func StructMapSubtract(map1, map2 map[string]struct{}) map[string]struct{} {
+	result := map[string]struct{}{}
 
-	for k1, v1 := range m1 {
-		if _, ok := m2[k1]; !ok {
-			m[k1] = v1
+	for key1, value1 := range map1 {
+		if _, ok := map2[key1]; !ok {
+			result[key1] = value1
 		}
 	}
 
-	return m
+	return result
 }

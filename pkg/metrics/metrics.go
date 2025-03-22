@@ -1,3 +1,5 @@
+// Package metrics provides functionality for tracking and exposing Watchtower scan metrics.
+// It integrates with Prometheus to monitor container scan outcomes, including scanned, updated, and failed counts.
 package metrics
 
 import (
@@ -8,14 +10,16 @@ import (
 
 var metrics *Metrics
 
-// Metric is the data points of a single scan
+// Metric represents the data points collected from a single Watchtower scan.
+// It includes counts of scanned, updated, and failed containers.
 type Metric struct {
 	Scanned int
 	Updated int
 	Failed  int
 }
 
-// Metrics is the handler processing all individual scan metrics
+// Metrics is the handler for processing and exposing scan metrics.
+// It maintains a channel for queueing metrics and Prometheus gauges/counters for tracking.
 type Metrics struct {
 	channel chan *Metric
 	scanned prometheus.Gauge
@@ -25,7 +29,8 @@ type Metrics struct {
 	skipped prometheus.Counter
 }
 
-// NewMetric returns a Metric with the counts taken from the appropriate types.Report fields
+// NewMetric creates a new Metric instance from a types.Report.
+// It counts scanned, updated (including stale for compatibility), and failed containers.
 func NewMetric(report types.Report) *Metric {
 	return &Metric{
 		Scanned: len(report.Scanned()),
@@ -35,21 +40,27 @@ func NewMetric(report types.Report) *Metric {
 	}
 }
 
-// QueueIsEmpty checks whether any messages are enqueued in the channel
+// QueueIsEmpty checks whether any metric messages are currently enqueued in the channel.
+// It returns true if the channel is empty, false otherwise.
 func (metrics *Metrics) QueueIsEmpty() bool {
 	return len(metrics.channel) == 0
 }
 
-// Register registers metrics for an executed scan
+// Register enqueues a metric for processing by the metrics handler.
+// It sends the metric to the channel for asynchronous handling.
 func (metrics *Metrics) Register(metric *Metric) {
 	metrics.channel <- metric
 }
 
-// Default creates a new metrics handler if none exists, otherwise returns the existing one
+// Default creates a new Metrics handler if none exists, or returns the existing singleton.
+// It initializes Prometheus gauges and counters, and starts a goroutine to handle metric updates.
 func Default() *Metrics {
 	if metrics != nil {
 		return metrics
 	}
+
+	// channelBufferSize defines the buffer capacity for the metrics channel.
+	const channelBufferSize = 10
 
 	metrics = &Metrics{
 		scanned: promauto.NewGauge(prometheus.GaugeOpts{
@@ -69,10 +80,10 @@ func Default() *Metrics {
 			Help: "Number of scans since the watchtower started",
 		}),
 		skipped: promauto.NewCounter(prometheus.CounterOpts{
-			Name: "watchtower_scans_skipped",
+			Name: "watchtower_scans_skipped_total",
 			Help: "Number of skipped scans since watchtower started",
 		}),
-		channel: make(chan *Metric, 10),
+		channel: make(chan *Metric, channelBufferSize),
 	}
 
 	go metrics.HandleUpdate(metrics.channel)
@@ -80,13 +91,15 @@ func Default() *Metrics {
 	return metrics
 }
 
-// RegisterScan fetches a metric handler and enqueues a metric
+// RegisterScan fetches the default metrics handler and enqueues a metric for processing.
+// It provides a convenient way to register a scan’s metrics without directly accessing the handler.
 func RegisterScan(metric *Metric) {
 	metrics := Default()
 	metrics.Register(metric)
 }
 
-// HandleUpdate dequeue the metric channel and processes it
+// HandleUpdate dequeues metrics from the channel and updates Prometheus metrics accordingly.
+// It processes each metric, incrementing counters and setting gauges based on scan outcomes.
 func (metrics *Metrics) HandleUpdate(channel <-chan *Metric) {
 	for change := range channel {
 		if change == nil {
@@ -96,6 +109,7 @@ func (metrics *Metrics) HandleUpdate(channel <-chan *Metric) {
 			metrics.scanned.Set(0)
 			metrics.updated.Set(0)
 			metrics.failed.Set(0)
+
 			continue
 		}
 		// Update metrics with the new values

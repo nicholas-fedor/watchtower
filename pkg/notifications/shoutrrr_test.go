@@ -1,3 +1,5 @@
+// Package notifications provides mechanisms for sending notifications via various services.
+// This file contains tests for Shoutrrr notification functionality, including templating and batching.
 package notifications
 
 import (
@@ -47,9 +49,12 @@ var mockDataAllFresh = Data{
 	Report:  mocks.CreateMockProgressReport(session.FreshState),
 }
 
+// mockDataFromStates generates mock notification data with specified container states.
+// It includes legacy log entries and static data for testing.
 func mockDataFromStates(states ...session.State) Data {
 	hostname := "Mock"
 	prefix := ""
+
 	return Data{
 		Entries: legacyMockData.Entries,
 		Report:  mocks.CreateMockProgressReport(states...),
@@ -108,7 +113,6 @@ updt1 (mock/updt1:latest): Updated
 	})
 
 	ginkgo.When("using legacy templates", func() {
-
 		ginkgo.When("no custom template is provided", func() {
 			ginkgo.It("should format the messages using the default template", func() {
 				cmd := new(cobra.Command)
@@ -130,7 +134,6 @@ updt1 (mock/updt1:latest): Updated
 		})
 		ginkgo.When("given a valid custom template", func() {
 			ginkgo.It("should format the messages using the custom template", func() {
-
 				tplString := `{{range .}}{{.Level}}: {{.Message}}{{println}}{{end}}`
 				tpl, err := getShoutrrrTemplate(tplString, true)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -198,7 +201,6 @@ updt1 (mock/updt1:latest): Updated
 				gomega.Expect(getTemplatedResult(tplString, true, legacyMockData)).To(gomega.Equal("Foo Bar"))
 			})
 		})
-
 	})
 
 	ginkgo.When("using report templates", func() {
@@ -213,7 +215,6 @@ updt1 (mock/updt1:latest): Updated
 				data := mockDataFromStates(session.UpdatedState, session.FreshState, session.FailedState, session.SkippedState, session.UpdatedState)
 				gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
 			})
-
 		})
 
 		ginkgo.When("using a template referencing Title", func() {
@@ -299,12 +300,10 @@ Turns out everything is on fire
 	})
 
 	ginkgo.When("sending notifications", func() {
-
 		ginkgo.It("SlowNotificationNotSent", func() {
 			_, blockingRouter := sendNotificationsWithBlockingRouter(true)
 
 			gomega.Eventually(blockingRouter.sent).Should(gomega.Not(gomega.Receive()))
-
 		})
 
 		ginkgo.It("SlowNotificationSent", func() {
@@ -318,6 +317,8 @@ Turns out everything is on fire
 	})
 })
 
+// blockingRouter simulates a notification router with blocking behavior for testing.
+// It waits for an unlock signal before sending and reports send completion.
 type blockingRouter struct {
 	unlock chan bool
 	sent   chan bool
@@ -326,11 +327,13 @@ type blockingRouter struct {
 func (b blockingRouter) Send(_ string, _ *types.Params) []error {
 	<-b.unlock
 	b.sent <- true
+
 	return nil
 }
 
+// sendNotificationsWithBlockingRouter sets up a test notifier with a blocking router.
+// It returns the notifier and router for testing notification delays.
 func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *blockingRouter) {
-
 	router := &blockingRouter{
 		unlock: make(chan bool, 1),
 		sent:   make(chan bool, 1),
@@ -363,6 +366,8 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 	return shoutrrr, router
 }
 
+// createNotifierWithTemplate creates a notifier with a specified template for testing.
+// It returns the notifier and any template parsing error.
 func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNotifier, error) {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
 
@@ -372,10 +377,13 @@ func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNot
 	}, err
 }
 
-func getTemplatedResult(tplString string, legacy bool, data Data) (msg string) {
+// getTemplatedResult generates a templated message for testing.
+// It builds and returns the message string, expecting no errors.
+func getTemplatedResult(tplString string, legacy bool, data Data) string {
 	notifier, err := createNotifierWithTemplate(tplString, legacy)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
-	msg, err = notifier.buildMessage(data)
+	msg, err := notifier.buildMessage(data)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
+
 	return msg
 }

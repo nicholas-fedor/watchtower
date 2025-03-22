@@ -19,9 +19,11 @@ var Funcs = template.FuncMap{
 
 func toJSON(v interface{}) string {
 	var bytes []byte
+
 	var err error
 	if bytes, err = json.MarshalIndent(v, "", "  "); err != nil {
 		return fmt.Sprintf("failed to marshal JSON in notification template: %v", err)
 	}
+
 	return string(bytes)
 }

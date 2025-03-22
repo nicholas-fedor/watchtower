@@ -1,8 +1,11 @@
+// Package data provides utilities for generating preview data for Watchtower notifications.
+// It includes mechanisms to simulate container statuses and log entries for testing purposes.
 package data
 
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
@@ -10,7 +13,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-type previewData struct {
+// PreviewData represents a generator for preview data, including container statuses and log entries.
+type PreviewData struct {
 	rand           *rand.Rand
 	lastTime       time.Time
 	report         *report
@@ -24,10 +28,13 @@ type staticData struct {
 	Host  string
 }
 
-// New initializes a new preview data struct
-func New() *previewData {
-	return &previewData{
-		rand:           rand.New(rand.NewSource(1)),
+// New initializes a new PreviewData struct with seeded random generation and default static data.
+// The random seed is fixed at 1 for deterministic output in previews.
+//
+//nolint:redefines-builtin-id // Constructor naming convention
+func New() *PreviewData {
+	return &PreviewData{
+		rand:           rand.New(rand.NewSource(1)), //nolint:gosec // Preview data, not security-critical
 		lastTime:       time.Now().Add(-30 * time.Minute),
 		report:         nil,
 		containerCount: 0,
@@ -39,20 +46,27 @@ func New() *previewData {
 	}
 }
 
-// AddFromState adds a container status entry to the report with the given state
-func (pb *previewData) AddFromState(state State) {
-	cid := types.ContainerID(pb.generateID())
-	old := types.ImageID(pb.generateID())
-	new := types.ImageID(pb.generateID())
-	name := pb.generateName()
-	image := pb.generateImageName(name)
+// AddFromState adds a container status entry to the report with the specified state.
+// It generates a random container ID, image IDs, name, and image name based on the state.
+// For FailedState or SkippedState, it includes a contextual error message.
+func (p *PreviewData) AddFromState(state State) {
+	cid := types.ContainerID(p.generateID())
+	old := types.ImageID(p.generateID())
+	new := types.ImageID(p.generateID()) //nolint
+	name := p.generateName()
+	image := p.generateImageName(name)
+
 	var err error
-	if state == FailedState {
-		err = errors.New(pb.randomEntry(errorMessages))
-	} else if state == SkippedState {
-		err = errors.New(pb.randomEntry(skippedMessages))
+
+	//nolint
+	switch state {
+	case FailedState:
+		err = fmt.Errorf("execution failed: %w", errors.New(p.randomEntry(errorMessages)))
+	case SkippedState:
+		err = fmt.Errorf("skipped: %w", errors.New(p.randomEntry(skippedMessages)))
 	}
-	pb.addContainer(containerStatus{
+
+	p.addContainer(containerStatus{
 		containerID:   cid,
 		oldImage:      old,
 		newImage:      new,
@@ -63,81 +77,99 @@ func (pb *previewData) AddFromState(state State) {
 	})
 }
 
-func (pb *previewData) addContainer(c containerStatus) {
-	if pb.report == nil {
-		pb.report = &report{}
+// addContainer appends a container status to the appropriate report category based on its state.
+// It initializes the report if it doesn’t exist and increments the container count.
+func (p *PreviewData) addContainer(c containerStatus) {
+	if p.report == nil {
+		p.report = &report{}
 	}
+
 	switch c.state {
 	case ScannedState:
-		pb.report.scanned = append(pb.report.scanned, &c)
+		p.report.scanned = append(p.report.scanned, &c)
 	case UpdatedState:
-		pb.report.updated = append(pb.report.updated, &c)
+		p.report.updated = append(p.report.updated, &c)
 	case FailedState:
-		pb.report.failed = append(pb.report.failed, &c)
+		p.report.failed = append(p.report.failed, &c)
 	case SkippedState:
-		pb.report.skipped = append(pb.report.skipped, &c)
+		p.report.skipped = append(p.report.skipped, &c)
 	case StaleState:
-		pb.report.stale = append(pb.report.stale, &c)
+		p.report.stale = append(p.report.stale, &c)
 	case FreshState:
-		pb.report.fresh = append(pb.report.fresh, &c)
+		p.report.fresh = append(p.report.fresh, &c)
 	default:
 		return
 	}
-	pb.containerCount += 1
+
+	p.containerCount++
 }
 
-// AddLogEntry adds a preview log entry of the given level
-func (pd *previewData) AddLogEntry(level LogLevel) {
+// AddLogEntry adds a preview log entry with the specified level.
+// It generates a message based on the log level, using error messages for Fatal, Error, and Warn levels,
+// and general messages for others, with a timestamp advancing randomly.
+func (p *PreviewData) AddLogEntry(level LogLevel) {
 	var msg string
+
 	switch level {
-	case FatalLevel:
-		fallthrough
-	case ErrorLevel:
-		fallthrough
-	case WarnLevel:
-		msg = pd.randomEntry(logErrors)
+	case FatalLevel, ErrorLevel, WarnLevel:
+		msg = p.randomEntry(logErrors)
+	case TraceLevel, DebugLevel, InfoLevel, PanicLevel:
+		msg = p.randomEntry(logMessages)
 	default:
-		msg = pd.randomEntry(logMessages)
+		msg = p.randomEntry(logMessages) // Fallback for unhandled levels
 	}
-	pd.Entries = append(pd.Entries, &logEntry{
+
+	p.Entries = append(p.Entries, &logEntry{
 		Message: msg,
 		Data:    map[string]any{},
-		Time:    pd.generateTime(),
+		Time:    p.generateTime(),
 		Level:   level,
 	})
 }
 
-// Report returns a preview report
-func (pb *previewData) Report() types.Report {
-	return pb.report
+// Report returns the current preview report containing categorized container statuses.
+// It provides a snapshot of the simulated data for notification previews.
+func (p *PreviewData) Report() types.Report {
+	return p.report
 }
 
-func (pb *previewData) generateID() string {
-	buf := make([]byte, 32)
-	_, _ = pb.rand.Read(buf)
+// Constants for ID generation and time increments.
+const (
+	idLength                = 32 // Length of generated IDs in bytes
+	maxTimeIncrementSeconds = 30 // Maximum seconds to increment time
+)
+
+func (p *PreviewData) generateID() string {
+	buf := make([]byte, idLength)
+	_, _ = p.rand.Read(buf)
+
 	return hex.EncodeToString(buf)
 }
 
-func (pb *previewData) generateTime() time.Time {
-	pb.lastTime = pb.lastTime.Add(time.Duration(pb.rand.Intn(30)) * time.Second)
-	return pb.lastTime
+func (p *PreviewData) generateTime() time.Time {
+	p.lastTime = p.lastTime.Add(time.Duration(p.rand.Intn(maxTimeIncrementSeconds)) * time.Second)
+
+	return p.lastTime
 }
 
-func (pb *previewData) randomEntry(arr []string) string {
-	return arr[pb.rand.Intn(len(arr))]
+func (p *PreviewData) randomEntry(arr []string) string {
+	return arr[p.rand.Intn(len(arr))]
 }
 
-func (pb *previewData) generateName() string {
-	index := pb.containerCount
+func (p *PreviewData) generateName() string {
+	index := p.containerCount
 	if index <= len(containerNames) {
 		return "/" + containerNames[index]
 	}
+
 	suffix := index / len(containerNames)
 	index %= len(containerNames)
+
 	return "/" + containerNames[index] + strconv.FormatInt(int64(suffix), 10)
 }
 
-func (pb *previewData) generateImageName(name string) string {
-	index := pb.containerCount % len(organizationNames)
+func (p *PreviewData) generateImageName(name string) string {
+	index := p.containerCount % len(organizationNames)
+
 	return organizationNames[index] + name + ":latest"
 }

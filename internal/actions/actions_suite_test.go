@@ -15,11 +15,13 @@ import (
 )
 
 func TestActions(t *testing.T) {
+	t.Parallel()
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	logrus.SetOutput(ginkgo.GinkgoWriter)
 	ginkgo.RunSpecs(t, "Actions Suite")
 }
 
+//nolint:exhaustruct // Mock structs intentionally omit fields irrelevant to tests
 var _ = ginkgo.Describe("the actions package", func() {
 	ginkgo.Describe("the check prerequisites method", func() {
 		ginkgo.When("given an empty array", func() {
@@ -83,6 +85,8 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should stop all but the latest one", func() {
 				err := actions.CheckForMultipleWatchtowerInstances(client, false, "")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).To(gomega.BeFalse(), "test-container-01 should be stopped")
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).To(gomega.BeTrue(), "test-container-02 should remain running")
 			})
 		})
 		ginkgo.When("deciding whether to cleanup images", func() {

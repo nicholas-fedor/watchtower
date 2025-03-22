@@ -1,3 +1,4 @@
+// Package update provides an HTTP API handler for triggering Watchtower container updates.
 package update
 
 import (
@@ -9,11 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	lock chan bool
-)
+var lock chan bool
 
-// New is a factory function creating a new  Handler instance
+// New is a factory function creating a new Handler instance.
+// It initializes the update lock, either from the provided channel or a new one.
 func New(updateFn func(images []string), updateLock chan bool) *Handler {
 	if updateLock != nil {
 		lock = updateLock
@@ -28,29 +28,32 @@ func New(updateFn func(images []string), updateLock chan bool) *Handler {
 	}
 }
 
-// Handler is an API handler used for triggering container update scans
+// Handler is an API handler used for triggering container update scans.
+// It encapsulates the update function and the API endpoint path.
 type Handler struct {
 	fn   func(images []string)
 	Path string
 }
 
-// Handle is the actual http.Handle function doing all the heavy lifting
-func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+// Handle processes HTTP requests to trigger container updates.
+// It reads the request body, extracts image queries, and executes the update function.
+func (handle *Handler) Handle(_ http.ResponseWriter, r *http.Request) {
 	logrus.Info("Updates triggered by HTTP API request.")
 
 	_, err := io.Copy(os.Stdout, r.Body)
 	if err != nil {
 		logrus.Println(err)
+
 		return
 	}
 
 	var images []string
+
 	imageQueries, found := r.URL.Query()["image"]
 	if found {
 		for _, image := range imageQueries {
 			images = append(images, strings.Split(image, ",")...)
 		}
-
 	} else {
 		images = nil
 	}
@@ -68,5 +71,4 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			logrus.Debug("Skipped. Another update already running.")
 		}
 	}
-
 }

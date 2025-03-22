@@ -36,5 +36,3 @@ var _ = ginkgo.Describe("GetRunningContainerID", func() {
 		})
 	})
 })
-
-//

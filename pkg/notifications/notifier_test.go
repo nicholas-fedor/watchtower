@@ -15,7 +15,6 @@ import (
 var _ = ginkgo.Describe("notifications", func() {
 	ginkgo.Describe("the notifier", func() {
 		ginkgo.When("only empty notifier types are provided", func() {
-
 			command := cmd.NewRootCommand()
 			flags.RegisterNotificationFlags(command)
 
@@ -201,7 +200,6 @@ var _ = ginkgo.Describe("notifications", func() {
 
 			ginkgo.When("icon URL is specified", func() {
 				ginkgo.It("should return the expected URL", func() {
-
 					hookURL := fmt.Sprintf("https://hooks.slack.com/services/%s/%s/%s", tokenA, tokenB, tokenC)
 					expectedOutput := fmt.Sprintf("slack://hook:%s-%s-%s@webhook?botname=%s&color=%s&icon=%s", tokenA, tokenB, tokenC, username, color, url.QueryEscape(iconURL))
 					expectedDelay := time.Duration(7) * time.Second
@@ -260,7 +258,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"--notifications",
 					"gotify",
 					"--notification-gotify-url",
-					fmt.Sprintf("https://%s", host),
+					"https://" + host,
 					"--notification-gotify-token",
 					token,
 				}
@@ -323,7 +321,6 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 
 			ginkgo.It("should return the expected URL", func() {
-
 				fromAddress := "sender@example.com"
 				toAddress := "receiver@example.com"
 				expectedOutput := buildExpectedURL("containrrrbot", "secret-password", "mail.watchtower.dev", 25, fromAddress, toAddress, "Plain")
@@ -353,7 +350,8 @@ var _ = ginkgo.Describe("notifications", func() {
 })
 
 func buildExpectedURL(username string, password string, host string, port int, from string, to string, auth string) string {
-	var template = "smtp://%s:%s@%s:%d/?auth=%s&fromaddress=%s&fromname=Watchtower&subject=&toaddresses=%s"
+	template := "smtp://%s:%s@%s:%d/?auth=%s&fromaddress=%s&fromname=Watchtower&subject=&toaddresses=%s"
+
 	return fmt.Sprintf(template,
 		url.QueryEscape(username),
 		url.QueryEscape(password),

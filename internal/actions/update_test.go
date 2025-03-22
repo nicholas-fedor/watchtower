@@ -14,6 +14,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
+//nolint:exhaustruct // Mock func intentionally omit fields irrelevant to tests
 func getCommonTestData(keepContainer string) *mocks.TestData {
 	return &mocks.TestData{
 		NameOfContainerToKeep: keepContainer,
@@ -37,6 +38,7 @@ func getCommonTestData(keepContainer string) *mocks.TestData {
 	}
 }
 
+//nolint:exhaustruct // Mock intentionally omit fields irrelevant to tests
 func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 	staleContainer := mocks.CreateMockContainer(
 		"test-container-01",
@@ -48,6 +50,7 @@ func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 	if withImageInfo {
 		imageInfo = mocks.CreateMockImageInfo("test-container-02")
 	}
+
 	linkingContainer := mocks.CreateMockContainerWithLinks(
 		"test-container-02",
 		"/test-container-02",
@@ -65,6 +68,7 @@ func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 	}
 }
 
+//nolint:exhaustruct // Mock intentionally omit fields irrelevant to tests
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("watchtower has been instructed to clean up", func() {
 		ginkgo.When("there are multiple containers using the same image", func() {
@@ -186,7 +190,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				ginkgo.It("it should update containers when monitor only is set to false", func() {
 					client := mocks.CreateMockClient(
 						&mocks.TestData{
-							//NameOfContainerToKeep: "test-container-02",
+							// NameOfContainerToKeep: "test-container-02",
 							Containers: []types.Container{
 								mocks.CreateMockContainerWithConfig(
 									"test-container-02",
@@ -212,7 +216,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				ginkgo.It("it should update not containers when monitor only is set to true", func() {
 					client := mocks.CreateMockClient(
 						&mocks.TestData{
-							//NameOfContainerToKeep: "test-container-02",
+							// NameOfContainerToKeep: "test-container-02",
 							Containers: []types.Container{
 								mocks.CreateMockContainerWithConfig(
 									"test-container-02",
@@ -253,18 +257,16 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 				})
-
 			})
 		})
 	})
 
 	ginkgo.When("watchtower has been instructed to run lifecycle hooks", func() {
-
 		ginkgo.When("pre-update script returns 1", func() {
 			ginkgo.It("should not update those containers", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						//NameOfContainerToKeep: "test-container-02",
+						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -290,14 +292,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 			})
-
 		})
 
 		ginkgo.When("preupdate script returns 75", func() {
 			ginkgo.It("should not update those containers", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						//NameOfContainerToKeep: "test-container-02",
+						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -322,14 +323,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 			})
-
 		})
 
 		ginkgo.When("preupdate script returns 0", func() {
 			ginkgo.It("should update those containers", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						//NameOfContainerToKeep: "test-container-02",
+						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -358,7 +358,6 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("container is linked to restarting containers", func() {
 			ginkgo.It("should be marked for restart", func() {
-
 				provider := mocks.CreateMockContainerWithConfig(
 					"test-container-provider",
 					"/test-container-provider",
@@ -399,16 +398,14 @@ var _ = ginkgo.Describe("the update action", func() {
 
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
-
 			})
-
 		})
 
 		ginkgo.When("container is not running", func() {
 			ginkgo.It("skip running preupdate", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						//NameOfContainerToKeep: "test-container-02",
+						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -433,14 +430,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
 			})
-
 		})
 
 		ginkgo.When("container is restarting", func() {
 			ginkgo.It("skip running preupdate", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						//NameOfContainerToKeep: "test-container-02",
+						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -465,8 +461,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
 			})
-
 		})
-
 	})
 })

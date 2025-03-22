@@ -409,6 +409,17 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
              Default: false
 ```
 
+## HTTP API Port
+
+Specifies the HTTP API listening port.
+
+```text
+            Argument: --http-api-port
+Environment Variable: WATCHTOWER_HTTP_API_PORT
+                Type: String
+             Default: 8080
+```
+
 ## Scheduling
 
 [Cron expression](https://pkg.go.dev/github.com/robfig/cron@v1.2.0?tab=doc#hdr-CRON_Expression_Format) in 6 fields (rather than the traditional 5) which defines when and how often to check for new images. Either `--interval` or the schedule expression

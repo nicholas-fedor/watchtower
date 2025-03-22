@@ -2,6 +2,7 @@ package data
 
 import "github.com/nicholas-fedor/watchtower/pkg/types"
 
+//nolint:errname
 type containerStatus struct {
 	containerID   types.ContainerID
 	oldImage      types.ImageID
@@ -36,6 +37,7 @@ func (u *containerStatus) Error() string {
 	if u.error == nil {
 		return ""
 	}
+
 	return u.error.Error()
 }
 

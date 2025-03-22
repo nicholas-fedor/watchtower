@@ -8,9 +8,9 @@ import (
 
 type jsonMap = map[string]interface{}
 
-// MarshalJSON implements json.Marshaler
+// MarshalJSON implements json.Marshaler.
 func (d Data) MarshalJSON() ([]byte, error) {
-	var entries = make([]jsonMap, len(d.Entries))
+	entries := make([]jsonMap, len(d.Entries))
 	for i, entry := range d.Entries {
 		entries[i] = jsonMap{
 			`level`:   entry.Level,
@@ -55,6 +55,7 @@ func marshalReports(reports []types.ContainerReport) []jsonMap {
 			jsonReports[i][`error`] = errorMessage
 		}
 	}
+
 	return jsonReports
 }
 

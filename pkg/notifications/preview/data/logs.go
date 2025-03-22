@@ -11,7 +11,7 @@ type logEntry struct {
 	Level   LogLevel
 }
 
-// LogLevel is the analog of logrus.Level
+// LogLevel is the analog of logrus.Level.
 type LogLevel string
 
 const (
@@ -24,9 +24,10 @@ const (
 	PanicLevel LogLevel = "panic"
 )
 
-// LevelsFromString parses a string of level characters and returns a slice of the corresponding log levels
+// LevelsFromString parses a string of level characters and returns a slice of the corresponding log levels.
 func LevelsFromString(str string) []LogLevel {
 	levels := make([]LogLevel, 0, len(str))
+
 	for _, c := range str {
 		switch c {
 		case 'p':
@@ -47,10 +48,11 @@ func LevelsFromString(str string) []LogLevel {
 			continue
 		}
 	}
+
 	return levels
 }
 
-// String returns the log level as a string
+// String returns the log level as a string.
 func (level LogLevel) String() string {
 	return string(level)
 }
