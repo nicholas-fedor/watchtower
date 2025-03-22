@@ -78,9 +78,8 @@ func CompareDigest(ctx context.Context, container types.Container, registryAuth 
 	req.Header.Set("User-Agent", UserAgent) // Use dynamic User-Agent
 
 	logrus.WithFields(logrus.Fields{
-		"method":  req.Method,
-		"url":     req.URL.String(),
-		"headers": req.Header,
+		"method": req.Method,
+		"url":    req.URL.String(),
 	}).Debug("Sending HEAD request")
 
 	resp, err := auth.Client.Do(req) // Use auth.Client
@@ -172,9 +171,8 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 	req.Header.Set("User-Agent", UserAgent)
 
 	logrus.WithFields(logrus.Fields{
-		"method":  req.Method,
-		"url":     req.URL.String(),
-		"headers": req.Header,
+		"method": req.Method,
+		"url":    req.URL.String(),
 	}).Debug("Sending GET request")
 
 	resp, err := auth.Client.Do(req)
