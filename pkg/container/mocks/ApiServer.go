@@ -12,10 +12,11 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Constants for magic numbers used in mock setup.
@@ -81,18 +82,13 @@ func createFilterArgs(statuses []string) filters.Args {
 	return args
 }
 
-// Default mock image fixture for reuse across tests.
-// Represents a standard Watchtower image
-//
-//nolint:gochecknoglobals // Mock fixture reused across tests for consistency
+// Represents a standard Watchtower image.
 var defaultImage = imageRef{
 	id:   types.ImageID("sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa"), // Watchtower image ID
 	file: "default",
 }
 
 // Mock container fixture representing a Watchtower instance.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var Watchtower = ContainerRef{
 	name:  "watchtower",
 	id:    "3d88e0e3543281c747d88b27e246578b65ae8964ba86c7cd7522cf84e0978134",
@@ -100,8 +96,6 @@ var Watchtower = ContainerRef{
 }
 
 // Mock container fixture in a stopped state.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var Stopped = ContainerRef{
 	name:  "stopped",
 	id:    "ae8964ba86c7cd7522cf84e09781343d88e0e3543281c747d88b27e246578b65",
@@ -109,8 +103,6 @@ var Stopped = ContainerRef{
 }
 
 // Mock container fixture in a running state with a Portainer image.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var Running = ContainerRef{
 	name: "running",
 	id:   "b978af0b858aa8855cce46b628817d4ed58e58f2c4f66c9b9c5449134ed4c008",
@@ -121,8 +113,6 @@ var Running = ContainerRef{
 }
 
 // Mock container fixture in a restarting state.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var Restarting = ContainerRef{
 	name:  "restarting",
 	id:    "ae8964ba86c7cd7522cf84e09781343d88e0e3543281c747d88b27e246578b67",
@@ -130,8 +120,6 @@ var Restarting = ContainerRef{
 }
 
 // Mock container fixture supplying a network.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var netSupplierOK = ContainerRef{
 	id:   "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2",
 	name: "net_supplier",
@@ -142,8 +130,6 @@ var netSupplierOK = ContainerRef{
 }
 
 // Mock container fixture for a non-existent network supplier.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var netSupplierNotFound = ContainerRef{
 	id:        NetSupplierNotFoundID,
 	name:      netSupplierOK.name,
@@ -151,8 +137,6 @@ var netSupplierNotFound = ContainerRef{
 }
 
 // Mock container fixture consuming an existing network supplier.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var NetConsumerOK = ContainerRef{
 	id:   "1f6b79d2aff23244382026c76f4995851322bed5f9c50631620162f6f9aafbd6",
 	name: "net_consumer",
@@ -164,8 +148,6 @@ var NetConsumerOK = ContainerRef{
 }
 
 // Mock container fixture referencing a non-existent network supplier.
-//
-//nolint:exhaustruct,gochecknoglobals // Mocks omit fields irrelevant to tests, fixture reused across tests for consistency
 var NetConsumerInvalidSupplier = ContainerRef{
 	id:         NetConsumerOK.id,
 	name:       "net_consumer-missing_supplier",
@@ -178,22 +160,19 @@ const (
 	NetSupplierContainerName = "/wt-contnet-producer-1"
 )
 
-// getContainerFileHandler creates a handler for a container’s JSON file.
-// Fails the test if the file can’t be retrieved; returns a 404 handler if the container is missing
-//
-//nolint:varnamelen // Short name idiomatic for mock parameter
-func getContainerFileHandler(cr *ContainerRef) http.HandlerFunc {
-	if cr.isMissing {
-		return containerNotFoundResponse(string(cr.id))
+// Fails the test if the file can’t be retrieved; returns a 404 handler if the container is missing.
+func getContainerFileHandler(container *ContainerRef) http.HandlerFunc {
+	if container.isMissing {
+		return containerNotFoundResponse(string(container.id))
 	}
 
-	containerFile, err := cr.getContainerFile()
+	containerFile, err := container.getContainerFile()
 	if err != nil {
 		ginkgo.Fail(fmt.Sprintf("Failed to get container mock file: %v", err))
 	}
 
 	return getContainerHandler(
-		string(cr.id),
+		string(container.id),
 		RespondWithJSONFile(containerFile, http.StatusOK),
 	)
 }
@@ -299,8 +278,6 @@ func containerNotFoundResponse(containerID string) http.HandlerFunc {
 }
 
 // Mock response fixture for no-content status (204).
-//
-//nolint:gochecknoglobals // Mock fixture reused across tests for consistency
 var noContentStatusResponse = ghttp.RespondWith(http.StatusNoContent, nil)
 
 type FoundStatus bool
@@ -310,10 +287,7 @@ const (
 	Missing FoundStatus = false
 )
 
-// RemoveImageHandler mocks the DELETE /images/{id} endpoint.
-// Simulates image removal with optional parent images; returns 404 if not found
-//
-//nolint:exhaustruct // Mocks omit fields irrelevant to tests
+// Simulates image removal with optional parent images; returns 404 if not found.
 func RemoveImageHandler(imagesWithParents map[string][]string) http.HandlerFunc {
 	return ghttp.CombineHandlers(
 		ghttp.VerifyRequest("DELETE", gomega.MatchRegexp("/images/.*")),

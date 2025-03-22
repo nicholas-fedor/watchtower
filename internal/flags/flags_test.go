@@ -16,8 +16,6 @@ import (
 
 // TestEnvConfig_Defaults verifies that default Docker environment variables are set correctly.
 // It ensures the fallback values are applied when no custom flags are provided.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestEnvConfig_Defaults(t *testing.T) {
 	// Unset testing environment variables to isolate defaults.
 	_ = os.Unsetenv("DOCKER_TLS_VERIFY")
@@ -38,8 +36,6 @@ func TestEnvConfig_Defaults(t *testing.T) {
 
 // TestEnvConfig_Custom verifies that custom Docker flags override default environment variables.
 // It tests setting specific host, TLS, and API version values.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestEnvConfig_Custom(t *testing.T) {
 	cmd := new(cobra.Command)
 
@@ -86,8 +82,6 @@ func TestGetSecretsFromFilesWithFile(t *testing.T) {
 
 // TestGetSliceSecretsFromFiles verifies that a slice secret flag combines file and direct values.
 // It tests reading multiple values, including from a file.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestGetSliceSecretsFromFiles(t *testing.T) {
 	values := []string{"entry2", "", "entry3"}
 
@@ -109,8 +103,6 @@ func TestGetSliceSecretsFromFiles(t *testing.T) {
 
 // TestHTTPAPIPeriodicPollsFlag verifies the HTTP API periodic polls flag enables correctly.
 // It ensures the flag sets the expected boolean value.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestHTTPAPIPeriodicPollsFlag(t *testing.T) {
 	cmd := new(cobra.Command)
 
@@ -129,8 +121,6 @@ func TestHTTPAPIPeriodicPollsFlag(t *testing.T) {
 
 // TestIsFile verifies the isFilePath function distinguishes files from non-files.
 // It tests both URL-like strings and actual file paths.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestIsFile(t *testing.T) {
 	assert.False(t, isFilePath("https://google.com"), "an URL should never be considered a file")
 	assert.True(t, isFilePath(os.Args[0]), "the currently running binary path should always be considered a file")
@@ -138,8 +128,6 @@ func TestIsFile(t *testing.T) {
 
 // TestProcessFlagAliases verifies that flag aliases are processed correctly.
 // It tests porcelain mode, interval, and trace settings.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestProcessFlagAliases(t *testing.T) {
 	logrus.StandardLogger().ExitFunc = func(_ int) { t.FailNow() }
 	cmd := new(cobra.Command)
@@ -199,8 +187,6 @@ func TestProcessFlagAliasesLogLevelFromEnvironment(t *testing.T) {
 
 // TestLogFormatFlag verifies that log format flags configure the logger correctly.
 // It tests various format options and their effects.
-//
-//nolint:exhaustruct,paralleltest // Intentionally omit fields irrelevant to tests. Omit parallel testing.
 func TestLogFormatFlag(t *testing.T) {
 	cmd := new(cobra.Command)
 
@@ -243,8 +229,6 @@ func TestLogFormatFlag(t *testing.T) {
 
 // TestLogLevelFlag verifies that an invalid log level flag results in an error.
 // It ensures proper validation of log level settings.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestLogLevelFlag(t *testing.T) {
 	cmd := new(cobra.Command)
 
@@ -258,8 +242,6 @@ func TestLogLevelFlag(t *testing.T) {
 
 // TestProcessFlagAliasesSchedAndInterval verifies that conflicting schedule and interval flags fail.
 // It ensures mutual exclusivity is enforced.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestProcessFlagAliasesSchedAndInterval(t *testing.T) {
 	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
 	cmd := new(cobra.Command)
@@ -299,8 +281,6 @@ func TestProcessFlagAliasesScheduleFromEnvironment(t *testing.T) {
 
 // TestProcessFlagAliasesInvalidPorcelaineVersion verifies that an invalid porcelain version fails.
 // It ensures version validation triggers a fatal error.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestProcessFlagAliasesInvalidPorcelaineVersion(t *testing.T) {
 	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
 	cmd := new(cobra.Command)
@@ -320,8 +300,6 @@ func TestProcessFlagAliasesInvalidPorcelaineVersion(t *testing.T) {
 
 // TestFlagsArePresentInDocumentation verifies that all flags are documented.
 // It checks documentation files for flag and environment variable mentions.
-//
-//nolint:paralleltest // Omit parallel testing.
 func TestFlagsArePresentInDocumentation(t *testing.T) {
 	// Legacy notifications ignored due to soft deprecation.
 	ignoredEnvs := map[string]string{

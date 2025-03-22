@@ -7,11 +7,12 @@ import (
 	"sort"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 // errRollingRestartDependency indicates a container has dependencies incompatible with rolling restarts.

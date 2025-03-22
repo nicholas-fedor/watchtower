@@ -1,9 +1,10 @@
 package container_test
 
 import (
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var _ = ginkgo.Describe("container utils", func() {

@@ -3,9 +3,10 @@
 package metrics
 
 import (
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var metrics *Metrics
@@ -42,13 +43,13 @@ func NewMetric(report types.Report) *Metric {
 
 // QueueIsEmpty checks whether any metric messages are currently enqueued in the channel.
 // It returns true if the channel is empty, false otherwise.
-func (metrics *Metrics) QueueIsEmpty() bool {
+func (m *Metrics) QueueIsEmpty() bool {
 	return len(metrics.channel) == 0
 }
 
 // Register enqueues a metric for processing by the metrics handler.
 // It sends the metric to the channel for asynchronous handling.
-func (metrics *Metrics) Register(metric *Metric) {
+func (m *Metrics) Register(metric *Metric) {
 	metrics.channel <- metric
 }
 
@@ -100,22 +101,22 @@ func RegisterScan(metric *Metric) {
 
 // HandleUpdate dequeues metrics from the channel and updates Prometheus metrics accordingly.
 // It processes each metric, incrementing counters and setting gauges based on scan outcomes.
-func (metrics *Metrics) HandleUpdate(channel <-chan *Metric) {
+func (m *Metrics) HandleUpdate(channel <-chan *Metric) {
 	for change := range channel {
 		if change == nil {
 			// Update was skipped and rescheduled
-			metrics.total.Inc()
-			metrics.skipped.Inc()
-			metrics.scanned.Set(0)
-			metrics.updated.Set(0)
-			metrics.failed.Set(0)
+			m.total.Inc()
+			m.skipped.Inc()
+			m.scanned.Set(0)
+			m.updated.Set(0)
+			m.failed.Set(0)
 
 			continue
 		}
 		// Update metrics with the new values
-		metrics.total.Inc()
-		metrics.scanned.Set(float64(change.Scanned))
-		metrics.updated.Set(float64(change.Updated))
-		metrics.failed.Set(float64(change.Failed))
+		m.total.Inc()
+		m.scanned.Set(float64(change.Scanned))
+		m.updated.Set(float64(change.Updated))
+		m.failed.Set(float64(change.Failed))
 	}
 }

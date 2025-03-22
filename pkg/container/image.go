@@ -8,10 +8,17 @@ import (
 
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
+
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
+)
+
+const (
+	WarnAlways WarningStrategy = "always"
+	WarnNever  WarningStrategy = "never"
+	WarnAuto   WarningStrategy = "auto"
 )
 
 // imageClient manages image-related operations for Watchtower.
@@ -19,6 +26,10 @@ import (
 type imageClient struct {
 	api client.APIClient
 }
+
+// WarningStrategy defines the policy for logging warnings when HEAD requests fail during image pulls.
+// It controls the verbosity of error reporting in various scenarios.
+type WarningStrategy string
 
 // newImageClient creates a new imageClient instance.
 // It initializes the client with the provided Docker API client.
@@ -102,7 +113,7 @@ func (c imageClient) PullImage(ctx context.Context, targetContainer types.Contai
 	logrus.WithFields(fields).Debugf("Checking if pull is needed")
 
 	warn := c.warnOnHeadFailed(targetContainer, warnOnHeadFailed)
-	match, err := digest.CompareDigest(targetContainer, opts.RegistryAuth)
+	match, err := digest.CompareDigest(ctx, targetContainer, opts.RegistryAuth)
 	logrus.WithFields(fields).Debugf("Digest match: %v, error: %v", match, err)
 
 	switch {

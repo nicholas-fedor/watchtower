@@ -3,12 +3,12 @@ package container
 import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-//nolint:exhaustruct // Mock structs intentionally omit fields irrelevant to tests
 var _ = ginkgo.Describe("the container", func() {
 	ginkgo.Describe("VerifyConfiguration", func() {
 		ginkgo.When("verifying a container with no image info", func() {

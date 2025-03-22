@@ -3,17 +3,20 @@
 package notifications
 
 import (
+	"text/template"
 	"time"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/types"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/nicholas-fedor/watchtower/internal/flags"
-	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
+	"github.com/nicholas-fedor/watchtower/pkg/session"
 )
 
 var allButTrace = logrus.DebugLevel
@@ -367,9 +370,22 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 }
 
 // createNotifierWithTemplate creates a notifier with a specified template for testing.
-// It returns the notifier and any template parsing error.
+// It returns the notifier and any template parsing error, falling back to a default template if parsing fails.
 func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNotifier, error) {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
+	if err != nil {
+		logrus.Errorf("Could not use configured notification template: %s. Using default template", err)
+
+		tplBase := template.New("").Funcs(templates.Funcs)
+
+		defaultKey := `default`
+		if legacy {
+			defaultKey = `default-legacy`
+		}
+
+		tpl = template.Must(tplBase.Parse(commonTemplates[defaultKey]))
+		// Do not reset err; keep it to indicate the original parsing failure
+	}
 
 	return &shoutrrrTypeNotifier{
 		template:       tpl,

@@ -10,10 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
-	"github.com/spf13/cobra"
 )
 
 // errCreateTempFile is a static error for failures in creating temporary files.
@@ -27,8 +28,6 @@ const cleanupTimeout = 5 * time.Minute
 // init registers the notify-upgrade command with the root command.
 // It follows Cobra’s best practice of adding subcommands in an init function,
 // avoiding global variables and ensuring proper command hierarchy setup.
-//
-//nolint:exhaustruct // Intentionally omit fields to cmd struct
 func init() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "notify-upgrade",
@@ -141,6 +140,6 @@ func tryOrLog(err error, message string) {
 
 // logf writes formatted messages to stderr.
 // It ensures consistent logging output for user-facing messages.
-func logf(format string, v ...interface{}) {
+func logf(format string, v ...any) {
 	fmt.Fprintln(os.Stderr, fmt.Sprintf(format, v...))
 }

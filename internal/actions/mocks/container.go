@@ -7,9 +7,11 @@ import (
 	"strings"
 	"time"
 
-	dockerContainer "github.com/docker/docker/api/types/container" // Alias to avoid conflict.
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
+
+	dockerContainer "github.com/docker/docker/api/types/container" // Alias to avoid conflict.
+
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -20,8 +22,6 @@ const mockIDLength = 64
 
 // CreateMockContainer creates a container substitute valid for testing.
 // It initializes a basic container with the specified ID, name, image, and creation time.
-//
-//nolint:exhaustruct // Mock intentionally omits fields irrelevant to tests
 func CreateMockContainer(id string, name string, image string, created time.Time) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -48,8 +48,6 @@ func CreateMockContainer(id string, name string, image string, created time.Time
 
 // CreateMockImageInfo returns a mock image info struct based on the passed image.
 // It provides a minimal image representation for testing purposes.
-//
-//nolint:exhaustruct // Mock intentionally omits fields irrelevant to tests
 func CreateMockImageInfo(mockImage string) *image.InspectResponse {
 	return &image.InspectResponse{
 		ID: mockImage,
@@ -67,8 +65,6 @@ func CreateMockContainerWithImageInfo(id string, name string, image string, crea
 
 // CreateMockContainerWithImageInfoP creates a container with a pointer to custom image info for testing.
 // It uses a pointer to the image info struct, suitable for cases where the info is pre-allocated.
-//
-//nolint:exhaustruct // Mock intentionally omits fields irrelevant to tests
 func CreateMockContainerWithImageInfoP(id string, name string, image string, created time.Time, imageInfo *image.InspectResponse) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -100,8 +96,6 @@ func CreateMockContainerWithDigest(id string, name string, image string, created
 
 // CreateMockContainerWithConfig creates a container substitute with custom configuration for testing.
 // It allows specifying running/restarting states and config details for flexible test scenarios.
-//
-//nolint:exhaustruct // Mock intentionally omits fields irrelevant to tests
 func CreateMockContainerWithConfig(id string, name string, image string, running bool, restarting bool, created time.Time, config *dockerContainer.Config) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -128,8 +122,6 @@ func CreateMockContainerWithConfig(id string, name string, image string, running
 
 // CreateContainerForProgress creates a container substitute for tracking session/update progress.
 // It generates a unique ID and name based on the index and state prefix for testing progress reporting.
-//
-//nolint:exhaustruct // Mock intentionally omits fields irrelevant to tests
 func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (types.Container, types.ImageID) {
 	indexStr := strconv.Itoa(idPrefix + index)
 	// Pad the mock ID to a consistent length with zeros, accounting for the "c79" prefix.
@@ -149,8 +141,6 @@ func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (typ
 
 // CreateMockContainerWithLinks creates a container with specified links for testing.
 // It is useful for testing dependency-related behaviors in Watchtower.
-//
-//nolint:exhaustruct // Mock intentionally omits fields irrelevant to tests
 func CreateMockContainerWithLinks(id string, name string, image string, created time.Time, links []string, imageInfo *image.InspectResponse) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{

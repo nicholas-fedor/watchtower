@@ -14,6 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/robfig/cron"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -25,9 +29,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/robfig/cron"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 // client is the Docker client used for interacting with container operations.
@@ -92,8 +93,6 @@ var rootCmd = NewRootCommand()
 
 // NewRootCommand creates and configures the root command for Watchtower.
 // It defines the base usage, description, and lifecycle hooks for execution.
-//
-//nolint:exhaustruct // Not all fields need to be populated.
 func NewRootCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    "watchtower",
@@ -307,7 +306,7 @@ func runMain(c *cobra.Command, names []string, filter types.Filter, filterDesc s
 	}
 
 	// Run updates on the specified schedule, handling any errors.
-	if err := runUpgradesOnSchedule(c, filter, filterDesc, updateLock, ctx); err != nil {
+	if err := runUpgradesOnSchedule(ctx, c, filter, filterDesc, updateLock); err != nil {
 		logrus.Error(err)
 
 		return 1
@@ -439,8 +438,7 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
 
 // runUpgradesOnSchedule schedules and executes periodic updates.
 // It uses a cron scheduler and ensures graceful shutdown on interrupt signals.
-// The ctx parameter is currently unused but reserved for future context-aware scheduling.
-func runUpgradesOnSchedule(c *cobra.Command, filter types.Filter, filtering string, lock chan bool, ctx context.Context) error { //nolint:all
+func runUpgradesOnSchedule(ctx context.Context, c *cobra.Command, filter types.Filter, filtering string, lock chan bool) error {
 	if lock == nil {
 		lock = make(chan bool, 1)
 		lock <- true
@@ -477,15 +475,21 @@ func runUpgradesOnSchedule(c *cobra.Command, filter types.Filter, filtering stri
 
 	scheduler.Start()
 
-	// Handle graceful shutdown on SIGINT/SIGTERM.
+	// Handle graceful shutdown on context cancellation or SIGINT/SIGTERM.
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
-	signal.Notify(interrupt, syscall.SIGTERM)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	<-interrupt
+	select {
+	case <-ctx.Done():
+		logrus.Info("Context canceled, stopping scheduler...")
+	case <-interrupt:
+		logrus.Info("Received interrupt signal, stopping scheduler...")
+	}
+
 	scheduler.Stop()
 	logrus.Info("Waiting for running update to be finished...")
 	<-lock
+	logrus.Info("Scheduler stopped and update completed.")
 
 	return nil
 }

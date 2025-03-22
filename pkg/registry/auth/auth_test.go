@@ -16,12 +16,14 @@ import (
 	"testing"
 
 	"github.com/distribution/reference"
-	containertypes "github.com/docker/docker/api/types/container" // Alias for clarity
 	"github.com/docker/docker/api/types/image"
-	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	containertypes "github.com/docker/docker/api/types/container" // Alias for clarity
+
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestAuth executes the registry authentication test suite using the Ginkgo
@@ -36,7 +38,7 @@ func TestAuth(t *testing.T) {
 // based on the presence of registry credentials. It checks if the username or password
 // is empty, skipping the test with an appropriate message if either is missing, and
 // otherwise returns the provided test function for execution.
-func SkipIfCredentialsEmpty(credentials *types.RegistryCredentials, fn func()) func() {
+func SkipIfCredentialsEmpty(credentials *types.RegistryCredentials, testFunc func()) func() {
 	switch {
 	case credentials.Username == "":
 		return func() {
@@ -47,7 +49,7 @@ func SkipIfCredentialsEmpty(credentials *types.RegistryCredentials, fn func()) f
 			ginkgo.Skip("Password missing. Skipping integration test")
 		}
 	default:
-		return fn
+		return testFunc
 	}
 }
 
@@ -313,16 +315,16 @@ var _ = ginkgo.Describe("the auth module", func() {
 	// runBasicAuthTest is a helper function to reduce duplication in GetToken tests
 	// that use a mock HTTPS server to simulate basic auth challenges.
 	runBasicAuthTest := func(challengeHeader, creds, expectedToken, expectedErr string) {
-		ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set(auth.ChallengeHeader, challengeHeader)
 			w.WriteHeader(http.StatusUnauthorized)
 		}))
-		defer ts.Close()
+		defer testServer.Close()
 
 		containerInstance := mockContainer{
 			id:        mockID,
 			name:      mockName,
-			imageName: strings.TrimPrefix(ts.URL, "https://") + "/test/image",
+			imageName: strings.TrimPrefix(testServer.URL, "https://") + "/test/image",
 		}
 
 		// Create an HTTP client that skips TLS verification for the mock server
@@ -336,7 +338,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		auth.Client = client
 		defer func() { auth.Client = origClient }()
 
-		token, err := auth.GetToken(containerInstance, creds)
+		token, err := auth.GetToken(context.Background(), containerInstance, creds)
 		if expectedErr != "" {
 			gomega.Expect(err).To(gomega.MatchError(expectedErr), fmt.Sprintf("Expected error '%s'", expectedErr))
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
@@ -349,7 +351,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 	// runBearerHeaderTest is a helper function to reduce duplication in GetBearerHeader tests
 	// that use a mock HTTPS server to simulate bearer token retrieval.
 	runBearerHeaderTest := func(creds, expectedToken string, expectAuthFailure bool) {
-		ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if expectAuthFailure {
 				auth := r.Header.Get("Authorization")
 				if auth != "Basic user:pass" {
@@ -361,7 +363,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintf(w, `{"token": "%s"}`, expectedToken)
 		}))
-		defer ts.Close()
+		defer testServer.Close()
 
 		// Create an HTTP client that skips TLS verification for the mock server
 		client := &http.Client{
@@ -374,9 +376,9 @@ var _ = ginkgo.Describe("the auth module", func() {
 		auth.Client = client
 		defer func() { auth.Client = origClient }()
 
-		challenge := fmt.Sprintf(`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`, ts.URL)
+		challenge := fmt.Sprintf(`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`, testServer.URL)
 		ref, _ := reference.ParseNormalizedNamed("test/image")
-		token, err := auth.GetBearerHeader(challenge, ref, creds)
+		token, err := auth.GetBearerHeader(context.Background(), challenge, ref, creds)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(token).To(gomega.Equal("Bearer " + expectedToken))
 	}
@@ -388,7 +390,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should parse the token from a bearer response",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
-				token, err := auth.GetToken(mockContainerInstance, creds)
+				token, err := auth.GetToken(context.Background(), mockContainerInstance, creds)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(token).NotTo(gomega.Equal(""))
 			}),
@@ -423,7 +425,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				imageName: "nonexistent.local/test/image",
 			}
 
-			token, err := auth.GetToken(containerInstance, "user:pass")
+			token, err := auth.GetToken(context.Background(), containerInstance, "user:pass")
 			gomega.Expect(err).To(gomega.HaveOccurred(), "Expected error due to HTTP request failure")
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
 		})
@@ -439,7 +441,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				Host:   "example.com",
 				Path:   "/v2/",
 			}
-			req, err := auth.GetChallengeRequest(url)
+			req, err := auth.GetChallengeRequest(context.Background(), url)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(req.Method).To(gomega.Equal(http.MethodGet))
 			gomega.Expect(req.URL.String()).To(gomega.Equal("https://example.com/v2/"))
@@ -455,7 +457,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				Scheme: "://", // Invalid scheme
 				Host:   "example.com",
 			}
-			req, err := auth.GetChallengeRequest(url)
+			req, err := auth.GetChallengeRequest(context.Background(), url)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(req).To(gomega.BeNil())
 		})
@@ -479,18 +481,18 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fail on HTTP request error", func() {
 			challenge := `bearer realm="http://nonexistent.local/token",service="test-service",scope="repository:test/image:pull"`
 			ref, _ := reference.ParseNormalizedNamed("test/image")
-			token, err := auth.GetBearerHeader(challenge, ref, "")
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
 
 		// Test case: Verifies GetBearerHeader fails when the registry returns invalid JSON.
 		ginkgo.It("should fail on invalid JSON response", func() {
-			ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				fmt.Fprintf(w, `{"invalid": "json"`) // Missing token field
 			}))
-			defer ts.Close()
+			defer testServer.Close()
 
 			// Create an HTTP client that skips TLS verification for the mock server
 			client := &http.Client{
@@ -503,9 +505,9 @@ var _ = ginkgo.Describe("the auth module", func() {
 			auth.Client = client
 			defer func() { auth.Client = origClient }()
 
-			challenge := fmt.Sprintf(`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`, ts.URL)
+			challenge := fmt.Sprintf(`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`, testServer.URL)
 			ref, _ := reference.ParseNormalizedNamed("test/image")
-			token, err := auth.GetBearerHeader(challenge, ref, "")
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})

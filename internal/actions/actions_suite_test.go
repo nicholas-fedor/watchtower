@@ -4,14 +4,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestActions(t *testing.T) {
@@ -21,7 +20,6 @@ func TestActions(t *testing.T) {
 	ginkgo.RunSpecs(t, "Actions Suite")
 }
 
-//nolint:exhaustruct // Mock structs intentionally omit fields irrelevant to tests
 var _ = ginkgo.Describe("the actions package", func() {
 	ginkgo.Describe("the check prerequisites method", func() {
 		ginkgo.When("given an empty array", func() {

@@ -3,14 +3,16 @@
 package notifications
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/gotify"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -35,13 +37,13 @@ func newGotifyNotifier(c *cobra.Command) types.ConvertibleNotifier {
 
 	skipVerify, _ := flags.GetBool("notification-gotify-tls-skip-verify")
 
-	n := &gotifyTypeNotifier{
+	notifier := &gotifyTypeNotifier{
 		gotifyURL:                apiURL,
 		gotifyAppToken:           token,
 		gotifyInsecureSkipVerify: skipVerify,
 	}
 
-	return n
+	return notifier
 }
 
 // getGotifyToken retrieves and validates the Gotify token from flags.
@@ -77,7 +79,7 @@ func getGotifyURL(flags *pflag.FlagSet) string {
 func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	apiURL, err := url.Parse(n.gotifyURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to generate Gotify URL: %w", err)
 	}
 
 	config := &gotify.Config{

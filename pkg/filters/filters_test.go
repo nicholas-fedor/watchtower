@@ -3,19 +3,17 @@ package filters
 import (
 	"testing"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
 
 func TestWatchtowerContainersFilter(t *testing.T) {
 	t.Parallel()
 
 	container := new(mocks.FilterableContainer)
-
 	container.On("IsWatchtower").Return(true)
-
 	assert.True(t, WatchtowerContainersFilter(container))
-
 	container.AssertExpectations(t)
 }
 
@@ -23,9 +21,7 @@ func TestNoFilter(t *testing.T) {
 	t.Parallel()
 
 	container := new(mocks.FilterableContainer)
-
 	assert.True(t, NoFilter(container))
-
 	container.AssertExpectations(t)
 }
 
@@ -33,12 +29,10 @@ func TestFilterByNames(t *testing.T) {
 	t.Parallel()
 
 	var names []string
-
 	filter := FilterByNames(names, nil)
 	assert.Nil(t, filter)
 
 	names = append(names, "test")
-
 	filter = FilterByNames(names, NoFilter)
 	assert.NotNil(t, filter)
 
@@ -46,7 +40,6 @@ func TestFilterByNames(t *testing.T) {
 	container.On("Name").Return("test")
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
-
 	container = new(mocks.FilterableContainer)
 	container.On("Name").Return("NoTest")
 	assert.False(t, filter(container))

@@ -6,9 +6,10 @@ package lifecycle
 import (
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 // ExecutePreChecks runs pre-check lifecycle hooks for all containers matching the provided filter.

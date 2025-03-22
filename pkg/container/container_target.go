@@ -7,8 +7,9 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // StartTargetContainer creates and starts a new container using the source container’s configuration.

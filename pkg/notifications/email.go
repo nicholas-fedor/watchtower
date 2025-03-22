@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/smtp"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -37,7 +38,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
 	from, _ := flags.GetString("notification-email-from")
-	to, _ := flags.GetString("notification-email-to")
+	destAddress, _ := flags.GetString("notification-email-to")
 	server, _ := flags.GetString("notification-email-server")
 	user, _ := flags.GetString("notification-email-server-user")
 	password, _ := flags.GetString("notification-email-server-password")
@@ -45,10 +46,10 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	tlsSkipVerify, _ := flags.GetBool("notification-email-server-tls-skip-verify")
 	delay, _ := flags.GetInt("notification-email-delay")
 
-	n := &emailTypeNotifier{
+	notifier := &emailTypeNotifier{
 		entries:       []*logrus.Entry{},
 		From:          from,
-		To:            to,
+		To:            destAddress,
 		Server:        server,
 		User:          user,
 		Password:      password,
@@ -57,7 +58,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 		delay:         time.Duration(delay) * time.Second,
 	}
 
-	return n
+	return notifier
 }
 
 // GetURL generates the SMTP URL for the email notifier based on its configuration.

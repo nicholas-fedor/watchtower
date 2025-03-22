@@ -13,10 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/pkg/api"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+
+	"github.com/nicholas-fedor/watchtower/pkg/api"
 )
 
 // testToken is a constant token used for testing authentication.

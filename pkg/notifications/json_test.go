@@ -1,9 +1,10 @@
 package notifications
 
 import (
-	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/nicholas-fedor/watchtower/pkg/session"
 )
 
 var _ = ginkgo.Describe("JSON template", func() {

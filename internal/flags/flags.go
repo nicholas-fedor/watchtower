@@ -756,8 +756,6 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 
 // SetupLogging configures the global logger based on log-related flags.
 // It sets the log format and level, returning an error for invalid configurations.
-//
-//nolint:exhaustruct // Intentionally omits fields irrelevant to tests
 func SetupLogging(flags *pflag.FlagSet) error {
 	logFormat, err := flags.GetString("log-format")
 	if err != nil {

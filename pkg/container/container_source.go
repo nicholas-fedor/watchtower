@@ -10,9 +10,14 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// defaultStopSignal defines the default signal used to stop containers when no custom signal is specified.
+// It is set to "SIGTERM" to allow containers to terminate gracefully by default.
+const defaultStopSignal = "SIGTERM"
 
 // ListSourceContainers retrieves a list of containers from the Docker host, filtered by the provided function.
 // It respects the IncludeStopped and IncludeRestarting options to determine which container states to include.
@@ -91,7 +96,7 @@ func GetSourceContainer(api client.APIClient, containerID types.ContainerID) (ty
 	if found && netType == "container" {
 		parentContainer, err := api.ContainerInspect(ctx, netContainerID)
 		if err != nil {
-			logrus.WithFields(map[string]interface{}{
+			logrus.WithFields(map[string]any{
 				"container":         containerInfo.Name,
 				"error":             err,
 				"network-container": netContainerID,

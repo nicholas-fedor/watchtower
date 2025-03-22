@@ -8,7 +8,6 @@ import (
 
 type MockContainerUpdate func(*container.InspectResponse, *image.InspectResponse)
 
-//nolint:exhaustruct // Mock structs intentionally omit fields irrelevant to tests
 func MockContainer(updates ...MockContainerUpdate) *Container {
 	containerInfo := container.InspectResponse{
 		ContainerJSONBase: &container.ContainerJSONBase{

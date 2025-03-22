@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/nicholas-fedor/watchtower/cmd"
 	"github.com/sirupsen/logrus"
+
+	"github.com/nicholas-fedor/watchtower/cmd"
 )
 
 func init() {

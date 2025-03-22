@@ -7,10 +7,11 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
-	"github.com/nicholas-fedor/watchtower/pkg/sorter"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/nicholas-fedor/watchtower/pkg/sorter"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // mockContainer implements types.Container for testing sorting.
@@ -20,7 +21,6 @@ type mockContainer struct {
 	links   []string
 }
 
-//nolint:exhaustruct // Mocks omit fields irrelevant to tests
 func (m *mockContainer) ContainerInfo() *container.InspectResponse {
 	return &container.InspectResponse{
 		ContainerJSONBase: &container.ContainerJSONBase{
@@ -61,13 +61,10 @@ func (m *mockContainer) IsLinkedToRestarting() bool            { return false }
 func (m *mockContainer) PreUpdateTimeout() int                 { return 0 }
 func (m *mockContainer) PostUpdateTimeout() int                { return 0 }
 
-//nolint:exhaustruct // Mocks omit fields irrelevant to tests
 func (m *mockContainer) GetCreateConfig() *container.Config { return &container.Config{} }
 
-//nolint:exhaustruct // Mocks omit fields irrelevant to tests
 func (m *mockContainer) GetCreateHostConfig() *container.HostConfig { return &container.HostConfig{} }
 
-//nolint:exhaustruct // Mocks omit fields irrelevant to tests
 var _ = ginkgo.Describe("Container Sorting", func() {
 	ginkgo.Describe("ByCreated", func() {
 		ginkgo.When("sorting by creation date", func() {

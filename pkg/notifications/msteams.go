@@ -3,12 +3,14 @@
 package notifications
 
 import (
+	"fmt"
 	"net/url"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/teams"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -46,12 +48,12 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	webhookURL, err := url.Parse(n.webHookURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse Microsoft Teams webhook URL: %w", err)
 	}
 
 	config, err := teams.ConfigFromWebhookURL(*webhookURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create Microsoft Teams config from webhook URL: %w", err)
 	}
 
 	config.Color = ColorHex

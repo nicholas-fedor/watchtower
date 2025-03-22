@@ -5,11 +5,12 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	"github.com/nicholas-fedor/watchtower/cmd"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 var _ = ginkgo.Describe("notifications", func() {
@@ -349,7 +350,7 @@ var _ = ginkgo.Describe("notifications", func() {
 	})
 })
 
-func buildExpectedURL(username string, password string, host string, port int, from string, to string, auth string) string {
+func buildExpectedURL(username string, password string, host string, port int, from string, destAddress string, auth string) string {
 	template := "smtp://%s:%s@%s:%d/?auth=%s&fromaddress=%s&fromname=Watchtower&subject=&toaddresses=%s"
 
 	return fmt.Sprintf(template,
@@ -357,7 +358,7 @@ func buildExpectedURL(username string, password string, host string, port int, f
 		url.QueryEscape(password),
 		host, port, auth,
 		url.QueryEscape(from),
-		url.QueryEscape(to))
+		url.QueryEscape(destAddress))
 }
 
 func testURL(args []string, expectedURL string, expectedDelay time.Duration) {

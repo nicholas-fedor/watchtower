@@ -28,13 +28,17 @@ type staticData struct {
 	Host  string
 }
 
+var (
+	errExecutionFailed = errors.New("execution failed")
+	errSkipped         = errors.New("container skipped")
+)
+
 // New initializes a new PreviewData struct with seeded random generation and default static data.
 // The random seed is fixed at 1 for deterministic output in previews.
-//
-//nolint:redefines-builtin-id // Constructor naming convention
 func New() *PreviewData {
+	//nolint:gosec // G404: math/rand is used intentionally for deterministic preview data
 	return &PreviewData{
-		rand:           rand.New(rand.NewSource(1)), //nolint:gosec // Preview data, not security-critical
+		rand:           rand.New(rand.NewSource(1)),
 		lastTime:       time.Now().Add(-30 * time.Minute),
 		report:         nil,
 		containerCount: 0,
@@ -51,29 +55,31 @@ func New() *PreviewData {
 // For FailedState or SkippedState, it includes a contextual error message.
 func (p *PreviewData) AddFromState(state State) {
 	cid := types.ContainerID(p.generateID())
-	old := types.ImageID(p.generateID())
-	new := types.ImageID(p.generateID()) //nolint
+	oldImageID := types.ImageID(p.generateID())
+	newImageID := types.ImageID(p.generateID())
 	name := p.generateName()
 	image := p.generateImageName(name)
 
 	var err error
 
-	//nolint
+	//nolint:exhaustive // Excessively verbose for this case
 	switch state {
 	case FailedState:
-		err = fmt.Errorf("execution failed: %w", errors.New(p.randomEntry(errorMessages)))
+		err = fmt.Errorf("%w: %s", errExecutionFailed, p.randomEntry(errorMessages))
 	case SkippedState:
-		err = fmt.Errorf("skipped: %w", errors.New(p.randomEntry(skippedMessages)))
+		err = fmt.Errorf("%w: %s", errSkipped, p.randomEntry(skippedMessages))
+	default:
+		// No error for ScannedState, UpdatedState, StaleState, FreshState
 	}
 
 	p.addContainer(containerStatus{
-		containerID:   cid,
-		oldImage:      old,
-		newImage:      new,
-		containerName: name,
-		imageName:     image,
-		error:         err,
-		state:         state,
+		containerID:    cid,
+		oldImage:       oldImageID,
+		newImage:       newImageID,
+		containerName:  name,
+		imageName:      image,
+		containerError: err,
+		state:          state,
 	})
 }
 

@@ -84,13 +84,13 @@ func (r *report) All() []types.ContainerReport {
 	presentIDs := map[types.ContainerID][]string{}
 
 	appendUnique := func(reports []types.ContainerReport) {
-		for _, cr := range reports {
-			if _, found := presentIDs[cr.ID()]; found {
+		for _, report := range reports {
+			if _, found := presentIDs[report.ID()]; found {
 				continue
 			}
 
-			all = append(all, cr)
-			presentIDs[cr.ID()] = nil
+			all = append(all, report)
+			presentIDs[report.ID()] = nil
 		}
 	}
 

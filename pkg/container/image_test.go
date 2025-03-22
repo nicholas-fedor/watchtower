@@ -3,22 +3,21 @@ package container
 import (
 	"context"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
-	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	gomegaTypes "github.com/onsi/gomega/types"
+
+	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-//nolint:exhaustruct // Mock structs intentionally omit fields irrelevant to tests
 var _ = ginkgo.Describe("the client", func() {
 	var docker *client.Client
 	var mockServer *ghttp.Server

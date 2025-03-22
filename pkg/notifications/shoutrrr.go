@@ -4,6 +4,7 @@ package notifications
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -11,10 +12,12 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/shoutrrr"
+	"github.com/sirupsen/logrus"
+
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
+
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 // LocalLog is a logrus logger that does not send entries as notifications.
@@ -94,8 +97,13 @@ func (n *shoutrrrTypeNotifier) AddLogHook() {
 // It sets a reasonable default for expected log entry batch sizes.
 const initialEntriesCapacity = 10
 
-// createNotifier initializes a new Shoutrrr notifier with specified URLs, log level, and template.
-// It sets up the router, template, and parameters, optionally enabling stdout logging.
+// createNotifier initializes a new Shoutrrr notifier for sending notifications through multiple services.
+// It configures the notifier with the provided URLs, log level, template string, and static data, setting up
+// a router using shoutrrr.NewSender to handle message delivery. The function parses the template string
+// or falls back to a default if parsing fails or no template is provided, supporting both legacy (log-only)
+// and full report modes. It optionally enables stdout logging if specified, otherwise directs Shoutrrr logs
+// to the logrus trace level. The notifier is returned fully initialized with channels for message queuing
+// and parameters like a custom title if present in the static data.
 func createNotifier(urls []string, level logrus.Level, tplString string, legacy bool, data StaticData, stdout bool, delay time.Duration) *shoutrrrTypeNotifier {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
 	if err != nil {
@@ -109,7 +117,7 @@ func createNotifier(urls []string, level logrus.Level, tplString string, legacy 
 		logger = log.New(logrus.StandardLogger().WriterLevel(logrus.TraceLevel), "Shoutrrr: ", 0)
 	}
 
-	r, err := shoutrrr.NewSender(logger, urls...)
+	router, err := shoutrrr.NewSender(logger, urls...)
 	if err != nil {
 		logrus.Fatalf("Failed to initialize Shoutrrr notifications: %s\n", err.Error())
 	}
@@ -121,7 +129,7 @@ func createNotifier(urls []string, level logrus.Level, tplString string, legacy 
 
 	return &shoutrrrTypeNotifier{
 		Urls:           urls,
-		Router:         r,
+		Router:         router,
 		messages:       make(chan string, 1),
 		done:           make(chan bool),
 		logLevel:       level,
@@ -136,14 +144,14 @@ func createNotifier(urls []string, level logrus.Level, tplString string, legacy 
 
 // sendNotifications processes queued messages and sends them via the router.
 // It applies the configured delay between sends and logs errors locally.
-func sendNotifications(n *shoutrrrTypeNotifier) {
-	for msg := range n.messages {
-		time.Sleep(n.delay)
-		errs := n.Router.Send(msg, n.params)
+func sendNotifications(notifier *shoutrrrTypeNotifier) {
+	for msg := range notifier.messages {
+		time.Sleep(notifier.delay)
+		errs := notifier.Router.Send(msg, notifier.params)
 
 		for i, err := range errs {
 			if err != nil {
-				scheme := GetScheme(n.Urls[i])
+				scheme := GetScheme(notifier.Urls[i])
 				// Use fmt so it doesn't trigger another notification.
 				LocalLog.WithFields(logrus.Fields{
 					"service": scheme,
@@ -153,7 +161,7 @@ func sendNotifications(n *shoutrrrTypeNotifier) {
 		}
 	}
 
-	n.done <- true
+	notifier.done <- true
 }
 
 // buildMessage constructs a notification message from the provided data using the configured template.
@@ -161,13 +169,13 @@ func sendNotifications(n *shoutrrrTypeNotifier) {
 func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 	var body bytes.Buffer
 
-	var templateData interface{} = data
+	var templateData any = data
 	if n.legacyTemplate {
 		templateData = data.Entries
 	}
 
 	if err := n.template.Execute(&body, templateData); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to execute notification template: %w", err)
 	}
 
 	return body.String(), nil
@@ -261,13 +269,13 @@ func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, err
 	// try to parse the template string.
 	if tplString != "" {
 		tpl, err = tplBase.Parse(tplString)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse notification template string: %w", err)
+		}
 	}
 
-	// If we had an error (either from parsing the template string
-	// or from getting the template configuration) or a
-	// template wasn't configured (the empty template string)
-	// fallback to using the default template.
-	if err != nil || tplString == "" {
+	// If a template wasn't configured (empty string), fall back to using the default template.
+	if tplString == "" {
 		defaultKey := `default`
 		if legacy {
 			defaultKey = `default-legacy`
@@ -276,5 +284,5 @@ func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, err
 		tpl = template.Must(tplBase.Parse(commonTemplates[defaultKey]))
 	}
 
-	return tpl, err
+	return tpl, nil
 }

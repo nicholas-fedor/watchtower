@@ -1,24 +1,19 @@
-//go:generate mockery --name Client --output mocks
 package container
 
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
+
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
 )
-
-// defaultStopSignal defines the default signal used to stop containers when no custom signal is specified.
-// It is set to "SIGTERM" to allow containers to terminate gracefully by default.
-const defaultStopSignal = "SIGTERM"
 
 // Client defines the interface for interacting with the Docker API within Watchtower.
 // It provides methods for managing containers, images, and executing commands, abstracting the underlying Docker client operations.
@@ -60,6 +55,23 @@ type Client interface {
 	WarnOnHeadPullFailed(container types.Container) bool
 }
 
+// dockerClient is the concrete implementation of the Client interface.
+// It wraps the Docker API client and applies custom behavior via ClientOptions.
+type dockerClient struct {
+	api client.APIClient
+	ClientOptions
+}
+
+// ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
+// It controls container management and warning behaviors.
+type ClientOptions struct {
+	RemoveVolumes     bool
+	IncludeStopped    bool
+	ReviveStopped     bool
+	IncludeRestarting bool
+	WarnOnHeadFailed  WarningStrategy
+}
+
 // NewClient initializes a new Client instance for interacting with the Docker API.
 // It configures the client using environment variables and the provided options.
 // Environment variables used include DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
@@ -74,33 +86,6 @@ func NewClient(opts ClientOptions) Client {
 		api:           cli,
 		ClientOptions: opts,
 	}
-}
-
-// ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
-// It controls container management and warning behaviors.
-type ClientOptions struct {
-	RemoveVolumes     bool
-	IncludeStopped    bool
-	ReviveStopped     bool
-	IncludeRestarting bool
-	WarnOnHeadFailed  WarningStrategy
-}
-
-// WarningStrategy defines the policy for logging warnings when HEAD requests fail during image pulls.
-// It controls the verbosity of error reporting in various scenarios.
-type WarningStrategy string
-
-const (
-	WarnAlways WarningStrategy = "always"
-	WarnNever  WarningStrategy = "never"
-	WarnAuto   WarningStrategy = "auto"
-)
-
-// dockerClient is the concrete implementation of the Client interface.
-// It wraps the Docker API client and applies custom behavior via ClientOptions.
-type dockerClient struct {
-	api client.APIClient
-	ClientOptions
 }
 
 // ListContainers retrieves a list of existing containers.
@@ -239,9 +224,6 @@ func (c dockerClient) ExecuteCommand(containerID types.ContainerID, command stri
 
 	return skipUpdate, nil
 }
-
-// errCommandFailed is returned when an executed command fails with a non-zero exit code.
-var errCommandFailed = errors.New("command execution failed")
 
 // waitForExecOrTimeout waits for an exec instance to complete or times out.
 // It checks the exit code: 75 (ExTempFail) skips updates, >0 indicates failure.

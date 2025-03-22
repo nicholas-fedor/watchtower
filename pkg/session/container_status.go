@@ -21,15 +21,15 @@ const (
 
 // ContainerStatus contains the container state during a session.
 //
-//nolint:errname // embedded error
+//nolint:errname // containerStatus is not an error type, it contains an error field
 type ContainerStatus struct {
-	containerID   types.ContainerID
-	oldImage      types.ImageID
-	newImage      types.ImageID
-	containerName string
-	imageName     string
-	error
-	state State
+	containerID    types.ContainerID
+	oldImage       types.ImageID
+	newImage       types.ImageID
+	containerName  string
+	imageName      string
+	containerError error
+	state          State
 }
 
 // ID returns the container ID.
@@ -59,11 +59,11 @@ func (u *ContainerStatus) ImageName() string {
 
 // Error returns the error (if any) that was encountered for the container during a session.
 func (u *ContainerStatus) Error() string {
-	if u.error == nil {
+	if u.containerError == nil {
 		return ""
 	}
 
-	return u.error.Error()
+	return u.containerError.Error()
 }
 
 // Maps State enum values to human-readable names.

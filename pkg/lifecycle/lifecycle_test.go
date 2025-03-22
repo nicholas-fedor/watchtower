@@ -8,14 +8,16 @@ import (
 	"testing"
 	"time"
 
-	dockercontainer "github.com/docker/docker/api/types/container"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	dockercontainer "github.com/docker/docker/api/types/container"
+
+	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // mockClient is a manual mock for the Client interface.
@@ -110,8 +112,6 @@ func (m *mockClient) WarnOnHeadPullFailed(container types.Container) bool {
 }
 
 // mockContainer creates a *container.Container for testing.
-//
-//nolint:exhaustruct // Omit fields irrelevant to tests
 func mockContainer(options ...func(*container.Container)) *container.Container {
 	c := container.NewContainer(
 		&dockercontainer.InspectResponse{
@@ -159,8 +159,6 @@ var (
 // TestExecutePreChecks tests the ExecutePreChecks function.
 // It verifies that pre-check commands are executed for all filtered containers,
 // handles listing errors gracefully, and logs appropriately.
-//
-//nolint:paralleltest,exhaustruct // Omit fields irrelevant to tests
 func TestExecutePreChecks(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -192,7 +190,6 @@ func TestExecutePreChecks(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -222,11 +219,6 @@ func TestExecutePreChecks(t *testing.T) {
 	}
 }
 
-// TestExecutePostChecks tests the ExecutePostChecks function.
-// It verifies that post-check commands are executed for all filtered containers,
-// handles listing errors gracefully, and logs appropriately.
-//
-//nolint:paralleltest,exhaustruct // Omit fields irrelevant to tests
 func TestExecutePostChecks(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -258,7 +250,6 @@ func TestExecutePostChecks(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -288,11 +279,6 @@ func TestExecutePostChecks(t *testing.T) {
 	}
 }
 
-// TestExecutePreCheckCommand tests the ExecutePreCheckCommand function.
-// It ensures the pre-check command is executed when present, skipped when absent,
-// and errors are logged correctly.
-//
-//nolint:paralleltest,exhaustruct,dupl // Omit fields irrelevant to tests
 func TestExecutePreCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -331,7 +317,6 @@ func TestExecutePreCheckCommand(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -364,8 +349,6 @@ func TestExecutePreCheckCommand(t *testing.T) {
 // TestExecutePostCheckCommand tests the ExecutePostCheckCommand function.
 // It ensures the post-check command is executed when present, skipped when absent,
 // and errors are logged correctly.
-//
-//nolint:paralleltest,exhaustruct,dupl // Omit fields irrelevant to tests
 func TestExecutePostCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -404,7 +387,6 @@ func TestExecutePostCheckCommand(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -436,8 +418,6 @@ func TestExecutePostCheckCommand(t *testing.T) {
 
 // TestExecutePreUpdateCommand tests the ExecutePreUpdateCommand function.
 // It verifies command execution, skipping for non-running containers, and error handling.
-//
-//nolint:paralleltest,exhaustruct // Omit fields irrelevant to tests
 func TestExecutePreUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -503,7 +483,6 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -525,7 +504,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "pre-update command execution failed")
 			} else {
-				assert.NoError(t, err) //nolint
+				assert.NoError(t, err) //nolint:testifylint // assert.NoError is intentional for non-failing checks
 			}
 
 			assert.Len(t, hook.Entries, testClient.expectedLogs)
@@ -544,8 +523,6 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 
 // TestExecutePostUpdateCommand tests the ExecutePostUpdateCommand function.
 // It verifies command execution, container retrieval errors, and logging behavior.
-//
-//nolint:paralleltest
 func TestExecutePostUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -598,7 +575,6 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()

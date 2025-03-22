@@ -2,15 +2,15 @@ package data
 
 import "github.com/nicholas-fedor/watchtower/pkg/types"
 
-//nolint:errname
+//nolint:errname // containerStatus is not an error type, it contains an error field
 type containerStatus struct {
-	containerID   types.ContainerID
-	oldImage      types.ImageID
-	newImage      types.ImageID
-	containerName string
-	imageName     string
-	error
-	state State
+	containerID    types.ContainerID
+	oldImage       types.ImageID
+	newImage       types.ImageID
+	containerName  string
+	imageName      string
+	containerError error
+	state          State
 }
 
 func (u *containerStatus) ID() types.ContainerID {
@@ -34,11 +34,11 @@ func (u *containerStatus) ImageName() string {
 }
 
 func (u *containerStatus) Error() string {
-	if u.error == nil {
+	if u.containerError == nil {
 		return ""
 	}
 
-	return u.error.Error()
+	return u.containerError.Error()
 }
 
 func (u *containerStatus) State() string {
