@@ -767,11 +767,33 @@ func SetupLogging(flags *pflag.FlagSet) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
+	if err := configureLogFormat(logFormat, noColor); err != nil {
+		return err
+	}
+
+	rawLogLevel, err := flags.GetString("log-level")
+	if err != nil {
+		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
+	}
+
+	logLevel, err := logrus.ParseLevel(rawLogLevel)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errInvalidLogLevel, err)
+	}
+
+	logrus.SetLevel(logLevel)
+
+	return nil
+}
+
+// configureLogFormat sets the logrus formatter based on the specified format and color preference.
+// It returns an error if the format is invalid.
+func configureLogFormat(logFormat string, noColor bool) error {
 	switch strings.ToLower(logFormat) {
 	case "auto":
 		logrus.SetFormatter(&logrus.TextFormatter{
 			DisableColors:             noColor,
-			EnvironmentOverrideColors: true, // Enable clicolors support.
+			EnvironmentOverrideColors: true,
 		})
 	case "json":
 		logrus.SetFormatter(&logrus.JSONFormatter{})
@@ -788,18 +810,6 @@ func SetupLogging(flags *pflag.FlagSet) error {
 	default:
 		return fmt.Errorf("%w: %s", errInvalidLogFormat, logFormat)
 	}
-
-	rawLogLevel, err := flags.GetString("log-level")
-	if err != nil {
-		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
-	}
-
-	logLevel, err := logrus.ParseLevel(rawLogLevel)
-	if err != nil {
-		return fmt.Errorf("%w: %w", errInvalidLogLevel, err)
-	}
-
-	logrus.SetLevel(logLevel)
 
 	return nil
 }
