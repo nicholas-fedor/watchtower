@@ -339,6 +339,7 @@ issues:
         - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
         - errorlint # Errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13. [auto-fix]
         - wrapcheck # Checks that errors returned from external packages are wrapped.
+        - varnamelen # Checks that the length of a variable's name matches its scope.
 
   ####################################################################################################
   # Run some linter only for test files by excluding its issues for everything else.

@@ -455,7 +455,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 			name: "not running",
 			container: mockContainer(
 				withContainerState(dockercontainer.State{Running: false}),
-				withLabels(map[string]string{ // Add a command to reach the running check
+				withLabels(map[string]string{
 					"com.centurylinklabs.watchtower.lifecycle.pre-update":         "pre-update",
 					"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "2",
 				}),
@@ -483,42 +483,61 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 		},
 	}
 
-	for _, testClient := range tests {
-		t.Run(testClient.name, func(t *testing.T) {
-			hook := test.NewGlobal()
-
-			logrus.SetLevel(logrus.DebugLevel)
-
-			client := new(mockClient)
-			if testClient.setupClient != nil {
-				testClient.setupClient(client)
-			}
-
-			hook.Reset()
-
-			result, err := ExecutePreUpdateCommand(client, testClient.container)
-
-			assert.Equal(t, testClient.expectedResult, result)
-
-			if testClient.expectedErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "pre-update command execution failed")
-			} else {
-				assert.NoError(t, err) //nolint:testifylint // assert.NoError is intentional for non-failing checks
-			}
-
-			assert.Len(t, hook.Entries, testClient.expectedLogs)
-
-			if len(hook.Entries) > 0 {
-				assert.Contains(t, hook.LastEntry().Message, testClient.expectedLogMsg)
-			} else {
-				t.Errorf("No log entries captured; expected %d with message %q", testClient.expectedLogs, testClient.expectedLogMsg)
-			}
-
-			client.AssertExpectations(t)
-			hook.Reset()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runPreUpdateTest(t, tt)
 		})
 	}
+}
+
+// runPreUpdateTest executes a single pre-update command test case and validates its results.
+// It sets up the mock client, executes the command, and asserts the expected outcomes.
+//
+// Parameters:
+//   - t: The testing.T instance for assertions and test control.
+//   - tt: The test case data containing setup and expectations.
+func runPreUpdateTest(t *testing.T, tt struct {
+	name           string
+	container      types.Container
+	setupClient    func(*mockClient)
+	expectedResult bool
+	expectedErr    bool
+	expectedLogs   int
+	expectedLogMsg string
+},
+) {
+	t.Helper() // Mark as helper to improve stack traces
+
+	hook := test.NewGlobal()
+
+	logrus.SetLevel(logrus.DebugLevel)
+
+	client := new(mockClient)
+	if tt.setupClient != nil {
+		tt.setupClient(client)
+	}
+
+	hook.Reset()
+
+	result, err := ExecutePreUpdateCommand(client, tt.container)
+
+	assert.Equal(t, tt.expectedResult, result)
+
+	if tt.expectedErr {
+		require.Error(t, err, "expected an error but got none")
+		assert.Contains(t, err.Error(), "pre-update command execution failed")
+	} else {
+		assert.NoError(t, err) //nolint:testifylint // Intentional for non-failing cases
+	}
+
+	assert.Len(t, hook.Entries, tt.expectedLogs)
+
+	if tt.expectedLogs > 0 {
+		assert.Contains(t, hook.LastEntry().Message, tt.expectedLogMsg)
+	}
+
+	client.AssertExpectations(t)
+	hook.Reset()
 }
 
 // TestExecutePostUpdateCommand tests the ExecutePostUpdateCommand function.
