@@ -41,8 +41,7 @@ var (
 		Username: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_USERNAME"),
 		Password: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_PASSWORD"),
 	}
-	invalidImageRef = "invalid:image:ref:!!"
-	origClient      *http.Client
+	origClient *http.Client
 )
 
 // SkipIfCredentialsEmpty skips a test if registry credentials are incomplete.
@@ -212,22 +211,28 @@ var _ = ginkgo.Describe("Digests", func() {
 		})
 
 		ginkgo.It("should return an error if manifest URL build fails", func() {
+			defer ginkgo.GinkgoRecover()
+			// Use an invalid reference to trigger an error; GetToken fails before BuildManifestURL
+			mockImageRef := "example.com/test/image:" // Missing tag, invalid format
 			mockContainerInvalidImage := mocks.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
-				invalidImageRef,
+				mockImageRef,
 				mockCreated,
 				mockDigest,
 			)
 
 			matches, err := digest.CompareDigest(context.Background(), mockContainerInvalidImage, "token")
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
+			// Expect GetToken failure as it catches the invalid reference first
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("should return an error if HEAD request creation fails", func() {
-			mockImageRef := "\x00://invalid-url/test/image:latest"
+			defer ginkgo.GinkgoRecover()
+			// Use an invalid reference; GetToken fails before request creation
+			mockImageRef := "example.com/test/image:latest\x00invalid"
 			mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
@@ -238,7 +243,50 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			matches, err := digest.CompareDigest(context.Background(), mockContainerInvalidURL, "token")
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
+			// Expect GetToken failure as it catches the invalid reference first
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
+			gomega.Expect(matches).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return an error if HEAD request fails", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Simulating network failure for HEAD request")
+				conn, _, err := w.(http.Hijacker).Hijack() //nolint:forcetypeassert
+				if err != nil {
+					logrus.WithError(err).Error("Failed to hijack connection")
+
+					return
+				}
+				conn.Close() // Simulate network failure
+			})
+
+			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("HEAD request failed"))
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
@@ -550,7 +598,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			origClient := auth.Client
 			auth.Client = &http.Client{
 				Transport: &http.Transport{
-					TLSClientConfig:       &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Insecure TLS for testing
+					TLSClientConfig:       &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 					DisableKeepAlives:     true,
 					ResponseHeaderTimeout: 50 * time.Millisecond,
 				},
@@ -566,6 +614,103 @@ var _ = ginkgo.Describe("Digests", func() {
 			result, err := digest.FetchDigest(ctx, mockContainerWithServer, "token")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("GET request failed"))
+			gomega.Expect(result).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should return an error if GetToken fails", func() {
+			defer ginkgo.GinkgoRecover()
+			mockImageRef := "unreachable.local/test/image:latest"
+			mockContainerUnreachable := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			result, err := digest.FetchDigest(context.Background(), mockContainerUnreachable, "token")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
+			gomega.Expect(result).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should return an error if manifest URL build fails", func() {
+			defer ginkgo.GinkgoRecover()
+			// Use an invalid reference; GetToken fails before BuildManifestURL
+			mockImageRef := "example.com/test/image:" // Missing tag, invalid format
+			mockContainerInvalidImage := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			result, err := digest.FetchDigest(context.Background(), mockContainerInvalidImage, "token")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			// Expect GetToken failure as it catches the invalid reference first
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
+			gomega.Expect(result).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should return an error if GET request creation fails", func() {
+			defer ginkgo.GinkgoRecover()
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest\x00invalid"
+			mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+
+			result, err := digest.FetchDigest(context.Background(), mockContainerInvalidURL, "token")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			// Expect GetToken failure as it catches the invalid reference first
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
+			gomega.Expect(result).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should return an error if response decoding fails", func() {
+			defer ginkgo.GinkgoRecover()
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/test/image/manifests/latest with invalid JSON")
+				w.Write([]byte("invalid-json")) // Invalid JSON to trigger decode failure
+			})
+
+			result, err := digest.FetchDigest(context.Background(), mockContainerWithServer, "token")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to decode manifest response"))
 			gomega.Expect(result).To(gomega.BeEmpty())
 		})
 	})
