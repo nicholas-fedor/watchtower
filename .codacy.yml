@@ -4,12 +4,4 @@ engines:
     exclude_paths:
       - "*.md"
       - "**/*.md"
-  gosec:
-    enabled: true
-    files:
-      - pattern: "**/*_test.go"
-        rules:
-          - id: "G402" # TLS InsecureSkipVerify
-            enabled: false
-          - id: "G404" # TLS MinVersion
-            enabled: false
+      - "**/*_test.go"
