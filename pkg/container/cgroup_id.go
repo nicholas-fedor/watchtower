@@ -1,6 +1,7 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"os"
@@ -27,6 +28,13 @@ const minMatchGroups = 2
 // Defaults to os.ReadFile but can be overridden for testing purposes.
 var readFileFunc = os.ReadFile
 
+// Static error definitions
+var (
+	ErrNoValidContainerID = errors.New("no valid docker container ID found in input")
+	ErrReadCgroupFile     = errors.New("failed to read cgroup file")
+	ErrExtractContainerID = errors.New("failed to extract container ID")
+)
+
 // GetRunningContainerID retrieves the current container ID from the process's cgroup information.
 // It reads the cgroup file (/proc/<pid>/cgroup) for the current process and extracts the ID.
 // Returns an error if the file cannot be read or no valid ID is found.
@@ -35,13 +43,13 @@ func GetRunningContainerID() (types.ContainerID, error) {
 	// Construct the path to the cgroup file using the current process ID (PID)
 	file, err := readFileFunc(fmt.Sprintf("/proc/%d/cgroup", os.Getpid()))
 	if err != nil {
-		return "", fmt.Errorf("failed to read cgroup file: %w", err)
+		return "", fmt.Errorf("%w: %v", ErrReadCgroupFile, err)
 	}
 
 	// Pass the file content to the extraction function and handle any errors
 	id, err := getRunningContainerIDFromString(string(file))
 	if err != nil {
-		return "", fmt.Errorf("failed to extract container ID: %w", err)
+		return "", fmt.Errorf("%w: %v", ErrExtractContainerID, err)
 	}
 	return id, nil
 }
@@ -50,16 +58,16 @@ func GetRunningContainerID() (types.ContainerID, error) {
 // It processes the input string, which may be single-line or multiline, to find a 64-character
 // hexadecimal ID following "/docker/". Returns the ID and nil on success, or an empty string
 // and an error if no valid ID is found. Uses regex matching for precision and logs debug info.
-func getRunningContainerIDFromString(s string) (types.ContainerID, error) {
+func getRunningContainerIDFromString(cgroupString string) (types.ContainerID, error) {
 	// Define an iterator for lines; behavior depends on whether the input is single-line or multiline
 	var lines iter.Seq[string]
-	if strings.Contains(s, "\n") {
+	if strings.Contains(cgroupString, "\n") {
 		// For multiline input (e.g., full /proc/<pid>/cgroup content), use strings.Lines to iterate over each line
-		lines = strings.Lines(s)
+		lines = strings.Lines(cgroupString)
 	} else {
 		// For single-line input, create a simple iterator that yields just the input string
 		lines = func(yield func(string) bool) {
-			yield(s)
+			yield(cgroupString)
 		}
 	}
 
@@ -82,5 +90,5 @@ func getRunningContainerIDFromString(s string) (types.ContainerID, error) {
 		}
 	}
 	// If no valid ID is found after checking all lines, return an error with the input for context
-	return "", fmt.Errorf("no valid docker container ID found in input: %q", s)
+	return "", fmt.Errorf("%w: %q", ErrNoValidContainerID, cgroupString)
 }

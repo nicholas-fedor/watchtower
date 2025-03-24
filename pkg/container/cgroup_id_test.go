@@ -1,11 +1,16 @@
 package container
 
 import (
-	"fmt"
+	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// Static error for test
+var (
+	ErrMockedFileRead = errors.New("mocked file read error")
 )
 
 func TestGetRunningContainerID(t *testing.T) {
@@ -18,7 +23,7 @@ func TestGetRunningContainerID(t *testing.T) {
 		name    string
 		setup   func()
 		want    types.ContainerID
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name: "SuccessWithValidID",
@@ -28,17 +33,17 @@ func TestGetRunningContainerID(t *testing.T) {
 				}
 			},
 			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
-			wantErr: false,
+			wantErr: nil,
 		},
 		{
 			name: "FileNotReadable",
 			setup: func() {
 				readFileFunc = func(string) ([]byte, error) {
-					return nil, fmt.Errorf("mocked file read error")
+					return nil, ErrMockedFileRead
 				}
 			},
 			want:    "",
-			wantErr: true,
+			wantErr: ErrReadCgroupFile,
 		},
 		{
 			name: "NoValidID",
@@ -48,7 +53,17 @@ func TestGetRunningContainerID(t *testing.T) {
 				}
 			},
 			want:    "",
-			wantErr: true,
+			wantErr: ErrExtractContainerID,
+		},
+		{
+			name: "EmptyFileContent",
+			setup: func() {
+				readFileFunc = func(string) ([]byte, error) {
+					return []byte(""), nil
+				}
+			},
+			want:    "",
+			wantErr: ErrExtractContainerID,
 		},
 	}
 	for _, tt := range tests {
@@ -57,9 +72,19 @@ func TestGetRunningContainerID(t *testing.T) {
 				tt.setup()
 			}
 			got, err := GetRunningContainerID()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetRunningContainerID() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("GetRunningContainerID() error = %v, want no error", err)
+					return
+				}
+			} else {
+				if err == nil {
+					t.Errorf("GetRunningContainerID() expected error %v, got nil", tt.wantErr)
+					return
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("GetRunningContainerID() error = %v, want error wrapping %v", err, tt.wantErr)
+				}
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetRunningContainerID() = %v, want %v", got, tt.want)
@@ -76,33 +101,31 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 		name    string
 		args    args
 		want    types.ContainerID
-		wantErr bool
+		wantErr error
 	}{
 		{
-			name: "ValidDockerContainerID",
+			name: "ValidDockerContainerIDSingleLine",
 			args: args{
 				s: "11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			},
 			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
-			wantErr: false,
+			wantErr: nil,
 		},
 		{
-			name: "MultipleLinesWithValidID",
+			name: "ValidDockerContainerIDMultiLine",
 			args: args{
-				s: "12:memory:/user.slice\n" +
-					"11:perf_event:/docker/abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800\n" +
-					"10:cpu:/system.slice",
+				s: "12:memory:/user.slice\n11:perf_event:/docker/abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800\n10:cpu:/system.slice",
 			},
 			want:    types.ContainerID("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800"),
-			wantErr: false,
+			wantErr: nil,
 		},
 		{
-			name: "NoDockerPattern",
+			name: "NoDockerPatternMultiLine",
 			args: args{
 				s: "11:perf_event:/user.slice\n10:cpu:/system.slice",
 			},
 			want:    "",
-			wantErr: true,
+			wantErr: ErrNoValidContainerID,
 		},
 		{
 			name: "EmptyString",
@@ -110,7 +133,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "",
 			},
 			want:    "",
-			wantErr: true,
+			wantErr: ErrNoValidContainerID,
 		},
 		{
 			name: "InvalidIDLength",
@@ -118,7 +141,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "11:perf_event:/docker/12345678",
 			},
 			want:    "",
-			wantErr: true,
+			wantErr: ErrNoValidContainerID,
 		},
 		{
 			name: "NonHexID",
@@ -126,15 +149,41 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "11:perf_event:/docker/gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
 			},
 			want:    "",
-			wantErr: true,
+			wantErr: ErrNoValidContainerID,
+		},
+		{
+			name: "ValidIDWithExtraLines",
+			args: args{
+				s: "11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\n10:cpu:/system.slice",
+			},
+			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+			wantErr: nil,
+		},
+		{
+			name: "NoDockerPatternSingleLine",
+			args: args{
+				s: "11:perf_event:/user.slice",
+			},
+			want:    "",
+			wantErr: ErrNoValidContainerID,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := getRunningContainerIDFromString(tt.args.s)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getRunningContainerIDFromString() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("getRunningContainerIDFromString() error = %v, want no error", err)
+					return
+				}
+			} else {
+				if err == nil {
+					t.Errorf("getRunningContainerIDFromString() expected error %v, got nil", tt.wantErr)
+					return
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("getRunningContainerIDFromString() error = %v, want error wrapping %v", err, tt.wantErr)
+				}
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getRunningContainerIDFromString() = %v, want %v", got, tt.want)
