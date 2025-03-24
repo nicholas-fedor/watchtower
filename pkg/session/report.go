@@ -6,7 +6,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// Implements types.Report interface.
+// Implements Report type interface.
 type report struct {
 	scanned []types.ContainerReport
 	updated []types.ContainerReport
@@ -75,61 +75,76 @@ func (r *report) All() []types.ContainerReport {
 	return all
 }
 
-// Adds all non-skipped containers to scanned, then categorizes and sorts by ID.
+// NewReport creates a new Report from a Progress instance, categorizing and sorting container statuses.
+// It processes each container in the progress map, assigns them to appropriate categories (scanned,
+// updated, failed, skipped, stale, fresh), and ensures each category is sorted by container ID.
+// Non-skipped containers are added to the scanned list, with further categorization based on their state
+// or image comparison.
 func NewReport(progress Progress) types.Report {
-	report := &report{
-		scanned: []types.ContainerReport{},
-		updated: []types.ContainerReport{},
-		failed:  []types.ContainerReport{},
-		skipped: []types.ContainerReport{},
-		stale:   []types.ContainerReport{},
-		fresh:   []types.ContainerReport{},
+	r := &report{
+		scanned: make([]types.ContainerReport, 0, len(progress)),
+		updated: make([]types.ContainerReport, 0),
+		failed:  make([]types.ContainerReport, 0),
+		skipped: make([]types.ContainerReport, 0),
+		stale:   make([]types.ContainerReport, 0),
+		fresh:   make([]types.ContainerReport, 0),
 	}
 
+	// Categorize all containers from progress
 	for _, update := range progress {
-		if update.state == SkippedState {
-			report.skipped = append(report.skipped, update)
-
-			continue
-		}
-
-		// Add all non-skipped containers to scanned
-		report.scanned = append(report.scanned, update)
-
-		// Categorize based on state or image comparison
-		if update.newImage == update.oldImage {
-			update.state = FreshState
-			report.fresh = append(report.fresh, update)
-
-			continue
-		}
-
-		//nolint:exhaustive // SkippedState and FreshState are handled above
-		switch update.state {
-		case UnknownState:
-			// Already in scanned; no additional category
-		case ScannedState:
-			// Already in scanned; no additional category unless fresh (handled above)
-		case UpdatedState:
-			report.updated = append(report.updated, update)
-		case FailedState:
-			report.failed = append(report.failed, update)
-		case StaleState:
-			report.stale = append(report.stale, update)
-		default:
-			update.state = StaleState
-			report.stale = append(report.stale, update)
-		}
+		categorizeContainer(r, update)
 	}
 
-	sort.Sort(sortableContainers(report.scanned))
-	sort.Sort(sortableContainers(report.updated))
-	sort.Sort(sortableContainers(report.failed))
-	sort.Sort(sortableContainers(report.skipped))
-	sort.Sort(sortableContainers(report.stale))
-	sort.Sort(sortableContainers(report.fresh))
+	// Sort all categories by container ID
+	sortCategories(r)
 
-	return report
+	return r
+}
+
+// categorizeContainer assigns a container status to the appropriate report categories based on its state
+// and image IDs. Skipped containers go to the skipped list only. Non-skipped containers are added to
+// scanned and may also be categorized as fresh, updated, failed, or stale depending on their state
+// and whether their images match.
+func categorizeContainer(r *report, update *ContainerStatus) {
+	if update.state == SkippedState {
+		r.skipped = append(r.skipped, update)
+		return
+	}
+
+	// All non-skipped containers are scanned
+	r.scanned = append(r.scanned, update)
+
+	// Categorize based on image comparison or state
+	if update.newImage == update.oldImage {
+		update.state = FreshState
+		r.fresh = append(r.fresh, update)
+		return
+	}
+
+	// Handle remaining states explicitly
+	switch update.state {
+	case UpdatedState:
+		r.updated = append(r.updated, update)
+	case FailedState:
+		r.failed = append(r.failed, update)
+	case StaleState:
+		r.stale = append(r.stale, update)
+	default:
+		// Default to stale for unhandled or unknown states
+		update.state = StaleState
+		r.stale = append(r.stale, update)
+	}
+}
+
+// sortCategories sorts each category in the report by container ID in ascending order.
+// This ensures consistent ordering when retrieving containers from the report.
+func sortCategories(r *report) {
+	sort.Sort(sortableContainers(r.scanned))
+	sort.Sort(sortableContainers(r.updated))
+	sort.Sort(sortableContainers(r.failed))
+	sort.Sort(sortableContainers(r.skipped))
+	sort.Sort(sortableContainers(r.stale))
+	sort.Sort(sortableContainers(r.fresh))
 }
 
 // sortableContainers implements sort.Interface for sorting container reports by ID.
