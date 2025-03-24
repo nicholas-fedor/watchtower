@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -114,20 +114,20 @@ func (m *mockClient) WarnOnHeadPullFailed(container types.Container) bool {
 // mockContainer creates a *container.Container for testing.
 func mockContainer(options ...func(*container.Container)) *container.Container {
 	c := container.NewContainer(
-		&dockercontainer.InspectResponse{
-			ContainerJSONBase: &dockercontainer.ContainerJSONBase{
+		&dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 				ID:         "container_id",
-				HostConfig: &dockercontainer.HostConfig{},
+				HostConfig: &dockerContainer.HostConfig{},
 				Name:       "/test-container", // Ensure valid name
 			},
-			Config: &dockercontainer.Config{
+			Config: &dockerContainer.Config{
 				Labels: map[string]string{},
 			},
 		},
 		nil, // No image info needed for these tests
 	)
 	// Apply default state to avoid nil pointer issues
-	c.ContainerInfo().State = &dockercontainer.State{Running: false}
+	c.ContainerInfo().State = &dockerContainer.State{Running: false}
 
 	for _, opt := range options {
 		opt(c)
@@ -144,7 +144,7 @@ func withLabels(labels map[string]string) func(*container.Container) {
 }
 
 // withContainerState sets the state on a container.
-func withContainerState(state dockercontainer.State) func(*container.Container) {
+func withContainerState(state dockerContainer.State) func(*container.Container) {
 	return func(c *container.Container) {
 		c.ContainerInfo().State = &state
 	}
@@ -431,7 +431,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 		{
 			name: "command present and running",
 			container: mockContainer(
-				withContainerState(dockercontainer.State{Running: true}),
+				withContainerState(dockerContainer.State{Running: true}),
 				withLabels(map[string]string{
 					"com.centurylinklabs.watchtower.lifecycle.pre-update":         "pre-update",
 					"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "2",
@@ -446,7 +446,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 		},
 		{
 			name:           "no command",
-			container:      mockContainer(withContainerState(dockercontainer.State{Running: true})),
+			container:      mockContainer(withContainerState(dockerContainer.State{Running: true})),
 			expectedResult: false,
 			expectedLogs:   1,
 			expectedLogMsg: "No pre-update command supplied",
@@ -454,7 +454,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 		{
 			name: "not running",
 			container: mockContainer(
-				withContainerState(dockercontainer.State{Running: false}),
+				withContainerState(dockerContainer.State{Running: false}),
 				withLabels(map[string]string{
 					"com.centurylinklabs.watchtower.lifecycle.pre-update":         "pre-update",
 					"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "2",
@@ -467,7 +467,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 		{
 			name: "command error",
 			container: mockContainer(
-				withContainerState(dockercontainer.State{Running: true}),
+				withContainerState(dockerContainer.State{Running: true}),
 				withLabels(map[string]string{
 					"com.centurylinklabs.watchtower.lifecycle.pre-update":         "pre-update",
 					"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "2",

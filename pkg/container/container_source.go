@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerFiltersType "github.com/docker/docker/api/types/filters"
+	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -22,7 +22,7 @@ const defaultStopSignal = "SIGTERM"
 // ListSourceContainers retrieves a list of containers from the Docker host, filtered by the provided function.
 // It respects the IncludeStopped and IncludeRestarting options to determine which container states to include.
 // Returns a slice of containers or an error if the listing fails.
-func ListSourceContainers(api client.APIClient, opts ClientOptions, filter types.Filter) ([]types.Container, error) {
+func ListSourceContainers(api dockerClient.APIClient, opts ClientOptions, filter types.Filter) ([]types.Container, error) {
 	hostContainers := []types.Container{}
 	ctx := context.Background()
 
@@ -39,7 +39,7 @@ func ListSourceContainers(api client.APIClient, opts ClientOptions, filter types
 	}
 
 	// Apply filters based on configured options.
-	filterArgs := filters.NewArgs()
+	filterArgs := dockerFiltersType.NewArgs()
 	filterArgs.Add("status", "running")
 
 	if opts.IncludeStopped {
@@ -51,7 +51,7 @@ func ListSourceContainers(api client.APIClient, opts ClientOptions, filter types
 		filterArgs.Add("status", "restarting")
 	}
 
-	containers, err := api.ContainerList(ctx, container.ListOptions{
+	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{
 		Filters: filterArgs,
 		Size:    false,
 		All:     false,
@@ -82,7 +82,7 @@ func ListSourceContainers(api client.APIClient, opts ClientOptions, filter types
 // GetSourceContainer retrieves detailed information about a container by its ID.
 // It resolves network container references by replacing IDs with names when possible.
 // Returns a Container object or an error if inspection fails.
-func GetSourceContainer(api client.APIClient, containerID types.ContainerID) (types.Container, error) {
+func GetSourceContainer(api dockerClient.APIClient, containerID types.ContainerID) (types.Container, error) {
 	ctx := context.Background()
 
 	// Fetch basic container information.
@@ -103,7 +103,7 @@ func GetSourceContainer(api client.APIClient, containerID types.ContainerID) (ty
 			}).Warnf("Unable to resolve network container: %v", err)
 		} else {
 			// Update NetworkMode to use the parent container's name for stable references across recreations.
-			containerInfo.HostConfig.NetworkMode = container.NetworkMode("container:" + parentContainer.Name)
+			containerInfo.HostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + parentContainer.Name)
 		}
 	}
 
@@ -121,7 +121,7 @@ func GetSourceContainer(api client.APIClient, containerID types.ContainerID) (ty
 // StopSourceContainer stops and removes the specified container within the given timeout.
 // It first attempts to stop the container gracefully, then removes it unless AutoRemove is enabled.
 // Returns an error if stopping or removal fails.
-func StopSourceContainer(api client.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
+func StopSourceContainer(api dockerClient.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
 	ctx := context.Background()
 	idStr := string(sourceContainer.ID())
 	shortID := sourceContainer.ID().ShortID()
@@ -145,7 +145,7 @@ func StopSourceContainer(api client.APIClient, sourceContainer types.Container, 
 
 // stopAndRemoveContainer waits for a container to stop and removes it if needed.
 // It respects AutoRemove and logs progress, returning an error if the process fails.
-func stopAndRemoveContainer(api client.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
+func stopAndRemoveContainer(api dockerClient.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
 	ctx := context.Background()
 	idStr := string(sourceContainer.ID())
 	shortID := sourceContainer.ID().ShortID()
@@ -170,15 +170,15 @@ func stopAndRemoveContainer(api client.APIClient, sourceContainer types.Containe
 	// Attempt removal.
 	logrus.Debugf("Removing container %s", shortID)
 
-	err = api.ContainerRemove(ctx, idStr, container.RemoveOptions{
+	err = api.ContainerRemove(ctx, idStr, dockerContainerType.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: removeVolumes,
 	})
-	if err != nil && !client.IsErrNotFound(err) {
+	if err != nil && !dockerClient.IsErrNotFound(err) {
 		return fmt.Errorf("failed to remove container %s (%s): %w", sourceContainer.Name(), shortID, err)
 	}
 
-	if client.IsErrNotFound(err) {
+	if dockerClient.IsErrNotFound(err) {
 		// Container was already gone after removal attempt; no need for second wait.
 		return nil
 	}
@@ -199,7 +199,7 @@ func stopAndRemoveContainer(api client.APIClient, sourceContainer types.Containe
 // waitForStopOrTimeout waits for a container to stop or times out.
 // Returns true if stopped (or gone), false if still running after timeout, and any error.
 // Treats a 404 (not found) as stopped, indicating successful removal or prior stop.
-func waitForStopOrTimeout(api client.APIClient, container types.Container, waitTime time.Duration) (bool, error) {
+func waitForStopOrTimeout(api dockerClient.APIClient, container types.Container, waitTime time.Duration) (bool, error) {
 	ctx := context.Background()
 	timeout := time.After(waitTime)
 
@@ -210,7 +210,7 @@ func waitForStopOrTimeout(api client.APIClient, container types.Container, waitT
 		default:
 			containerInfo, err := api.ContainerInspect(ctx, string(container.ID()))
 			if err != nil {
-				if client.IsErrNotFound(err) {
+				if dockerClient.IsErrNotFound(err) {
 					return true, nil // Container gone, treat as stopped
 				}
 
@@ -228,14 +228,14 @@ func waitForStopOrTimeout(api client.APIClient, container types.Container, waitT
 // getNetworkConfig extracts the network configuration from the source container.
 // It preserves essential settings (e.g., IP, MAC) while resetting DNSNames and Aliases to minimal values.
 // Returns a sanitized network configuration for use in creating the target container.
-func getNetworkConfig(sourceContainer types.Container) *network.NetworkingConfig {
-	config := &network.NetworkingConfig{
-		EndpointsConfig: make(map[string]*network.EndpointSettings),
+func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.NetworkingConfig {
+	config := &dockerNetworkType.NetworkingConfig{
+		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
 	}
 
 	for networkName, originalEndpoint := range sourceContainer.ContainerInfo().NetworkSettings.Networks {
 		// Copy all fields from the original endpoint
-		endpoint := &network.EndpointSettings{
+		endpoint := &dockerNetworkType.EndpointSettings{
 			IPAMConfig:          originalEndpoint.IPAMConfig,          // Preserve full IPAM config
 			Links:               originalEndpoint.Links,               // Preserve container links
 			Aliases:             []string{sourceContainer.Name()[1:]}, // Reset to container name only
@@ -255,7 +255,7 @@ func getNetworkConfig(sourceContainer types.Container) *network.NetworkingConfig
 
 		// Preserve IPAMConfig if present
 		if originalEndpoint.IPAMConfig != nil {
-			endpoint.IPAMConfig = &network.EndpointIPAMConfig{
+			endpoint.IPAMConfig = &dockerNetworkType.EndpointIPAMConfig{
 				IPv4Address:  originalEndpoint.IPAMConfig.IPv4Address,
 				IPv6Address:  originalEndpoint.IPAMConfig.IPv6Address,
 				LinkLocalIPs: originalEndpoint.IPAMConfig.LinkLocalIPs,
@@ -272,7 +272,7 @@ func getNetworkConfig(sourceContainer types.Container) *network.NetworkingConfig
 // getDesiredMacAddress extracts the first MAC address from the network config for logging.
 // It logs the MAC address being preserved and returns it for debugging purposes.
 // Returns an empty string if no MAC address is found.
-func getDesiredMacAddress(networkConfig *network.NetworkingConfig, containerID types.ContainerID) string {
+func getDesiredMacAddress(networkConfig *dockerNetworkType.NetworkingConfig, containerID types.ContainerID) string {
 	for networkName, ep := range networkConfig.EndpointsConfig {
 		if ep.MacAddress != "" {
 			logrus.Debugf("Preserving MAC address %s for container %s on network %s", ep.MacAddress, containerID, networkName)

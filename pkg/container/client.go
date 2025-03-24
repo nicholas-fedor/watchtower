@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
@@ -55,10 +55,10 @@ type Client interface {
 	WarnOnHeadPullFailed(container types.Container) bool
 }
 
-// dockerClient is the concrete implementation of the Client interface.
+// client is the concrete implementation of the Client interface.
 // It wraps the Docker API client and applies custom behavior via ClientOptions.
-type dockerClient struct {
-	api client.APIClient
+type client struct {
+	api dockerClient.APIClient
 	ClientOptions
 }
 
@@ -77,12 +77,12 @@ type ClientOptions struct {
 // Environment variables used include DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
 // Panics if the Docker client cannot be instantiated due to invalid configuration.
 func NewClient(opts ClientOptions) Client {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv)
 	if err != nil {
 		logrus.Fatalf("Error instantiating Docker client: %s", err)
 	}
 
-	return &dockerClient{
+	return &client{
 		api:           cli,
 		ClientOptions: opts,
 	}
@@ -91,7 +91,7 @@ func NewClient(opts ClientOptions) Client {
 // ListContainers retrieves a list of existing containers.
 // It delegates to ListSourceContainers to fetch and filter containers based on the provided function.
 // Returns a slice of containers or an error if listing fails.
-func (c dockerClient) ListContainers(filter types.Filter) ([]types.Container, error) {
+func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
 	return ListSourceContainers(c.api, c.ClientOptions, filter)
 }
 
@@ -99,21 +99,21 @@ func (c dockerClient) ListContainers(filter types.Filter) ([]types.Container, er
 // It delegates to GetSourceContainer to retrieve the container details.
 // Returns the container object as a types.Container interface, which is intentional to support multiple container implementations.
 // Returns an error if retrieval fails.
-func (c dockerClient) GetContainer(containerID types.ContainerID) (types.Container, error) {
+func (c client) GetContainer(containerID types.ContainerID) (types.Container, error) {
 	return GetSourceContainer(c.api, containerID)
 }
 
 // StopContainer stops and removes an existing container within the given timeout.
 // It delegates to StopSourceContainer to handle the stopping and removal process.
 // Returns an error if stopping or removal fails.
-func (c dockerClient) StopContainer(container types.Container, timeout time.Duration) error {
+func (c client) StopContainer(container types.Container, timeout time.Duration) error {
 	return StopSourceContainer(c.api, container, timeout, c.RemoveVolumes)
 }
 
 // StartContainer creates and starts a new container based on the source container’s configuration.
 // It extracts the network configuration from the source and passes it to StartTargetContainer.
 // Returns the new container’s ID or an error if creation or startup fails.
-func (c dockerClient) StartContainer(container types.Container) (types.ContainerID, error) {
+func (c client) StartContainer(container types.Container) (types.ContainerID, error) {
 	networkConfig := getNetworkConfig(container)
 
 	return StartTargetContainer(c.api, container, networkConfig, c.ReviveStopped)
@@ -122,14 +122,14 @@ func (c dockerClient) StartContainer(container types.Container) (types.Container
 // RenameContainer renames an existing container to the specified new name.
 // It delegates to RenameTargetContainer to perform the renaming.
 // Returns an error if the rename operation fails.
-func (c dockerClient) RenameContainer(container types.Container, newName string) error {
+func (c client) RenameContainer(container types.Container, newName string) error {
 	return RenameTargetContainer(c.api, container, newName)
 }
 
 // WarnOnHeadPullFailed decides whether to warn about failed HEAD requests during image pulls.
 // It returns true if a warning should be logged, based on the configured strategy.
 // Uses WarnAlways, WarnNever, or delegates to registry logic for WarnAuto.
-func (c dockerClient) WarnOnHeadPullFailed(container types.Container) bool {
+func (c client) WarnOnHeadPullFailed(container types.Container) bool {
 	if c.WarnOnHeadFailed == WarnAlways {
 		return true
 	}
@@ -144,7 +144,7 @@ func (c dockerClient) WarnOnHeadPullFailed(container types.Container) bool {
 // IsContainerStale determines if a container’s image is outdated compared to the latest available version.
 // It delegates to the imageClient to check staleness.
 // Returns whether the container is stale, the latest image ID, and any error encountered.
-func (c dockerClient) IsContainerStale(container types.Container, params types.UpdateParams) (bool, types.ImageID, error) {
+func (c client) IsContainerStale(container types.Container, params types.UpdateParams) (bool, types.ImageID, error) {
 	imgClient := newImageClient(c.api)
 
 	return imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
@@ -153,12 +153,12 @@ func (c dockerClient) IsContainerStale(container types.Container, params types.U
 // ExecuteCommand runs a command inside a container and evaluates its result.
 // It creates an exec instance, runs it, and waits for completion or timeout.
 // Returns whether to skip updates (based on exit code) and any error encountered.
-func (c dockerClient) ExecuteCommand(containerID types.ContainerID, command string, timeout int) (bool, error) {
+func (c client) ExecuteCommand(containerID types.ContainerID, command string, timeout int) (bool, error) {
 	ctx := context.Background()
 	clog := logrus.WithField("containerID", containerID)
 
 	// Configure and create the exec instance.
-	execConfig := container.ExecOptions{
+	execConfig := dockerContainer.ExecOptions{
 		Tty:          true,
 		Detach:       false,
 		Cmd:          []string{"sh", "-c", command},
@@ -179,7 +179,7 @@ func (c dockerClient) ExecuteCommand(containerID types.ContainerID, command stri
 	}
 
 	// Start the exec instance.
-	execStartCheck := container.ExecStartOptions{
+	execStartCheck := dockerContainer.ExecStartOptions{
 		Detach:      false,
 		Tty:         true,
 		ConsoleSize: nil,
@@ -205,8 +205,8 @@ func (c dockerClient) ExecuteCommand(containerID types.ContainerID, command stri
 
 // captureExecOutput attaches to an exec instance and captures its output.
 // It logs errors internally and returns the trimmed output or an error if attachment or reading fails.
-func (c dockerClient) captureExecOutput(ctx context.Context, execID string) (string, error) {
-	response, err := c.api.ContainerExecAttach(ctx, execID, container.ExecStartOptions{
+func (c client) captureExecOutput(ctx context.Context, execID string) (string, error) {
+	response, err := c.api.ContainerExecAttach(ctx, execID, dockerContainer.ExecStartOptions{
 		Tty:         true,
 		Detach:      false,
 		ConsoleSize: nil,
@@ -233,7 +233,7 @@ func (c dockerClient) captureExecOutput(ctx context.Context, execID string) (str
 // waitForExecOrTimeout waits for an exec instance to complete or times out.
 // It checks the exit code: 75 (ExTempFail) skips updates, >0 indicates failure.
 // Returns whether to skip updates and any error encountered.
-func (c dockerClient) waitForExecOrTimeout(parentContext context.Context, execID string, execOutput string, timeout int) (bool, error) {
+func (c client) waitForExecOrTimeout(parentContext context.Context, execID string, execOutput string, timeout int) (bool, error) {
 	const ExTempFail = 75
 
 	var ctx context.Context
@@ -289,7 +289,7 @@ func (c dockerClient) waitForExecOrTimeout(parentContext context.Context, execID
 // RemoveImageByID deletes an image from the Docker host by its ID.
 // It delegates to the imageClient to perform the removal.
 // Returns an error if the removal fails.
-func (c dockerClient) RemoveImageByID(imageID types.ImageID) error {
+func (c client) RemoveImageByID(imageID types.ImageID) error {
 	imgClient := newImageClient(c.api)
 
 	return imgClient.RemoveImageByID(imageID)

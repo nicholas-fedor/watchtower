@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/image"
+	dockerImageType "github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -97,7 +97,7 @@ var _ = ginkgo.Describe("the manifest module", func() {
 // buildMockContainerManifestURL creates a mock container and builds its manifest URL.
 // It constructs a container with the given image reference for testing BuildManifestURL.
 func buildMockContainerManifestURL(imageRef string) (string, error) {
-	imageInfo := image.InspectResponse{
+	imageInfo := dockerImageType.InspectResponse{
 		RepoTags: []string{
 			imageRef,
 		},

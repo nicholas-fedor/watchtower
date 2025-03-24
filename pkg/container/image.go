@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
@@ -27,7 +27,7 @@ const (
 // imageClient manages image-related operations for Watchtower.
 // It encapsulates a Docker API client to perform tasks like pulling and inspecting images.
 type imageClient struct {
-	api client.APIClient
+	api dockerClient.APIClient
 }
 
 // WarningStrategy defines the policy for logging warnings when HEAD requests fail during image pulls.
@@ -44,7 +44,7 @@ type WarningStrategy string
 // Returns:
 //
 //	An initialized imageClient ready to manage image-related tasks.
-func newImageClient(api client.APIClient) imageClient {
+func newImageClient(api dockerClient.APIClient) imageClient {
 	return imageClient{api: api}
 }
 
@@ -211,7 +211,7 @@ func (c imageClient) shouldSkipPull(ctx context.Context, targetContainer types.C
 //
 // Returns:
 //   - error: Any error from pulling or reading the response, nil if successful.
-func (c imageClient) performImagePull(ctx context.Context, imageName string, opts image.PullOptions, fields logrus.Fields) error {
+func (c imageClient) performImagePull(ctx context.Context, imageName string, opts dockerImageType.PullOptions, fields logrus.Fields) error {
 	logrus.WithFields(fields).Debugf("Pulling image")
 
 	response, err := c.api.ImagePull(ctx, imageName, opts)
@@ -248,7 +248,7 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
 	items, err := c.api.ImageRemove(
 		context.Background(),
 		string(imageID),
-		image.RemoveOptions{
+		dockerImageType.RemoveOptions{
 			Force:         true,
 			PruneChildren: true,
 		},

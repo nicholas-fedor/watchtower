@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/cli/cli/config"
-	"github.com/docker/cli/cli/config/configfile"
-	"github.com/docker/cli/cli/config/credentials"
-	"github.com/docker/cli/cli/config/types"
+	dockerCliConfig "github.com/docker/cli/cli/config"
+	dockerConfigConfigfile "github.com/docker/cli/cli/config/configfile"
+	dockerConfigCredentials "github.com/docker/cli/cli/config/credentials"
+	dockerConfigTypes "github.com/docker/cli/cli/config/types"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
@@ -39,7 +39,7 @@ func EncodedEnvAuth() (string, error) {
 	password := os.Getenv("REPO_PASS")
 
 	if username != "" && password != "" {
-		auth := types.AuthConfig{
+		auth := dockerConfigTypes.AuthConfig{
 			Username: username,
 			Password: password,
 		}
@@ -70,7 +70,7 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 		configDir = "/"
 	}
 
-	configFile, err := config.Load(configDir)
+	configFile, err := dockerCliConfig.Load(configDir)
 	if err != nil {
 		logrus.Errorf("Unable to find default config file: %s", err)
 
@@ -80,7 +80,7 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 	credStore := CredentialsStore(*configFile)
 	auth, _ := credStore.Get(server) // returns (types.AuthConfig{}) if server not in credStore
 
-	if auth == (types.AuthConfig{}) {
+	if auth == (dockerConfigTypes.AuthConfig{}) {
 		logrus.WithField("config_file", configFile.Filename).Debugf("No credentials for %s found", server)
 
 		return "", nil
@@ -94,17 +94,17 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 
 // CredentialsStore returns a new credentials store based on the settings provided in the configuration file.
 // It determines whether to use a native or file-based store depending on the config.
-func CredentialsStore(configFile configfile.ConfigFile) credentials.Store {
+func CredentialsStore(configFile dockerConfigConfigfile.ConfigFile) dockerConfigCredentials.Store {
 	if configFile.CredentialsStore != "" {
-		return credentials.NewNativeStore(&configFile, configFile.CredentialsStore)
+		return dockerConfigCredentials.NewNativeStore(&configFile, configFile.CredentialsStore)
 	}
 
-	return credentials.NewFileStore(&configFile)
+	return dockerConfigCredentials.NewFileStore(&configFile)
 }
 
 // EncodeAuth Base64 encodes an AuthConfig struct for transmission over HTTP.
 // It marshals the struct to JSON and applies URL-safe base64 encoding.
-func EncodeAuth(authConfig types.AuthConfig) (string, error) {
+func EncodeAuth(authConfig dockerConfigTypes.AuthConfig) (string, error) {
 	buf, err := json.Marshal(authConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal auth config to JSON: %w", err)

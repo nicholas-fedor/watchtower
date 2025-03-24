@@ -20,7 +20,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	containertypes "github.com/docker/docker/api/types/container" // Alias for clarity
+	dockerContainerType "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -94,14 +94,14 @@ func (m mockContainer) Enabled() (bool, bool) {
 // ContainerInfo returns a pointer to a containertypes.InspectResponse, which contains
 // detailed container metadata. For these tests, it returns nil since the auth package
 // does not require this information, satisfying the interface with a minimal stub.
-func (m mockContainer) ContainerInfo() *containertypes.InspectResponse {
+func (m mockContainer) ContainerInfo() *dockerContainerType.InspectResponse {
 	return nil // Minimal stub, not used in these tests
 }
 
 // GetCreateConfig returns a pointer to a containertypes.Config, representing the
 // container’s creation configuration. This method satisfies the types.Container interface,
 // returning nil as a minimal stub since the auth package does not use this data in these tests.
-func (m mockContainer) GetCreateConfig() *containertypes.Config {
+func (m mockContainer) GetCreateConfig() *dockerContainerType.Config {
 	return nil // Minimal stub, not used in these tests
 }
 
@@ -109,7 +109,7 @@ func (m mockContainer) GetCreateConfig() *containertypes.Config {
 // container’s host-specific creation configuration (e.g., port bindings, network settings).
 // This method satisfies the types.Container interface, returning nil as a minimal stub since
 // the auth package does not use this data in these authentication-focused tests.
-func (m mockContainer) GetCreateHostConfig() *containertypes.HostConfig {
+func (m mockContainer) GetCreateHostConfig() *dockerContainerType.HostConfig {
 	return nil // Minimal stub, not used in these tests
 }
 

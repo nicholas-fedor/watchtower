@@ -3,13 +3,13 @@ package types
 import (
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
+	dockerContainerTypes "github.com/docker/docker/api/types/container"
+	dockerImageTypes "github.com/docker/docker/api/types/image"
 )
 
 // Container is a docker container running an image.
 type Container interface {
-	ContainerInfo() *container.InspectResponse
+	ContainerInfo() *dockerContainerTypes.InspectResponse
 	ID() ContainerID
 	IsRunning() bool
 	Name() string
@@ -24,7 +24,7 @@ type Container interface {
 	IsWatchtower() bool
 	StopSignal() string
 	HasImageInfo() bool
-	ImageInfo() *image.InspectResponse
+	ImageInfo() *dockerImageTypes.InspectResponse
 	GetLifecyclePreCheckCommand() string
 	GetLifecyclePostCheckCommand() string
 	GetLifecyclePreUpdateCommand() string
@@ -38,8 +38,8 @@ type Container interface {
 	PreUpdateTimeout() int
 	PostUpdateTimeout() int
 	IsRestarting() bool
-	GetCreateConfig() *container.Config
-	GetCreateHostConfig() *container.HostConfig
+	GetCreateConfig() *dockerContainerTypes.Config
+	GetCreateHostConfig() *dockerContainerTypes.HostConfig
 }
 
 // ImageID is a hash string representing a container image.

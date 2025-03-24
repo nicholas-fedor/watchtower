@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/image"
+	dockerImageType "github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -121,7 +121,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockName,
 				mockImageRef,
 				mockCreated,
-				&image.InspectResponse{RepoDigests: []string{}},
+				&dockerImageType.InspectResponse{RepoDigests: []string{}},
 			)
 
 			server.AppendHandlers(

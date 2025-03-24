@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
+	dockerContainerTypes "github.com/docker/docker/api/types/container"
+	dockerImageTypes "github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -21,9 +21,9 @@ type mockContainer struct {
 	links   []string
 }
 
-func (m *mockContainer) ContainerInfo() *container.InspectResponse {
-	return &container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
+func (m *mockContainer) ContainerInfo() *dockerContainerTypes.InspectResponse {
+	return &dockerContainerTypes.InspectResponse{
+		ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
 			Name:    m.name,
 			Created: m.created,
 		},
@@ -35,35 +35,39 @@ func (m *mockContainer) Links() []string { return m.links }
 func (m *mockContainer) ID() types.ContainerID {
 	return types.ContainerID("id-" + m.name)
 }
-func (m *mockContainer) IsRunning() bool                       { return true }
-func (m *mockContainer) IsRestarting() bool                    { return false }
-func (m *mockContainer) ImageID() types.ImageID                { return "" }
-func (m *mockContainer) SafeImageID() types.ImageID            { return "" }
-func (m *mockContainer) ImageName() string                     { return "mock/image" }
-func (m *mockContainer) Enabled() (bool, bool)                 { return true, true }
-func (m *mockContainer) IsMonitorOnly(types.UpdateParams) bool { return false }
-func (m *mockContainer) Scope() (string, bool)                 { return "", false }
-func (m *mockContainer) ToRestart() bool                       { return false }
-func (m *mockContainer) IsWatchtower() bool                    { return false }
-func (m *mockContainer) StopSignal() string                    { return "SIGTERM" }
-func (m *mockContainer) HasImageInfo() bool                    { return false }
-func (m *mockContainer) ImageInfo() *image.InspectResponse     { return nil }
-func (m *mockContainer) GetLifecyclePreCheckCommand() string   { return "" }
-func (m *mockContainer) GetLifecyclePostCheckCommand() string  { return "" }
-func (m *mockContainer) GetLifecyclePreUpdateCommand() string  { return "" }
-func (m *mockContainer) GetLifecyclePostUpdateCommand() string { return "" }
-func (m *mockContainer) VerifyConfiguration() error            { return nil }
-func (m *mockContainer) SetStale(bool)                         {}
-func (m *mockContainer) IsStale() bool                         { return false }
-func (m *mockContainer) IsNoPull(types.UpdateParams) bool      { return false }
-func (m *mockContainer) SetLinkedToRestarting(bool)            {}
-func (m *mockContainer) IsLinkedToRestarting() bool            { return false }
-func (m *mockContainer) PreUpdateTimeout() int                 { return 0 }
-func (m *mockContainer) PostUpdateTimeout() int                { return 0 }
+func (m *mockContainer) IsRunning() bool                              { return true }
+func (m *mockContainer) IsRestarting() bool                           { return false }
+func (m *mockContainer) ImageID() types.ImageID                       { return "" }
+func (m *mockContainer) SafeImageID() types.ImageID                   { return "" }
+func (m *mockContainer) ImageName() string                            { return "mock/image" }
+func (m *mockContainer) Enabled() (bool, bool)                        { return true, true }
+func (m *mockContainer) IsMonitorOnly(types.UpdateParams) bool        { return false }
+func (m *mockContainer) Scope() (string, bool)                        { return "", false }
+func (m *mockContainer) ToRestart() bool                              { return false }
+func (m *mockContainer) IsWatchtower() bool                           { return false }
+func (m *mockContainer) StopSignal() string                           { return "SIGTERM" }
+func (m *mockContainer) HasImageInfo() bool                           { return false }
+func (m *mockContainer) ImageInfo() *dockerImageTypes.InspectResponse { return nil }
+func (m *mockContainer) GetLifecyclePreCheckCommand() string          { return "" }
+func (m *mockContainer) GetLifecyclePostCheckCommand() string         { return "" }
+func (m *mockContainer) GetLifecyclePreUpdateCommand() string         { return "" }
+func (m *mockContainer) GetLifecyclePostUpdateCommand() string        { return "" }
+func (m *mockContainer) VerifyConfiguration() error                   { return nil }
+func (m *mockContainer) SetStale(bool)                                {}
+func (m *mockContainer) IsStale() bool                                { return false }
+func (m *mockContainer) IsNoPull(types.UpdateParams) bool             { return false }
+func (m *mockContainer) SetLinkedToRestarting(bool)                   {}
+func (m *mockContainer) IsLinkedToRestarting() bool                   { return false }
+func (m *mockContainer) PreUpdateTimeout() int                        { return 0 }
+func (m *mockContainer) PostUpdateTimeout() int                       { return 0 }
 
-func (m *mockContainer) GetCreateConfig() *container.Config { return &container.Config{} }
+func (m *mockContainer) GetCreateConfig() *dockerContainerTypes.Config {
+	return &dockerContainerTypes.Config{}
+}
 
-func (m *mockContainer) GetCreateHostConfig() *container.HostConfig { return &container.HostConfig{} }
+func (m *mockContainer) GetCreateHostConfig() *dockerContainerTypes.HostConfig {
+	return &dockerContainerTypes.HostConfig{}
+}
 
 var _ = ginkgo.Describe("Container Sorting", func() {
 	ginkgo.Describe("ByCreated", func() {

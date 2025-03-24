@@ -1,8 +1,8 @@
 package container
 
 import (
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
+	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerNat "github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -63,7 +63,7 @@ var _ = ginkgo.Describe("the container", func() {
 		ginkgo.When("verifying a container with port bindings and exposed ports is non-nil", func() {
 			ginkgo.It("should return an error", func() {
 				c := MockContainer(WithPortBindings("80/tcp"))
-				c.containerInfo.Config.ExposedPorts = map[nat.Port]struct{}{"80/tcp": {}}
+				c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{"80/tcp": {}}
 				err := c.VerifyConfiguration()
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
@@ -72,51 +72,51 @@ var _ = ginkgo.Describe("the container", func() {
 	ginkgo.Describe("GetCreateConfig", func() {
 		ginkgo.When("container healthcheck config is equal to image config", func() {
 			ginkgo.It("should return empty healthcheck values", func() {
-				mockContainer := MockContainer(WithHealthcheck(container.HealthConfig{
+				mockContainer := MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					Test: []string{"/usr/bin/sleep", "1s"},
-				}), WithImageHealthcheck(container.HealthConfig{
+				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Test: []string{"/usr/bin/sleep", "1s"},
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&container.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 
-				mockContainer = MockContainer(WithHealthcheck(container.HealthConfig{
+				mockContainer = MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					Timeout: 30,
-				}), WithImageHealthcheck(container.HealthConfig{
+				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Timeout: 30,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&container.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 
-				mockContainer = MockContainer(WithHealthcheck(container.HealthConfig{
+				mockContainer = MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					StartPeriod: 30,
-				}), WithImageHealthcheck(container.HealthConfig{
+				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					StartPeriod: 30,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&container.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 
-				mockContainer = MockContainer(WithHealthcheck(container.HealthConfig{
+				mockContainer = MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					Retries: 30,
-				}), WithImageHealthcheck(container.HealthConfig{
+				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Retries: 30,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&container.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 			})
 		})
 		ginkgo.When("container healthcheck config is different to image config", func() {
 			ginkgo.It("should return the container healthcheck values", func() {
-				mockContainer := MockContainer(WithHealthcheck(container.HealthConfig{
+				mockContainer := MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
 					StartPeriod: 10,
 					Retries:     2,
-				}), WithImageHealthcheck(container.HealthConfig{
+				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "10s"},
 					Interval:    10,
 					Timeout:     60,
 					StartPeriod: 30,
 					Retries:     10,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&container.HealthConfig{
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("the container", func() {
 		})
 		ginkgo.When("container healthcheck config is empty", func() {
 			ginkgo.It("should not panic", func() {
-				mockContainer := MockContainer(WithImageHealthcheck(container.HealthConfig{
+				mockContainer := MockContainer(WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "10s"},
 					Interval:    10,
 					Timeout:     60,
@@ -139,14 +139,14 @@ var _ = ginkgo.Describe("the container", func() {
 		})
 		ginkgo.When("container image healthcheck config is empty", func() {
 			ginkgo.It("should not panic", func() {
-				mockContainer := MockContainer(WithHealthcheck(container.HealthConfig{
+				mockContainer := MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
 					StartPeriod: 10,
 					Retries:     2,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&container.HealthConfig{
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,

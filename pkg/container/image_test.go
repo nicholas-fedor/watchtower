@@ -3,8 +3,8 @@ package container
 import (
 	"context"
 
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
+	dockerClient "github.com/docker/docker/client"
+	dockerErrdefs "github.com/docker/docker/errdefs"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -19,13 +19,13 @@ import (
 )
 
 var _ = ginkgo.Describe("the client", func() {
-	var docker *client.Client
+	var docker *dockerClient.Client
 	var mockServer *ghttp.Server
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = client.NewClientWithOpts(
-			client.WithHost(mockServer.URL()),
-			client.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+		docker, _ = dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(mockServer.URL()),
+			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
 	})
 	ginkgo.AfterEach(func() {
 		mockServer.Close()
@@ -34,14 +34,14 @@ var _ = ginkgo.Describe("the client", func() {
 		containerUnknown := MockContainer(WithImageName("unknown.repo/prefix/imagename:latest"))
 		containerKnown := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
 		ginkgo.When(`warn on head failure is set to "always"`, func() {
-			c := dockerClient{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAlways}}
+			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAlways}}
 			ginkgo.It("should always return true", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeTrue())
 				gomega.Expect(c.WarnOnHeadPullFailed(containerKnown)).To(gomega.BeTrue())
 			})
 		})
 		ginkgo.When(`warn on head failure is set to "auto"`, func() {
-			c := dockerClient{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAuto}}
+			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAuto}}
 			ginkgo.It("should return false for unknown repos", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeFalse())
 			})
@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 		ginkgo.When(`warn on head failure is set to "never"`, func() {
-			c := dockerClient{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnNever}}
+			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnNever}}
 			ginkgo.It("should never return true", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeFalse())
 				gomega.Expect(c.WarnOnHeadPullFailed(containerKnown)).To(gomega.BeFalse())
@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("the client", func() {
 				imageAParent := util.GenerateRandomSHA256()
 				images := map[string][]string{imageA: {imageAParent}}
 				mockServer.AppendHandlers(mocks.RemoveImageHandler(images))
-				c := dockerClient{api: docker}
+				c := client{api: docker}
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 				gomega.Expect(c.RemoveImageByID(types.ImageID(imageA))).To(gomega.Succeed())
@@ -87,9 +87,9 @@ var _ = ginkgo.Describe("the client", func() {
 			ginkgo.It("should return an error", func() {
 				image := util.GenerateRandomSHA256()
 				mockServer.AppendHandlers(mocks.RemoveImageHandler(nil))
-				c := dockerClient{api: docker}
+				c := client{api: docker}
 				err := c.RemoveImageByID(types.ImageID(image))
-				gomega.Expect(errdefs.IsNotFound(err)).To(gomega.BeTrue())
+				gomega.Expect(dockerErrdefs.IsNotFound(err)).To(gomega.BeTrue())
 			})
 		})
 	})

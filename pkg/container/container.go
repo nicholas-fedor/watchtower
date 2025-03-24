@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
+	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerImageType "github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
@@ -21,16 +21,16 @@ import (
 //
 //nolint:recvcheck // Intentional mix: value receivers for reads, pointer receivers for writes
 type Container struct {
-	LinkedToRestarting bool                       // Indicates if linked to a restarting container
-	Stale              bool                       // Marks the container as having an outdated image
-	containerInfo      *container.InspectResponse // Docker container metadata
-	imageInfo          *image.InspectResponse     // Docker image metadata
+	LinkedToRestarting bool                                 // Indicates if linked to a restarting container
+	Stale              bool                                 // Marks the container as having an outdated image
+	containerInfo      *dockerContainerType.InspectResponse // Docker container metadata
+	imageInfo          *dockerImageType.InspectResponse     // Docker image metadata
 }
 
 // NewContainer creates a new Container instance with the specified metadata.
 // It initializes the container with the provided containerInfo and imageInfo,
 // setting LinkedToRestarting and Stale to false by default.
-func NewContainer(containerInfo *container.InspectResponse, imageInfo *image.InspectResponse) *Container {
+func NewContainer(containerInfo *dockerContainerType.InspectResponse, imageInfo *dockerImageType.InspectResponse) *Container {
 	return &Container{
 		LinkedToRestarting: false,
 		Stale:              false,
@@ -77,7 +77,7 @@ func (c Container) ToRestart() bool {
 
 // ContainerInfo returns the full Docker container metadata.
 // It provides the InspectResponse data for detailed container information.
-func (c Container) ContainerInfo() *container.InspectResponse {
+func (c Container) ContainerInfo() *dockerContainerType.InspectResponse {
 	return c.containerInfo
 }
 
@@ -145,7 +145,7 @@ func (c Container) HasImageInfo() bool {
 
 // ImageInfo returns the Docker image metadata for the container.
 // It provides the InspectResponse data for the image, or nil if unavailable.
-func (c Container) ImageInfo() *image.InspectResponse {
+func (c Container) ImageInfo() *dockerImageType.InspectResponse {
 	return c.imageInfo
 }
 
@@ -155,7 +155,7 @@ func (c Container) ImageInfo() *image.InspectResponse {
 // GetCreateConfig generates a container configuration for recreation.
 // It compares the current Config with the image’s Config to isolate runtime overrides,
 // ensuring defaults are not unintentionally reapplied, and sets the image name accordingly.
-func (c Container) GetCreateConfig() *container.Config {
+func (c Container) GetCreateConfig() *dockerContainerType.Config {
 	config := c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 	imageConfig := c.imageInfo.Config
@@ -222,7 +222,7 @@ func (c Container) GetCreateConfig() *container.Config {
 
 // GetCreateHostConfig generates a host configuration for recreation.
 // It adjusts the current HostConfig’s Links to a format suitable for the Docker create API.
-func (c Container) GetCreateHostConfig() *container.HostConfig {
+func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 	hostConfig := c.containerInfo.HostConfig
 	for i, link := range hostConfig.Links {
 		name := link[0:strings.Index(link, ":")]

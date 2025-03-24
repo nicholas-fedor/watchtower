@@ -24,7 +24,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
-	"github.com/nicholas-fedor/watchtower/pkg/api"
+	pkgApi "github.com/nicholas-fedor/watchtower/pkg/api"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -396,7 +396,7 @@ func runMain(cfg RunConfig) int {
 //   - error: An error if the API fails to start (excluding clean shutdown), nil otherwise.
 func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) error {
 	// Initialize the HTTP API with the configured authentication token and port.
-	httpAPI := api.New(cfg.APIToken)
+	httpAPI := pkgApi.New(cfg.APIToken)
 	httpAPI.Addr = ":" + cfg.APIPort
 
 	// Register the update API endpoint if enabled, linking it to the update handler.
