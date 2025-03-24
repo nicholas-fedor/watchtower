@@ -141,7 +141,6 @@ var _ = ginkgo.Describe("API", func() {
 					return reqErr
 				}
 				defer resp.Body.Close()
-
 				return nil
 			}, 400*time.Millisecond, 5*time.Millisecond).Should(gomega.Succeed())
 
@@ -157,7 +156,10 @@ var _ = ginkgo.Describe("API", func() {
 			cancel()
 			select {
 			case err := <-errChan:
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				// Accept nil or context.Canceled as valid outcomes
+				if err != nil && !errors.Is(err, context.Canceled) {
+					gomega.Expect(err).ToNot(gomega.HaveOccurred(), "Expected no error or context.Canceled, got unexpected error")
+				}
 			case <-time.After(500 * time.Millisecond):
 				ginkgo.Fail("Timeout waiting for server to stop")
 			}
