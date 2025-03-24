@@ -81,7 +81,7 @@ func (r *report) All() []types.ContainerReport {
 // Non-skipped containers are added to the scanned list, with further categorization based on their state
 // or image comparison.
 func NewReport(progress Progress) types.Report {
-	r := &report{
+	report := &report{
 		scanned: make([]types.ContainerReport, 0, len(progress)),
 		updated: make([]types.ContainerReport, 0),
 		failed:  make([]types.ContainerReport, 0),
@@ -92,59 +92,60 @@ func NewReport(progress Progress) types.Report {
 
 	// Categorize all containers from progress
 	for _, update := range progress {
-		categorizeContainer(r, update)
+		categorizeContainer(report, update)
 	}
 
 	// Sort all categories by container ID
-	sortCategories(r)
+	sortCategories(report)
 
-	return r
+	return report
 }
 
 // categorizeContainer assigns a container status to the appropriate report categories based on its state
 // and image IDs. Skipped containers go to the skipped list only. Non-skipped containers are added to
 // scanned and may also be categorized as fresh, updated, failed, or stale depending on their state
 // and whether their images match.
-func categorizeContainer(r *report, update *ContainerStatus) {
+func categorizeContainer(report *report, update *ContainerStatus) {
 	if update.state == SkippedState {
-		r.skipped = append(r.skipped, update)
+		report.skipped = append(report.skipped, update)
 		return
 	}
 
 	// All non-skipped containers are scanned
-	r.scanned = append(r.scanned, update)
+	report.scanned = append(report.scanned, update)
 
 	// Categorize based on image comparison or state
 	if update.newImage == update.oldImage {
 		update.state = FreshState
-		r.fresh = append(r.fresh, update)
+		report.fresh = append(report.fresh, update)
 		return
 	}
 
 	// Handle remaining states explicitly
+	//nolint:exhaustive // Missing states handled above.
 	switch update.state {
 	case UpdatedState:
-		r.updated = append(r.updated, update)
+		report.updated = append(report.updated, update)
 	case FailedState:
-		r.failed = append(r.failed, update)
+		report.failed = append(report.failed, update)
 	case StaleState:
-		r.stale = append(r.stale, update)
+		report.stale = append(report.stale, update)
 	default:
 		// Default to stale for unhandled or unknown states
 		update.state = StaleState
-		r.stale = append(r.stale, update)
+		report.stale = append(report.stale, update)
 	}
 }
 
 // sortCategories sorts each category in the report by container ID in ascending order.
 // This ensures consistent ordering when retrieving containers from the report.
-func sortCategories(r *report) {
-	sort.Sort(sortableContainers(r.scanned))
-	sort.Sort(sortableContainers(r.updated))
-	sort.Sort(sortableContainers(r.failed))
-	sort.Sort(sortableContainers(r.skipped))
-	sort.Sort(sortableContainers(r.stale))
-	sort.Sort(sortableContainers(r.fresh))
+func sortCategories(report *report) {
+	sort.Sort(sortableContainers(report.scanned))
+	sort.Sort(sortableContainers(report.updated))
+	sort.Sort(sortableContainers(report.failed))
+	sort.Sort(sortableContainers(report.skipped))
+	sort.Sort(sortableContainers(report.stale))
+	sort.Sort(sortableContainers(report.fresh))
 }
 
 // sortableContainers implements sort.Interface for sorting container reports by ID.
