@@ -5,3 +5,4 @@ engines:
       - "*.md"
       - "**/*.md"
       - "**/*_test.go"
+      - "**/mocks/**"
