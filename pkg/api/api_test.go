@@ -4,6 +4,7 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -23,6 +24,9 @@ import (
 // testToken is a constant token used for testing authentication.
 const testToken = "123123123"
 
+// errMockShutdownFailure is a mock error for shutdown failure.
+var errMockShutdownFailure = errors.New("mock shutdown failure")
+
 // TestAPI runs the Ginkgo test suite for the API package.
 func TestAPI(t *testing.T) {
 	t.Parallel()
@@ -40,36 +44,27 @@ var _ = ginkgo.Describe("API", func() {
 
 		ginkgo.It("should return 401 Unauthorized when token is not provided", func() {
 			handlerFunc := apiInstance.RequireToken(testHandler)
-
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/hello", nil)
-
 			handlerFunc(rec, req)
-
 			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusUnauthorized))
 		})
 
 		ginkgo.It("should return 401 Unauthorized when token is invalid", func() {
 			handlerFunc := apiInstance.RequireToken(testHandler)
-
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 			req.Header.Set("Authorization", "Bearer 123")
-
 			handlerFunc(rec, req)
-
 			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusUnauthorized))
 		})
 
 		ginkgo.It("should return 200 OK when token is valid", func() {
 			handlerFunc := apiInstance.RequireToken(testHandler)
-
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 			req.Header.Set("Authorization", "Bearer "+testToken)
-
 			handlerFunc(rec, req)
-
 			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
 			gomega.Expect(rec.Body.String()).To(gomega.Equal("Hello!"))
 		})
@@ -79,10 +74,7 @@ var _ = ginkgo.Describe("API", func() {
 		var logBuffer *threadSafeBuffer
 
 		ginkgo.BeforeEach(func() {
-			logBuffer = &threadSafeBuffer{
-				buf: &bytes.Buffer{},
-				mu:  sync.Mutex{},
-			}
+			logBuffer = &threadSafeBuffer{buf: &bytes.Buffer{}, mu: sync.Mutex{}}
 			logrus.SetOutput(logBuffer)
 			logrus.SetLevel(logrus.DebugLevel)
 		})
@@ -102,7 +94,6 @@ var _ = ginkgo.Describe("API", func() {
 		ginkgo.It("should fail with a fatal log when token is empty", func() {
 			emptyTokenAPI := api.New("")
 			emptyTokenAPI.RegisterFunc("/test", http.HandlerFunc(testHandler))
-
 			var logOutput string
 			logrus.SetOutput(&testLogWriter{
 				buffer: []byte{},
@@ -113,156 +104,143 @@ var _ = ginkgo.Describe("API", func() {
 				},
 			})
 			defer logrus.SetOutput(nil)
-
 			originalExit := logrus.StandardLogger().ExitFunc
 			logrus.StandardLogger().ExitFunc = func(int) { panic("fatal exit") }
 			defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
 			gomega.Expect(func() { _ = emptyTokenAPI.Start(context.Background(), true) }).To(gomega.Panic())
 			gomega.Expect(logOutput).To(gomega.ContainSubstring("api token is empty or has not been set. exiting"))
 		})
 
-		testHandlerResponse := func(path, token string, expectedCode int) {
-			apiInstance := api.New(testToken)
-			mux := http.NewServeMux()
-			if path[0] == '/' {
-				mux.HandleFunc(path, apiInstance.RequireToken(http.HandlerFunc(testHandler)))
-			} else {
-				mux.Handle(path, apiInstance.RequireToken(http.HandlerFunc(testHandler)))
-			}
-
-			server := httptest.NewServer(mux)
-			defer server.Close()
-
-			req, _ := http.NewRequest(http.MethodGet, server.URL+path, nil)
-			req.Header.Set("Authorization", "Bearer "+token)
-			resp, err := http.DefaultClient.Do(req)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			defer resp.Body.Close()
-
-			body, _ := io.ReadAll(resp.Body)
-			gomega.Expect(resp.StatusCode).To(gomega.Equal(expectedCode))
-			if expectedCode == http.StatusOK {
-				gomega.Expect(string(body)).To(gomega.Equal("Hello!"))
-			}
-		}
-
-		ginkgo.It("should register and serve requests via RegisterFunc synchronously", func() {
-			testHandlerResponse("/test-sync", testToken, http.StatusOK)
-		})
-
-		ginkgo.It("should register and serve requests via RegisterFunc asynchronously", func() {
-			testHandlerResponse("/test-async", testToken, http.StatusOK)
-		})
-
-		ginkgo.It("should register and serve requests via RegisterHandler with valid token", func() {
-			testHandlerResponse("/test-handler", testToken, http.StatusOK)
-		})
-
-		ginkgo.It("should return 401 via RegisterHandler with invalid token", func() {
-			testHandlerResponse("/test-handler-invalid", "wrongtoken", http.StatusUnauthorized)
-		})
-
-		ginkgo.It("should start server and serve requests via RegisterFunc", func() {
-			// Select a random port and ensure it’s available
+		ginkgo.It("should start server synchronously and serve requests", func() {
 			listener, err := net.Listen("tcp", "127.0.0.1:0")
-			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "Failed to create listener")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			defer listener.Close()
-
 			tcpAddr, ok := listener.Addr().(*net.TCPAddr)
-			gomega.Expect(ok).To(gomega.BeTrue(), "Listener address should be TCPAddr")
+			gomega.Expect(ok).To(gomega.BeTrue())
 			port := tcpAddr.Port
-
-			// Close listener immediately to free the port for the API server
 			listener.Close()
 
 			apiInstance := api.New(testToken)
 			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
-			apiInstance.RegisterFunc("/test-real", http.HandlerFunc(testHandler))
+			apiInstance.RegisterFunc("/test-sync", http.HandlerFunc(testHandler))
 
-			// Use a very short timeout for server startup
 			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 			defer cancel()
 
 			errChan := make(chan error, 1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
-				logrus.Debugf("Starting API server on port %d", port)
 				errChan <- apiInstance.Start(ctx, true)
-				logrus.Debug("API server stopped")
 			}()
 
-			// Poll with an extremely tight timeout and interval
 			gomega.Eventually(func() error {
-				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-real", port), nil)
+				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-sync", port), nil)
 				req.Header.Set("Authorization", "Bearer "+testToken)
-				resp, requestErr := http.DefaultClient.Do(req) // Renamed err to requestErr to avoid shadowing
-				if requestErr != nil {
-					logrus.Debugf("Request failed: %v", requestErr)
-
-					return requestErr
+				resp, reqErr := http.DefaultClient.Do(req)
+				if reqErr != nil {
+					return reqErr
 				}
 				defer resp.Body.Close()
-				logrus.Debug("Request succeeded")
 
 				return nil
 			}, 400*time.Millisecond, 5*time.Millisecond).Should(gomega.Succeed())
 
-			// Perform the actual request
-			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-real", port), nil)
+			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-sync", port), nil)
 			req.Header.Set("Authorization", "Bearer "+testToken)
 			resp, err := http.DefaultClient.Do(req)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "HTTP request should succeed")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			defer resp.Body.Close()
-
 			body, _ := io.ReadAll(resp.Body)
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 			gomega.Expect(string(body)).To(gomega.Equal("Hello!"))
 
-			// Explicitly cancel and wait for shutdown
 			cancel()
 			select {
 			case err := <-errChan:
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), "Server should stop cleanly")
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			case <-time.After(500 * time.Millisecond):
 				ginkgo.Fail("Timeout waiting for server to stop")
 			}
 		})
 
-		ginkgo.It("should fail to start server on occupied port via runHTTPServer", func() {
+		ginkgo.It("should start server asynchronously and serve requests", func() {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer listener.Close()
+			tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			port := tcpAddr.Port
+			listener.Close()
+
+			apiInstance := api.New(testToken)
+			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
+			apiInstance.RegisterFunc("/test-async", http.HandlerFunc(testHandler))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			err = apiInstance.Start(ctx, false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() error {
+				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-async", port), nil)
+				req.Header.Set("Authorization", "Bearer "+testToken)
+				resp, reqErr := http.DefaultClient.Do(req)
+				if reqErr != nil {
+					return reqErr
+				}
+				defer resp.Body.Close()
+
+				return nil
+			}, 500*time.Millisecond, 10*time.Millisecond).Should(gomega.Succeed())
+
+			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-async", port), nil)
+			req.Header.Set("Authorization", "Bearer "+testToken)
+			resp, err := http.DefaultClient.Do(req)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(resp.Body)
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(string(body)).To(gomega.Equal("Hello!"))
+
+			cancel()
+			gomega.Eventually(logBuffer.String, 100*time.Millisecond).ShouldNot(gomega.ContainSubstring("HTTP server failed"))
+		})
+
+		ginkgo.It("should start server asynchronously and log error on failure", func() {
+			apiInstance := api.New(testToken)
+			apiInstance.Addr = "127.0.0.1:invalid" // Invalid address to force failure
+			apiInstance.RegisterFunc("/test-fail", http.HandlerFunc(testHandler))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			err := apiInstance.Start(ctx, false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(logBuffer.String, 1*time.Second, 50*time.Millisecond).Should(
+				gomega.ContainSubstring("HTTP server failed"),
+				"Expected error log for invalid address",
+			)
+			gomega.Expect(logBuffer.String()).To(gomega.ContainSubstring("invalid"))
+		})
+
+		ginkgo.It("should fail to start server on occupied port", func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 				fmt.Fprintln(w, "Occupied")
 			})
 			listener, err := net.Listen("tcp", "127.0.0.1:0")
-			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "Failed to create listener")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			defer listener.Close()
-
 			tcpAddr, ok := listener.Addr().(*net.TCPAddr)
-			gomega.Expect(ok).To(gomega.BeTrue(), "Listener address should be TCPAddr")
+			gomega.Expect(ok).To(gomega.BeTrue())
 			port := tcpAddr.Port
 
 			testServer := &http.Server{
-				Addr:                         fmt.Sprintf("127.0.0.1:%d", port),
-				Handler:                      mux,
-				DisableGeneralOptionsHandler: false,
-				ReadTimeout:                  10 * time.Second,
-				WriteTimeout:                 10 * time.Second,
-				IdleTimeout:                  30 * time.Second,
-				ReadHeaderTimeout:            10 * time.Second,
-				MaxHeaderBytes:               1 << 20,
-				TLSConfig:                    nil,
-				TLSNextProto:                 nil,
-				ConnState:                    nil,
-				ErrorLog:                     nil,
-				BaseContext:                  func(_ net.Listener) context.Context { return context.Background() },
-				ConnContext:                  nil,
-				HTTP2:                        nil,
-				Protocols:                    nil,
+				Addr:              fmt.Sprintf("127.0.0.1:%d", port),
+				Handler:           mux,
+				ReadHeaderTimeout: 10 * time.Second,
 			}
-			go func() {
-				_ = testServer.Serve(listener)
-			}()
+			go func() { _ = testServer.Serve(listener) }()
 			defer testServer.Close()
 
 			apiInstance := api.New(testToken)
@@ -277,8 +255,7 @@ var _ = ginkgo.Describe("API", func() {
 
 			select {
 			case err := <-errChan:
-				gomega.Expect(err).To(gomega.HaveOccurred(), "Server should fail to start on occupied port")
-				// Check for both Windows and POSIX error messages
+				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err.Error()).To(gomega.SatisfyAny(
 					gomega.ContainSubstring("address already in use"),
 					gomega.ContainSubstring("Only one usage of each socket address"),
@@ -287,12 +264,143 @@ var _ = ginkgo.Describe("API", func() {
 				ginkgo.Fail("Timeout waiting for server start error")
 			}
 		})
+
+		ginkgo.It("should handle server shutdown via context cancellation", func() {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer listener.Close()
+			tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			port := tcpAddr.Port
+			listener.Close()
+
+			apiInstance := api.New(testToken)
+			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
+			apiInstance.RegisterFunc("/test-shutdown", http.HandlerFunc(testHandler))
+
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+
+			errChan := make(chan error, 1)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				errChan <- apiInstance.Start(ctx, true)
+			}()
+
+			select {
+			case err := <-errChan:
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			case <-time.After(500 * time.Millisecond):
+				ginkgo.Fail("Timeout waiting for server to stop")
+			}
+
+			gomega.Eventually(func() error {
+				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-shutdown", port), nil)
+				req.Header.Set("Authorization", "Bearer "+testToken)
+				_, err := http.DefaultClient.Do(req)
+
+				return err
+			}, 200*time.Millisecond, 10*time.Millisecond).Should(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should return error on shutdown failure", func() {
+			apiInstance := api.New(testToken)
+			apiInstance.Addr = "127.0.0.1:0"
+			apiInstance.RegisterFunc("/test-shutdown-fail", http.HandlerFunc(testHandler))
+
+			mockServer := &mockHTTPServer{
+				listenErr:   nil,
+				shutdownErr: errMockShutdownFailure,
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			err := api.RunHTTPServer(ctx, mockServer)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("server shutdown failed"))
+		})
+
+		ginkgo.It("should register and serve requests via RegisterHandler", func() {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer listener.Close()
+			tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			port := tcpAddr.Port
+			listener.Close()
+
+			apiInstance := api.New(testToken)
+			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
+			// Use RegisterHandler with a custom handler
+			apiInstance.RegisterHandler("/test-handler", http.HandlerFunc(testHandler))
+
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
+
+			errChan := make(chan error, 1)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				errChan <- apiInstance.Start(ctx, true)
+			}()
+
+			gomega.Eventually(func() error {
+				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-handler", port), nil)
+				req.Header.Set("Authorization", "Bearer "+testToken)
+				resp, reqErr := http.DefaultClient.Do(req)
+				if reqErr != nil {
+					return reqErr
+				}
+				defer resp.Body.Close()
+
+				return nil
+			}, 400*time.Millisecond, 5*time.Millisecond).Should(gomega.Succeed())
+
+			// Valid token request
+			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-handler", port), nil)
+			req.Header.Set("Authorization", "Bearer "+testToken)
+			resp, err := http.DefaultClient.Do(req)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(resp.Body)
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(string(body)).To(gomega.Equal("Hello!"))
+
+			// Invalid token request
+			req, _ = http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-handler", port), nil)
+			req.Header.Set("Authorization", "Bearer wrongtoken")
+			resp, err = http.DefaultClient.Do(req)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer resp.Body.Close()
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusUnauthorized))
+
+			cancel()
+			select {
+			case err := <-errChan:
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			case <-time.After(500 * time.Millisecond):
+				ginkgo.Fail("Timeout waiting for server to stop")
+			}
+		})
 	})
 })
 
 // testHandler is a simple handler for testing HTTP responses.
 func testHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = io.WriteString(w, "Hello!")
+}
+
+// mockHTTPServer is a mock implementation of HTTPServer for testing.
+type mockHTTPServer struct {
+	listenErr   error
+	shutdownErr error
+}
+
+func (m *mockHTTPServer) ListenAndServe() error {
+	return m.listenErr
+}
+
+func (m *mockHTTPServer) Shutdown(_ context.Context) error {
+	return m.shutdownErr
 }
 
 // testLogWriter is a custom io.Writer for capturing log output in tests.

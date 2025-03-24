@@ -8,31 +8,38 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-// serverReadTimeout defines the maximum duration for reading the request, including headers.
-const serverReadTimeout = 10 * time.Second
-
-// serverWriteTimeout defines the maximum duration for writing the response.
-const serverWriteTimeout = 10 * time.Second
-
-// serverIdleTimeout defines the maximum duration for keeping idle connections alive.
-const serverIdleTimeout = 30 * time.Second
-
-// serverMaxHeaderShift defines the bit shift for the maximum header size (1 MB).
-const serverMaxHeaderShift = 20
+const (
+	// serverReadTimeout defines the maximum duration for reading the request, including headers.
+	serverReadTimeout = 10 * time.Second
+	// serverWriteTimeout defines the maximum duration for writing the response.
+	serverWriteTimeout = 10 * time.Second
+	// serverIdleTimeout defines the maximum duration for keeping idle connections alive.
+	serverIdleTimeout = 30 * time.Second
+	// serverMaxHeaderShift defines the bit shift for the maximum header size (1 MB).
+	serverMaxHeaderShift = 20
+)
 
 // errServerFailed indicates a failure in starting or running the HTTP server.
 var errServerFailed = errors.New("http server failed")
 
+// HTTPServer defines the interface for an HTTP server.
+type HTTPServer interface {
+	ListenAndServe() error
+	Shutdown(ctx context.Context) error
+}
+
 // API is the http server responsible for serving the HTTP API endpoints.
 type API struct {
 	Token       string
-	Addr        string // Now set dynamically from flags
+	Addr        string // Set dynamically from flags
 	hasHandlers bool
+	mux         *http.ServeMux // Custom mux to avoid global collisions
 }
 
 // New is a factory function creating a new API instance.
@@ -41,16 +48,18 @@ func New(token string) *API {
 		Token:       token,
 		Addr:        ":8080", // Default here, overridden in run()
 		hasHandlers: false,
+		mux:         http.NewServeMux(),
 	}
 }
 
 // RequireToken is a wrapper around http.HandleFunc that checks token validity.
 func (api *API) RequireToken(handleFunc http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
+		auth := strings.TrimSpace(r.Header.Get("Authorization"))
 		want := "Bearer " + api.Token
 
 		if auth != want {
+			logrus.Warn("Invalid token attempt")
 			w.WriteHeader(http.StatusUnauthorized)
 
 			return
@@ -64,13 +73,13 @@ func (api *API) RequireToken(handleFunc http.HandlerFunc) http.HandlerFunc {
 // RegisterFunc is a wrapper around http.HandleFunc that also sets the flag used to determine whether to launch the API.
 func (api *API) RegisterFunc(path string, fn http.HandlerFunc) {
 	api.hasHandlers = true
-	http.HandleFunc(path, api.RequireToken(fn))
+	api.mux.HandleFunc(path, api.RequireToken(fn))
 }
 
 // RegisterHandler is a wrapper around http.Handler that also sets the flag used to determine whether to launch the API.
 func (api *API) RegisterHandler(path string, handler http.Handler) {
 	api.hasHandlers = true
-	http.Handle(path, api.RequireToken(handler.ServeHTTP))
+	api.mux.Handle(path, api.RequireToken(handler.ServeHTTP))
 }
 
 // Start launches the API server over HTTP, requiring a non-empty token.
@@ -85,24 +94,9 @@ func (api *API) Start(ctx context.Context, block bool) error {
 		logrus.Fatal("api token is empty or has not been set. exiting")
 	}
 
-	if block {
-		return runHTTPServer(ctx, api.Addr)
-	}
-
-	go func() {
-		if err := runHTTPServer(ctx, api.Addr); err != nil {
-			logrus.Errorf("HTTP server failed: %v", err)
-		}
-	}()
-
-	return nil
-}
-
-// runHTTPServer starts the HTTP server with configured timeouts and handlers.
-func runHTTPServer(ctx context.Context, addr string) error {
 	server := &http.Server{
-		Addr:                         addr,
-		Handler:                      nil, // Use default ServeMux
+		Addr:                         api.Addr,
+		Handler:                      api.mux,
 		ReadTimeout:                  serverReadTimeout,
 		WriteTimeout:                 serverWriteTimeout,
 		IdleTimeout:                  serverIdleTimeout,
@@ -119,6 +113,21 @@ func runHTTPServer(ctx context.Context, addr string) error {
 		Protocols:                    nil,   // No custom protocols
 	}
 
+	if block {
+		return RunHTTPServer(ctx, server)
+	}
+
+	go func() {
+		if err := RunHTTPServer(ctx, server); err != nil {
+			logrus.Errorf("HTTP server failed: %v", err)
+		}
+	}()
+
+	return nil
+}
+
+// RunHTTPServer starts the HTTP server with configured timeouts and handlers.
+func RunHTTPServer(ctx context.Context, server HTTPServer) error {
 	errChan := make(chan error, 1)
 
 	go func() {
