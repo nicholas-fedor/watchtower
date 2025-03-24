@@ -44,13 +44,13 @@ func NewMetric(report types.Report) *Metric {
 // QueueIsEmpty checks whether any metric messages are currently enqueued in the channel.
 // It returns true if the channel is empty, false otherwise.
 func (m *Metrics) QueueIsEmpty() bool {
-	return len(metrics.channel) == 0
+	return len(m.channel) == 0
 }
 
 // Register enqueues a metric for processing by the metrics handler.
 // It sends the metric to the channel for asynchronous handling.
 func (m *Metrics) Register(metric *Metric) {
-	metrics.channel <- metric
+	m.channel <- metric
 }
 
 // Default creates a new Metrics handler if none exists, or returns the existing singleton.
@@ -94,9 +94,8 @@ func Default() *Metrics {
 
 // RegisterScan fetches the default metrics handler and enqueues a metric for processing.
 // It provides a convenient way to register a scan’s metrics without directly accessing the handler.
-func RegisterScan(metric *Metric) {
-	metrics := Default()
-	metrics.Register(metric)
+func (m *Metrics) RegisterScan(metric *Metric) {
+	m.Register(metric)
 }
 
 // HandleUpdate dequeues metrics from the channel and updates Prometheus metrics accordingly.

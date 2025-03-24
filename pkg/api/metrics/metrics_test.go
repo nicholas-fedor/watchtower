@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("the metrics API", func() {
 			Failed:  1,
 		}
 
-		metrics.RegisterScan(metric)
+		metrics.Default().RegisterScan(metric)
 		gomega.Eventually(metrics.Default().QueueIsEmpty).Should(gomega.BeTrue())
 
 		gomega.Eventually(tryGetMetrics).Should(gomega.SatisfyAll(
@@ -78,7 +78,7 @@ var _ = ginkgo.Describe("the metrics API", func() {
 		))
 
 		for range 3 {
-			metrics.RegisterScan(nil)
+			metrics.Default().RegisterScan(nil)
 		}
 		gomega.Eventually(metrics.Default().QueueIsEmpty).Should(gomega.BeTrue())
 

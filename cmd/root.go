@@ -403,7 +403,7 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	if cfg.EnableUpdateAPI {
 		updateHandler := update.New(func(images []string) {
 			metric := runUpdatesWithNotifications(filters.FilterByImage(images, cfg.Filter))
-			metrics.RegisterScan(metric)
+			metrics.Default().RegisterScan(metric)
 		}, updateLock)
 		httpAPI.RegisterFunc(updateHandler.Path, updateHandler.Handle)
 
@@ -676,10 +676,10 @@ func runUpgradesOnSchedule(ctx context.Context, c *cobra.Command, filter types.F
 			case v := <-lock:
 				defer func() { lock <- v }()
 				metric := runUpdatesWithNotifications(filter)
-				metrics.RegisterScan(metric)
+				metrics.Default().RegisterScan(metric)
 			default:
 				// Skip if another update is running, logging and registering a nil metric.
-				metrics.RegisterScan(nil)
+				metrics.Default().RegisterScan(nil)
 				logrus.Debug("Skipped another update already running.")
 			}
 
