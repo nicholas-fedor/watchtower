@@ -82,6 +82,8 @@ ignore:
   - "docs/*"
   # Docker configs
   - "dockerfiles/*"
+  # Ignore all mocks subdirectories.
+  - "**/mocks/*"
 
 # Categorize coverage by module
 flags:
