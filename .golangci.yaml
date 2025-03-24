@@ -336,8 +336,11 @@ issues:
     - path: _test\.go
       linters:
         - dupl # Detects duplicate fragments of code. [fast]
+        - err113 # Go linter to check the errors handling expressions. [auto-fix]
         - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
         - errorlint # Errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13. [auto-fix]
+        - exhaustive # Check exhaustiveness of enum switch statements.
+        - forcetypeassert # Finds forced type assertions.
         - wrapcheck # Checks that errors returned from external packages are wrapped.
         - varnamelen # Checks that the length of a variable's name matches its scope.
 
