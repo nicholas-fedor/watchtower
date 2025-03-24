@@ -1,38 +1,144 @@
 package container
 
 import (
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	"fmt"
+	"reflect"
+	"testing"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-var _ = ginkgo.Describe("GetRunningContainerID", func() {
-	ginkgo.When("a matching container ID is found", func() {
-		ginkgo.It("should return that container ID", func() {
-			cid := getRunningContainerIDFromString(`
-15:name=systemd:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-14:misc:/
-13:rdma:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-12:pids:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-11:hugetlb:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-10:net_prio:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-9:perf_event:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-8:net_cls:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-7:freezer:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-6:devices:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-5:blkio:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-4:cpuacct:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-3:cpu:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-2:cpuset:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-1:memory:/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-0::/docker/991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377
-			`)
-			gomega.Expect(cid).To(gomega.BeEquivalentTo(`991b6b42691449d3ce90192ff9f006863dcdafc6195e227aeefa298235004377`))
+func TestGetRunningContainerID(t *testing.T) {
+	originalReadFileFunc := readFileFunc
+	defer func() {
+		readFileFunc = originalReadFileFunc
+	}()
+
+	tests := []struct {
+		name    string
+		setup   func()
+		want    types.ContainerID
+		wantErr bool
+	}{
+		{
+			name: "SuccessWithValidID",
+			setup: func() {
+				readFileFunc = func(string) ([]byte, error) {
+					return []byte("11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"), nil
+				}
+			},
+			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+			wantErr: false,
+		},
+		{
+			name: "FileNotReadable",
+			setup: func() {
+				readFileFunc = func(string) ([]byte, error) {
+					return nil, fmt.Errorf("mocked file read error")
+				}
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "NoValidID",
+			setup: func() {
+				readFileFunc = func(string) ([]byte, error) {
+					return []byte("11:perf_event:/user.slice\n10:cpu:/system.slice"), nil
+				}
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+			got, err := GetRunningContainerID()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetRunningContainerID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRunningContainerID() = %v, want %v", got, tt.want)
+			}
 		})
-	})
-	ginkgo.When("no matching container ID could be found", func() {
-		ginkgo.It("should return that container ID", func() {
-			cid := getRunningContainerIDFromString(`14:misc:/`)
-			gomega.Expect(cid).To(gomega.BeEmpty())
+	}
+}
+
+func Test_getRunningContainerIDFromString(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    types.ContainerID
+		wantErr bool
+	}{
+		{
+			name: "ValidDockerContainerID",
+			args: args{
+				s: "11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			},
+			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+			wantErr: false,
+		},
+		{
+			name: "MultipleLinesWithValidID",
+			args: args{
+				s: "12:memory:/user.slice\n" +
+					"11:perf_event:/docker/abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800\n" +
+					"10:cpu:/system.slice",
+			},
+			want:    types.ContainerID("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800"),
+			wantErr: false,
+		},
+		{
+			name: "NoDockerPattern",
+			args: args{
+				s: "11:perf_event:/user.slice\n10:cpu:/system.slice",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "EmptyString",
+			args: args{
+				s: "",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "InvalidIDLength",
+			args: args{
+				s: "11:perf_event:/docker/12345678",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "NonHexID",
+			args: args{
+				s: "11:perf_event:/docker/gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getRunningContainerIDFromString(tt.args.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getRunningContainerIDFromString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getRunningContainerIDFromString() = %v, want %v", got, tt.want)
+			}
 		})
-	})
-})
+	}
+}
