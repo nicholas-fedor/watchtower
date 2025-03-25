@@ -8,7 +8,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// Static error for test
+// Static error for test.
 var (
 	ErrMockedFileRead = errors.New("mocked file read error")
 )
@@ -29,10 +29,14 @@ func TestGetRunningContainerID(t *testing.T) {
 			name: "SuccessWithValidID",
 			setup: func() {
 				readFileFunc = func(string) ([]byte, error) {
-					return []byte("11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"), nil
+					return []byte(
+						"11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+					), nil
 				}
 			},
-			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+			want: types.ContainerID(
+				"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			),
 			wantErr: nil,
 		},
 		{
@@ -71,21 +75,26 @@ func TestGetRunningContainerID(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup()
 			}
+
 			got, err := GetRunningContainerID()
 			if tt.wantErr == nil {
 				if err != nil {
 					t.Errorf("GetRunningContainerID() error = %v, want no error", err)
+
 					return
 				}
 			} else {
 				if err == nil {
 					t.Errorf("GetRunningContainerID() expected error %v, got nil", tt.wantErr)
+
 					return
 				}
+
 				if !errors.Is(err, tt.wantErr) {
 					t.Errorf("GetRunningContainerID() error = %v, want error wrapping %v", err, tt.wantErr)
 				}
 			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetRunningContainerID() = %v, want %v", got, tt.want)
 			}
@@ -97,6 +106,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 	type args struct {
 		s string
 	}
+
 	tests := []struct {
 		name    string
 		args    args
@@ -108,7 +118,9 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 			args: args{
 				s: "11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			},
-			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+			want: types.ContainerID(
+				"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			),
 			wantErr: nil,
 		},
 		{
@@ -116,7 +128,9 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 			args: args{
 				s: "12:memory:/user.slice\n11:perf_event:/docker/abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800\n10:cpu:/system.slice",
 			},
-			want:    types.ContainerID("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800"),
+			want: types.ContainerID(
+				"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800",
+			),
 			wantErr: nil,
 		},
 		{
@@ -156,7 +170,9 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 			args: args{
 				s: "11:perf_event:/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\n10:cpu:/system.slice",
 			},
-			want:    types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+			want: types.ContainerID(
+				"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			),
 			wantErr: nil,
 		},
 		{
@@ -174,17 +190,21 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 			if tt.wantErr == nil {
 				if err != nil {
 					t.Errorf("getRunningContainerIDFromString() error = %v, want no error", err)
+
 					return
 				}
 			} else {
 				if err == nil {
 					t.Errorf("getRunningContainerIDFromString() expected error %v, got nil", tt.wantErr)
+
 					return
 				}
+
 				if !errors.Is(err, tt.wantErr) {
 					t.Errorf("getRunningContainerIDFromString() error = %v, want error wrapping %v", err, tt.wantErr)
 				}
 			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getRunningContainerIDFromString() = %v, want %v", got, tt.want)
 			}

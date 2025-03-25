@@ -8,8 +8,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // dockerContainerPattern matches Docker container IDs in cgroup data.
@@ -21,14 +22,14 @@ import (
 var dockerContainerPattern = regexp.MustCompile(`[0-9]+:.*:/docker/([a-f0-9]{64})`)
 
 // minMatchGroups is the minimum number of regex match groups expected.
-// - 1 for the full match, 1 for the captured ID (total of 2)
+// - 1 for the full match, 1 for the captured ID (total of 2).
 const minMatchGroups = 2
 
 // readFileFunc is a variable to allow mocking file reading in tests.
 // Defaults to os.ReadFile but can be overridden for testing purposes.
 var readFileFunc = os.ReadFile
 
-// Static error definitions
+// Static error definitions.
 var (
 	ErrNoValidContainerID = errors.New("no valid docker container ID found in input")
 	ErrReadCgroupFile     = errors.New("failed to read cgroup file")
@@ -43,14 +44,15 @@ func GetRunningContainerID() (types.ContainerID, error) {
 	// Construct the path to the cgroup file using the current process ID (PID)
 	file, err := readFileFunc(fmt.Sprintf("/proc/%d/cgroup", os.Getpid()))
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrReadCgroupFile, err)
+		return "", fmt.Errorf("%w: %w", ErrReadCgroupFile, err)
 	}
 
 	// Pass the file content to the extraction function and handle any errors
 	id, err := getRunningContainerIDFromString(string(file))
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrExtractContainerID, err)
+		return "", fmt.Errorf("%w: %w", ErrExtractContainerID, err)
 	}
+
 	return id, nil
 }
 

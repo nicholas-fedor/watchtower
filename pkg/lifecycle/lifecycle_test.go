@@ -80,7 +80,10 @@ func (m *mockClient) RenameContainer(container types.Container, newName string) 
 	return m.Called(container, newName).Error(0)
 }
 
-func (m *mockClient) IsContainerStale(container types.Container, params types.UpdateParams) (bool, types.ImageID, error) {
+func (m *mockClient) IsContainerStale(
+	container types.Container,
+	params types.UpdateParams,
+) (bool, types.ImageID, error) {
 	args := m.Called(container, params)
 	imageID, _ := args.Get(1).(types.ImageID) // Nil is valid
 
@@ -92,7 +95,11 @@ func (m *mockClient) IsContainerStale(container types.Container, params types.Up
 	return args.Bool(0), imageID, nil
 }
 
-func (m *mockClient) ExecuteCommand(containerID types.ContainerID, command string, timeout int) (bool, error) {
+func (m *mockClient) ExecuteCommand(
+	containerID types.ContainerID,
+	command string,
+	timeout int,
+) (bool, error) {
 	args := m.Called(containerID, command, timeout)
 
 	err := args.Error(1)
@@ -175,7 +182,8 @@ func TestExecutePreChecks(t *testing.T) {
 					})),
 					mockContainer(),
 				}, nil)
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).Return(true, nil)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).
+					Return(true, nil)
 			},
 			expectedLogs:   2,
 			expectedLogMsg: "Executing pre-check command",
@@ -208,7 +216,12 @@ func TestExecutePreChecks(t *testing.T) {
 			assert.Len(t, hook.Entries, testClient.expectedLogs, "log entry count mismatch")
 
 			if len(hook.Entries) > 0 {
-				assert.Contains(t, hook.Entries[0].Message, testClient.expectedLogMsg, "first log message mismatch")
+				assert.Contains(
+					t,
+					hook.Entries[0].Message,
+					testClient.expectedLogMsg,
+					"first log message mismatch",
+				)
 			} else {
 				t.Errorf("No log entries captured; expected %d with message %q", testClient.expectedLogs, testClient.expectedLogMsg)
 			}
@@ -235,7 +248,8 @@ func TestExecutePostChecks(t *testing.T) {
 					})),
 					mockContainer(),
 				}, nil)
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).Return(true, nil)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).
+					Return(true, nil)
 			},
 			expectedLogs:   2,
 			expectedLogMsg: "Executing post-check command",
@@ -293,7 +307,8 @@ func TestExecutePreCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 			})),
 			setupClient: func(c *mockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).Return(true, nil)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).
+					Return(true, nil)
 			},
 			expectedLogs:   1,
 			expectedLogMsg: "Executing pre-check command",
@@ -310,7 +325,8 @@ func TestExecutePreCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 			})),
 			setupClient: func(c *mockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).Return(false, errExecFailed)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).
+					Return(false, errExecFailed)
 			},
 			expectedLogs:   2,
 			expectedLogMsg: "Pre-check command failed",
@@ -363,7 +379,8 @@ func TestExecutePostCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 			})),
 			setupClient: func(c *mockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).Return(true, nil)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).
+					Return(true, nil)
 			},
 			expectedLogs:   1,
 			expectedLogMsg: "Executing post-check command",
@@ -380,7 +397,8 @@ func TestExecutePostCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 			})),
 			setupClient: func(c *mockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).Return(false, errExecFailed)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).
+					Return(false, errExecFailed)
 			},
 			expectedLogs:   2,
 			expectedLogMsg: "Post-check command failed",
@@ -438,7 +456,8 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 				}),
 			),
 			setupClient: func(c *mockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-update", 2).Return(true, nil)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-update", 2).
+					Return(true, nil)
 			},
 			expectedResult: true,
 			expectedLogs:   1,
@@ -474,7 +493,8 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 				}),
 			),
 			setupClient: func(c *mockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-update", 2).Return(false, errExecFailed)
+				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-update", 2).
+					Return(false, errExecFailed)
 			},
 			expectedResult: true,
 			expectedErr:    true,
@@ -554,10 +574,12 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			name:        "command present",
 			containerID: "test",
 			setupClient: func(c *mockClient) {
-				c.On("GetContainer", types.ContainerID("test")).Return(mockContainer(withLabels(map[string]string{
-					"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
-				})), nil)
-				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).Return(true, nil)
+				c.On("GetContainer", types.ContainerID("test")).
+					Return(mockContainer(withLabels(map[string]string{
+						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
+					})), nil)
+				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).
+					Return(true, nil)
 			},
 			expectedLogs:   1,
 			expectedLogMsg: "Executing post-update command",
@@ -584,10 +606,12 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			name:        "command error",
 			containerID: "test",
 			setupClient: func(c *mockClient) {
-				c.On("GetContainer", types.ContainerID("test")).Return(mockContainer(withLabels(map[string]string{
-					"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
-				})), nil)
-				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).Return(false, errExecFailed)
+				c.On("GetContainer", types.ContainerID("test")).
+					Return(mockContainer(withLabels(map[string]string{
+						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
+					})), nil)
+				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).
+					Return(false, errExecFailed)
 			},
 			expectedLogs:   2,
 			expectedLogMsg: "Post-update command failed",

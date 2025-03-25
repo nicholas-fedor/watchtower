@@ -206,7 +206,12 @@ func (c Container) getBoolLabelValue(label string) (bool, error) {
 	if strVal, ok := c.containerInfo.Config.Labels[label]; ok {
 		value, err := strconv.ParseBool(strVal)
 		if err != nil {
-			return false, fmt.Errorf("failed to parse boolean value for label %s=%q: %w", label, strVal, err)
+			return false, fmt.Errorf(
+				"failed to parse boolean value for label %s=%q: %w",
+				label,
+				strVal,
+				err,
+			)
 		}
 
 		return value, nil
@@ -218,11 +223,17 @@ func (c Container) getBoolLabelValue(label string) (bool, error) {
 // getContainerOrGlobalBool resolves a boolean value from a label or global parameter.
 // It prefers the label value if precedence is set, otherwise combines it with the global value,
 // logging warnings for parsing errors and defaulting to the global value if the label is absent.
-func (c Container) getContainerOrGlobalBool(globalVal bool, label string, contPrecedence bool) bool {
+func (c Container) getContainerOrGlobalBool(
+	globalVal bool,
+	label string,
+	contPrecedence bool,
+) bool {
 	contVal, err := c.getBoolLabelValue(label)
 	if err != nil {
 		if !errors.Is(err, errLabelNotFound) {
-			logrus.WithField("error", err).WithField("label", label).Warn("Failed to parse label value")
+			logrus.WithField("error", err).
+				WithField("label", label).
+				Warn("Failed to parse label value")
 		}
 
 		return globalVal

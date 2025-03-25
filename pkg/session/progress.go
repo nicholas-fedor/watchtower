@@ -8,7 +8,11 @@ import (
 type Progress map[types.ContainerID]*ContainerStatus
 
 // UpdateFromContainer sets various status fields from their corresponding container equivalents.
-func UpdateFromContainer(cont types.Container, newImage types.ImageID, state State) *ContainerStatus {
+func UpdateFromContainer(
+	cont types.Container,
+	newImage types.ImageID,
+	state State,
+) *ContainerStatus {
 	return &ContainerStatus{
 		containerID:    cont.ID(),
 		oldImage:       cont.SafeImageID(),

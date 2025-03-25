@@ -34,7 +34,7 @@ func TestEnvConfig_Defaults(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "unix:///var/run/docker.sock", os.Getenv("DOCKER_HOST"))
-	assert.Equal(t, "", os.Getenv("DOCKER_TLS_VERIFY"))
+	assert.Empty(t, os.Getenv("DOCKER_TLS_VERIFY"))
 	assert.Equal(t, DockerAPIMinVersion, os.Getenv("DOCKER_API_VERSION"))
 }
 
@@ -46,7 +46,9 @@ func TestEnvConfig_Custom(t *testing.T) {
 	SetDefaults()
 	RegisterDockerFlags(cmd)
 
-	err := cmd.ParseFlags([]string{"--host", "some-custom-docker-host", "--tlsverify", "--api-version", "1.99"})
+	err := cmd.ParseFlags(
+		[]string{"--host", "some-custom-docker-host", "--tlsverify", "--api-version", "1.99"},
+	)
 	require.NoError(t, err)
 
 	err = EnvConfig(cmd)
@@ -138,7 +140,11 @@ func TestHTTPAPIPeriodicPollsFlag(t *testing.T) {
 // It tests both URL-like strings and actual file paths.
 func TestIsFile(t *testing.T) {
 	assert.False(t, isFilePath("https://google.com"), "an URL should never be considered a file")
-	assert.True(t, isFilePath(os.Args[0]), "the currently running binary path should always be considered a file")
+	assert.True(
+		t,
+		isFilePath(os.Args[0]),
+		"the currently running binary path should always be considered a file",
+	)
 }
 
 // TestProcessFlagAliases verifies that flag aliases are processed correctly.

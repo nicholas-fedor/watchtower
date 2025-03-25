@@ -127,7 +127,12 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 }
 
 // BuildFilter creates the needed filter of containers.
-func BuildFilter(names []string, disableNames []string, enableLabel bool, scope string) (types.Filter, string) {
+func BuildFilter(
+	names []string,
+	disableNames []string,
+	enableLabel bool,
+	scope string,
+) (types.Filter, string) {
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
 	filter = FilterByNames(names, filter)

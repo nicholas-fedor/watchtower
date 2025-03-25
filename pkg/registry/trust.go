@@ -7,18 +7,21 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sirupsen/logrus"
+
 	dockerCliConfig "github.com/docker/cli/cli/config"
 	dockerConfigConfigfile "github.com/docker/cli/cli/config/configfile"
 	dockerConfigCredentials "github.com/docker/cli/cli/config/credentials"
 	dockerConfigTypes "github.com/docker/cli/cli/config/types"
-	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 )
 
 // Static error for when registry authentication environment variables are unset.
 // It provides a clear message for cases where credentials are expected but missing.
-var errUnsetRegAuthVars = errors.New("registry auth environment variables (REPO_USER, REPO_PASS) not set")
+var errUnsetRegAuthVars = errors.New(
+	"registry auth environment variables (REPO_USER, REPO_PASS) not set",
+)
 
 // EncodedAuth attempts to retrieve encoded authentication credentials for a given image reference,
 // first checking environment variables and then falling back to the Docker config file if necessary.
@@ -44,7 +47,10 @@ func EncodedEnvAuth() (string, error) {
 			Password: password,
 		}
 
-		logrus.Debugf("Loaded auth credentials for registry user %s from environment", auth.Username)
+		logrus.Debugf(
+			"Loaded auth credentials for registry user %s from environment",
+			auth.Username,
+		)
 		// CREDENTIAL: Uncomment to log REPO_PASS environment variable
 		// log.Tracef("Using auth password %s", auth.Password)
 
@@ -62,7 +68,11 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 	if err != nil {
 		logrus.Errorf("Could not get registry from image ref %s", imageRef)
 
-		return "", fmt.Errorf("failed to get registry address from image reference %s: %w", imageRef, err)
+		return "", fmt.Errorf(
+			"failed to get registry address from image reference %s: %w",
+			imageRef,
+			err,
+		)
 	}
 
 	configDir := os.Getenv("DOCKER_CONFIG")
@@ -81,12 +91,18 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 	auth, _ := credStore.Get(server) // returns (types.AuthConfig{}) if server not in credStore
 
 	if auth == (dockerConfigTypes.AuthConfig{}) {
-		logrus.WithField("config_file", configFile.Filename).Debugf("No credentials for %s found", server)
+		logrus.WithField("config_file", configFile.Filename).
+			Debugf("No credentials for %s found", server)
 
 		return "", nil
 	}
 
-	logrus.Debugf("Loaded auth credentials for user %s, on registry %s, from file %s", auth.Username, server, configFile.Filename)
+	logrus.Debugf(
+		"Loaded auth credentials for user %s, on registry %s, from file %s",
+		auth.Username,
+		server,
+		configFile.Filename,
+	)
 	// CREDENTIAL: Uncomment to log docker config password
 	// log.Tracef("Using auth password %s", auth.Password)
 	return EncodeAuth(auth)

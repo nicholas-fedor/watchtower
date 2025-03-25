@@ -7,111 +7,90 @@
 #                                                                                                    #
 ######################################################################################################
 
-######################################################################################################
-# Configuration Structure
-#
-# Linters: Determines enabled/disabled linters
-# Linters Settings: Manages individual linter settings
-# Issues: Manages issues to exclude
-# Output: Determines how issues are output
-# Run: Manages the programs performance options
-# Severity: Sets the default severity for issues
-#
-######################################################################################################
+version: "2"
 
 ######################################################################################################
 # Linters Configuration
-# https://golangci-lint.run/usage/configuration/#linters-configuration
+# https://golangci-lint.run/usage/linters/
 ######################################################################################################
 linters:
   ####################################################################################################
-  # Disable all linters.
-  # Default: false
-  # disable-all: true
+  # Default set of linters.
+  # The value can be: `standard`, `all`, `none`, or `fast`.
+  # Default: standard
+  # default: all
 
   ####################################################################################################
-  # Enable specific linters.
-  # https://golangci-lint.run/usage/linters/#enabled-by-default
   enable:
     ##################################################################################################
     # Enabled linters that automatically resolve issues
-    - canonicalheader # Canonicalheader checks whether net/http.Header uses canonical header. [auto-fix]
-    - copyloopvar # A linter detects places where loop variables are copied. [fast, auto-fix]
-    - dupword # Checks for duplicate words in the source code. [fast, auto-fix]
-    - err113 # Go linter to check the errors handling expressions. [auto-fix]
-    - errorlint # Errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13. [auto-fix]
-    - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions. [auto-fix]
-    - fatcontext # Detects nested contexts in loops and function literals. [auto-fix]
-    - ginkgolinter # Enforces standards of using ginkgo and gomega. [auto-fix]
-    - gocritic # Provides diagnostics that check for bugs, performance and style issues. [auto-fix]
-    - godot # Check if comments end in a period. [fast, auto-fix]
-    - gofmt # Checks if the code is formatted according to 'gofmt' command. [fast, auto-fix]
-    - gofumpt # Checks if code and import statements are formatted, with additional rules. [fast, auto-fix]
-    - goheader # Checks if file header matches to pattern. [fast, auto-fix]
-    - goimports # Checks if the code and import statements are formatted according to the 'goimports' command. [fast, auto-fix]
-    - gosimple # Linter for Go source code that specializes in simplifying code. [auto-fix]
-    - govet # Vet examines Go source code and reports suspicious constructs. It is roughly the same as 'go vet' and uses its passes. [auto-fix]
-    - iface # Detect the incorrect use of interfaces, helping developers avoid interface pollution. [auto-fix]
-    - importas # Enforces consistent import aliases. [auto-fix]
-    - intrange # Intrange is a linter to find places where for loops could make use of an integer range. [auto-fix]
-    - mirror # Reports wrong mirror patterns of bytes/strings usage. [auto-fix]
-    - misspell # Finds commonly misspelled English words. [fast, auto-fix]
-    - nakedret # Checks that functions with naked returns are not longer than a maximum size (can be zero). [fast, auto-fix]
-    - nlreturn # Nlreturn checks for a new line before return and branch statements to increase code clarity. [fast, auto-fix]
-    - nolintlint # Reports ill-formed or insufficient nolint directives. [fast, auto-fix]
-    - perfsprint # Checks that fmt.Sprintf can be replaced with a faster alternative. [auto-fix]
-    - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint. [auto-fix]
-    - staticcheck # It's a set of rules from staticcheck. It's not the same thing as the staticcheck binary. The author of staticcheck doesn't support or approve the use of staticcheck as a library inside golangci-lint. [auto-fix]
-    - stylecheck # Stylecheck is a replacement for golint. [auto-fix]
-    - tagalign # Check that struct tags are well aligned. [fast, auto-fix]
-    - testifylint # Checks usage of github.com/stretchr/testify. [auto-fix]
-    - usestdlibvars # A linter that detect the possibility to use variables/constants from the Go standard library. [fast, auto-fix]
-    - usetesting # Reports uses of functions with replacement inside the testing package. [auto-fix]
-    - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc. [fast, auto-fix]
-    - wsl # Add or remove empty lines. [fast, auto-fix]
-
+    - canonicalheader # Canonicalheader checks whether net/http.Header uses canonical header.
+    - copyloopvar # A linter detects places where loop variables are copied.
+    - dupword # Checks for duplicate words in the source code.
+    - err113 # Go linter to check the errors handling expressions.
+    - errorlint # Errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
+    - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions.
+    - fatcontext # Detects nested contexts in loops and function literals.
+    - ginkgolinter # Enforces standards of using ginkgo and gomega.
+    - gocritic # Provides diagnostics that check for bugs, performance and style issues.
+    - godot # Check if comments end in a period.
+    - goheader # Checks if file header matches to pattern.
+    - importas # Enforces consistent import aliases.
+    - intrange # Intrange is a linter to find places where for loops could make use of an integer range.
+    - mirror # Reports wrong mirror patterns of bytes/strings usage.
+    - misspell # Finds commonly misspelled English words.
+    - nakedret # Checks that functions with naked returns are not longer than a maximum size (can be zero).
+    - nlreturn # Nlreturn checks for a new line before return and branch statements to increase code clarity.
+    - nolintlint # Reports ill-formed or insufficient nolint directives.
+    - perfsprint # Checks that fmt.Sprintf can be replaced with a faster alternative.
+    - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint.
+    - staticcheck # It's a set of rules from staticcheck. It's not the same thing as the staticcheck binary. The author of staticcheck doesn't support or approve the use of staticcheck as a library inside golangci-lint.
+    - tagalign # Check that struct tags are well aligned.
+    - testifylint # Checks usage of github.com/stretchr/testify.
+    - usestdlibvars # A linter that detect the possibility to use variables/constants from the Go standard library.
+    - usetesting # Reports uses of functions with replacement inside the testing package.
+    - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc.
+    - wsl # Add or remove empty lines.
     ##################################################################################################
     # Enabled linters that require manual issue resolution
     - asasalint # Check for pass []any as any in variadic func(...any).
-    - asciicheck # Checks that all code identifiers does not have non-ASCII symbols in the name. [fast]
-    - bidichk # Checks for dangerous unicode character sequences. [fast]
+    - asciicheck # Checks that all code identifiers does not have non-ASCII symbols in the name.
+    - bidichk # Checks for dangerous unicode character sequences.
     - bodyclose # Checks whether HTTP response body is closed successfully.
     - containedctx # Containedctx is a linter that detects struct contained context.Context field.
     - contextcheck # Check whether the function uses a non-inherited context.
-    - decorder # Check declaration order and count of types, constants, variables and functions. [fast]
-    - dogsled # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f()). [fast]
-    - dupl # Detects duplicate fragments of code. [fast]
+    - decorder # Check declaration order and count of types, constants, variables and functions.
+    - dogsled # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f()).
+    - dupl # Detects duplicate fragments of code.
     - durationcheck # Check for two durations multiplied together.
-    - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
     - errchkjson # Checks types passed to the json encoding functions. Reports unsupported types and reports occurrences where the check for the returned error can be omitted.
     - errname # Checks that sentinel errors are prefixed with the `Err` and error types are suffixed with the `Error`.
     - exhaustive # Check exhaustiveness of enum switch statements.
     - forbidigo # Forbids identifiers.
     - forcetypeassert # Finds forced type assertions.
-    - gci # Checks if code and import statements are formatted, with additional rules.
-    - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid. [fast]
+    - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid.
     - gochecksumtype # Run exhaustiveness checks on Go "sum types".
-    - goconst # Finds repeated strings that could be replaced by a constant. [fast]
-    - godox # Detects usage of FIXME, TODO and other keywords inside comments. [fast]
-    - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod. [fast]
-    - goprintffuncname # Checks that printf-like functions are named with `f` at the end. [fast]
+    - goconst # Finds repeated strings that could be replaced by a constant.
+    - godox # Detects usage of FIXME, TODO and other keywords inside comments.
+    - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
+    - goprintffuncname # Checks that printf-like functions are named with `f` at the end.
     - gosec # Inspects source code for security problems.
-    - grouper # Analyze expression groups. [fast]
-    - inamedparam # Reports interfaces with unnamed method parameters. [fast]
-    - ineffassign # Detects when assignments to existing variables are not used. [fast]
+    - grouper # Analyze expression groups.
+    - iface # Detect the incorrect use of interfaces, helping developers avoid interface pollution.
+    - inamedparam # Reports interfaces with unnamed method parameters.
     - loggercheck # Checks key value pairs for common logger libraries (kitlog,klog,logr,zap).
     - makezero # Finds slice declarations with non-zero initial length.
-    - mnd # An analyzer to detect magic numbers. [fast]
+    - mnd # An analyzer to detect magic numbers.
     - musttag # Enforce field tags in (un)marshaled structs.
     - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
     - nilnesserr # Reports constructs that checks for err != nil, but returns a different nil value error.
     - nilnil # Checks that there is no simultaneous return of `nil` error and an invalid value.
     - noctx # Finds sending http request without context.Context.
     - nonamedreturns # Reports all named returns.
-    - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL. [fast]
-    - predeclared # Find code that shadows one of Go's predeclared identifiers. [fast]
-    - prealloc # Finds slice declarations that could potentially be pre-allocated. [fast]
-    - promlinter # Check Prometheus metrics naming via promlint. [fast]
+    - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL.
+    - prealloc # Finds slice declarations that could potentially be pre-allocated.
+    - predeclared # Find code that shadows one of Go's predeclared identifiers.
+    - promlinter # Check Prometheus metrics naming via promlint.
     - reassign # Checks that package variables are not reassigned.
     - recvcheck # Checks for receiver type consistency.
     - spancheck # Checks for mistakes with OpenTelemetry/Census spans.
@@ -120,19 +99,9 @@ linters:
     - tparallel # Tparallel detects inappropriate usage of t.Parallel() method in your Go test codes.
     - unconvert # Remove unnecessary type conversions.
     - unparam # Reports unused function parameters.
-    - unused # Checks Go code for unused constants, variables, functions and types.
     - varnamelen # Checks that the length of a variable's name matches its scope.
     - wastedassign # Finds wasted assignment statements.
     - wrapcheck # Checks that errors returned from external packages are wrapped.
-
-  ####################################################################################################
-  # Enable all available linters.
-  # Default: false
-  # enable-all: true
-
-  ####################################################################################################
-  # Disable specific linters
-  # https://golangci-lint.run/usage/linters/#disabled-by-default
   disable:
     - cyclop # Checks function and package cyclomatic complexity.
     - depguard # Checks if package imports are in a list of acceptable packages.
@@ -158,296 +127,190 @@ linters:
     - testpackage # Linter that makes you use a separate _test package.
     - zerologlint # Detects the wrong usage of `zerolog` that a user forgets to dispatch with `Send` or `Msg`.
 
-  ####################################################################################################
-  # Enable presets.
-  # https://golangci-lint.run/usage/linters
+  ######################################################################################################
+  # Linter Settings Configuration
+  ######################################################################################################
+  settings:
+    varnamelen:
+      max-distance: 5
+      min-name-length: 3
+      check-return: true
+      check-type-param: true
+      ignore-type-assert-ok: true
+      ignore-map-index-ok: true
+      ignore-chan-recv-ok: true
+      ignore-names:
+        - err
+        - c
+        - ctx
+        - i
+      ignore-decls:
+        - c echo.Context
+        - t testing.T
+        - f *foo.Bar
+        - e error
+        - i int
+        - const C
+        - T any
+        - m map[string]int
+        - w http.ResponseWriter
+        - r *http.Request
+        - r http.Request
+        - r *net/http/Request
+        - r *mux.Router
 
-  # Default: []
-  # presets:
-  #   - bugs
-  #   - comment
-  #   - complexity
-  #   - error
-  #   - format
-  #   - import
-  #   - metalinter
-  #   - module
-  #   - performance
-  #   - sql
-  #   - style
-  #   - test
-  #   - unused
-
-  ####################################################################################################
-  # Enable only fast linters from enabled linters set (first run won't be fast)
-  # Default: false
-  # fast: true
-
-######################################################################################################
-# End of Linters Configuration
-######################################################################################################
-
-######################################################################################################
-# Linter Settings Configuration
-# https://golangci-lint.run/usage/configuration/#linters-settings-configuration
-######################################################################################################
-linters-settings:
-  ####################################################################################################
-  gci:
-    # Checks if code and import statements are formatted, with additional rules.
-    # https://golangci-lint.run/usage/linters/#gci
-
-    # Section configuration to compare against.
-    # Section names are case-insensitive and may contain parameters in ().
-    # The default order of sections is `standard > default > custom > blank > dot > alias > localmodule`,
-    # If `custom-order` is `true`, it follows the order of `sections` option.
-    # Default: ["standard", "default"]
-    sections:
-      - standard # Standard section: captures all standard packages.
-      - default # Default section: contains all imports that could not be matched to another section type.
-      - prefix(github.com/nicholas-fedor/watchtower) # Custom section: groups all imports with the specified Prefix.
-      - blank # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
-      - dot # Dot section: contains all dot imports. This section is not present unless explicitly enabled.
-      - alias # Alias section: contains all alias imports. This section is not present unless explicitly enabled.
-      - localmodule # Local module section: contains all local packages. This section is not present unless explicitly enabled.
-
-    # Checks that no inline Comments are present.
-    # Default: false
-    # no-inline-comments: true
-
-    # Checks that no prefix Comments(comment lines above an import) are present.
-    # Default: false
-    # no-prefix-comments: true
-
-    # Skip generated files.
-    # Default: true
-    # skip-generated: false
-
-    # Enable custom order of sections.
-    # If `true`, make the section order the same as the order of `sections`.
-    # Default: false
-    # custom-order: true
-
-    # Drops lexical ordering for custom sections.
-    # Default: false
-    # no-lex-order: true
-
-  ####################################################################################################
-  gofmt:
-    # Checks if the code is formatted according to 'gofmt' command.
-    # https://golangci-lint.run/usage/linters/#gofmt
-
-    # Simplify code: gofmt with `-s` option.
-    # Default: true
-    # simplify: false
-    # Apply the rewrite rules to the source before reformatting.
-    # https://pkg.go.dev/cmd/gofmt
-    # Default: []
-    rewrite-rules:
-      - pattern: "interface{}"
-        replacement: "any"
-      - pattern: "a[b:len(a)]"
-        replacement: "a[b:]"
-
-  ####################################################################################################
-  varnamelen:
-    # Checks that the length of a variable's name matches its scope.
-    # https://golangci-lint.run/usage/linters/#varnamelen
-
-    # The longest distance, in source lines, that is being considered a "small scope".
-    # Variables used in at most this many lines will be ignored.
-    # Default: 5
-    max-distance: 5
-    # The minimum length of a variable's name that is considered "long".
-    # Variable names that are at least this long will be ignored.
-    # Default: 3
-    min-name-length: 3
-    # Check method receivers.
-    # Default: false
-    # check-receiver: true
-    # Check named return values.
-    # Default: false
-    check-return: true
-    # Check type parameters.
-    # Default: false
-    check-type-param: true
-    # Ignore "ok" variables that hold the bool return value of a type assertion.
-    # Default: false
-    ignore-type-assert-ok: true
-    # Ignore "ok" variables that hold the bool return value of a map index.
-    # Default: false
-    ignore-map-index-ok: true
-    # Ignore "ok" variables that hold the bool return value of a channel receive.
-    # Default: false
-    ignore-chan-recv-ok: true
-    # Optional list of variable names that should be ignored completely.
-    # Default: []
-    ignore-names:
-      - err
-      - c
-      - ctx
-      - i
-    # Optional list of variable declarations that should be ignored completely.
-    # Entries must be in one of the following forms (see below for examples):
-    # - for variables, parameters, named return values, method receivers, or type parameters:
-    #   <name> <type>  (<type> can also be a pointer/slice/map/chan/...)
-    # - for constants: const <name>
+  ######################################################################################################
+  # Defines a set of rules to ignore issues.
+  # It does not skip the analysis, and so does not ignore "typecheck" errors.
+  exclusions:
+    # Mode of the generated files analysis.
     #
+    # - `strict`: sources are excluded by strictly following the Go generated file convention.
+    #    Source files that have lines matching only the following regular expression will be excluded: `^// Code generated .* DO NOT EDIT\.$`
+    #    This line must appear before the first non-comment, non-blank text in the file.
+    #    https://go.dev/s/generatedcode
+    # - `lax`: sources are excluded if they contain lines like `autogenerated file`, `code generated`, `do not edit`, etc.
+    # - `disable`: disable the generated files exclusion.
+    #
+    # Default: lax
+    # generated: strict
+
+    ####################################################################################################
+    # Log a warning if an exclusion rule is unused.
+    # Default: false
+    warn-unused: true
+
+    ####################################################################################################
+    # Predefined exclusion rules.
     # Default: []
-    ignore-decls:
-      - c echo.Context
-      - t testing.T
-      - f *foo.Bar
-      - e error
-      - i int
-      - const C
-      - T any
-      - m map[string]int
-      - w http.ResponseWriter
-      - r *http.Request
-      - r http.Request
-      - r *net/http/Request
-      - r *mux.Router
+    presets:
+      - comments
+      - std-error-handling
+      - common-false-positives
+      - legacy
+
+    ####################################################################################################
+    # Excluding configuration per-path, per-linter, per-text and per-source.
+    rules:
+      # Exclude some linters from running on tests files.
+      - path: ".*_test.go$"
+        linters:
+          - dupl
+          - err113
+          - errcheck
+          - errorlint
+          - exhaustive
+          - forcetypeassert
+          - gocyclo
+          - gosec
+          - promlinter
+          - wrapcheck
+          - varnamelen
+
+      # Run some linter only for test files by excluding its issues for everything else.
+      # - path-except: _test\.go
+      # linters:
+      # - forbidigo
+
+      # Exclude known linters from partially hard-vendored code,
+      # which is impossible to exclude via `nolint` comments.
+      # `/` will be replaced by the current OS file path separator to properly work on Windows.
+      # - path: internal/hmac/
+      #   text: "weak cryptographic primitive"
+      #   linters:
+      #     - gosec
+
+      # Exclude some `staticcheck` messages.
+      # - linters:
+      # - staticcheck
+      # text: "SA9003:"
+
+      # Exclude `lll` issues for long lines with `go:generate`.
+      # - linters:
+      # - lll
+      # source: "^//go:generate "
+
+    ####################################################################################################
+    # Which file paths to exclude: they will be analyzed, but issues from them won't be reported.
+    # "/" will be replaced by the current OS file path separator to properly work on Windows.
+    # Default: []
+    paths:
+      # - ".*\\.my\\.go$"
+      # - lib/bad.go
+      - ".*/mocks/.*"
+      - third_party$
+      - builtin$
+      - examples$
+
+    ####################################################################################################
+    # Which file paths to not exclude.
+    # Default: []
+    # paths-except:
+    #   - ".*\\.my\\.go$"
+    #   - lib/bad.go
 
 ######################################################################################################
-# End of Linter Settings Configuration
+# Formatters Configuration
+# https://golangci-lint.run/usage/configuration/#formatters-configuration
 ######################################################################################################
+
+formatters:
+  # Enable specific formatter.
+  # Default: []
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+
+  ####################################################################################################
+  # Formatters settings.
+  settings:
+    # See the dedicated "formatters.settings" documentation section.
+    # option: value
+    gci:
+      sections:
+        - standard # Standard section: captures all standard packages.
+        - default # Default section: contains all imports that could not be matched to another section type.
+        - prefix(github.com/nicholas-fedor/watchtower) # Custom section: groups all imports with the specified Prefix.
+        - blank # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
+        - dot # Dot section: contains all dot imports. This section is not present unless explicitly enabled.
+        - alias # Alias section: contains all alias imports. This section is not present unless explicitly enabled.
+        - localmodule # Local module section: contains all local packages. This section is not present unless explicitly enabled.
+    gofmt:
+      rewrite-rules:
+        - pattern: "interface{}"
+          replacement: "any"
+        - pattern: "a[b:len(a)]"
+          replacement: "a[b:]"
+
+  ####################################################################################################
+  exclusions:
+    # Mode of the generated files analysis.
+    #
+    # - `strict`: sources are excluded by strictly following the Go generated file convention.
+    #    Source files that have lines matching only the following regular expression will be excluded: `^// Code generated .* DO NOT EDIT\.$`
+    #    This line must appear before the first non-comment, non-blank text in the file.
+    #    https://go.dev/s/generatedcode
+    # - `lax`: sources are excluded if they contain lines like `autogenerated file`, `code generated`, `do not edit`, etc.
+    # - `disable`: disable the generated files exclusion.
+    #
+    # Default: lax
+    # generated: strict
+    # Which file paths to exclude.
+    # Default: []
+    paths:
+      - ".*mocks$"
+      - third_party$
+      - builtin$
+      - examples$
 
 ######################################################################################################
 # Issues Configuration
 # https://golangci-lint.run/usage/configuration/#issues-configuration
 ######################################################################################################
 issues:
-  ####################################################################################################
-  # List of regexps of issue texts to exclude.
-  #
-  # But independently of this option we use default exclude patterns,
-  # it can be disabled by `exclude-use-default: false`.
-  # To list all excluded by default patterns execute `golangci-lint run --help`
-  #
-  # Default: https://golangci-lint.run/usage/false-positives/#default-exclusions
-  # exclude:
-  #   - abcdef
-
-  ####################################################################################################
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - dupl # Detects duplicate fragments of code. [fast]
-        - err113 # Go linter to check the errors handling expressions. [auto-fix]
-        - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
-        - errorlint # Errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13. [auto-fix]
-        - exhaustive # Check exhaustiveness of enum switch statements.
-        - forcetypeassert # Finds forced type assertions.
-        - wrapcheck # Checks that errors returned from external packages are wrapped.
-        - varnamelen # Checks that the length of a variable's name matches its scope.
-
-  ####################################################################################################
-  # Run some linter only for test files by excluding its issues for everything else.
-  # - path-except: _test\.go
-  #   linters:
-  #     - forbidigo
-
-  ####################################################################################################
-  # Exclude known linters from partially hard-vendored code,
-  # which is impossible to exclude via `nolint` comments.
-  # `/` will be replaced by current OS file path separator to properly work on Windows.
-  # - path: internal/hmac/
-  #   text: "weak cryptographic primitive"
-  #   linters:
-  #     - gosec
-  # Exclude some `staticcheck` messages.
-  # - linters:
-  #     - staticcheck
-  #   text: "SA9003:"
-  # Exclude `lll` issues for long lines with `go:generate`.
-  # - linters:
-  #     - lll
-  #   source: "^//go:generate "
-
-  ####################################################################################################
-  # Independently of option `exclude` we use default exclude patterns,
-  # it can be disabled by this option.
-  # To list all excluded by default patterns execute `golangci-lint run --help`.
-  # Default: true
-  # exclude-use-default: false
-
-  ####################################################################################################
-  # If set to true, `exclude` and `exclude-rules` regular expressions become case-sensitive.
-  # Default: false
-  # exclude-case-sensitive: false
-
-  ####################################################################################################
-  # Which dirs to exclude: issues from them won't be reported.
-  # Can use regexp here: `generated.*`, regexp is applied on full path,
-  # including the path prefix if one is set.
-  # Default dirs are skipped independently of this option's value (see exclude-dirs-use-default).
-  # "/" will be replaced by current OS file path separator to properly work on Windows.
-  # Default: []
-  exclude-dirs:
-    #   - src/external_libs
-    #   - autogenerated_by_my_lib
-    - ".*mocks$" # Exclude mocks directories
-
-  ####################################################################################################
-  # Enables exclude of directories:
-  # - vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
-  # Default: true
-  # exclude-dirs-use-default: false
-
-  ####################################################################################################
-  # Which files to exclude: they will be analyzed, but issues from them won't be reported.
-  # There is no need to include all autogenerated files,
-  # we confidently recognize autogenerated files.
-  # If it's not, please let us know.
-  # "/" will be replaced by current OS file path separator to properly work on Windows.
-  # Default: []
-  # exclude-files:
-  #   - ".*\\.my\\.go$"
-  #   - lib/bad.go
-
-  ####################################################################################################
-  # Mode of the generated files analysis.
-  #
-  # - `strict`:  Sources are excluded by following strictly the Go generated file convention.
-  #              Source files that have lines matching only the following regular expression
-  #              will be excluded:
-  #                `^// Code generated .* DO NOT EDIT\.$`
-  #              This line must appear before the first non-comment, non-blank text in the file.
-  #              https://go.dev/s/generatedcode
-  #
-  # - `lax`:     Sources are excluded if they contain lines:
-  #                `autogenerated file`, `code generated`, `do not edit`, etc.
-  #
-  # - `disable`: Disable the generated files exclusion.
-  #
-  # Default: lax
-  # exclude-generated: strict
-
-  ####################################################################################################
-  # The list of ids of default excludes to include or disable.
-  # https://golangci-lint.run/usage/false-positives/#default-exclusions
-  # Default: []
-  # include:
-  #   - EXC0001
-  #   - EXC0002
-  #   - EXC0003
-  #   - EXC0004
-  #   - EXC0005
-  #   - EXC0006
-  #   - EXC0007
-  #   - EXC0008
-  #   - EXC0009
-  #   - EXC0010
-  #   - EXC0011
-  #   - EXC0012
-  #   - EXC0013
-  #   - EXC0014
-  #   - EXC0015
-
-  ####################################################################################################
   # Maximum issues count per one linter.
   # Set to 0 to disable.
   # Default: 50
@@ -500,71 +363,105 @@ issues:
   fix: true
 
 ######################################################################################################
-# End of Issues Configuration
-######################################################################################################
-
-######################################################################################################
 # Output Configuration
 # https://golangci-lint.run/usage/configuration/#output-configuration
 ######################################################################################################
 output:
   ####################################################################################################
   # The formats used to render issues.
-  # Formats:
-  # - `colored-line-number`
-  # - `line-number`
-  # - `json`
-  # - `colored-tab`
-  # - `tab`
-  # - `html`
-  # - `checkstyle`
-  # - `code-climate`
-  # - `junit-xml`
-  # - `junit-xml-extended`
-  # - `github-actions`
-  # - `teamcity`
-  # - `sarif`
+  formats:
+    ##################################################################################################
+    # Prints issues in a text format with colors, line number, and linter name.
+    # This format is the default format.
+    text:
+      # Output path can be either `stdout`, `stderr` or path to the file to write to.
+      # Default: stdout
+      # path: ./path/to/output.txt
+      # Print linter name in the end of issue text.
+      # Default: true
+      # print-linter-name: false
+      # Print lines of code with issue.
+      # Default: true
+      # print-issued-lines: false
+      # Use colors.
+      # Default: true
+      # colors: false
+      colors: true
+
+    ##################################################################################################
+    # Prints issues in a JSON representation.
+    # json:
+    # Output path can be either `stdout`, `stderr` or path to the file to write to.
+    # Default: stdout
+    # path: ./path/to/output.json
+
+    ##################################################################################################
+    # Prints issues in columns representation separated by tabulations.
+    tab:
+      # Output path can be either `stdout`, `stderr` or path to the file to write to.
+      # Default: stdout
+      # path: ./path/to/output.txt
+      # Print linter name in the end of issue text.
+      # Default: true
+      print-linter-name: true
+      # Use colors.
+      # Default: true
+      # colors: false
+      colors: true
+
+  ##################################################################################################
+  # Prints issues in an HTML page.
+  # It uses the Cloudflare CDN (cdnjs) and React.
+  # html:
   # Output path can be either `stdout`, `stderr` or path to the file to write to.
-  #
-  # For the CLI flag (`--out-format`), multiple formats can be specified by separating them by comma.
-  # The output can be specified for each of them by separating format name and path by colon symbol.
-  # Example: "--out-format=checkstyle:report.xml,json:stdout,colored-line-number"
-  # The CLI flag (`--out-format`) override the configuration file.
-  #
-  # Default:
-  #   formats:
-  #     - format: colored-line-number
-  #       path: stdout
-  # formats:
-  #   - format: json
-  #     path: stderr
-  #   - format: checkstyle
-  #     path: report.xml
-  #   - format: colored-line-number
+  # Default: stdout
+  # path: ./path/to/output.html
 
-  ####################################################################################################
-  # Print lines of code with issue.
-  # Default: true
-  # print-issued-lines: false
+  ##################################################################################################
+  # Prints issues in the Checkstyle format.
+  # checkstyle:
+  # Output path can be either `stdout`, `stderr` or path to the file to write to.
+  # Default: stdout
+  # path: ./path/to/output.xml
 
-  ####################################################################################################
-  # Print linter name in the end of issue text.
-  # Default: true
-  # print-linter-name: false
+  ##################################################################################################
+  # Prints issues in the Code Climate format.
+  # code-climate:
+  # Output path can be either `stdout`, `stderr` or path to the file to write to.
+  # Default: stdout
+  # path: ./path/to/output.json
+
+  ##################################################################################################
+  # Prints issues in the JUnit XML format.
+  # junit-xml:
+  # Output path can be either `stdout`, `stderr` or path to the file to write to.
+  # Default: stdout
+  # path: ./path/to/output.xml
+  # Support extra JUnit XML fields.
+  # Default: false
+  # extended: true
+
+  ##################################################################################################
+  # Prints issues in the TeamCity format.
+  # teamcity:
+  # Output path can be either `stdout`, `stderr` or path to the file to write to.
+  # Default: stdout
+  # path: ./path/to/output.txt
+
+  ##################################################################################################
+  # Prints issues in the SARIF format.
+  # sarif:
+  # Output path can be either `stdout`, `stderr` or path to the file to write to.
+  # Default: stdout
+  # path: ./path/to/output.json
 
   ####################################################################################################
   # Add a prefix to the output file references.
   # Default: ""
-  # path-prefix: "./"
-
-  ####################################################################################################
-  # Sort results by the order defined in `sort-order`.
-  # Default: false
-  sort-results: true
+  # path-prefix: ""
 
   ####################################################################################################
   # Order to use when sorting results.
-  # Require `sort-results` to `true`.
   # Possible values: `file`, `linter`, and `severity`.
   #
   # If the severity values are inside the following list, they are ordered in this order:
@@ -575,7 +472,7 @@ output:
   #   5. low
   # Either they are sorted alphabetically.
   #
-  # Default: ["file"]
+  # Default: ["linter", "file"]
   sort-order:
     - linter
     - severity
@@ -583,15 +480,12 @@ output:
 
   ####################################################################################################
   # Show statistics per linter.
-  # Default: false
-  show-stats: true
-
-######################################################################################################
-# End of Output Configuration
-######################################################################################################
+  # Default: true
+  # show-stats: false
 
 ######################################################################################################
 # Run Configuration
+# Options for analysis running.
 # https://golangci-lint.run/usage/configuration/#run-configuration
 ######################################################################################################
 run:
@@ -657,64 +551,54 @@ run:
   ####################################################################################################
   # Define the Go version limit.
   # Mainly related to generics support since go1.18.
-  # Default: use Go version from the go.mod file, fallback on the env var `GOVERSION`, fallback on 1.17
-  # go: "1.19"
+  # Default: use Go version from the go.mod file, fallback on the env var `GOVERSION`, fallback on 1.22.
+  # go: "1.24"
 
   ####################################################################################################
   # Number of operating system threads (`GOMAXPROCS`) that can execute golangci-lint simultaneously.
   # If it is explicitly set to 0 (i.e. not the default) then golangci-lint will automatically set the value to match Linux container CPU quota.
   # Default: the number of logical CPUs in the machine
   # concurrency: 4
-
-######################################################################################################
-# End of Run Configuration
-######################################################################################################
-
 ######################################################################################################
 # Severity Configuration
 # https://golangci-lint.run/usage/configuration/#severity-configuration
 ######################################################################################################
-severity:
-  ####################################################################################################
-  # Set the default severity for issues.
-  #
-  # If severity rules are defined and the issues do not match or no severity is provided to the rule
-  # this will be the default severity applied.
-  # Severities should match the supported severity names of the selected out format.
-  # - Code climate: https://docs.codeclimate.com/docs/issues#issue-severity
-  # - Checkstyle: https://checkstyle.sourceforge.io/property_types.html#SeverityLevel
-  # - GitHub: https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
-  # - TeamCity: https://www.jetbrains.com/help/teamcity/service-messages.html#Inspection+Instance
-  #
-  # `@linter` can be used as severity value to keep the severity from linters (e.g. revive, gosec, ...)
-  #
-  # Default: ""
-  # default-severity: error
-  default-severity: ""
+# severity:
+####################################################################################################
+# Set the default severity for issues.
+#
+# If severity rules are defined and the issues do not match or no severity is provided to the rule
+# this will be the default severity applied.
+# Severities should match the supported severity names of the selected out format.
+# - Code climate: https://docs.codeclimate.com/docs/issues#issue-severity
+# - Checkstyle: https://checkstyle.sourceforge.io/property_types.html#SeverityLevel
+# - GitHub: https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
+# - TeamCity: https://www.jetbrains.com/help/teamcity/service-messages.html#Inspection+Instance
+#
+# `@linter` can be used as severity value to keep the severity from linters (e.g. revive, gosec, ...)
+#
+# Default: ""
+# default: error
 
-  ####################################################################################################
-  # If set to true `severity-rules` regular expressions become case-sensitive.
-  # Default: false
-  # case-sensitive: true
+####################################################################################################
+# If set to true `severity-rules` regular expressions become case-sensitive.
+# Default: false
+# case-sensitive: true
 
-  ####################################################################################################
-  # When a list of severity rules are provided, severity information will be added to lint issues.
-  # Severity rules have the same filtering capability as exclude rules
-  # except you are allowed to specify one matcher per severity rule.
-  #
-  # `@linter` can be used as severity value to keep the severity from linters (e.g. revive, gosec, ...)
-  #
-  # Only affects out formats that support setting severity information.
-  #
-  # Default: []
-  # rules:
-  #   - linters:
-  #       - dupl
-  #     severity: info
-######################################################################################################
-# End of Severity Configuration
-######################################################################################################
-
+####################################################################################################
+# When a list of severity rules are provided, severity information will be added to lint issues.
+# Severity rules have the same filtering capability as exclude rules
+# except you are allowed to specify one matcher per severity rule.
+#
+# `@linter` can be used as severity value to keep the severity from linters (e.g. revive, gosec, ...)
+#
+# Only affects out formats that support setting severity information.
+#
+# Default: []
+# rules:
+#   - linters:
+#       - dupl
+#     severity: info
 ######################################################################################################
 # End of golangci-lint Configuration
 ######################################################################################################

@@ -9,7 +9,7 @@ type FilterableContainer struct {
 
 // Enabled provides a mock function with given fields:.
 func (_m *FilterableContainer) Enabled() (bool, bool) {
-	ret := _m.Mock.Called()
+	ret := _m.Called()
 
 	var result0 bool
 	if rf, ok := ret.Get(0).(func() bool); ok {
@@ -30,7 +30,7 @@ func (_m *FilterableContainer) Enabled() (bool, bool) {
 
 // IsWatchtower provides a mock function with given fields:.
 func (_m *FilterableContainer) IsWatchtower() bool {
-	ret := _m.Mock.Called()
+	ret := _m.Called()
 
 	var result0 bool
 	if rf, ok := ret.Get(0).(func() bool); ok {
@@ -44,7 +44,7 @@ func (_m *FilterableContainer) IsWatchtower() bool {
 
 // Name provides a mock function with given fields:.
 func (_m *FilterableContainer) Name() string {
-	ret := _m.Mock.Called()
+	ret := _m.Called()
 
 	var result0 string
 	if rf, ok := ret.Get(0).(func() string); ok {
@@ -58,7 +58,7 @@ func (_m *FilterableContainer) Name() string {
 
 // Scope provides a mock function with given fields:.
 func (_m *FilterableContainer) Scope() (string, bool) {
-	ret := _m.Mock.Called()
+	ret := _m.Called()
 
 	var result0 string
 
@@ -81,7 +81,7 @@ func (_m *FilterableContainer) Scope() (string, bool) {
 
 // ImageName provides a mock function with given fields:.
 func (_m *FilterableContainer) ImageName() string {
-	ret := _m.Mock.Called()
+	ret := _m.Called()
 
 	var result0 string
 	if rf, ok := ret.Get(0).(func() string); ok {

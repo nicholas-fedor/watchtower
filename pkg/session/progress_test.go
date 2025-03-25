@@ -15,6 +15,7 @@ func TestUpdateFromContainer(t *testing.T) {
 		newImage types.ImageID
 		state    State
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -29,6 +30,7 @@ func TestUpdateFromContainer(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
+
 					return mock
 				}(),
 				newImage: "img2",
@@ -53,6 +55,7 @@ func TestUpdateFromContainer(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID(""))
 					mock.EXPECT().Name().Return("")
 					mock.EXPECT().ImageName().Return("")
+
 					return mock
 				}(),
 				newImage: "",
@@ -82,7 +85,11 @@ func TestUpdateFromContainer(t *testing.T) {
 			}
 			// Handle error field separately
 			if (got.containerError == nil) != (tt.want.containerError == nil) {
-				t.Errorf("UpdateFromContainer() error = %v, want %v", got.containerError, tt.want.containerError)
+				t.Errorf(
+					"UpdateFromContainer() error = %v, want %v",
+					got.containerError,
+					tt.want.containerError,
+				)
 			} else if got.containerError != nil && got.containerError.Error() != tt.want.containerError.Error() {
 				t.Errorf("UpdateFromContainer() error message = %v, want %v", got.containerError.Error(), tt.want.containerError.Error())
 			}
@@ -95,6 +102,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 		cont types.Container
 		err  error
 	}
+
 	tests := []struct {
 		name string
 		m    Progress
@@ -111,6 +119,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
+
 					return mock
 				}(),
 				err: errors.New("skipped due to policy"),
@@ -137,6 +146,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
+
 					return mock
 				}(),
 				err: nil,
@@ -157,10 +167,13 @@ func TestProgress_AddSkipped(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.m.AddSkipped(tt.args.cont, tt.args.err)
+
 			if len(tt.m) != len(tt.want) {
 				t.Errorf("Progress.AddSkipped() map length = %d, want %d", len(tt.m), len(tt.want))
+
 				return
 			}
+
 			for id, gotStatus := range tt.m {
 				wantStatus := tt.want[id]
 				if gotStatus.containerID != wantStatus.containerID ||
@@ -169,10 +182,21 @@ func TestProgress_AddSkipped(t *testing.T) {
 					gotStatus.containerName != wantStatus.containerName ||
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
-					t.Errorf("Progress.AddSkipped() status for %v = %+v, want %+v", id, gotStatus, wantStatus)
+					t.Errorf(
+						"Progress.AddSkipped() status for %v = %+v, want %+v",
+						id,
+						gotStatus,
+						wantStatus,
+					)
 				}
+
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
-					t.Errorf("Progress.AddSkipped() error for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.AddSkipped() error for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError.Error() != wantStatus.containerError.Error() {
 					t.Errorf("Progress.AddSkipped() error message for %v = %v, want %v", id, gotStatus.containerError.Error(), wantStatus.containerError.Error())
 				}
@@ -186,6 +210,7 @@ func TestProgress_AddScanned(t *testing.T) {
 		cont     types.Container
 		newImage types.ImageID
 	}
+
 	tests := []struct {
 		name string
 		m    Progress
@@ -202,6 +227,7 @@ func TestProgress_AddScanned(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
+
 					return mock
 				}(),
 				newImage: "img2",
@@ -228,6 +254,7 @@ func TestProgress_AddScanned(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
+
 					return mock
 				}(),
 				newImage: "img2",
@@ -248,10 +275,13 @@ func TestProgress_AddScanned(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.m.AddScanned(tt.args.cont, tt.args.newImage)
+
 			if len(tt.m) != len(tt.want) {
 				t.Errorf("Progress.AddScanned() map length = %d, want %d", len(tt.m), len(tt.want))
+
 				return
 			}
+
 			for id, gotStatus := range tt.m {
 				wantStatus := tt.want[id]
 				if gotStatus.containerID != wantStatus.containerID ||
@@ -260,10 +290,21 @@ func TestProgress_AddScanned(t *testing.T) {
 					gotStatus.containerName != wantStatus.containerName ||
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
-					t.Errorf("Progress.AddScanned() status for %v = %+v, want %+v", id, gotStatus, wantStatus)
+					t.Errorf(
+						"Progress.AddScanned() status for %v = %+v, want %+v",
+						id,
+						gotStatus,
+						wantStatus,
+					)
 				}
+
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
-					t.Errorf("Progress.AddScanned() error for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.AddScanned() error for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError.Error() != wantStatus.containerError.Error() {
 					t.Errorf("Progress.AddScanned() error message for %v = %v, want %v", id, gotStatus.containerError.Error(), wantStatus.containerError.Error())
 				}
@@ -276,6 +317,7 @@ func TestProgress_UpdateFailed(t *testing.T) {
 	type args struct {
 		failures map[types.ContainerID]error
 	}
+
 	tests := []struct {
 		name string
 		m    Progress
@@ -341,10 +383,17 @@ func TestProgress_UpdateFailed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.m.UpdateFailed(tt.args.failures)
+
 			if len(tt.m) != len(tt.want) {
-				t.Errorf("Progress.UpdateFailed() map length = %d, want %d", len(tt.m), len(tt.want))
+				t.Errorf(
+					"Progress.UpdateFailed() map length = %d, want %d",
+					len(tt.m),
+					len(tt.want),
+				)
+
 				return
 			}
+
 			for id, gotStatus := range tt.m {
 				wantStatus := tt.want[id]
 				if gotStatus.containerID != wantStatus.containerID ||
@@ -353,10 +402,21 @@ func TestProgress_UpdateFailed(t *testing.T) {
 					gotStatus.containerName != wantStatus.containerName ||
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
-					t.Errorf("Progress.UpdateFailed() status for %v = %+v, want %+v", id, gotStatus, wantStatus)
+					t.Errorf(
+						"Progress.UpdateFailed() status for %v = %+v, want %+v",
+						id,
+						gotStatus,
+						wantStatus,
+					)
 				}
+
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
-					t.Errorf("Progress.UpdateFailed() error for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.UpdateFailed() error for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError.Error() != wantStatus.containerError.Error() {
 					t.Errorf("Progress.UpdateFailed() error message for %v = %v, want %v", id, gotStatus.containerError.Error(), wantStatus.containerError.Error())
 				}
@@ -369,6 +429,7 @@ func TestProgress_Add(t *testing.T) {
 	type args struct {
 		update *ContainerStatus
 	}
+
 	tests := []struct {
 		name string
 		m    Progress
@@ -401,10 +462,13 @@ func TestProgress_Add(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.m.Add(tt.args.update)
+
 			if len(tt.m) != len(tt.want) {
 				t.Errorf("Progress.Add() map length = %d, want %d", len(tt.m), len(tt.want))
+
 				return
 			}
+
 			for id, gotStatus := range tt.m {
 				wantStatus := tt.want[id]
 				if gotStatus.containerID != wantStatus.containerID ||
@@ -413,10 +477,21 @@ func TestProgress_Add(t *testing.T) {
 					gotStatus.containerName != wantStatus.containerName ||
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
-					t.Errorf("Progress.Add() status for %v = %+v, want %+v", id, gotStatus, wantStatus)
+					t.Errorf(
+						"Progress.Add() status for %v = %+v, want %+v",
+						id,
+						gotStatus,
+						wantStatus,
+					)
 				}
+
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
-					t.Errorf("Progress.Add() error for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.Add() error for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError.Error() != wantStatus.containerError.Error() {
 					t.Errorf("Progress.Add() error message for %v = %v, want %v", id, gotStatus.containerError.Error(), wantStatus.containerError.Error())
 				}
@@ -429,6 +504,7 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 	type args struct {
 		containerID types.ContainerID
 	}
+
 	tests := []struct {
 		name string
 		m    Progress
@@ -460,10 +536,17 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 				}
 			}()
 			tt.m.MarkForUpdate(tt.args.containerID)
+
 			if len(tt.m) != len(tt.want) {
-				t.Errorf("Progress.MarkForUpdate() map length = %d, want %d", len(tt.m), len(tt.want))
+				t.Errorf(
+					"Progress.MarkForUpdate() map length = %d, want %d",
+					len(tt.m),
+					len(tt.want),
+				)
+
 				return
 			}
+
 			for id, gotStatus := range tt.m {
 				wantStatus := tt.want[id]
 				if gotStatus.containerID != wantStatus.containerID ||
@@ -472,10 +555,21 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 					gotStatus.containerName != wantStatus.containerName ||
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
-					t.Errorf("Progress.MarkForUpdate() status for %v = %+v, want %+v", id, gotStatus, wantStatus)
+					t.Errorf(
+						"Progress.MarkForUpdate() status for %v = %+v, want %+v",
+						id,
+						gotStatus,
+						wantStatus,
+					)
 				}
+
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
-					t.Errorf("Progress.MarkForUpdate() error for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.MarkForUpdate() error for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError.Error() != wantStatus.containerError.Error() {
 					t.Errorf("Progress.MarkForUpdate() error message for %v = %v, want %v", id, gotStatus.containerError.Error(), wantStatus.containerError.Error())
 				}

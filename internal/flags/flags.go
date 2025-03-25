@@ -78,7 +78,12 @@ func RegisterDockerFlags(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
 	flags.StringP("host", "H", envString("DOCKER_HOST"), "daemon socket to connect to")
 	flags.BoolP("tlsverify", "v", envBool("DOCKER_TLS_VERIFY"), "use TLS and verify the remote")
-	flags.StringP("api-version", "a", envString("DOCKER_API_VERSION"), "api version to use by docker client")
+	flags.StringP(
+		"api-version",
+		"a",
+		envString("DOCKER_API_VERSION"),
+		"api version to use by docker client",
+	)
 }
 
 // RegisterSystemFlags adds flags that modify Watchtower’s program flow to the root command.
@@ -150,7 +155,8 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"log-format",
 		"l",
 		viper.GetString("WATCHTOWER_LOG_FORMAT"),
-		"Sets what logging format to use for console output. Possible values: Auto, LogFmt, Pretty, JSON")
+		"Sets what logging format to use for console output. Possible values: Auto, LogFmt, Pretty, JSON",
+	)
 
 	flags.BoolP(
 		"debug",
@@ -233,7 +239,8 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"http-api-periodic-polls",
 		"",
 		envBool("WATCHTOWER_HTTP_API_PERIODIC_POLLS"),
-		"Also run periodic updates (specified with --interval and --schedule) if HTTP API is enabled")
+		"Also run periodic updates (specified with --interval and --schedule) if HTTP API is enabled",
+	)
 
 	// https://no-color.org/
 	flags.BoolP(
@@ -257,7 +264,8 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	flags.String(
 		"log-level",
 		envString("WATCHTOWER_LOG_LEVEL"),
-		"The maximum log level that will be written to STDERR. Possible values: panic, fatal, error, warn, info, debug or trace")
+		"The maximum log level that will be written to STDERR. Possible values: panic, fatal, error, warn, info, debug or trace",
+	)
 
 	flags.BoolP(
 		"health-check",
@@ -286,7 +294,8 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 	flags.String(
 		"notifications-level",
 		envString("WATCHTOWER_NOTIFICATIONS_LEVEL"),
-		"The log level used for sending notifications. Possible values: panic, fatal, error, warn, info or debug")
+		"The log level used for sending notifications. Possible values: panic, fatal, error, warn, info or debug",
+	)
 
 	flags.IntP(
 		"notifications-delay",
@@ -334,7 +343,8 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"notification-email-server-tls-skip-verify",
 		"",
 		envBool("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY"),
-		"Controls whether watchtower verifies the SMTP server's certificate chain and host name. Should only be used for testing.")
+		"Controls whether watchtower verifies the SMTP server's certificate chain and host name. Should only be used for testing.",
+	)
 
 	flags.StringP(
 		"notification-email-server-user",
@@ -412,7 +422,8 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"notification-gotify-tls-skip-verify",
 		"",
 		envBool("WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY"),
-		"Controls whether watchtower verifies the Gotify server's certificate chain and host name. Should only be used for testing.")
+		"Controls whether watchtower verifies the Gotify server's certificate chain and host name. Should only be used for testing.",
+	)
 
 	flags.String(
 		"notification-template",

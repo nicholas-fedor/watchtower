@@ -115,7 +115,11 @@ func ExecutePreUpdateCommand(client container.Client, container types.Container)
 	if err != nil {
 		clog.Errorf("Pre-update command failed: %v", err)
 
-		return true, fmt.Errorf("pre-update command execution failed for container %s: %w", container.Name(), err)
+		return true, fmt.Errorf(
+			"pre-update command execution failed for container %s: %w",
+			container.Name(),
+			err,
+		)
 	}
 
 	return success, nil
@@ -128,7 +132,8 @@ func ExecutePreUpdateCommand(client container.Client, container types.Container)
 func ExecutePostUpdateCommand(client container.Client, newContainerID types.ContainerID) {
 	newContainer, err := client.GetContainer(newContainerID)
 	if err != nil {
-		logrus.WithField("containerID", newContainerID.ShortID()).Errorf("Failed to get container for post-update: %v", err)
+		logrus.WithField("containerID", newContainerID.ShortID()).
+			Errorf("Failed to get container for post-update: %v", err)
 
 		return
 	}
@@ -147,6 +152,11 @@ func ExecutePostUpdateCommand(client container.Client, newContainerID types.Cont
 
 	_, err = client.ExecuteCommand(newContainerID, command, timeout)
 	if err != nil {
-		clog.Errorf("Post-update command failed for container %s (ID: %s): %v", newContainer.Name(), newContainerID.ShortID(), err)
+		clog.Errorf(
+			"Post-update command failed for container %s (ID: %s): %v",
+			newContainer.Name(),
+			newContainerID.ShortID(),
+			err,
+		)
 	}
 }

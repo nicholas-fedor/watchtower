@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	dockerImageType "github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	dockerImageType "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
@@ -48,20 +49,24 @@ var _ = ginkgo.Describe("the manifest module", func() {
 			gomega.Expect(URL).To(gomega.Equal(expected))
 		})
 
-		ginkgo.It("should not prepend library/ for single-part container names in registries other than Docker Hub", func() {
-			imageRef := "docker-registry.domain/imagename:latest"
-			expected := "https://docker-registry.domain/v2/imagename/manifests/latest"
+		ginkgo.It(
+			"should not prepend library/ for single-part container names in registries other than Docker Hub",
+			func() {
+				imageRef := "docker-registry.domain/imagename:latest"
+				expected := "https://docker-registry.domain/v2/imagename/manifests/latest"
 
-			URL, err := buildMockContainerManifestURL(imageRef)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(URL).To(gomega.Equal(expected))
-		})
+				URL, err := buildMockContainerManifestURL(imageRef)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(URL).To(gomega.Equal(expected))
+			},
+		)
 
 		ginkgo.It("should throw an error on pinned images with digest", func() {
 			imageRef := "docker-registry.domain/imagename@sha256:daf7034c5c89775afe3008393ae033529913548243b84926931d7c84398ecda7"
 			URL, err := buildMockContainerManifestURL(imageRef)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("parsed container image reference has no tag"))
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("parsed container image reference has no tag"))
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring(imageRef))
 			gomega.Expect(URL).To(gomega.BeEmpty())
 		})
@@ -105,7 +110,13 @@ func buildMockContainerManifestURL(imageRef string) (string, error) {
 	mockID := "mock-id"
 	mockName := "mock-container"
 	mockCreated := time.Now()
-	mock := mocks.CreateMockContainerWithImageInfo(mockID, mockName, imageRef, mockCreated, imageInfo)
+	mock := mocks.CreateMockContainerWithImageInfo(
+		mockID,
+		mockName,
+		imageRef,
+		mockCreated,
+		imageInfo,
+	)
 
 	return manifest.BuildManifestURL(mock)
 }

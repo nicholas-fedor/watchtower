@@ -7,16 +7,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestNewMetric(t *testing.T) {
 	type args struct {
 		report types.Report
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -31,6 +33,7 @@ func TestNewMetric(t *testing.T) {
 					mock.EXPECT().Updated().Return([]types.ContainerReport{})
 					mock.EXPECT().Stale().Return([]types.ContainerReport{})
 					mock.EXPECT().Failed().Return([]types.ContainerReport{})
+
 					return mock
 				}(),
 			},
@@ -49,6 +52,7 @@ func TestNewMetric(t *testing.T) {
 					mock.EXPECT().Updated().Return(make([]types.ContainerReport, 1))
 					mock.EXPECT().Stale().Return(make([]types.ContainerReport, 2))
 					mock.EXPECT().Failed().Return(make([]types.ContainerReport, 1))
+
 					return mock
 				}(),
 			},
@@ -84,6 +88,7 @@ func TestMetrics_QueueIsEmpty(t *testing.T) {
 			m: func() *Metrics {
 				ch := make(chan *Metric, 10)
 				ch <- &Metric{Scanned: 1}
+
 				return &Metrics{channel: ch}
 			}(),
 			want: false,
@@ -102,6 +107,7 @@ func TestMetrics_Register(t *testing.T) {
 	type args struct {
 		metric *Metric
 	}
+
 	tests := []struct {
 		name string
 		m    *Metrics
@@ -110,7 +116,10 @@ func TestMetrics_Register(t *testing.T) {
 		{
 			name: "register metric",
 			m: func() *Metrics {
-				metrics = &Metrics{channel: make(chan *Metric, 10)} // Set global metrics for Register
+				metrics = &Metrics{
+					channel: make(chan *Metric, 10),
+				} // Set global metrics for Register
+
 				return metrics
 			}(),
 			args: args{
@@ -121,6 +130,7 @@ func TestMetrics_Register(t *testing.T) {
 			name: "register nil metric",
 			m: func() *Metrics {
 				metrics = &Metrics{channel: make(chan *Metric, 10)} // Reset global metrics
+
 				return metrics
 			}(),
 			args: args{
@@ -147,9 +157,11 @@ func TestDefault(t *testing.T) {
 	// Reset metrics to nil to force initialization, but only if not already tested
 	originalMetrics := metrics
 	metrics = nil
+
 	defer func() { metrics = originalMetrics }() // Restore original state after test
 
 	got := Default()
+
 	tests := []struct {
 		name string
 	}{
@@ -158,29 +170,37 @@ func TestDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Logf("Default() returned: %+v", got)
+
 			if got == nil {
 				t.Fatalf("Default() returned nil pointer")
 			}
+
 			if got.channel == nil {
 				t.Errorf("Default().channel is nil")
 			} else if cap(got.channel) != 10 {
 				t.Errorf("Default() channel capacity = %d, want 10", cap(got.channel))
 			}
+
 			if got.scanned == nil {
 				t.Errorf("Default().scanned is nil")
 			}
+
 			if got.updated == nil {
 				t.Errorf("Default().updated is nil")
 			}
+
 			if got.failed == nil {
 				t.Errorf("Default().failed is nil")
 			}
+
 			if got.total == nil {
 				t.Errorf("Default().total is nil")
 			}
+
 			if got.skipped == nil {
 				t.Errorf("Default().skipped is nil")
 			}
+
 			gotAgain := Default()
 			if got != gotAgain {
 				t.Errorf("Default() did not return singleton: got %p, gotAgain %p", got, gotAgain)
@@ -193,6 +213,7 @@ func TestRegisterScan(t *testing.T) {
 	type args struct {
 		metric *Metric
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -231,6 +252,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 	type args struct {
 		channel <-chan *Metric
 	}
+
 	tests := []struct {
 		name string
 		m    *Metrics
@@ -250,6 +272,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 					ch := make(chan *Metric, 1)
 					ch <- &Metric{Scanned: 3, Updated: 2, Failed: 1}
 					close(ch)
+
 					return ch
 				}(),
 			},
@@ -268,6 +291,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 					ch := make(chan *Metric, 1)
 					ch <- nil
 					close(ch)
+
 					return ch
 				}(),
 			},
@@ -280,7 +304,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 			time.Sleep(100 * time.Millisecond) // Allow time for processing
 
 			// Check Prometheus metrics (simplified check since we can't directly access values easily in tests)
-			if tt.args.channel != nil && len(tt.args.channel) > 0 {
+			if len(tt.args.channel) > 0 {
 				t.Errorf("HandleUpdate did not consume all metrics from channel")
 			}
 			// Note: Full verification requires inspecting Prometheus metric values, which is complex in unit tests.

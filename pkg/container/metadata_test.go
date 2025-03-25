@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -345,6 +346,7 @@ func TestContainer_Enabled(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("Container.Enabled() got = %v, want %v", got, tt.want)
 			}
+
 			if got1 != tt.want1 {
 				t.Errorf("Container.Enabled() got1 = %v, want %v", got1, tt.want1)
 			}
@@ -356,6 +358,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 	type args struct {
 		params types.UpdateParams
 	}
+
 	tests := []struct {
 		name string
 		c    Container
@@ -430,6 +433,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 	type args struct {
 		params types.UpdateParams
 	}
+
 	tests := []struct {
 		name string
 		c    Container
@@ -540,6 +544,7 @@ func TestContainer_Scope(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("Container.Scope() got = %v, want %v", got, tt.want)
 			}
+
 			if got1 != tt.want1 {
 				t.Errorf("Container.Scope() got1 = %v, want %v", got1, tt.want1)
 			}
@@ -644,6 +649,7 @@ func TestContainsWatchtowerLabel(t *testing.T) {
 	type args struct {
 		labels map[string]string
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -688,6 +694,7 @@ func TestContainer_getLabelValueOrEmpty(t *testing.T) {
 	type args struct {
 		label string
 	}
+
 	tests := []struct {
 		name string
 		c    Container
@@ -734,6 +741,7 @@ func TestContainer_getLabelValue(t *testing.T) {
 	type args struct {
 		label string
 	}
+
 	tests := []struct {
 		name  string
 		c     Container
@@ -776,6 +784,7 @@ func TestContainer_getLabelValue(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("Container.getLabelValue() got = %v, want %v", got, tt.want)
 			}
+
 			if got1 != tt.want1 {
 				t.Errorf("Container.getLabelValue() got1 = %v, want %v", got1, tt.want1)
 			}
@@ -787,6 +796,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 	type args struct {
 		label string
 	}
+
 	tests := []struct {
 		name    string
 		c       Container
@@ -858,8 +868,10 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 			got, err := tt.c.getBoolLabelValue(tt.args.label)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Container.getBoolLabelValue() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("Container.getBoolLabelValue() = %v, want %v", got, tt.want)
 			}
@@ -873,6 +885,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 		label          string
 		contPrecedence bool
 	}
+
 	tests := []struct {
 		name string
 		c    Container

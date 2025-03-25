@@ -87,7 +87,8 @@ var _ = ginkgo.Describe("Shoutrrr", func() {
 updt1 (mock/updt1:latest): Updated
 `[1:]
 			data := mockDataFromStates(session.UpdatedState)
-			gomega.Expect(getTemplatedResult(`porcelain.v1.summary-no-log`, false, data)).To(gomega.Equal(expected))
+			gomega.Expect(getTemplatedResult(`porcelain.v1.summary-no-log`, false, data)).
+				To(gomega.Equal(expected))
 		})
 	})
 
@@ -96,7 +97,15 @@ updt1 (mock/updt1:latest): Updated
 			ginkgo.It("should be added to the logrus hooks", func() {
 				level := logrus.TraceLevel
 				hooksBefore := len(logrus.StandardLogger().Hooks[level])
-				shoutrrr := createNotifier([]string{}, level, "", true, StaticData{}, false, time.Second)
+				shoutrrr := createNotifier(
+					[]string{},
+					level,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Second,
+				)
 				shoutrrr.AddLogHook()
 				hooksAfter := len(logrus.StandardLogger().Hooks[level])
 				gomega.Expect(hooksAfter).To(gomega.BeNumerically(">", hooksBefore))
@@ -105,7 +114,15 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.When("it is being added a second time", func() {
 			ginkgo.It("should not be added to the logrus hooks", func() {
 				level := logrus.TraceLevel
-				shoutrrr := createNotifier([]string{}, level, "", true, StaticData{}, false, time.Second)
+				shoutrrr := createNotifier(
+					[]string{},
+					level,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Second,
+				)
 				shoutrrr.AddLogHook()
 				hooksBefore := len(logrus.StandardLogger().Hooks[level])
 				shoutrrr.AddLogHook()
@@ -121,7 +138,15 @@ updt1 (mock/updt1:latest): Updated
 				cmd := new(cobra.Command)
 				flags.RegisterNotificationFlags(cmd)
 
-				shoutrrr := createNotifier([]string{}, logrus.TraceLevel, "", true, StaticData{}, false, time.Second)
+				shoutrrr := createNotifier(
+					[]string{},
+					logrus.TraceLevel,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Second,
+				)
 
 				entries := []*logrus.Entry{
 					{
@@ -163,7 +188,8 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.Describe("the default template", func() {
 			ginkgo.When("all containers are fresh", func() {
 				ginkgo.It("should return an empty string", func() {
-					gomega.Expect(getTemplatedResult(``, true, mockDataAllFresh)).To(gomega.Equal(""))
+					gomega.Expect(getTemplatedResult(``, true, mockDataAllFresh)).
+						To(gomega.Equal(""))
 				})
 			})
 		})
@@ -187,21 +213,24 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.When("given a template that is using ToUpper function", func() {
 			ginkgo.It("should return the text in UPPER CASE", func() {
 				tplString := `{{range .}}{{ .Message | ToUpper }}{{end}}`
-				gomega.Expect(getTemplatedResult(tplString, true, legacyMockData)).To(gomega.Equal("FOO BAR"))
+				gomega.Expect(getTemplatedResult(tplString, true, legacyMockData)).
+					To(gomega.Equal("FOO BAR"))
 			})
 		})
 
 		ginkgo.When("given a template that is using ToLower function", func() {
 			ginkgo.It("should return the text in lower case", func() {
 				tplString := `{{range .}}{{ .Message | ToLower }}{{end}}`
-				gomega.Expect(getTemplatedResult(tplString, true, legacyMockData)).To(gomega.Equal("foo bar"))
+				gomega.Expect(getTemplatedResult(tplString, true, legacyMockData)).
+					To(gomega.Equal("foo bar"))
 			})
 		})
 
 		ginkgo.When("given a template that is using Title function", func() {
 			ginkgo.It("should return the text in Title Case", func() {
 				tplString := `{{range .}}{{ .Message | Title }}{{end}}`
-				gomega.Expect(getTemplatedResult(tplString, true, legacyMockData)).To(gomega.Equal("Foo Bar"))
+				gomega.Expect(getTemplatedResult(tplString, true, legacyMockData)).
+					To(gomega.Equal("Foo Bar"))
 			})
 		})
 	})
@@ -215,7 +244,13 @@ updt1 (mock/updt1:latest): Updated
 - frsh1 (mock/frsh1:latest): Fresh
 - skip1 (mock/skip1:latest): Skipped: unpossible
 - fail1 (mock/fail1:latest): Failed: accidentally the whole container`
-				data := mockDataFromStates(session.UpdatedState, session.FreshState, session.FailedState, session.SkippedState, session.UpdatedState)
+				data := mockDataFromStates(
+					session.UpdatedState,
+					session.FreshState,
+					session.FailedState,
+					session.SkippedState,
+					session.UpdatedState,
+				)
 				gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
 			})
 		})
@@ -224,7 +259,8 @@ updt1 (mock/updt1:latest): Updated
 			ginkgo.It("should contain the title in the output", func() {
 				expected := `Watchtower updates on Mock`
 				data := mockDataFromStates(session.UpdatedState)
-				gomega.Expect(getTemplatedResult(`{{ .Title }}`, false, data)).To(gomega.Equal(expected))
+				gomega.Expect(getTemplatedResult(`{{ .Title }}`, false, data)).
+					To(gomega.Equal(expected))
 			})
 		})
 
@@ -232,14 +268,16 @@ updt1 (mock/updt1:latest): Updated
 			ginkgo.It("should contain the hostname in the output", func() {
 				expected := `Mock`
 				data := mockDataFromStates(session.UpdatedState)
-				gomega.Expect(getTemplatedResult(`{{ .Host }}`, false, data)).To(gomega.Equal(expected))
+				gomega.Expect(getTemplatedResult(`{{ .Host }}`, false, data)).
+					To(gomega.Equal(expected))
 			})
 		})
 
 		ginkgo.Describe("the default template", func() {
 			ginkgo.When("all containers are fresh", func() {
 				ginkgo.It("should return an empty string", func() {
-					gomega.Expect(getTemplatedResult(``, false, mockDataAllFresh)).To(gomega.Equal(""))
+					gomega.Expect(getTemplatedResult(``, false, mockDataAllFresh)).
+						To(gomega.Equal(""))
 				})
 			})
 			ginkgo.When("at least one container was updated", func() {
@@ -264,7 +302,8 @@ updt1 (mock/updt1:latest): Updated
 All the smoke might be covering up some problems
 Turns out everything is on fire
 `
-					gomega.Expect(getTemplatedResult(``, false, mockDataMultipleEntries)).To(gomega.Equal(expected))
+					gomega.Expect(getTemplatedResult(``, false, mockDataMultipleEntries)).
+						To(gomega.Equal(expected))
 				})
 			})
 		})
@@ -273,7 +312,15 @@ Turns out everything is on fire
 	ginkgo.When("batching notifications", func() {
 		ginkgo.When("no messages are queued", func() {
 			ginkgo.It("should not send any notification", func() {
-				shoutrrr := createNotifier([]string{"logger://"}, allButTrace, "", true, StaticData{}, false, time.Duration(0))
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					allButTrace,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
 				shoutrrr.StartNotification()
 				shoutrrr.SendNotification(nil)
 				gomega.Consistently(logBuffer).ShouldNot(gbytes.Say(`Shoutrrr:`))
@@ -281,12 +328,21 @@ Turns out everything is on fire
 		})
 		ginkgo.When("at least one message is queued", func() {
 			ginkgo.It("should send a notification", func() {
-				shoutrrr := createNotifier([]string{"logger://"}, allButTrace, "", true, StaticData{}, false, time.Duration(0))
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					allButTrace,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
 				shoutrrr.AddLogHook()
 				shoutrrr.StartNotification()
 				logrus.Info("This log message is sponsored by ContainrrrVPN")
 				shoutrrr.SendNotification(nil)
-				gomega.Eventually(logBuffer).Should(gbytes.Say(`Shoutrrr: This log message is sponsored by ContainrrrVPN`))
+				gomega.Eventually(logBuffer).
+					Should(gbytes.Say(`Shoutrrr: This log message is sponsored by ContainrrrVPN`))
 			})
 		})
 	})
@@ -374,7 +430,10 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNotifier, error) {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
 	if err != nil {
-		logrus.Errorf("Could not use configured notification template: %s. Using default template", err)
+		logrus.Errorf(
+			"Could not use configured notification template: %s. Using default template",
+			err,
+		)
 
 		tplBase := template.New("").Funcs(templates.Funcs)
 

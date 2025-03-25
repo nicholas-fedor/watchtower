@@ -105,7 +105,10 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.When("performing a rolling restart update", func() {
 			ginkgo.It("should try to remove the image once", func() {
 				client := mocks.CreateMockClient(getCommonTestData(""), false, false)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true, RollingRestart: true})
+				_, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true, RollingRestart: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
 			})
@@ -179,7 +182,10 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true, MonitorOnly: true})
+				_, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true, MonitorOnly: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 			})
@@ -206,36 +212,49 @@ var _ = ginkgo.Describe("the update action", func() {
 						false,
 						false,
 					)
-					_, err := actions.Update(client, types.UpdateParams{Cleanup: true, MonitorOnly: true, LabelPrecedence: true})
+					_, err := actions.Update(
+						client,
+						types.UpdateParams{Cleanup: true, MonitorOnly: true, LabelPrecedence: true},
+					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
 				})
-				ginkgo.It("it should update not containers when monitor only is set to true", func() {
-					client := mocks.CreateMockClient(
-						&mocks.TestData{
-							// NameOfContainerToKeep: "test-container-02",
-							Containers: []types.Container{
-								mocks.CreateMockContainerWithConfig(
-									"test-container-02",
-									"test-container-02",
-									"fake-image2:latest",
-									false,
-									false,
-									time.Now(),
-									&container.Config{
-										Labels: map[string]string{
-											"com.centurylinklabs.watchtower.monitor-only": "true",
-										},
-									}),
+				ginkgo.It(
+					"it should update not containers when monitor only is set to true",
+					func() {
+						client := mocks.CreateMockClient(
+							&mocks.TestData{
+								// NameOfContainerToKeep: "test-container-02",
+								Containers: []types.Container{
+									mocks.CreateMockContainerWithConfig(
+										"test-container-02",
+										"test-container-02",
+										"fake-image2:latest",
+										false,
+										false,
+										time.Now(),
+										&container.Config{
+											Labels: map[string]string{
+												"com.centurylinklabs.watchtower.monitor-only": "true",
+											},
+										}),
+								},
 							},
-						},
-						false,
-						false,
-					)
-					_, err := actions.Update(client, types.UpdateParams{Cleanup: true, MonitorOnly: true, LabelPrecedence: true})
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
-				})
+							false,
+							false,
+						)
+						_, err := actions.Update(
+							client,
+							types.UpdateParams{
+								Cleanup:         true,
+								MonitorOnly:     true,
+								LabelPrecedence: true,
+							},
+						)
+						gomega.Expect(err).NotTo(gomega.HaveOccurred())
+						gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+					},
+				)
 				ginkgo.It("it should update not containers when monitor only is not set", func() {
 					client := mocks.CreateMockClient(
 						&mocks.TestData{
@@ -250,7 +269,10 @@ var _ = ginkgo.Describe("the update action", func() {
 						false,
 						false,
 					)
-					_, err := actions.Update(client, types.UpdateParams{Cleanup: true, MonitorOnly: true, LabelPrecedence: true})
+					_, err := actions.Update(
+						client,
+						types.UpdateParams{Cleanup: true, MonitorOnly: true, LabelPrecedence: true},
+					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 				})
@@ -285,7 +307,10 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 				)
 
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true, LifecycleHooks: true})
+				_, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 			})
@@ -316,7 +341,10 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true, LifecycleHooks: true})
+				_, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 			})
@@ -347,7 +375,10 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true, LifecycleHooks: true})
+				_, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
 			})
@@ -423,7 +454,10 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true, LifecycleHooks: true})
+				_, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
 			})
@@ -454,7 +488,10 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true, LifecycleHooks: true})
+				_, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
 			})

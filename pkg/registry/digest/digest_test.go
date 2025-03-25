@@ -14,11 +14,12 @@ import (
 	"testing"
 	"time"
 
-	dockerImageType "github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
+
+	dockerImageType "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
@@ -62,7 +63,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	origClient = auth.Client
 	auth.Client = &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
 })
@@ -128,7 +129,12 @@ var _ = ginkgo.Describe("Digests", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
 					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
+						"WWW-Authenticate": []string{
+							fmt.Sprintf(
+								`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								serverAddr,
+							),
+						},
 					}),
 				),
 				ghttp.CombineHandlers(
@@ -143,7 +149,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerEmptyDigests, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerEmptyDigests,
+				"token",
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
@@ -167,7 +177,12 @@ var _ = ginkgo.Describe("Digests", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
 					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
+						"WWW-Authenticate": []string{
+							fmt.Sprintf(
+								`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								serverAddr,
+							),
+						},
 					}),
 				),
 				ghttp.CombineHandlers(
@@ -182,7 +197,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerWithServer,
+				"token",
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
@@ -198,14 +217,23 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerUnreachable, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerUnreachable,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to execute challenge request"))
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("failed to execute challenge request"))
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("should return an error when container contains no image info", func() {
-			matches, err := digest.CompareDigest(context.Background(), mockContainerNoImage, "user:pass")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerNoImage,
+				"user:pass",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
@@ -222,7 +250,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerInvalidImage, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerInvalidImage,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			// Expect GetToken failure as it catches the invalid reference first
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
@@ -241,7 +273,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerInvalidURL, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerInvalidURL,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			// Expect GetToken failure as it catches the invalid reference first
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
@@ -266,25 +302,33 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
-				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /token request")
 				w.Write([]byte(`{"token": "mock-token"}`))
 			})
-			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Simulating network failure for HEAD request")
-				conn, _, err := w.(http.Hijacker).Hijack() //nolint:forcetypeassert
-				if err != nil {
-					logrus.WithError(err).Error("Failed to hijack connection")
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Simulating network failure for HEAD request")
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						logrus.WithError(err).Error("Failed to hijack connection")
 
-					return
-				}
-				conn.Close() // Simulate network failure
-			})
+						return
+					}
+					conn.Close() // Simulate network failure
+				},
+			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerWithServer,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("HEAD request failed"))
 			gomega.Expect(matches).To(gomega.BeFalse())
@@ -308,7 +352,12 @@ var _ = ginkgo.Describe("Digests", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
 					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
+						"WWW-Authenticate": []string{
+							fmt.Sprintf(
+								`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								serverAddr,
+							),
+						},
 					}),
 				),
 				ghttp.CombineHandlers(
@@ -323,9 +372,14 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerWithServer,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("registry responded with invalid HEAD request"))
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("registry responded with invalid HEAD request"))
 			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
@@ -348,7 +402,12 @@ var _ = ginkgo.Describe("Digests", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
 					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
+						"WWW-Authenticate": []string{
+							fmt.Sprintf(
+								`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								serverAddr,
+							),
+						},
 					}),
 				),
 				ghttp.CombineHandlers(
@@ -363,7 +422,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerWithInvalidDigest, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerWithInvalidDigest,
+				"token",
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
@@ -373,7 +436,8 @@ var _ = ginkgo.Describe("Digests", func() {
 	ginkgo.When("using different registries", func() {
 		ginkgo.It("should work with DockerHub",
 			SkipIfCredentialsEmpty(DockerHubCredentials, func() {
-				ginkgo.GinkgoT().Logf("DockerHubCredentials present: %v", DockerHubCredentials != nil)
+				ginkgo.GinkgoT().
+					Logf("DockerHubCredentials present: %v", DockerHubCredentials != nil)
 			}),
 		)
 
@@ -410,7 +474,12 @@ var _ = ginkgo.Describe("Digests", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
 					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr)},
+						"WWW-Authenticate": []string{
+							fmt.Sprintf(
+								`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								serverAddr,
+							),
+						},
 					}),
 				),
 				ghttp.CombineHandlers(
@@ -436,7 +505,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			matches, err := digest.CompareDigest(context.Background(), mockContainerWithServer, "token")
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				mockContainerWithServer,
+				"token",
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeTrue())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
@@ -490,7 +563,8 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			mux = http.NewServeMux()
 			server = httptest.NewTLSServer(mux)
-			logrus.WithField("server_addr", server.Listener.Addr().String()).Debug("Starting test server")
+			logrus.WithField("server_addr", server.Listener.Addr().String()).
+				Debug("Starting test server")
 		})
 
 		ginkgo.AfterEach(func() {
@@ -513,19 +587,27 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
-				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /token request")
 				w.Write([]byte(`{"token": "mock-token"}`))
 			})
-			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/test/image/manifests/latest request")
-				w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
-			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/test/image/manifests/latest request")
+					w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
+				},
+			)
 
-			result, err := digest.FetchDigest(context.Background(), mockContainerWithServer, "token")
+			result, err := digest.FetchDigest(
+				context.Background(),
+				mockContainerWithServer,
+				"token",
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.Equal(helpers.NormalizeDigest(mockDigestHash)))
 		})
@@ -544,25 +626,33 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
-				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /token request")
 				w.Write([]byte(`{"token": "mock-token"}`))
 			})
-			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Simulating network failure for manifest request")
-				conn, _, err := w.(http.Hijacker).Hijack() //nolint:forcetypeassert
-				if err != nil {
-					logrus.WithError(err).Error("Failed to hijack connection")
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Simulating network failure for manifest request")
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						logrus.WithError(err).Error("Failed to hijack connection")
 
-					return
-				}
-				conn.Close() // Simulate network failure
-			})
+						return
+					}
+					conn.Close() // Simulate network failure
+				},
+			)
 
-			result, err := digest.FetchDigest(context.Background(), mockContainerWithServer, "token")
+			result, err := digest.FetchDigest(
+				context.Background(),
+				mockContainerWithServer,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("GET request failed"))
 			gomega.Expect(result).To(gomega.BeEmpty())
@@ -582,23 +672,27 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
-				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /token request")
 				w.Write([]byte(`{"token": "mock-token"}`))
 			})
-			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Simulating slow response for manifest request")
-				time.Sleep(5 * time.Second) // Delay to exceed context timeout
-				w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
-			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Simulating slow response for manifest request")
+					time.Sleep(5 * time.Second) // Delay to exceed context timeout
+					w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
+				},
+			)
 
 			origClient := auth.Client
 			auth.Client = &http.Client{
 				Transport: &http.Transport{
-					TLSClientConfig:       &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+					TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 					DisableKeepAlives:     true,
 					ResponseHeaderTimeout: 50 * time.Millisecond,
 				},
@@ -628,7 +722,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			result, err := digest.FetchDigest(context.Background(), mockContainerUnreachable, "token")
+			result, err := digest.FetchDigest(
+				context.Background(),
+				mockContainerUnreachable,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
 			gomega.Expect(result).To(gomega.BeEmpty())
@@ -646,7 +744,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			result, err := digest.FetchDigest(context.Background(), mockContainerInvalidImage, "token")
+			result, err := digest.FetchDigest(
+				context.Background(),
+				mockContainerInvalidImage,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			// Expect GetToken failure as it catches the invalid reference first
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
@@ -667,7 +769,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
-				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -675,7 +778,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				w.Write([]byte(`{"token": "mock-token"}`))
 			})
 
-			result, err := digest.FetchDigest(context.Background(), mockContainerInvalidURL, "token")
+			result, err := digest.FetchDigest(
+				context.Background(),
+				mockContainerInvalidURL,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			// Expect GetToken failure as it catches the invalid reference first
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get token"))
@@ -696,21 +803,30 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
-				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /token request")
 				w.Write([]byte(`{"token": "mock-token"}`))
 			})
-			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/test/image/manifests/latest with invalid JSON")
-				w.Write([]byte("invalid-json")) // Invalid JSON to trigger decode failure
-			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/test/image/manifests/latest with invalid JSON")
+					w.Write([]byte("invalid-json")) // Invalid JSON to trigger decode failure
+				},
+			)
 
-			result, err := digest.FetchDigest(context.Background(), mockContainerWithServer, "token")
+			result, err := digest.FetchDigest(
+				context.Background(),
+				mockContainerWithServer,
+				"token",
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to decode manifest response"))
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("failed to decode manifest response"))
 			gomega.Expect(result).To(gomega.BeEmpty())
 		})
 	})

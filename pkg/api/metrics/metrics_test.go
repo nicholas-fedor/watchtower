@@ -58,7 +58,8 @@ var _ = ginkgo.Describe("the metrics API", func() {
 	tryGetMetrics := func() map[string]string { return getWithToken(handleReq) }
 
 	ginkgo.It("should serve metrics", func() {
-		gomega.Expect(tryGetMetrics()).To(gomega.HaveKeyWithValue("watchtower_containers_updated", "0"))
+		gomega.Expect(tryGetMetrics()).
+			To(gomega.HaveKeyWithValue("watchtower_containers_updated", "0"))
 
 		metric := &metrics.Metric{
 			Scanned: 4,

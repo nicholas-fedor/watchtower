@@ -33,7 +33,9 @@ var errPreUpdateFailed = errors.New("pre-update command failed")
 
 // errSkipUpdate signals that a container update should be skipped due to a specific condition.
 // It is used when the pre-update command returns exit code 75 (EX_TEMPFAIL).
-var errSkipUpdate = errors.New("skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)")
+var errSkipUpdate = errors.New(
+	"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
+)
 
 // errStopContainerFailed indicates a failure to stop a container.
 // It is used to wrap errors from client.StopContainer for consistent error handling.
@@ -82,7 +84,11 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 		}
 
 		if err != nil {
-			logrus.Infof("Unable to update container %q: %v. Proceeding to next.", targetContainer.Name(), err)
+			logrus.Infof(
+				"Unable to update container %q: %v. Proceeding to next.",
+				targetContainer.Name(),
+				err,
+			)
 
 			stale = false
 			staleCheckFailed++
@@ -135,7 +141,11 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 // performRollingRestart updates containers using a rolling restart strategy.
 // It processes containers in reverse order, stopping and restarting stale ones,
 // and returns a map of container IDs to any errors encountered.
-func performRollingRestart(containers []types.Container, client container.Client, params types.UpdateParams) map[types.ContainerID]error {
+func performRollingRestart(
+	containers []types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) map[types.ContainerID]error {
 	cleanupImageIDs := make(map[types.ImageID]bool, len(containers))
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -164,7 +174,11 @@ func performRollingRestart(containers []types.Container, client container.Client
 
 // stopContainersInReversedOrder stops containers in reverse order based on their update needs.
 // It returns maps of failed stops and stopped image IDs for further processing.
-func stopContainersInReversedOrder(containers []types.Container, client container.Client, params types.UpdateParams) (map[types.ContainerID]error, map[types.ImageID]bool) {
+func stopContainersInReversedOrder(
+	containers []types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) (map[types.ContainerID]error, map[types.ImageID]bool) {
 	failed := make(map[types.ContainerID]error, len(containers))
 	stopped := make(map[types.ImageID]bool, len(containers))
 
@@ -182,7 +196,11 @@ func stopContainersInReversedOrder(containers []types.Container, client containe
 
 // stopStaleContainer stops a container if it is stale and eligible for update.
 // It skips Watchtower containers and non-restart candidates, handling lifecycle hooks if enabled.
-func stopStaleContainer(container types.Container, client container.Client, params types.UpdateParams) error {
+func stopStaleContainer(
+	container types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) error {
 	if container.IsWatchtower() {
 		logrus.Debugf("This is the watchtower container %s", container.Name())
 
@@ -210,7 +228,9 @@ func stopStaleContainer(container types.Container, client container.Client, para
 		}
 
 		if skipUpdate {
-			logrus.Debug("Skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
+			logrus.Debug(
+				"Skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)",
+			)
 
 			return errSkipUpdate
 		}
@@ -227,7 +247,12 @@ func stopStaleContainer(container types.Container, client container.Client, para
 
 // restartContainersInSortedOrder restarts containers in sorted order based on prior stops.
 // It processes only previously stopped containers and returns a map of failed restarts.
-func restartContainersInSortedOrder(containers []types.Container, client container.Client, params types.UpdateParams, stoppedImages map[types.ImageID]bool) map[types.ContainerID]error {
+func restartContainersInSortedOrder(
+	containers []types.Container,
+	client container.Client,
+	params types.UpdateParams,
+	stoppedImages map[types.ImageID]bool,
+) map[types.ContainerID]error {
 	cleanupImageIDs := make(map[types.ImageID]bool, len(containers))
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -269,7 +294,11 @@ func cleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 
 // restartStaleContainer restarts a stale container, handling Watchtower renaming if needed.
 // It starts the new container and executes post-update hooks if applicable, returning any errors.
-func restartStaleContainer(container types.Container, client container.Client, params types.UpdateParams) error {
+func restartStaleContainer(
+	container types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) error {
 	// Rename the current Watchtower instance to free its name for the new one.
 	if container.IsWatchtower() {
 		if err := client.RenameContainer(container, util.RandName()); err != nil {

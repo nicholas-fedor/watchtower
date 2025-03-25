@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	dockerContainerTypes "github.com/docker/docker/api/types/container"
-	dockerImageTypes "github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	dockerContainerTypes "github.com/docker/docker/api/types/container"
+	dockerImageTypes "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -75,9 +76,18 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			ginkgo.It("sorts containers in ascending order", func() {
 				now := time.Now()
 				containers := []types.Container{
-					&mockContainer{name: "c3", created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano)},
-					&mockContainer{name: "c1", created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano)},
-					&mockContainer{name: "c2", created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano)},
+					&mockContainer{
+						name:    "c3",
+						created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
+					},
+					&mockContainer{
+						name:    "c1",
+						created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano),
+					},
+					&mockContainer{
+						name:    "c2",
+						created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
+					},
 				}
 				sort.Sort(sorter.ByCreated(containers))
 				gomega.Expect(containers[0].Name()).To(gomega.Equal("c1"))

@@ -88,7 +88,8 @@ var _ = ginkgo.Describe("API", func() {
 			apiInstance := api.New(testToken)
 			err := apiInstance.Start(context.Background(), true)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Eventually(logBuffer.String, 100*time.Millisecond).Should(gomega.ContainSubstring("Watchtower HTTP API skipped."))
+			gomega.Eventually(logBuffer.String, 100*time.Millisecond).
+				Should(gomega.ContainSubstring("Watchtower HTTP API skipped."))
 		})
 
 		ginkgo.It("should fail with a fatal log when token is empty", func() {
@@ -107,8 +108,10 @@ var _ = ginkgo.Describe("API", func() {
 			originalExit := logrus.StandardLogger().ExitFunc
 			logrus.StandardLogger().ExitFunc = func(int) { panic("fatal exit") }
 			defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-			gomega.Expect(func() { _ = emptyTokenAPI.Start(context.Background(), true) }).To(gomega.Panic())
-			gomega.Expect(logOutput).To(gomega.ContainSubstring("api token is empty or has not been set. exiting"))
+			gomega.Expect(func() { _ = emptyTokenAPI.Start(context.Background(), true) }).
+				To(gomega.Panic())
+			gomega.Expect(logOutput).
+				To(gomega.ContainSubstring("api token is empty or has not been set. exiting"))
 		})
 
 		ginkgo.It("should start server synchronously and serve requests", func() {
@@ -134,17 +137,26 @@ var _ = ginkgo.Describe("API", func() {
 			}()
 
 			gomega.Eventually(func() error {
-				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-sync", port), nil)
+				req, _ := http.NewRequest(
+					http.MethodGet,
+					fmt.Sprintf("http://127.0.0.1:%d/test-sync", port),
+					nil,
+				)
 				req.Header.Set("Authorization", "Bearer "+testToken)
 				resp, reqErr := http.DefaultClient.Do(req)
 				if reqErr != nil {
 					return reqErr
 				}
 				defer resp.Body.Close()
+
 				return nil
 			}, 400*time.Millisecond, 5*time.Millisecond).Should(gomega.Succeed())
 
-			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-sync", port), nil)
+			req, _ := http.NewRequest(
+				http.MethodGet,
+				fmt.Sprintf("http://127.0.0.1:%d/test-sync", port),
+				nil,
+			)
 			req.Header.Set("Authorization", "Bearer "+testToken)
 			resp, err := http.DefaultClient.Do(req)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -158,7 +170,8 @@ var _ = ginkgo.Describe("API", func() {
 			case err := <-errChan:
 				// Accept nil or context.Canceled as valid outcomes
 				if err != nil && !errors.Is(err, context.Canceled) {
-					gomega.Expect(err).ToNot(gomega.HaveOccurred(), "Expected no error or context.Canceled, got unexpected error")
+					gomega.Expect(err).
+						ToNot(gomega.HaveOccurred(), "Expected no error or context.Canceled, got unexpected error")
 				}
 			case <-time.After(500 * time.Millisecond):
 				ginkgo.Fail("Timeout waiting for server to stop")
@@ -184,7 +197,11 @@ var _ = ginkgo.Describe("API", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
-				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-async", port), nil)
+				req, _ := http.NewRequest(
+					http.MethodGet,
+					fmt.Sprintf("http://127.0.0.1:%d/test-async", port),
+					nil,
+				)
 				req.Header.Set("Authorization", "Bearer "+testToken)
 				resp, reqErr := http.DefaultClient.Do(req)
 				if reqErr != nil {
@@ -195,7 +212,11 @@ var _ = ginkgo.Describe("API", func() {
 				return nil
 			}, 500*time.Millisecond, 10*time.Millisecond).Should(gomega.Succeed())
 
-			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-async", port), nil)
+			req, _ := http.NewRequest(
+				http.MethodGet,
+				fmt.Sprintf("http://127.0.0.1:%d/test-async", port),
+				nil,
+			)
 			req.Header.Set("Authorization", "Bearer "+testToken)
 			resp, err := http.DefaultClient.Do(req)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -205,7 +226,8 @@ var _ = ginkgo.Describe("API", func() {
 			gomega.Expect(string(body)).To(gomega.Equal("Hello!"))
 
 			cancel()
-			gomega.Eventually(logBuffer.String, 100*time.Millisecond).ShouldNot(gomega.ContainSubstring("HTTP server failed"))
+			gomega.Eventually(logBuffer.String, 100*time.Millisecond).
+				ShouldNot(gomega.ContainSubstring("HTTP server failed"))
 		})
 
 		ginkgo.It("should start server asynchronously and log error on failure", func() {
@@ -297,7 +319,11 @@ var _ = ginkgo.Describe("API", func() {
 			}
 
 			gomega.Eventually(func() error {
-				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-shutdown", port), nil)
+				req, _ := http.NewRequest(
+					http.MethodGet,
+					fmt.Sprintf("http://127.0.0.1:%d/test-shutdown", port),
+					nil,
+				)
 				req.Header.Set("Authorization", "Bearer "+testToken)
 				_, err := http.DefaultClient.Do(req)
 
@@ -346,7 +372,11 @@ var _ = ginkgo.Describe("API", func() {
 			}()
 
 			gomega.Eventually(func() error {
-				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-handler", port), nil)
+				req, _ := http.NewRequest(
+					http.MethodGet,
+					fmt.Sprintf("http://127.0.0.1:%d/test-handler", port),
+					nil,
+				)
 				req.Header.Set("Authorization", "Bearer "+testToken)
 				resp, reqErr := http.DefaultClient.Do(req)
 				if reqErr != nil {
@@ -358,7 +388,11 @@ var _ = ginkgo.Describe("API", func() {
 			}, 400*time.Millisecond, 5*time.Millisecond).Should(gomega.Succeed())
 
 			// Valid token request
-			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-handler", port), nil)
+			req, _ := http.NewRequest(
+				http.MethodGet,
+				fmt.Sprintf("http://127.0.0.1:%d/test-handler", port),
+				nil,
+			)
 			req.Header.Set("Authorization", "Bearer "+testToken)
 			resp, err := http.DefaultClient.Do(req)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -368,7 +402,11 @@ var _ = ginkgo.Describe("API", func() {
 			gomega.Expect(string(body)).To(gomega.Equal("Hello!"))
 
 			// Invalid token request
-			req, _ = http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/test-handler", port), nil)
+			req, _ = http.NewRequest(
+				http.MethodGet,
+				fmt.Sprintf("http://127.0.0.1:%d/test-handler", port),
+				nil,
+			)
 			req.Header.Set("Authorization", "Bearer wrongtoken")
 			resp, err = http.DefaultClient.Do(req)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())

@@ -122,7 +122,10 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	}
 
 	if err := os.Remove(outFile.Name()); err != nil {
-		logf("Failed to remove file, it may still be present in the container image! Error: %v", err)
+		logf(
+			"Failed to remove file, it may still be present in the container image! Error: %v",
+			err,
+		)
 	} else {
 		logf("Environment file has been removed.")
 	}

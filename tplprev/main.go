@@ -19,7 +19,12 @@ func main() {
 
 	var entries string
 
-	flag.StringVar(&states, "states", "cccuuueeekkktttfff", "sCanned, Updated, failEd, sKipped, sTale, Fresh")
+	flag.StringVar(
+		&states,
+		"states",
+		"cccuuueeekkktttfff",
+		"sCanned, Updated, failEd, sKipped, sTale, Fresh",
+	)
 	flag.StringVar(&entries, "entries", "ewwiiidddd", "Fatal,Error,Warn,Info,Debug,Trace")
 
 	flag.Parse()
@@ -40,7 +45,11 @@ func main() {
 		return
 	}
 
-	result, err := preview.Render(string(input), data.StatesFromString(states), data.LevelsFromString(entries))
+	result, err := preview.Render(
+		string(input),
+		data.StatesFromString(states),
+		data.LevelsFromString(entries),
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read template file %q: %v\n", flag.Arg(0), err)
 		os.Exit(1)

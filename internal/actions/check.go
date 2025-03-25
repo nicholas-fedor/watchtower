@@ -17,7 +17,9 @@ import (
 
 // errRollingRestartDependency indicates a container has dependencies incompatible with rolling restarts.
 // It is used in CheckForSanity to report configuration errors.
-var errRollingRestartDependency = errors.New("container has dependencies incompatible with rolling restarts")
+var errRollingRestartDependency = errors.New(
+	"container has dependencies incompatible with rolling restarts",
+)
 
 // errStopWatchtowerFailed indicates a failure to stop excess Watchtower instances.
 // It is used in cleanupExcessWatchtowers to report aggregated stop errors.
@@ -41,7 +43,11 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 
 		for _, c := range containers {
 			if len(c.Links()) > 0 {
-				return fmt.Errorf("%w: %q depends on at least one other container", errRollingRestartDependency, c.Name())
+				return fmt.Errorf(
+					"%w: %q depends on at least one other container",
+					errRollingRestartDependency,
+					c.Name(),
+				)
 			}
 		}
 	}
@@ -52,7 +58,11 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 // CheckForMultipleWatchtowerInstances ensures only one Watchtower instance runs at a time.
 // It stops and optionally removes all but the most recently started Watchtower container,
 // unless a scope UID is provided to bypass this check.
-func CheckForMultipleWatchtowerInstances(client container.Client, cleanup bool, scope string) error {
+func CheckForMultipleWatchtowerInstances(
+	client container.Client,
+	cleanup bool,
+	scope string,
+) error {
 	filter := filters.WatchtowerContainersFilter
 	if scope != "" {
 		filter = filters.FilterByScope(scope, filter)
@@ -76,7 +86,11 @@ func CheckForMultipleWatchtowerInstances(client container.Client, cleanup bool, 
 
 // cleanupExcessWatchtowers stops and optionally removes all but the latest Watchtower container.
 // It sorts containers by creation time, processes all except the most recent, and reports any stop errors.
-func cleanupExcessWatchtowers(containers []types.Container, client container.Client, cleanup bool) error {
+func cleanupExcessWatchtowers(
+	containers []types.Container,
+	client container.Client,
+	cleanup bool,
+) error {
 	var stopErrors int
 
 	sort.Sort(sorter.ByCreated(containers))
@@ -95,7 +109,8 @@ func cleanupExcessWatchtowers(containers []types.Container, client container.Cli
 
 		if cleanup {
 			if err := client.RemoveImageByID(c.ImageID()); err != nil {
-				logrus.WithError(err).Warning("Could not cleanup watchtower images, possibly because of other watchtowers instances in other scopes.")
+				logrus.WithError(err).
+					Warning("Could not cleanup watchtower images, possibly because of other watchtowers instances in other scopes.")
 			}
 		}
 	}

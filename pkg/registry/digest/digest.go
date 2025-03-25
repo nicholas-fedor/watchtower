@@ -68,7 +68,11 @@ type manifestResponse struct {
 // Returns:
 //   - bool: True if any local digest matches the remote digest, indicating the image is up-to-date; false otherwise.
 //   - error: An error if the operation fails (e.g., missing image info, request failure), nil if successful.
-func CompareDigest(ctx context.Context, container types.Container, registryAuth string) (bool, error) {
+func CompareDigest(
+	ctx context.Context,
+	container types.Container,
+	registryAuth string,
+) (bool, error) {
 	// Ensure the container has image metadata to proceed with digest comparison.
 	if !container.HasImageInfo() {
 		return false, errMissingImageInfo
@@ -114,7 +118,11 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 // Returns:
 //   - string: The normalized digest extracted from the response.
 //   - error: An error if any step (auth, URL, request, extraction) fails, nil if successful.
-func fetchDigest(ctx context.Context, container types.Container, registryAuth, method string) (string, error) {
+func fetchDigest(
+	ctx context.Context,
+	container types.Container,
+	registryAuth, method string,
+) (string, error) {
 	// Transform the provided auth string into a usable format for registry authentication.
 	registryAuth = TransformAuth(registryAuth)
 
@@ -171,7 +179,12 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 	if digest == "" {
 		wwwAuthHeader := resp.Header.Get("Www-Authenticate")
 
-		return "", fmt.Errorf("%w: status %q, auth: %q", errInvalidRegistryResponse, resp.Status, wwwAuthHeader)
+		return "", fmt.Errorf(
+			"%w: status %q, auth: %q",
+			errInvalidRegistryResponse,
+			resp.Status,
+			wwwAuthHeader,
+		)
 	}
 
 	return helpers.NormalizeDigest(digest), nil
@@ -190,7 +203,11 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 func extractGetDigest(resp *http.Response) (string, error) {
 	var response manifestResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return "", fmt.Errorf("%w: failed to decode manifest response: %w", errDigestExtractionFailed, err)
+		return "", fmt.Errorf(
+			"%w: failed to decode manifest response: %w",
+			errDigestExtractionFailed,
+			err,
+		)
 	}
 
 	return helpers.NormalizeDigest(response.Digest), nil

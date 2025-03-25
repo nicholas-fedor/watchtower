@@ -48,7 +48,19 @@ func (r *report) Fresh() []types.ContainerReport {
 
 // Deduplicates by container ID, prioritizing updated, failed, skipped, stale, fresh, then scanned.
 func (r *report) All() []types.ContainerReport {
-	allLen := len(r.scanned) + len(r.updated) + len(r.failed) + len(r.skipped) + len(r.stale) + len(r.fresh)
+	allLen := len(
+		r.scanned,
+	) + len(
+		r.updated,
+	) + len(
+		r.failed,
+	) + len(
+		r.skipped,
+	) + len(
+		r.stale,
+	) + len(
+		r.fresh,
+	)
 	all := make([]types.ContainerReport, 0, allLen)
 	presentIDs := map[types.ContainerID][]string{}
 
@@ -108,6 +120,7 @@ func NewReport(progress Progress) types.Report {
 func categorizeContainer(report *report, update *ContainerStatus) {
 	if update.state == SkippedState {
 		report.skipped = append(report.skipped, update)
+
 		return
 	}
 
@@ -118,6 +131,7 @@ func categorizeContainer(report *report, update *ContainerStatus) {
 	if update.newImage == update.oldImage {
 		update.state = FreshState
 		report.fresh = append(report.fresh, update)
+
 		return
 	}
 

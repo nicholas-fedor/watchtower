@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/go-connections/nat"
+
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerImageType "github.com/docker/docker/api/types/image"
-	"github.com/docker/go-connections/nat"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -30,7 +31,10 @@ type Container struct {
 // NewContainer creates a new Container instance with the specified metadata.
 // It initializes the container with the provided containerInfo and imageInfo,
 // setting LinkedToRestarting and Stale to false by default.
-func NewContainer(containerInfo *dockerContainerType.InspectResponse, imageInfo *dockerImageType.InspectResponse) *Container {
+func NewContainer(
+	containerInfo *dockerContainerType.InspectResponse,
+	imageInfo *dockerImageType.InspectResponse,
+) *Container {
 	return &Container{
 		LinkedToRestarting: false,
 		Stale:              false,

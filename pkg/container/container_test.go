@@ -1,10 +1,11 @@
 package container
 
 import (
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerNat "github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerNat "github.com/docker/go-connections/nat"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -60,14 +61,17 @@ var _ = ginkgo.Describe("the container", func() {
 				gomega.Expect(c.containerInfo.Config.ExposedPorts).To(gomega.BeEmpty())
 			})
 		})
-		ginkgo.When("verifying a container with port bindings and exposed ports is non-nil", func() {
-			ginkgo.It("should return an error", func() {
-				c := MockContainer(WithPortBindings("80/tcp"))
-				c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{"80/tcp": {}}
-				err := c.VerifyConfiguration()
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			})
-		})
+		ginkgo.When(
+			"verifying a container with port bindings and exposed ports is non-nil",
+			func() {
+				ginkgo.It("should return an error", func() {
+					c := MockContainer(WithPortBindings("80/tcp"))
+					c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{"80/tcp": {}}
+					err := c.VerifyConfiguration()
+					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				})
+			},
+		)
 	})
 	ginkgo.Describe("GetCreateConfig", func() {
 		ginkgo.When("container healthcheck config is equal to image config", func() {
@@ -77,28 +81,32 @@ var _ = ginkgo.Describe("the container", func() {
 				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Test: []string{"/usr/bin/sleep", "1s"},
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).
+					To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 
 				mockContainer = MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					Timeout: 30,
 				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Timeout: 30,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).
+					To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 
 				mockContainer = MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					StartPeriod: 30,
 				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					StartPeriod: 30,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).
+					To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 
 				mockContainer = MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
 					Retries: 30,
 				}), WithImageHealthcheck(dockerContainerType.HealthConfig{
 					Retries: 30,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).
+					To(gomega.Equal(&dockerContainerType.HealthConfig{}))
 			})
 		})
 		ginkgo.When("container healthcheck config is different to image config", func() {
@@ -116,24 +124,27 @@ var _ = ginkgo.Describe("the container", func() {
 					StartPeriod: 30,
 					Retries:     10,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{
-					Test:        []string{"/usr/bin/sleep", "1s"},
-					Interval:    30,
-					Timeout:     30,
-					StartPeriod: 10,
-					Retries:     2,
-				}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).
+					To(gomega.Equal(&dockerContainerType.HealthConfig{
+						Test:        []string{"/usr/bin/sleep", "1s"},
+						Interval:    30,
+						Timeout:     30,
+						StartPeriod: 10,
+						Retries:     2,
+					}))
 			})
 		})
 		ginkgo.When("container healthcheck config is empty", func() {
 			ginkgo.It("should not panic", func() {
-				mockContainer := MockContainer(WithImageHealthcheck(dockerContainerType.HealthConfig{
-					Test:        []string{"/usr/bin/sleep", "10s"},
-					Interval:    10,
-					Timeout:     60,
-					StartPeriod: 30,
-					Retries:     10,
-				}))
+				mockContainer := MockContainer(
+					WithImageHealthcheck(dockerContainerType.HealthConfig{
+						Test:        []string{"/usr/bin/sleep", "10s"},
+						Interval:    10,
+						Timeout:     60,
+						StartPeriod: 30,
+						Retries:     10,
+					}),
+				)
 				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.BeNil())
 			})
 		})
@@ -146,13 +157,14 @@ var _ = ginkgo.Describe("the container", func() {
 					StartPeriod: 10,
 					Retries:     2,
 				}))
-				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).To(gomega.Equal(&dockerContainerType.HealthConfig{
-					Test:        []string{"/usr/bin/sleep", "1s"},
-					Interval:    30,
-					Timeout:     30,
-					StartPeriod: 10,
-					Retries:     2,
-				}))
+				gomega.Expect(mockContainer.GetCreateConfig().Healthcheck).
+					To(gomega.Equal(&dockerContainerType.HealthConfig{
+						Test:        []string{"/usr/bin/sleep", "1s"},
+						Interval:    30,
+						Timeout:     30,
+						StartPeriod: 10,
+						Retries:     2,
+					}))
 			})
 		})
 	})
@@ -181,13 +193,18 @@ var _ = ginkgo.Describe("the container", func() {
 			gomega.Expect(enabled).To(gomega.BeTrue())
 			gomega.Expect(exists).To(gomega.BeTrue())
 		})
-		ginkgo.It("should return false, true if present but not true on calls to .Enabled()", func() {
-			container = MockContainer(WithLabels(map[string]string{"com.centurylinklabs.watchtower.enable": "false"}))
-			enabled, exists := container.Enabled()
+		ginkgo.It(
+			"should return false, true if present but not true on calls to .Enabled()",
+			func() {
+				container = MockContainer(
+					WithLabels(map[string]string{"com.centurylinklabs.watchtower.enable": "false"}),
+				)
+				enabled, exists := container.Enabled()
 
-			gomega.Expect(enabled).To(gomega.BeFalse())
-			gomega.Expect(exists).To(gomega.BeTrue())
-		})
+				gomega.Expect(enabled).To(gomega.BeFalse())
+				gomega.Expect(exists).To(gomega.BeTrue())
+			},
+		)
 		ginkgo.It("should return false, false if not present on calls to .Enabled()", func() {
 			container = MockContainer(WithLabels(map[string]string{"lol": "false"}))
 			enabled, exists := container.Enabled()
@@ -196,7 +213,9 @@ var _ = ginkgo.Describe("the container", func() {
 			gomega.Expect(exists).To(gomega.BeFalse())
 		})
 		ginkgo.It("should return false, false if present but not parsable .Enabled()", func() {
-			container = MockContainer(WithLabels(map[string]string{"com.centurylinklabs.watchtower.enable": "falsy"}))
+			container = MockContainer(
+				WithLabels(map[string]string{"com.centurylinklabs.watchtower.enable": "falsy"}),
+			)
 			enabled, exists := container.Enabled()
 
 			gomega.Expect(enabled).To(gomega.BeFalse())
@@ -208,7 +227,9 @@ var _ = ginkgo.Describe("the container", func() {
 				gomega.Expect(isWatchtower).To(gomega.BeTrue())
 			})
 			ginkgo.It("should return false if the label is present but set to false", func() {
-				container = MockContainer(WithLabels(map[string]string{"com.centurylinklabs.watchtower": "false"}))
+				container = MockContainer(
+					WithLabels(map[string]string{"com.centurylinklabs.watchtower": "false"}),
+				)
 				isWatchtower := container.IsWatchtower()
 				gomega.Expect(isWatchtower).To(gomega.BeFalse())
 			})
@@ -268,21 +289,24 @@ var _ = ginkgo.Describe("the container", func() {
 						"com.centurylinklabs.watchtower.depends-on": "postgres",
 					}))
 					links := container.Links()
-					gomega.Expect(links).To(gomega.SatisfyAll(gomega.ContainElement("/postgres"), gomega.HaveLen(1)))
+					gomega.Expect(links).
+						To(gomega.SatisfyAll(gomega.ContainElement("/postgres"), gomega.HaveLen(1)))
 				})
 				ginkgo.It("should fetch depending containers if there are many", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres,redis",
 					}))
 					links := container.Links()
-					gomega.Expect(links).To(gomega.SatisfyAll(gomega.ContainElement("/postgres"), gomega.ContainElement("/redis"), gomega.HaveLen(2)))
+					gomega.Expect(links).
+						To(gomega.SatisfyAll(gomega.ContainElement("/postgres"), gomega.ContainElement("/redis"), gomega.HaveLen(2)))
 				})
 				ginkgo.It("should only add slashes to names when they are missing", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "/postgres,redis",
 					}))
 					links := container.Links()
-					gomega.Expect(links).To(gomega.SatisfyAll(gomega.ContainElement("/postgres"), gomega.ContainElement("/redis")))
+					gomega.Expect(links).
+						To(gomega.SatisfyAll(gomega.ContainElement("/postgres"), gomega.ContainElement("/redis")))
 				})
 				ginkgo.It("should fetch depending containers if label is blank", func() {
 					container = MockContainer(WithLabels(map[string]string{
@@ -299,7 +323,8 @@ var _ = ginkgo.Describe("the container", func() {
 						"postgres:test-watchtower",
 					}))
 					links := container.Links()
-					gomega.Expect(links).To(gomega.SatisfyAll(gomega.ContainElement("redis"), gomega.ContainElement("postgres"), gomega.HaveLen(2)))
+					gomega.Expect(links).
+						To(gomega.SatisfyAll(gomega.ContainElement("redis"), gomega.ContainElement("postgres"), gomega.HaveLen(2)))
 				})
 			})
 		})
@@ -343,7 +368,8 @@ var _ = ginkgo.Describe("the container", func() {
 						"com.centurylinklabs.watchtower.no-pull": "true",
 					}))
 					ginkgo.It("should return true", func() {
-						gomega.Expect(c.IsNoPull(types.UpdateParams{NoPull: true})).To(gomega.BeTrue())
+						gomega.Expect(c.IsNoPull(types.UpdateParams{NoPull: true})).
+							To(gomega.BeTrue())
 					})
 				})
 				ginkgo.When("no-pull label is false", func() {
@@ -351,7 +377,8 @@ var _ = ginkgo.Describe("the container", func() {
 						"com.centurylinklabs.watchtower.no-pull": "false",
 					}))
 					ginkgo.It("should return true", func() {
-						gomega.Expect(c.IsNoPull(types.UpdateParams{NoPull: true})).To(gomega.BeTrue())
+						gomega.Expect(c.IsNoPull(types.UpdateParams{NoPull: true})).
+							To(gomega.BeTrue())
 					})
 				})
 				ginkgo.When("label-take-precedence argument is set to true", func() {
@@ -360,7 +387,8 @@ var _ = ginkgo.Describe("the container", func() {
 							"com.centurylinklabs.watchtower.no-pull": "true",
 						}))
 						ginkgo.It("should return true", func() {
-							gomega.Expect(c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true})).To(gomega.BeTrue())
+							gomega.Expect(c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true})).
+								To(gomega.BeTrue())
 						})
 					})
 					ginkgo.When("no-pull label is false", func() {
@@ -368,7 +396,8 @@ var _ = ginkgo.Describe("the container", func() {
 							"com.centurylinklabs.watchtower.no-pull": "false",
 						}))
 						ginkgo.It("should return false", func() {
-							gomega.Expect(c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true})).To(gomega.BeFalse())
+							gomega.Expect(c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true})).
+								To(gomega.BeFalse())
 						})
 					})
 				})

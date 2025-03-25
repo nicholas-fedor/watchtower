@@ -111,8 +111,15 @@ var _ = ginkgo.Describe("JSON template", func() {
 		},
 		"title": "Watchtower updates on Mock"
 }`
-				data := mockDataFromStates(session.UpdatedState, session.FreshState, session.FailedState, session.SkippedState, session.UpdatedState)
-				gomega.Expect(getTemplatedResult(`json.v1`, false, data)).To(gomega.MatchJSON(expected))
+				data := mockDataFromStates(
+					session.UpdatedState,
+					session.FreshState,
+					session.FailedState,
+					session.SkippedState,
+					session.UpdatedState,
+				)
+				gomega.Expect(getTemplatedResult(`json.v1`, false, data)).
+					To(gomega.MatchJSON(expected))
 			})
 		})
 	})

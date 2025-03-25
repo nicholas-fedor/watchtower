@@ -103,7 +103,11 @@ func (client MockClient) ExecuteCommand(_ types.ContainerID, command string, _ i
 	case "/PreUpdateReturn0.sh":
 		return false, nil // Command succeeds (exit 0), no skip.
 	case "/PreUpdateReturn1.sh":
-		return false, fmt.Errorf("%w: %s", errCommandFailed, "code 1") // Command fails (exit 1), no skip.
+		return false, fmt.Errorf(
+			"%w: %s",
+			errCommandFailed,
+			"code 1",
+		) // Command fails (exit 1), no skip.
 	case "/PreUpdateReturn75.sh":
 		return true, nil // Command succeeds (exit 75), signals skip.
 	default:
@@ -113,7 +117,10 @@ func (client MockClient) ExecuteCommand(_ types.ContainerID, command string, _ i
 
 // IsContainerStale determines if a container is stale based on TestData’s Staleness map.
 // It returns true if the container’s name isn’t explicitly marked as fresh, along with an empty ImageID and no error.
-func (client MockClient) IsContainerStale(cont types.Container, _ types.UpdateParams) (bool, types.ImageID, error) {
+func (client MockClient) IsContainerStale(
+	cont types.Container,
+	_ types.UpdateParams,
+) (bool, types.ImageID, error) {
 	stale, found := client.TestData.Staleness[cont.Name()]
 	if !found {
 		stale = true // Default to stale if not specified.

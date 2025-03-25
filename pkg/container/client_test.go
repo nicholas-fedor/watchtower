@@ -4,15 +4,15 @@ import (
 	"net/http"
 	"time"
 
-	dockerBackendType "github.com/docker/docker/api/types/backend"
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerClient "github.com/docker/docker/client"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 
+	dockerBackendType "github.com/docker/docker/api/types/backend"
+	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerClient "github.com/docker/docker/client"
 	gomegaTypes "github.com/onsi/gomega/types"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -35,12 +35,19 @@ var _ = ginkgo.Describe("the client", func() {
 	ginkgo.When("removing a running container", func() {
 		ginkgo.When("the container still exists after stopping", func() {
 			ginkgo.It("should attempt to remove the container", func() {
-				mockContainer := MockContainer(WithContainerState(dockerContainerType.State{Running: true}))
-				containerStopped := MockContainer(WithContainerState(dockerContainerType.State{Running: false}))
+				mockContainer := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: true}),
+				)
+				containerStopped := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: false}),
+				)
 				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
-					mocks.GetContainerHandler(cid, containerStopped.ContainerInfo()), // First wait: stopped
+					mocks.GetContainerHandler(
+						cid,
+						containerStopped.ContainerInfo(),
+					), // First wait: stopped
 					mocks.RemoveContainerHandler(cid, mocks.Found),
 					ghttp.CombineHandlers( // Second wait: timeout after removal
 						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
@@ -53,7 +60,9 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 		ginkgo.When("the container does not exist after stopping", func() {
 			ginkgo.It("should not cause an error", func() {
-				mockContainer := MockContainer(WithContainerState(dockerContainerType.State{Running: true}))
+				mockContainer := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: true}),
+				)
 				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
@@ -69,12 +78,19 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 		ginkgo.When("the container fails to stop within timeout", func() {
 			ginkgo.It("should log a warning but proceed with removal", func() {
-				mockContainer := MockContainer(WithContainerState(dockerContainerType.State{Running: true}))
-				containerRunning := MockContainer(WithContainerState(dockerContainerType.State{Running: true}))
+				mockContainer := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: true}),
+				)
+				containerRunning := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: true}),
+				)
 				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
-					mocks.GetContainerHandler(cid, containerRunning.ContainerInfo()), // First wait: still running
+					mocks.GetContainerHandler(
+						cid,
+						containerRunning.ContainerInfo(),
+					), // First wait: still running
 					mocks.RemoveContainerHandler(cid, mocks.Found),
 					ghttp.CombineHandlers( // Second wait: removed
 						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
@@ -83,14 +99,22 @@ var _ = ginkgo.Describe("the client", func() {
 				)
 				resetLogrus, logbuf := captureLogrus(logrus.WarnLevel)
 				defer resetLogrus()
-				err := client{api: docker}.StopContainer(mockContainer, 1*time.Millisecond) // Short timeout
+				err := client{
+					api: docker,
+				}.StopContainer(
+					mockContainer,
+					1*time.Millisecond,
+				) // Short timeout
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Eventually(logbuf).Should(gbytes.Say(`Container %s \(%s\) did not stop within %v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
+				gomega.Eventually(logbuf).
+					Should(gbytes.Say(`Container %s \(%s\) did not stop within %v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
 			})
 		})
 		ginkgo.When("waiting for stop fails with an unexpected error", func() {
 			ginkgo.It("should return an error", func() {
-				mockContainer := MockContainer(WithContainerState(dockerContainerType.State{Running: true}))
+				mockContainer := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: true}),
+				)
 				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
@@ -100,17 +124,25 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				err := client{api: docker}.StopContainer(mockContainer, time.Second)
-				gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("failed to wait for container %s (%s) to stop", mockContainer.Name(), mockContainer.ID().ShortID())))
+				gomega.Expect(err).
+					To(gomega.MatchError(gomega.ContainSubstring("failed to wait for container %s (%s) to stop", mockContainer.Name(), mockContainer.ID().ShortID())))
 			})
 		})
 		ginkgo.When("waiting for removal fails with an unexpected error", func() {
 			ginkgo.It("should return an error", func() {
-				mockContainer := MockContainer(WithContainerState(dockerContainerType.State{Running: true}))
-				containerStopped := MockContainer(WithContainerState(dockerContainerType.State{Running: false}))
+				mockContainer := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: true}),
+				)
+				containerStopped := MockContainer(
+					WithContainerState(dockerContainerType.State{Running: false}),
+				)
 				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
-					mocks.GetContainerHandler(cid, containerStopped.ContainerInfo()), // First wait: stopped
+					mocks.GetContainerHandler(
+						cid,
+						containerStopped.ContainerInfo(),
+					), // First wait: stopped
 					mocks.RemoveContainerHandler(cid, mocks.Found),
 					ghttp.CombineHandlers( // Second wait fails
 						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
@@ -118,7 +150,8 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				err := client{api: docker}.StopContainer(mockContainer, time.Second)
-				gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("failed to confirm removal of container %s (%s)", mockContainer.Name(), mockContainer.ID().ShortID())))
+				gomega.Expect(err).
+					To(gomega.MatchError(gomega.ContainSubstring("failed to confirm removal of container %s (%s)", mockContainer.Name(), mockContainer.ID().ShortID())))
 			})
 		})
 	})
@@ -126,7 +159,8 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.When("no filter is provided", func() {
 			ginkgo.It("should return all available containers", func() {
 				mockServer.AppendHandlers(mocks.ListContainersHandler("running"))
-				mockServer.AppendHandlers(mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
+				mockServer.AppendHandlers(
+					mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{},
@@ -139,7 +173,8 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.When("a filter matching nothing", func() {
 			ginkgo.It("should return an empty array", func() {
 				mockServer.AppendHandlers(mocks.ListContainersHandler("running"))
-				mockServer.AppendHandlers(mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
+				mockServer.AppendHandlers(
+					mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
 				filter := filters.FilterByNames([]string{"lollercoaster"}, filters.NoFilter)
 				client := client{
 					api:           docker,
@@ -153,20 +188,29 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.When("a watchtower filter is provided", func() {
 			ginkgo.It("should return only the watchtower container", func() {
 				mockServer.AppendHandlers(mocks.ListContainersHandler("running"))
-				mockServer.AppendHandlers(mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
+				mockServer.AppendHandlers(
+					mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{},
 				}
 				containers, err := client.ListContainers(filters.WatchtowerContainersFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(containers).To(gomega.ConsistOf(withContainerImageName(gomega.Equal("nickfedor/watchtower:latest"))))
+				gomega.Expect(containers).
+					To(gomega.ConsistOf(withContainerImageName(gomega.Equal("nickfedor/watchtower:latest"))))
 			})
 		})
 		ginkgo.When(`include stopped is enabled`, func() {
 			ginkgo.It("should return both stopped and running containers", func() {
-				mockServer.AppendHandlers(mocks.ListContainersHandler("running", "exited", "created"))
-				mockServer.AppendHandlers(mocks.GetContainerHandlers(&mocks.Stopped, &mocks.Watchtower, &mocks.Running)...)
+				mockServer.AppendHandlers(
+					mocks.ListContainersHandler("running", "exited", "created"),
+				)
+				mockServer.AppendHandlers(
+					mocks.GetContainerHandlers(
+						&mocks.Stopped,
+						&mocks.Watchtower,
+						&mocks.Running,
+					)...)
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{IncludeStopped: true},
@@ -179,7 +223,12 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.When(`include restarting is enabled`, func() {
 			ginkgo.It("should return both restarting and running containers", func() {
 				mockServer.AppendHandlers(mocks.ListContainersHandler("running", "restarting"))
-				mockServer.AppendHandlers(mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running, &mocks.Restarting)...)
+				mockServer.AppendHandlers(
+					mocks.GetContainerHandlers(
+						&mocks.Watchtower,
+						&mocks.Running,
+						&mocks.Restarting,
+					)...)
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{IncludeRestarting: true},
@@ -192,7 +241,8 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.When(`include restarting is disabled`, func() {
 			ginkgo.It("should not return restarting containers", func() {
 				mockServer.AppendHandlers(mocks.ListContainersHandler("running"))
-				mockServer.AppendHandlers(mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
+				mockServer.AppendHandlers(
+					mocks.GetContainerHandlers(&mocks.Watchtower, &mocks.Running)...)
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{IncludeRestarting: false},
@@ -214,7 +264,8 @@ var _ = ginkgo.Describe("the client", func() {
 					container, err := client.GetContainer(consumerContainerRef.ContainerID())
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					networkMode := container.ContainerInfo().HostConfig.NetworkMode
-					gomega.Expect(networkMode.ConnectedContainer()).To(gomega.Equal(mocks.NetSupplierContainerName))
+					gomega.Expect(networkMode.ConnectedContainer()).
+						To(gomega.Equal(mocks.NetSupplierContainerName))
 				})
 			})
 			ginkgo.When(`the network container cannot be resolved`, func() {
@@ -228,7 +279,8 @@ var _ = ginkgo.Describe("the client", func() {
 					container, err := client.GetContainer(consumerContainerRef.ContainerID())
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					networkMode := container.ContainerInfo().HostConfig.NetworkMode
-					gomega.Expect(networkMode.ConnectedContainer()).To(gomega.Equal(mocks.NetSupplierNotFoundID))
+					gomega.Expect(networkMode.ConnectedContainer()).
+						To(gomega.Equal(mocks.NetSupplierNotFoundID))
 				})
 			})
 		})
@@ -250,7 +302,10 @@ var _ = ginkgo.Describe("the client", func() {
 				mockServer.AppendHandlers(
 					// API.ContainerExecCreate
 					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("POST", gomega.HaveSuffix("containers/%v/exec", containerID)),
+						ghttp.VerifyRequest(
+							"POST",
+							gomega.HaveSuffix("containers/%v/exec", containerID),
+						),
 						ghttp.VerifyJSONRepresenting(dockerContainerType.ExecOptions{
 							User:   user,
 							Detach: false,
@@ -261,7 +316,10 @@ var _ = ginkgo.Describe("the client", func() {
 								cmd,
 							},
 						}),
-						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainerType.CommitResponse{ID: execID}),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerContainerType.CommitResponse{ID: execID},
+						),
 					),
 					// API.ContainerExecStart
 					ghttp.CombineHandlers(

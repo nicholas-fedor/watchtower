@@ -122,18 +122,21 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 		})
 		ginkgo.When("legacy delay and delay is defined", func() {
-			ginkgo.It("should use the specified legacy delay and ignore the specified delay", func() {
-				command := cmd.NewRootCommand()
-				flags.RegisterNotificationFlags(command)
+			ginkgo.It(
+				"should use the specified legacy delay and ignore the specified delay",
+				func() {
+					command := cmd.NewRootCommand()
+					flags.RegisterNotificationFlags(command)
 
-				err := command.ParseFlags([]string{
-					"--notifications-delay",
-					"0",
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				delay := notifications.GetDelay(command, time.Duration(7)*time.Second)
-				gomega.Expect(delay).To(gomega.Equal(time.Duration(7) * time.Second))
-			})
+					err := command.ParseFlags([]string{
+						"--notifications-delay",
+						"0",
+					})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					delay := notifications.GetDelay(command, time.Duration(7)*time.Second)
+					gomega.Expect(delay).To(gomega.Equal(time.Duration(7) * time.Second))
+				},
+			)
 		})
 	})
 	ginkgo.Describe("the slack notifier", func() {
@@ -148,7 +151,12 @@ var _ = ginkgo.Describe("notifications", func() {
 			color := notifications.ColorInt
 			username := "containrrrbot"
 			iconURL := "https://github.com/nicholas-fedor/watchtower/blob/main/watchtower-sq180.png"
-			expected := fmt.Sprintf("discord://%s@%s?color=0x%x&colordebug=0x0&colorerror=0x0&colorinfo=0x0&colorwarn=0x0&username=watchtower", token, channel, color)
+			expected := fmt.Sprintf(
+				"discord://%s@%s?color=0x%x&colordebug=0x0&colorerror=0x0&colorinfo=0x0&colorwarn=0x0&username=watchtower",
+				token,
+				channel,
+				color,
+			)
 			buildArgs := func(url string) []string {
 				return []string{
 					"--notifications",
@@ -158,18 +166,46 @@ var _ = ginkgo.Describe("notifications", func() {
 				}
 			}
 
-			ginkgo.It("should return a discord url ginkgo.when using a hook url with the domain discord.com", func() {
-				hookURL := fmt.Sprintf("https://%s/api/webhooks/%s/%s/slack", "discord.com", channel, token)
-				testURL(buildArgs(hookURL), expected, time.Duration(0))
-			})
-			ginkgo.It("should return a discord url ginkgo.when using a hook url with the domain discordapp.com", func() {
-				hookURL := fmt.Sprintf("https://%s/api/webhooks/%s/%s/slack", "discordapp.com", channel, token)
-				testURL(buildArgs(hookURL), expected, time.Duration(0))
-			})
+			ginkgo.It(
+				"should return a discord url ginkgo.when using a hook url with the domain discord.com",
+				func() {
+					hookURL := fmt.Sprintf(
+						"https://%s/api/webhooks/%s/%s/slack",
+						"discord.com",
+						channel,
+						token,
+					)
+					testURL(buildArgs(hookURL), expected, time.Duration(0))
+				},
+			)
+			ginkgo.It(
+				"should return a discord url ginkgo.when using a hook url with the domain discordapp.com",
+				func() {
+					hookURL := fmt.Sprintf(
+						"https://%s/api/webhooks/%s/%s/slack",
+						"discordapp.com",
+						channel,
+						token,
+					)
+					testURL(buildArgs(hookURL), expected, time.Duration(0))
+				},
+			)
 			ginkgo.When("icon URL and username are specified", func() {
 				ginkgo.It("should return the expected URL", func() {
-					hookURL := fmt.Sprintf("https://%s/api/webhooks/%s/%s/slack", "discord.com", channel, token)
-					expectedOutput := fmt.Sprintf("discord://%s@%s?avatar=%s&color=0x%x&colordebug=0x0&colorerror=0x0&colorinfo=0x0&colorwarn=0x0&username=%s", token, channel, url.QueryEscape(iconURL), color, username)
+					hookURL := fmt.Sprintf(
+						"https://%s/api/webhooks/%s/%s/slack",
+						"discord.com",
+						channel,
+						token,
+					)
+					expectedOutput := fmt.Sprintf(
+						"discord://%s@%s?avatar=%s&color=0x%x&colordebug=0x0&colorerror=0x0&colorinfo=0x0&colorwarn=0x0&username=%s",
+						token,
+						channel,
+						url.QueryEscape(iconURL),
+						color,
+						username,
+					)
 					expectedDelay := time.Duration(7) * time.Second
 					args := []string{
 						"--notifications",
@@ -201,8 +237,21 @@ var _ = ginkgo.Describe("notifications", func() {
 
 			ginkgo.When("icon URL is specified", func() {
 				ginkgo.It("should return the expected URL", func() {
-					hookURL := fmt.Sprintf("https://hooks.slack.com/services/%s/%s/%s", tokenA, tokenB, tokenC)
-					expectedOutput := fmt.Sprintf("slack://hook:%s-%s-%s@webhook?botname=%s&color=%s&icon=%s", tokenA, tokenB, tokenC, username, color, url.QueryEscape(iconURL))
+					hookURL := fmt.Sprintf(
+						"https://hooks.slack.com/services/%s/%s/%s",
+						tokenA,
+						tokenB,
+						tokenC,
+					)
+					expectedOutput := fmt.Sprintf(
+						"slack://hook:%s-%s-%s@webhook?botname=%s&color=%s&icon=%s",
+						tokenA,
+						tokenB,
+						tokenC,
+						username,
+						color,
+						url.QueryEscape(iconURL),
+					)
 					expectedDelay := time.Duration(7) * time.Second
 
 					args := []string{
@@ -224,8 +273,21 @@ var _ = ginkgo.Describe("notifications", func() {
 
 			ginkgo.When("icon emoji is specified", func() {
 				ginkgo.It("should return the expected URL", func() {
-					hookURL := fmt.Sprintf("https://hooks.slack.com/services/%s/%s/%s", tokenA, tokenB, tokenC)
-					expectedOutput := fmt.Sprintf("slack://hook:%s-%s-%s@webhook?botname=%s&color=%s&icon=%s", tokenA, tokenB, tokenC, username, color, iconEmoji)
+					hookURL := fmt.Sprintf(
+						"https://hooks.slack.com/services/%s/%s/%s",
+						tokenA,
+						tokenB,
+						tokenC,
+					)
+					expectedOutput := fmt.Sprintf(
+						"slack://hook:%s-%s-%s@webhook?botname=%s&color=%s&icon=%s",
+						tokenA,
+						tokenB,
+						tokenC,
+						username,
+						color,
+						iconEmoji,
+					)
 
 					args := []string{
 						"--notifications",
@@ -280,8 +342,19 @@ var _ = ginkgo.Describe("notifications", func() {
 				tokenC := "44444444-4444-4444-8444-cccccccccccc"
 				color := url.QueryEscape(notifications.ColorHex)
 
-				hookURL := fmt.Sprintf("https://outlook.office.com/webhook/%s/IncomingWebhook/%s/%s", tokenA, tokenB, tokenC)
-				expectedOutput := fmt.Sprintf("teams://%s/%s/%s?color=%s", tokenA, tokenB, tokenC, color)
+				hookURL := fmt.Sprintf(
+					"https://outlook.office.com/webhook/%s/IncomingWebhook/%s/%s",
+					tokenA,
+					tokenB,
+					tokenC,
+				)
+				expectedOutput := fmt.Sprintf(
+					"teams://%s/%s/%s?color=%s",
+					tokenA,
+					tokenB,
+					tokenC,
+					color,
+				)
 
 				args := []string{
 					"--notifications",
@@ -299,7 +372,15 @@ var _ = ginkgo.Describe("notifications", func() {
 		ginkgo.When("converting an email service config into a shoutrrr url", func() {
 			ginkgo.It("should set the from address in the URL", func() {
 				fromAddress := "lala@example.com"
-				expectedOutput := buildExpectedURL("containrrrbot", "secret-password", "mail.watchtower.dev", 25, fromAddress, "mail@example.com", "Plain")
+				expectedOutput := buildExpectedURL(
+					"containrrrbot",
+					"secret-password",
+					"mail.watchtower.dev",
+					25,
+					fromAddress,
+					"mail@example.com",
+					"Plain",
+				)
 				expectedDelay := time.Duration(7) * time.Second
 
 				args := []string{
@@ -324,7 +405,15 @@ var _ = ginkgo.Describe("notifications", func() {
 			ginkgo.It("should return the expected URL", func() {
 				fromAddress := "sender@example.com"
 				toAddress := "receiver@example.com"
-				expectedOutput := buildExpectedURL("containrrrbot", "secret-password", "mail.watchtower.dev", 25, fromAddress, toAddress, "Plain")
+				expectedOutput := buildExpectedURL(
+					"containrrrbot",
+					"secret-password",
+					"mail.watchtower.dev",
+					25,
+					fromAddress,
+					toAddress,
+					"Plain",
+				)
 				expectedDelay := time.Duration(7) * time.Second
 
 				args := []string{
@@ -350,7 +439,15 @@ var _ = ginkgo.Describe("notifications", func() {
 	})
 })
 
-func buildExpectedURL(username string, password string, host string, port int, from string, destAddress string, auth string) string {
+func buildExpectedURL(
+	username string,
+	password string,
+	host string,
+	port int,
+	from string,
+	destAddress string,
+	auth string,
+) string {
 	template := "smtp://%s:%s@%s:%d/?auth=%s&fromaddress=%s&fromname=Watchtower&subject=&toaddresses=%s"
 
 	return fmt.Sprintf(template,

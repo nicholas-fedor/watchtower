@@ -116,7 +116,13 @@ func TestRandName(t *testing.T) {
 	name := RandName()
 
 	// Check length is exactly 32 characters.
-	assert.Len(t, name, randomNameLength, "RandName should generate a %d-character name", randomNameLength)
+	assert.Len(
+		t,
+		name,
+		randomNameLength,
+		"RandName should generate a %d-character name",
+		randomNameLength,
+	)
 
 	// Check that the name matches the expected pattern of only letters.
 	assert.Regexp(t, "^[a-zA-Z]+$", name, "RandName should contain only alphabetic characters")

@@ -78,7 +78,19 @@ func (r *report) Fresh() []types.ContainerReport {
 }
 
 func (r *report) All() []types.ContainerReport {
-	allLen := len(r.scanned) + len(r.updated) + len(r.failed) + len(r.skipped) + len(r.stale) + len(r.fresh)
+	allLen := len(
+		r.scanned,
+	) + len(
+		r.updated,
+	) + len(
+		r.failed,
+	) + len(
+		r.skipped,
+	) + len(
+		r.stale,
+	) + len(
+		r.fresh,
+	)
 	all := make([]types.ContainerReport, 0, allLen)
 
 	presentIDs := map[types.ContainerID][]string{}

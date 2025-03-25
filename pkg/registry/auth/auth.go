@@ -51,8 +51,10 @@ var Client = &http.Client{
 var (
 	errNoCredentials          = errors.New("no credentials available")
 	errUnsupportedChallenge   = errors.New("unsupported challenge type from registry")
-	errInvalidChallengeHeader = errors.New("challenge header did not include all values needed to construct an auth url")
-	errInvalidRealmURL        = errors.New("invalid realm URL in challenge header")
+	errInvalidChallengeHeader = errors.New(
+		"challenge header did not include all values needed to construct an auth url",
+	)
+	errInvalidRealmURL = errors.New("invalid realm URL in challenge header")
 )
 
 // GetToken fetches a token for the registry hosting the provided image.
@@ -118,7 +120,12 @@ func GetChallengeRequest(ctx context.Context, url url.URL) (*http.Request, error
 // GetBearerHeader tries to fetch a bearer token from the registry based on the challenge instructions.
 // It uses the provided registry authentication string if available, propagating the context
 // for request cancellation and timeouts.
-func GetBearerHeader(ctx context.Context, challenge string, imageRef reference.Named, registryAuth string) (string, error) {
+func GetBearerHeader(
+	ctx context.Context,
+	challenge string,
+	imageRef reference.Named,
+	registryAuth string,
+) (string, error) {
 	authURL, err := GetAuthURL(challenge, imageRef)
 	if err != nil {
 		return "", err

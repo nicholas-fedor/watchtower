@@ -37,7 +37,11 @@ func getMockJSONFile(relPath string) ([]byte, error) {
 }
 
 // Expects the file to exist at the given relative path; fails the test otherwise.
-func RespondWithJSONFile(relPath string, statusCode int, optionalHeader ...http.Header) http.HandlerFunc {
+func RespondWithJSONFile(
+	relPath string,
+	statusCode int,
+	optionalHeader ...http.Header,
+) http.HandlerFunc {
 	handler, err := respondWithJSONFile(relPath, statusCode, optionalHeader...)
 	gomega.ExpectWithOffset(1, err).ShouldNot(gomega.HaveOccurred())
 
@@ -45,7 +49,11 @@ func RespondWithJSONFile(relPath string, statusCode int, optionalHeader ...http.
 }
 
 // Returns the handler and an error if the file can’t be read.
-func respondWithJSONFile(relPath string, statusCode int, optionalHeader ...http.Header) (http.HandlerFunc, error) {
+func respondWithJSONFile(
+	relPath string,
+	statusCode int,
+	optionalHeader ...http.Header,
+) (http.HandlerFunc, error) {
 	buf, err := getMockJSONFile(relPath)
 	if err != nil {
 		return nil, err
@@ -84,7 +92,9 @@ func createFilterArgs(statuses []string) filters.Args {
 
 // Represents a standard Watchtower image.
 var defaultImage = imageRef{
-	id:   types.ImageID("sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa"), // Watchtower image ID
+	id: types.ImageID(
+		"sha256:4dbc5f9c07028a985e14d1393e849ea07f68804c4293050d5a641b138db72daa",
+	), // Watchtower image ID
 	file: "default",
 }
 
@@ -107,7 +117,9 @@ var Running = ContainerRef{
 	name: "running",
 	id:   "b978af0b858aa8855cce46b628817d4ed58e58f2c4f66c9b9c5449134ed4c008",
 	image: &imageRef{
-		id:   types.ImageID("sha256:19d07168491a3f9e2798a9bed96544e34d57ddc4757a4ac5bb199dea896c87fd"), // Portainer image ID
+		id: types.ImageID(
+			"sha256:19d07168491a3f9e2798a9bed96544e34d57ddc4757a4ac5bb199dea896c87fd",
+		), // Portainer image ID
 		file: "running",
 	},
 }
@@ -124,7 +136,9 @@ var netSupplierOK = ContainerRef{
 	id:   "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2",
 	name: "net_supplier",
 	image: &imageRef{
-		id:   types.ImageID("sha256:c22b543d33bfdcb9992cbef23961677133cdf09da71d782468ae2517138bad51"), // Gluetun image ID
+		id: types.ImageID(
+			"sha256:c22b543d33bfdcb9992cbef23961677133cdf09da71d782468ae2517138bad51",
+		), // Gluetun image ID
 		file: "net_producer",
 	},
 }
@@ -141,7 +155,9 @@ var NetConsumerOK = ContainerRef{
 	id:   "1f6b79d2aff23244382026c76f4995851322bed5f9c50631620162f6f9aafbd6",
 	name: "net_consumer",
 	image: &imageRef{
-		id:   types.ImageID("sha256:904b8cb13b932e23230836850610fa45dce9eb0650d5618c2b1487c2a4f577b8"), // Nginx image ID
+		id: types.ImageID(
+			"sha256:904b8cb13b932e23230836850610fa45dce9eb0650d5618c2b1487c2a4f577b8",
+		), // Nginx image ID
 		file: "net_consumer",
 	},
 	references: []*ContainerRef{&netSupplierOK},
@@ -186,7 +202,10 @@ func getContainerHandler(containerID string, responseHandler http.HandlerFunc) h
 }
 
 // Returns a 404 if containerInfo is nil; otherwise, serves the provided info.
-func GetContainerHandler(containerID string, containerInfo *container.InspectResponse) http.HandlerFunc {
+func GetContainerHandler(
+	containerID string,
+	containerInfo *container.InspectResponse,
+) http.HandlerFunc {
 	responseHandler := containerNotFoundResponse(containerID)
 	if containerInfo != nil {
 		responseHandler = ghttp.RespondWithJSONEncoded(http.StatusOK, containerInfo)
@@ -197,7 +216,10 @@ func GetContainerHandler(containerID string, containerInfo *container.InspectRes
 
 // Serves the provided image info as a JSON response.
 func GetImageHandler(imageInfo *image.InspectResponse) http.HandlerFunc {
-	return getImageHandler(types.ImageID(imageInfo.ID), ghttp.RespondWithJSONEncoded(http.StatusOK, imageInfo))
+	return getImageHandler(
+		types.ImageID(imageInfo.ID),
+		ghttp.RespondWithJSONEncoded(http.StatusOK, imageInfo),
+	)
 }
 
 // Filters containers by the given statuses and serves the filtered list.
@@ -219,13 +241,17 @@ func ListContainersHandler(statuses ...string) http.HandlerFunc {
 // Loads mock data from containers.json and filters it according to the provided args.
 func respondWithFilteredContainers(filters filters.Args) http.HandlerFunc {
 	containersJSON, err := getMockJSONFile("./mocks/data/containers.json")
-	gomega.ExpectWithOffset(assertionOffset, err).ShouldNot(gomega.HaveOccurred()) // Offset for nested call depth
+	gomega.ExpectWithOffset(assertionOffset, err).
+		ShouldNot(gomega.HaveOccurred())
+		// Offset for nested call depth
 
 	var filteredContainers []container.Summary
 
 	var containers []container.Summary
 
-	gomega.ExpectWithOffset(assertionOffset, json.Unmarshal(containersJSON, &containers)).To(gomega.Succeed()) // Offset for nested call depth
+	gomega.ExpectWithOffset(assertionOffset, json.Unmarshal(containersJSON, &containers)).
+		To(gomega.Succeed())
+		// Offset for nested call depth
 
 	for _, v := range containers {
 		for _, key := range filters.Get("status") {
@@ -274,7 +300,10 @@ func RemoveContainerHandler(containerID string, found FoundStatus) http.HandlerF
 
 // Includes a standard "No such container" message with the ID.
 func containerNotFoundResponse(containerID string) http.HandlerFunc {
-	return ghttp.RespondWithJSONEncoded(http.StatusNotFound, struct{ message string }{message: "No such container: " + containerID})
+	return ghttp.RespondWithJSONEncoded(
+		http.StatusNotFound,
+		struct{ message string }{message: "No such container: " + containerID},
+	)
 }
 
 // Mock response fixture for no-content status (204).

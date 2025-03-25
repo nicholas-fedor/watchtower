@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -40,7 +41,10 @@ type Client interface {
 
 	// IsContainerStale checks if a container's image is outdated compared to the latest available version.
 	// Returns whether the container is stale, the latest image ID, and any error encountered.
-	IsContainerStale(container types.Container, params types.UpdateParams) (bool, types.ImageID, error)
+	IsContainerStale(
+		container types.Container,
+		params types.UpdateParams,
+	) (bool, types.ImageID, error)
 
 	// ExecuteCommand runs a command inside a container and returns whether to skip updates based on the result.
 	// The timeout specifies how long to wait for the command to complete.
@@ -144,7 +148,10 @@ func (c client) WarnOnHeadPullFailed(container types.Container) bool {
 // IsContainerStale determines if a container’s image is outdated compared to the latest available version.
 // It delegates to the imageClient to check staleness.
 // Returns whether the container is stale, the latest image ID, and any error encountered.
-func (c client) IsContainerStale(container types.Container, params types.UpdateParams) (bool, types.ImageID, error) {
+func (c client) IsContainerStale(
+	container types.Container,
+	params types.UpdateParams,
+) (bool, types.ImageID, error) {
 	imgClient := newImageClient(c.api)
 
 	return imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
@@ -153,7 +160,11 @@ func (c client) IsContainerStale(container types.Container, params types.UpdateP
 // ExecuteCommand runs a command inside a container and evaluates its result.
 // It creates an exec instance, runs it, and waits for completion or timeout.
 // Returns whether to skip updates (based on exit code) and any error encountered.
-func (c client) ExecuteCommand(containerID types.ContainerID, command string, timeout int) (bool, error) {
+func (c client) ExecuteCommand(
+	containerID types.ContainerID,
+	command string,
+	timeout int,
+) (bool, error) {
 	ctx := context.Background()
 	clog := logrus.WithField("containerID", containerID)
 
@@ -233,7 +244,12 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 // waitForExecOrTimeout waits for an exec instance to complete or times out.
 // It checks the exit code: 75 (ExTempFail) skips updates, >0 indicates failure.
 // Returns whether to skip updates and any error encountered.
-func (c client) waitForExecOrTimeout(parentContext context.Context, execID string, execOutput string, timeout int) (bool, error) {
+func (c client) waitForExecOrTimeout(
+	parentContext context.Context,
+	execID string,
+	execOutput string,
+	timeout int,
+) (bool, error) {
 	const ExTempFail = 75
 
 	var ctx context.Context
@@ -277,7 +293,12 @@ func (c client) waitForExecOrTimeout(parentContext context.Context, execID strin
 		}
 
 		if execInspect.ExitCode > 0 {
-			return false, fmt.Errorf("%w with exit code %d: %s", errCommandFailed, execInspect.ExitCode, execOutput)
+			return false, fmt.Errorf(
+				"%w with exit code %d: %s",
+				errCommandFailed,
+				execInspect.ExitCode,
+				execOutput,
+			)
 		}
 
 		break

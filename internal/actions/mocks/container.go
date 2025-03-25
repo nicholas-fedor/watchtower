@@ -59,13 +59,25 @@ func CreateMockImageInfo(mockImage string) *image.InspectResponse {
 
 // CreateMockContainerWithImageInfo creates a container with custom image info for testing.
 // It is intended for specific test cases requiring detailed image configuration.
-func CreateMockContainerWithImageInfo(id string, name string, image string, created time.Time, imageInfo image.InspectResponse) types.Container {
+func CreateMockContainerWithImageInfo(
+	id string,
+	name string,
+	image string,
+	created time.Time,
+	imageInfo image.InspectResponse,
+) types.Container {
 	return CreateMockContainerWithImageInfoP(id, name, image, created, &imageInfo)
 }
 
 // CreateMockContainerWithImageInfoP creates a container with a pointer to custom image info for testing.
 // It uses a pointer to the image info struct, suitable for cases where the info is pre-allocated.
-func CreateMockContainerWithImageInfoP(id string, name string, image string, created time.Time, imageInfo *image.InspectResponse) types.Container {
+func CreateMockContainerWithImageInfoP(
+	id string,
+	name string,
+	image string,
+	created time.Time,
+	imageInfo *image.InspectResponse,
+) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:      id,
@@ -87,7 +99,13 @@ func CreateMockContainerWithImageInfoP(id string, name string, image string, cre
 
 // CreateMockContainerWithDigest creates a container with a specific digest for testing.
 // It builds a container and overrides its image digest, useful for staleness tests.
-func CreateMockContainerWithDigest(id string, name string, image string, created time.Time, digest string) types.Container {
+func CreateMockContainerWithDigest(
+	id string,
+	name string,
+	image string,
+	created time.Time,
+	digest string,
+) types.Container {
 	c := CreateMockContainer(id, name, image, created)
 	c.ImageInfo().RepoDigests = []string{digest}
 
@@ -96,7 +114,15 @@ func CreateMockContainerWithDigest(id string, name string, image string, created
 
 // CreateMockContainerWithConfig creates a container substitute with custom configuration for testing.
 // It allows specifying running/restarting states and config details for flexible test scenarios.
-func CreateMockContainerWithConfig(id string, name string, image string, running bool, restarting bool, created time.Time, config *dockerContainer.Config) types.Container {
+func CreateMockContainerWithConfig(
+	id string,
+	name string,
+	image string,
+	running bool,
+	restarting bool,
+	created time.Time,
+	config *dockerContainer.Config,
+) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:    id,
@@ -122,7 +148,11 @@ func CreateMockContainerWithConfig(id string, name string, image string, running
 
 // CreateContainerForProgress creates a container substitute for tracking session/update progress.
 // It generates a unique ID and name based on the index and state prefix for testing progress reporting.
-func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (types.Container, types.ImageID) {
+func CreateContainerForProgress(
+	index int,
+	idPrefix int,
+	nameFormat string,
+) (types.Container, types.ImageID) {
 	indexStr := strconv.Itoa(idPrefix + index)
 	// Pad the mock ID to a consistent length with zeros, accounting for the "c79" prefix.
 	mockID := indexStr + strings.Repeat("0", mockIDLength-3-len(indexStr))
@@ -141,7 +171,14 @@ func CreateContainerForProgress(index int, idPrefix int, nameFormat string) (typ
 
 // CreateMockContainerWithLinks creates a container with specified links for testing.
 // It is useful for testing dependency-related behaviors in Watchtower.
-func CreateMockContainerWithLinks(id string, name string, image string, created time.Time, links []string, imageInfo *image.InspectResponse) types.Container {
+func CreateMockContainerWithLinks(
+	id string,
+	name string,
+	image string,
+	created time.Time,
+	links []string,
+	imageInfo *image.InspectResponse,
+) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:      id,

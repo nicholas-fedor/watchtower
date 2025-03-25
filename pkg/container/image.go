@@ -6,9 +6,10 @@ import (
 	"io"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	dockerImageType "github.com/docker/docker/api/types/image"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
@@ -61,7 +62,11 @@ func newImageClient(api dockerClient.APIClient) imageClient {
 //   - bool: True if the container’s image is stale (newer version exists), false otherwise.
 //   - types.ImageID: The ID of the latest image (or current if not pulled).
 //   - error: Any error encountered during pulling or inspection, nil if successful or skipped.
-func (c imageClient) IsContainerStale(target types.Container, params types.UpdateParams, warnOnHeadFailed WarningStrategy) (bool, types.ImageID, error) {
+func (c imageClient) IsContainerStale(
+	target types.Container,
+	params types.UpdateParams,
+	warnOnHeadFailed WarningStrategy,
+) (bool, types.ImageID, error) {
 	ctx := context.Background()
 
 	if target.IsNoPull(params) {
@@ -89,8 +94,11 @@ func (c imageClient) IsContainerStale(target types.Container, params types.Updat
 //   - bool: True if a newer image is available, false if the current image is up-to-date.
 //   - types.ImageID: The ID of the latest image.
 //   - error: Any error from inspecting the image, nil if successful.
-func (c imageClient) HasNewImage(ctx context.Context, targetContainer types.Container) (bool, types.ImageID, error) {
-	currentImageID := types.ImageID(targetContainer.ContainerInfo().ContainerJSONBase.Image)
+func (c imageClient) HasNewImage(
+	ctx context.Context,
+	targetContainer types.Container,
+) (bool, types.ImageID, error) {
+	currentImageID := types.ImageID(targetContainer.ContainerInfo().Image)
 	imageName := targetContainer.ImageName()
 
 	newImageInfo, err := c.api.ImageInspect(ctx, imageName)
@@ -121,7 +129,11 @@ func (c imageClient) HasNewImage(ctx context.Context, targetContainer types.Cont
 //
 // Returns:
 //   - error: Any error from authentication, pulling, or reading the response, nil if successful or skipped.
-func (c imageClient) PullImage(ctx context.Context, targetContainer types.Container, warnOnHeadFailed WarningStrategy) error {
+func (c imageClient) PullImage(
+	ctx context.Context,
+	targetContainer types.Container,
+	warnOnHeadFailed WarningStrategy,
+) error {
 	containerName := targetContainer.Name()
 	imageName := targetContainer.ImageName()
 	fields := logrus.Fields{"image": imageName, "container": containerName}
@@ -167,7 +179,13 @@ func (c imageClient) PullImage(ctx context.Context, targetContainer types.Contai
 //
 // Returns:
 //   - bool: True if the pull should be skipped (digests match), false if it should proceed.
-func (c imageClient) shouldSkipPull(ctx context.Context, targetContainer types.Container, auth string, warnOnHeadFailed WarningStrategy, fields logrus.Fields) bool {
+func (c imageClient) shouldSkipPull(
+	ctx context.Context,
+	targetContainer types.Container,
+	auth string,
+	warnOnHeadFailed WarningStrategy,
+	fields logrus.Fields,
+) bool {
 	logrus.WithFields(fields).Debugf("Checking if pull is needed")
 
 	warn := c.warnOnHeadFailed(targetContainer, warnOnHeadFailed)
@@ -182,7 +200,8 @@ func (c imageClient) shouldSkipPull(ctx context.Context, targetContainer types.C
 			headLevel = logrus.WarnLevel
 		}
 
-		logrus.WithFields(fields).Logf(headLevel, "Could not do a head request for %q, falling back to regular pull.", targetContainer.ImageName())
+		logrus.WithFields(fields).
+			Logf(headLevel, "Could not do a head request for %q, falling back to regular pull.", targetContainer.ImageName())
 		logrus.WithFields(fields).Log(headLevel, "Reason: ", err)
 
 		return false
@@ -211,7 +230,12 @@ func (c imageClient) shouldSkipPull(ctx context.Context, targetContainer types.C
 //
 // Returns:
 //   - error: Any error from pulling or reading the response, nil if successful.
-func (c imageClient) performImagePull(ctx context.Context, imageName string, opts dockerImageType.PullOptions, fields logrus.Fields) error {
+func (c imageClient) performImagePull(
+	ctx context.Context,
+	imageName string,
+	opts dockerImageType.PullOptions,
+	fields logrus.Fields,
+) error {
 	logrus.WithFields(fields).Debugf("Pulling image")
 
 	response, err := c.api.ImagePull(ctx, imageName, opts)
@@ -297,7 +321,10 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
 //
 // Returns:
 //   - bool: True if a warning should be logged, false otherwise.
-func (c imageClient) warnOnHeadFailed(targetContainer types.Container, warnOnHeadFailed WarningStrategy) bool {
+func (c imageClient) warnOnHeadFailed(
+	targetContainer types.Container,
+	warnOnHeadFailed WarningStrategy,
+) bool {
 	if warnOnHeadFailed == WarnAlways {
 		return true
 	}

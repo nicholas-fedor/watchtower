@@ -104,10 +104,21 @@ const initialEntriesCapacity = 10
 // and full report modes. It optionally enables stdout logging if specified, otherwise directs Shoutrrr logs
 // to the logrus trace level. The notifier is returned fully initialized with channels for message queuing
 // and parameters like a custom title if present in the static data.
-func createNotifier(urls []string, level logrus.Level, tplString string, legacy bool, data StaticData, stdout bool, delay time.Duration) *shoutrrrTypeNotifier {
+func createNotifier(
+	urls []string,
+	level logrus.Level,
+	tplString string,
+	legacy bool,
+	data StaticData,
+	stdout bool,
+	delay time.Duration,
+) *shoutrrrTypeNotifier {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
 	if err != nil {
-		logrus.Errorf("Could not use configured notification template: %s. Using default template", err)
+		logrus.Errorf(
+			"Could not use configured notification template: %s. Using default template",
+			err,
+		)
 	}
 
 	var logger shoutrrrTypes.StdLogger

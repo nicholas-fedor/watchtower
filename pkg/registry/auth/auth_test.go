@@ -315,10 +315,12 @@ var _ = ginkgo.Describe("the auth module", func() {
 	// runBasicAuthTest is a helper function to reduce duplication in GetToken tests
 	// that use a mock HTTPS server to simulate basic auth challenges.
 	runBasicAuthTest := func(challengeHeader, creds, expectedToken, expectedErr string) {
-		testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set(auth.ChallengeHeader, challengeHeader)
-			w.WriteHeader(http.StatusUnauthorized)
-		}))
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set(auth.ChallengeHeader, challengeHeader)
+				w.WriteHeader(http.StatusUnauthorized)
+			}),
+		)
 		defer testServer.Close()
 
 		containerInstance := mockContainer{
@@ -330,7 +332,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Create an HTTP client that skips TLS verification for the mock server
 		client := &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		}
 		// Temporarily replace the default client in auth package for this test
@@ -340,7 +342,8 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 		token, err := auth.GetToken(context.Background(), containerInstance, creds)
 		if expectedErr != "" {
-			gomega.Expect(err).To(gomega.MatchError(expectedErr), fmt.Sprintf("Expected error '%s'", expectedErr))
+			gomega.Expect(err).
+				To(gomega.MatchError(expectedErr), fmt.Sprintf("Expected error '%s'", expectedErr))
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
 		} else {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Expected no error when fetching basic auth token")
@@ -351,24 +354,26 @@ var _ = ginkgo.Describe("the auth module", func() {
 	// runBearerHeaderTest is a helper function to reduce duplication in GetBearerHeader tests
 	// that use a mock HTTPS server to simulate bearer token retrieval.
 	runBearerHeaderTest := func(creds, expectedToken string, expectAuthFailure bool) {
-		testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if expectAuthFailure {
-				auth := r.Header.Get("Authorization")
-				if auth != "Basic user:pass" {
-					w.WriteHeader(http.StatusUnauthorized)
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if expectAuthFailure {
+					auth := r.Header.Get("Authorization")
+					if auth != "Basic user:pass" {
+						w.WriteHeader(http.StatusUnauthorized)
 
-					return
+						return
+					}
 				}
-			}
-			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"token": "%s"}`, expectedToken)
-		}))
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprintf(w, `{"token": "%s"}`, expectedToken)
+			}),
+		)
 		defer testServer.Close()
 
 		// Create an HTTP client that skips TLS verification for the mock server
 		client := &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		}
 		// Temporarily replace the default client in auth package for this test
@@ -376,7 +381,10 @@ var _ = ginkgo.Describe("the auth module", func() {
 		auth.Client = client
 		defer func() { auth.Client = origClient }()
 
-		challenge := fmt.Sprintf(`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`, testServer.URL)
+		challenge := fmt.Sprintf(
+			`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`,
+			testServer.URL,
+		)
 		ref, _ := reference.ParseNormalizedNamed("test/image")
 		token, err := auth.GetBearerHeader(context.Background(), challenge, ref, creds)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -411,7 +419,12 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Ensures GetToken returns an error for an unsupported challenge type
 		// (e.g., "Digest").
 		ginkgo.It("should fail with unsupported challenge type", func() {
-			runBasicAuthTest("Digest realm=\"test\"", "user:pass", "", "unsupported challenge type from registry")
+			runBasicAuthTest(
+				"Digest realm=\"test\"",
+				"user:pass",
+				"",
+				"unsupported challenge type from registry",
+			)
 		})
 
 		// Test case: Tests GetToken’s behavior when an HTTP request fails (e.g., due to an
@@ -426,7 +439,8 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 
 			token, err := auth.GetToken(context.Background(), containerInstance, "user:pass")
-			gomega.Expect(err).To(gomega.HaveOccurred(), "Expected error due to HTTP request failure")
+			gomega.Expect(err).
+				To(gomega.HaveOccurred(), "Expected error due to HTTP request failure")
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
 		})
 	})
@@ -488,16 +502,18 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 		// Test case: Verifies GetBearerHeader fails when the registry returns invalid JSON.
 		ginkgo.It("should fail on invalid JSON response", func() {
-			testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprintf(w, `{"invalid": "json"`) // Missing token field
-			}))
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					fmt.Fprintf(w, `{"invalid": "json"`) // Missing token field
+				}),
+			)
 			defer testServer.Close()
 
 			// Create an HTTP client that skips TLS verification for the mock server
 			client := &http.Client{
 				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				},
 			}
 			// Temporarily replace the default client in auth package for this test
@@ -505,7 +521,10 @@ var _ = ginkgo.Describe("the auth module", func() {
 			auth.Client = client
 			defer func() { auth.Client = origClient }()
 
-			challenge := fmt.Sprintf(`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`, testServer.URL)
+			challenge := fmt.Sprintf(
+				`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`,
+				testServer.URL,
+			)
 			ref, _ := reference.ParseNormalizedNamed("test/image")
 			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "")
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -516,21 +535,24 @@ var _ = ginkgo.Describe("the auth module", func() {
 	ginkgo.Describe("GetAuthURL", func() {
 		// Test case: Ensures GetAuthURL constructs a valid URL from a bearer challenge
 		// header, including realm, service, and scope parameters, for a given image reference.
-		ginkgo.It("should create a valid auth url object based on the challenge header supplied", func() {
-			challenge := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull"`
-			imageRef, err := reference.ParseNormalizedNamed("nicholas-fedor/watchtower")
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			expected := &url.URL{
-				Host:     "ghcr.io",
-				Scheme:   "https",
-				Path:     "/token",
-				RawQuery: "scope=repository%3Anicholas-fedor%2Fwatchtower%3Apull&service=ghcr.io",
-			}
+		ginkgo.It(
+			"should create a valid auth url object based on the challenge header supplied",
+			func() {
+				challenge := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull"`
+				imageRef, err := reference.ParseNormalizedNamed("nicholas-fedor/watchtower")
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				expected := &url.URL{
+					Host:     "ghcr.io",
+					Scheme:   "https",
+					Path:     "/token",
+					RawQuery: "scope=repository%3Anicholas-fedor%2Fwatchtower%3Apull&service=ghcr.io",
+				}
 
-			URL, err := auth.GetAuthURL(challenge, imageRef)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(URL).To(gomega.Equal(expected))
-		})
+				URL, err := auth.GetAuthURL(challenge, imageRef)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(URL).To(gomega.Equal(expected))
+			},
+		)
 
 		ginkgo.When("given an invalid challenge header", func() {
 			// Test case: Verifies GetAuthURL returns an error when the challenge header lacks
@@ -549,23 +571,30 @@ var _ = ginkgo.Describe("the auth module", func() {
 			// Test case: Ensures GetAuthURL prepends "library/" to official Docker Hub images,
 			// validating correct scope derivation for standard images.
 			ginkgo.It("should prepend official dockerhub images with \"library/\"", func() {
-				gomega.Expect(getScopeFromImageAuthURL("registry")).To(gomega.Equal("library/registry"))
-				gomega.Expect(getScopeFromImageAuthURL("docker.io/registry")).To(gomega.Equal("library/registry"))
-				gomega.Expect(getScopeFromImageAuthURL("index.docker.io/registry")).To(gomega.Equal("library/registry"))
+				gomega.Expect(getScopeFromImageAuthURL("registry")).
+					To(gomega.Equal("library/registry"))
+				gomega.Expect(getScopeFromImageAuthURL("docker.io/registry")).
+					To(gomega.Equal("library/registry"))
+				gomega.Expect(getScopeFromImageAuthURL("index.docker.io/registry")).
+					To(gomega.Equal("library/registry"))
 			})
 
 			// Test case: Verifies GetAuthURL excludes vanity hosts (e.g., "docker.io") from the
 			// scope, ensuring clean repository paths for Docker Hub images.
 			ginkgo.It("should not include vanity hosts", func() {
-				gomega.Expect(getScopeFromImageAuthURL("docker.io/nickfedor/watchtower")).To(gomega.Equal("nickfedor/watchtower"))
-				gomega.Expect(getScopeFromImageAuthURL("index.docker.io/nickfedor/watchtower")).To(gomega.Equal("nickfedor/watchtower"))
+				gomega.Expect(getScopeFromImageAuthURL("docker.io/nickfedor/watchtower")).
+					To(gomega.Equal("nickfedor/watchtower"))
+				gomega.Expect(getScopeFromImageAuthURL("index.docker.io/nickfedor/watchtower")).
+					To(gomega.Equal("nickfedor/watchtower"))
 			})
 
 			// Test case: Confirms GetAuthURL handles non-Docker Hub images correctly, extracting
 			// the repository path without additional prefixes for registries like GHCR.
 			ginkgo.It("should handle non-Docker Hub images correctly", func() {
-				gomega.Expect(getScopeFromImageAuthURL("ghcr.io/watchtower")).To(gomega.Equal("watchtower"))
-				gomega.Expect(getScopeFromImageAuthURL("ghcr.io/nicholas-fedor/watchtower")).To(gomega.Equal("nicholas-fedor/watchtower"))
+				gomega.Expect(getScopeFromImageAuthURL("ghcr.io/watchtower")).
+					To(gomega.Equal("watchtower"))
+				gomega.Expect(getScopeFromImageAuthURL("ghcr.io/nicholas-fedor/watchtower")).
+					To(gomega.Equal("nicholas-fedor/watchtower"))
 			})
 		})
 
@@ -595,11 +624,16 @@ var _ = ginkgo.Describe("the auth module", func() {
 	ginkgo.Describe("GetChallengeURL", func() {
 		// Test case: Ensures GetChallengeURL constructs a correct challenge URL for a
 		// GHCR-hosted image, validating registry address extraction and URL formatting.
-		ginkgo.It("should create a valid challenge url object based on the image ref supplied", func() {
-			expected := url.URL{Host: "ghcr.io", Scheme: "https", Path: "/v2/"}
-			imageRef, _ := reference.ParseNormalizedNamed("ghcr.io/nicholas-fedor/watchtower:latest")
-			gomega.Expect(auth.GetChallengeURL(imageRef)).To(gomega.Equal(expected))
-		})
+		ginkgo.It(
+			"should create a valid challenge url object based on the image ref supplied",
+			func() {
+				expected := url.URL{Host: "ghcr.io", Scheme: "https", Path: "/v2/"}
+				imageRef, _ := reference.ParseNormalizedNamed(
+					"ghcr.io/nicholas-fedor/watchtower:latest",
+				)
+				gomega.Expect(auth.GetChallengeURL(imageRef)).To(gomega.Equal(expected))
+			},
+		)
 
 		// Test case: Verifies GetChallengeURL defaults to Docker Hub (index.docker.io) for
 		// images without an explicit registry, ensuring correct fallback behavior.

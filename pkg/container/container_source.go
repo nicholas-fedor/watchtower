@@ -6,11 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerFiltersType "github.com/docker/docker/api/types/filters"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -22,7 +23,11 @@ const defaultStopSignal = "SIGTERM"
 // ListSourceContainers retrieves a list of containers from the Docker host, filtered by the provided function.
 // It respects the IncludeStopped and IncludeRestarting options to determine which container states to include.
 // Returns a slice of containers or an error if the listing fails.
-func ListSourceContainers(api dockerClient.APIClient, opts ClientOptions, filter types.Filter) ([]types.Container, error) {
+func ListSourceContainers(
+	api dockerClient.APIClient,
+	opts ClientOptions,
+	filter types.Filter,
+) ([]types.Container, error) {
 	hostContainers := []types.Container{}
 	ctx := context.Background()
 
@@ -82,7 +87,10 @@ func ListSourceContainers(api dockerClient.APIClient, opts ClientOptions, filter
 // GetSourceContainer retrieves detailed information about a container by its ID.
 // It resolves network container references by replacing IDs with names when possible.
 // Returns a Container object or an error if inspection fails.
-func GetSourceContainer(api dockerClient.APIClient, containerID types.ContainerID) (types.Container, error) {
+func GetSourceContainer(
+	api dockerClient.APIClient,
+	containerID types.ContainerID,
+) (types.Container, error) {
 	ctx := context.Background()
 
 	// Fetch basic container information.
@@ -121,7 +129,12 @@ func GetSourceContainer(api dockerClient.APIClient, containerID types.ContainerI
 // StopSourceContainer stops and removes the specified container within the given timeout.
 // It first attempts to stop the container gracefully, then removes it unless AutoRemove is enabled.
 // Returns an error if stopping or removal fails.
-func StopSourceContainer(api dockerClient.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
+func StopSourceContainer(
+	api dockerClient.APIClient,
+	sourceContainer types.Container,
+	timeout time.Duration,
+	removeVolumes bool,
+) error {
 	ctx := context.Background()
 	idStr := string(sourceContainer.ID())
 	shortID := sourceContainer.ID().ShortID()
@@ -136,7 +149,12 @@ func StopSourceContainer(api dockerClient.APIClient, sourceContainer types.Conta
 		logrus.Infof("Stopping %s (%s) with %s", sourceContainer.Name(), shortID, signal)
 
 		if err := api.ContainerKill(ctx, idStr, signal); err != nil {
-			return fmt.Errorf("failed to stop container %s (%s): %w", sourceContainer.Name(), shortID, err)
+			return fmt.Errorf(
+				"failed to stop container %s (%s): %w",
+				sourceContainer.Name(),
+				shortID,
+				err,
+			)
 		}
 	}
 
@@ -145,7 +163,12 @@ func StopSourceContainer(api dockerClient.APIClient, sourceContainer types.Conta
 
 // stopAndRemoveContainer waits for a container to stop and removes it if needed.
 // It respects AutoRemove and logs progress, returning an error if the process fails.
-func stopAndRemoveContainer(api dockerClient.APIClient, sourceContainer types.Container, timeout time.Duration, removeVolumes bool) error {
+func stopAndRemoveContainer(
+	api dockerClient.APIClient,
+	sourceContainer types.Container,
+	timeout time.Duration,
+	removeVolumes bool,
+) error {
 	ctx := context.Background()
 	idStr := string(sourceContainer.ID())
 	shortID := sourceContainer.ID().ShortID()
@@ -153,11 +176,21 @@ func stopAndRemoveContainer(api dockerClient.APIClient, sourceContainer types.Co
 	// Wait for the container to stop or timeout.
 	stopped, err := waitForStopOrTimeout(api, sourceContainer, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to wait for container %s (%s) to stop: %w", sourceContainer.Name(), shortID, err)
+		return fmt.Errorf(
+			"failed to wait for container %s (%s) to stop: %w",
+			sourceContainer.Name(),
+			shortID,
+			err,
+		)
 	}
 
 	if !stopped {
-		logrus.Warnf("Container %s (%s) did not stop within %v", sourceContainer.Name(), shortID, timeout)
+		logrus.Warnf(
+			"Container %s (%s) did not stop within %v",
+			sourceContainer.Name(),
+			shortID,
+			timeout,
+		)
 	}
 
 	// If already gone and AutoRemove is enabled, no further action needed.
@@ -175,7 +208,12 @@ func stopAndRemoveContainer(api dockerClient.APIClient, sourceContainer types.Co
 		RemoveVolumes: removeVolumes,
 	})
 	if err != nil && !dockerClient.IsErrNotFound(err) {
-		return fmt.Errorf("failed to remove container %s (%s): %w", sourceContainer.Name(), shortID, err)
+		return fmt.Errorf(
+			"failed to remove container %s (%s): %w",
+			sourceContainer.Name(),
+			shortID,
+			err,
+		)
 	}
 
 	if dockerClient.IsErrNotFound(err) {
@@ -186,7 +224,12 @@ func stopAndRemoveContainer(api dockerClient.APIClient, sourceContainer types.Co
 	// Confirm removal if it succeeded or container wasn’t gone before.
 	stopped, err = waitForStopOrTimeout(api, sourceContainer, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to confirm removal of container %s (%s): %w", sourceContainer.Name(), shortID, err)
+		return fmt.Errorf(
+			"failed to confirm removal of container %s (%s): %w",
+			sourceContainer.Name(),
+			shortID,
+			err,
+		)
 	}
 
 	if !stopped {
@@ -199,7 +242,11 @@ func stopAndRemoveContainer(api dockerClient.APIClient, sourceContainer types.Co
 // waitForStopOrTimeout waits for a container to stop or times out.
 // Returns true if stopped (or gone), false if still running after timeout, and any error.
 // Treats a 404 (not found) as stopped, indicating successful removal or prior stop.
-func waitForStopOrTimeout(api dockerClient.APIClient, container types.Container, waitTime time.Duration) (bool, error) {
+func waitForStopOrTimeout(
+	api dockerClient.APIClient,
+	container types.Container,
+	waitTime time.Duration,
+) (bool, error) {
 	ctx := context.Background()
 	timeout := time.After(waitTime)
 
@@ -214,7 +261,11 @@ func waitForStopOrTimeout(api dockerClient.APIClient, container types.Container,
 					return true, nil // Container gone, treat as stopped
 				}
 
-				return false, fmt.Errorf("failed to inspect container %s: %w", container.ID(), err) // Other errors propagate
+				return false, fmt.Errorf(
+					"failed to inspect container %s: %w",
+					container.ID(),
+					err,
+				) // Other errors propagate
 			}
 
 			if !containerInfo.State.Running {
@@ -236,9 +287,11 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 	for networkName, originalEndpoint := range sourceContainer.ContainerInfo().NetworkSettings.Networks {
 		// Copy all fields from the original endpoint
 		endpoint := &dockerNetworkType.EndpointSettings{
-			IPAMConfig:          originalEndpoint.IPAMConfig,          // Preserve full IPAM config
-			Links:               originalEndpoint.Links,               // Preserve container links
-			Aliases:             []string{sourceContainer.Name()[1:]}, // Reset to container name only
+			IPAMConfig: originalEndpoint.IPAMConfig, // Preserve full IPAM config
+			Links:      originalEndpoint.Links,      // Preserve container links
+			Aliases: []string{
+				sourceContainer.Name()[1:],
+			}, // Reset to container name only
 			DriverOpts:          originalEndpoint.DriverOpts,          // Preserve driver options
 			GwPriority:          originalEndpoint.GwPriority,          // Preserve gateway priority
 			NetworkID:           originalEndpoint.NetworkID,           // Preserve network ID
@@ -250,7 +303,9 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 			GlobalIPv6Address:   originalEndpoint.GlobalIPv6Address,   // Preserve global IPv6 address
 			GlobalIPv6PrefixLen: originalEndpoint.GlobalIPv6PrefixLen, // Preserve IPv6 prefix length
 			MacAddress:          originalEndpoint.MacAddress,          // Preserve MAC address
-			DNSNames:            []string{sourceContainer.Name()[1:]}, // Reset to container name only
+			DNSNames: []string{
+				sourceContainer.Name()[1:],
+			}, // Reset to container name only
 		}
 
 		// Preserve IPAMConfig if present
@@ -263,7 +318,13 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 		}
 
 		config.EndpointsConfig[networkName] = endpoint
-		logrus.Debugf("Preserving network config for %s on %s: MAC=%s, IP=%s", sourceContainer.Name(), networkName, endpoint.MacAddress, endpoint.IPAddress)
+		logrus.Debugf(
+			"Preserving network config for %s on %s: MAC=%s, IP=%s",
+			sourceContainer.Name(),
+			networkName,
+			endpoint.MacAddress,
+			endpoint.IPAddress,
+		)
 	}
 
 	return config
@@ -272,12 +333,20 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 // getDesiredMacAddress extracts the first MAC address from the network config for logging.
 // It logs the MAC address being preserved and returns it for debugging purposes.
 // Returns an empty string if no MAC address is found.
-func getDesiredMacAddress(networkConfig *dockerNetworkType.NetworkingConfig, containerID types.ContainerID) string {
-	for networkName, ep := range networkConfig.EndpointsConfig {
-		if ep.MacAddress != "" {
-			logrus.Debugf("Preserving MAC address %s for container %s on network %s", ep.MacAddress, containerID, networkName)
+func getDesiredMacAddress(
+	networkConfig *dockerNetworkType.NetworkingConfig,
+	containerID types.ContainerID,
+) string {
+	for networkName, endpoint := range networkConfig.EndpointsConfig {
+		if endpoint.MacAddress != "" {
+			logrus.Debugf(
+				"Preserving MAC address %s for container %s on network %s",
+				endpoint.MacAddress,
+				containerID,
+				networkName,
+			)
 
-			return ep.MacAddress
+			return endpoint.MacAddress
 		}
 	}
 

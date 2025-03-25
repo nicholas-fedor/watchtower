@@ -234,7 +234,9 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
 	if monitorOnly && noPull {
-		logrus.Warn("Using `WATCHTOWER_NO_PULL` and `WATCHTOWER_MONITOR_ONLY` simultaneously might lead to no action being taken at all. If this is intentional, you may safely ignore this message.")
+		logrus.Warn(
+			"Using `WATCHTOWER_NO_PULL` and `WATCHTOWER_MONITOR_ONLY` simultaneously might lead to no action being taken at all. If this is intentional, you may safely ignore this message.",
+		)
 	}
 
 	// Initialize the Docker client with options reflecting the desired container handling behavior.
@@ -288,7 +290,9 @@ func run(c *cobra.Command, names []string) {
 	if healthCheck {
 		if os.Getpid() == 1 {
 			time.Sleep(1 * time.Second)
-			logrus.Fatal("The health check flag should never be passed to the main watchtower container process")
+			logrus.Fatal(
+				"The health check flag should never be passed to the main watchtower container process",
+			)
 		}
 
 		return // Exit early without os.Exit to preserve defer in caller.
@@ -419,7 +423,8 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	}
 
 	// Start the API server, logging errors unless it’s a clean shutdown triggered by context.
-	if err := httpAPI.Start(ctx, cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := httpAPI.Start(ctx, cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI); err != nil &&
+		!errors.Is(err, http.ErrServerClosed) {
 		logrus.Error("failed to start API", err)
 
 		return fmt.Errorf("failed to start HTTP API: %w", err)
@@ -443,7 +448,9 @@ func logNotify(err error) {
 // It pauses execution for one second to mitigate potential race conditions during startup,
 // giving the Docker API time to stabilize before Watchtower begins interacting with containers.
 func awaitDockerClient() {
-	logrus.Debug("Sleeping for a second to ensure the docker api client has been properly initialized.")
+	logrus.Debug(
+		"Sleeping for a second to ensure the docker api client has been properly initialized.",
+	)
 	time.Sleep(1 * time.Second)
 }
 
@@ -581,7 +588,9 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
 
 	// Warn about trace-level logging if enabled, as it may expose sensitive data.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		startupLog.Warn("Trace level enabled: log will include sensitive information as credentials and tokens")
+		startupLog.Warn(
+			"Trace level enabled: log will include sensitive information as credentials and tokens",
+		)
 	}
 }
 
@@ -658,7 +667,13 @@ func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
-func runUpgradesOnSchedule(ctx context.Context, c *cobra.Command, filter types.Filter, filtering string, lock chan bool) error {
+func runUpgradesOnSchedule(
+	ctx context.Context,
+	c *cobra.Command,
+	filter types.Filter,
+	filtering string,
+	lock chan bool,
+) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
 		lock = make(chan bool, 1)
