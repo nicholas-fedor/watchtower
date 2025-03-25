@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
@@ -73,6 +75,8 @@ func CompareDigest(
 	container types.Container,
 	registryAuth string,
 ) (bool, error) {
+	fields := logrus.Fields{"container": container.Name(), "image": container.ImageName()}
+
 	// Ensure the container has image metadata to proceed with digest comparison.
 	if !container.HasImageInfo() {
 		return false, errMissingImageInfo
@@ -84,8 +88,14 @@ func CompareDigest(
 		return false, err
 	}
 
+	logrus.WithFields(fields).Debugf("Found a remote digest to compare with: %s", remoteDigest)
+
 	// Compare the fetched remote digest with the container’s local digests.
-	return digestsMatch(container.ImageInfo().RepoDigests, remoteDigest), nil
+	matches := digestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
+
+	logrus.WithFields(fields).Debugf("Digest comparison completed, matches: %v", matches)
+
+	return matches, nil
 }
 
 // FetchDigest retrieves the digest of an image from its registry using a GET request.
@@ -123,6 +133,8 @@ func fetchDigest(
 	container types.Container,
 	registryAuth, method string,
 ) (string, error) {
+	fields := logrus.Fields{"container": container.Name(), "image": container.ImageName()}
+
 	// Transform the provided auth string into a usable format for registry authentication.
 	registryAuth = TransformAuth(registryAuth)
 
@@ -137,6 +149,8 @@ func fetchDigest(
 	if err != nil {
 		return "", fmt.Errorf("failed to build manifest URL: %w", err)
 	}
+
+	logrus.WithFields(fields).Debugf("Sending %s request to fetch digest: %s", method, url)
 
 	// Construct the HTTP request with the appropriate method, headers, and context.
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
@@ -187,7 +201,11 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 		)
 	}
 
-	return helpers.NormalizeDigest(digest), nil
+	normalizedDigest := helpers.NormalizeDigest(digest)
+
+	logrus.Debugf("Extracted digest from HEAD response: %s", normalizedDigest)
+
+	return normalizedDigest, nil
 }
 
 // extractGetDigest extracts the image digest from a GET response’s body.
@@ -210,7 +228,11 @@ func extractGetDigest(resp *http.Response) (string, error) {
 		)
 	}
 
-	return helpers.NormalizeDigest(response.Digest), nil
+	normalizedDigest := helpers.NormalizeDigest(response.Digest)
+
+	logrus.Debugf("Extracted digest from GET response: %s", normalizedDigest)
+
+	return normalizedDigest, nil
 }
 
 // digestsMatch compares a list of local digests with a remote digest to determine if there’s a match.
@@ -232,7 +254,16 @@ func digestsMatch(localDigests []string, remoteDigest string) bool {
 			continue
 		}
 
-		if helpers.NormalizeDigest(parts[1]) == normalizedRemoteDigest {
+		normalizedLocalDigest := helpers.NormalizeDigest(parts[1])
+		logrus.Debugf(
+			"Comparing digests - local: %s, remote: %s",
+			normalizedLocalDigest,
+			normalizedRemoteDigest,
+		)
+
+		if normalizedLocalDigest == normalizedRemoteDigest {
+			logrus.Debug("Found a digest match")
+
 			return true
 		}
 	}
