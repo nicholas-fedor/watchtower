@@ -23,6 +23,8 @@ const (
 	serverIdleTimeout = 30 * time.Second
 	// serverMaxHeaderShift defines the bit shift for the maximum header size (1 MB).
 	serverMaxHeaderShift = 20
+	// serverShutdownTimeout defines the maximum duration allowed for the server to shut down gracefully.
+	serverShutdownTimeout = 5 * time.Second
 )
 
 // errServerFailed indicates a failure in starting or running the HTTP server.
@@ -142,7 +144,12 @@ func RunHTTPServer(ctx context.Context, server HTTPServer) error {
 	case err := <-errChan:
 		return err
 	case <-ctx.Done():
-		if err := server.Shutdown(ctx); err != nil {
+		shutdownCtx, shutdownCancel := context.WithTimeout(
+			context.Background(),
+			serverShutdownTimeout,
+		)
+		defer shutdownCancel()
+		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
 			return fmt.Errorf("server shutdown failed: %w", err)
 		}
 
