@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../images/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
     
     
       
@@ -26,7 +26,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.4af4bdda.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -603,6 +603,7 @@
 
 <p>Watchtower is itself packaged as a Docker container so installation is as simple as pulling the <code>nickfedor/watchtower</code> image. If you are using ARM based architecture, pull the appropriate <code>nickfedor/watchtower:armhf-&lt;tag&gt;</code> image from the <a href="https://hub.docker.com/r/nickfedor/watchtower/tags/">nickfedor Docker Hub</a>.</p>
 <p>Since the watchtower code needs to interact with the Docker API in order to monitor the running containers, you need to mount <em>/var/run/docker.sock</em> into the container with the <code>-v</code> flag when you run it.</p>
+<p><strong>⚠️ Note:</strong> Docker v25 / API v1.44 is the minimum supported version. This can be checked using the <a href="https://docs.docker.com/reference/cli/docker/version/">CLI command</a> <code>docker version</code>. Manually setting the <code>DOCKER_API_VERSION</code> <a href="https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version">variable</a> is a temporary override until you are able to update to Docker version 25 or newer.</p>
 <p>Run the <code>watchtower</code> container with the following command:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
@@ -704,7 +705,7 @@ to 30s rather than the default 24 hours.</p>
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.f1b6f286.min.js"></script>
+      <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
       
     
   </body>

@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../images/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
     
     
       
@@ -26,7 +26,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.4af4bdda.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -645,6 +645,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#http_api_port" class="md-nav__link">
+    <span class="md-ellipsis">
+      HTTP API Port
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scheduling" class="md-nav__link">
     <span class="md-ellipsis">
       Scheduling
@@ -1256,6 +1265,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#http_api_port" class="md-nav__link">
+    <span class="md-ellipsis">
+      HTTP API Port
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scheduling" class="md-nav__link">
     <span class="md-ellipsis">
       Scheduling
@@ -1466,7 +1484,8 @@ Environment Variable: DOCKER_HOST
              Default: &quot;unix:///var/run/docker.sock&quot;
 </code></pre></div>
 <h2 id="docker_api_version">Docker API version<a class="headerlink" href="#docker_api_version" title="Permanent link">&para;</a></h2>
-<p>The API version to use by the Docker client for connecting to the Docker daemon. The minimum supported version is 1.44.</p>
+<p>The API version to use by the Docker client for connecting to the Docker daemon. Using this argument/variable enables overriding the minimum supported version of 1.44.
+Use Docker's <a href="https://docs.docker.com/reference/api/engine/#api-version-matrix">API version matrix</a> chart as a reference for comparing your version of Docker and the maximum supported API version.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --api-version, -a
 Environment Variable: DOCKER_API_VERSION
                 Type: String
@@ -1622,6 +1641,13 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
                 Type: Boolean
              Default: false
 </code></pre></div>
+<h2 id="http_api_port">HTTP API Port<a class="headerlink" href="#http_api_port" title="Permanent link">&para;</a></h2>
+<p>Specifies the HTTP API listening port.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --http-api-port
+Environment Variable: WATCHTOWER_HTTP_API_PORT
+                Type: String
+             Default: 8080
+</code></pre></div>
 <h2 id="scheduling">Scheduling<a class="headerlink" href="#scheduling" title="Permanent link">&para;</a></h2>
 <p><a href="https://pkg.go.dev/github.com/robfig/cron@v1.2.0?tab=doc#hdr-CRON_Expression_Format">Cron expression</a> in 6 fields (rather than the traditional 5) which defines when and how often to check for new images. Either <code>--interval</code> or the schedule expression
 can be defined, but not both. An example: <code>--schedule "0 0 4 * * *"</code></p>
@@ -1731,7 +1757,7 @@ Environment Variable: WATCHTOWER_PORCELAIN
     <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.f1b6f286.min.js"></script>
+      <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
       
     
   </body>
