@@ -189,8 +189,13 @@ func (c imageClient) shouldSkipPull(
 	logrus.WithFields(fields).Debugf("Checking if pull is needed")
 
 	warn := c.warnOnHeadFailed(targetContainer, warnOnHeadFailed)
+
 	match, err := digest.CompareDigest(ctx, targetContainer, auth)
-	logrus.WithFields(fields).Debugf("Digest match: %v, error: %v", match, err)
+	if err != nil {
+		logrus.WithFields(fields).Debugf("Digest match: %v, error: %s", match, err)
+	} else {
+		logrus.WithFields(fields).Debugf("Digest match: %v", match)
+	}
 
 	switch {
 	case err != nil:
