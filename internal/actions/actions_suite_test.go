@@ -4,17 +4,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestActions(t *testing.T) {
+	t.Parallel()
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	logrus.SetOutput(ginkgo.GinkgoWriter)
 	ginkgo.RunSpecs(t, "Actions Suite")
@@ -31,7 +31,8 @@ var _ = ginkgo.Describe("the actions package", func() {
 					// removeVolumes:
 					false,
 				)
-				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).To(gomega.Succeed())
+				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).
+					To(gomega.Succeed())
 			})
 		})
 		ginkgo.When("given an array of one", func() {
@@ -51,7 +52,8 @@ var _ = ginkgo.Describe("the actions package", func() {
 					// removeVolumes:
 					false,
 				)
-				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).To(gomega.Succeed())
+				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).
+					To(gomega.Succeed())
 			})
 		})
 		ginkgo.When("given multiple containers", func() {
@@ -83,6 +85,10 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should stop all but the latest one", func() {
 				err := actions.CheckForMultipleWatchtowerInstances(client, false, "")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).
+					To(gomega.BeFalse(), "test-container-01 should be stopped")
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).
+					To(gomega.BeTrue(), "test-container-02 should remain running")
 			})
 		})
 		ginkgo.When("deciding whether to cleanup images", func() {

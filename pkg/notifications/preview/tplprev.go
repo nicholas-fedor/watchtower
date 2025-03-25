@@ -10,12 +10,11 @@ import (
 )
 
 func Render(input string, states []data.State, loglevels []data.LogLevel) (string, error) {
-
 	data := data.New()
 
 	tpl, err := template.New("").Funcs(templates.Funcs).Parse(input)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse %v", err)
+		return "", fmt.Errorf("failed to parse %w", err)
 	}
 
 	for _, state := range states {
@@ -27,9 +26,10 @@ func Render(input string, states []data.State, loglevels []data.LogLevel) (strin
 	}
 
 	var buf strings.Builder
+
 	err = tpl.Execute(&buf, data)
 	if err != nil {
-		return "", fmt.Errorf("failed to execute template: %v", err)
+		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return buf.String(), nil

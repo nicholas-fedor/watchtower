@@ -7,13 +7,16 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// WatchtowerContainersFilter filters only watchtower containers
+// noScope is the default scope value when none is specified.
+const noScope = "none"
+
+// WatchtowerContainersFilter filters only watchtower containers.
 func WatchtowerContainersFilter(c types.FilterableContainer) bool { return c.IsWatchtower() }
 
-// NoFilter will not filter out any containers
+// NoFilter will not filter out any containers.
 func NoFilter(types.FilterableContainer) bool { return true }
 
-// FilterByNames returns all containers that match one of the specified names
+// FilterByNames returns all containers that match one of the specified names.
 func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 	if len(names) == 0 {
 		return baseFilter
@@ -30,18 +33,21 @@ func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 				if indices == nil {
 					continue
 				}
+
 				start := indices[0]
 				end := indices[1]
+
 				if start <= 1 && end >= len(c.Name())-1 {
 					return baseFilter(c)
 				}
 			}
 		}
+
 		return false
 	}
 }
 
-// FilterByDisableNames returns all containers that don't match any of the specified names
+// FilterByDisableNames returns all containers that don't match any of the specified names.
 func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.Filter {
 	if len(disableNames) == 0 {
 		return baseFilter
@@ -53,11 +59,12 @@ func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.
 				return false
 			}
 		}
+
 		return baseFilter(c)
 	}
 }
 
-// FilterByEnableLabel returns all containers that have the enabled label set
+// FilterByEnableLabel returns all containers that have the enabled label set.
 func FilterByEnableLabel(baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
 		// If label filtering is enabled, containers should only be considered
@@ -71,7 +78,7 @@ func FilterByEnableLabel(baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByDisabledLabel returns all containers that have the enabled label set to disable
+// FilterByDisabledLabel returns all containers that have the enabled label set to disable.
 func FilterByDisabledLabel(baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
 		enabledLabel, ok := c.Enabled()
@@ -84,13 +91,13 @@ func FilterByDisabledLabel(baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByScope returns all containers that belongs to a specific scope
+// FilterByScope returns all containers that belong to a specific scope.
 func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
 		containerScope, containerHasScope := c.Scope()
 
 		if !containerHasScope || containerScope == "" {
-			containerScope = "none"
+			containerScope = noScope
 		}
 
 		if containerScope == scope {
@@ -101,7 +108,7 @@ func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByImage returns all containers that have a specific image
+// FilterByImage returns all containers that have a specific image.
 func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	if images == nil {
 		return baseFilter
@@ -119,59 +126,75 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	}
 }
 
-// BuildFilter creates the needed filter of containers
-func BuildFilter(names []string, disableNames []string, enableLabel bool, scope string) (types.Filter, string) {
-	sb := strings.Builder{}
+// BuildFilter creates the needed filter of containers.
+func BuildFilter(
+	names []string,
+	disableNames []string,
+	enableLabel bool,
+	scope string,
+) (types.Filter, string) {
+	stringBuilder := strings.Builder{}
 	filter := NoFilter
 	filter = FilterByNames(names, filter)
 	filter = FilterByDisableNames(disableNames, filter)
 
 	if len(names) > 0 {
-		sb.WriteString("which name matches \"")
+		stringBuilder.WriteString("which name matches \"")
+
 		for i, n := range names {
-			sb.WriteString(n)
+			stringBuilder.WriteString(n)
+
 			if i < len(names)-1 {
-				sb.WriteString(`" or "`)
+				stringBuilder.WriteString(`" or "`)
 			}
 		}
-		sb.WriteString(`", `)
+
+		stringBuilder.WriteString(`", `)
 	}
+
 	if len(disableNames) > 0 {
-		sb.WriteString("not named one of \"")
+		stringBuilder.WriteString("not named one of \"")
+
 		for i, n := range disableNames {
-			sb.WriteString(n)
+			stringBuilder.WriteString(n)
+
 			if i < len(disableNames)-1 {
-				sb.WriteString(`" or "`)
+				stringBuilder.WriteString(`" or "`)
 			}
 		}
-		sb.WriteString(`", `)
+
+		stringBuilder.WriteString(`", `)
 	}
 
 	if enableLabel {
 		// If label filtering is enabled, containers should only be considered
 		// if the label is specifically set.
 		filter = FilterByEnableLabel(filter)
-		sb.WriteString("using enable label, ")
+
+		stringBuilder.WriteString("using enable label, ")
 	}
 
-	if scope == "none" {
+	if scope == noScope {
 		// If a scope has explicitly defined as "none", containers should only be considered
 		// if they do not have a scope defined, or if it's explicitly set to "none".
 		filter = FilterByScope(scope, filter)
-		sb.WriteString(`without a scope, "`)
+
+		stringBuilder.WriteString(`without a scope, "`)
 	} else if scope != "" {
 		// If a scope has been defined, containers should only be considered
 		// if the scope is specifically set.
 		filter = FilterByScope(scope, filter)
-		sb.WriteString(`in scope "`)
-		sb.WriteString(scope)
-		sb.WriteString(`", `)
+
+		stringBuilder.WriteString(`in scope "`)
+		stringBuilder.WriteString(scope)
+		stringBuilder.WriteString(`", `)
 	}
+
 	filter = FilterByDisabledLabel(filter)
 
 	filterDesc := "Checking all containers (except explicitly disabled with label)"
-	if sb.Len() > 0 {
-		filterDesc = "Only checking containers " + sb.String()
+	if stringBuilder.Len() > 0 {
+		filterDesc = "Only checking containers " + stringBuilder.String()
 
 		// Remove the last ", "
 		filterDesc = filterDesc[:len(filterDesc)-2]

@@ -1,286 +1,165 @@
-// Package container contains code related to dealing with docker containers
+// Package container provides functionality for managing Docker containers within Watchtower.
+// This file defines the Container type and its core methods, implementing the types.Container interface
+// to handle container state, metadata, and configuration for updates and recreation.
 package container
 
 import (
-	"errors"
 	"fmt"
-	"strconv"
 	"strings"
+
+	"github.com/docker/go-connections/nat"
+
+	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerImageType "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
-
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/go-connections/nat"
 )
 
-// NewContainer returns a new Container instance instantiated with the
-// specified ContainerInfo and ImageInfo structs.
-func NewContainer(containerInfo *container.InspectResponse, imageInfo *image.InspectResponse) *Container {
+// Container represents a running Docker container managed by Watchtower.
+// It implements the types.Container interface, storing state and metadata
+// for container operations such as updates and lifecycle hooks.
+//
+//nolint:recvcheck // Intentional mix: value receivers for reads, pointer receivers for writes
+type Container struct {
+	LinkedToRestarting bool                                 // Indicates if linked to a restarting container
+	Stale              bool                                 // Marks the container as having an outdated image
+	containerInfo      *dockerContainerType.InspectResponse // Docker container metadata
+	imageInfo          *dockerImageType.InspectResponse     // Docker image metadata
+}
+
+// NewContainer creates a new Container instance with the specified metadata.
+// It initializes the container with the provided containerInfo and imageInfo,
+// setting LinkedToRestarting and Stale to false by default.
+func NewContainer(
+	containerInfo *dockerContainerType.InspectResponse,
+	imageInfo *dockerImageType.InspectResponse,
+) *Container {
 	return &Container{
-		containerInfo: containerInfo,
-		imageInfo:     imageInfo,
+		LinkedToRestarting: false,
+		Stale:              false,
+		containerInfo:      containerInfo,
+		imageInfo:          imageInfo,
 	}
 }
 
-// Container represents a running Docker container.
-type Container struct {
-	LinkedToRestarting bool
-	Stale              bool
+// State Management Methods
+// These methods manage and query the container’s state related to updates and dependencies.
 
-	containerInfo *container.InspectResponse
-	imageInfo     *image.InspectResponse
-}
-
-// IsLinkedToRestarting returns the current value of the LinkedToRestarting field for the container
-func (c *Container) IsLinkedToRestarting() bool {
+// IsLinkedToRestarting returns whether the container is linked to a restarting container.
+// It reflects the current value of the LinkedToRestarting field.
+func (c Container) IsLinkedToRestarting() bool {
 	return c.LinkedToRestarting
 }
 
-// IsStale returns the current value of the Stale field for the container
-func (c *Container) IsStale() bool {
-	return c.Stale
-}
-
-// SetLinkedToRestarting sets the LinkedToRestarting field for the container
+// SetLinkedToRestarting sets whether the container is linked to a restarting container.
+// It updates the LinkedToRestarting field to the specified value.
 func (c *Container) SetLinkedToRestarting(value bool) {
 	c.LinkedToRestarting = value
 }
 
-// SetStale implements sets the Stale field for the container
+// IsStale returns whether the container’s image is outdated.
+// It reflects the current value of the Stale field.
+func (c Container) IsStale() bool {
+	return c.Stale
+}
+
+// SetStale marks the container as having an outdated image.
+// It updates the Stale field to the specified value.
 func (c *Container) SetStale(value bool) {
 	c.Stale = value
 }
 
-// ContainerInfo fetches JSON info for the container
-func (c Container) ContainerInfo() *container.InspectResponse {
+// ToRestart determines if the container should be restarted.
+// It returns true if the container is stale or linked to a restarting container.
+func (c Container) ToRestart() bool {
+	return c.Stale || c.LinkedToRestarting
+}
+
+// Container Metadata Methods
+// These methods provide access to the container’s basic metadata and state.
+
+// ContainerInfo returns the full Docker container metadata.
+// It provides the InspectResponse data for detailed container information.
+func (c Container) ContainerInfo() *dockerContainerType.InspectResponse {
 	return c.containerInfo
 }
 
-// ID returns the Docker container ID.
+// ID returns the unique identifier of the container.
+// It extracts the container ID from the metadata as a types.ContainerID.
 func (c Container) ID() types.ContainerID {
 	return types.ContainerID(c.containerInfo.ID)
 }
 
-// IsRunning returns a boolean flag indicating whether or not the current
-// container is running. The status is determined by the value of the
-// container's "State.Running" property.
+// IsRunning checks if the container is currently running.
+// It returns true if the container’s State.Running property is set.
 func (c Container) IsRunning() bool {
 	return c.containerInfo.State.Running
 }
 
-// IsRestarting returns a boolean flag indicating whether or not the current
-// container is restarting. The status is determined by the value of the
-// container's "State.Restarting" property.
+// IsRestarting checks if the container is currently restarting.
+// It returns true if the container’s State.Restarting property is set.
 func (c Container) IsRestarting() bool {
 	return c.containerInfo.State.Restarting
 }
 
-// Name returns the Docker container name.
+// Name returns the name of the container.
+// It extracts the name from the container’s metadata, typically prefixed with a slash.
 func (c Container) Name() string {
 	return c.containerInfo.Name
 }
 
-// ImageID returns the ID of the Docker image that was used to start the
-// container. May cause nil dereference if imageInfo is not set!
+// ImageID returns the ID of the image used to start the container.
+// It retrieves the image ID from imageInfo, panicking if imageInfo is nil.
 func (c Container) ImageID() types.ImageID {
 	return types.ImageID(c.imageInfo.ID)
 }
 
-// SafeImageID returns the ID of the Docker image that was used to start the container if available,
-// otherwise returns an empty string
+// SafeImageID returns the image ID if available, or an empty string if not.
+// It safely handles cases where imageInfo is nil, avoiding panics.
 func (c Container) SafeImageID() types.ImageID {
 	if c.imageInfo == nil {
 		return ""
 	}
+
 	return types.ImageID(c.imageInfo.ID)
 }
 
-// ImageName returns the name of the Docker image that was used to start the
-// container. If the original image was specified without a particular tag, the
-// "latest" tag is assumed.
+// ImageName returns the name of the image used to start the container.
+// It prefers the Zodiac label if set, otherwise uses the Config.Image value,
+// appending ":latest" if no tag is specified.
 func (c Container) ImageName() string {
-	// Compatibility w/ Zodiac deployments
 	imageName, ok := c.getLabelValue(zodiacLabel)
 	if !ok {
 		imageName = c.containerInfo.Config.Image
 	}
 
 	if !strings.Contains(imageName, ":") {
-		imageName = fmt.Sprintf("%s:latest", imageName)
+		imageName += ":latest"
 	}
 
 	return imageName
 }
 
-// Enabled returns the value of the container enabled label and if the label
-// was set.
-func (c Container) Enabled() (bool, bool) {
-	rawBool, ok := c.getLabelValue(enableLabel)
-	if !ok {
-		return false, false
-	}
-
-	parsedBool, err := strconv.ParseBool(rawBool)
-	if err != nil {
-		return false, false
-	}
-
-	return parsedBool, true
+// HasImageInfo indicates whether image metadata is available for the container.
+// It returns true if imageInfo is non-nil, false otherwise.
+func (c Container) HasImageInfo() bool {
+	return c.imageInfo != nil
 }
 
-// IsMonitorOnly returns whether the container should only be monitored based on values of
-// the monitor-only label, the monitor-only argument and the label-take-precedence argument.
-func (c Container) IsMonitorOnly(params types.UpdateParams) bool {
-	return c.getContainerOrGlobalBool(params.MonitorOnly, monitorOnlyLabel, params.LabelPrecedence)
+// ImageInfo returns the Docker image metadata for the container.
+// It provides the InspectResponse data for the image, or nil if unavailable.
+func (c Container) ImageInfo() *dockerImageType.InspectResponse {
+	return c.imageInfo
 }
 
-// IsNoPull returns whether the image should be pulled based on values of
-// the no-pull label, the no-pull argument and the label-take-precedence argument.
-func (c Container) IsNoPull(params types.UpdateParams) bool {
-	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
-}
+// Configuration and Dependency Methods
+// These methods handle container configuration and dependencies for recreation.
 
-func (c Container) getContainerOrGlobalBool(globalVal bool, label string, contPrecedence bool) bool {
-	if contVal, err := c.getBoolLabelValue(label); err != nil {
-		if !errors.Is(err, errorLabelNotFound) {
-			logrus.WithField("error", err).WithField("label", label).Warn("Failed to parse label value")
-		}
-		return globalVal
-	} else {
-		if contPrecedence {
-			return contVal
-		} else {
-			return contVal || globalVal
-		}
-	}
-}
-
-// Scope returns the value of the scope UID label and if the label
-// was set.
-func (c Container) Scope() (string, bool) {
-	rawString, ok := c.getLabelValue(scope)
-	if !ok {
-		return "", false
-	}
-
-	return rawString, true
-}
-
-// Links returns a list containing the names of all the containers to which
-// this container is linked.
-func (c Container) Links() []string {
-	var links []string
-
-	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
-
-	if dependsOnLabelValue != "" {
-		for _, link := range strings.Split(dependsOnLabelValue, ",") {
-			// Since the container names need to start with '/', let's prepend it if it's missing
-			if !strings.HasPrefix(link, "/") {
-				link = "/" + link
-			}
-			links = append(links, link)
-		}
-
-		return links
-	}
-
-	if (c.containerInfo != nil) && (c.containerInfo.HostConfig != nil) {
-		for _, link := range c.containerInfo.HostConfig.Links {
-			name := strings.Split(link, ":")[0]
-			links = append(links, name)
-		}
-
-		// If the container uses another container for networking, it can be considered an implicit link
-		// since the container would stop working if the network supplier were to be recreated
-		networkMode := c.containerInfo.HostConfig.NetworkMode
-		if networkMode.IsContainer() {
-			links = append(links, networkMode.ConnectedContainer())
-		}
-	}
-
-	return links
-}
-
-// ToRestart return whether the container should be restarted, either because
-// is stale or linked to another stale container.
-func (c Container) ToRestart() bool {
-	return c.Stale || c.LinkedToRestarting
-}
-
-// IsWatchtower returns a boolean flag indicating whether or not the current
-// container is the watchtower container itself. The watchtower container is
-// identified by the presence of the "com.centurylinklabs.watchtower" label in
-// the container metadata.
-func (c Container) IsWatchtower() bool {
-	return ContainsWatchtowerLabel(c.containerInfo.Config.Labels)
-}
-
-// PreUpdateTimeout checks whether a container has a specific timeout set
-// for how long the pre-update command is allowed to run. This value is expressed
-// either as an integer, in minutes, or as 0 which will allow the command/script
-// to run indefinitely. Users should be cautious with the 0 option, as that
-// could result in watchtower waiting forever.
-func (c Container) PreUpdateTimeout() int {
-	var minutes int
-	var err error
-
-	val := c.getLabelValueOrEmpty(preUpdateTimeoutLabel)
-
-	minutes, err = strconv.Atoi(val)
-	if err != nil || val == "" {
-		return 1
-	}
-
-	return minutes
-}
-
-// PostUpdateTimeout checks whether a container has a specific timeout set
-// for how long the post-update command is allowed to run. This value is expressed
-// either as an integer, in minutes, or as 0 which will allow the command/script
-// to run indefinitely. Users should be cautious with the 0 option, as that
-// could result in watchtower waiting forever.
-func (c Container) PostUpdateTimeout() int {
-	var minutes int
-	var err error
-
-	val := c.getLabelValueOrEmpty(postUpdateTimeoutLabel)
-
-	minutes, err = strconv.Atoi(val)
-	if err != nil || val == "" {
-		return 1
-	}
-
-	return minutes
-}
-
-// StopSignal returns the custom stop signal (if any) that is encoded in the
-// container's metadata. If the container has not specified a custom stop
-// signal, the empty string "" is returned.
-func (c Container) StopSignal() string {
-	return c.getLabelValueOrEmpty(signalLabel)
-}
-
-// GetCreateConfig returns the container's current Config converted into a format
-// that can be re-submitted to the Docker create API.
-//
-// Ideally, we'd just be able to take the ContainerConfig from the old container
-// and use it as the starting point for creating the new container; however,
-// the ContainerConfig that comes back from the Inspect call merges the default
-// configuration (the stuff specified in the metadata for the image itself)
-// with the overridden configuration (the stuff that you might specify as part
-// of the "docker run").
-//
-// In order to avoid unintentionally overriding the
-// defaults in the new image we need to separate the override options from the
-// default options. To do this we have to compare the ContainerConfig for the
-// running container with the ContainerConfig from the image that container was
-// started from. This function returns a ContainerConfig which contains just
-// the options overridden at runtime.
-func (c Container) GetCreateConfig() *container.Config {
+// GetCreateConfig generates a container configuration for recreation.
+// It compares the current Config with the image’s Config to isolate runtime overrides,
+// ensuring defaults are not unintentionally reapplied, and sets the image name accordingly.
+func (c Container) GetCreateConfig() *dockerContainerType.Config {
 	config := c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 	imageConfig := c.imageInfo.Config
@@ -303,8 +182,7 @@ func (c Container) GetCreateConfig() *container.Config {
 			config.Cmd = nil
 		}
 	}
-
-	// Clear HEALTHCHECK configuration (if default)
+	// Clear HEALTHCHECK if it matches the image default.
 	if config.Healthcheck != nil && imageConfig.Healthcheck != nil {
 		if util.SliceEqual(config.Healthcheck.Test, imageConfig.Healthcheck.Test) {
 			config.Healthcheck.Test = nil
@@ -328,77 +206,97 @@ func (c Container) GetCreateConfig() *container.Config {
 	}
 
 	config.Env = util.SliceSubtract(config.Env, imageConfig.Env)
-
 	config.Labels = util.StringMapSubtract(config.Labels, imageConfig.Labels)
-
 	config.Volumes = util.StructMapSubtract(config.Volumes, imageConfig.Volumes)
-
-	// subtract ports exposed in image from container
+	// Subtract ports exposed in the image from the container’s ports.
 	for k := range config.ExposedPorts {
 		if _, ok := imageConfig.ExposedPorts[k]; ok {
 			delete(config.ExposedPorts, k)
 		}
 	}
+
 	for p := range c.containerInfo.HostConfig.PortBindings {
 		config.ExposedPorts[p] = struct{}{}
 	}
 
 	config.Image = c.ImageName()
+
 	return config
 }
 
-// GetCreateHostConfig returns the container's current HostConfig with any links
-// re-written so that they can be re-submitted to the Docker create API.
-func (c Container) GetCreateHostConfig() *container.HostConfig {
+// GetCreateHostConfig generates a host configuration for recreation.
+// It adjusts the current HostConfig’s Links to a format suitable for the Docker create API.
+func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 	hostConfig := c.containerInfo.HostConfig
-
 	for i, link := range hostConfig.Links {
 		name := link[0:strings.Index(link, ":")]
 		alias := link[strings.LastIndex(link, "/"):]
-
 		hostConfig.Links[i] = fmt.Sprintf("%s:%s", name, alias)
 	}
 
 	return hostConfig
 }
 
-// HasImageInfo returns whether image information could be retrieved for the container
-func (c Container) HasImageInfo() bool {
-	return c.imageInfo != nil
-}
-
-// ImageInfo fetches the ImageInspect data of the current container
-func (c Container) ImageInfo() *image.InspectResponse {
-	return c.imageInfo
-}
-
-// VerifyConfiguration checks the container and image configurations for nil references to make sure
-// that the container can be recreated once deleted
+// VerifyConfiguration validates the container’s metadata for recreation.
+// It checks for nil references in imageInfo, containerInfo, Config, and HostConfig,
+// returning an error if any are missing or invalid, ensuring the container can be recreated.
 func (c Container) VerifyConfiguration() error {
 	if c.imageInfo == nil {
-		return errorNoImageInfo
+		return errNoImageInfo
 	}
 
 	containerInfo := c.ContainerInfo()
 	if containerInfo == nil {
-		return errorNoContainerInfo
+		return errNoContainerInfo
 	}
 
 	containerConfig := containerInfo.Config
 	if containerConfig == nil {
-		return errorInvalidConfig
+		return errInvalidConfig
 	}
 
 	hostConfig := containerInfo.HostConfig
 	if hostConfig == nil {
-		return errorInvalidConfig
+		return errInvalidConfig
 	}
-
-	// Instead of returning an error here, we just create an empty map
-	// This should allow for updating containers where the exposed ports are missing
+	// Ensure ExposedPorts is non-nil if PortBindings exist, avoiding recreation issues.
 	if len(hostConfig.PortBindings) > 0 && containerConfig.ExposedPorts == nil {
 		containerConfig.ExposedPorts = make(map[nat.Port]struct{})
 	}
 
 	return nil
+}
+
+// Links returns a list of container names this container depends on.
+// It combines names from the depends-on label and HostConfig.Links, ensuring a leading slash,
+// and includes implicit network dependencies if applicable.
+func (c Container) Links() []string {
+	var links []string
+
+	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
+	if dependsOnLabelValue != "" {
+		for _, link := range strings.Split(dependsOnLabelValue, ",") {
+			if !strings.HasPrefix(link, "/") {
+				link = "/" + link
+			}
+
+			links = append(links, link)
+		}
+
+		return links
+	}
+
+	if c.containerInfo != nil && c.containerInfo.HostConfig != nil {
+		for _, link := range c.containerInfo.HostConfig.Links {
+			name := strings.Split(link, ":")[0]
+			links = append(links, name)
+		}
+
+		networkMode := c.containerInfo.HostConfig.NetworkMode
+		if networkMode.IsContainer() {
+			links = append(links, networkMode.ConnectedContainer())
+		}
+	}
+
+	return links
 }

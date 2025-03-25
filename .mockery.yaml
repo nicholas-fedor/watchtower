@@ -1,0 +1,196 @@
+######################################################################################################
+#                                                                                                    #
+#                                    Watchtower Mockery Configuration                                #
+#                                                                                                    #
+# Watchtower: https://github.com/nicholas-fedor/watchtower/                                          #
+# Mockery: https://vektra.github.io/mockery/latest/                                                  #
+# Configuration: https://vektra.github.io/mockery/latest/configuration                               #
+# Mockery Version: 2.53                                                                              #
+#                                                                                                    #
+######################################################################################################
+
+######################################################################################################
+# Mockery Usage                                                                                      #
+#                                                                                                    #
+# Install Mockery:                                                                                   #
+# go install github.com/vektra/mockery/v2@v2.53.3                                                     #
+#                                                                                                    #
+# Run CLI command from root:                                                                         #
+# mockery                                                                                            #
+#                                                                                                    #
+# Expected Result:                                                                                   #
+# Mockery will recursively traverse through configured package locations,                            #
+# identify interfaces, and create 'mocks' subdirectories containing files                            #
+# named for the respective interface.                                                                #
+######################################################################################################
+
+######################################################################################################
+# Configuration Structure                                                                            #
+#                                                                                                    #
+# Mockery Configuration File: Settings for locating and enabling the config file                     #
+# Logging Configuration: Options for controlling output verbosity and deprecation warnings           #
+# Interface Discovery Configuration: Settings for finding and filtering interfaces to mock           #
+# Mock Generation Configuration: Options for customizing the mock generation process                 #
+# File Output Configuration: Settings for naming and placing generated mock files                    #
+#                                                                                                    #
+######################################################################################################
+
+######################################################################################################
+# Mockery Configuration File Settings                                                                #
+######################################################################################################
+
+# Set the location of the mockery config file.
+# Overrides the default search paths (.mockery.yaml, mockery.yaml in current or parent dirs).
+# Default: ""
+# config: ""
+
+# Disable searching for configuration files in the current and parent directories.
+# When true, requires an explicit --config flag or config: setting to load a config file.
+# Default: false
+# disable-config-search: true
+
+######################################################################################################
+# Logging Configuration                                                                              #
+######################################################################################################
+
+# Suppress non-error output (set to true for silent runs except fatal errors).
+# v3 Deprecation: Removed and superseded by log-level; use log-level: error for similar effect.
+# Default: false
+# quiet: true
+
+# Set the logging verbosity level.
+# Options: debug (most verbose), info (standard), warn (warnings only), error (errors only).
+# Default: info# log-level: debug
+
+# Disable all warnings for deprecated behavior.
+# When true, suppresses deprecation messages (e.g., for quiet, with-expecter in v3).
+# Default: false
+disable-deprecation-warnings: true
+
+# Selectively disable specific deprecation warnings by name.
+# Use names from deprecation-name in log messages (e.g., "quiet", "with-expecter").
+# Default: []
+# disabled-deprecation-warnings: []
+
+######################################################################################################
+# Interface Discovery Configuration                                                                  #
+######################################################################################################
+
+# Defines the scope of packages to process for mock generation
+# Default: null
+packages:
+  # Top-level pkg directory, recursively includes all subpackages (e.g., pkg/types, pkg/container)
+  github.com/nicholas-fedor/watchtower/pkg: {}
+
+  # Top-level internal directory, recursively includes all subpackages (e.g., internal/actions)
+  github.com/nicholas-fedor/watchtower/internal: {}
+
+# Generate mocks for all exported interfaces within specified packages or directories.
+# When true with packages section, processes all interfaces in listed packages.
+# Default: false
+all: true
+
+# Limit mock generation to interfaces matching this regex.
+# Ignored if all: true; use with exclude-regex for finer control when all: false.
+# Default: ""
+# include-regex: ""
+
+# Exclude interfaces matching this regex when include-regex is set.
+# Only effective with include-regex and all: false; ignored otherwise.
+# Default: ""
+# exclude-regex: ""
+
+# Scan subdirectories recursively for interfaces within specified packages or directories.
+# Requires all: true or specific interface targeting to generate mocks.
+# Default: false
+recursive: true
+
+# Exclude specific subpackages from recursive discovery.
+# Applies when recursive: true; uses package import paths (e.g., "pkg/subpkg").
+# Default: []
+# exclude: []
+
+# Include auto-generated files in package discovery when true.
+# When false, skips files matching Go’s generated file convention (e.g., "// Code generated").
+# Default: true
+# include-auto-generated: false
+
+# Only generate mocks for exported interfaces (uppercase names) when true.
+# Limits scope to public APIs; unexported interfaces are ignored.
+# Default: false
+# exported: true
+
+######################################################################################################
+# Mock Generation Configuration                                                                      #
+######################################################################################################
+
+# Perform a dry run, printing actions without writing files to disk.
+# Useful for previewing mock generation without modifying the filesystem.
+# Default: false
+# dry-run: true
+
+# Specify a file containing boilerplate text (e.g., license headers) to prepend to all mocks.
+# Path is relative to the config file or working directory.
+# Default: ""
+# boilerplate-file: ""
+
+# Disable generation of function mocks when true.
+# Limits mocks to interfaces only, skipping standalone functions.
+# Default: false
+# disable-func-mocks: true
+
+# Generate testify expecter methods (e.g., EXPECT()) for mocks when true.
+# Enhances compatibility with github.com/stretchr/testify; v3 deprecation: permanently enabled.
+# Default: false
+with-expecter: true
+
+# Specify build tags for the generated mock files.
+# Matches Go’s build constraint syntax (e.g., "// +build tag1,tag2").
+# https://pkg.go.dev/cmd/go#hdr-Build_constraints
+# Default: ""
+# mock-build-tags: ""
+
+# Customize the struct name of the generated mock using a Go template.
+# Overrides the default "Mock{{.InterfaceName}}" naming convention.
+# Default: "Mock{{.InterfaceName}}"
+# mockname: ""
+
+# Package name for generated mock files.
+# Default: "{{.PackageName}}"
+outpkg: mocks
+
+# Treat variadic parameters as a single slice when false, rather than unrolling them.
+# Affects how variadic methods are mocked (e.g., func(...int) vs. func([]int)).
+# Default: true
+# unroll-variadic: false
+
+######################################################################################################
+# File Output Configuration                                                                          #
+######################################################################################################
+
+# Print mock code to stdout instead of writing to files when true.
+# Useful for inspection or piping; no files are created on disk.
+# Default: false
+# print: true
+
+# Place mocks in the same package as the interface when true (not recommended).
+# Avoids creating a separate package; can lead to naming conflicts.
+# Default: false
+# inpackage: true
+
+# Define the output directory for mocks using a Go template.
+# "{{.InterfaceDir}}/mocks" places mocks in a subdirectory of the interface’s source dir.
+# Default: "mocks/{{.PackagePath}}"
+dir: "{{.InterfaceDir}}/mocks"
+
+# Set the case convention for mock filenames (e.g., underscore, camel, snake).
+# v3 Deprecation: Removed; use filename template instead.
+# Default: "underscore"
+# case: "underscore"
+
+# Filename template using interface name
+# Default: "mock_{{.InterfaceName}}.go"
+filename: "{{.InterfaceName}}.go"
+######################################################################################################
+# End of Mockery Configuration                                                                       #
+######################################################################################################

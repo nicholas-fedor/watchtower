@@ -1,7 +1,11 @@
+// Package actions provides core logic for Watchtower’s container update operations.
 package actions
 
 import (
 	"errors"
+	"fmt"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -9,15 +13,44 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
-// Update looks at the running Docker containers to see if any of the images
-// used to start those containers have been updated. If a change is detected in
-// any of the images, the associated containers are stopped and restarted with
-// the new image.
+// errListContainersFailed indicates a failure to list containers.
+// It is used to wrap errors from client.ListContainers for consistent error handling.
+var errListContainersFailed = errors.New("failed to list containers")
+
+// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
+// It is used to wrap errors from sorter.SortByDependencies.
+var errSortDependenciesFailed = errors.New("failed to sort containers by dependencies")
+
+// errVerifyConfigFailed indicates a failure to verify container configuration.
+// It is used to wrap errors from VerifyConfiguration for consistency.
+var errVerifyConfigFailed = errors.New("failed to verify container configuration")
+
+// errPreUpdateFailed indicates a failure in the pre-update lifecycle command.
+// It is used to wrap errors from ExecutePreUpdateCommand.
+var errPreUpdateFailed = errors.New("pre-update command failed")
+
+// errSkipUpdate signals that a container update should be skipped due to a specific condition.
+// It is used when the pre-update command returns exit code 75 (EX_TEMPFAIL).
+var errSkipUpdate = errors.New(
+	"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
+)
+
+// errStopContainerFailed indicates a failure to stop a container.
+// It is used to wrap errors from client.StopContainer for consistent error handling.
+var errStopContainerFailed = errors.New("failed to stop container")
+
+// errStartContainerFailed indicates a failure to start a container.
+// It is used to wrap errors from client.StartContainer for consistent error handling.
+var errStartContainerFailed = errors.New("failed to start container")
+
+// Update examines running Docker containers for outdated images and updates them.
+// It scans containers, sorts them by dependencies, and performs updates based on provided parameters,
+// returning a report of the operation’s outcome.
 func Update(client container.Client, params types.UpdateParams) (types.Report, error) {
 	logrus.Debug("Checking containers for updated images")
+
 	progress := &session.Progress{}
 	staleCount := 0
 
@@ -27,7 +60,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 
 	containers, err := client.ListContainers(params.Filter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
 	staleCheckFailed := 0
@@ -35,14 +68,15 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	for i, targetContainer := range containers {
 		stale, newestImage, err := client.IsContainerStale(targetContainer, params)
 		shouldUpdate := stale && !params.NoRestart && !targetContainer.IsMonitorOnly(params)
+
 		if err == nil && shouldUpdate {
-			// Check to make sure we have all the necessary information for recreating the container
+			// Verify configuration for recreating the container.
 			err = targetContainer.VerifyConfiguration()
-			// If the image information is incomplete and trace logging is enabled, log it for further diagnosis
 			if err != nil && logrus.IsLevelEnabled(logrus.TraceLevel) {
 				imageInfo := targetContainer.ImageInfo()
 				logrus.Tracef("Image info: %#v", imageInfo)
 				logrus.Tracef("Container info: %#v", targetContainer.ContainerInfo())
+
 				if imageInfo != nil {
 					logrus.Tracef("Image config: %#v", imageInfo.Config)
 				}
@@ -50,13 +84,20 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 		}
 
 		if err != nil {
-			logrus.Infof("Unable to update container %q: %v. Proceeding to next.", targetContainer.Name(), err)
+			logrus.Infof(
+				"Unable to update container %q: %v. Proceeding to next.",
+				targetContainer.Name(),
+				err,
+			)
+
 			stale = false
 			staleCheckFailed++
+
 			progress.AddSkipped(targetContainer, err)
 		} else {
 			progress.AddScanned(targetContainer, newestImage)
 		}
+
 		containers[i].SetStale(stale)
 
 		if stale {
@@ -66,12 +107,13 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 
 	containers, err = sorter.SortByDependencies(containers)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errSortDependenciesFailed, err)
 	}
 
 	UpdateImplicitRestart(containers)
 
 	var containersToUpdate []types.Container
+
 	for _, c := range containers {
 		if !c.IsMonitorOnly(params) {
 			containersToUpdate = append(containersToUpdate, c)
@@ -84,6 +126,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	} else {
 		failedStop, stoppedImages := stopContainersInReversedOrder(containersToUpdate, client, params)
 		progress.UpdateFailed(failedStop)
+
 		failedStart := restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages)
 		progress.UpdateFailed(failedStart)
 	}
@@ -91,10 +134,18 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	if params.LifecycleHooks {
 		lifecycle.ExecutePostChecks(client, params)
 	}
+
 	return progress.Report(), nil
 }
 
-func performRollingRestart(containers []types.Container, client container.Client, params types.UpdateParams) map[types.ContainerID]error {
+// performRollingRestart updates containers using a rolling restart strategy.
+// It processes containers in reverse order, stopping and restarting stale ones,
+// and returns a map of container IDs to any errors encountered.
+func performRollingRestart(
+	containers []types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) map[types.ContainerID]error {
 	cleanupImageIDs := make(map[types.ImageID]bool, len(containers))
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -117,27 +168,42 @@ func performRollingRestart(containers []types.Container, client container.Client
 	if params.Cleanup {
 		cleanupImages(client, cleanupImageIDs)
 	}
+
 	return failed
 }
 
-func stopContainersInReversedOrder(containers []types.Container, client container.Client, params types.UpdateParams) (failed map[types.ContainerID]error, stopped map[types.ImageID]bool) {
-	failed = make(map[types.ContainerID]error, len(containers))
-	stopped = make(map[types.ImageID]bool, len(containers))
+// stopContainersInReversedOrder stops containers in reverse order based on their update needs.
+// It returns maps of failed stops and stopped image IDs for further processing.
+func stopContainersInReversedOrder(
+	containers []types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) (map[types.ContainerID]error, map[types.ImageID]bool) {
+	failed := make(map[types.ContainerID]error, len(containers))
+	stopped := make(map[types.ImageID]bool, len(containers))
+
 	for i := len(containers) - 1; i >= 0; i-- {
 		if err := stopStaleContainer(containers[i], client, params); err != nil {
 			failed[containers[i].ID()] = err
 		} else {
-			// NOTE: If a container is restarted due to a dependency this might be empty
+			// Note: If a container is restarted due to a dependency, this might be empty.
 			stopped[containers[i].SafeImageID()] = true
 		}
-
 	}
-	return
+
+	return failed, stopped
 }
 
-func stopStaleContainer(container types.Container, client container.Client, params types.UpdateParams) error {
+// stopStaleContainer stops a container if it is stale and eligible for update.
+// It skips Watchtower containers and non-restart candidates, handling lifecycle hooks if enabled.
+func stopStaleContainer(
+	container types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) error {
 	if container.IsWatchtower() {
 		logrus.Debugf("This is the watchtower container %s", container.Name())
+
 		return nil
 	}
 
@@ -145,10 +211,10 @@ func stopStaleContainer(container types.Container, client container.Client, para
 		return nil
 	}
 
-	// Perform an additional check here to prevent us from stopping a linked container we cannot restart
+	// Prevent stopping a linked container we cannot restart by verifying its configuration.
 	if container.IsLinkedToRestarting() {
 		if err := container.VerifyConfiguration(); err != nil {
-			return err
+			return fmt.Errorf("%w: %w", errVerifyConfigFailed, err)
 		}
 	}
 
@@ -157,22 +223,36 @@ func stopStaleContainer(container types.Container, client container.Client, para
 		if err != nil {
 			logrus.Error(err)
 			logrus.Info("Skipping container as the pre-update command failed")
-			return err
+
+			return fmt.Errorf("%w: %w", errPreUpdateFailed, err)
 		}
+
 		if skipUpdate {
-			logrus.Debug("Skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
-			return errors.New("skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)")
+			logrus.Debug(
+				"Skipping container as the pre-update command returned exit code 75 (EX_TEMPFAIL)",
+			)
+
+			return errSkipUpdate
 		}
 	}
 
 	if err := client.StopContainer(container, params.Timeout); err != nil {
 		logrus.Error(err)
-		return err
+
+		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
 	}
+
 	return nil
 }
 
-func restartContainersInSortedOrder(containers []types.Container, client container.Client, params types.UpdateParams, stoppedImages map[types.ImageID]bool) map[types.ContainerID]error {
+// restartContainersInSortedOrder restarts containers in sorted order based on prior stops.
+// It processes only previously stopped containers and returns a map of failed restarts.
+func restartContainersInSortedOrder(
+	containers []types.Container,
+	client container.Client,
+	params types.UpdateParams,
+	stoppedImages map[types.ImageID]bool,
+) map[types.ContainerID]error {
 	cleanupImageIDs := make(map[types.ImageID]bool, len(containers))
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -180,6 +260,7 @@ func restartContainersInSortedOrder(containers []types.Container, client contain
 		if !c.ToRestart() {
 			continue
 		}
+
 		if stoppedImages[c.SafeImageID()] {
 			if err := restartStaleContainer(c, client, params); err != nil {
 				failed[c.ID()] = err
@@ -197,47 +278,55 @@ func restartContainersInSortedOrder(containers []types.Container, client contain
 	return failed
 }
 
+// cleanupImages removes specified image IDs from the client.
+// It skips empty IDs and logs any errors encountered during removal.
 func cleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 	for imageID := range imageIDs {
 		if imageID == "" {
 			continue
 		}
+
 		if err := client.RemoveImageByID(imageID); err != nil {
 			logrus.Error(err)
 		}
 	}
 }
 
-func restartStaleContainer(container types.Container, client container.Client, params types.UpdateParams) error {
-	// Since we can't shutdown a watchtower container immediately, we need to
-	// start the new one while the old one is still running. This prevents us
-	// from re-using the same container name so we first rename the current
-	// instance so that the new one can adopt the old name.
+// restartStaleContainer restarts a stale container, handling Watchtower renaming if needed.
+// It starts the new container and executes post-update hooks if applicable, returning any errors.
+func restartStaleContainer(
+	container types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) error {
+	// Rename the current Watchtower instance to free its name for the new one.
 	if container.IsWatchtower() {
 		if err := client.RenameContainer(container, util.RandName()); err != nil {
 			logrus.Error(err)
-			return nil
+
+			return nil // Continue despite error per original logic.
 		}
 	}
 
 	if !params.NoRestart {
 		if newContainerID, err := client.StartContainer(container); err != nil {
 			logrus.Error(err)
-			return err
+
+			return fmt.Errorf("%w: %w", errStartContainerFailed, err)
 		} else if container.ToRestart() && params.LifecycleHooks {
 			lifecycle.ExecutePostUpdateCommand(client, newContainerID)
 		}
 	}
+
 	return nil
 }
 
-// UpdateImplicitRestart iterates through the passed containers, setting the
-// `LinkedToRestarting` flag if any of it's linked containers are marked for restart
+// UpdateImplicitRestart updates containers’ LinkedToRestarting flag based on linked dependencies.
+// It marks containers linked to restarting ones, ensuring dependent updates are triggered.
 func UpdateImplicitRestart(containers []types.Container) {
-
-	for ci, c := range containers {
+	for containerIndex, c := range containers {
 		if c.ToRestart() {
-			// The container is already marked for restart, no need to check
+			// Skip if already marked for restart.
 			continue
 		}
 
@@ -246,15 +335,14 @@ func UpdateImplicitRestart(containers []types.Container) {
 				"restarting": link,
 				"linked":     c.Name(),
 			}).Debug("container is linked to restarting")
-			// NOTE: To mutate the array, the `c` variable cannot be used as it's a copy
-			containers[ci].SetLinkedToRestarting(true)
+			// Mutate the original array entry, not the loop variable copy.
+			containers[containerIndex].SetLinkedToRestarting(true)
 		}
-
 	}
 }
 
-// linkedContainerMarkedForRestart returns the name of the first link that matches a
-// container marked for restart
+// linkedContainerMarkedForRestart finds the first linked container marked for restart.
+// It returns the name of the linked container if found, or an empty string otherwise.
 func linkedContainerMarkedForRestart(links []string, containers []types.Container) string {
 	for _, linkName := range links {
 		for _, candidate := range containers {
@@ -263,5 +351,6 @@ func linkedContainerMarkedForRestart(links []string, containers []types.Containe
 			}
 		}
 	}
+
 	return ""
 }

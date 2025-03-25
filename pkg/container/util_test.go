@@ -1,9 +1,10 @@
 package container_test
 
 import (
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var _ = ginkgo.Describe("container utils", func() {
@@ -11,13 +12,17 @@ var _ = ginkgo.Describe("container utils", func() {
 		ginkgo.When("given a normal image ID", func() {
 			ginkgo.When("it contains a sha256 prefix", func() {
 				ginkgo.It("should return that ID in short version", func() {
-					actual := shortID("sha256:0123456789abcd00000000001111111111222222222233333333334444444444")
+					actual := shortID(
+						"sha256:0123456789abcd00000000001111111111222222222233333333334444444444",
+					)
 					gomega.Expect(actual).To(gomega.Equal("0123456789ab"))
 				})
 			})
 			ginkgo.When("it doesn't contain a prefix", func() {
 				ginkgo.It("should return that ID in short version", func() {
-					actual := shortID("0123456789abcd00000000001111111111222222222233333333334444444444")
+					actual := shortID(
+						"0123456789abcd00000000001111111111222222222233333333334444444444",
+					)
 					gomega.Expect(actual).To(gomega.Equal("0123456789ab"))
 				})
 			})

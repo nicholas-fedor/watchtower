@@ -5,25 +5,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // NewNotifier creates and returns a new Notifier, using global configuration.
 func NewNotifier(c *cobra.Command) types.Notifier {
-	f := c.Flags()
+	flag := c.Flags()
 
-	level, _ := f.GetString("notifications-level")
+	level, _ := flag.GetString("notifications-level")
+
 	logLevel, err := logrus.ParseLevel(level)
 	if err != nil {
 		logrus.Fatalf("Notifications invalid log level: %s", err.Error())
 	}
 
-	reportTemplate, _ := f.GetBool("notification-report")
-	stdout, _ := f.GetBool("notification-log-stdout")
-	tplString, _ := f.GetString("notification-template")
-	urls, _ := f.GetStringArray("notification-url")
+	reportTemplate, _ := flag.GetBool("notification-report")
+	stdout, _ := flag.GetBool("notification-log-stdout")
+	tplString, _ := flag.GetString("notification-template")
+	urls, _ := flag.GetStringArray("notification-url")
 
 	data := GetTemplateData(c)
 	urls, delay := AppendLegacyUrls(urls, c)
@@ -31,9 +33,8 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 	return createNotifier(urls, logLevel, tplString, !reportTemplate, data, stdout, delay)
 }
 
-// AppendLegacyUrls creates shoutrrr equivalent URLs from legacy notification flags
+// AppendLegacyUrls creates shoutrrr equivalent URLs from legacy notification flags.
 func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duration) {
-
 	// Parse notification notificationTypes and create notifiers.
 	notificationTypes, err := cmd.Flags().GetStringSlice("notifications")
 	if err != nil {
@@ -42,12 +43,12 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 
 	legacyDelay := time.Duration(0)
 
-	for _, t := range notificationTypes {
-
+	for _, notificationType := range notificationTypes {
 		var legacyNotifier types.ConvertibleNotifier
+
 		var err error
 
-		switch t {
+		switch notificationType {
 		case emailType:
 			legacyNotifier = newEmailNotifier(cmd)
 		case slackType:
@@ -59,7 +60,7 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 		case shoutrrrType:
 			continue
 		default:
-			logrus.Fatalf("Unknown notification type %q", t)
+			logrus.Fatalf("Unknown notification type %q", notificationType)
 			// Not really needed, used for nil checking static analysis
 			continue
 		}
@@ -68,6 +69,7 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 		if err != nil {
 			logrus.Fatal("failed to create notification config: ", err)
 		}
+
 		urls = append(urls, shoutrrrURL)
 
 		if delayNotifier, ok := legacyNotifier.(types.DelayNotifier); ok {
@@ -78,10 +80,11 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 	}
 
 	delay := GetDelay(cmd, legacyDelay)
+
 	return urls, delay
 }
 
-// GetDelay returns the legacy delay if defined, otherwise the delay as set by args is returned
+// GetDelay returns the legacy delay if defined, otherwise the delay as set by args is returned.
 func GetDelay(c *cobra.Command, legacyDelay time.Duration) time.Duration {
 	if legacyDelay > 0 {
 		return legacyDelay
@@ -91,46 +94,49 @@ func GetDelay(c *cobra.Command, legacyDelay time.Duration) time.Duration {
 	if delay > 0 {
 		return time.Duration(delay) * time.Second
 	}
+
 	return time.Duration(0)
 }
 
-// GetTitle formats the title based on the passed hostname and tag
+// GetTitle formats the title based on the passed hostname and tag.
 func GetTitle(hostname string, tag string) string {
-	tb := strings.Builder{}
+	titleBuilder := strings.Builder{}
 
 	if tag != "" {
-		tb.WriteRune('[')
-		tb.WriteString(tag)
-		tb.WriteRune(']')
-		tb.WriteRune(' ')
+		titleBuilder.WriteRune('[')
+		titleBuilder.WriteString(tag)
+		titleBuilder.WriteRune(']')
+		titleBuilder.WriteRune(' ')
 	}
 
-	tb.WriteString("Watchtower updates")
+	titleBuilder.WriteString("Watchtower updates")
 
 	if hostname != "" {
-		tb.WriteString(" on ")
-		tb.WriteString(hostname)
+		titleBuilder.WriteString(" on ")
+		titleBuilder.WriteString(hostname)
 	}
 
-	return tb.String()
+	return titleBuilder.String()
 }
 
-// GetTemplateData populates the static notification data from flags and environment
+// GetTemplateData populates the static notification data from flags and environment.
 func GetTemplateData(c *cobra.Command) StaticData {
-	f := c.PersistentFlags()
+	flag := c.PersistentFlags()
 
-	hostname, _ := f.GetString("notifications-hostname")
+	hostname, _ := flag.GetString("notifications-hostname")
 	if hostname == "" {
 		hostname, _ = os.Hostname()
 	}
 
 	title := ""
-	if skip, _ := f.GetBool("notification-skip-title"); !skip {
-		tag, _ := f.GetString("notification-title-tag")
+
+	if skip, _ := flag.GetBool("notification-skip-title"); !skip {
+		tag, _ := flag.GetString("notification-title-tag")
 		if tag == "" {
 			// For legacy email support
-			tag, _ = f.GetString("notification-email-subjecttag")
+			tag, _ = flag.GetString("notification-email-subjecttag")
 		}
+
 		title = GetTitle(hostname, tag)
 	}
 
@@ -140,8 +146,8 @@ func GetTemplateData(c *cobra.Command) StaticData {
 	}
 }
 
-// ColorHex is the default notification color used for services that support it (formatted as a CSS hex string)
+// ColorHex is the default notification color used for services that support it (formatted as a CSS hex string).
 const ColorHex = "#406170"
 
-// ColorInt is the default notification color used for services that support it (as an int value)
+// ColorInt is the default notification color used for services that support it (as an int value).
 const ColorInt = 0x406170

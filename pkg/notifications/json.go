@@ -2,15 +2,16 @@ package notifications
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-type jsonMap = map[string]interface{}
+type jsonMap = map[string]any
 
-// MarshalJSON implements json.Marshaler
+// MarshalJSON implements json.Marshaler.
 func (d Data) MarshalJSON() ([]byte, error) {
-	var entries = make([]jsonMap, len(d.Entries))
+	entries := make([]jsonMap, len(d.Entries))
 	for i, entry := range d.Entries {
 		entries[i] = jsonMap{
 			`level`:   entry.Level,
@@ -32,12 +33,19 @@ func (d Data) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	return json.Marshal(jsonMap{
+	data := jsonMap{
 		`report`:  report,
 		`title`:   d.Title,
 		`host`:    d.Host,
 		`entries`: entries,
-	})
+	}
+
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal notification data: %w", err)
+	}
+
+	return bytes, nil
 }
 
 func marshalReports(reports []types.ContainerReport) []jsonMap {
@@ -55,6 +63,7 @@ func marshalReports(reports []types.ContainerReport) []jsonMap {
 			jsonReports[i][`error`] = errorMessage
 		}
 	}
+
 	return jsonReports
 }
 

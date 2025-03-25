@@ -5,15 +5,19 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/image"
+	"github.com/sirupsen/logrus"
+
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
-// GetPullOptions creates a struct with all options needed for pulling images from a registry
+// GetPullOptions creates a struct with all options needed for pulling images from a registry.
+// It retrieves encoded authentication credentials for the specified image and configures
+// pull options, including a privilege function for handling authentication retries.
 func GetPullOptions(imageName string) (image.PullOptions, error) {
 	auth, err := EncodedAuth(imageName)
 	logrus.Debugf("Got image name: %s", imageName)
+
 	if err != nil {
 		return image.PullOptions{}, err
 	}
@@ -31,20 +35,20 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 	}, nil
 }
 
-// DefaultAuthHandler will be invoked if an AuthConfig is rejected
-// It could be used to return a new value for the "X-Registry-Auth" authentication header,
-// but there's no point trying again with the same value as used in AuthConfig
+// DefaultAuthHandler is a privilege function called when initial authentication fails.
+// It logs the rejection and returns an empty string to retry the request without authentication,
+// as retrying with the same credentials used in AuthConfig is unlikely to succeed.
 func DefaultAuthHandler(context.Context) (string, error) {
 	logrus.Debug("Authentication request was rejected. Trying again without authentication")
+
 	return "", nil
 }
 
-// WarnOnAPIConsumption will return true if the registry is known-expected
-// to respond well to HTTP HEAD in checking the container digest -- or if there
-// are problems parsing the container hostname.
-// Will return false if behavior for container is unknown.
+// WarnOnAPIConsumption determines whether to warn about API consumption for a container’s registry.
+// It returns true if the registry is known to support HTTP HEAD requests for digest checking
+// (e.g., Docker Hub, GHCR) or if parsing the container hostname fails, indicating uncertainty.
+// It returns false if the registry’s behavior is unknown, avoiding unnecessary warnings.
 func WarnOnAPIConsumption(container types.Container) bool {
-
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
 		return true

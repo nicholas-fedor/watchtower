@@ -4,3 +4,5 @@ engines:
     exclude_paths:
       - "*.md"
       - "**/*.md"
+      - "**/*_test.go"
+      - "**/mocks/**"

@@ -1,9 +1,10 @@
 package notifications
 
 import (
-	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/nicholas-fedor/watchtower/pkg/session"
 )
 
 var _ = ginkgo.Describe("JSON template", func() {
@@ -110,8 +111,15 @@ var _ = ginkgo.Describe("JSON template", func() {
 		},
 		"title": "Watchtower updates on Mock"
 }`
-				data := mockDataFromStates(session.UpdatedState, session.FreshState, session.FailedState, session.SkippedState, session.UpdatedState)
-				gomega.Expect(getTemplatedResult(`json.v1`, false, data)).To(gomega.MatchJSON(expected))
+				data := mockDataFromStates(
+					session.UpdatedState,
+					session.FreshState,
+					session.FailedState,
+					session.SkippedState,
+					session.UpdatedState,
+				)
+				gomega.Expect(getTemplatedResult(`json.v1`, false, data)).
+					To(gomega.MatchJSON(expected))
 			})
 		})
 	})
