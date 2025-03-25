@@ -177,7 +177,8 @@ Environment Variable: DOCKER_HOST
 
 ## Docker API version
 
-The API version to use by the Docker client for connecting to the Docker daemon. The minimum supported version is 1.44.
+The API version to use by the Docker client for connecting to the Docker daemon. Using this argument/variable enables overriding the minimum supported version of 1.44.
+Use Docker's [API version matrix](https://docs.docker.com/reference/api/engine/#api-version-matrix) chart as a reference for comparing your version of Docker and the maximum supported API version.
 
 ```text
             Argument: --api-version, -a
