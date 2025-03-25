@@ -144,11 +144,9 @@ func RunHTTPServer(ctx context.Context, server HTTPServer) error {
 	case err := <-errChan:
 		return err
 	case <-ctx.Done():
-		shutdownCtx, shutdownCancel := context.WithTimeout(
-			context.Background(),
-			serverShutdownTimeout,
-		)
+		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, serverShutdownTimeout)
 		defer shutdownCancel()
+
 		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
 			return fmt.Errorf("server shutdown failed: %w", err)
 		}
