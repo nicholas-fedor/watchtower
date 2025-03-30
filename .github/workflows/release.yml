@@ -34,7 +34,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@dec74fa03096ff515422f71d18d41307cacde373
+        uses: golangci/golangci-lint-action@2968cc1a32340ead54c0a5817a5740910153fb02
 
   test:
     name: Test
