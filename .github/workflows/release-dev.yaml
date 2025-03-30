@@ -13,18 +13,19 @@ on:
       - go.sum
       - main.go
 
-permissions:
-  contents: read
-  actions: read
-  packages: write
-  id-token: write
-
 jobs:
   Test:
     uses: ./.github/workflows/test.yaml
+    permissions:
+      contents: read
 
   Build:
     uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
     secrets: inherit
     needs:
       - Test

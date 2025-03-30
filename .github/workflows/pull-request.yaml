@@ -13,12 +13,13 @@ on:
       - go.sum
       - main.go
 
-permissions:
-  contents: read
-
 jobs:
   Lint:
     uses: ./.github/workflows/lint.yaml
+    permissions:
+      contents: read
 
   Test:
     uses: ./.github/workflows/test.yaml
+    permissions:
+      contents: read

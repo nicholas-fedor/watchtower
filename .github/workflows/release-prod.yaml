@@ -7,20 +7,31 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "**/v[0-9]+.[0-9]+.[0-9]+"
 
-permissions:
-  contents: read
-
 jobs:
   Test:
     uses: ./.github/workflows/test.yaml
+    permissions:
+      contents: read
 
   Build:
     uses: ./.github/workflows/build.yaml
     secrets: inherit
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
 
   Generate-Manifests:
     uses: ./.github/workflows/generate-manifests.yaml
     secrets: inherit
+    permissions:
+      packages: write
+      contents: read
+      attestations: write
+      id-token: write
 
   Update-Go-docs:
     uses: ./.github/workflows/update-go-docs.yaml
+    permissions:
+      contents: read
