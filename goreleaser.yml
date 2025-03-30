@@ -1,3 +1,5 @@
+version: 2
+
 builds:
   - main: ./main.go
     binary: watchtower
@@ -24,10 +26,10 @@ archives:
       {{- else if eq .Arch "arm64" }}arm64v8
       {{- else }}{{ .Arch }}{{ end }}_
       {{- .Version -}}
-    format: tar.gz
+    formats: ["tar.gz"]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ["zip"]
     files:
       - LICENSE.md
 
