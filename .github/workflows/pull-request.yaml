@@ -1,8 +1,8 @@
-name: Release (Dev)
+name: Pull Request
 
 on:
   workflow_dispatch: {}
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -15,18 +15,10 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  packages: write
-  id-token: write
 
 jobs:
+  Lint:
+    uses: ./.github/workflows/lint.yaml
+
   Test:
     uses: ./.github/workflows/test.yaml
-
-  Build:
-    uses: ./.github/workflows/build.yaml
-    secrets: inherit
-    needs:
-      - Test
-    with:
-      snapshot: true

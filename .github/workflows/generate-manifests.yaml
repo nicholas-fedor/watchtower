@@ -1,0 +1,68 @@
+name: Create and push Docker manifests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  Run:
+    name: Create and push Docker manifests
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+      attestations: write
+      id-token: write
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - name: Enable experimental Docker features
+        run: |
+          mkdir -p ~/.docker/ && \
+          echo '{"experimental": "enabled"}' > ~/.docker/config.json
+
+      - name: Create and push Docker manifests
+        env:
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GHCR_USER: ${{ secrets.BOT_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.BOT_GHCR_PAT }}
+        run: |
+          # Login to Docker Hub and GHCR (redundant but ensures manifest push works)
+          echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          # Get the tag without the 'v' prefix
+          TAG="${GITHUB_REF_NAME#v}"
+
+          # Architectures to include in manifests
+          ARCHES=("amd64" "i386" "armhf" "arm64v8")
+
+          # Function to create and push manifests
+          create_and_push_manifest() {
+            local repo="$1"
+            local tag="$2"
+            local manifest="${repo}:${tag}"
+            local images=()
+
+            # Collect images for the manifest
+            for arch in "${ARCHES[@]}"; do
+              images+=("${repo}:${arch}-${tag}")
+            done
+
+            # Create the manifest
+            docker manifest create "$manifest" "${images[@]}"
+
+            # Push the manifest
+            docker manifest push "$manifest"
+          }
+
+          # Create and push manifests for Docker Hub
+          create_and_push_manifest "nickfedor/watchtower" "latest"
+          create_and_push_manifest "nickfedor/watchtower" "$TAG"
+
+          # Create and push manifests for GHCR
+          create_and_push_manifest "ghcr.io/nicholas-fedor/watchtower" "latest"
+          create_and_push_manifest "ghcr.io/nicholas-fedor/watchtower" "$TAG"

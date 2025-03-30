@@ -2,6 +2,11 @@ name: Publish Docs
 
 on:
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - docs
+      - README.md
   workflow_run:
     workflows: ["Release (Production)"]
     branches: [main]

@@ -1,0 +1,15 @@
+name: Refresh pkg.go.dev
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  renew-docs:
+    name: Refresh pkg.go.dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull new module version
+        uses: nicholas-fedor/go-proxy-pull-action@96d97dd65179161a3d0a38e65a49ebfd55dcfd69

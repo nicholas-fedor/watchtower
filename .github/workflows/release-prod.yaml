@@ -1,0 +1,26 @@
+name: Release (Production)
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "**/v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  Test:
+    uses: ./.github/workflows/test.yaml
+
+  Build:
+    uses: ./.github/workflows/build.yaml
+    secrets: inherit
+
+  Generate-Manifests:
+    uses: ./.github/workflows/generate-manifests.yaml
+    secrets: inherit
+
+  Update-Go-docs:
+    uses: ./.github/workflows/update-go-docs.yaml
