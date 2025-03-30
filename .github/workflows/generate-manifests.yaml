@@ -3,9 +3,6 @@ name: Create and push Docker manifests
 on:
   workflow_call:
 
-permissions:
-  contents: read
-
 jobs:
   Run:
     name: Create and push Docker manifests
