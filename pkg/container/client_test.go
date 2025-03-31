@@ -107,7 +107,7 @@ var _ = ginkgo.Describe("the client", func() {
 				) // Short timeout
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Eventually(logbuf).
-					Should(gbytes.Say(`Container %s \(%s\) did not stop within %v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
+					Should(gbytes.Say(`Stopping source container: %s \(%s\) did not stop within %v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
 			})
 		})
 		ginkgo.When("waiting for stop fails with an unexpected error", func() {

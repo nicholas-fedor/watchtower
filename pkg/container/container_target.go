@@ -21,18 +21,19 @@ func StartTargetContainer(
 	sourceContainer types.Container,
 	networkConfig *dockerNetworkType.NetworkingConfig,
 	reviveStopped bool,
+	clientVersion string,
+	minSupportedVersion string,
 ) (types.ContainerID, error) {
 	ctx := context.Background()
 	config := sourceContainer.GetCreateConfig()
 	hostConfig := sourceContainer.GetCreateHostConfig()
 
-	// Log the MAC address being preserved for debugging
-	_ = getDesiredMacAddress(networkConfig, sourceContainer.ID())
+	// Log network config details with client version context
+	debugLogMacAddress(networkConfig, sourceContainer.ID(), clientVersion, minSupportedVersion)
 
 	name := sourceContainer.Name()
-	logrus.Infof("Creating %s", name)
+	logrus.Debugf("Starting target container: Creating %s", name)
 
-	// Create the new container with the exact network configuration from the source
 	createdContainer, err := api.ContainerCreate(ctx, config, hostConfig, networkConfig, nil, name)
 	if err != nil {
 		return "", fmt.Errorf("failed to create container: %w", err)
@@ -43,15 +44,19 @@ func StartTargetContainer(
 		return createdContainerID, nil
 	}
 
-	// Start the new container
-	logrus.Debugf("Starting container %s (%s)", name, createdContainerID.ShortID())
+	logrus.Debugf("Starting target container: Starting %s (%s)", name, createdContainerID.ShortID())
 
 	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainerType.StartOptions{
 		CheckpointID:  "",
 		CheckpointDir: "",
 	}); err != nil {
-		return createdContainerID, fmt.Errorf("failed to start container: %w", err)
+		return createdContainerID, fmt.Errorf(
+			"failed to start container: %w",
+			err,
+		)
 	}
+
+	logrus.Infof("Started new container %s (%s)", name, createdContainerID.ShortID())
 
 	return createdContainerID, nil
 }
@@ -65,10 +70,20 @@ func RenameTargetContainer(
 ) error {
 	ctx := context.Background()
 
-	logrus.Debugf("Renaming container %s (%s) to %s", target.Name(), target.ID().ShortID(), newName)
+	logrus.Debugf(
+		"Renaming target container: %s (%s) to %s",
+		target.Name(),
+		target.ID().ShortID(),
+		newName,
+	)
 
 	if err := api.ContainerRename(ctx, string(target.ID()), newName); err != nil {
-		return fmt.Errorf("failed to rename container %s to %s: %w", target.ID(), newName, err)
+		return fmt.Errorf(
+			"failed to rename container %s to %s: %w",
+			target.ID(),
+			newName,
+			err,
+		)
 	}
 
 	return nil

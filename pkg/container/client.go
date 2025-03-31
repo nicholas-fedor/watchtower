@@ -7,11 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -57,6 +60,9 @@ type Client interface {
 	// WarnOnHeadPullFailed determines whether to log a warning when a HEAD request fails during image pulls.
 	// The decision is based on the configured warning strategy and container context.
 	WarnOnHeadPullFailed(container types.Container) bool
+
+	// GetVersion returns the client's API version.
+	GetVersion() string
 }
 
 // client is the concrete implementation of the Client interface.
@@ -118,9 +124,42 @@ func (c client) StopContainer(container types.Container, timeout time.Duration) 
 // It extracts the network configuration from the source and passes it to StartTargetContainer.
 // Returns the new container’s ID or an error if creation or startup fails.
 func (c client) StartContainer(container types.Container) (types.ContainerID, error) {
-	networkConfig := getNetworkConfig(container)
+	var networkConfig *network.NetworkingConfig
 
-	return StartTargetContainer(c.api, container, networkConfig, c.ReviveStopped)
+	clientVersion := c.GetVersion()
+	minSupportedVersion := flags.DockerAPIMinVersion
+
+	// Obtain the container's network configuration based on the client's API version
+	switch {
+	// If the client is using version 1.44 or greater
+	case versions.GreaterThanOrEqualTo(clientVersion, minSupportedVersion):
+		logrus.Debugf(
+			"Starting new container: Docker client version: %s >= to Watchtower's minimum supported version: %s",
+			clientVersion,
+			minSupportedVersion,
+		)
+
+		networkConfig = getNetworkConfig(container)
+
+		// If the client is using versions less than 1.44
+	case versions.LessThan(clientVersion, minSupportedVersion):
+		logrus.Debugf(
+			"Starting new container: Docker client version: %s < Watchtower's minimum supported version: %s",
+			clientVersion,
+			minSupportedVersion,
+		)
+
+		networkConfig = getLegacyNetworkConfig(container, clientVersion)
+	}
+
+	return StartTargetContainer(
+		c.api,
+		container,
+		networkConfig,
+		c.ReviveStopped,
+		clientVersion,
+		minSupportedVersion,
+	)
 }
 
 // RenameContainer renames an existing container to the specified new name.
@@ -314,4 +353,9 @@ func (c client) RemoveImageByID(imageID types.ImageID) error {
 	imgClient := newImageClient(c.api)
 
 	return imgClient.RemoveImageByID(imageID)
+}
+
+// GetVersion gets the client API version from the Docker host.
+func (c client) GetVersion() string {
+	return c.api.ClientVersion()
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
@@ -34,13 +35,15 @@ func ListSourceContainers(
 	// Log the scope of containers being retrieved based on configuration.
 	switch {
 	case opts.IncludeStopped && opts.IncludeRestarting:
-		logrus.Debug("Retrieving running, stopped, restarting and exited containers")
+		logrus.Debug(
+			"Listing source containers: Retrieving running, stopped, restarting and exited containers",
+		)
 	case opts.IncludeStopped:
-		logrus.Debug("Retrieving running, stopped and exited containers")
+		logrus.Debug("Listing source containers: Retrieving running, stopped and exited containers")
 	case opts.IncludeRestarting:
-		logrus.Debug("Retrieving running and restarting containers")
+		logrus.Debug("Listing source containers: Retrieving running and restarting containers")
 	default:
-		logrus.Debug("Retrieving running containers")
+		logrus.Debug("Listing source containers: Retrieving running containers")
 	}
 
 	// Apply filters based on configured options.
@@ -96,7 +99,11 @@ func GetSourceContainer(
 	// Fetch basic container information.
 	containerInfo, err := api.ContainerInspect(ctx, string(containerID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to inspect container %s: %w", containerID, err)
+		return nil, fmt.Errorf(
+			"failed to inspect container %s: %w",
+			containerID,
+			err,
+		)
 	}
 
 	// Handle container network mode dependencies.
@@ -108,7 +115,7 @@ func GetSourceContainer(
 				"container":         containerInfo.Name,
 				"error":             err,
 				"network-container": netContainerID,
-			}).Warnf("Unable to resolve network container: %v", err)
+			}).Warnf("Getting source container info: Unable to resolve network container: %v", err)
 		} else {
 			// Update NetworkMode to use the parent container's name for stable references across recreations.
 			containerInfo.HostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + parentContainer.Name)
@@ -118,7 +125,7 @@ func GetSourceContainer(
 	// Fetch associated image information.
 	imageInfo, err := api.ImageInspect(ctx, containerInfo.Image)
 	if err != nil {
-		logrus.Warnf("Failed to retrieve container image info: %v", err)
+		logrus.Warnf("Get source container info: Failed to retrieve container image info: %v", err)
 
 		return NewContainer(&containerInfo, nil), nil
 	}
@@ -146,11 +153,16 @@ func StopSourceContainer(
 	}
 
 	if sourceContainer.IsRunning() {
-		logrus.Infof("Stopping %s (%s) with %s", sourceContainer.Name(), shortID, signal)
+		logrus.Infof(
+			"Stopping source container: Stopping %s (%s) with %s",
+			sourceContainer.Name(),
+			shortID,
+			signal,
+		)
 
 		if err := api.ContainerKill(ctx, idStr, signal); err != nil {
 			return fmt.Errorf(
-				"failed to stop container %s (%s): %w",
+				"failed stopping container %s (%s): %w",
 				sourceContainer.Name(),
 				shortID,
 				err,
@@ -186,7 +198,7 @@ func stopAndRemoveContainer(
 
 	if !stopped {
 		logrus.Warnf(
-			"Container %s (%s) did not stop within %v",
+			"Stopping source container: %s (%s) did not stop within %v",
 			sourceContainer.Name(),
 			shortID,
 			timeout,
@@ -195,13 +207,16 @@ func stopAndRemoveContainer(
 
 	// If already gone and AutoRemove is enabled, no further action needed.
 	if stopped && sourceContainer.ContainerInfo().HostConfig.AutoRemove {
-		logrus.Debugf("AutoRemove container %s, skipping ContainerRemove call.", shortID)
+		logrus.Debugf(
+			"Removing source container: AutoRemove container %s, skipping ContainerRemove call.",
+			shortID,
+		)
 
 		return nil
 	}
 
 	// Attempt removal.
-	logrus.Debugf("Removing container %s", shortID)
+	logrus.Debugf("Removing source container: Removing container %s", shortID)
 
 	err = api.ContainerRemove(ctx, idStr, dockerContainerType.RemoveOptions{
 		Force:         true,
@@ -276,6 +291,86 @@ func waitForStopOrTimeout(
 	}
 }
 
+// getLegacyNetworkConfig returns the network configuration of the source container.
+// It duplicates Watchtower's original function to maintain compatibility with pre-version 1.44 API clients.
+// See Docker's source code for implementation details: https://github.com/moby/moby/blob/master/client/container_create.go
+func getLegacyNetworkConfig(
+	sourceContainer types.Container,
+	clientVersion string,
+) *dockerNetworkType.NetworkingConfig {
+	networks := sourceContainer.ContainerInfo().NetworkSettings.Networks
+	if networks == nil {
+		logrus.Warnf(
+			"Getting (legacy) network config using API version %s: No network settings found for container %s",
+			clientVersion,
+			sourceContainer.ID(),
+		)
+
+		return &dockerNetworkType.NetworkingConfig{
+			EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
+		}
+	}
+
+	config := &dockerNetworkType.NetworkingConfig{
+		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
+	}
+
+	for networkName, endpoint := range networks {
+		if endpoint == nil {
+			logrus.Warnf(
+				"Getting (legacy) network config using API version %s: Nil endpoint for network %s in container %s.",
+				clientVersion,
+				networkName,
+				sourceContainer.ID(),
+			)
+
+			continue
+		}
+		// Create a minimal endpoint config without MAC address
+		newEndpoint := &dockerNetworkType.EndpointSettings{
+			NetworkID:  endpoint.NetworkID,
+			EndpointID: endpoint.EndpointID,
+			Gateway:    endpoint.Gateway,
+			IPAddress:  endpoint.IPAddress,
+			Aliases:    filterAliases(endpoint.Aliases, sourceContainer.ID().ShortID()),
+		}
+		config.EndpointsConfig[networkName] = newEndpoint
+		// Log MAC address for visibility, but don’t include it
+		if endpoint.MacAddress != "" {
+			logrus.Debugf(
+				"Getting (legacy) network config using API version %s: Found MAC address %s for container %s on network %s.",
+				clientVersion,
+				endpoint.MacAddress,
+				sourceContainer.Name(),
+				networkName,
+			)
+		}
+	}
+
+	// Warn if MAC preservation is desired but not possible
+	if len(networks) > 0 {
+		logrus.Warnf(
+			"Getting (legacy) network config using API version %s: Container %s MAC addresses cannot be preserved. Docker will dynamically assign new ones.",
+			clientVersion,
+			sourceContainer.ID(),
+		)
+	}
+
+	return config
+}
+
+func filterAliases(aliases []string, shortID string) []string {
+	result := make([]string, 0, len(aliases))
+
+	for _, alias := range aliases {
+		if alias != shortID {
+			result = append(result, alias)
+		}
+	}
+
+	return result
+}
+
 // getNetworkConfig extracts the network configuration from the source container.
 // It preserves essential settings (e.g., IP, MAC) while resetting DNSNames and Aliases to minimal values.
 // Returns a sanitized network configuration for use in creating the target container.
@@ -302,7 +397,7 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 			IPv6Gateway:         originalEndpoint.IPv6Gateway,         // Preserve IPv6 gateway
 			GlobalIPv6Address:   originalEndpoint.GlobalIPv6Address,   // Preserve global IPv6 address
 			GlobalIPv6PrefixLen: originalEndpoint.GlobalIPv6PrefixLen, // Preserve IPv6 prefix length
-			MacAddress:          originalEndpoint.MacAddress,          // Preserve MAC address
+			MacAddress:          originalEndpoint.MacAddress,          // Preserve endpoint MAC address if API Version > 1.43
 			DNSNames: []string{
 				sourceContainer.Name()[1:],
 			}, // Reset to container name only
@@ -319,7 +414,7 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 
 		config.EndpointsConfig[networkName] = endpoint
 		logrus.Debugf(
-			"Preserving network config for %s on %s: MAC=%s, IP=%s",
+			"Getting network config: Preserving network config for container %s on network %s: MAC=%s, IP=%s",
 			sourceContainer.Name(),
 			networkName,
 			endpoint.MacAddress,
@@ -330,27 +425,64 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 	return config
 }
 
-// getDesiredMacAddress extracts the first MAC address from the network config for logging.
-// It logs the MAC address being preserved and returns it for debugging purposes.
-// Returns an empty string if no MAC address is found.
-func getDesiredMacAddress(
+// debugLogMacAddress logs MAC address information for a container's network configuration.
+// It verifies that at least one MAC address exists for the container across its network
+// endpoints, logging each found address at debug level.
+// If no MAC addresses are found, then it emits a warning since containers typically require
+// at least one MAC address for network communication.
+// Multiple MAC addresses are supported as a container may be connected to multiple networks.
+func debugLogMacAddress(
 	networkConfig *dockerNetworkType.NetworkingConfig,
 	containerID types.ContainerID,
-) string {
+	clientVersion string,
+	minSupportedVersion string,
+) {
+	foundMac := false
+
+	// Log any MAC addresses found in the config
 	for networkName, endpoint := range networkConfig.EndpointsConfig {
 		if endpoint.MacAddress != "" {
 			logrus.Debugf(
-				"Preserving MAC address %s for container %s on network %s",
+				"Debugging MAC address: Found MAC address %s for container %s on network %s",
 				endpoint.MacAddress,
 				containerID,
 				networkName,
 			)
 
-			return endpoint.MacAddress
+			foundMac = true
 		}
 	}
 
-	logrus.Warnf("No MAC address found for container %s", containerID)
-
-	return ""
+	// Determine logging behavior based on API version
+	switch {
+	case versions.LessThan(clientVersion, minSupportedVersion):
+		switch foundMac {
+		case true:
+			logrus.Warnf(
+				"Debugging MAC address: Unexpected MAC address in config for container %s with API version less than %s. This should not happen",
+				containerID,
+				minSupportedVersion,
+			)
+		case false:
+			logrus.Debugf(
+				"Debugging MAC address: No MAC address in config for container %s (expected for API versions less than %s. Docker will assign one)",
+				containerID,
+				minSupportedVersion,
+			)
+		}
+	default: // API >= 1.44
+		switch foundMac {
+		case true:
+			logrus.Debugf(
+				"Debugging MAC address: MAC address configuration verified for container %s",
+				containerID,
+			)
+		case false:
+			logrus.Warnf(
+				"Debugging MAC address: No MAC address found for container %s with API version greater than or equal to %s. This may indicate a configuration issue",
+				containerID,
+				minSupportedVersion,
+			)
+		}
+	}
 }
