@@ -15,10 +15,10 @@ import (
 
 // dockerContainerPattern matches Docker container IDs in cgroup data.
 // The pattern captures a 64-character hexadecimal ID after "/docker/".
-// - [0-9]+: matches one or more digits followed by a colon (e.g., "11:")
-// - .*: matches any characters (greedy) followed by a colon (e.g., "perf_event:")
-// - /docker/ matches the literal string "/docker/"
-// - ([a-f0-9]{64}) captures exactly 64 lowercase hexadecimal characters as the container ID
+// - [0-9]+: matches one or more digits followed by a colon (e.g., "11:").
+// - .*: matches any characters (greedy) followed by a colon (e.g., "perf_event:").
+// - /docker/ matches the literal string "/docker/".
+// - ([a-f0-9]{64}) captures exactly 64 lowercase hexadecimal characters as the container ID.
 var dockerContainerPattern = regexp.MustCompile(`[0-9]+:.*:/docker/([a-f0-9]{64})`)
 
 // minMatchGroups is the minimum number of regex match groups expected.
