@@ -15,6 +15,8 @@ jobs:
 
   Build:
     uses: ./.github/workflows/build.yaml
+    needs:
+      - Test
     secrets: inherit
     permissions:
       contents: write
@@ -24,6 +26,9 @@ jobs:
 
   Generate-Manifests:
     uses: ./.github/workflows/generate-manifests.yaml
+    needs:
+      - Test
+      - Build
     secrets: inherit
     permissions:
       packages: write
@@ -33,5 +38,9 @@ jobs:
 
   Update-Go-docs:
     uses: ./.github/workflows/update-go-docs.yaml
+    needs:
+      - Test
+      - Build
+      - Generate-Manifests
     permissions:
       contents: read

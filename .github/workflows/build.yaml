@@ -59,4 +59,4 @@ jobs:
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2
         if: success()
         with:
-          subject-path: "dist/**/*"
+          subject-checksums: ./dist/checksums.txt
