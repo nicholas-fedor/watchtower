@@ -438,7 +438,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 
 	if tt.expectedErr {
 		require.Error(t, err, "expected an error but got none")
-		assert.Contains(t, err.Error(), "Pre-update command execution failed")
+		assert.Contains(t, err.Error(), "pre-update command execution failed")
 	} else {
 		require.NoError(t, err)
 	}
