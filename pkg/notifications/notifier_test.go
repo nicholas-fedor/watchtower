@@ -7,6 +7,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/cmd"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
@@ -332,27 +333,37 @@ var _ = ginkgo.Describe("notifications", func() {
 	})
 
 	ginkgo.Describe("the teams notifier", func() {
+		ginkgo.BeforeEach(func() {
+			logrus.SetLevel(logrus.DebugLevel) // Ensure debug logs are visible
+		})
 		ginkgo.When("converting a teams service config into a shoutrrr url", func() {
 			ginkgo.It("should return the expected URL", func() {
 				command := cmd.NewRootCommand()
 				flags.RegisterNotificationFlags(command)
 
-				tokenA := "11111111-4444-4444-8444-cccccccccccc@22222222-4444-4444-8444-cccccccccccc"
-				tokenB := "33333333012222222222333333333344"
-				tokenC := "44444444-4444-4444-8444-cccccccccccc"
+				tokenA := "11111111-4444-4444-8444-cccccccccccc"            // Group
+				tokenB := "22222222-4444-4444-8444-cccccccccccc"            // Tenant
+				tokenC := "33333301222222222233333333333344"                // AltID
+				tokenD := "44444444-4444-4444-8444-cccccccccccc"            // GroupOwner
+				extraID := "V2ESyij_gAljSoUQHvZoZYzlpAoAXExyOl26dlf1xHEx05" // ExtraID from shoutrrr test
 				color := url.QueryEscape(notifications.ColorHex)
 
+				// Use a more specific org domain instead of "test"
 				hookURL := fmt.Sprintf(
-					"https://outlook.office.com/webhook/%s/IncomingWebhook/%s/%s",
+					"https://myorg.webhook.office.com/webhookb2/%s@%s/IncomingWebhook/%s/%s/%s",
 					tokenA,
 					tokenB,
 					tokenC,
+					tokenD,
+					extraID,
 				)
 				expectedOutput := fmt.Sprintf(
-					"teams://%s/%s/%s?color=%s",
+					"teams://%s@%s/%s/%s/%s?color=%s&host=myorg.webhook.office.com",
 					tokenA,
 					tokenB,
 					tokenC,
+					tokenD,
+					extraID,
 					color,
 				)
 

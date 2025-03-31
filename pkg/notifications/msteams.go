@@ -52,9 +52,10 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to parse Microsoft Teams webhook URL: %w", err)
 	}
-
+	logrus.Debugf("Parsed webhook URL: %s", n.webHookURL)
 	config, err := teams.ConfigFromWebhookURL(*webhookURL)
 	if err != nil {
+		logrus.Debugf("Config error with URL: %s", n.webHookURL)
 		return "", fmt.Errorf("failed to create Microsoft Teams config from webhook URL: %w", err)
 	}
 
