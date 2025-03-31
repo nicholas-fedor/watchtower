@@ -24,14 +24,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 	ginkgo.Describe("the check prerequisites method", func() {
 		ginkgo.When("given an empty array", func() {
 			ginkgo.It("should not do anything", func() {
-				client := mocks.CreateMockClient(
+				mockClient := mocks.CreateMockClient(
 					&mocks.TestData{},
 					// pullImages:
 					false,
 					// removeVolumes:
 					false,
 				)
-				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "")).
+				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(mockClient, false, "")).
 					To(gomega.Succeed())
 			})
 		})

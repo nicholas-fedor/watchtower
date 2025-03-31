@@ -91,6 +91,12 @@ func (client MockClient) GetContainer(_ types.ContainerID) (types.Container, err
 	return client.TestData.Containers[0], nil
 }
 
+// GetVersion returns the Docker host API client version.
+// It provides a mock response for testing the function.
+func (client MockClient) GetVersion() string {
+	return client.GetVersion()
+}
+
 // errCommandFailed is a static error indicating a command exited with a non-zero code.
 // It is used in ExecuteCommand to provide consistent error reporting for test scenarios.
 var errCommandFailed = errors.New("command exited with non-zero code")

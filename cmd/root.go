@@ -567,7 +567,7 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
 
 	// Configure the logger based on whether startup messages should be suppressed.
 	startupLog := setupStartupLogger(noStartupMessage)
-	startupLog.Info("Watchtower ", meta.Version)
+	startupLog.Info("Watchtower ", meta.Version, " using Docker API v", client.GetVersion())
 
 	// Log details about configured notifiers or lack thereof.
 	logNotifierInfo(startupLog, notifier.GetNames())

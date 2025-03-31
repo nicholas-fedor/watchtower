@@ -139,6 +139,51 @@ func (_c *MockClient_GetContainer_Call) RunAndReturn(run func(types.ContainerID)
 	return _c
 }
 
+// GetVersion provides a mock function with no fields
+func (_m *MockClient) GetVersion() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetVersion")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockClient_GetVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetVersion'
+type MockClient_GetVersion_Call struct {
+	*mock.Call
+}
+
+// GetVersion is a helper method to define mock.On call
+func (_e *MockClient_Expecter) GetVersion() *MockClient_GetVersion_Call {
+	return &MockClient_GetVersion_Call{Call: _e.mock.On("GetVersion")}
+}
+
+func (_c *MockClient_GetVersion_Call) Run(run func()) *MockClient_GetVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClient_GetVersion_Call) Return(_a0 string) *MockClient_GetVersion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_GetVersion_Call) RunAndReturn(run func() string) *MockClient_GetVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsContainerStale provides a mock function with given fields: _a0, params
 func (_m *MockClient) IsContainerStale(_a0 types.Container, params types.UpdateParams) (bool, types.ImageID, error) {
 	ret := _m.Called(_a0, params)

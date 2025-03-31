@@ -62,7 +62,7 @@ func ExecutePreCheckCommand(client container.Client, container types.Container) 
 
 	_, err := client.ExecuteCommand(container.ID(), command, 1)
 	if err != nil {
-		clog.Errorf("Pre-check command failed: %v", err)
+		clog.Errorf("Error: Pre-check command failed: %v", err)
 	}
 }
 
@@ -84,7 +84,7 @@ func ExecutePostCheckCommand(client container.Client, container types.Container)
 
 	_, err := client.ExecuteCommand(container.ID(), command, 1)
 	if err != nil {
-		clog.Errorf("Post-check command failed: %v", err)
+		clog.Errorf("Error: Post-check command failed: %v", err)
 	}
 }
 
@@ -113,7 +113,7 @@ func ExecutePreUpdateCommand(client container.Client, container types.Container)
 
 	success, err := client.ExecuteCommand(container.ID(), command, timeout)
 	if err != nil {
-		clog.Errorf("Pre-update command failed: %v", err)
+		clog.Errorf("Error: Pre-update command failed: %v", err)
 
 		return true, fmt.Errorf(
 			"pre-update command execution failed for container %s: %w",
@@ -153,7 +153,7 @@ func ExecutePostUpdateCommand(client container.Client, newContainerID types.Cont
 	_, err = client.ExecuteCommand(newContainerID, command, timeout)
 	if err != nil {
 		clog.Errorf(
-			"Post-update command failed for container %s (ID: %s): %v",
+			"Error: Post-update command failed for container %s (ID: %s): %v",
 			newContainer.Name(),
 			newContainerID.ShortID(),
 			err,
