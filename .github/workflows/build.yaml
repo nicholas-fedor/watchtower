@@ -51,7 +51,7 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean ${{ inputs.snapshot && '--snapshot' || '' }}
+          args: release ${{ inputs.snapshot && '--snapshot' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -59,4 +59,8 @@ jobs:
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2
         if: success()
         with:
-          subject-checksums: ./dist/checksums.txt
+          subject-checksums: dist/watchtower_${{ github.ref_name }}_checksums.txt
+
+      - name: Clean up dist directory
+        if: always()  # Runs even if previous steps fail
+        run: rm -rf dist
