@@ -382,11 +382,8 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 	for networkName, originalEndpoint := range sourceContainer.ContainerInfo().NetworkSettings.Networks {
 		// Copy all fields from the original endpoint
 		endpoint := &dockerNetworkType.EndpointSettings{
-			IPAMConfig: originalEndpoint.IPAMConfig, // Preserve full IPAM config
-			Links:      originalEndpoint.Links,      // Preserve container links
-			Aliases: []string{
-				sourceContainer.Name()[1:],
-			}, // Reset to container name only
+			IPAMConfig:          originalEndpoint.IPAMConfig,          // Preserve full IPAM config
+			Links:               originalEndpoint.Links,               // Preserve container links
 			DriverOpts:          originalEndpoint.DriverOpts,          // Preserve driver options
 			GwPriority:          originalEndpoint.GwPriority,          // Preserve gateway priority
 			NetworkID:           originalEndpoint.NetworkID,           // Preserve network ID
@@ -398,9 +395,12 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 			GlobalIPv6Address:   originalEndpoint.GlobalIPv6Address,   // Preserve global IPv6 address
 			GlobalIPv6PrefixLen: originalEndpoint.GlobalIPv6PrefixLen, // Preserve IPv6 prefix length
 			MacAddress:          originalEndpoint.MacAddress,          // Preserve endpoint MAC address if API Version > 1.43
-			DNSNames: []string{
-				sourceContainer.Name()[1:],
-			}, // Reset to container name only
+		}
+
+		// Only set Aliases and DNSNames for user-defined networks and not the default "bridge" network.
+		if networkName != "bridge" {
+			endpoint.Aliases = []string{sourceContainer.Name()[1:]}  // Reset to container name only
+			endpoint.DNSNames = []string{sourceContainer.Name()[1:]} // Reset to container name only
 		}
 
 		// Preserve IPAMConfig if present

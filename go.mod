@@ -1,6 +1,6 @@
 module github.com/nicholas-fedor/watchtower
 
-go 1.24.1
+go 1.24.2
 
 // Retract prematurely published versions
 retract [v1.7.2, v1.7.9]
@@ -11,7 +11,7 @@ require (
 	github.com/docker/docker v28.0.4+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/nicholas-fedor/shoutrrr v0.8.6
-	github.com/onsi/gomega v1.36.3
+	github.com/onsi/gomega v1.37.0
 	github.com/prometheus/client_golang v1.21.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
