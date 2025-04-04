@@ -54,7 +54,7 @@ func newImageClient(api dockerClient.APIClient) imageClient {
 // with the container’s current image. If pulling is skipped or fails, it returns the current image ID.
 //
 // Parameters:
-//   - target: The container whose image staleness is being checked.
+//   - sourceContainer: The container whose image staleness is being checked.
 //   - params: Update parameters, including whether pulling is disabled (NoPull).
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
 //
@@ -63,29 +63,29 @@ func newImageClient(api dockerClient.APIClient) imageClient {
 //   - types.ImageID: The ID of the latest image (or current if not pulled).
 //   - error: Any error encountered during pulling or inspection, nil if successful or skipped.
 func (c imageClient) IsContainerStale(
-	target types.Container,
+	sourceContainer types.Container,
 	params types.UpdateParams,
 	warnOnHeadFailed WarningStrategy,
 ) (bool, types.ImageID, error) {
 	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
-		"container": target.Name(),
-		"image":     target.ImageName(),
+		"container": sourceContainer.Name(),
+		"image":     sourceContainer.ImageName(),
 	})
 
-	if target.IsNoPull(params) {
+	if sourceContainer.IsNoPull(params) {
 		clog.Debug("Skipping image pull due to no-pull setting")
 
-		return false, target.SafeImageID(), nil
+		return false, sourceContainer.SafeImageID(), nil
 	}
 
-	if err := c.PullImage(ctx, target, warnOnHeadFailed); err != nil {
+	if err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed); err != nil {
 		clog.WithError(err).Debug("Failed to pull image")
 
-		return false, target.SafeImageID(), err
+		return false, sourceContainer.SafeImageID(), err
 	}
 
-	return c.HasNewImage(ctx, target)
+	return c.HasNewImage(ctx, sourceContainer)
 }
 
 // HasNewImage checks if a newer image exists for the container’s image name.
@@ -94,7 +94,7 @@ func (c imageClient) IsContainerStale(
 //
 // Parameters:
 //   - ctx: Context for controlling the operation’s lifecycle.
-//   - targetContainer: The container whose image is being checked.
+//   - sourceContainer: The container whose image is being checked.
 //
 // Returns:
 //   - bool: True if a newer image is available, false if the current image is up-to-date.
@@ -102,24 +102,24 @@ func (c imageClient) IsContainerStale(
 //   - error: Any error from inspecting the image, nil if successful.
 func (c imageClient) HasNewImage(
 	ctx context.Context,
-	targetContainer types.Container,
+	sourceContainer types.Container,
 ) (bool, types.ImageID, error) {
 	clog := logrus.WithFields(logrus.Fields{
-		"container": targetContainer.Name(),
-		"image":     targetContainer.ImageName(),
+		"container": sourceContainer.Name(),
+		"image":     sourceContainer.ImageName(),
 	})
-	currentImageID := types.ImageID(targetContainer.ContainerInfo().Image)
+	currentImageID := types.ImageID(sourceContainer.ContainerInfo().Image)
 
 	clog.Debug("Inspecting latest image")
 
-	newImageInfo, err := c.api.ImageInspect(ctx, targetContainer.ImageName())
+	newImageInfo, err := c.api.ImageInspect(ctx, sourceContainer.ImageName())
 	if err != nil {
 		clog.WithError(err).Debug("Failed to inspect latest image")
 
 		return false, currentImageID, fmt.Errorf(
 			"%w: %s: %w",
 			errInspectImageFailed,
-			targetContainer.ImageName(),
+			sourceContainer.ImageName(),
 			err,
 		)
 	}
@@ -142,24 +142,24 @@ func (c imageClient) HasNewImage(
 //
 // Parameters:
 //   - ctx: Context for controlling the operation’s lifecycle.
-//   - targetContainer: The container whose image is being pulled.
+//   - sourceContainer: The container whose image is being pulled.
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
 //
 // Returns:
 //   - error: Any error from authentication, pulling, or reading the response, nil if successful or skipped.
 func (c imageClient) PullImage(
 	ctx context.Context,
-	targetContainer types.Container,
+	sourceContainer types.Container,
 	warnOnHeadFailed WarningStrategy,
 ) error {
 	fields := logrus.Fields{
-		"container": targetContainer.Name(),
-		"image":     targetContainer.ImageName(),
+		"container": sourceContainer.Name(),
+		"image":     sourceContainer.ImageName(),
 	}
 	clog := logrus.WithFields(fields)
 
 	// Prevent pulling pinned images (e.g., sha256: references), as they are immutable.
-	if strings.HasPrefix(targetContainer.ImageName(), "sha256:") {
+	if strings.HasPrefix(sourceContainer.ImageName(), "sha256:") {
 		clog.Warn("Skipping pull of pinned sha256 image")
 
 		return errPinnedImage
@@ -167,11 +167,11 @@ func (c imageClient) PullImage(
 
 	clog.Debug("Loading authentication credentials")
 
-	opts, err := registry.GetPullOptions(targetContainer.ImageName())
+	opts, err := registry.GetPullOptions(sourceContainer.ImageName())
 	if err != nil {
 		clog.WithError(err).Debug("Failed to load authentication credentials")
 
-		return fmt.Errorf("%w: %s: %w", errPullImageFailed, targetContainer.ImageName(), err)
+		return fmt.Errorf("%w: %s: %w", errPullImageFailed, sourceContainer.ImageName(), err)
 	}
 
 	// Log if authentication credentials are successfully loaded.
@@ -180,12 +180,12 @@ func (c imageClient) PullImage(
 	}
 
 	// Skip the pull if the digest matches the current image.
-	if c.shouldSkipPull(ctx, targetContainer, opts.RegistryAuth, warnOnHeadFailed, fields) {
+	if c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed, fields) {
 		return nil
 	}
 
 	// Perform the full image pull if needed.
-	return c.performImagePull(ctx, targetContainer.ImageName(), opts, fields)
+	return c.performImagePull(ctx, sourceContainer.ImageName(), opts, fields)
 }
 
 // shouldSkipPull determines if an image pull can be skipped based on digest comparison.
@@ -194,7 +194,7 @@ func (c imageClient) PullImage(
 //
 // Parameters:
 //   - ctx: Context for controlling the operation’s lifecycle.
-//   - targetContainer: The container whose image digest is being checked.
+//   - sourceContainer: The container whose image digest is being checked.
 //   - auth: Registry authentication credentials for the HEAD request.
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
 //   - fields: Logrus fields for consistent logging context.
@@ -203,7 +203,7 @@ func (c imageClient) PullImage(
 //   - bool: True if the pull should be skipped (digests match), false if it should proceed.
 func (c imageClient) shouldSkipPull(
 	ctx context.Context,
-	targetContainer types.Container,
+	sourceContainer types.Container,
 	auth string,
 	warnOnHeadFailed WarningStrategy,
 	fields logrus.Fields,
@@ -211,9 +211,9 @@ func (c imageClient) shouldSkipPull(
 	clog := logrus.WithFields(fields)
 	clog.Debug("Checking if pull is needed")
 
-	warn := c.warnOnHeadFailed(targetContainer, warnOnHeadFailed)
+	warn := c.warnOnHeadFailed(sourceContainer, warnOnHeadFailed)
 
-	match, err := digest.CompareDigest(ctx, targetContainer, auth)
+	match, err := digest.CompareDigest(ctx, sourceContainer, auth)
 	if err != nil {
 		clog.WithFields(logrus.Fields{
 			"match": match,
@@ -359,13 +359,13 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
 // to registry-specific logic.
 //
 // Parameters:
-//   - targetContainer: The container whose image is being checked.
+//   - sourceContainer: The container whose image is being checked.
 //   - warnOnHeadFailed: The configured warning strategy.
 //
 // Returns:
 //   - bool: True if a warning should be logged, false otherwise.
 func (c imageClient) warnOnHeadFailed(
-	targetContainer types.Container,
+	sourceContainer types.Container,
 	warnOnHeadFailed WarningStrategy,
 ) bool {
 	if warnOnHeadFailed == WarnAlways {
@@ -376,5 +376,5 @@ func (c imageClient) warnOnHeadFailed(
 		return false
 	}
 
-	return registry.WarnOnAPIConsumption(targetContainer)
+	return registry.WarnOnAPIConsumption(sourceContainer)
 }
