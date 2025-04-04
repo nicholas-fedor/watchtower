@@ -16,7 +16,7 @@ import (
 	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/container/mocks" // Add this import
+	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -27,7 +27,7 @@ func mockContainer(options ...func(*container.Container)) *container.Container {
 			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 				ID:         "container_id",
 				HostConfig: &dockerContainer.HostConfig{},
-				Name:       "/test-container", // Ensure valid name
+				Name:       "/test-container",
 			},
 			Config: &dockerContainer.Config{
 				Labels: map[string]string{},
@@ -66,8 +66,6 @@ var (
 )
 
 // TestExecutePreChecks tests the ExecutePreChecks function.
-// It verifies that pre-check commands are executed for all filtered containers,
-// handles listing errors gracefully, and logs appropriately.
 func TestExecutePreChecks(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -87,19 +85,18 @@ func TestExecutePreChecks(t *testing.T) {
 				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).
 					Return(true, nil)
 			},
-			expectedLogs:   2,
-			expectedLogMsg: "Executing pre-check command",
+			expectedLogs:   5, // Listing, Found, Execute, Label not found, Skip
+			expectedLogMsg: "Listing containers for pre-checks",
 		},
 		{
 			name: "listing error",
 			setupClient: func(c *mocks.MockClient) {
 				c.On("ListContainers", mock.Anything).Return(nil, errListingFailed)
 			},
-			expectedLogs:   1,
-			expectedLogMsg: "Failed to list containers for pre-checks",
+			expectedLogs:   2, // Listing, Error
+			expectedLogMsg: "Listing containers for pre-checks",
 		},
 	}
-
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -133,6 +130,7 @@ func TestExecutePreChecks(t *testing.T) {
 	}
 }
 
+// TestExecutePostChecks tests the ExecutePostChecks function.
 func TestExecutePostChecks(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -152,19 +150,18 @@ func TestExecutePostChecks(t *testing.T) {
 				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).
 					Return(true, nil)
 			},
-			expectedLogs:   2,
-			expectedLogMsg: "Executing post-check command",
+			expectedLogs:   5, // Listing, Found, Execute, Label not found, Skip
+			expectedLogMsg: "Listing containers for post-checks",
 		},
 		{
 			name: "listing error",
 			setupClient: func(c *mocks.MockClient) {
 				c.On("ListContainers", mock.Anything).Return(nil, errListingFailed)
 			},
-			expectedLogs:   1,
-			expectedLogMsg: "Failed to list containers for post-checks",
+			expectedLogs:   2, // Listing, Error
+			expectedLogMsg: "Listing containers for post-checks",
 		},
 	}
-
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -193,6 +190,7 @@ func TestExecutePostChecks(t *testing.T) {
 	}
 }
 
+// TestExecutePreCheckCommand tests the ExecutePreCheckCommand function.
 func TestExecutePreCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -216,7 +214,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 		{
 			name:           "no command",
 			container:      mockContainer(),
-			expectedLogs:   1,
+			expectedLogs:   2, // "Label not found" + "Skipping"
 			expectedLogMsg: "No pre-check command supplied",
 		},
 		{
@@ -232,7 +230,6 @@ func TestExecutePreCheckCommand(t *testing.T) {
 			expectedLogMsg: "Pre-check command failed",
 		},
 	}
-
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -261,6 +258,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 	}
 }
 
+// TestExecutePostCheckCommand tests the ExecutePostCheckCommand function.
 func TestExecutePostCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -284,7 +282,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 		{
 			name:           "no command",
 			container:      mockContainer(),
-			expectedLogs:   1,
+			expectedLogs:   2, // "Label not found" + "Skipping"
 			expectedLogMsg: "No post-check command supplied",
 		},
 		{
@@ -300,7 +298,6 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			expectedLogMsg: "Post-check command failed",
 		},
 	}
-
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()
@@ -329,6 +326,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 	}
 }
 
+// TestExecutePreUpdateCommand tests the ExecutePreUpdateCommand function.
 func TestExecutePreUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -353,14 +351,14 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 					Return(true, nil)
 			},
 			expectedResult: true,
-			expectedLogs:   1,
-			expectedLogMsg: "Executing pre-update command",
+			expectedLogs:   3,
+			expectedLogMsg: "Pre-update command executed",
 		},
 		{
 			name:           "no command",
 			container:      mockContainer(withContainerState(dockerContainer.State{Running: true})),
 			expectedResult: false,
-			expectedLogs:   1,
+			expectedLogs:   4, // Timeout label not found, Default timeout, Command label not found, Skipping
 			expectedLogMsg: "No pre-update command supplied",
 		},
 		{
@@ -373,7 +371,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 				}),
 			),
 			expectedResult: false,
-			expectedLogs:   1,
+			expectedLogs:   2, // Timeout, Skip
 			expectedLogMsg: "Container is not running",
 		},
 		{
@@ -391,11 +389,10 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 			},
 			expectedResult: true,
 			expectedErr:    true,
-			expectedLogs:   2,
-			expectedLogMsg: "Error: Pre-update command failed",
+			expectedLogs:   3, // Timeout, Execute, Error
+			expectedLogMsg: "Pre-update command failed",
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			runPreUpdateTest(t, tt)
@@ -404,11 +401,6 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 }
 
 // runPreUpdateTest executes a single pre-update command test case and validates its results.
-// It sets up the mock client, executes the command, and asserts the expected outcomes.
-//
-// Parameters:
-//   - t: The testing.T instance for assertions and test control.
-//   - tt: The test case data containing setup and expectations.
 func runPreUpdateTest(t *testing.T, tt struct {
 	name           string
 	container      types.Container
@@ -419,7 +411,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 	expectedLogMsg string
 },
 ) {
-	t.Helper() // Mark as helper to improve stack traces
+	t.Helper()
 
 	hook := test.NewGlobal()
 
@@ -438,7 +430,12 @@ func runPreUpdateTest(t *testing.T, tt struct {
 
 	if tt.expectedErr {
 		require.Error(t, err, "expected an error but got none")
-		assert.Contains(t, err.Error(), "pre-update command execution failed")
+		assert.Contains(
+			t,
+			err.Error(),
+			"pre-update command execution failed",
+			"error message mismatch",
+		)
 	} else {
 		require.NoError(t, err)
 	}
@@ -453,7 +450,6 @@ func runPreUpdateTest(t *testing.T, tt struct {
 }
 
 // TestExecutePostUpdateCommand tests the ExecutePostUpdateCommand function.
-// It verifies command execution, container retrieval errors, and logging behavior.
 func TestExecutePostUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -473,7 +469,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).
 					Return(true, nil)
 			},
-			expectedLogs:   1,
+			expectedLogs:   4, // Retrieve, Label not found, Default timeout, Execute
 			expectedLogMsg: "Executing post-update command",
 		},
 		{
@@ -482,7 +478,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			setupClient: func(c *mocks.MockClient) {
 				c.On("GetContainer", types.ContainerID("test")).Return(mockContainer(), nil)
 			},
-			expectedLogs:   1,
+			expectedLogs:   5, // Retrieve, Timeout label not found, Default timeout, Command label not found, Skipping
 			expectedLogMsg: "No post-update command supplied",
 		},
 		{
@@ -491,7 +487,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			setupClient: func(c *mocks.MockClient) {
 				c.On("GetContainer", types.ContainerID("test")).Return(nil, errNotFound)
 			},
-			expectedLogs:   1,
+			expectedLogs:   2, // Retrieve, Error
 			expectedLogMsg: "Failed to get container",
 		},
 		{
@@ -505,11 +501,10 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).
 					Return(false, errExecFailed)
 			},
-			expectedLogs:   2,
+			expectedLogs:   5, // Retrieve, Label not found, Default timeout, Execute, Error
 			expectedLogMsg: "Post-update command failed",
 		},
 	}
-
 	for _, testClient := range tests {
 		t.Run(testClient.name, func(t *testing.T) {
 			hook := test.NewGlobal()

@@ -68,15 +68,21 @@ func (c imageClient) IsContainerStale(
 	warnOnHeadFailed WarningStrategy,
 ) (bool, types.ImageID, error) {
 	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": target.Name(),
+		"image":     target.ImageName(),
+	})
 
 	if target.IsNoPull(params) {
-		logrus.Debugf("Skipping image pull.")
+		clog.Debug("Skipping image pull due to no-pull setting")
 
-		return false, target.SafeImageID(), nil // No pull, so assume not stale
+		return false, target.SafeImageID(), nil
 	}
 
 	if err := c.PullImage(ctx, target, warnOnHeadFailed); err != nil {
-		return false, target.SafeImageID(), err // Return current ID on pull failure
+		clog.WithError(err).Debug("Failed to pull image")
+
+		return false, target.SafeImageID(), err
 	}
 
 	return c.HasNewImage(ctx, target)
@@ -98,22 +104,34 @@ func (c imageClient) HasNewImage(
 	ctx context.Context,
 	targetContainer types.Container,
 ) (bool, types.ImageID, error) {
+	clog := logrus.WithFields(logrus.Fields{
+		"container": targetContainer.Name(),
+		"image":     targetContainer.ImageName(),
+	})
 	currentImageID := types.ImageID(targetContainer.ContainerInfo().Image)
-	imageName := targetContainer.ImageName()
 
-	newImageInfo, err := c.api.ImageInspect(ctx, imageName)
+	clog.Debug("Inspecting latest image")
+
+	newImageInfo, err := c.api.ImageInspect(ctx, targetContainer.ImageName())
 	if err != nil {
-		return false, currentImageID, fmt.Errorf("failed to inspect image %s: %w", imageName, err)
+		clog.WithError(err).Debug("Failed to inspect latest image")
+
+		return false, currentImageID, fmt.Errorf(
+			"%w: %s: %w",
+			errInspectImageFailed,
+			targetContainer.ImageName(),
+			err,
+		)
 	}
 
 	newImageID := types.ImageID(newImageInfo.ID)
 	if newImageID == currentImageID {
-		logrus.Debugf("No new images found for %s", targetContainer.Name())
+		clog.Debug("No new image found")
 
 		return false, currentImageID, nil
 	}
 
-	logrus.Infof("Found new %s image (%s)", imageName, newImageID.ShortID())
+	clog.WithField("new_id", newImageID.ShortID()).Info("Found new image")
 
 	return true, newImageID, nil
 }
@@ -134,27 +152,31 @@ func (c imageClient) PullImage(
 	targetContainer types.Container,
 	warnOnHeadFailed WarningStrategy,
 ) error {
-	containerName := targetContainer.Name()
-	imageName := targetContainer.ImageName()
-	fields := logrus.Fields{"image": imageName, "container": containerName}
+	fields := logrus.Fields{
+		"container": targetContainer.Name(),
+		"image":     targetContainer.ImageName(),
+	}
+	clog := logrus.WithFields(fields)
 
 	// Prevent pulling pinned images (e.g., sha256: references), as they are immutable.
-	if strings.HasPrefix(imageName, "sha256:") {
+	if strings.HasPrefix(targetContainer.ImageName(), "sha256:") {
+		clog.Warn("Skipping pull of pinned sha256 image")
+
 		return errPinnedImage
 	}
 
-	logrus.WithFields(fields).Debugf("Trying to load authentication credentials.")
+	clog.Debug("Loading authentication credentials")
 
-	opts, err := registry.GetPullOptions(imageName)
+	opts, err := registry.GetPullOptions(targetContainer.ImageName())
 	if err != nil {
-		logrus.Debugf("Error loading authentication credentials %s", err)
+		clog.WithError(err).Debug("Failed to load authentication credentials")
 
-		return fmt.Errorf("failed to get pull options for %s: %w", imageName, err)
+		return fmt.Errorf("%w: %s: %w", errPullImageFailed, targetContainer.ImageName(), err)
 	}
 
 	// Log if authentication credentials are successfully loaded.
 	if opts.RegistryAuth != "" {
-		logrus.Debug("Credentials loaded")
+		clog.Debug("Authentication credentials loaded")
 	}
 
 	// Skip the pull if the digest matches the current image.
@@ -163,7 +185,7 @@ func (c imageClient) PullImage(
 	}
 
 	// Perform the full image pull if needed.
-	return c.performImagePull(ctx, imageName, opts, fields)
+	return c.performImagePull(ctx, targetContainer.ImageName(), opts, fields)
 }
 
 // shouldSkipPull determines if an image pull can be skipped based on digest comparison.
@@ -186,15 +208,19 @@ func (c imageClient) shouldSkipPull(
 	warnOnHeadFailed WarningStrategy,
 	fields logrus.Fields,
 ) bool {
-	logrus.WithFields(fields).Debugf("Checking if pull is needed")
+	clog := logrus.WithFields(fields)
+	clog.Debug("Checking if pull is needed")
 
 	warn := c.warnOnHeadFailed(targetContainer, warnOnHeadFailed)
 
 	match, err := digest.CompareDigest(ctx, targetContainer, auth)
 	if err != nil {
-		logrus.WithFields(fields).Debugf("Digest match: %v, error: %s", match, err)
+		clog.WithFields(logrus.Fields{
+			"match": match,
+			"error": err,
+		}).Debug("Digest comparison result")
 	} else {
-		logrus.WithFields(fields).Debugf("Digest match: %v", match)
+		clog.WithField("match", match).Debug("Digest comparison result")
 	}
 
 	switch {
@@ -205,19 +231,18 @@ func (c imageClient) shouldSkipPull(
 			headLevel = logrus.WarnLevel
 		}
 
-		logrus.WithFields(fields).
-			Logf(headLevel, "Could not do a head request for %q, falling back to regular pull.", targetContainer.ImageName())
-		logrus.WithFields(fields).Log(headLevel, "Reason: ", err)
+		clog.WithError(err).
+			Log(headLevel, "HEAD request failed, falling back to full pull")
 
 		return false
 	case match:
 		// Digests match; no pull needed.
-		logrus.Debug("No pull needed. Skipping image.")
+		clog.Debug("Digest match, skipping pull")
 
 		return true
 	default:
 		// Digests differ; proceed with pull.
-		logrus.Debug("Digests did not match, doing a pull.")
+		clog.Debug("Digest mismatch, proceeding with pull")
 
 		return false
 	}
@@ -241,23 +266,25 @@ func (c imageClient) performImagePull(
 	opts dockerImageType.PullOptions,
 	fields logrus.Fields,
 ) error {
-	logrus.WithFields(fields).Debugf("Pulling image")
+	clog := logrus.WithFields(fields)
+	clog.Debug("Initiating image pull")
 
 	response, err := c.api.ImagePull(ctx, imageName, opts)
 	if err != nil {
-		logrus.Debugf("Error pulling image %s, %s", imageName, err)
+		clog.WithError(err).Debug("Failed to initiate image pull")
 
-		return fmt.Errorf("failed to pull image %s: %w", imageName, err)
+		return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
 	}
-
 	defer response.Close()
 
 	// Read the entire response to ensure the pull completes successfully.
 	if _, err = io.ReadAll(response); err != nil {
-		logrus.Error(err)
+		clog.WithError(err).Debug("Failed to read image pull response")
 
-		return fmt.Errorf("failed to read pull response for %s: %w", imageName, err)
+		return fmt.Errorf("%w: %s: %w", errReadPullResponseFailed, imageName, err)
 	}
+
+	clog.Debug("Image pull completed")
 
 	return nil
 }
@@ -272,7 +299,8 @@ func (c imageClient) performImagePull(
 // Returns:
 //   - error: Any error from the removal operation, nil if successful.
 func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
-	logrus.Infof("Removing image %s", imageID.ShortID())
+	clog := logrus.WithField("image_id", imageID.ShortID())
+	clog.Info("Removing image")
 
 	items, err := c.api.ImageRemove(
 		context.Background(),
@@ -283,7 +311,15 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to remove image %s: %w", imageID, err)
+		if dockerClient.IsErrNotFound(err) {
+			clog.WithError(err).Debug("Image not found, no removal needed")
+
+			return fmt.Errorf("%w: %s", err, imageID)
+		}
+
+		clog.WithError(err).Debug("Failed to remove image")
+
+		return fmt.Errorf("%w: %s: %w", errRemoveImageFailed, imageID, err)
 	}
 
 	// Log detailed removal info if debug level is enabled.
@@ -309,8 +345,10 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
 			}
 		}
 
-		fields := logrus.Fields{"deleted": deleted.String(), "untagged": untagged.String()}
-		logrus.WithFields(fields).Debug("Image removal completed")
+		clog.WithFields(logrus.Fields{
+			"deleted":  deleted.String(),
+			"untagged": untagged.String(),
+		}).Debug("Image removal details")
 	}
 
 	return nil

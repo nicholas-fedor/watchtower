@@ -5,11 +5,11 @@ package main
 import (
 	"fmt"
 
+	"syscall/js"
+
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/preview"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/preview/data"
-
-	"syscall/js"
 )
 
 func main() {
@@ -19,11 +19,9 @@ func main() {
 		"tplprev": js.FuncOf(jsTplPrev),
 	}))
 	<-make(chan bool)
-
 }
 
 func jsTplPrev(this js.Value, args []js.Value) any {
-
 	if len(args) < 3 {
 		return "Requires 3 arguments passed"
 	}

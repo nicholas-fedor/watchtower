@@ -238,9 +238,9 @@ linters:
       # - ".*\\.my\\.go$"
       # - lib/bad.go
       - ".*/mocks/.*"
-      - third_party$
-      - builtin$
-      - examples$
+      # - third_party$
+      # - builtin$
+      # - examples$
 
     ####################################################################################################
     # Which file paths to not exclude.

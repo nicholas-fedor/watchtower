@@ -614,7 +614,7 @@ func TestNewReport(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewReport(tt.args.progress)
 			if !compareReports(got.(*report), tt.want.(*report)) {
-				t.Errorf("NewReport() = %v, want %v", got, tt.want)
+				t.Errorf("NewReport() = %+v, want %+v", got, tt.want)
 			}
 			// Explicitly exercise Stale() to ensure coverage
 			stale := got.Stale()
@@ -649,16 +649,13 @@ func compareReports(got, want *report) bool {
 			g := gotSlice[i].(*ContainerStatus)
 			w := wantSlice[i].(*ContainerStatus)
 
-			if g.containerID != w.containerID || g.state != w.state || g.oldImage != w.oldImage ||
+			if g.containerID != w.containerID ||
+				g.state != w.state ||
+				g.oldImage != w.oldImage ||
 				g.newImage != w.newImage ||
 				g.containerName != w.containerName ||
 				g.imageName != w.imageName ||
-				((g.containerError == nil) != (w.containerError == nil)) {
-				return false
-			}
-
-			if g.containerError != nil && w.containerError != nil &&
-				g.containerError.Error() != w.containerError.Error() {
+				g.Error() != w.Error() { // Compare error strings
 				return false
 			}
 		}

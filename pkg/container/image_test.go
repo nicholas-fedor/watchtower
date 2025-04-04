@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("the client", func() {
 				)
 				err := i.PullImage(context.Background(), pinnedContainer, WarnAuto)
 				gomega.Expect(err).
-					To(gomega.MatchError(`container uses a pinned image, and cannot be updated by watchtower`))
+					To(gomega.MatchError(`image is pinned with sha256, skipping pull`))
 			})
 		})
 	})
@@ -86,7 +86,7 @@ var _ = ginkgo.Describe("the client", func() {
 				shortA := types.ImageID(imageA).ShortID()
 				shortAParent := types.ImageID(imageAParent).ShortID()
 				gomega.Eventually(logbuf).
-					Should(gbytes.Say(`deleted="%v, %v" untagged="?%v"?`, shortA, shortAParent, shortA))
+					Should(gbytes.Say(`deleted="%v, %v" image_id=%v untagged=%v`, shortA, shortAParent, shortA, shortA))
 			})
 		})
 		ginkgo.When("image is not found", func() {

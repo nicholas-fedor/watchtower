@@ -32,45 +32,27 @@ const defaultStopTimeoutSeconds = 10
 // It provides a standard port for email communication.
 const defaultEmailServerPort = 25
 
-// errInvalidLogFormat indicates an invalid log format was specified.
-// It is used in SetupLogging to report configuration errors.
-var errInvalidLogFormat = errors.New("invalid log format specified")
-
-// errInvalidLogLevel indicates an invalid log level was specified.
-// It is used in SetupLogging to report configuration errors.
-var errInvalidLogLevel = errors.New("invalid log level specified")
-
-// errSetEnvFailed indicates a failure to set an environment variable.
-// It is used in setEnvOptStr to wrap os.Setenv errors.
-var errSetEnvFailed = errors.New("failed to set environment variable")
-
-// errOpenFileFailed indicates a failure to open a file for reading secrets.
-// It is used in getSecretFromFile to wrap os.Open errors.
-var errOpenFileFailed = errors.New("failed to open secret file")
-
-// errCloseFileFailed indicates a failure to close a file after reading secrets.
-// It is used in getSecretFromFile to wrap file.Close errors.
-var errCloseFileFailed = errors.New("failed to close secret file")
-
-// errReplaceSliceFailed indicates a failure to replace a slice value in a flag.
-// It is used in getSecretFromFile to wrap SliceValue.Replace errors.
-var errReplaceSliceFailed = errors.New("failed to replace slice value in flag")
-
-// errReadFileFailed indicates a failure to read a file’s contents.
-// It is used in getSecretFromFile to wrap os.ReadFile errors.
-var errReadFileFailed = errors.New("failed to read secret file")
-
-// errSetFlagFailed indicates a failure to set a flag’s value.
-// It is used in getSecretFromFile and setFlagIfDefault to wrap flags.Set errors.
-var errSetFlagFailed = errors.New("failed to set flag value")
-
-// errInvalidFlagName indicates an invalid flag name was provided.
-// It is used in appendFlagValue to report flag lookup errors.
-var errInvalidFlagName = errors.New("invalid flag name provided")
-
-// errNotSliceValue indicates a flag does not support slice values.
-// It is used in appendFlagValue to report type errors.
-var errNotSliceValue = errors.New("flag does not support slice values")
+// Errors for flag and environment configuration.
+var (
+	// errInvalidLogFormat indicates an invalid log format was specified in configuration.
+	errInvalidLogFormat = errors.New("invalid log format specified")
+	// errInvalidLogLevel indicates an invalid log level was specified in configuration.
+	errInvalidLogLevel = errors.New("invalid log level specified")
+	// errSetEnvFailed indicates a failure to set an environment variable during configuration.
+	errSetEnvFailed = errors.New("failed to set environment variable")
+	// errOpenFileFailed indicates a failure to open a file when reading secrets.
+	errOpenFileFailed = errors.New("failed to open secret file")
+	// errReplaceSliceFailed indicates a failure to replace a slice value in a flag.
+	errReplaceSliceFailed = errors.New("failed to replace slice value in flag")
+	// errReadFileFailed indicates a failure to read a file’s contents for secrets.
+	errReadFileFailed = errors.New("failed to read secret file")
+	// errSetFlagFailed indicates a failure to set a flag’s value during configuration.
+	errSetFlagFailed = errors.New("failed to set flag value")
+	// errInvalidFlagName indicates an invalid flag name was provided for modification.
+	errInvalidFlagName = errors.New("invalid flag name provided")
+	// errNotSliceValue indicates a flag does not support slice values for appending.
+	errNotSliceValue = errors.New("flag does not support slice values")
+)
 
 // RegisterDockerFlags adds flags used directly by the Docker API client to the root command.
 // These flags configure the Docker connection settings.
@@ -521,39 +503,48 @@ func SetDefaults() {
 // EnvConfig sets environment variables based on Docker-related flags.
 // It configures the Docker client’s environment, returning an error if flag retrieval fails.
 func EnvConfig(cmd *cobra.Command) error {
-	var err error
-
-	var host string
-
-	var tls bool
-
-	var version string
-
 	flags := cmd.PersistentFlags()
 
-	if host, err = flags.GetString("host"); err != nil {
+	host, err := flags.GetString("host")
+	if err != nil {
+		logrus.WithError(err).WithField("flag", "host").Debug("Failed to get host flag")
+
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
-	if tls, err = flags.GetBool("tlsverify"); err != nil {
+	tls, err := flags.GetBool("tlsverify")
+	if err != nil {
+		logrus.WithError(err).WithField("flag", "tlsverify").Debug("Failed to get tlsverify flag")
+
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
-	if version, err = flags.GetString("api-version"); err != nil {
+	version, err := flags.GetString("api-version")
+	if err != nil {
+		logrus.WithError(err).
+			WithField("flag", "api-version").
+			Debug("Failed to get api-version flag")
+
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
-	if err = setEnvOptStr("DOCKER_HOST", host); err != nil {
+	if err := setEnvOptStr("DOCKER_HOST", host); err != nil {
 		return err
 	}
 
-	if err = setEnvOptBool("DOCKER_TLS_VERIFY", tls); err != nil {
+	if err := setEnvOptBool("DOCKER_TLS_VERIFY", tls); err != nil {
 		return err
 	}
 
-	if err = setEnvOptStr("DOCKER_API_VERSION", version); err != nil {
+	if err := setEnvOptStr("DOCKER_API_VERSION", version); err != nil {
 		return err
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"host":    host,
+		"tls":     tls,
+		"version": version,
+	}).Debug("Configured Docker environment variables")
 
 	return nil
 }
@@ -563,31 +554,40 @@ func EnvConfig(cmd *cobra.Command) error {
 func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 	flags := cmd.PersistentFlags()
 
-	var err error
-
-	var cleanup bool
-
-	var noRestart bool
-
-	var monitorOnly bool
-
-	var timeout time.Duration
-
-	if cleanup, err = flags.GetBool("cleanup"); err != nil {
-		logrus.Fatal(err)
+	cleanup, err := flags.GetBool("cleanup")
+	if err != nil {
+		logrus.WithField("flag", "cleanup").
+			WithError(err).
+			Fatal("Failed to get cleanup flag")
 	}
 
-	if noRestart, err = flags.GetBool("no-restart"); err != nil {
-		logrus.Fatal(err)
+	noRestart, err := flags.GetBool("no-restart")
+	if err != nil {
+		logrus.WithField("flag", "no-restart").
+			WithError(err).
+			Fatal("Failed to get no-restart flag")
 	}
 
-	if monitorOnly, err = flags.GetBool("monitor-only"); err != nil {
-		logrus.Fatal(err)
+	monitorOnly, err := flags.GetBool("monitor-only")
+	if err != nil {
+		logrus.WithField("flag", "monitor-only").
+			WithError(err).
+			Fatal("Failed to get monitor-only flag")
 	}
 
-	if timeout, err = flags.GetDuration("stop-timeout"); err != nil {
-		logrus.Fatal(err)
+	timeout, err := flags.GetDuration("stop-timeout")
+	if err != nil {
+		logrus.WithField("flag", "stop-timeout").
+			WithError(err).
+			Fatal("Failed to get stop-timeout flag")
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"cleanup":      cleanup,
+		"no_restart":   noRestart,
+		"monitor_only": monitorOnly,
+		"timeout":      timeout,
+	}).Debug("Retrieved operational flags")
 
 	return cleanup, noRestart, monitorOnly, timeout
 }
@@ -600,8 +600,18 @@ func setEnvOptStr(env string, opt string) error {
 	}
 
 	if err := os.Setenv(env, opt); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"env":   env,
+			"value": opt,
+		}).Debug("Failed to set environment variable")
+
 		return fmt.Errorf("%w: %s: %w", errSetEnvFailed, env, err)
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"env":   env,
+		"value": opt,
+	}).Debug("Set environment variable")
 
 	return nil
 }
@@ -620,7 +630,6 @@ func setEnvOptBool(env string, opt bool) error {
 // It processes a predefined list of secret-related flags, updating their values accordingly.
 func GetSecretsFromFiles(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
-
 	secrets := []string{
 		"notification-email-server-password",
 		"notification-slack-hook-url",
@@ -629,9 +638,12 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 		"notification-url",
 		"http-api-token",
 	}
+
 	for _, secret := range secrets {
 		if err := getSecretFromFile(flags, secret); err != nil {
-			logrus.Fatalf("failed to get secret from flag %v: %s", secret, err)
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"flag": secret,
+			}).Fatal("Failed to load secret from file")
 		}
 	}
 }
@@ -640,6 +652,8 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 // It handles both string and slice flags, returning an error if file operations fail.
 func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 	flag := flags.Lookup(secret)
+	fields := logrus.Fields{"flag": secret}
+
 	if sliceValue, ok := flag.Value.(pflag.SliceValue); ok {
 		oldValues := sliceValue.GetSlice()
 		values := make([]string, 0, len(oldValues))
@@ -648,28 +662,42 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 			if value != "" && isFilePath(value) {
 				file, err := os.Open(value)
 				if err != nil {
+					logrus.WithError(err).WithFields(fields).
+						WithField("file", value).
+						Debug("Failed to open secret file")
+
 					return fmt.Errorf("%w: %w", errOpenFileFailed, err)
 				}
+				defer file.Close()
 
 				scanner := bufio.NewScanner(file)
 				for scanner.Scan() {
 					line := scanner.Text()
-					if line == "" {
-						continue
+					if line != "" {
+						values = append(values, line)
 					}
-
-					values = append(values, line)
 				}
 
-				if err := file.Close(); err != nil {
-					return fmt.Errorf("%w: %w", errCloseFileFailed, err)
+				if err := scanner.Err(); err != nil {
+					logrus.WithFields(fields).
+						WithField("file", value).
+						WithError(err).
+						Debug("Failed to read secret file")
+
+					return fmt.Errorf("%w: %w", errReadFileFailed, err)
 				}
+
+				logrus.WithFields(fields).
+					WithField("file", value).
+					Debug("Read secret from file into slice")
 			} else {
 				values = append(values, value)
 			}
 		}
 
 		if err := sliceValue.Replace(values); err != nil {
+			logrus.WithFields(fields).WithError(err).Debug("Failed to replace slice value in flag")
+
 			return fmt.Errorf("%w: %w", errReplaceSliceFailed, err)
 		}
 
@@ -680,12 +708,21 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 	if value != "" && isFilePath(value) {
 		content, err := os.ReadFile(value)
 		if err != nil {
+			logrus.WithFields(fields).
+				WithField("file", value).
+				WithError(err).
+				Debug("Failed to read secret file")
+
 			return fmt.Errorf("%w: %w", errReadFileFailed, err)
 		}
 
 		if err := flags.Set(secret, strings.TrimSpace(string(content))); err != nil {
+			logrus.WithFields(fields).WithError(err).Debug("Failed to set flag from file contents")
+
 			return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 		}
+
+		logrus.WithFields(fields).WithField("file", value).Debug("Set flag from file contents")
 	}
 
 	return nil
@@ -710,16 +747,18 @@ func isFilePath(path string) bool {
 func ProcessFlagAliases(flags *pflag.FlagSet) {
 	porcelain, err := flags.GetString("porcelain")
 	if err != nil {
-		logrus.Fatalf("Failed to get flag: %v", err)
+		logrus.WithField("flag", "porcelain").
+			WithError(err).
+			Fatal("Failed to get porcelain flag")
 	}
 
 	if porcelain != "" {
 		if porcelain != "v1" {
-			logrus.Fatalf("Unknown porcelain version %q. Supported values: \"v1\"", porcelain)
+			logrus.WithField("version", porcelain).Fatal("Unknown porcelain version, supported: v1")
 		}
 
-		if err = appendFlagValue(flags, "notification-url", "logger://"); err != nil {
-			logrus.Errorf("Failed to set flag: %v", err)
+		if err := appendFlagValue(flags, "notification-url", "logger://"); err != nil {
+			logrus.WithError(err).Debug("Failed to append notification-url")
 		}
 
 		setFlagIfDefault(flags, "notification-log-stdout", "true")
@@ -727,11 +766,12 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 
 		tpl := fmt.Sprintf("porcelain.%s.summary-no-log", porcelain)
 		setFlagIfDefault(flags, "notification-template", tpl)
+		logrus.WithField("porcelain", porcelain).Debug("Configured porcelain mode")
 	}
 
 	scheduleChanged := flags.Changed("schedule")
 	intervalChanged := flags.Changed("interval")
-	// Workaround for Viper default swapping issue: check if values differ from defaults.
+
 	if val, _ := flags.GetString("schedule"); val != "" {
 		scheduleChanged = true
 	}
@@ -741,26 +781,33 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 	}
 
 	if intervalChanged && scheduleChanged {
-		logrus.Fatal("Only schedule or interval can be defined, not both.")
+		logrus.WithFields(logrus.Fields{
+			"interval": intervalChanged,
+			"schedule": scheduleChanged,
+		}).Fatal("Cannot define both interval and schedule")
 	}
 
 	// Update schedule to match interval or default if needed.
 	if intervalChanged || !scheduleChanged {
 		interval, _ := flags.GetInt("interval")
 		if err := flags.Set("schedule", fmt.Sprintf("@every %ds", interval)); err != nil {
-			logrus.Errorf("Failed to set schedule flag: %v", err)
+			logrus.WithError(err).
+				WithField("interval", interval).
+				Debug("Failed to set schedule from interval")
+		} else {
+			logrus.WithField("interval", interval).Debug("Set schedule from interval")
 		}
 	}
 
 	if flagIsEnabled(flags, "debug") {
 		if err := flags.Set("log-level", "debug"); err != nil {
-			logrus.Errorf("Failed to set log-level flag: %v", err)
+			logrus.WithError(err).Debug("Failed to set debug log level")
 		}
 	}
 
 	if flagIsEnabled(flags, "trace") {
 		if err := flags.Set("log-level", "trace"); err != nil {
-			logrus.Errorf("Failed to set log-level flag: %v", err)
+			logrus.WithError(err).Debug("Failed to set trace log level")
 		}
 	}
 }
@@ -770,11 +817,15 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 func SetupLogging(flags *pflag.FlagSet) error {
 	logFormat, err := flags.GetString("log-format")
 	if err != nil {
+		logrus.WithField("flag", "log-format").WithError(err).Debug("Failed to get log-format flag")
+
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
 	noColor, err := flags.GetBool("no-color")
 	if err != nil {
+		logrus.WithField("flag", "no-color").WithError(err).Debug("Failed to get no-color flag")
+
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
@@ -784,15 +835,24 @@ func SetupLogging(flags *pflag.FlagSet) error {
 
 	rawLogLevel, err := flags.GetString("log-level")
 	if err != nil {
+		logrus.WithField("flag", "log-level").WithError(err).Debug("Failed to get log-level flag")
+
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
 	logLevel, err := logrus.ParseLevel(rawLogLevel)
 	if err != nil {
+		logrus.WithError(err).WithField("level", rawLogLevel).Debug("Invalid log level specified")
+
 		return fmt.Errorf("%w: %w", errInvalidLogLevel, err)
 	}
 
 	logrus.SetLevel(logLevel)
+	logrus.WithFields(logrus.Fields{
+		"format":   logFormat,
+		"level":    logLevel,
+		"no_color": noColor,
+	}).Debug("Configured logging settings")
 
 	return nil
 }
@@ -819,6 +879,8 @@ func configureLogFormat(logFormat string, noColor bool) error {
 			FullTimestamp: false,
 		})
 	default:
+		logrus.WithField("format", logFormat).Debug("Invalid log format specified")
+
 		return fmt.Errorf("%w: %s", errInvalidLogFormat, logFormat)
 	}
 
@@ -830,7 +892,7 @@ func configureLogFormat(logFormat string, noColor bool) error {
 func flagIsEnabled(flags *pflag.FlagSet, name string) bool {
 	value, err := flags.GetBool(name)
 	if err != nil {
-		logrus.Fatalf("The flag %q is not defined", name)
+		logrus.WithField("flag", name).WithError(err).Fatal("Failed to check flag status")
 	}
 
 	return value
@@ -841,16 +903,23 @@ func flagIsEnabled(flags *pflag.FlagSet, name string) bool {
 func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error {
 	flag := flags.Lookup(name)
 	if flag == nil {
+		logrus.WithField("flag", name).Debug("Invalid flag name provided")
+
 		return fmt.Errorf("%w: %q", errInvalidFlagName, name)
 	}
 
 	if flagValues, ok := flag.Value.(pflag.SliceValue); ok {
 		for _, value := range values {
 			if err := flagValues.Append(value); err != nil {
-				logrus.Errorf("Failed to append value to flag %q: %v", name, err)
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"flag":  name,
+					"value": value,
+				}).Debug("Failed to append value to flag")
 			}
 		}
 	} else {
+		logrus.WithField("flag", name).Debug("Flag does not support slice values")
+
 		return fmt.Errorf("%w: %q", errNotSliceValue, name)
 	}
 
@@ -865,6 +934,15 @@ func setFlagIfDefault(flags *pflag.FlagSet, name string, value string) {
 	}
 
 	if err := flags.Set(name, value); err != nil {
-		logrus.Errorf("Failed to set flag: %v", err)
+		logrus.WithFields(logrus.Fields{
+			"flag":  name,
+			"value": value,
+			"error": err,
+		}).Debug("Failed to set default flag value")
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"flag":  name,
+			"value": value,
+		}).Debug("Set default flag value")
 	}
 }

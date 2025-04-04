@@ -557,8 +557,12 @@ func TestProcessFlagAliases_FlagSetErrors(t *testing.T) {
 	var logOutput strings.Builder
 
 	logrus.SetOutput(&logOutput)
+	logrus.SetLevel(logrus.DebugLevel) // Ensure Debug logs are captured
 
-	defer logrus.SetOutput(os.Stderr) // Restore default output
+	defer func() {
+		logrus.SetOutput(os.Stderr)       // Restore default output
+		logrus.SetLevel(logrus.InfoLevel) // Restore default level
+	}()
 
 	cmd := new(cobra.Command)
 
@@ -576,7 +580,12 @@ func TestProcessFlagAliases_FlagSetErrors(t *testing.T) {
 	defer func() { flag.Value = originalValue }() // Restore original value
 
 	ProcessFlagAliases(flags)
-	assert.Contains(t, logOutput.String(), "Failed to set log-level flag") // Broader match
+	assert.Contains(
+		t,
+		logOutput.String(),
+		"Failed to set debug log level",
+		"Expected log output to contain the debug log level set failure message",
+	)
 }
 
 // errorStringValue is a custom pflag.Value that always errors on Set.

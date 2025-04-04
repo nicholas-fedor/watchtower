@@ -172,7 +172,7 @@ func init() {
 // interface between the CLI and the operating system.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		logrus.Fatal(err)
+		logrus.WithError(err).Fatal("Failed to execute root command")
 	}
 }
 
@@ -190,7 +190,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Configure logging based on flags such as --debug, --trace, and --log-format.
 	if err := flags.SetupLogging(flagsSet); err != nil {
-		logrus.Fatalf("Failed to initialize logging: %s", err.Error())
+		logrus.WithError(err).Fatal("Failed to initialize logging")
 	}
 
 	// Retrieve the cron schedule specification from flags or environment variables.
@@ -215,13 +215,13 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Log the scope if specified, aiding debugging by confirming the operational boundary.
 	if scope != "" {
-		logrus.Debugf(`Using scope %q`, scope)
+		logrus.WithField("scope", scope).Debug("Configured operational scope")
 	}
 
 	// Set Docker environment variables (e.g., DOCKER_HOST) based on flags for client initialization.
 	err := flags.EnvConfig(cmd)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.WithError(err).Fatal("Failed to configure Docker environment")
 	}
 
 	// Retrieve flags controlling container inclusion and image handling behavior.
@@ -234,9 +234,10 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
 	if monitorOnly && noPull {
-		logrus.Warn(
-			"Using `WATCHTOWER_NO_PULL` and `WATCHTOWER_MONITOR_ONLY` simultaneously might lead to no action being taken at all. If this is intentional, you may safely ignore this message.",
-		)
+		logrus.WithFields(logrus.Fields{
+			"monitor_only": monitorOnly,
+			"no_pull":      noPull,
+		}).Warn("Combining monitor-only and no-pull might result in no updates")
 	}
 
 	// Initialize the Docker client with options reflecting the desired container handling behavior.
@@ -279,7 +280,7 @@ func run(c *cobra.Command, names []string) {
 
 	apiPort, err := flagsSet.GetString("http-api-port")
 	if err != nil {
-		logrus.Fatalf("Failed to get http-api-port flag: %v", err)
+		logrus.WithError(err).Fatal("Failed to get http-api-port flag")
 	}
 
 	if apiPort == "" {
@@ -314,6 +315,7 @@ func run(c *cobra.Command, names []string) {
 
 	// Execute core logic and exit with the returned status code (0 for success, 1 for failure).
 	if exitCode := runMain(cfg); exitCode != 0 {
+		logrus.WithField("exit_code", exitCode).Debug("Exiting with non-zero status")
 		os.Exit(exitCode)
 	}
 }
@@ -330,11 +332,14 @@ func run(c *cobra.Command, names []string) {
 //   - int: An exit code (0 for success, 1 for failure) used to terminate the program.
 func runMain(cfg RunConfig) int {
 	// Log the container names being processed for debugging visibility.
-	logrus.Debugf("Processing containers: %v", cfg.Names)
+	logrus.WithField("names", cfg.Names).Debug("Processing specified containers")
 
 	// Validate flag compatibility to prevent conflicting operational modes (e.g., rolling restarts with monitor-only).
 	if rollingRestart && monitorOnly {
-		logrus.Fatal("Rolling restarts is not compatible with the global monitor only flag")
+		logrus.WithFields(logrus.Fields{
+			"rolling_restart": rollingRestart,
+			"monitor_only":    monitorOnly,
+		}).Fatal("Incompatible flags: rolling restarts and monitor-only")
 	}
 
 	// Ensure the Docker client is fully initialized before proceeding.
@@ -342,7 +347,7 @@ func runMain(cfg RunConfig) int {
 
 	// Perform sanity checks on the Docker environment and container setup to catch misconfigurations.
 	if err := actions.CheckForSanity(client, cfg.Filter, rollingRestart); err != nil {
-		logNotify(err)
+		logNotify("Sanity check failed", err)
 
 		return 1
 	}
@@ -358,7 +363,7 @@ func runMain(cfg RunConfig) int {
 
 	// Check for and resolve conflicts with multiple Watchtower instances running concurrently.
 	if err := actions.CheckForMultipleWatchtowerInstances(client, cleanup, scope); err != nil {
-		logNotify(err)
+		logNotify("Multiple Watchtower instances detected", err)
 
 		return 1
 	}
@@ -373,12 +378,12 @@ func runMain(cfg RunConfig) int {
 
 	// Configure and start the HTTP API, handling any startup errors gracefully.
 	if err := setupAndStartAPI(ctx, cfg, updateLock); err != nil {
-		return 1
+		return 1 // Error logged in setupAndStartAPI
 	}
 
 	// Schedule and execute periodic updates, returning on error or shutdown.
 	if err := runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock); err != nil {
-		logrus.Error(err)
+		logNotify("Scheduled upgrades failed", err)
 
 		return 1
 	}
@@ -425,7 +430,7 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	// Start the API server, logging errors unless it’s a clean shutdown triggered by context.
 	if err := httpAPI.Start(ctx, cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI); err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
-		logrus.Error("failed to start API", err)
+		logrus.WithError(err).Error("Failed to start API")
 
 		return fmt.Errorf("failed to start HTTP API: %w", err)
 	}
@@ -434,13 +439,17 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 }
 
 // logNotify logs an error message and ensures notifications are sent before returning control.
-// It provides a consistent mechanism for reporting errors during execution without immediately
-// terminating the program, allowing the notifier to complete its tasks (e.g., sending alerts).
+// It uses a specific message if provided, falling back to a generic one, and includes the error in fields.
 //
 // Parameters:
+//   - msg: A string specifying the error context (e.g., "Sanity check failed"), optional.
 //   - err: The error to log and include in notifications.
-func logNotify(err error) {
-	logrus.Error(err)
+func logNotify(msg string, err error) {
+	if msg == "" {
+		msg = "Operation failed"
+	}
+
+	logrus.WithError(err).Error(msg)
 	notifier.Close()
 }
 
@@ -762,7 +771,7 @@ func runUpdatesWithNotifications(filter types.Filter) *metrics.Metric {
 	// Execute the update action, capturing results and handling any errors.
 	result, err := actions.Update(client, updateParams)
 	if err != nil {
-		logrus.Error(err)
+		logrus.WithError(err).Error("Update execution failed")
 	}
 
 	// Send the batched notification with update results (successes, failures, etc.).
@@ -771,10 +780,10 @@ func runUpdatesWithNotifications(filter types.Filter) *metrics.Metric {
 	// Generate and log a metric summarizing the update session.
 	metricResults := metrics.NewMetric(result)
 	notifications.LocalLog.WithFields(logrus.Fields{
-		"Scanned": metricResults.Scanned,
-		"Updated": metricResults.Updated,
-		"Failed":  metricResults.Failed,
-	}).Info("Session done")
+		"scanned": metricResults.Scanned,
+		"updated": metricResults.Updated,
+		"failed":  metricResults.Failed,
+	}).Info("Update session completed")
 
 	return metricResults
 }

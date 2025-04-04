@@ -22,11 +22,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// UserAgent is the User-Agent header value used in HTTP requests to identify Watchtower as the client.
-// It can be customized at build time using linker flags (e.g., -ldflags "-X ...UserAgent=Watchtower/v1.0").
-// If not set during the build, it defaults to "Watchtower/unknown", providing a fallback identifier for registry requests.
-var UserAgent = "Watchtower/unknown"
-
 // ContentDigestHeader is the HTTP header key used to retrieve the digest from a registry’s response.
 // This header, typically "Docker-Content-Digest", contains the digest value (e.g., "sha256:abc...") for an image manifest,
 // allowing Watchtower to compare or fetch it without downloading the full manifest body.
@@ -37,16 +32,27 @@ const ContentDigestHeader = "Docker-Content-Digest"
 // This constant ensures digest strings are well-formed before comparison or processing.
 const minDigestParts = 2
 
+// UserAgent is the User-Agent header value used in HTTP requests to identify Watchtower as the client.
+// It can be customized at build time using linker flags (e.g., -ldflags "-X ...UserAgent=Watchtower/v1.0").
+// If not set during the build, it defaults to "Watchtower/unknown", providing a fallback identifier for registry requests.
+var UserAgent = "Watchtower/unknown"
+
 // Errors for digest retrieval operations.
-// These static errors provide consistent, predefined messages for common failure scenarios, improving error handling discipline.
-// Using static errors allows callers to check specific conditions with errors.Is() where needed.
 var (
-	// errMissingImageInfo indicates that the container lacks image metadata, preventing digest retrieval or comparison.
+	// errMissingImageInfo indicates the container lacks image metadata, preventing digest operations.
 	errMissingImageInfo = errors.New("container image info missing")
-	// errInvalidRegistryResponse signals that the registry’s response to a HEAD request lacks a digest or is malformed.
+	// errInvalidRegistryResponse indicates the registry’s HEAD response lacks a digest or is malformed.
 	errInvalidRegistryResponse = errors.New("registry responded with invalid HEAD request")
-	// errDigestExtractionFailed denotes a failure to extract a digest from a response, typically due to decoding issues.
+	// errDigestExtractionFailed indicates a failure to extract a digest from a GET response due to decoding issues.
 	errDigestExtractionFailed = errors.New("failed to extract digest from response")
+	// errFailedGetToken indicates a failure to obtain an authentication token from the registry.
+	errFailedGetToken = errors.New("failed to get token")
+	// errFailedBuildManifestURL indicates a failure to construct the manifest URL for the registry.
+	errFailedBuildManifestURL = errors.New("failed to build manifest URL")
+	// errFailedCreateRequest indicates a failure to construct an HTTP request for digest retrieval.
+	errFailedCreateRequest = errors.New("failed to create request")
+	// errFailedExecuteRequest indicates a failure to execute an HTTP request to the registry.
+	errFailedExecuteRequest = errors.New("failed to execute request")
 )
 
 // manifestResponse represents the JSON structure of a registry manifest response from a GET request.
@@ -75,10 +81,15 @@ func CompareDigest(
 	container types.Container,
 	registryAuth string,
 ) (bool, error) {
-	fields := logrus.Fields{"container": container.Name(), "image": container.ImageName()}
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
 
 	// Ensure the container has image metadata to proceed with digest comparison.
 	if !container.HasImageInfo() {
+		logrus.WithFields(fields).Debug("Container image info missing")
+
 		return false, errMissingImageInfo
 	}
 
@@ -88,12 +99,16 @@ func CompareDigest(
 		return false, err
 	}
 
-	logrus.WithFields(fields).Debugf("Found a remote digest to compare with: %s", remoteDigest)
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"remote_digest": remoteDigest,
+	}).Debug("Fetched remote digest")
 
 	// Compare the fetched remote digest with the container’s local digests.
 	matches := digestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
 
-	logrus.WithFields(fields).Debugf("Digest comparison completed, matches: %v", matches)
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"matches": matches,
+	}).Debug("Completed digest comparison")
 
 	return matches, nil
 }
@@ -133,7 +148,10 @@ func fetchDigest(
 	container types.Container,
 	registryAuth, method string,
 ) (string, error) {
-	fields := logrus.Fields{"container": container.Name(), "image": container.ImageName()}
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
 
 	// Transform the provided auth string into a usable format for registry authentication.
 	registryAuth = TransformAuth(registryAuth)
@@ -141,21 +159,33 @@ func fetchDigest(
 	// Obtain an authentication token for the registry, leveraging the container’s image reference.
 	token, err := auth.GetToken(ctx, container, registryAuth)
 	if err != nil {
-		return "", fmt.Errorf("failed to get token: %w", err)
+		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
+
+		return "", fmt.Errorf("%w: %w", errFailedGetToken, err)
 	}
 
 	// Build the manifest URL based on the container’s image name and tag.
 	url, err := manifest.BuildManifestURL(container)
 	if err != nil {
-		return "", fmt.Errorf("failed to build manifest URL: %w", err)
+		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+
+		return "", fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
 	}
 
-	logrus.WithFields(fields).Debugf("Sending %s request to fetch digest: %s", method, url)
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"method": method,
+		"url":    url,
+	}).Debug("Fetching digest")
 
 	// Construct the HTTP request with the appropriate method, headers, and context.
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create %s request: %w", method, err)
+		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
+			"method": method,
+			"url":    url,
+		}).Debug("Failed to create request")
+
+		return "", fmt.Errorf("%w: %w", errFailedCreateRequest, err)
 	}
 
 	// Set standard headers for Docker registry manifest requests.
@@ -166,7 +196,12 @@ func fetchDigest(
 	// Execute the request using the configured auth client.
 	resp, err := auth.Client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("%s request failed: %w", method, err)
+		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
+			"method": method,
+			"url":    url,
+		}).Debug("Failed to execute request")
+
+		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
 	}
 	defer resp.Body.Close()
 
@@ -192,6 +227,10 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest == "" {
 		wwwAuthHeader := resp.Header.Get("Www-Authenticate")
+		logrus.WithFields(logrus.Fields{
+			"status":      resp.Status,
+			"auth_header": wwwAuthHeader,
+		}).Debug("Registry responded with invalid HEAD request")
 
 		return "", fmt.Errorf(
 			"%w: status %q, auth: %q",
@@ -202,8 +241,9 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 	}
 
 	normalizedDigest := helpers.NormalizeDigest(digest)
-
-	logrus.Debugf("Extracted digest from HEAD response: %s", normalizedDigest)
+	logrus.WithFields(logrus.Fields{
+		"digest": normalizedDigest,
+	}).Debug("Extracted digest from HEAD response")
 
 	return normalizedDigest, nil
 }
@@ -221,16 +261,15 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 func extractGetDigest(resp *http.Response) (string, error) {
 	var response manifestResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return "", fmt.Errorf(
-			"%w: failed to decode manifest response: %w",
-			errDigestExtractionFailed,
-			err,
-		)
+		logrus.WithError(err).Debug("Failed to extract digest from GET response")
+
+		return "", fmt.Errorf("%w: %w", errDigestExtractionFailed, err)
 	}
 
 	normalizedDigest := helpers.NormalizeDigest(response.Digest)
-
-	logrus.Debugf("Extracted digest from GET response: %s", normalizedDigest)
+	logrus.WithFields(logrus.Fields{
+		"digest": normalizedDigest,
+	}).Debug("Extracted digest from GET response")
 
 	return normalizedDigest, nil
 }
@@ -255,14 +294,13 @@ func digestsMatch(localDigests []string, remoteDigest string) bool {
 		}
 
 		normalizedLocalDigest := helpers.NormalizeDigest(parts[1])
-		logrus.Debugf(
-			"Comparing digests - local: %s, remote: %s",
-			normalizedLocalDigest,
-			normalizedRemoteDigest,
-		)
+		logrus.WithFields(logrus.Fields{
+			"local_digest":  normalizedLocalDigest,
+			"remote_digest": normalizedRemoteDigest,
+		}).Debug("Comparing digests")
 
 		if normalizedLocalDigest == normalizedRemoteDigest {
-			logrus.Debug("Found a digest match")
+			logrus.Debug("Found digest match")
 
 			return true
 		}

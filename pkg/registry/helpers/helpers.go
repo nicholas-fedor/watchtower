@@ -3,10 +3,12 @@
 package helpers
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/distribution/reference"
+	"github.com/sirupsen/logrus"
 )
 
 // Domains for Docker Hub, the default registry.
@@ -16,19 +18,39 @@ const (
 	LegacyDefaultRegistryDomain = "index.docker.io"
 )
 
+// Errors for helper operations.
+var (
+	// errFailedParseImageReference indicates a failure to parse an image reference into a normalized form.
+	errFailedParseImageReference = errors.New("failed to parse image reference")
+)
+
 // GetRegistryAddress extracts the registry address from an image reference.
 // It returns the domain part of the reference, mapping Docker Hub’s default domain
 // to its canonical host address if applicable.
 func GetRegistryAddress(imageRef string) (string, error) {
 	normalizedRef, err := reference.ParseNormalizedNamed(imageRef)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse image reference: %w", err)
+		logrus.WithError(err).
+			WithField("image_ref", imageRef).
+			Debug("Failed to parse image reference")
+
+		return "", fmt.Errorf("%w: %w", errFailedParseImageReference, err)
 	}
 
 	address := reference.Domain(normalizedRef)
 	if address == DefaultRegistryDomain {
+		logrus.WithFields(logrus.Fields{
+			"image_ref": imageRef,
+			"address":   address,
+		}).Debug("Mapped Docker Hub domain to canonical host")
+
 		address = DefaultRegistryHost
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"image_ref": imageRef,
+		"address":   address,
+	}).Debug("Extracted registry address")
 
 	return address, nil
 }
@@ -40,7 +62,13 @@ func NormalizeDigest(digest string) string {
 	prefixes := []string{"sha256:"}
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(digest, prefix) {
-			return strings.TrimPrefix(digest, prefix)
+			normalized := strings.TrimPrefix(digest, prefix)
+			logrus.WithFields(logrus.Fields{
+				"original":   digest,
+				"normalized": normalized,
+			}).Debug("Normalized digest by trimming prefix")
+
+			return normalized
 		}
 	}
 

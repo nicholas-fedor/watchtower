@@ -17,19 +17,41 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 )
 
-// Static error for when registry authentication environment variables are unset.
-// It provides a clear message for cases where credentials are expected but missing.
-var errUnsetRegAuthVars = errors.New(
-	"registry auth environment variables (REPO_USER, REPO_PASS) not set",
+// Errors for registry authentication operations.
+var (
+	// errUnsetRegAuthVars indicates registry auth environment variables (REPO_USER, REPO_PASS) are not set.
+	errUnsetRegAuthVars = errors.New(
+		"registry auth environment variables (REPO_USER, REPO_PASS) not set",
+	)
+	// errFailedGetRegistryAddress indicates a failure to extract the registry address from an image reference.
+	errFailedGetRegistryAddress = errors.New("failed to get registry address")
+	// errFailedLoadDockerConfig indicates a failure to load the Docker configuration file.
+	errFailedLoadDockerConfig = errors.New("failed to load Docker config")
+	// errFailedMarshalAuthConfig indicates a failure to marshal the auth config to JSON.
+	errFailedMarshalAuthConfig = errors.New("failed to marshal auth config to JSON")
 )
 
 // EncodedAuth attempts to retrieve encoded authentication credentials for a given image reference,
 // first checking environment variables and then falling back to the Docker config file if necessary.
 // It returns the encoded auth string or an error if both methods fail.
 func EncodedAuth(ref string) (string, error) {
+	fields := logrus.Fields{
+		"image_ref": ref,
+	}
+
+	logrus.WithFields(fields).Debug("Attempting to retrieve auth credentials")
+
 	auth, err := EncodedEnvAuth()
 	if err != nil {
+		logrus.WithError(err).
+			WithFields(fields).
+			Debug("Environment auth not available, trying config file")
+
 		auth, err = EncodedConfigAuth(ref)
+	}
+
+	if err == nil {
+		logrus.WithFields(fields).Debug("Successfully retrieved auth credentials")
 	}
 
 	return auth, err
@@ -47,15 +69,22 @@ func EncodedEnvAuth() (string, error) {
 			Password: password,
 		}
 
-		logrus.Debugf(
-			"Loaded auth credentials for registry user %s from environment",
-			auth.Username,
-		)
-		// CREDENTIAL: Uncomment to log REPO_PASS environment variable
-		// log.Tracef("Using auth password %s", auth.Password)
+		logrus.WithFields(logrus.Fields{
+			"username": username,
+		}).Debug("Loaded auth credentials from environment")
+
+		// Log password only in trace mode
+		if logrus.GetLevel() == logrus.TraceLevel {
+			logrus.WithFields(logrus.Fields{
+				"username": username,
+				"password": password,
+			}).Trace("Using environment credentials")
+		}
 
 		return EncodeAuth(auth)
 	}
+
+	logrus.Debug("Environment auth variables not set")
 
 	return "", errUnsetRegAuthVars
 }
@@ -64,47 +93,61 @@ func EncodedEnvAuth() (string, error) {
 // image reference. The Docker config must be mounted on the container. It returns an encoded auth
 // string or an error if the config cannot be loaded or credentials are not found.
 func EncodedConfigAuth(imageRef string) (string, error) {
+	fields := logrus.Fields{
+		"image_ref": imageRef,
+	}
+
 	server, err := helpers.GetRegistryAddress(imageRef)
 	if err != nil {
-		logrus.Errorf("Could not get registry from image ref %s", imageRef)
+		logrus.WithError(err).WithFields(fields).Debug("Failed to get registry address")
 
-		return "", fmt.Errorf(
-			"failed to get registry address from image reference %s: %w",
-			imageRef,
-			err,
-		)
+		return "", fmt.Errorf("%w: %w", errFailedGetRegistryAddress, err)
 	}
 
 	configDir := os.Getenv("DOCKER_CONFIG")
 	if configDir == "" {
 		configDir = "/"
+
+		logrus.WithFields(fields).Debug("No DOCKER_CONFIG set, using default directory")
 	}
 
 	configFile, err := dockerCliConfig.Load(configDir)
 	if err != nil {
-		logrus.Errorf("Unable to find default config file: %s", err)
+		logrus.WithError(err).
+			WithFields(fields).
+			WithField("config_dir", configDir).
+			Debug("Failed to load Docker config")
 
-		return "", fmt.Errorf("failed to load Docker config from directory %s: %w", configDir, err)
+		return "", fmt.Errorf("%w: %w", errFailedLoadDockerConfig, err)
 	}
 
 	credStore := CredentialsStore(*configFile)
-	auth, _ := credStore.Get(server) // returns (types.AuthConfig{}) if server not in credStore
+	auth, _ := credStore.Get(server)
 
 	if auth == (dockerConfigTypes.AuthConfig{}) {
-		logrus.WithField("config_file", configFile.Filename).
-			Debugf("No credentials for %s found", server)
+		logrus.WithFields(fields).WithFields(logrus.Fields{
+			"server":      server,
+			"config_file": configFile.Filename,
+		}).Debug("No credentials found in config")
 
 		return "", nil
 	}
 
-	logrus.Debugf(
-		"Loaded auth credentials for user %s, on registry %s, from file %s",
-		auth.Username,
-		server,
-		configFile.Filename,
-	)
-	// CREDENTIAL: Uncomment to log docker config password
-	// log.Tracef("Using auth password %s", auth.Password)
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"username":    auth.Username,
+		"server":      server,
+		"config_file": configFile.Filename,
+	}).Debug("Loaded auth credentials from config")
+
+	// Log password only in trace mode
+	if logrus.GetLevel() == logrus.TraceLevel {
+		logrus.WithFields(fields).WithFields(logrus.Fields{
+			"username": auth.Username,
+			"password": auth.Password,
+			"server":   server,
+		}).Trace("Using config credentials")
+	}
+
 	return EncodeAuth(auth)
 }
 
@@ -121,10 +164,20 @@ func CredentialsStore(configFile dockerConfigConfigfile.ConfigFile) dockerConfig
 // EncodeAuth Base64 encodes an AuthConfig struct for transmission over HTTP.
 // It marshals the struct to JSON and applies URL-safe base64 encoding.
 func EncodeAuth(authConfig dockerConfigTypes.AuthConfig) (string, error) {
-	buf, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal auth config to JSON: %w", err)
+	fields := logrus.Fields{
+		"username": authConfig.Username,
 	}
 
-	return base64.URLEncoding.EncodeToString(buf), nil
+	buf, err := json.Marshal(authConfig)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to marshal auth config to JSON")
+
+		return "", fmt.Errorf("%w: %w", errFailedMarshalAuthConfig, err)
+	}
+
+	encoded := base64.URLEncoding.EncodeToString(buf)
+
+	logrus.WithFields(fields).Debug("Encoded auth config")
+
+	return encoded, nil
 }

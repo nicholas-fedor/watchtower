@@ -330,7 +330,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"token",
 			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("HEAD request failed"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to execute request"))
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
@@ -654,7 +654,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"token",
 			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("GET request failed"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to execute request"))
 			gomega.Expect(result).To(gomega.BeEmpty())
 		})
 
@@ -707,7 +707,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			result, err := digest.FetchDigest(ctx, mockContainerWithServer, "token")
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("GET request failed"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to execute request"))
 			gomega.Expect(result).To(gomega.BeEmpty())
 		})
 
@@ -826,7 +826,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
-				To(gomega.ContainSubstring("failed to decode manifest response"))
+				To(gomega.ContainSubstring("failed to extract digest from response"))
 			gomega.Expect(result).To(gomega.BeEmpty())
 		})
 	})

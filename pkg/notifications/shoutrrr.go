@@ -20,13 +20,17 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// LocalLog is a logrus logger that does not send entries as notifications.
-// It’s used for internal logging to avoid notification loops.
-var LocalLog = logrus.WithField("notify", "no")
-
 const (
 	shoutrrrType = "shoutrrr"
 )
+
+// initialEntriesCapacity defines the initial capacity for the entries slice in the Shoutrrr notifier.
+// It sets a reasonable default for expected log entry batch sizes.
+const initialEntriesCapacity = 10
+
+// LocalLog is a logrus logger that does not send entries as notifications.
+// It’s used for internal logging to avoid notification loops.
+var LocalLog = logrus.WithField("notify", "no")
 
 // router defines the interface for sending Shoutrrr notifications.
 // It abstracts the underlying service implementation.
@@ -88,14 +92,12 @@ func (n *shoutrrrTypeNotifier) AddLogHook() {
 
 	n.receiving = true
 	logrus.AddHook(n)
+	LocalLog.WithField("urls", n.Urls).
+		Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
 
 	// Do the sending in a separate goroutine, so we don't block the main process.
 	go sendNotifications(n)
 }
-
-// initialEntriesCapacity defines the initial capacity for the entries slice in the Shoutrrr notifier.
-// It sets a reasonable default for expected log entry batch sizes.
-const initialEntriesCapacity = 10
 
 // createNotifier initializes a new Shoutrrr notifier for sending notifications through multiple services.
 // It configures the notifier with the provided URLs, log level, template string, and static data, setting up
@@ -115,10 +117,8 @@ func createNotifier(
 ) *shoutrrrTypeNotifier {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
 	if err != nil {
-		logrus.Errorf(
-			"Could not use configured notification template: %s. Using default template",
-			err,
-		)
+		LocalLog.WithError(err).
+			Error("Could not use configured notification template, falling back to default")
 	}
 
 	var logger shoutrrrTypes.StdLogger
@@ -130,7 +130,7 @@ func createNotifier(
 
 	router, err := shoutrrr.NewSender(logger, urls...)
 	if err != nil {
-		logrus.Fatalf("Failed to initialize Shoutrrr notifications: %s\n", err.Error())
+		LocalLog.WithError(err).Fatal("Failed to initialize Shoutrrr notifications")
 	}
 
 	params := &shoutrrrTypes.Params{}
@@ -163,7 +163,6 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 		for i, err := range errs {
 			if err != nil {
 				scheme := GetScheme(notifier.Urls[i])
-				// Use fmt so it doesn't trigger another notification.
 				LocalLog.WithFields(logrus.Fields{
 					"service": scheme,
 					"index":   i,
@@ -186,6 +185,8 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 	}
 
 	if err := n.template.Execute(&body, templateData); err != nil {
+		LocalLog.WithError(err).Debug("Failed to execute notification template")
+
 		return "", fmt.Errorf("failed to execute notification template: %w", err)
 	}
 
@@ -232,7 +233,6 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 func (n *shoutrrrTypeNotifier) Close() {
 	close(n.messages)
 
-	// Use fmt so it doesn't trigger another notification.
 	LocalLog.Info("Waiting for the notification goroutine to finish")
 
 	<-n.done
@@ -268,7 +268,7 @@ func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, err
 	tplBase := template.New("").Funcs(templates.Funcs)
 
 	if builtin, found := commonTemplates[tplString]; found {
-		logrus.WithField(`template`, tplString).Debug(`Using common template`)
+		LocalLog.WithField("template", tplString).Debug("Using common template")
 		tplString = builtin
 	}
 
@@ -276,11 +276,12 @@ func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, err
 
 	var err error
 
-	// If we succeed in getting a non-empty template configuration
-	// try to parse the template string.
+	// If we succeed in getting a non-empty template configuration try to parse the template string.
 	if tplString != "" {
 		tpl, err = tplBase.Parse(tplString)
 		if err != nil {
+			LocalLog.WithError(err).Debug("Failed to parse notification template string")
+
 			return nil, fmt.Errorf("failed to parse notification template string: %w", err)
 		}
 	}

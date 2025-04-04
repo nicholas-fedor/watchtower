@@ -47,7 +47,7 @@ func TestGetRunningContainerID(t *testing.T) {
 				}
 			},
 			want:    "",
-			wantErr: ErrReadCgroupFile,
+			wantErr: errReadCgroupFile,
 		},
 		{
 			name: "NoValidID",
@@ -57,7 +57,7 @@ func TestGetRunningContainerID(t *testing.T) {
 				}
 			},
 			want:    "",
-			wantErr: ErrExtractContainerID,
+			wantErr: errExtractContainerID,
 		},
 		{
 			name: "EmptyFileContent",
@@ -67,7 +67,7 @@ func TestGetRunningContainerID(t *testing.T) {
 				}
 			},
 			want:    "",
-			wantErr: ErrExtractContainerID,
+			wantErr: errExtractContainerID,
 		},
 	}
 	for _, tt := range tests {
@@ -139,7 +139,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "11:perf_event:/user.slice\n10:cpu:/system.slice",
 			},
 			want:    "",
-			wantErr: ErrNoValidContainerID,
+			wantErr: errNoValidContainerID,
 		},
 		{
 			name: "EmptyString",
@@ -147,7 +147,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "",
 			},
 			want:    "",
-			wantErr: ErrNoValidContainerID,
+			wantErr: errNoValidContainerID,
 		},
 		{
 			name: "InvalidIDLength",
@@ -155,7 +155,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "11:perf_event:/docker/12345678",
 			},
 			want:    "",
-			wantErr: ErrNoValidContainerID,
+			wantErr: errNoValidContainerID,
 		},
 		{
 			name: "NonHexID",
@@ -163,7 +163,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "11:perf_event:/docker/gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
 			},
 			want:    "",
-			wantErr: ErrNoValidContainerID,
+			wantErr: errNoValidContainerID,
 		},
 		{
 			name: "ValidIDWithExtraLines",
@@ -181,7 +181,7 @@ func Test_getRunningContainerIDFromString(t *testing.T) {
 				s: "11:perf_event:/user.slice",
 			},
 			want:    "",
-			wantErr: ErrNoValidContainerID,
+			wantErr: errNoValidContainerID,
 		},
 	}
 	for _, tt := range tests {

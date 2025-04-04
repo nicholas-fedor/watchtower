@@ -25,38 +25,52 @@ func StartTargetContainer(
 	minSupportedVersion string,
 ) (types.ContainerID, error) {
 	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"id":        sourceContainer.ID().ShortID(),
+	})
+
 	config := sourceContainer.GetCreateConfig()
 	hostConfig := sourceContainer.GetCreateHostConfig()
 
 	// Log network config details with client version context
 	debugLogMacAddress(networkConfig, sourceContainer.ID(), clientVersion, minSupportedVersion)
 
-	name := sourceContainer.Name()
-	logrus.Debugf("Starting target container: Creating %s", name)
+	clog.Debug("Creating new container")
 
-	createdContainer, err := api.ContainerCreate(ctx, config, hostConfig, networkConfig, nil, name)
+	createdContainer, err := api.ContainerCreate(
+		ctx,
+		config,
+		hostConfig,
+		networkConfig,
+		nil,
+		sourceContainer.Name(),
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to create container: %w", err)
+		clog.WithError(err).Debug("Failed to create new container")
+
+		return "", fmt.Errorf("%w: %w", errCreateContainerFailed, err)
 	}
 
 	createdContainerID := types.ContainerID(createdContainer.ID)
 	if !sourceContainer.IsRunning() && !reviveStopped {
+		clog.WithField("new_id", createdContainerID.ShortID()).
+			Debug("Created container, not starting due to stopped state")
+
 		return createdContainerID, nil
 	}
 
-	logrus.Debugf("Starting target container: Starting %s (%s)", name, createdContainerID.ShortID())
+	clog.WithField("new_id", createdContainerID.ShortID()).Debug("Starting new container")
 
-	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainerType.StartOptions{
-		CheckpointID:  "",
-		CheckpointDir: "",
-	}); err != nil {
-		return createdContainerID, fmt.Errorf(
-			"failed to start container: %w",
-			err,
-		)
+	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainerType.StartOptions{}); err != nil {
+		clog.WithError(err).
+			WithField("new_id", createdContainerID.ShortID()).
+			Debug("Failed to start new container")
+
+		return createdContainerID, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
 
-	logrus.Infof("Started new container %s (%s)", name, createdContainerID.ShortID())
+	clog.WithField("new_id", createdContainerID.ShortID()).Info("Started new container")
 
 	return createdContainerID, nil
 }
@@ -65,26 +79,25 @@ func StartTargetContainer(
 // It logs the action and returns an error if the rename fails.
 func RenameTargetContainer(
 	api dockerClient.APIClient,
-	target types.Container,
+	targetContainer types.Container,
 	newName string,
 ) error {
 	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": targetContainer.Name(),
+		"id":        targetContainer.ID().ShortID(),
+		"new_name":  newName,
+	})
 
-	logrus.Debugf(
-		"Renaming target container: %s (%s) to %s",
-		target.Name(),
-		target.ID().ShortID(),
-		newName,
-	)
+	clog.Debug("Renaming container")
 
-	if err := api.ContainerRename(ctx, string(target.ID()), newName); err != nil {
-		return fmt.Errorf(
-			"failed to rename container %s to %s: %w",
-			target.ID(),
-			newName,
-			err,
-		)
+	if err := api.ContainerRename(ctx, string(targetContainer.ID()), newName); err != nil {
+		clog.WithError(err).Debug("Failed to rename container")
+
+		return fmt.Errorf("%w: %w", errRenameContainerFailed, err)
 	}
+
+	clog.Debug("Renamed container successfully")
 
 	return nil
 }

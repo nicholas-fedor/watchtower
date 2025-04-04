@@ -1,7 +1,6 @@
 package container
 
 import (
-	"errors"
 	"fmt"
 	"iter"
 	"os"
@@ -13,28 +12,21 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// dockerContainerPattern matches Docker container IDs in cgroup data.
-// The pattern captures a 64-character hexadecimal ID after "/docker/".
-// - [0-9]+: matches one or more digits followed by a colon (e.g., "11:")
-// - .*: matches any characters (greedy) followed by a colon (e.g., "perf_event:")
-// - /docker/ matches the literal string "/docker/"
-// - ([a-f0-9]{64}) captures exactly 64 lowercase hexadecimal characters as the container ID
-var dockerContainerPattern = regexp.MustCompile(`[0-9]+:.*:/docker/([a-f0-9]{64})`)
-
 // minMatchGroups is the minimum number of regex match groups expected.
 // - 1 for the full match, 1 for the captured ID (total of 2).
 const minMatchGroups = 2
 
+// dockerContainerPattern matches Docker container IDs in cgroup data.
+// The pattern captures a 64-character hexadecimal ID after "/docker/".
+//   - [0-9]+: matches one or more digits followed by a colon (e.g., "11:")
+//   - .*: matches any characters (greedy) followed by a colon (e.g., "perf_event:")
+//   - /docker/ matches the literal string "/docker/"
+//   - ([a-f0-9]{64}) captures exactly 64 lowercase hexadecimal characters as the container ID
+var dockerContainerPattern = regexp.MustCompile(`[0-9]+:.*:/docker/([a-f0-9]{64})`)
+
 // readFileFunc is a variable to allow mocking file reading in tests.
 // Defaults to os.ReadFile but can be overridden for testing purposes.
 var readFileFunc = os.ReadFile
-
-// Static error definitions.
-var (
-	ErrNoValidContainerID = errors.New("no valid docker container ID found in input")
-	ErrReadCgroupFile     = errors.New("failed to read cgroup file")
-	ErrExtractContainerID = errors.New("failed to extract container ID")
-)
 
 // GetRunningContainerID retrieves the current container ID from the process's cgroup information.
 // It reads the cgroup file (/proc/<pid>/cgroup) for the current process and extracts the ID.
@@ -42,18 +34,27 @@ var (
 // The returned ID is a 64-character hexadecimal string unique to the Docker container.
 func GetRunningContainerID() (types.ContainerID, error) {
 	// Construct the path to the cgroup file using the current process ID (PID)
-	file, err := readFileFunc(fmt.Sprintf("/proc/%d/cgroup", os.Getpid()))
+	filePath := fmt.Sprintf("/proc/%d/cgroup", os.Getpid())
+	file, err := readFileFunc(filePath)
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrReadCgroupFile, err)
+		logrus.WithError(err).WithField("file", filePath).Debug("Failed to read cgroup file")
+
+		return "", fmt.Errorf("%w: %w", errReadCgroupFile, err)
 	}
 
 	// Pass the file content to the extraction function and handle any errors
-	id, err := getRunningContainerIDFromString(string(file))
+	logrus.WithField("file", filePath).Debug("Read cgroup file successfully")
+
+	containerID, err := getRunningContainerIDFromString(string(file))
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrExtractContainerID, err)
+		logrus.WithError(err).
+			WithField("file", filePath).
+			Debug("Failed to extract container ID from cgroup")
+
+		return "", fmt.Errorf("%w: %w", errExtractContainerID, err)
 	}
 
-	return id, nil
+	return containerID, nil
 }
 
 // getRunningContainerIDFromString extracts a container ID from a cgroup string.
@@ -82,15 +83,17 @@ func getRunningContainerIDFromString(cgroupString string) (types.ContainerID, er
 		// Log debug information about the line being processed
 		logrus.WithFields(logrus.Fields{
 			"line":    trimmedLine,
-			"pattern": dockerContainerPattern.String(),
 			"matches": matches,
-		}).Debug("Processing input line")
+		}).Debug("Processed cgroup line for container ID")
 		// Check if the regex found a match with at least the full match and the captured ID
 		if len(matches) >= minMatchGroups {
 			// The captured group (matches[1]) is the 64-character ID; regex ensures length and hex format
-			return types.ContainerID(matches[1]), nil
+			id := types.ContainerID(matches[1])
+			logrus.WithField("id", id).Debug("Extracted container ID from cgroup")
+
+			return id, nil
 		}
 	}
 	// If no valid ID is found after checking all lines, return an error with the input for context
-	return "", fmt.Errorf("%w: %q", ErrNoValidContainerID, cgroupString)
+	return "", fmt.Errorf("%w: %q", errNoValidContainerID, cgroupString)
 }
