@@ -94,3 +94,6 @@ dockers:
       - nickfedor/watchtower:arm64v8-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+
+checksum:
+  name_template: checksums.txt
