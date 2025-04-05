@@ -6,9 +6,9 @@ on:
     branches:
       - main
     paths:
-      - cmd
-      - internal
-      - pkg
+      - cmd/**
+      - internal/**
+      - pkg/**
       - go.mod
       - go.sum
       - main.go
