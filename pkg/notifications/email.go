@@ -18,8 +18,11 @@ const (
 	emailType = "email"
 )
 
-// errInvalidPortRange is a static error for invalid port values.
-var errInvalidPortRange = errors.New("port out of valid range (0-65535)")
+// Errors for email notification configuration.
+var (
+	// errInvalidPortRange indicates that the specified SMTP port is outside the valid range (0-65535).
+	errInvalidPortRange = errors.New("port out of valid range (0-65535)")
+)
 
 // emailTypeNotifier handles email notifications using SMTP configuration.
 // It supports batching log entries with a configurable delay.
@@ -38,7 +41,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
 	from, _ := flags.GetString("notification-email-from")
-	destAddress, _ := flags.GetString("notification-email-to")
+	to, _ := flags.GetString("notification-email-to") //nolint:varnamelen
 	server, _ := flags.GetString("notification-email-server")
 	user, _ := flags.GetString("notification-email-server-user")
 	password, _ := flags.GetString("notification-email-server-password")
@@ -46,10 +49,28 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	tlsSkipVerify, _ := flags.GetBool("notification-email-server-tls-skip-verify")
 	delay, _ := flags.GetInt("notification-email-delay")
 
-	notifier := &emailTypeNotifier{
+	clog := logrus.WithFields(logrus.Fields{
+		"from":          from,
+		"to":            to,
+		"server":        server,
+		"port":          port,
+		"tls_skip":      tlsSkipVerify,
+		"delay_seconds": delay,
+	})
+	clog.Debug("Initializing email notifier from flags")
+
+	// Only log sensitive fields (user, password) at trace level
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithFields(logrus.Fields{
+			"user":     user,
+			"password": password,
+		}).Trace("Email notifier credentials loaded")
+	}
+
+	return &emailTypeNotifier{
 		entries:       []*logrus.Entry{},
 		From:          from,
-		To:            destAddress,
+		To:            to,
 		Server:        server,
 		User:          user,
 		Password:      password,
@@ -57,16 +78,22 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 		tlsSkipVerify: tlsSkipVerify,
 		delay:         time.Duration(delay) * time.Second,
 	}
-
-	return notifier
 }
 
 // GetURL generates the SMTP URL for the email notifier based on its configuration.
 // It configures authentication, TLS settings, and returns the formatted URL, validating the port range.
 func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
-	// Prevent integer overflow by ensuring port fits within uint16 range (0-65535)
+	clog := logrus.WithFields(logrus.Fields{
+		"from":   e.From,
+		"to":     e.To,
+		"server": e.Server,
+		"port":   e.Port,
+	})
+	clog.Debug("Generating SMTP URL")
+
+	// Validate port range (0-65535)
 	if e.Port < 0 || e.Port > 65535 {
-		logrus.Errorf("port %d out of valid range (0-65535)", e.Port)
+		clog.WithField("port", e.Port).Debug("Invalid SMTP port")
 
 		return "", fmt.Errorf("port %d: %w", e.Port, errInvalidPortRange)
 	}
@@ -90,17 +117,36 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	if len(e.User) > 0 {
 		conf.Auth = smtp.AuthTypes.Plain
+
+		clog.Debug("Using plain authentication")
 	}
 
 	if e.tlsSkipVerify {
 		conf.Encryption = smtp.EncMethods.None
+
+		clog.Debug("TLS verification skipped")
 	}
 
-	return conf.GetURL().String(), nil
+	url := conf.GetURL().String()
+	clog.WithFields(logrus.Fields{
+		"url":          url,
+		"tls_skip":     e.tlsSkipVerify,
+		"auth_enabled": len(e.User) > 0,
+	}).Debug("Generated SMTP URL")
+
+	return url, nil
 }
 
 // GetDelay returns the configured delay for batching email notifications.
 // It provides the duration to wait before sending queued messages.
 func (e *emailTypeNotifier) GetDelay() time.Duration {
+	clog := logrus.WithFields(logrus.Fields{
+		"from":   e.From,
+		"to":     e.To,
+		"server": e.Server,
+		"delay":  e.delay,
+	})
+	clog.Debug("Retrieved email notification delay")
+
 	return e.delay
 }

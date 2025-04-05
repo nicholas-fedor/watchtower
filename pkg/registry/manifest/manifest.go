@@ -15,37 +15,58 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-var errMissingTag = errors.New("parsed container image reference has no tag")
+// Errors for manifest operations.
+var (
+	// errMissingTag indicates the parsed image reference lacks a tag.
+	errMissingTag = errors.New("parsed container image reference has no tag")
+	// errFailedParseImageName indicates a failure to parse the container’s image name.
+	errFailedParseImageName = errors.New("failed to parse image name")
+)
 
 // BuildManifestURL constructs a URL for accessing a container’s image manifest from its registry.
 // It parses the container’s image name into a normalized reference, extracts the registry host,
 // and builds a URL with the appropriate path and tag for manifest retrieval.
 func BuildManifestURL(container types.Container) (string, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+
 	normalizedRef, err := reference.ParseDockerRef(container.ImageName())
 	if err != nil {
-		return "", fmt.Errorf("failed to parse image name: %w", err)
+		logrus.WithError(err).WithFields(fields).Debug("Failed to parse image name")
+
+		return "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
 	normalizedTaggedRef, isTagged := normalizedRef.(reference.NamedTagged)
 	if !isTagged {
+		logrus.WithFields(fields).
+			WithField("ref", normalizedRef.String()).
+			Debug("Missing tag in image reference")
+
 		return "", fmt.Errorf("%w: %s", errMissingTag, normalizedRef.String())
 	}
 
 	host, _ := helpers.GetRegistryAddress(normalizedTaggedRef.Name())
 	img, tag := reference.Path(normalizedTaggedRef), normalizedTaggedRef.Tag()
 
-	logrus.WithFields(logrus.Fields{
-		"image":      img,
-		"tag":        tag,
-		"normalized": normalizedTaggedRef.Name(),
+	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"host":       host,
-	}).Debug("Parsing image ref")
+		"image_path": img,
+		"tag":        tag,
+	}).Debug("Constructed manifest URL components")
 
 	url := url.URL{
 		Scheme: "https",
 		Host:   host,
 		Path:   fmt.Sprintf("/v2/%s/manifests/%s", img, tag),
 	}
+	urlStr := url.String()
 
-	return url.String(), nil
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"url": urlStr,
+	}).Debug("Built manifest URL")
+
+	return urlStr, nil
 }

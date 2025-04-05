@@ -89,8 +89,13 @@ type ClientOptions struct {
 func NewClient(opts ClientOptions) Client {
 	cli, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv)
 	if err != nil {
-		logrus.Fatalf("Error instantiating Docker client: %s", err)
+		logrus.WithError(err).Fatal("Failed to initialize Docker client")
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"version": cli.ClientVersion(),
+		"opts":    fmt.Sprintf("%+v", opts),
+	}).Debug("Initialized Docker client")
 
 	return &client{
 		api:           cli,
@@ -102,7 +107,16 @@ func NewClient(opts ClientOptions) Client {
 // It delegates to ListSourceContainers to fetch and filter containers based on the provided function.
 // Returns a slice of containers or an error if listing fails.
 func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
-	return ListSourceContainers(c.api, c.ClientOptions, filter)
+	containers, err := ListSourceContainers(c.api, c.ClientOptions, filter)
+	if err != nil {
+		logrus.WithError(err).Debug("Failed to list containers")
+
+		return nil, err
+	}
+
+	logrus.WithField("count", len(containers)).Debug("Listed containers")
+
+	return containers, nil
 }
 
 // GetContainer fetches detailed information about an existing container by its ID.
@@ -110,20 +124,51 @@ func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
 // Returns the container object as a types.Container interface, which is intentional to support multiple container implementations.
 // Returns an error if retrieval fails.
 func (c client) GetContainer(containerID types.ContainerID) (types.Container, error) {
-	return GetSourceContainer(c.api, containerID)
+	container, err := GetSourceContainer(c.api, containerID)
+	if err != nil {
+		logrus.WithError(err).
+			WithField("container_id", containerID).
+			Debug("Failed to get container")
+
+		return nil, err
+	}
+
+	logrus.WithField("container_id", containerID).Debug("Retrieved container details")
+
+	return container, nil
 }
 
 // StopContainer stops and removes an existing container within the given timeout.
 // It delegates to StopSourceContainer to handle the stopping and removal process.
 // Returns an error if stopping or removal fails.
 func (c client) StopContainer(container types.Container, timeout time.Duration) error {
-	return StopSourceContainer(c.api, container, timeout, c.RemoveVolumes)
+	err := StopSourceContainer(c.api, container, timeout, c.RemoveVolumes)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		}).Debug("Failed to stop and remove container")
+
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}).Debug("Stopped and removed container")
+
+	return nil
 }
 
 // StartContainer creates and starts a new container based on the source container’s configuration.
 // It extracts the network configuration from the source and passes it to StartTargetContainer.
 // Returns the new container’s ID or an error if creation or startup fails.
 func (c client) StartContainer(container types.Container) (types.ContainerID, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+
 	var networkConfig *network.NetworkingConfig
 
 	clientVersion := c.GetVersion()
@@ -133,26 +178,24 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 	switch {
 	// If the client is using version 1.44 or greater
 	case versions.GreaterThanOrEqualTo(clientVersion, minSupportedVersion):
-		logrus.Debugf(
-			"Starting new container: Docker client version: %s >= to Watchtower's minimum supported version: %s",
-			clientVersion,
-			minSupportedVersion,
-		)
+		logrus.WithFields(fields).WithFields(logrus.Fields{
+			"client_version": clientVersion,
+			"min_version":    minSupportedVersion,
+		}).Debug("Using modern network config")
 
 		networkConfig = getNetworkConfig(container)
 
 		// If the client is using versions less than 1.44
 	case versions.LessThan(clientVersion, minSupportedVersion):
-		logrus.Debugf(
-			"Starting new container: Docker client version: %s < Watchtower's minimum supported version: %s",
-			clientVersion,
-			minSupportedVersion,
-		)
+		logrus.WithFields(fields).WithFields(logrus.Fields{
+			"client_version": clientVersion,
+			"min_version":    minSupportedVersion,
+		}).Debug("Using legacy network config")
 
 		networkConfig = getLegacyNetworkConfig(container, clientVersion)
 	}
 
-	return StartTargetContainer(
+	newID, err := StartTargetContainer(
 		c.api,
 		container,
 		networkConfig,
@@ -160,13 +203,37 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		clientVersion,
 		minSupportedVersion,
 	)
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Debug("Failed to start new container")
+
+		return "", err
+	}
+
+	logrus.WithFields(fields).WithField("new_id", newID).Debug("Started new container")
+
+	return newID, nil
 }
 
 // RenameContainer renames an existing container to the specified new name.
 // It delegates to RenameTargetContainer to perform the renaming.
 // Returns an error if the rename operation fails.
 func (c client) RenameContainer(container types.Container, newName string) error {
-	return RenameTargetContainer(c.api, container, newName)
+	err := RenameTargetContainer(c.api, container, newName)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"new_name":  newName,
+		}).Debug("Failed to rename container")
+
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"new_name":  newName,
+	}).Debug("Renamed container")
+
+	return nil
 }
 
 // WarnOnHeadPullFailed decides whether to warn about failed HEAD requests during image pulls.
@@ -193,7 +260,22 @@ func (c client) IsContainerStale(
 ) (bool, types.ImageID, error) {
 	imgClient := newImageClient(c.api)
 
-	return imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
+	stale, newestImage, err := imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		}).Debug("Failed to check container staleness")
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"container":    container.Name(),
+			"image":        container.ImageName(),
+			"stale":        stale,
+			"newest_image": newestImage,
+		}).Debug("Checked container staleness")
+	}
+
+	return stale, newestImage, err
 }
 
 // ExecuteCommand runs a command inside a container and evaluates its result.
@@ -205,50 +287,52 @@ func (c client) ExecuteCommand(
 	timeout int,
 ) (bool, error) {
 	ctx := context.Background()
-	clog := logrus.WithField("containerID", containerID)
+	clog := logrus.WithField("container_id", containerID)
 
 	// Configure and create the exec instance.
+	clog.WithField("command", command).Debug("Creating exec instance")
 	execConfig := dockerContainer.ExecOptions{
-		Tty:          true,
-		Detach:       false,
-		Cmd:          []string{"sh", "-c", command},
-		User:         "",
-		Privileged:   false,
-		ConsoleSize:  nil,
-		AttachStdin:  false,
-		AttachStderr: false,
-		AttachStdout: false,
-		DetachKeys:   "",
-		Env:          nil,
-		WorkingDir:   "",
+		Tty:    true,
+		Detach: false,
+		Cmd:    []string{"sh", "-c", command},
 	}
 
 	exec, err := c.api.ContainerExecCreate(ctx, string(containerID), execConfig)
 	if err != nil {
-		return false, fmt.Errorf("failed to create exec instance: %w", err)
+		clog.WithError(err).Debug("Failed to create exec instance")
+
+		return false, fmt.Errorf("%w: %w", errCreateExecFailed, err)
 	}
 
 	// Start the exec instance.
-	execStartCheck := dockerContainer.ExecStartOptions{
-		Detach:      false,
-		Tty:         true,
-		ConsoleSize: nil,
-	}
+	clog.WithField("exec_id", exec.ID).Debug("Starting exec instance")
+
+	execStartCheck := dockerContainer.ExecStartOptions{Tty: true}
 	if err := c.api.ContainerExecStart(ctx, exec.ID, execStartCheck); err != nil {
-		return false, fmt.Errorf("failed to start exec instance: %w", err)
+		clog.WithError(err).Debug("Failed to start exec instance")
+
+		return false, fmt.Errorf("%w: %w", errStartExecFailed, err)
 	}
 
 	// Capture output and handle attachment.
 	output, err := c.captureExecOutput(ctx, exec.ID)
 	if err != nil {
-		clog.Warnf("Failed to capture command output: %v", err)
+		clog.WithError(err).Warn("Failed to capture command output")
 	}
 
 	// Wait for completion and interpret the result.
 	skipUpdate, err := c.waitForExecOrTimeout(ctx, exec.ID, output, timeout)
 	if err != nil {
-		return true, fmt.Errorf("failed to wait for exec completion: %w", err)
+		clog.WithError(err).Debug("Failed to inspect exec instance")
+
+		return true, fmt.Errorf("%w: %w", errInspectExecFailed, err)
 	}
+
+	clog.WithFields(logrus.Fields{
+		"command":     command,
+		"output":      output,
+		"skip_update": skipUpdate,
+	}).Debug("Executed command")
 
 	return skipUpdate, nil
 }
@@ -256,25 +340,37 @@ func (c client) ExecuteCommand(
 // captureExecOutput attaches to an exec instance and captures its output.
 // It logs errors internally and returns the trimmed output or an error if attachment or reading fails.
 func (c client) captureExecOutput(ctx context.Context, execID string) (string, error) {
-	response, err := c.api.ContainerExecAttach(ctx, execID, dockerContainer.ExecStartOptions{
-		Tty:         true,
-		Detach:      false,
-		ConsoleSize: nil,
-	})
+	clog := logrus.WithField("exec_id", execID)
+
+	clog.Debug("Attaching to exec instance")
+
+	response, err := c.api.ContainerExecAttach(
+		ctx,
+		execID,
+		dockerContainer.ExecStartOptions{Tty: true},
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to attach to exec instance: %w", err)
+		clog.WithError(err).Debug("Failed to attach to exec instance")
+
+		return "", fmt.Errorf("%w: %w", errAttachExecFailed, err)
 	}
+
 	defer response.Close()
 
 	var writer bytes.Buffer
 
 	written, err := writer.ReadFrom(response.Reader)
 	if err != nil {
-		return "", fmt.Errorf("failed to read exec output: %w", err)
+		clog.WithError(err).Debug("Failed to read exec output")
+
+		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, err)
 	}
 
 	if written > 0 {
-		return strings.TrimSpace(writer.String()), nil
+		output := strings.TrimSpace(writer.String())
+		clog.WithField("output", output).Debug("Captured exec output")
+
+		return output, nil
 	}
 
 	return "", nil
@@ -284,38 +380,39 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 // It checks the exit code: 75 (ExTempFail) skips updates, >0 indicates failure.
 // Returns whether to skip updates and any error encountered.
 func (c client) waitForExecOrTimeout(
-	parentContext context.Context,
+	ctx context.Context,
 	execID string,
 	execOutput string,
 	timeout int,
 ) (bool, error) {
 	const ExTempFail = 75
 
-	var ctx context.Context
+	clog := logrus.WithField("exec_id", execID)
+
+	var execCtx context.Context
 
 	var cancel context.CancelFunc
 
 	// Set up context with timeout if specified.
 	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(parentContext, time.Duration(timeout)*time.Minute)
+		execCtx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
 		defer cancel()
 	} else {
-		ctx = parentContext
+		execCtx = ctx
 	}
 
 	for {
-		execInspect, err := c.api.ContainerExecInspect(ctx, execID)
+		execInspect, err := c.api.ContainerExecInspect(execCtx, execID)
 		if err != nil {
-			return false, fmt.Errorf("failed to inspect exec instance: %w", err)
+			clog.WithError(err).Debug("Failed to inspect exec instance")
+
+			return false, fmt.Errorf("%w: %w", errInspectExecFailed, err)
 		}
 
-		// Log exec status for debugging.
-		logrus.WithFields(logrus.Fields{
-			"exit-code":    execInspect.ExitCode,
-			"exec-id":      execInspect.ExecID,
-			"running":      execInspect.Running,
-			"container-id": execInspect.ContainerID,
-		}).Debug("Awaiting timeout or completion")
+		clog.WithFields(logrus.Fields{
+			"exit_code": execInspect.ExitCode,
+			"running":   execInspect.Running,
+		}).Debug("Checked exec status")
 
 		if execInspect.Running {
 			time.Sleep(1 * time.Second)
@@ -324,7 +421,7 @@ func (c client) waitForExecOrTimeout(
 		}
 
 		if len(execOutput) > 0 {
-			logrus.Infof("Command output:\n%v", execOutput)
+			clog.WithField("output", execOutput).Info("Command output captured")
 		}
 
 		if execInspect.ExitCode == ExTempFail {
@@ -332,12 +429,15 @@ func (c client) waitForExecOrTimeout(
 		}
 
 		if execInspect.ExitCode > 0 {
-			return false, fmt.Errorf(
+			err := fmt.Errorf(
 				"%w with exit code %d: %s",
 				errCommandFailed,
 				execInspect.ExitCode,
 				execOutput,
 			)
+			clog.WithError(err).Debug("Command execution failed")
+
+			return false, err
 		}
 
 		break
@@ -352,7 +452,16 @@ func (c client) waitForExecOrTimeout(
 func (c client) RemoveImageByID(imageID types.ImageID) error {
 	imgClient := newImageClient(c.api)
 
-	return imgClient.RemoveImageByID(imageID)
+	err := imgClient.RemoveImageByID(imageID)
+	if err != nil {
+		logrus.WithError(err).WithField("image_id", imageID).Debug("Failed to remove image")
+
+		return err
+	}
+
+	logrus.WithField("image_id", imageID).Debug("Removed image")
+
+	return nil
 }
 
 // GetVersion gets the client API version from the Docker host.

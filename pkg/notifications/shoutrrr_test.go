@@ -53,7 +53,7 @@ var mockDataAllFresh = Data{
 }
 
 // mockDataFromStates generates mock notification data with specified container states.
-// It includes legacy log entries and static data for testing.
+// It includes legacy log entries and static data for testing purposes.
 func mockDataFromStates(states ...session.State) Data {
 	hostname := "Mock"
 	prefix := ""
@@ -71,6 +71,7 @@ func mockDataFromStates(states ...session.State) Data {
 var _ = ginkgo.Describe("Shoutrrr", func() {
 	var logBuffer *gbytes.Buffer
 
+	// BeforeEach configures the global logrus instance for each test.
 	ginkgo.BeforeEach(func() {
 		logBuffer = gbytes.NewBuffer()
 		logrus.SetOutput(logBuffer)
@@ -147,16 +148,12 @@ updt1 (mock/updt1:latest): Updated
 					false,
 					time.Second,
 				)
-
 				entries := []*logrus.Entry{
-					{
-						Message: "foo bar",
-					},
+					{Message: "foo bar"},
 				}
 
 				s, err := shoutrrr.buildMessage(Data{Entries: entries})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 				gomega.Expect(s).To(gomega.Equal("foo bar\n"))
 			})
 		})
@@ -180,7 +177,6 @@ updt1 (mock/updt1:latest): Updated
 
 				s, err := shoutrrr.buildMessage(Data{Entries: entries})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 				gomega.Expect(s).To(gomega.Equal("info: foo bar\n"))
 			})
 		})
@@ -377,7 +373,7 @@ Turns out everything is on fire
 })
 
 // blockingRouter simulates a notification router with blocking behavior for testing.
-// It waits for an unlock signal before sending and reports send completion.
+// It waits for an unlock signal before sending and signals completion via a channel.
 type blockingRouter struct {
 	unlock chan bool
 	sent   chan bool
@@ -390,8 +386,8 @@ func (b blockingRouter) Send(_ string, _ *types.Params) []error {
 	return nil
 }
 
-// sendNotificationsWithBlockingRouter sets up a test notifier with a blocking router.
-// It returns the notifier and router for testing notification delays.
+// sendNotificationsWithBlockingRouter creates a notifier with a blocking router for testing.
+// It queues a message and returns the notifier and router to verify notification delays.
 func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *blockingRouter) {
 	router := &blockingRouter{
 		unlock: make(chan bool, 1),
@@ -419,14 +415,13 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 
 	shoutrrr.StartNotification()
 	_ = shoutrrr.Fire(entry)
-
 	shoutrrr.SendNotification(nil)
 
 	return shoutrrr, router
 }
 
 // createNotifierWithTemplate creates a notifier with a specified template for testing.
-// It returns the notifier and any template parsing error, falling back to a default template if parsing fails.
+// It returns the notifier and an error, falling back to a default template if parsing fails.
 func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNotifier, error) {
 	tpl, err := getShoutrrrTemplate(tplString, legacy)
 	if err != nil {
@@ -437,9 +432,9 @@ func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNot
 
 		tplBase := template.New("").Funcs(templates.Funcs)
 
-		defaultKey := `default`
+		defaultKey := "default"
 		if legacy {
-			defaultKey = `default-legacy`
+			defaultKey = "default-legacy"
 		}
 
 		tpl = template.Must(tplBase.Parse(commonTemplates[defaultKey]))

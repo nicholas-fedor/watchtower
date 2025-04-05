@@ -8,12 +8,18 @@ import (
 	"strings"
 
 	"github.com/docker/go-connections/nat"
+	"github.com/sirupsen/logrus"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerImageType "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// Constants for container operations.
+const (
+	linkPartsCount = 2 // Number of parts expected in a link (name:alias)
 )
 
 // Container represents a running Docker container managed by Watchtower.
@@ -35,12 +41,19 @@ func NewContainer(
 	containerInfo *dockerContainerType.InspectResponse,
 	imageInfo *dockerImageType.InspectResponse,
 ) *Container {
-	return &Container{
+	c := &Container{
 		LinkedToRestarting: false,
 		Stale:              false,
 		containerInfo:      containerInfo,
 		imageInfo:          imageInfo,
 	}
+	logrus.WithFields(logrus.Fields{
+		"container": c.Name(),
+		"id":        c.ID().ShortID(),
+		"image":     c.SafeImageID(),
+	}).Debug("Created new container instance")
+
+	return c
 }
 
 // State Management Methods
@@ -129,13 +142,20 @@ func (c Container) SafeImageID() types.ImageID {
 // It prefers the Zodiac label if set, otherwise uses the Config.Image value,
 // appending ":latest" if no tag is specified.
 func (c Container) ImageName() string {
+	clog := logrus.WithField("container", c.Name())
+
 	imageName, ok := c.getLabelValue(zodiacLabel)
 	if !ok {
 		imageName = c.containerInfo.Config.Image
+
+		clog.Debug("Using Config.Image for image name")
+	} else {
+		clog.WithField("label", zodiacLabel).Debug("Using Zodiac label for image name")
 	}
 
 	if !strings.Contains(imageName, ":") {
 		imageName += ":latest"
+		clog.WithField("image", imageName).Debug("Appended :latest to image name")
 	}
 
 	return imageName
@@ -160,10 +180,19 @@ func (c Container) ImageInfo() *dockerImageType.InspectResponse {
 // It compares the current Config with the image’s Config to isolate runtime overrides,
 // ensuring defaults are not unintentionally reapplied, and sets the image name accordingly.
 func (c Container) GetCreateConfig() *dockerContainerType.Config {
+	clog := logrus.WithField("container", c.Name())
 	config := c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
-	imageConfig := c.imageInfo.Config
 
+	if c.imageInfo == nil {
+		clog.Warn("No image info available, using container config as-is")
+
+		config.Image = c.ImageName()
+
+		return config
+	}
+
+	imageConfig := c.imageInfo.Config
 	if config.WorkingDir == imageConfig.WorkingDir {
 		config.WorkingDir = ""
 	}
@@ -215,11 +244,12 @@ func (c Container) GetCreateConfig() *dockerContainerType.Config {
 		}
 	}
 
-	for p := range c.containerInfo.HostConfig.PortBindings {
+	for p := range hostConfig.PortBindings {
 		config.ExposedPorts[p] = struct{}{}
 	}
 
 	config.Image = c.ImageName()
+	clog.WithField("image", config.Image).Debug("Generated create config")
 
 	return config
 }
@@ -227,11 +257,21 @@ func (c Container) GetCreateConfig() *dockerContainerType.Config {
 // GetCreateHostConfig generates a host configuration for recreation.
 // It adjusts the current HostConfig’s Links to a format suitable for the Docker create API.
 func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
+	clog := logrus.WithField("container", c.Name())
+
 	hostConfig := c.containerInfo.HostConfig
 	for i, link := range hostConfig.Links {
-		name := link[0:strings.Index(link, ":")]
-		alias := link[strings.LastIndex(link, "/"):]
-		hostConfig.Links[i] = fmt.Sprintf("%s:%s", name, alias)
+		if !strings.Contains(link, ":") {
+			clog.WithField("link", link).Warn("Invalid link format, expected 'name:alias'")
+
+			continue // Skip invalid links
+		}
+
+		parts := strings.SplitN(link, ":", linkPartsCount)
+		name := parts[0]
+		alias := strings.TrimPrefix(parts[1], "/") // Remove leading '/' if present
+		hostConfig.Links[i] = fmt.Sprintf("%s:/%s", name, alias)
+		clog.WithField("link", hostConfig.Links[i]).Debug("Adjusted link for host config")
 	}
 
 	return hostConfig
@@ -242,27 +282,32 @@ func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 // returning an error if any are missing or invalid, ensuring the container can be recreated.
 func (c Container) VerifyConfiguration() error {
 	if c.imageInfo == nil {
+		logrus.WithField("container", "<unknown>").Debug("No image info available")
+
 		return errNoImageInfo
 	}
 
-	containerInfo := c.ContainerInfo()
-	if containerInfo == nil {
+	if c.containerInfo == nil {
+		logrus.WithField("container", "<unknown>").Debug("No container info available")
+
 		return errNoContainerInfo
 	}
 
-	containerConfig := containerInfo.Config
-	if containerConfig == nil {
+	clog := logrus.WithField("container", c.Name())
+	if c.containerInfo.Config == nil || c.containerInfo.HostConfig == nil {
+		clog.Debug("Invalid container configuration")
+
 		return errInvalidConfig
 	}
 
-	hostConfig := containerInfo.HostConfig
-	if hostConfig == nil {
-		return errInvalidConfig
+	if len(c.containerInfo.HostConfig.PortBindings) > 0 &&
+		c.containerInfo.Config.ExposedPorts == nil {
+		c.containerInfo.Config.ExposedPorts = make(map[nat.Port]struct{})
+
+		clog.Debug("Initialized ExposedPorts due to PortBindings")
 	}
-	// Ensure ExposedPorts is non-nil if PortBindings exist, avoiding recreation issues.
-	if len(hostConfig.PortBindings) > 0 && containerConfig.ExposedPorts == nil {
-		containerConfig.ExposedPorts = make(map[nat.Port]struct{})
-	}
+
+	clog.Debug("Verified container configuration")
 
 	return nil
 }
@@ -271,6 +316,8 @@ func (c Container) VerifyConfiguration() error {
 // It combines names from the depends-on label and HostConfig.Links, ensuring a leading slash,
 // and includes implicit network dependencies if applicable.
 func (c Container) Links() []string {
+	clog := logrus.WithField("container", c.Name())
+
 	var links []string
 
 	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
@@ -282,6 +329,9 @@ func (c Container) Links() []string {
 
 			links = append(links, link)
 		}
+
+		clog.WithField("depends_on", dependsOnLabelValue).
+			Debug("Retrieved links from depends-on label")
 
 		return links
 	}
@@ -296,6 +346,8 @@ func (c Container) Links() []string {
 		if networkMode.IsContainer() {
 			links = append(links, networkMode.ConnectedContainer())
 		}
+
+		clog.WithField("links", links).Debug("Retrieved links from host config")
 	}
 
 	return links

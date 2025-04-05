@@ -39,6 +39,15 @@ func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	emoji, _ := flags.GetString("notification-slack-icon-emoji")
 	iconURL, _ := flags.GetString("notification-slack-icon-url")
 
+	clog := logrus.WithFields(logrus.Fields{
+		"hook_url": hookURL,
+		"username": userName,
+		"channel":  channel,
+		"emoji":    emoji,
+		"icon_url": iconURL,
+	})
+	clog.Debug("Initializing Slack notifier")
+
 	notifier := &slackTypeNotifier{
 		HookURL:   hookURL,
 		Username:  userName,
@@ -53,12 +62,15 @@ func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 // GetURL generates the Slack webhook URL for the notifier.
 // It detects Discord wrappers and constructs the appropriate service URL.
 func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
+	clog := logrus.WithField("hook_url", s.HookURL)
+	clog.Debug("Generating Slack service URL")
+
 	trimmedURL := strings.TrimRight(s.HookURL, "/")
 	trimmedURL = strings.TrimPrefix(trimmedURL, "https://")
 	parts := strings.Split(trimmedURL, "/")
 
 	if parts[0] == "discord.com" || parts[0] == "discordapp.com" {
-		logrus.Debug("Detected a discord slack wrapper URL, using shoutrrr discord service")
+		clog.Debug("Detected a discord slack wrapper URL, using shoutrrr discord service")
 
 		conf := &discord.Config{
 			WebhookID:  parts[len(parts)-3],
@@ -72,7 +84,10 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 			conf.Avatar = s.IconURL
 		}
 
-		return conf.GetURL().String(), nil
+		urlStr := conf.GetURL().String()
+		clog.WithField("service_url", urlStr).Debug("Generated Discord service URL")
+
+		return urlStr, nil
 	}
 
 	webhookToken := strings.Replace(s.HookURL, "https://hooks.slack.com/services/", "", 1)
@@ -90,8 +105,13 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}
 
 	if err := conf.Token.SetFromProp(webhookToken); err != nil {
+		clog.WithError(err).Debug("Failed to set Slack webhook token")
+
 		return "", fmt.Errorf("failed to set Slack webhook token: %w", err)
 	}
 
-	return conf.GetURL().String(), nil
+	urlStr := conf.GetURL().String()
+	clog.WithField("service_url", urlStr).Debug("Generated Slack service URL")
+
+	return urlStr, nil
 }

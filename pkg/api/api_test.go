@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("API", func() {
 			err := apiInstance.Start(context.Background(), true)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(logBuffer.String, 100*time.Millisecond).
-				Should(gomega.ContainSubstring("Watchtower HTTP API skipped."))
+				Should(gomega.ContainSubstring("No handlers registered, skipping API start"))
 		})
 
 		ginkgo.It("should fail with a fatal log when token is empty", func() {
@@ -111,7 +111,7 @@ var _ = ginkgo.Describe("API", func() {
 			gomega.Expect(func() { _ = emptyTokenAPI.Start(context.Background(), true) }).
 				To(gomega.Panic())
 			gomega.Expect(logOutput).
-				To(gomega.ContainSubstring("api token is empty or has not been set. exiting"))
+				To(gomega.ContainSubstring("API token is empty or unset"))
 		})
 
 		ginkgo.It("should start server synchronously and serve requests", func() {
@@ -225,9 +225,25 @@ var _ = ginkgo.Describe("API", func() {
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 			gomega.Expect(string(body)).To(gomega.Equal("Hello!"))
 
+			// Wait for server to stop after cancellation
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				<-ctx.Done()                       // Wait for context cancellation
+				time.Sleep(100 * time.Millisecond) // Give server time to shut down
+			}()
+
 			cancel()
-			gomega.Eventually(logBuffer.String, 100*time.Millisecond).
-				ShouldNot(gomega.ContainSubstring("HTTP server failed"))
+			gomega.Eventually(func() bool {
+				select {
+				case <-done:
+					return true
+				default:
+					return false
+				}
+			}, 500*time.Millisecond, 10*time.Millisecond).Should(gomega.BeTrue())
+
+			gomega.Expect(logBuffer.String()).ToNot(gomega.ContainSubstring("HTTP server failed"))
 		})
 
 		ginkgo.It("should start server asynchronously and log error on failure", func() {
@@ -340,12 +356,30 @@ var _ = ginkgo.Describe("API", func() {
 				listenErr:   nil,
 				shutdownErr: errMockShutdownFailure,
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
 
-			err := api.RunHTTPServer(ctx, mockServer)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("server shutdown failed"))
+			// Run server in a goroutine and capture error
+			errChan := make(chan error, 1)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				errChan <- api.RunHTTPServer(ctx, mockServer)
+			}()
+
+			// Wait for server to start, then cancel to trigger shutdown
+			gomega.Eventually(func() bool {
+				return mockServer.ListenAndServe() == nil // Mock doesn’t block, but simulate start
+			}, 100*time.Millisecond, 10*time.Millisecond).Should(gomega.BeTrue())
+
+			cancel() // Trigger shutdown
+
+			select {
+			case err := <-errChan:
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("server shutdown failed"))
+			case <-time.After(600 * time.Millisecond):
+				ginkgo.Fail("Timeout waiting for shutdown error")
+			}
 		})
 
 		ginkgo.It("should register and serve requests via RegisterHandler", func() {

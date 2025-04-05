@@ -4,6 +4,7 @@
 package lifecycle
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -12,16 +13,30 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Errors for lifecycle hook execution.
+var (
+	// errPreUpdateFailed indicates a failure in executing the pre-update command.
+	errPreUpdateFailed = errors.New("pre-update command execution failed")
+)
+
 // ExecutePreChecks runs pre-check lifecycle hooks for all containers matching the provided filter.
 // It retrieves the list of containers using the client and executes the pre-check command for each.
 // If listing containers fails, it logs the error and returns silently, ensuring no further action is taken.
 func ExecutePreChecks(client container.Client, params types.UpdateParams) {
+	clog := logrus.WithField(
+		"filter",
+		fmt.Sprintf("%v", params.Filter),
+	) // Simplified filter logging
+	clog.Debug("Listing containers for pre-checks")
+
 	containers, err := client.ListContainers(params.Filter)
 	if err != nil {
-		logrus.Errorf("Failed to list containers for pre-checks: %v", err)
+		clog.WithError(err).Debug("Failed to list containers for pre-checks")
 
 		return
 	}
+
+	clog.WithField("count", len(containers)).Debug("Found containers for pre-checks")
 
 	for _, currentContainer := range containers {
 		ExecutePreCheckCommand(client, currentContainer)
@@ -32,12 +47,17 @@ func ExecutePreChecks(client container.Client, params types.UpdateParams) {
 // It retrieves the list of containers using the client and executes the post-check command for each.
 // If listing containers fails, it logs the error and returns silently, ensuring no further action is taken.
 func ExecutePostChecks(client container.Client, params types.UpdateParams) {
+	clog := logrus.WithField("filter", fmt.Sprintf("%v", params.Filter))
+	clog.Debug("Listing containers for post-checks")
+
 	containers, err := client.ListContainers(params.Filter)
 	if err != nil {
-		logrus.Errorf("Failed to list containers for post-checks: %v", err)
+		clog.WithError(err).Debug("Failed to list containers for post-checks")
 
 		return
 	}
+
+	clog.WithField("count", len(containers)).Debug("Found containers for post-checks")
 
 	for _, currentContainer := range containers {
 		ExecutePostCheckCommand(client, currentContainer)
@@ -58,11 +78,11 @@ func ExecutePreCheckCommand(client container.Client, container types.Container) 
 		return
 	}
 
-	clog.Debug("Executing pre-check command")
+	clog.WithField("command", command).Debug("Executing pre-check command")
 
 	_, err := client.ExecuteCommand(container.ID(), command, 1)
 	if err != nil {
-		clog.Errorf("Error: Pre-check command failed: %v", err)
+		clog.WithError(err).Debug("Pre-check command failed")
 	}
 }
 
@@ -80,11 +100,11 @@ func ExecutePostCheckCommand(client container.Client, container types.Container)
 		return
 	}
 
-	clog.Debug("Executing post-check command")
+	clog.WithField("command", command).Debug("Executing post-check command")
 
 	_, err := client.ExecuteCommand(container.ID(), command, 1)
 	if err != nil {
-		clog.Errorf("Error: Post-check command failed: %v", err)
+		clog.WithError(err).Debug("Post-check command failed")
 	}
 }
 
@@ -95,7 +115,10 @@ func ExecutePostCheckCommand(client container.Client, container types.Container)
 func ExecutePreUpdateCommand(client container.Client, container types.Container) (bool, error) {
 	timeout := container.PreUpdateTimeout()
 	command := container.GetLifecyclePreUpdateCommand()
-	clog := logrus.WithField("container", container.Name())
+	clog := logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"timeout":   timeout,
+	})
 
 	if len(command) == 0 {
 		clog.Debug("No pre-update command supplied. Skipping")
@@ -104,23 +127,29 @@ func ExecutePreUpdateCommand(client container.Client, container types.Container)
 	}
 
 	if !container.IsRunning() || container.IsRestarting() {
-		clog.Debug("Container is not running. Skipping pre-update command")
+		clog.WithFields(logrus.Fields{
+			"is_running":    container.IsRunning(),
+			"is_restarting": container.IsRestarting(),
+		}).Debug("Container is not running. Skipping pre-update command")
 
 		return false, nil
 	}
 
-	clog.Debug("Executing pre-update command")
+	clog.WithField("command", command).Debug("Executing pre-update command")
 
 	success, err := client.ExecuteCommand(container.ID(), command, timeout)
 	if err != nil {
-		clog.Errorf("Error: Pre-update command failed: %v", err)
+		clog.WithError(err).Debug("Pre-update command failed")
 
 		return true, fmt.Errorf(
-			"pre-update command execution failed for container %s: %w",
+			"%w for container %s: %w",
+			errPreUpdateFailed,
 			container.Name(),
 			err,
 		)
 	}
+
+	clog.WithField("success", success).Debug("Pre-update command executed")
 
 	return success, nil
 }
@@ -130,16 +159,21 @@ func ExecutePreUpdateCommand(client container.Client, container types.Container)
 // If the container cannot be retrieved or no command is specified, it logs an error or debug message and skips execution.
 // Errors from command execution are logged with context but do not affect the return, as this is a post-action.
 func ExecutePostUpdateCommand(client container.Client, newContainerID types.ContainerID) {
+	clog := logrus.WithField("container_id", newContainerID.ShortID())
+	clog.Debug("Retrieving container for post-update")
+
 	newContainer, err := client.GetContainer(newContainerID)
 	if err != nil {
-		logrus.WithField("containerID", newContainerID.ShortID()).
-			Errorf("Failed to get container for post-update: %v", err)
+		clog.WithError(err).Debug("Failed to get container for post-update")
 
 		return
 	}
 
 	timeout := newContainer.PostUpdateTimeout()
-	clog := logrus.WithField("container", newContainer.Name())
+	clog = logrus.WithFields(logrus.Fields{
+		"container": newContainer.Name(),
+		"timeout":   timeout,
+	})
 	command := newContainer.GetLifecyclePostUpdateCommand()
 
 	if len(command) == 0 {
@@ -148,15 +182,12 @@ func ExecutePostUpdateCommand(client container.Client, newContainerID types.Cont
 		return
 	}
 
-	clog.Debug("Executing post-update command")
+	clog.WithField("command", command).Debug("Executing post-update command")
 
 	_, err = client.ExecuteCommand(newContainerID, command, timeout)
 	if err != nil {
-		clog.Errorf(
-			"Error: Post-update command failed for container %s (ID: %s): %v",
-			newContainer.Name(),
-			newContainerID.ShortID(),
-			err,
-		)
+		clog.WithError(err).WithFields(logrus.Fields{
+			"container_id": newContainerID.ShortID(),
+		}).Debug("Post-update command failed")
 	}
 }

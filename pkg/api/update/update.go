@@ -17,9 +17,14 @@ var lock chan bool
 func New(updateFn func(images []string), updateLock chan bool) *Handler {
 	if updateLock != nil {
 		lock = updateLock
+
+		logrus.WithField("source", "provided").
+			Debug("Initialized update lock from provided channel")
 	} else {
 		lock = make(chan bool, 1)
 		lock <- true
+
+		logrus.Debug("Initialized new update lock channel")
 	}
 
 	return &Handler{
@@ -38,11 +43,14 @@ type Handler struct {
 // Handle processes HTTP requests to trigger container updates.
 // It reads the request body, extracts image queries, and executes the update function.
 func (handle *Handler) Handle(_ http.ResponseWriter, r *http.Request) {
-	logrus.Info("Updates triggered by HTTP API request.")
+	logrus.WithFields(logrus.Fields{
+		"method": r.Method,
+		"path":   r.URL.Path,
+	}).Info("Received HTTP API update request")
 
 	_, err := io.Copy(os.Stdout, r.Body)
 	if err != nil {
-		logrus.Println(err)
+		logrus.WithError(err).Debug("Failed to read request body")
 
 		return
 	}
@@ -54,21 +62,27 @@ func (handle *Handler) Handle(_ http.ResponseWriter, r *http.Request) {
 		for _, image := range imageQueries {
 			images = append(images, strings.Split(image, ",")...)
 		}
+
+		logrus.WithField("images", images).Debug("Extracted images from query parameters")
 	} else {
 		images = nil
+
+		logrus.Debug("No image query parameters provided")
 	}
 
 	if len(images) > 0 {
 		chanValue := <-lock
 		defer func() { lock <- chanValue }()
+		logrus.WithField("images", images).Info("Executing targeted update")
 		handle.fn(images)
 	} else {
 		select {
 		case chanValue := <-lock:
 			defer func() { lock <- chanValue }()
+			logrus.Info("Executing full update")
 			handle.fn(images)
 		default:
-			logrus.Debug("Skipped. Another update already running.")
+			logrus.Debug("Skipped update due to concurrent operation")
 		}
 	}
 }

@@ -29,22 +29,13 @@ func ListSourceContainers(
 	opts ClientOptions,
 	filter types.Filter,
 ) ([]types.Container, error) {
-	hostContainers := []types.Container{}
 	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"include_stopped":    opts.IncludeStopped,
+		"include_restarting": opts.IncludeRestarting,
+	})
 
-	// Log the scope of containers being retrieved based on configuration.
-	switch {
-	case opts.IncludeStopped && opts.IncludeRestarting:
-		logrus.Debug(
-			"Listing source containers: Retrieving running, stopped, restarting and exited containers",
-		)
-	case opts.IncludeStopped:
-		logrus.Debug("Listing source containers: Retrieving running, stopped and exited containers")
-	case opts.IncludeRestarting:
-		logrus.Debug("Listing source containers: Retrieving running and restarting containers")
-	default:
-		logrus.Debug("Listing source containers: Retrieving running containers")
-	}
+	clog.Debug("Retrieving container list")
 
 	// Apply filters based on configured options.
 	filterArgs := dockerFiltersType.NewArgs()
@@ -59,30 +50,28 @@ func ListSourceContainers(
 		filterArgs.Add("status", "restarting")
 	}
 
-	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{
-		Filters: filterArgs,
-		Size:    false,
-		All:     false,
-		Latest:  false,
-		Since:   "",
-		Before:  "",
-		Limit:   0,
-	})
+	// Apply filters based on configured options.
+	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{Filters: filterArgs})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
+		clog.WithError(err).Debug("Failed to list containers")
+
+		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
-	// Fetch detailed info for each container and apply the user-provided filter.
+	hostContainers := []types.Container{}
+
 	for _, runningContainer := range containers {
 		container, err := GetSourceContainer(api, types.ContainerID(runningContainer.ID))
 		if err != nil {
-			return nil, err
+			return nil, err // Logged in GetSourceContainer
 		}
 
 		if filter(container) {
 			hostContainers = append(hostContainers, container)
 		}
 	}
+
+	clog.WithField("count", len(hostContainers)).Debug("Filtered container list")
 
 	return hostContainers, nil
 }
@@ -95,40 +84,45 @@ func GetSourceContainer(
 	containerID types.ContainerID,
 ) (types.Container, error) {
 	ctx := context.Background()
+	clog := logrus.WithField("container_id", containerID)
+
+	clog.Debug("Inspecting container")
 
 	// Fetch basic container information.
 	containerInfo, err := api.ContainerInspect(ctx, string(containerID))
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to inspect container %s: %w",
-			containerID,
-			err,
-		)
+		clog.WithError(err).Debug("Failed to inspect container")
+
+		return nil, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
 	}
 
-	// Handle container network mode dependencies.
+	// Resolve network container references.
 	netType, netContainerID, found := strings.Cut(string(containerInfo.HostConfig.NetworkMode), ":")
 	if found && netType == "container" {
 		parentContainer, err := api.ContainerInspect(ctx, netContainerID)
 		if err != nil {
-			logrus.WithFields(map[string]any{
+			clog.WithError(err).WithFields(logrus.Fields{
 				"container":         containerInfo.Name,
-				"error":             err,
-				"network-container": netContainerID,
-			}).Warnf("Getting source container info: Unable to resolve network container: %v", err)
+				"network_container": netContainerID,
+			}).Warn("Unable to resolve network container")
 		} else {
-			// Update NetworkMode to use the parent container's name for stable references across recreations.
 			containerInfo.HostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + parentContainer.Name)
+			clog.WithFields(logrus.Fields{
+				"container":         containerInfo.Name,
+				"network_container": parentContainer.Name,
+			}).Debug("Resolved network container name")
 		}
 	}
 
-	// Fetch associated image information.
+	// Fetch image info, tolerating failure.
 	imageInfo, err := api.ImageInspect(ctx, containerInfo.Image)
 	if err != nil {
-		logrus.Warnf("Get source container info: Failed to retrieve container image info: %v", err)
+		clog.WithError(err).Warn("Failed to retrieve image info")
 
 		return NewContainer(&containerInfo, nil), nil
 	}
+
+	clog.WithField("image", containerInfo.Image).Debug("Retrieved container and image info")
 
 	return NewContainer(&containerInfo, &imageInfo), nil
 }
@@ -143,8 +137,10 @@ func StopSourceContainer(
 	removeVolumes bool,
 ) error {
 	ctx := context.Background()
-	idStr := string(sourceContainer.ID())
-	shortID := sourceContainer.ID().ShortID()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"id":        sourceContainer.ID().ShortID(),
+	})
 
 	// Stop the container if it’s running.
 	signal := sourceContainer.StopSignal()
@@ -153,20 +149,12 @@ func StopSourceContainer(
 	}
 
 	if sourceContainer.IsRunning() {
-		logrus.Infof(
-			"Stopping source container: Stopping %s (%s) with %s",
-			sourceContainer.Name(),
-			shortID,
-			signal,
-		)
+		clog.WithField("signal", signal).Info("Stopping container")
 
-		if err := api.ContainerKill(ctx, idStr, signal); err != nil {
-			return fmt.Errorf(
-				"failed stopping container %s (%s): %w",
-				sourceContainer.Name(),
-				shortID,
-				err,
-			)
+		if err := api.ContainerKill(ctx, string(sourceContainer.ID()), signal); err != nil {
+			clog.WithError(err).Debug("Failed to stop container")
+
+			return fmt.Errorf("%w: %w", errStopContainerFailed, err)
 		}
 	}
 
@@ -182,53 +170,40 @@ func stopAndRemoveContainer(
 	removeVolumes bool,
 ) error {
 	ctx := context.Background()
-	idStr := string(sourceContainer.ID())
-	shortID := sourceContainer.ID().ShortID()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"id":        sourceContainer.ID().ShortID(),
+	})
 
 	// Wait for the container to stop or timeout.
 	stopped, err := waitForStopOrTimeout(api, sourceContainer, timeout)
 	if err != nil {
-		return fmt.Errorf(
-			"failed to wait for container %s (%s) to stop: %w",
-			sourceContainer.Name(),
-			shortID,
-			err,
-		)
+		clog.WithError(err).Debug("Failed to wait for container stop")
+
+		return err
 	}
 
 	if !stopped {
-		logrus.Warnf(
-			"Stopping source container: %s (%s) did not stop within %v",
-			sourceContainer.Name(),
-			shortID,
-			timeout,
-		)
+		clog.WithField("timeout", timeout).Warn("Container did not stop within timeout")
 	}
 
 	// If already gone and AutoRemove is enabled, no further action needed.
 	if stopped && sourceContainer.ContainerInfo().HostConfig.AutoRemove {
-		logrus.Debugf(
-			"Removing source container: AutoRemove container %s, skipping ContainerRemove call.",
-			shortID,
-		)
+		clog.Debug("Skipping removal due to AutoRemove")
 
 		return nil
 	}
 
-	// Attempt removal.
-	logrus.Debugf("Removing source container: Removing container %s", shortID)
+	clog.Debug("Removing container")
 
-	err = api.ContainerRemove(ctx, idStr, dockerContainerType.RemoveOptions{
+	err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainerType.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: removeVolumes,
 	})
 	if err != nil && !dockerClient.IsErrNotFound(err) {
-		return fmt.Errorf(
-			"failed to remove container %s (%s): %w",
-			sourceContainer.Name(),
-			shortID,
-			err,
-		)
+		clog.WithError(err).Debug("Failed to remove container")
+
+		return fmt.Errorf("%w: %w", errRemoveContainerFailed, err)
 	}
 
 	if dockerClient.IsErrNotFound(err) {
@@ -239,17 +214,23 @@ func stopAndRemoveContainer(
 	// Confirm removal if it succeeded or container wasn’t gone before.
 	stopped, err = waitForStopOrTimeout(api, sourceContainer, timeout)
 	if err != nil {
-		return fmt.Errorf(
-			"failed to confirm removal of container %s (%s): %w",
-			sourceContainer.Name(),
-			shortID,
-			err,
-		)
+		clog.WithError(err).Debug("Failed to confirm container removal")
+
+		return err
 	}
 
 	if !stopped {
-		return fmt.Errorf("%w: %s (%s)", errContainerNotRemoved, sourceContainer.Name(), shortID)
+		clog.Debug("Container not removed within timeout")
+
+		return fmt.Errorf(
+			"%w: %s (%s)",
+			errContainerNotRemoved,
+			sourceContainer.Name(),
+			sourceContainer.ID().ShortID(),
+		)
 	}
+
+	clog.Debug("Confirmed container removal")
 
 	return nil
 }
@@ -276,11 +257,12 @@ func waitForStopOrTimeout(
 					return true, nil // Container gone, treat as stopped
 				}
 
-				return false, fmt.Errorf(
-					"failed to inspect container %s: %w",
-					container.ID(),
-					err,
-				) // Other errors propagate
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"container": container.Name(),
+					"id":        container.ID().ShortID(),
+				}).Debug("Failed to inspect container")
+
+				return false, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
 			}
 
 			if !containerInfo.State.Running {
@@ -298,13 +280,14 @@ func getLegacyNetworkConfig(
 	sourceContainer types.Container,
 	clientVersion string,
 ) *dockerNetworkType.NetworkingConfig {
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"version":   clientVersion,
+	})
+
 	networks := sourceContainer.ContainerInfo().NetworkSettings.Networks
 	if networks == nil {
-		logrus.Warnf(
-			"Getting (legacy) network config using API version %s: No network settings found for container %s",
-			clientVersion,
-			sourceContainer.ID(),
-		)
+		clog.Warn("No network settings found")
 
 		return &dockerNetworkType.NetworkingConfig{
 			EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
@@ -317,12 +300,7 @@ func getLegacyNetworkConfig(
 
 	for networkName, endpoint := range networks {
 		if endpoint == nil {
-			logrus.Warnf(
-				"Getting (legacy) network config using API version %s: Nil endpoint for network %s in container %s.",
-				clientVersion,
-				networkName,
-				sourceContainer.ID(),
-			)
+			clog.WithField("network", networkName).Warn("Nil endpoint in network settings")
 
 			continue
 		}
@@ -337,28 +315,22 @@ func getLegacyNetworkConfig(
 		config.EndpointsConfig[networkName] = newEndpoint
 		// Log MAC address for visibility, but don’t include it
 		if endpoint.MacAddress != "" {
-			logrus.Debugf(
-				"Getting (legacy) network config using API version %s: Found MAC address %s for container %s on network %s.",
-				clientVersion,
-				endpoint.MacAddress,
-				sourceContainer.Name(),
-				networkName,
-			)
+			clog.WithFields(logrus.Fields{
+				"network":     networkName,
+				"mac_address": endpoint.MacAddress,
+			}).Debug("Found MAC address in legacy config")
 		}
 	}
 
 	// Warn if MAC preservation is desired but not possible
 	if len(networks) > 0 {
-		logrus.Warnf(
-			"Getting (legacy) network config using API version %s: Container %s MAC addresses cannot be preserved. Docker will dynamically assign new ones.",
-			clientVersion,
-			sourceContainer.ID(),
-		)
+		clog.Warn("MAC addresses not preserved in legacy config")
 	}
 
 	return config
 }
 
+// filterAliases removes the container’s short ID from the list of aliases.
 func filterAliases(aliases []string, shortID string) []string {
 	result := make([]string, 0, len(aliases))
 
@@ -378,6 +350,7 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 	config := &dockerNetworkType.NetworkingConfig{
 		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
 	}
+	clog := logrus.WithField("container", sourceContainer.Name())
 
 	for networkName, originalEndpoint := range sourceContainer.ContainerInfo().NetworkSettings.Networks {
 		// Copy all fields from the original endpoint
@@ -413,13 +386,11 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 		}
 
 		config.EndpointsConfig[networkName] = endpoint
-		logrus.Debugf(
-			"Getting network config: Preserving network config for container %s on network %s: MAC=%s, IP=%s",
-			sourceContainer.Name(),
-			networkName,
-			endpoint.MacAddress,
-			endpoint.IPAddress,
-		)
+		clog.WithFields(logrus.Fields{
+			"network":     networkName,
+			"mac_address": endpoint.MacAddress,
+			"ip_address":  endpoint.IPAddress,
+		}).Debug("Preserved network config")
 	}
 
 	return config
@@ -437,17 +408,21 @@ func debugLogMacAddress(
 	clientVersion string,
 	minSupportedVersion string,
 ) {
-	foundMac := false
+	clog := logrus.WithFields(logrus.Fields{
+		"container":   containerID,
+		"version":     clientVersion,
+		"min_version": minSupportedVersion,
+	})
 
 	// Log any MAC addresses found in the config
+	foundMac := false
+
 	for networkName, endpoint := range networkConfig.EndpointsConfig {
 		if endpoint.MacAddress != "" {
-			logrus.Debugf(
-				"Debugging MAC address: Found MAC address %s for container %s on network %s",
-				endpoint.MacAddress,
-				containerID,
-				networkName,
-			)
+			clog.WithFields(logrus.Fields{
+				"network":     networkName,
+				"mac_address": endpoint.MacAddress,
+			}).Debug("Found MAC address in config")
 
 			foundMac = true
 		}
@@ -456,33 +431,16 @@ func debugLogMacAddress(
 	// Determine logging behavior based on API version
 	switch {
 	case versions.LessThan(clientVersion, minSupportedVersion):
-		switch foundMac {
-		case true:
-			logrus.Warnf(
-				"Debugging MAC address: Unexpected MAC address in config for container %s with API version less than %s. This should not happen",
-				containerID,
-				minSupportedVersion,
-			)
-		case false:
-			logrus.Debugf(
-				"Debugging MAC address: No MAC address in config for container %s (expected for API versions less than %s. Docker will assign one)",
-				containerID,
-				minSupportedVersion,
-			)
+		if foundMac {
+			clog.Warn("Unexpected MAC address in legacy config")
+		} else {
+			clog.Debug("No MAC address in legacy config, Docker will assign")
 		}
 	default: // API >= 1.44
-		switch foundMac {
-		case true:
-			logrus.Debugf(
-				"Debugging MAC address: MAC address configuration verified for container %s",
-				containerID,
-			)
-		case false:
-			logrus.Warnf(
-				"Debugging MAC address: No MAC address found for container %s with API version greater than or equal to %s. This may indicate a configuration issue",
-				containerID,
-				minSupportedVersion,
-			)
+		if foundMac {
+			clog.Debug("Verified MAC address configuration")
+		} else {
+			clog.Warn("No MAC address found in config")
 		}
 	}
 }

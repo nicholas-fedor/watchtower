@@ -107,7 +107,7 @@ var _ = ginkgo.Describe("the client", func() {
 				) // Short timeout
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Eventually(logbuf).
-					Should(gbytes.Say(`Stopping source container: %s \(%s\) did not stop within %v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
+					Should(gbytes.Say(`Container did not stop within timeout.*container=%s.*id=%s.*timeout=%v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
 			})
 		})
 		ginkgo.When("waiting for stop fails with an unexpected error", func() {
@@ -125,7 +125,7 @@ var _ = ginkgo.Describe("the client", func() {
 				)
 				err := client{api: docker}.StopContainer(mockContainer, time.Second)
 				gomega.Expect(err).
-					To(gomega.MatchError(gomega.ContainSubstring("failed to wait for container %s (%s) to stop", mockContainer.Name(), mockContainer.ID().ShortID())))
+					To(gomega.MatchError(gomega.ContainSubstring("failed to inspect container: Error response from daemon: server error")))
 			})
 		})
 		ginkgo.When("waiting for removal fails with an unexpected error", func() {
@@ -151,7 +151,7 @@ var _ = ginkgo.Describe("the client", func() {
 				)
 				err := client{api: docker}.StopContainer(mockContainer, time.Second)
 				gomega.Expect(err).
-					To(gomega.MatchError(gomega.ContainSubstring("failed to confirm removal of container %s (%s)", mockContainer.Name(), mockContainer.ID().ShortID())))
+					To(gomega.MatchError(gomega.ContainSubstring("failed to inspect container: Error response from daemon: server error")))
 			})
 		})
 	})
@@ -350,7 +350,7 @@ var _ = ginkgo.Describe("the client", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Note: Since Execute requires opening up a raw TCP stream to the daemon for the output, this will fail
 				// when using the mock API server. Regardless of the outcome, the log should include the container ID
-				gomega.Eventually(logbuf).Should(gbytes.Say(`containerID="?ex-cont-id"?`))
+				gomega.Eventually(logbuf).Should(gbytes.Say(`container_id=ex-cont-id`))
 			})
 		})
 	})
