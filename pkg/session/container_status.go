@@ -4,60 +4,77 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// State enum values.
+const (
+	UnknownState State = iota // Uninitialized state.
+	SkippedState              // Container skipped.
+	ScannedState              // Container scanned.
+	UpdatedState              // Container updated.
+	FailedState               // Container update failed.
+	FreshState                // Container is fresh.
+	StaleState                // Container is stale.
+)
+
 // State indicates what the current state is of the container.
 type State int
 
-// State enum values.
-const (
-	// UnknownState is only used to represent an uninitialized State value.
-	UnknownState State = iota
-	SkippedState
-	ScannedState
-	UpdatedState
-	FailedState
-	FreshState
-	StaleState
-)
-
-// ContainerStatus contains the container state during a session.
+// ContainerStatus holds a container’s state during a session.
 //
-//nolint:errname // containerStatus is not an error type, it contains an error field
+//nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
-	containerID    types.ContainerID
-	oldImage       types.ImageID
-	newImage       types.ImageID
-	containerName  string
-	imageName      string
-	containerError error
-	state          State
+	containerID    types.ContainerID // Container ID.
+	oldImage       types.ImageID     // Original image ID.
+	newImage       types.ImageID     // Latest image ID.
+	containerName  string            // Container name.
+	imageName      string            // Image name with tag.
+	containerError error             // Error encountered, if any.
+	state          State             // Current state.
 }
 
 // ID returns the container ID.
+//
+// Returns:
+//   - types.ContainerID: Container’s unique identifier.
 func (u *ContainerStatus) ID() types.ContainerID {
 	return u.containerID
 }
 
 // Name returns the container name.
+//
+// Returns:
+//   - string: Container’s name.
 func (u *ContainerStatus) Name() string {
 	return u.containerName
 }
 
-// CurrentImageID returns the image ID that the container used when the session started.
+// CurrentImageID returns the original image ID.
+//
+// Returns:
+//   - types.ImageID: Image ID at session start.
 func (u *ContainerStatus) CurrentImageID() types.ImageID {
 	return u.oldImage
 }
 
-// LatestImageID returns the newest image ID found during the session.
+// LatestImageID returns the latest image ID.
+//
+// Returns:
+//   - types.ImageID: Newest image ID from session.
 func (u *ContainerStatus) LatestImageID() types.ImageID {
 	return u.newImage
 }
 
-// ImageName returns the name:tag that the container uses.
+// ImageName returns the image name with tag.
+//
+// Returns:
+//   - string: Image name (e.g., "nginx:latest").
 func (u *ContainerStatus) ImageName() string {
 	return u.imageName
 }
 
-// Error returns the error (if any) that was encountered for the container during a session.
+// Error returns the session error, if any.
+//
+// Returns:
+//   - string: Error message or empty if none.
 func (u *ContainerStatus) Error() string {
 	if u.containerError == nil {
 		return ""
@@ -66,11 +83,14 @@ func (u *ContainerStatus) Error() string {
 	return u.containerError.Error()
 }
 
-// Maps State enum values to human-readable names.
+// State returns the human-readable state name.
+//
+// Returns:
+//   - string: State as a string (e.g., "Updated").
 func (u *ContainerStatus) State() string {
 	switch u.state {
 	case UnknownState:
-		return "Unknown" // Uninitialized state
+		return "Unknown" // Uninitialized state.
 	case SkippedState:
 		return "Skipped"
 	case ScannedState:
@@ -84,6 +104,6 @@ func (u *ContainerStatus) State() string {
 	case StaleState:
 		return "Stale"
 	default:
-		return "Unknown" // Handles unexpected states gracefully
+		return "Unknown" // Fallback for unexpected values.
 	}
 }

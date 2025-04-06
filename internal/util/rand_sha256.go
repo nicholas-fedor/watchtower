@@ -7,22 +7,24 @@ import (
 	"fmt"
 )
 
-// sha256ByteLength defines the number of bytes in a SHA-256 hash.
-// It ensures a 32-byte hash, resulting in a 64-character hex string.
+// sha256ByteLength sets the byte length of a SHA-256 hash (32).
 const sha256ByteLength = 32
 
-// sha256HexLength defines the length of a SHA-256 hash in hexadecimal.
-// It accounts for 64 characters (32 bytes * 2 hex digits per byte).
+// sha256HexLength sets the hex length of a SHA-256 hash (64).
 const sha256HexLength = 64
 
-// GenerateRandomSHA256 generates a random 64-character SHA-256 hash string.
-// It produces a hexadecimal representation without a prefix.
+// GenerateRandomSHA256 generates a 64-character SHA-256 hash.
+//
+// Returns:
+//   - string: Random hash without prefix.
 func GenerateRandomSHA256() string {
 	return GenerateRandomPrefixedSHA256()[7:]
 }
 
-// GenerateRandomPrefixedSHA256 generates a random 64-character SHA-256 hash string, prefixed with "sha256:".
-// It uses a cryptographically secure random source for the hash bytes.
+// GenerateRandomPrefixedSHA256 generates a prefixed SHA-256 hash.
+//
+// Returns:
+//   - string: Random hash with "sha256:" prefix.
 func GenerateRandomPrefixedSHA256() string {
 	hash := make([]byte, sha256ByteLength)
 	_, _ = rand.Read(hash)

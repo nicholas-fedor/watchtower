@@ -16,20 +16,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// DockerAPIMinVersion specifies the minimum Docker API version required by Watchtower.
-// It ensures compatibility with the Docker client.
+// DockerAPIMinVersion sets the minimum Docker API version supported by Watchtower.
 const DockerAPIMinVersion string = "1.44"
 
-// defaultPollIntervalSeconds defines the default polling interval in seconds (24 hours).
-// It provides a consistent default for periodic updates.
+// defaultPollIntervalSeconds sets the default polling interval (24 hours).
 const defaultPollIntervalSeconds = 86400 // 24 * 60 * 60 seconds
 
-// defaultStopTimeoutSeconds defines the default timeout for stopping containers (10 seconds).
-// It ensures a consistent default for container stop operations.
+// defaultStopTimeoutSeconds sets the default container stop timeout (10 seconds).
 const defaultStopTimeoutSeconds = 10
 
-// defaultEmailServerPort defines the default SMTP server port for email notifications (25).
-// It provides a standard port for email communication.
+// defaultEmailServerPort sets the default SMTP port (25).
 const defaultEmailServerPort = 25
 
 // Errors for flag and environment configuration.
@@ -54,8 +50,10 @@ var (
 	errNotSliceValue = errors.New("flag does not support slice values")
 )
 
-// RegisterDockerFlags adds flags used directly by the Docker API client to the root command.
-// These flags configure the Docker connection settings.
+// RegisterDockerFlags adds Docker API client flags to the root command.
+//
+// Parameters:
+//   - rootCmd: Root Cobra command.
 func RegisterDockerFlags(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
 	flags.StringP("host", "H", envString("DOCKER_HOST"), "daemon socket to connect to")
@@ -68,8 +66,10 @@ func RegisterDockerFlags(rootCmd *cobra.Command) {
 	)
 }
 
-// RegisterSystemFlags adds flags that modify Watchtower’s program flow to the root command.
-// These flags control update behavior, logging, and operational modes.
+// RegisterSystemFlags adds Watchtower flow control flags to the root command.
+//
+// Parameters:
+//   - rootCmd: Root Cobra command.
 func RegisterSystemFlags(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
 	flags.IntP(
@@ -262,8 +262,10 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Label applied to containers take precedence over arguments")
 }
 
-// RegisterNotificationFlags adds flags for configuring Watchtower notifications to the root command.
-// These flags control how and when notifications are sent.
+// RegisterNotificationFlags adds notification flags to the root command.
+//
+// Parameters:
+//   - rootCmd: Root Cobra command.
 func RegisterNotificationFlags(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
 
@@ -442,48 +444,74 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"Write notification logs to stdout instead of logging (to stderr)")
 }
 
-// envString retrieves a string value from an environment variable via Viper.
-// It binds the key to the environment and returns its value.
+// envString fetches a string from an environment variable.
+//
+// Parameters:
+//   - key: Environment variable key.
+//
+// Returns:
+//   - string: Value or empty if unset.
 func envString(key string) string {
 	viper.MustBindEnv(key)
 
 	return viper.GetString(key)
 }
 
-// envStringSlice retrieves a string slice from an environment variable via Viper.
-// It binds the key to the environment and returns its values.
+// envStringSlice fetches a string slice from an environment variable.
+//
+// Parameters:
+//   - key: Environment variable key.
+//
+// Returns:
+//   - []string: Values or empty slice if unset.
 func envStringSlice(key string) []string {
 	viper.MustBindEnv(key)
 
 	return viper.GetStringSlice(key)
 }
 
-// envInt retrieves an integer value from an environment variable via Viper.
-// It binds the key to the environment and returns its value.
+// envInt fetches an integer from an environment variable.
+//
+// Parameters:
+//   - key: Environment variable key.
+//
+// Returns:
+//   - int: Value or 0 if unset.
 func envInt(key string) int {
 	viper.MustBindEnv(key)
 
 	return viper.GetInt(key)
 }
 
-// envBool retrieves a boolean value from an environment variable via Viper.
-// It binds the key to the environment and returns its value.
+// envBool fetches a boolean from an environment variable.
+//
+// Parameters:
+//   - key: Environment variable key.
+//
+// Returns:
+//   - bool: Value or false if unset.
 func envBool(key string) bool {
 	viper.MustBindEnv(key)
 
 	return viper.GetBool(key)
 }
 
-// envDuration retrieves a duration value from an environment variable via Viper.
-// It binds the key to the environment and returns its value.
+// envDuration fetches a duration from an environment variable.
+//
+// Parameters:
+//   - key: Environment variable key.
+//
+// Returns:
+//   - time.Duration: Value or 0 if unset.
 func envDuration(key string) time.Duration {
 	viper.MustBindEnv(key)
 
 	return viper.GetDuration(key)
 }
 
-// SetDefaults configures default values for environment variables.
-// It ensures consistent fallback behavior when flags or environment variables are unset.
+// SetDefaults sets default environment variable values.
+//
+// It configures fallback values for unset flags.
 func SetDefaults() {
 	viper.AutomaticEnv()
 	viper.SetDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -500,11 +528,17 @@ func SetDefaults() {
 	viper.SetDefault("WATCHTOWER_LOG_FORMAT", "auto")
 }
 
-// EnvConfig sets environment variables based on Docker-related flags.
-// It configures the Docker client’s environment, returning an error if flag retrieval fails.
+// EnvConfig sets Docker environment variables from flags.
+//
+// Parameters:
+//   - cmd: Cobra command with flags.
+//
+// Returns:
+//   - error: Non-nil if flag retrieval fails, nil on success.
 func EnvConfig(cmd *cobra.Command) error {
 	flags := cmd.PersistentFlags()
 
+	// Fetch Docker flags.
 	host, err := flags.GetString("host")
 	if err != nil {
 		logrus.WithError(err).WithField("flag", "host").Debug("Failed to get host flag")
@@ -528,6 +562,7 @@ func EnvConfig(cmd *cobra.Command) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
+	// Set environment variables.
 	if err := setEnvOptStr("DOCKER_HOST", host); err != nil {
 		return err
 	}
@@ -549,11 +584,20 @@ func EnvConfig(cmd *cobra.Command) error {
 	return nil
 }
 
-// ReadFlags retrieves common operational flags used in Watchtower’s main flow.
-// It returns cleanup, noRestart, monitorOnly, and timeout values, exiting on error.
+// ReadFlags retrieves key operational flags.
+//
+// Parameters:
+//   - cmd: Cobra command with flags.
+//
+// Returns:
+//   - bool: Cleanup setting.
+//   - bool: No-restart setting.
+//   - bool: Monitor-only setting.
+//   - time.Duration: Stop timeout.
 func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 	flags := cmd.PersistentFlags()
 
+	// Fetch flags, fatal on error.
 	cleanup, err := flags.GetBool("cleanup")
 	if err != nil {
 		logrus.WithField("flag", "cleanup").
@@ -592,8 +636,14 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 	return cleanup, noRestart, monitorOnly, timeout
 }
 
-// setEnvOptStr sets an environment variable to a specified string value if needed.
-// It skips setting if the value is empty or matches the current environment, returning an error if the set fails.
+// setEnvOptStr sets an environment variable if needed.
+//
+// Parameters:
+//   - env: Environment variable name.
+//   - opt: Value to set.
+//
+// Returns:
+//   - error: Non-nil if set fails, nil if skipped or successful.
 func setEnvOptStr(env string, opt string) error {
 	if opt == "" || opt == os.Getenv(env) {
 		return nil
@@ -616,8 +666,14 @@ func setEnvOptStr(env string, opt string) error {
 	return nil
 }
 
-// setEnvOptBool sets an environment variable to "1" if the boolean is true.
-// It returns an error if the set operation fails, otherwise nil.
+// setEnvOptBool sets an environment variable to "1" if true.
+//
+// Parameters:
+//   - env: Environment variable name.
+//   - opt: Boolean value.
+//
+// Returns:
+//   - error: Non-nil if set fails, nil otherwise.
 func setEnvOptBool(env string, opt bool) error {
 	if opt {
 		return setEnvOptStr(env, "1")
@@ -626,8 +682,10 @@ func setEnvOptBool(env string, opt bool) error {
 	return nil
 }
 
-// GetSecretsFromFiles replaces flag values with file contents if they reference files.
-// It processes a predefined list of secret-related flags, updating their values accordingly.
+// GetSecretsFromFiles updates flags with file contents for secrets.
+//
+// Parameters:
+//   - rootCmd: Root Cobra command.
 func GetSecretsFromFiles(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
 	secrets := []string{
@@ -639,6 +697,7 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 		"http-api-token",
 	}
 
+	// Process each secret flag.
 	for _, secret := range secrets {
 		if err := getSecretFromFile(flags, secret); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
@@ -648,12 +707,19 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 	}
 }
 
-// getSecretFromFile updates a flag’s value with file contents if it references a file.
-// It handles both string and slice flags, returning an error if file operations fail.
+// getSecretFromFile reads file contents into a flag if applicable.
+//
+// Parameters:
+//   - flags: Flag set.
+//   - secret: Flag name.
+//
+// Returns:
+//   - error: Non-nil if file ops fail, nil on success or skip.
 func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 	flag := flags.Lookup(secret)
 	fields := logrus.Fields{"flag": secret}
 
+	// Handle slice flags.
 	if sliceValue, ok := flag.Value.(pflag.SliceValue); ok {
 		oldValues := sliceValue.GetSlice()
 		values := make([]string, 0, len(oldValues))
@@ -704,6 +770,7 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 		return nil
 	}
 
+	// Handle string flags.
 	value := flag.Value.String()
 	if value != "" && isFilePath(value) {
 		content, err := os.ReadFile(value)
@@ -728,8 +795,13 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 	return nil
 }
 
-// isFilePath determines if a string likely represents a file path.
-// It checks for file existence, avoiding false positives from URLs or invalid Windows paths.
+// isFilePath checks if a string is likely a file path.
+//
+// Parameters:
+//   - path: String to check.
+//
+// Returns:
+//   - bool: True if likely a file path, false otherwise.
 func isFilePath(path string) bool {
 	firstColon := strings.IndexRune(path, ':')
 	if firstColon != 1 && firstColon != -1 {
@@ -742,9 +814,12 @@ func isFilePath(path string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
-// ProcessFlagAliases synchronizes flag values based on helper flags and environment settings.
-// It adjusts notification, schedule, and logging settings, exiting on invalid configurations.
+// ProcessFlagAliases syncs flag values based on aliases.
+//
+// Parameters:
+//   - flags: Flag set.
 func ProcessFlagAliases(flags *pflag.FlagSet) {
+	// Handle porcelain mode.
 	porcelain, err := flags.GetString("porcelain")
 	if err != nil {
 		logrus.WithField("flag", "porcelain").
@@ -769,6 +844,7 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 		logrus.WithField("porcelain", porcelain).Debug("Configured porcelain mode")
 	}
 
+	// Handle interval vs. schedule conflicts.
 	scheduleChanged := flags.Changed("schedule")
 	intervalChanged := flags.Changed("interval")
 
@@ -799,6 +875,7 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 		}
 	}
 
+	// Adjust log level for debug/trace.
 	if flagIsEnabled(flags, "debug") {
 		if err := flags.Set("log-level", "debug"); err != nil {
 			logrus.WithError(err).Debug("Failed to set debug log level")
@@ -812,8 +889,13 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 	}
 }
 
-// SetupLogging configures the global logger based on log-related flags.
-// It sets the log format and level, returning an error for invalid configurations.
+// SetupLogging configures the global logger.
+//
+// Parameters:
+//   - flags: Flag set.
+//
+// Returns:
+//   - error: Non-nil if config fails, nil on success.
 func SetupLogging(flags *pflag.FlagSet) error {
 	logFormat, err := flags.GetString("log-format")
 	if err != nil {
@@ -833,6 +915,7 @@ func SetupLogging(flags *pflag.FlagSet) error {
 		return err
 	}
 
+	// Set log level.
 	rawLogLevel, err := flags.GetString("log-level")
 	if err != nil {
 		logrus.WithField("flag", "log-level").WithError(err).Debug("Failed to get log-level flag")
@@ -857,8 +940,14 @@ func SetupLogging(flags *pflag.FlagSet) error {
 	return nil
 }
 
-// configureLogFormat sets the logrus formatter based on the specified format and color preference.
-// It returns an error if the format is invalid.
+// configureLogFormat sets the logrus formatter.
+//
+// Parameters:
+//   - logFormat: Desired format.
+//   - noColor: Disable colors if true.
+//
+// Returns:
+//   - error: Non-nil if format invalid, nil on success.
 func configureLogFormat(logFormat string, noColor bool) error {
 	switch strings.ToLower(logFormat) {
 	case "auto":
@@ -887,8 +976,14 @@ func configureLogFormat(logFormat string, noColor bool) error {
 	return nil
 }
 
-// flagIsEnabled checks if a boolean flag is set to true.
-// It exits with a fatal error if the flag is not defined.
+// flagIsEnabled checks if a boolean flag is true.
+//
+// Parameters:
+//   - flags: Flag set.
+//   - name: Flag name.
+//
+// Returns:
+//   - bool: True if enabled.
 func flagIsEnabled(flags *pflag.FlagSet, name string) bool {
 	value, err := flags.GetBool(name)
 	if err != nil {
@@ -898,8 +993,15 @@ func flagIsEnabled(flags *pflag.FlagSet, name string) bool {
 	return value
 }
 
-// appendFlagValue appends values to a slice-type flag.
-// It returns an error if the flag is invalid or not a slice.
+// appendFlagValue appends values to a slice flag.
+//
+// Parameters:
+//   - flags: Flag set.
+//   - name: Flag name.
+//   - values: Values to append.
+//
+// Returns:
+//   - error: Non-nil if append fails, nil on success.
 func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error {
 	flag := flags.Lookup(name)
 	if flag == nil {
@@ -926,8 +1028,12 @@ func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error 
 	return nil
 }
 
-// setFlagIfDefault sets a flag’s value if it hasn’t been explicitly changed.
-// It logs an error if the set operation fails but continues execution.
+// setFlagIfDefault sets a flag’s default value if unchanged.
+//
+// Parameters:
+//   - flags: Flag set.
+//   - name: Flag name.
+//   - value: Default value.
 func setFlagIfDefault(flags *pflag.FlagSet, name string, value string) {
 	if flags.Changed(name) {
 		return

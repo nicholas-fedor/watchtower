@@ -14,8 +14,20 @@ import (
 )
 
 // StartTargetContainer creates and starts a new container using the source container’s configuration.
-// It applies the provided network configuration to ensure settings are preserved.
-// Returns the new container’s ID or an error if creation or startup fails.
+//
+// It applies the provided network configuration and respects the reviveStopped option.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - sourceContainer: Container to replicate.
+//   - networkConfig: Network settings to apply.
+//   - reviveStopped: Whether to start stopped containers.
+//   - clientVersion: API version of the client.
+//   - minSupportedVersion: Minimum API version for full features.
+//
+// Returns:
+//   - types.ContainerID: ID of the new container.
+//   - error: Non-nil if creation or start fails, nil on success.
 func StartTargetContainer(
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
@@ -30,14 +42,16 @@ func StartTargetContainer(
 		"id":        sourceContainer.ID().ShortID(),
 	})
 
+	// Extract configuration from the source container.
 	config := sourceContainer.GetCreateConfig()
 	hostConfig := sourceContainer.GetCreateHostConfig()
 
-	// Log network config details with client version context
+	// Log network details for debugging.
 	debugLogMacAddress(networkConfig, sourceContainer.ID(), clientVersion, minSupportedVersion)
 
 	clog.Debug("Creating new container")
 
+	// Create the new container with source config and network settings.
 	createdContainer, err := api.ContainerCreate(
 		ctx,
 		config,
@@ -53,6 +67,8 @@ func StartTargetContainer(
 	}
 
 	createdContainerID := types.ContainerID(createdContainer.ID)
+
+	// Skip starting if source isn’t running and revive isn’t enabled.
 	if !sourceContainer.IsRunning() && !reviveStopped {
 		clog.WithField("new_id", createdContainerID.ShortID()).
 			Debug("Created container, not starting due to stopped state")
@@ -60,6 +76,7 @@ func StartTargetContainer(
 		return createdContainerID, nil
 	}
 
+	// Start the newly created container.
 	clog.WithField("new_id", createdContainerID.ShortID()).Debug("Starting new container")
 
 	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainerType.StartOptions{}); err != nil {
@@ -76,7 +93,14 @@ func StartTargetContainer(
 }
 
 // RenameTargetContainer renames an existing container to the specified new name.
-// It logs the action and returns an error if the rename fails.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - targetContainer: Container to rename.
+//   - newName: New name for the container.
+//
+// Returns:
+//   - error: Non-nil if rename fails, nil on success.
 func RenameTargetContainer(
 	api dockerClient.APIClient,
 	targetContainer types.Container,
@@ -89,6 +113,7 @@ func RenameTargetContainer(
 		"new_name":  newName,
 	})
 
+	// Attempt to rename the container.
 	clog.Debug("Renaming container")
 
 	if err := api.ContainerRename(ctx, string(targetContainer.ID()), newName); err != nil {

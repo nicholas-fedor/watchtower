@@ -35,82 +35,98 @@ import (
 )
 
 // client is the Docker client instance used to interact with container operations in Watchtower.
+//
 // It provides an interface for listing, stopping, starting, and managing containers, initialized during
 // the preRun phase with options derived from command-line flags and environment variables such as
 // DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
 var client container.Client
 
 // scheduleSpec holds the cron-formatted schedule string that dictates when periodic container updates occur.
+//
 // It is populated during preRun from the --schedule flag or the WATCHTOWER_SCHEDULE environment variable,
 // supporting formats like "@every 1h" or standard cron syntax (e.g., "0 0 * * * *") for flexible scheduling.
 var scheduleSpec string
 
 // cleanup is a boolean flag determining whether to remove old images after a container update.
+//
 // It is set during preRun via the --cleanup flag or the WATCHTOWER_CLEANUP environment variable,
 // enabling disk space management by deleting outdated images post-update.
 var cleanup bool
 
 // noRestart is a boolean flag that prevents containers from being restarted after an update.
+//
 // It is configured in preRun via the --no-restart flag or the WATCHTOWER_NO_RESTART environment variable,
 // useful when users prefer manual restart control or want to minimize downtime during updates.
 var noRestart bool
 
 // noPull is a boolean flag that skips pulling new images from the registry during updates.
+//
 // It is enabled in preRun via the --no-pull flag or the WATCHTOWER_NO_PULL environment variable,
 // allowing updates to proceed using only locally cached images, potentially reducing network usage.
 var noPull bool
 
 // monitorOnly is a boolean flag enabling a mode where Watchtower monitors containers without updating them.
+//
 // It is set in preRun via the --monitor-only flag or the WATCHTOWER_MONITOR_ONLY environment variable,
 // ideal for observing image staleness without triggering automatic updates.
 var monitorOnly bool
 
 // enableLabel is a boolean flag restricting updates to containers with the "com.centurylinklabs.watchtower.enable" label set to true.
+//
 // It is configured in preRun via the --label-enable flag or the WATCHTOWER_LABEL_ENABLE environment variable,
 // providing granular control over which containers are targeted for updates.
 var enableLabel bool
 
 // disableContainers is a slice of container names explicitly excluded from updates.
+//
 // It is populated in preRun from the --disable-containers flag or the WATCHTOWER_DISABLE_CONTAINERS environment variable,
 // allowing users to blacklist specific containers from Watchtower’s operations.
 var disableContainers []string
 
 // notifier is the notification system instance responsible for sending update status messages to configured channels.
+//
 // It is initialized in preRun with notification types specified via flags (e.g., --notifications), supporting
 // multiple methods like email, Slack, or MSTeams to inform users about update successes, failures, or skips.
 var notifier types.Notifier
 
 // timeout specifies the maximum duration allowed for container stop operations during updates.
+//
 // It defaults to a value defined in the flags package and can be overridden in preRun via the --timeout flag or
 // WATCHTOWER_TIMEOUT environment variable, ensuring containers are stopped gracefully within a specified time limit.
 var timeout time.Duration
 
 // lifecycleHooks is a boolean flag enabling the execution of pre- and post-update lifecycle hook commands.
+//
 // It is set in preRun via the --enable-lifecycle-hooks flag or the WATCHTOWER_LIFECYCLE_HOOKS environment variable,
 // allowing custom scripts to run at specific update stages for additional validation or actions.
 var lifecycleHooks bool
 
 // rollingRestart is a boolean flag enabling rolling restarts, updating containers sequentially rather than all at once.
+//
 // It is configured in preRun via the --rolling-restart flag or the WATCHTOWER_ROLLING_RESTART environment variable,
 // reducing downtime by restarting containers one-by-one during updates.
 var rollingRestart bool
 
 // scope defines a specific operational scope for Watchtower, limiting updates to containers matching this scope.
+//
 // It is set in preRun via the --scope flag or the WATCHTOWER_SCOPE environment variable, useful for isolating
 // Watchtower’s actions to a subset of containers (e.g., a project or environment).
 var scope string
 
 // labelPrecedence is a boolean flag giving container label settings priority over global command-line flags.
+//
 // It is enabled in preRun via the --label-take-precedence flag or the WATCHTOWER_LABEL_PRECEDENCE environment variable,
 // allowing container-specific configurations to override broader settings for flexibility.
 var labelPrecedence bool
 
 // rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
+//
 // It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
 // to manage setup and execution, initialized with default behavior and configured via flags during runtime.
 var rootCmd = NewRootCommand()
 
 // RunConfig encapsulates the configuration parameters for the runMain function.
+//
 // It aggregates command-line flags and derived settings into a single structure, providing a cohesive way
 // to pass configuration data through the CLI execution flow, ensuring all necessary parameters are accessible
 // for update operations, API setup, and scheduling.
@@ -138,9 +154,11 @@ type RunConfig struct {
 }
 
 // NewRootCommand creates and configures the root command for the Watchtower CLI.
+//
 // It establishes the base usage string ("watchtower"), a short description summarizing its purpose,
-// and a long description with additional context and a project URL. It assigns the PreRun and Run
-// functions to handle setup and execution, respectively, and allows arbitrary arguments for flexibility.
+// and a long description with additional context and a project URL.
+//
+// It assigns the PreRun and Run functions to handle setup and execution, respectively, and allows arbitrary arguments for flexibility.
 //
 // Returns:
 //   - *cobra.Command: A pointer to the fully configured root command, ready for flag registration and execution.
@@ -156,6 +174,7 @@ func NewRootCommand() *cobra.Command {
 }
 
 // init registers command-line flags for the root command during package initialization.
+//
 // It invokes functions from the flags package to set default values and register flags for Docker configuration
 // (e.g., --host), system behavior (e.g., --interval), and notifications (e.g., --notifications), establishing
 // the CLI’s configurable parameters before execution begins.
@@ -167,6 +186,7 @@ func init() {
 }
 
 // Execute runs the root command and manages any errors encountered during its execution.
+//
 // It serves as the primary entry point for the Watchtower CLI, called from main.go, and ensures that any
 // fatal errors are logged and terminate the program with an appropriate exit status, providing a clean
 // interface between the CLI and the operating system.
@@ -177,6 +197,7 @@ func Execute() {
 }
 
 // preRun prepares the environment and configuration before the main command execution begins.
+//
 // It processes command-line flags and their aliases, configures logging based on verbosity settings,
 // initializes the Docker client and notification system, retrieves operational flags, and validates
 // flag combinations to ensure Watchtower is correctly set up for its tasks.
@@ -188,15 +209,15 @@ func preRun(cmd *cobra.Command, _ []string) {
 	flagsSet := cmd.PersistentFlags()
 	flags.ProcessFlagAliases(flagsSet)
 
-	// Configure logging based on flags such as --debug, --trace, and --log-format.
+	// Setup logging based on flags such as --debug, --trace, and --log-format.
 	if err := flags.SetupLogging(flagsSet); err != nil {
 		logrus.WithError(err).Fatal("Failed to initialize logging")
 	}
 
-	// Retrieve the cron schedule specification from flags or environment variables.
+	// Get the cron schedule specification from flags or environment variables.
 	scheduleSpec, _ = flagsSet.GetString("schedule")
 
-	// Process secrets from files (e.g., for notifications) and read core operational flags.
+	// Get secrets from files (e.g., for notifications) and read core operational flags.
 	flags.GetSecretsFromFiles(cmd)
 	cleanup, noRestart, monitorOnly, timeout = flags.ReadFlags(cmd)
 
@@ -205,7 +226,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 		logrus.Fatal("Please specify a positive value for timeout value.")
 	}
 
-	// Assign additional configuration flags that control update behavior and scope.
+	// Set additional configuration flags that control update behavior and scope.
 	enableLabel, _ = flagsSet.GetBool("label-enable")
 	disableContainers, _ = flagsSet.GetStringSlice("disable-containers")
 	lifecycleHooks, _ = flagsSet.GetBool("enable-lifecycle-hooks")
@@ -255,19 +276,21 @@ func preRun(cmd *cobra.Command, _ []string) {
 }
 
 // run executes the main Watchtower logic based on parsed command-line flags.
+//
 // It determines the operational mode (one-time update, HTTP API, or scheduled updates), builds
 // the container filter, and delegates to runMain for core execution, exiting with a status code
-// based on the outcome (0 for success, non-zero for failure). This function bridges flag parsing
-// and the application’s primary workflow.
+// based on the outcome (0 for success, non-zero for failure).
+//
+// This function bridges flag parsing and the application’s primary workflow.
 //
 // Parameters:
 //   - c: The cobra.Command instance being executed, providing access to parsed flags.
 //   - names: A slice of container names provided as positional arguments, used for filtering.
 func run(c *cobra.Command, names []string) {
-	// Construct the filter and its description based on names, exclusions, and label settings.
+	// Build the filter and its description based on names, exclusions, and label settings.
 	filter, filterDesc := filters.BuildFilter(names, disableContainers, enableLabel, scope)
 
-	// Retrieve flags controlling execution mode and HTTP API behavior.
+	// Get flags controlling execution mode and HTTP API behavior.
 	runOnce, _ := c.PersistentFlags().GetBool("run-once")
 	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
 	enableMetricsAPI, _ := c.PersistentFlags().GetBool("http-api-metrics")
@@ -275,7 +298,7 @@ func run(c *cobra.Command, names []string) {
 	apiToken, _ := c.PersistentFlags().GetString("http-api-token")
 	healthCheck, _ := c.PersistentFlags().GetBool("health-check")
 
-	// Retrieve the HTTP API port, falling back to "8080" if not specified.
+	// Get the HTTP API port, falling back to "8080" if not specified.
 	flagsSet := c.PersistentFlags()
 
 	apiPort, err := flagsSet.GetString("http-api-port")
@@ -299,7 +322,7 @@ func run(c *cobra.Command, names []string) {
 		return // Exit early without os.Exit to preserve defer in caller.
 	}
 
-	// Assemble configuration for core execution, encapsulating all operational parameters.
+	// Set configuration for core execution, encapsulating all operational parameters.
 	cfg := RunConfig{
 		Command:          c,
 		Names:            names,
@@ -321,9 +344,9 @@ func run(c *cobra.Command, names []string) {
 }
 
 // runMain contains the core Watchtower logic after early exits are handled.
+//
 // It validates the environment, performs one-time updates if specified, sets up the HTTP API,
 // and schedules periodic updates, managing context and concurrency to ensure graceful operation.
-// It returns an exit code to indicate success (0) or failure (1), driving the CLI’s termination behavior.
 //
 // Parameters:
 //   - cfg: The RunConfig struct containing all necessary configuration parameters for execution.
@@ -368,7 +391,7 @@ func runMain(cfg RunConfig) int {
 		return 1
 	}
 
-	// Initialize a lock channel to prevent concurrent updates between API and scheduler.
+	// Setup API and scheduling by initializing a lock channel to prevent concurrent conflicting updates.
 	updateLock := make(chan bool, 1)
 	updateLock <- true
 
@@ -393,6 +416,7 @@ func runMain(cfg RunConfig) int {
 }
 
 // setupAndStartAPI configures and launches the HTTP API if enabled by configuration flags.
+//
 // It sets up update and metrics endpoints, starts the API server in blocking or non-blocking mode,
 // and handles startup errors, ensuring the API integrates seamlessly with Watchtower’s update workflow.
 //
@@ -439,6 +463,7 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 }
 
 // logNotify logs an error message and ensures notifications are sent before returning control.
+//
 // It uses a specific message if provided, falling back to a generic one, and includes the error in fields.
 //
 // Parameters:
@@ -454,6 +479,7 @@ func logNotify(msg string, err error) {
 }
 
 // awaitDockerClient introduces a brief delay to ensure the Docker client is fully initialized.
+//
 // It pauses execution for one second to mitigate potential race conditions during startup,
 // giving the Docker API time to stabilize before Watchtower begins interacting with containers.
 func awaitDockerClient() {
@@ -464,6 +490,7 @@ func awaitDockerClient() {
 }
 
 // formatDuration converts a time.Duration into a human-readable string representation.
+//
 // It breaks down the duration into hours, minutes, and seconds, formatting each unit with appropriate
 // grammar (singular or plural) and returning a string like "1 hour, 2 minutes, 3 seconds" or "0 seconds"
 // if the duration is zero, ensuring a user-friendly output for logs and notifications.
@@ -510,6 +537,7 @@ func formatDuration(duration time.Duration) string {
 }
 
 // formatTimeUnit formats a single time unit into a string based on its value and context.
+//
 // It applies singular or plural grammar, skipping leading zeros unless forced (e.g., for seconds as the last unit),
 // returning an empty string for skippable zeros to maintain a concise output.
 //
@@ -536,6 +564,7 @@ func formatTimeUnit(unit struct {
 }
 
 // filterEmpty removes empty strings from a slice, returning only non-empty elements.
+//
 // It ensures the final formatted duration string excludes unnecessary parts, maintaining readability
 // by filtering out zero-value units that were not explicitly included.
 //
@@ -557,6 +586,7 @@ func filterEmpty(parts []string) []string {
 }
 
 // writeStartupMessage logs or notifies startup information based on configuration flags.
+//
 // It reports Watchtower’s version, notification setup, container filtering details, scheduling information,
 // and HTTP API status, providing users with a comprehensive overview of the application’s initial state.
 //
@@ -604,6 +634,7 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
 }
 
 // setupStartupLogger configures the logger for startup messages based on message suppression settings.
+//
 // It uses a local log entry if messages are suppressed (--no-startup-message), otherwise batches messages
 // via the notifier for consolidated delivery, ensuring flexibility in how startup info is presented.
 //
@@ -625,6 +656,7 @@ func setupStartupLogger(noStartupMessage bool) *logrus.Entry {
 }
 
 // logNotifierInfo logs details about the notification setup for Watchtower.
+//
 // It reports the list of configured notifier names (e.g., "email, slack") or indicates no notifications
 // are set up, providing visibility into how update statuses will be communicated.
 //
@@ -640,6 +672,7 @@ func logNotifierInfo(log *logrus.Entry, notifierNames []string) {
 }
 
 // logScheduleInfo logs information about the scheduling or run mode configuration.
+//
 // It handles scheduled runs with timing details, one-time updates, or indicates no periodic runs,
 // ensuring users understand when and how updates will occur.
 //
@@ -664,6 +697,7 @@ func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 }
 
 // runUpgradesOnSchedule schedules and executes periodic container updates according to the cron specification.
+//
 // It sets up a cron scheduler, runs updates at specified intervals, and ensures graceful shutdown on interrupt
 // signals (SIGINT, SIGTERM) or context cancellation, handling concurrency with a lock channel.
 //
@@ -743,6 +777,7 @@ func runUpgradesOnSchedule(
 }
 
 // runUpdatesWithNotifications performs container updates and sends notifications about the results.
+//
 // It executes the update action with configured parameters, batches notifications, and returns a metric
 // summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
 //

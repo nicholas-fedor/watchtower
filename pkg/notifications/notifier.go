@@ -19,10 +19,17 @@ const ColorHex = "#406170"
 // ColorInt is the default notification color used for services that support it (as an int value).
 const ColorInt = 0x406170
 
-// NewNotifier creates and returns a new Notifier, using global configuration.
+// NewNotifier creates a new Notifier from global configuration.
+//
+// Parameters:
+//   - c: Cobra command with flags.
+//
+// Returns:
+//   - types.Notifier: Configured notifier instance.
 func NewNotifier(c *cobra.Command) types.Notifier {
 	flag := c.Flags()
 
+	// Parse log level from flags.
 	level, _ := flag.GetString("notifications-level")
 	clog := logrus.WithField("level", level)
 	clog.Debug("Parsing notifications log level")
@@ -32,6 +39,7 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 		clog.WithError(err).Fatal("Invalid notifications log level")
 	}
 
+	// Extract notification settings.
 	reportTemplate, _ := flag.GetBool("notification-report")
 	stdout, _ := flag.GetBool("notification-log-stdout")
 	tplString, _ := flag.GetString("notification-template")
@@ -53,11 +61,20 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 	return createNotifier(urls, logLevel, tplString, !reportTemplate, data, stdout, delay)
 }
 
-// AppendLegacyUrls creates shoutrrr equivalent URLs from legacy notification flags.
+// AppendLegacyUrls adds shoutrrr URLs from legacy notification flags.
+//
+// Parameters:
+//   - urls: Initial URL list.
+//   - cmd: Cobra command with flags.
+//
+// Returns:
+//   - []string: Updated URL list.
+//   - time.Duration: Notification delay.
 func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duration) {
 	clog := logrus.WithField("function", "AppendLegacyUrls")
 	clog.Debug("Appending legacy notification URLs")
 
+	// Fetch legacy notification types.
 	notificationTypes, err := cmd.Flags().GetStringSlice("notifications")
 	if err != nil {
 		clog.WithError(err).Fatal("Could not read notifications argument")
@@ -87,6 +104,7 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 			continue
 		}
 
+		// Generate shoutrrr URL from legacy notifier.
 		shoutrrrURL, err := legacyNotifier.GetURL(cmd)
 		if err != nil {
 			clog.WithError(err).
@@ -96,6 +114,7 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 
 		urls = append(urls, shoutrrrURL)
 
+		// Check for delay if supported.
 		if delayNotifier, ok := legacyNotifier.(types.DelayNotifier); ok {
 			legacyDelay = delayNotifier.GetDelay()
 			clog.WithFields(logrus.Fields{
@@ -119,17 +138,26 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 	return urls, delay
 }
 
-// GetDelay returns the legacy delay if defined, otherwise the delay as set by args is returned.
+// GetDelay determines the notification delay from flags or legacy value.
+//
+// Parameters:
+//   - c: Cobra command with flags.
+//   - legacyDelay: Delay from legacy notifier.
+//
+// Returns:
+//   - time.Duration: Selected delay.
 func GetDelay(c *cobra.Command, legacyDelay time.Duration) time.Duration {
 	clog := logrus.WithField("legacy_delay", legacyDelay)
 	clog.Debug("Determining notification delay")
 
+	// Use legacy delay if set.
 	if legacyDelay > 0 {
 		clog.Debug("Using legacy delay")
 
 		return legacyDelay
 	}
 
+	// Check configured delay from flags.
 	delay, _ := c.PersistentFlags().GetInt("notifications-delay")
 	if delay > 0 {
 		delayDuration := time.Duration(delay) * time.Second
@@ -143,7 +171,14 @@ func GetDelay(c *cobra.Command, legacyDelay time.Duration) time.Duration {
 	return time.Duration(0)
 }
 
-// GetTitle formats the title based on the passed hostname and tag.
+// GetTitle formats the notification title with hostname and tag.
+//
+// Parameters:
+//   - hostname: Hostname to include.
+//   - tag: Optional tag prefix.
+//
+// Returns:
+//   - string: Formatted title.
 func GetTitle(hostname string, tag string) string {
 	clog := logrus.WithFields(logrus.Fields{
 		"hostname": hostname,
@@ -151,31 +186,39 @@ func GetTitle(hostname string, tag string) string {
 	})
 	clog.Debug("Generating notification title")
 
-	titleBuilder := strings.Builder{}
+	// Build title with optional tag and hostname.
+	b := strings.Builder{}
 	if tag != "" {
-		titleBuilder.WriteRune('[')
-		titleBuilder.WriteString(tag)
-		titleBuilder.WriteRune(']')
-		titleBuilder.WriteRune(' ')
+		b.WriteRune('[')
+		b.WriteString(tag)
+		b.WriteRune(']')
+		b.WriteRune(' ')
 	}
 
-	titleBuilder.WriteString("Watchtower updates")
+	b.WriteString("Watchtower updates")
 
 	if hostname != "" {
-		titleBuilder.WriteString(" on ")
-		titleBuilder.WriteString(hostname)
+		b.WriteString(" on ")
+		b.WriteString(hostname)
 	}
 
-	title := titleBuilder.String()
+	title := b.String()
 	clog.WithField("title", title).Debug("Generated notification title")
 
 	return title
 }
 
-// GetTemplateData populates the static notification data from flags and environment.
+// GetTemplateData populates static notification data from flags and env.
+//
+// Parameters:
+//   - c: Cobra command with flags.
+//
+// Returns:
+//   - StaticData: Populated data.
 func GetTemplateData(c *cobra.Command) StaticData {
 	flag := c.PersistentFlags()
 
+	// Get hostname from flag or system.
 	hostname, _ := flag.GetString("notifications-hostname")
 	clog := logrus.WithField("hostname_flag", hostname)
 	clog.Debug("Retrieving template data")
@@ -185,12 +228,13 @@ func GetTemplateData(c *cobra.Command) StaticData {
 		clog.WithField("hostname", hostname).Debug("Using system hostname")
 	}
 
+	// Generate title unless skipped.
 	title := ""
 
 	if skip, _ := flag.GetBool("notification-skip-title"); !skip {
 		tag, _ := flag.GetString("notification-title-tag")
 		if tag == "" {
-			// For legacy email support
+			// Check legacy email tag.
 			tag, _ = flag.GetString("notification-email-subjecttag")
 			clog.WithField("tag", tag).Debug("Using legacy email subject tag")
 		}

@@ -14,25 +14,31 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-const (
-	slackType = "slack"
-)
+// slackType is the identifier for Slack notifications.
+const slackType = "slack"
 
 // slackTypeNotifier handles Slack notifications via webhook.
-// It supports customization with username, channel, and icon settings.
+//
+// It supports custom username, channel, and icons.
 type slackTypeNotifier struct {
-	HookURL   string
-	Username  string
-	Channel   string
-	IconEmoji string
-	IconURL   string
+	HookURL   string // Slack webhook URL.
+	Username  string // Notification username.
+	Channel   string // Target channel (unused in webhook mode).
+	IconEmoji string // Emoji icon for messages.
+	IconURL   string // URL icon for messages.
 }
 
-// newSlackNotifier creates a new Slack notifier from command-line flags.
-// It initializes webhook URL, username, channel, and icon preferences.
+// newSlackNotifier creates a Slack notifier from command-line flags.
+//
+// Parameters:
+//   - c: Cobra command with flags.
+//
+// Returns:
+//   - types.ConvertibleNotifier: New Slack notifier instance.
 func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
+	// Extract Slack configuration from flags.
 	hookURL, _ := flags.GetString("notification-slack-hook-url")
 	userName, _ := flags.GetString("notification-slack-identifier")
 	channel, _ := flags.GetString("notification-slack-channel")
@@ -60,15 +66,23 @@ func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 }
 
 // GetURL generates the Slack webhook URL for the notifier.
-// It detects Discord wrappers and constructs the appropriate service URL.
+//
+// Parameters:
+//   - c: Cobra command (unused here).
+//
+// Returns:
+//   - string: Service URL (Slack or Discord).
+//   - error: Non-nil if token parsing fails, nil on success.
 func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("hook_url", s.HookURL)
 	clog.Debug("Generating Slack service URL")
 
+	// Normalize URL and split parts.
 	trimmedURL := strings.TrimRight(s.HookURL, "/")
 	trimmedURL = strings.TrimPrefix(trimmedURL, "https://")
 	parts := strings.Split(trimmedURL, "/")
 
+	// Handle Discord wrapper URLs.
 	if parts[0] == "discord.com" || parts[0] == "discordapp.com" {
 		clog.Debug("Detected a discord slack wrapper URL, using shoutrrr discord service")
 
@@ -90,8 +104,10 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		return urlStr, nil
 	}
 
+	// Extract Slack webhook token.
 	webhookToken := strings.Replace(s.HookURL, "https://hooks.slack.com/services/", "", 1)
 
+	// Configure Slack settings.
 	conf := &slack.Config{
 		BotName: s.Username,
 		Color:   ColorHex,
@@ -104,6 +120,7 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		conf.Icon = s.IconEmoji
 	}
 
+	// Set webhook token.
 	if err := conf.Token.SetFromProp(webhookToken); err != nil {
 		clog.WithError(err).Debug("Failed to set Slack webhook token")
 

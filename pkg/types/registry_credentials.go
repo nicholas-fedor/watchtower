@@ -1,7 +1,7 @@
 package types
 
-// RegistryCredentials is a credential pair used for basic auth.
+// RegistryCredentials holds basic auth credentials.
 type RegistryCredentials struct {
-	Username string
-	Password string // usually a token rather than an actual password
+	Username string // Registry username.
+	Password string // Registry token or password.
 }

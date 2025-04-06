@@ -14,9 +14,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-const (
-	msTeamsType = "msteams"
-)
+// msTeamsType is the identifier for Microsoft Teams notifications.
+const msTeamsType = "msteams"
 
 // Errors for Microsoft Teams notification configuration.
 var (
@@ -27,17 +26,24 @@ var (
 )
 
 // msTeamsTypeNotifier handles Microsoft Teams notifications via webhook.
+//
 // It supports optional data inclusion for detailed messages.
 type msTeamsTypeNotifier struct {
 	webHookURL string
 	data       bool
 }
 
-// newMsTeamsNotifier creates a new Microsoft Teams notifier from command-line flags.
-// It validates the webhook URL and sets data inclusion preference.
+// newMsTeamsNotifier creates a Teams notifier from command-line flags.
+//
+// Parameters:
+//   - cmd: Cobra command with flags.
+//
+// Returns:
+//   - types.ConvertibleNotifier: New Teams notifier instance.
 func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 	flags := cmd.Flags()
 
+	// Extract and validate webhook URL.
 	webHookURL, _ := flags.GetString("notification-msteams-hook")
 	clog := logrus.WithField("url", webHookURL)
 
@@ -47,6 +53,7 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 		)
 	}
 
+	// Get data inclusion flag.
 	withData, _ := flags.GetBool("notification-msteams-data")
 	clog.WithField("with_data", withData).Debug("Initializing Microsoft Teams notifier")
 
@@ -56,12 +63,19 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 	}
 }
 
-// GetURL generates the Microsoft Teams webhook URL for the notifier.
-// It parses the webhook and constructs the service URL with predefined color settings.
+// GetURL generates the Teams service URL from the notifier’s webhook.
+//
+// Parameters:
+//   - c: Cobra command (unused here).
+//
+// Returns:
+//   - string: Teams service URL.
+//   - error: Non-nil if parsing or config fails, nil on success.
 func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("url", n.webHookURL)
 	clog.Debug("Generating Microsoft Teams service URL")
 
+	// Parse the webhook URL.
 	webhookURL, err := url.Parse(n.webHookURL)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to parse Microsoft Teams webhook URL")
@@ -71,6 +85,7 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	clog.Debug("Parsed Microsoft Teams webhook URL")
 
+	// Create Teams config from webhook.
 	config, err := teams.ConfigFromWebhookURL(*webhookURL)
 	if err != nil {
 		clog.WithError(err).
@@ -79,6 +94,7 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		return "", fmt.Errorf("%w: %w", errConfigWebhookFailed, err)
 	}
 
+	// Set predefined color and generate URL.
 	config.Color = ColorHex
 
 	urlStr := config.GetURL().String()

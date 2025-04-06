@@ -27,10 +27,12 @@ import (
 // allowing Watchtower to compare or fetch it without downloading the full manifest body.
 const ContentDigestHeader = "Docker-Content-Digest"
 
-// minDigestParts defines the minimum number of parts expected when splitting a digest string.
-// A valid digest typically has two parts: a prefix (e.g., "sha256") and a hash value (e.g., "abc..."), separated by a colon.
-// This constant ensures digest strings are well-formed before comparison or processing.
-const minDigestParts = 2
+const (
+	// minDigestParts defines the minimum number of parts expected when splitting a digest string.
+	// A valid digest typically has two parts: a prefix (e.g., "sha256") and a hash value (e.g., "abc..."), separated by a colon.
+	// This constant ensures digest strings are well-formed before comparison or processing.
+	minDigestParts = 2
+)
 
 // UserAgent is the User-Agent header value used in HTTP requests to identify Watchtower as the client.
 // It can be customized at build time using linker flags (e.g., -ldflags "-X ...UserAgent=Watchtower/v1.0").
@@ -56,6 +58,7 @@ var (
 )
 
 // manifestResponse represents the JSON structure of a registry manifest response from a GET request.
+//
 // It is used to deserialize the digest field when fetching the full manifest body, providing a structured way
 // to access the image digest returned by the registry.
 type manifestResponse struct {
@@ -63,19 +66,16 @@ type manifestResponse struct {
 	Digest string `json:"digest"`
 }
 
-// CompareDigest checks whether a container’s current image digest matches the latest digest from its registry.
-// It performs a HEAD request to retrieve the remote digest efficiently without downloading the full manifest,
-// then compares it against the container’s local digests. This function is critical for determining if an image update
-// is needed during Watchtower’s update process.
+// CompareDigest checks whether a container’s current image digest matches the latest from its registry.
 //
 // Parameters:
-//   - ctx: The context controlling the request’s lifecycle, allowing cancellation or timeouts.
-//   - container: The container whose image digest is being compared, providing local digest information.
-//   - registryAuth: A base64-encoded authentication string (e.g., JSON credentials or "username:password").
+//   - ctx: Context for request lifecycle control.
+//   - container: Container whose digest is being compared.
+//   - registryAuth: Base64-encoded auth string.
 //
 // Returns:
-//   - bool: True if any local digest matches the remote digest, indicating the image is up-to-date; false otherwise.
-//   - error: An error if the operation fails (e.g., missing image info, request failure), nil if successful.
+//   - bool: True if digests match (image is up-to-date), false otherwise.
+//   - error: Non-nil if operation fails, nil on success.
 func CompareDigest(
 	ctx context.Context,
 	container types.Container,
@@ -99,16 +99,13 @@ func CompareDigest(
 		return false, err
 	}
 
-	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"remote_digest": remoteDigest,
-	}).Debug("Fetched remote digest")
+	logrus.WithFields(fields).
+		WithField("remote_digest", remoteDigest).
+		Debug("Fetched remote digest")
 
 	// Compare the fetched remote digest with the container’s local digests.
 	matches := digestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
-
-	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"matches": matches,
-	}).Debug("Completed digest comparison")
+	logrus.WithFields(fields).WithField("matches", matches).Debug("Completed digest comparison")
 
 	return matches, nil
 }
@@ -129,24 +126,22 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 	return fetchDigest(ctx, container, authToken, http.MethodGet)
 }
 
-// fetchDigest retrieves an image digest from the registry using the specified HTTP method (HEAD or GET).
-// It orchestrates authentication, request construction, and digest extraction, providing a unified approach
-// for both comparison (HEAD) and full fetch (GET) operations. This function reduces code duplication by
-// handling the common logic for both CompareDigest and FetchDigest.
+// fetchDigest retrieves an image digest using the specified HTTP method.
 //
 // Parameters:
-//   - ctx: The context controlling the request’s lifecycle, supporting cancellation and timeouts.
-//   - container: The container whose image digest is being retrieved, used for URL and auth construction.
-//   - registryAuth: The base64-encoded authentication string, transformed as needed.
-//   - method: The HTTP method ("HEAD" or "GET") determining how the digest is fetched.
+//   - ctx: Context for request lifecycle control.
+//   - container: Container whose digest is being retrieved.
+//   - registryAuth: Base64-encoded auth string.
+//   - method: HTTP method ("HEAD" or "GET").
 //
 // Returns:
-//   - string: The normalized digest extracted from the response.
-//   - error: An error if any step (auth, URL, request, extraction) fails, nil if successful.
+//   - string: Normalized digest.
+//   - error: Non-nil if operation fails, nil on success.
 func fetchDigest(
 	ctx context.Context,
 	container types.Container,
-	registryAuth, method string,
+	registryAuth string,
+	method string,
 ) (string, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
@@ -214,6 +209,7 @@ func fetchDigest(
 }
 
 // extractHeadDigest extracts the image digest from a HEAD response’s headers.
+//
 // It retrieves the digest from the "Docker-Content-Digest" header, normalizing it for comparison,
 // and validates its presence to ensure a valid response from the registry.
 //
@@ -224,9 +220,11 @@ func fetchDigest(
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if present.
 //   - error: An error if the digest is missing or the response is invalid, nil if successful.
 func extractHeadDigest(resp *http.Response) (string, error) {
+	// Retrieve the digest from the standard header.
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest == "" {
-		wwwAuthHeader := resp.Header.Get("Www-Authenticate")
+		// Log and return an error if the digest is missing, including auth details for debugging.
+		wwwAuthHeader := resp.Header.Get("www-authenticate")
 		logrus.WithFields(logrus.Fields{
 			"status":      resp.Status,
 			"auth_header": wwwAuthHeader,
@@ -240,6 +238,7 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 		)
 	}
 
+	// Normalize the digest (e.g., strip "sha256:") for consistency.
 	normalizedDigest := helpers.NormalizeDigest(digest)
 	logrus.WithFields(logrus.Fields{
 		"digest": normalizedDigest,
@@ -260,12 +259,14 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 //   - error: An error if decoding fails or the digest is missing, nil if successful.
 func extractGetDigest(resp *http.Response) (string, error) {
 	var response manifestResponse
+	// Decode the JSON response body into the manifest structure.
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		logrus.WithError(err).Debug("Failed to extract digest from GET response")
 
 		return "", fmt.Errorf("%w: %w", errDigestExtractionFailed, err)
 	}
 
+	// Normalize the extracted digest for consistent comparison.
 	normalizedDigest := helpers.NormalizeDigest(response.Digest)
 	logrus.WithFields(logrus.Fields{
 		"digest": normalizedDigest,
@@ -285,20 +286,24 @@ func extractGetDigest(resp *http.Response) (string, error) {
 // Returns:
 //   - bool: True if any normalized local digest matches the normalized remote digest, false otherwise.
 func digestsMatch(localDigests []string, remoteDigest string) bool {
+	// Normalize the remote digest once for efficiency.
 	normalizedRemoteDigest := helpers.NormalizeDigest(remoteDigest)
 
 	for _, digest := range localDigests {
+		// Split digest into repo and hash parts (e.g., "repo@sha256:abc").
 		parts := strings.Split(digest, "@")
 		if len(parts) < minDigestParts {
-			continue
+			continue // Skip malformed digests.
 		}
 
+		// Normalize the local digest’s hash part.
 		normalizedLocalDigest := helpers.NormalizeDigest(parts[1])
 		logrus.WithFields(logrus.Fields{
 			"local_digest":  normalizedLocalDigest,
 			"remote_digest": normalizedRemoteDigest,
 		}).Debug("Comparing digests")
 
+		// Return true on the first match.
 		if normalizedLocalDigest == normalizedRemoteDigest {
 			logrus.Debug("Found digest match")
 
@@ -323,7 +328,7 @@ func TransformAuth(registryAuth string) string {
 	b, _ := base64.StdEncoding.DecodeString(registryAuth)
 	credentials := &types.RegistryCredentials{}
 
-	// Unmarshal the decoded bytes into a credentials struct, ignoring errors as per original behavior.
+	// Unmarshal JSON into credentials struct, ignoring errors if malformed.
 	_ = json.Unmarshal(b, credentials) //nolint:musttag
 
 	// If both username and password are present, re-encode them as "username:password".
@@ -332,5 +337,5 @@ func TransformAuth(registryAuth string) string {
 		registryAuth = base64.StdEncoding.EncodeToString(ba)
 	}
 
-	return registryAuth
+	return registryAuth // Return original if no valid credentials.
 }

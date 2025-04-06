@@ -12,9 +12,24 @@ import (
 
 var lock chan bool
 
-// New is a factory function creating a new Handler instance.
-// It initializes the update lock, either from the provided channel or a new one.
+// Handler triggers container update scans via HTTP.
+//
+// It holds the update function and endpoint path.
+type Handler struct {
+	fn   func(images []string) // Update execution function.
+	Path string                // API endpoint path.
+}
+
+// New creates a new Handler instance.
+//
+// Parameters:
+//   - updateFn: Function to execute updates.
+//   - updateLock: Optional lock channel for concurrency.
+//
+// Returns:
+//   - *Handler: Initialized handler.
 func New(updateFn func(images []string), updateLock chan bool) *Handler {
+	// Use provided lock or create a new one.
 	if updateLock != nil {
 		lock = updateLock
 
@@ -33,21 +48,18 @@ func New(updateFn func(images []string), updateLock chan bool) *Handler {
 	}
 }
 
-// Handler is an API handler used for triggering container update scans.
-// It encapsulates the update function and the API endpoint path.
-type Handler struct {
-	fn   func(images []string)
-	Path string
-}
-
-// Handle processes HTTP requests to trigger container updates.
-// It reads the request body, extracts image queries, and executes the update function.
+// Handle processes HTTP update requests.
+//
+// Parameters:
+//   - w: HTTP response writer (unused here).
+//   - r: HTTP request with optional image queries.
 func (handle *Handler) Handle(_ http.ResponseWriter, r *http.Request) {
 	logrus.WithFields(logrus.Fields{
 		"method": r.Method,
 		"path":   r.URL.Path,
 	}).Info("Received HTTP API update request")
 
+	// Log request body to stdout.
 	_, err := io.Copy(os.Stdout, r.Body)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to read request body")
@@ -55,6 +67,7 @@ func (handle *Handler) Handle(_ http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract images from query parameters.
 	var images []string
 
 	imageQueries, found := r.URL.Query()["image"]
@@ -70,6 +83,7 @@ func (handle *Handler) Handle(_ http.ResponseWriter, r *http.Request) {
 		logrus.Debug("No image query parameters provided")
 	}
 
+	// Execute update with lock handling.
 	if len(images) > 0 {
 		chanValue := <-lock
 		defer func() { lock <- chanValue }()

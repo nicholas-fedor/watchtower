@@ -15,23 +15,29 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-const (
-	gotifyType = "gotify"
-)
+// gotifyType is the identifier for Gotify notifications.
+const gotifyType = "gotify"
 
-// gotifyTypeNotifier handles Gotify notifications with URL, token, and TLS settings.
-// It configures the Gotify service for sending messages.
+// gotifyTypeNotifier handles Gotify notifications.
+//
+// It configures URL, token, and TLS settings.
 type gotifyTypeNotifier struct {
-	gotifyURL                string
-	gotifyAppToken           string
-	gotifyInsecureSkipVerify bool
+	gotifyURL                string // Gotify server URL.
+	gotifyAppToken           string // Gotify application token.
+	gotifyInsecureSkipVerify bool   // Skip TLS verification if true.
 }
 
-// newGotifyNotifier creates a new Gotify notifier from command-line flags.
-// It validates and retrieves the URL and token, setting TLS skip verification as needed.
+// newGotifyNotifier creates a Gotify notifier from command-line flags.
+//
+// Parameters:
+//   - c: Cobra command with flags.
+//
+// Returns:
+//   - types.ConvertibleNotifier: New Gotify notifier instance.
 func newGotifyNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
+	// Extract and validate configuration.
 	apiURL := getGotifyURL(flags)
 	token := getGotifyToken(flags)
 	skipVerify, _ := flags.GetBool("notification-gotify-tls-skip-verify")
@@ -42,7 +48,7 @@ func newGotifyNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	})
 	clog.Debug("Initializing Gotify notifier")
 
-	// Log token at trace level for sensitivity
+	// Log token only at trace level for security.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		clog.WithField("token", token).Trace("Gotify notifier token loaded")
 	}
@@ -54,12 +60,18 @@ func newGotifyNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	}
 }
 
-// getGotifyToken retrieves and validates the Gotify token from flags.
-// It returns the token or exits with a fatal error if empty.
+// getGotifyToken retrieves the Gotify token from flags.
+//
+// Parameters:
+//   - flags: Flag set to check.
+//
+// Returns:
+//   - string: Token value (fatal if empty).
 func getGotifyToken(flags *pflag.FlagSet) string {
 	gotifyToken, _ := flags.GetString("notification-gotify-token")
 	clog := logrus.WithField("flag", "notification-gotify-token")
 
+	// Fatal error if token is missing.
 	if len(gotifyToken) < 1 {
 		clog.Fatal(
 			"Gotify token is empty; required argument --notification-gotify-token(cli) or WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN(env) is empty",
@@ -72,7 +84,12 @@ func getGotifyToken(flags *pflag.FlagSet) string {
 }
 
 // getGotifyURL retrieves and validates the Gotify URL from flags.
-// It ensures the URL starts with "http://" or "https://", warning if insecure.
+//
+// Parameters:
+//   - flags: Flag set to check.
+//
+// Returns:
+//   - string: Validated URL (fatal if empty or malformed).
 func getGotifyURL(flags *pflag.FlagSet) string {
 	gotifyURL, _ := flags.GetString("notification-gotify-url")
 	clog := logrus.WithFields(logrus.Fields{
@@ -80,16 +97,19 @@ func getGotifyURL(flags *pflag.FlagSet) string {
 		"url":  gotifyURL,
 	})
 
+	// Fatal error if URL is missing.
 	if len(gotifyURL) < 1 {
 		clog.Fatal(
 			"Gotify URL is empty; required argument --notification-gotify-url(cli) or WATCHTOWER_NOTIFICATION_GOTIFY_URL(env) is empty",
 		)
 	}
 
+	// Validate URL scheme.
 	if !strings.HasPrefix(gotifyURL, "http://") && !strings.HasPrefix(gotifyURL, "https://") {
 		clog.Fatal("Gotify URL must start with \"http://\" or \"https://\"")
 	}
 
+	// Warn if using insecure HTTP.
 	if strings.HasPrefix(gotifyURL, "http://") {
 		clog.Warn("Using an HTTP URL for Gotify is insecure")
 	}
@@ -99,12 +119,19 @@ func getGotifyURL(flags *pflag.FlagSet) string {
 	return gotifyURL
 }
 
-// GetURL generates the Gotify URL for the notifier based on its configuration.
-// It parses the API URL and constructs the service URL with TLS settings.
+// GetURL generates the Gotify service URL from the notifier’s configuration.
+//
+// Parameters:
+//   - c: Cobra command (unused here).
+//
+// Returns:
+//   - string: Gotify service URL.
+//   - error: Non-nil if URL parsing fails, nil on success.
 func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("url", n.gotifyURL)
 	clog.Debug("Generating Gotify service URL")
 
+	// Parse the API URL.
 	apiURL, err := url.Parse(n.gotifyURL)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to parse Gotify URL")
@@ -112,6 +139,7 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		return "", fmt.Errorf("failed to generate Gotify URL: %w", err)
 	}
 
+	// Configure Gotify settings.
 	config := &gotify.Config{
 		Host:       apiURL.Host,
 		Path:       apiURL.Path,
