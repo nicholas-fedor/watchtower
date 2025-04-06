@@ -4,15 +4,15 @@ import (
 	"time"
 )
 
-// UpdateParams contains all different options available to alter the behavior of the Update func.
+// UpdateParams defines options for the Update function.
 type UpdateParams struct {
-	Filter          Filter
-	Cleanup         bool
-	NoRestart       bool
-	Timeout         time.Duration
-	MonitorOnly     bool
-	NoPull          bool
-	LifecycleHooks  bool
-	RollingRestart  bool
-	LabelPrecedence bool
+	Filter          Filter        // Container filter.
+	Cleanup         bool          // Remove old images if true.
+	NoRestart       bool          // Skip restarts if true.
+	Timeout         time.Duration // Update timeout.
+	MonitorOnly     bool          // Monitor without updating if true.
+	NoPull          bool          // Skip image pulls if true.
+	LifecycleHooks  bool          // Enable lifecycle hooks if true.
+	RollingRestart  bool          // Use rolling restart if true.
+	LabelPrecedence bool          // Prioritize labels if true.
 }

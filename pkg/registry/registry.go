@@ -1,3 +1,5 @@
+// Package registry provides utilities for interacting with container registries in Watchtower.
+// It handles authentication, pull option configuration, and API consumption checks for registry operations.
 package registry
 
 import (
@@ -20,15 +22,24 @@ var (
 )
 
 // GetPullOptions creates a struct with all options needed for pulling images from a registry.
-// It retrieves encoded authentication credentials for the specified image and configures
-// pull options, including a privilege function for handling authentication retries.
+//
+// It retrieves encoded authentication credentials and configures pull options with a privilege function.
+//
+// Parameters:
+//   - imageName: Name of the image to pull (e.g., "docker.io/library/alpine").
+//
+// Returns:
+//   - image.PullOptions: Configured pull options if successful.
+//   - error: Non-nil if auth retrieval fails, nil on success.
 func GetPullOptions(imageName string) (image.PullOptions, error) {
+	// Set up logging fields for consistent tracking.
 	fields := logrus.Fields{
 		"image": imageName,
 	}
 
 	logrus.WithFields(fields).Debug("Retrieving pull options")
 
+	// Fetch encoded auth credentials for the image.
 	auth, err := EncodedAuth(imageName)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get authentication credentials")
@@ -36,19 +47,21 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 		return image.PullOptions{}, fmt.Errorf("%w: %w", errFailedGetAuth, err)
 	}
 
+	// Return empty options if no auth is available.
 	if auth == "" {
 		logrus.WithFields(fields).Debug("No authentication credentials found")
 
 		return image.PullOptions{}, nil
 	}
 
-	// Log auth value only in trace mode to avoid leaking credentials
+	// Log auth details only in trace mode to protect sensitive data.
 	if logrus.GetLevel() == logrus.TraceLevel {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"auth": auth,
 		}).Trace("Retrieved authentication credentials")
 	}
 
+	// Configure pull options with auth and a default privilege handler.
 	pullOptions := image.PullOptions{
 		RegistryAuth:  auth,
 		PrivilegeFunc: DefaultAuthHandler,
@@ -60,24 +73,39 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 }
 
 // DefaultAuthHandler is a privilege function called when initial authentication fails.
-// It logs the rejection and returns an empty string to retry the request without authentication,
-// as retrying with the same credentials used in AuthConfig is unlikely to succeed.
+//
+// It retries the request without credentials, as reusing the same auth is unlikely to succeed.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control (unused here).
+//
+// Returns:
+//   - string: Empty string to indicate no new credentials.
+//   - error: Always nil, as no further action is taken.
 func DefaultAuthHandler(_ context.Context) (string, error) {
+	// Log the auth rejection and proceed without credentials.
 	logrus.Debug("Authentication rejected, retrying without credentials")
 
 	return "", nil
 }
 
 // WarnOnAPIConsumption determines whether to warn about API consumption for a container’s registry.
-// It returns true if the registry is known to support HTTP HEAD requests for digest checking
-// (e.g., Docker Hub, GHCR) or if parsing the container hostname fails, indicating uncertainty.
-// It returns false if the registry’s behavior is unknown, avoiding unnecessary warnings.
+//
+// It returns true for registries supporting HEAD requests (e.g., Docker Hub, GHCR) or if parsing fails.
+//
+// Parameters:
+//   - container: Container with image info for registry check.
+//
+// Returns:
+//   - bool: True if a warning is warranted, false otherwise.
 func WarnOnAPIConsumption(container types.Container) bool {
+	// Set up logging fields for tracking.
 	fields := logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
 
+	// Parse the image name into a normalized reference.
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
 		logrus.WithError(err).
@@ -87,6 +115,7 @@ func WarnOnAPIConsumption(container types.Container) bool {
 		return true
 	}
 
+	// Extract the registry host from the reference.
 	containerHost, err := helpers.GetRegistryAddress(normalizedRef.Name())
 	if err != nil {
 		logrus.WithError(err).
@@ -96,6 +125,7 @@ func WarnOnAPIConsumption(container types.Container) bool {
 		return true
 	}
 
+	// Check if the registry is known to support HEAD requests.
 	if containerHost == helpers.DefaultRegistryHost || containerHost == "ghcr.io" {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"host": containerHost,
@@ -104,6 +134,7 @@ func WarnOnAPIConsumption(container types.Container) bool {
 		return true
 	}
 
+	// No warning if registry behavior is unknown.
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"host": containerHost,
 	}).Debug("Registry behavior unknown, no API consumption warning")

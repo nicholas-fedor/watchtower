@@ -1,8 +1,14 @@
 // Package util provides utility functions for Watchtower operations.
 package util
 
-// SliceEqual compares two string slices for equality.
-// It returns true if both slices have identical content in the same order.
+// SliceEqual checks if two string slices are identical.
+//
+// Parameters:
+//   - slice1: First slice.
+//   - slice2: Second slice.
+//
+// Returns:
+//   - bool: True if equal, false otherwise.
 func SliceEqual(slice1, slice2 []string) bool {
 	if len(slice1) != len(slice2) {
 		return false
@@ -17,8 +23,14 @@ func SliceEqual(slice1, slice2 []string) bool {
 	return true
 }
 
-// SliceSubtract removes elements in subtractFrom from slice.
-// It returns a new slice containing only elements unique to the first slice.
+// SliceEqual checks if two string slices are identical.
+//
+// Parameters:
+//   - slice1: First slice.
+//   - slice2: Second slice.
+//
+// Returns:
+//   - bool: True if equal, false otherwise.
 func SliceSubtract(slice, subtractFrom []string) []string {
 	result := []string{}
 
@@ -41,8 +53,14 @@ func SliceSubtract(slice, subtractFrom []string) []string {
 	return result
 }
 
-// StringMapSubtract removes matching key-value pairs from map1 based on map2.
-// It returns a new map with keys from map1 that are absent or differ in map2.
+// StringMapSubtract removes matching key-value pairs.
+//
+// Parameters:
+//   - map1: Source map.
+//   - map2: Map to subtract.
+//
+// Returns:
+//   - map[string]string: New map with unique or differing entries.
 func StringMapSubtract(map1, map2 map[string]string) map[string]string {
 	result := map[string]string{}
 
@@ -59,8 +77,14 @@ func StringMapSubtract(map1, map2 map[string]string) map[string]string {
 	return result
 }
 
-// StructMapSubtract removes keys from map1 that exist in map2.
-// It returns a new map with keys unique to map1.
+// StructMapSubtract removes matching keys.
+//
+// Parameters:
+//   - map1: Source map.
+//   - map2: Map to subtract.
+//
+// Returns:
+//   - map[string]struct{}: New map with unique keys.
 func StructMapSubtract(map1, map2 map[string]struct{}) map[string]struct{} {
 	result := map[string]struct{}{}
 

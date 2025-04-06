@@ -1,7 +1,3 @@
-// Package container provides functionality for managing Docker containers within Watchtower.
-// This file contains methods and helpers for accessing and interpreting container metadata,
-// focusing on labels that configure Watchtower behavior and lifecycle hooks.
-// These methods operate on the Container type defined in container.go.
 package container
 
 import (
@@ -50,40 +46,49 @@ const (
 	postUpdateTimeoutLabel = "com.centurylinklabs.watchtower.lifecycle.post-update-timeout"
 )
 
-// Lifecycle Hook Methods
-// These methods retrieve commands and timeouts associated with lifecycle hooks from container labels.
-
-// GetLifecyclePreCheckCommand returns the pre-check command from the container’s metadata.
-// It retrieves the command specified by the pre-check label, returning an empty string if not set.
+// GetLifecyclePreCheckCommand returns the pre-check command from labels.
+//
+// Returns:
+//   - string: Pre-check command or empty if unset.
 func (c Container) GetLifecyclePreCheckCommand() string {
 	return c.getLabelValueOrEmpty(preCheckLabel)
 }
 
-// GetLifecyclePostCheckCommand returns the post-check command from the container’s metadata.
-// It retrieves the command specified by the post-check label, returning an empty string if not set.
+// GetLifecyclePostCheckCommand returns the post-check command from labels.
+//
+// Returns:
+//   - string: Post-check command or empty if unset.
 func (c Container) GetLifecyclePostCheckCommand() string {
 	return c.getLabelValueOrEmpty(postCheckLabel)
 }
 
-// GetLifecyclePreUpdateCommand returns the pre-update command from the container’s metadata.
-// It retrieves the command specified by the pre-update label, returning an empty string if not set.
+// GetLifecyclePreUpdateCommand returns the pre-update command from labels.
+//
+// Returns:
+//   - string: Pre-update command or empty if unset.
 func (c Container) GetLifecyclePreUpdateCommand() string {
 	return c.getLabelValueOrEmpty(preUpdateLabel)
 }
 
-// GetLifecyclePostUpdateCommand returns the post-update command from the container’s metadata.
-// It retrieves the command specified by the post-update label, returning an empty string if not set.
+// GetLifecyclePostUpdateCommand returns the post-update command from labels.
+//
+// Returns:
+//   - string: Post-update command or empty if unset.
 func (c Container) GetLifecyclePostUpdateCommand() string {
 	return c.getLabelValueOrEmpty(postUpdateLabel)
 }
 
-// PreUpdateTimeout returns the timeout (in minutes) for the pre-update command.
-// It parses the pre-update timeout label, defaulting to 1 minute if unset or invalid.
-// A value of 0 allows indefinite execution, which users should use cautiously to avoid hangs.
+// PreUpdateTimeout returns the pre-update command timeout in minutes.
+//
+// It defaults to 1 minute if unset or invalid; 0 allows indefinite execution.
+//
+// Returns:
+//   - int: Timeout in minutes.
 func (c Container) PreUpdateTimeout() int {
 	clog := logrus.WithField("container", c.Name())
 	val := c.getLabelValueOrEmpty(preUpdateTimeoutLabel)
 
+	// Use default if label is unset.
 	if val == "" {
 		clog.WithField("label", preUpdateTimeoutLabel).
 			Debug("Pre-update timeout not set, using default")
@@ -91,6 +96,7 @@ func (c Container) PreUpdateTimeout() int {
 		return 1
 	}
 
+	// Parse timeout value.
 	minutes, err := strconv.Atoi(val)
 	if err != nil {
 		clog.WithError(err).WithFields(logrus.Fields{
@@ -109,13 +115,17 @@ func (c Container) PreUpdateTimeout() int {
 	return minutes
 }
 
-// PostUpdateTimeout returns the timeout (in minutes) for the post-update command.
-// It parses the post-update timeout label, defaulting to 1 minute if unset or invalid.
-// A value of 0 allows indefinite execution, which users should use cautiously to avoid hangs.
+// PostUpdateTimeout returns the post-update command timeout in minutes.
+//
+// It defaults to 1 minute if unset or invalid; 0 allows indefinite execution.
+//
+// Returns:
+//   - int: Timeout in minutes.
 func (c Container) PostUpdateTimeout() int {
 	clog := logrus.WithField("container", c.Name())
 	val := c.getLabelValueOrEmpty(postUpdateTimeoutLabel)
 
+	// Use default if label is unset.
 	if val == "" {
 		clog.WithField("label", postUpdateTimeoutLabel).
 			Debug("Post-update timeout not set, using default")
@@ -123,6 +133,7 @@ func (c Container) PostUpdateTimeout() int {
 		return 1
 	}
 
+	// Parse timeout value.
 	minutes, err := strconv.Atoi(val)
 	if err != nil {
 		clog.WithError(err).WithFields(logrus.Fields{
@@ -141,22 +152,23 @@ func (c Container) PostUpdateTimeout() int {
 	return minutes
 }
 
-// Label-Based Configuration Methods
-// These methods interpret container labels to determine Watchtower behavior.
-
-// Enabled checks if the container is enabled for Watchtower management.
-// It returns the parsed boolean value of the enable label and true if set,
-// or false and false if the label is absent or invalid.
+// Enabled checks if Watchtower should manage the container.
+//
+// Returns:
+//   - bool: True if enabled, false otherwise.
+//   - bool: True if label is set, false if absent/invalid.
 func (c Container) Enabled() (bool, bool) {
 	clog := logrus.WithField("container", c.Name())
 	rawBool, ok := c.getLabelValue(enableLabel)
 
+	// Label not set, return default.
 	if !ok {
 		clog.WithField("label", enableLabel).Debug("Enable label not set")
 
 		return false, false
 	}
 
+	// Parse enable label value.
 	parsedBool, err := strconv.ParseBool(rawBool)
 	if err != nil {
 		clog.WithError(err).WithFields(logrus.Fields{
@@ -175,22 +187,37 @@ func (c Container) Enabled() (bool, bool) {
 	return parsedBool, true
 }
 
-// IsMonitorOnly determines if the container should only be monitored without updates.
-// It considers the global MonitorOnly parameter, the monitor-only label, and label precedence,
-// returning true if either the label or global setting (depending on precedence) indicates monitoring only.
+// IsMonitorOnly determines if the container is monitor-only.
+//
+// It uses UpdateParams.MonitorOnly and label precedence.
+//
+// Parameters:
+//   - params: Update parameters from types.UpdateParams.
+//
+// Returns:
+//   - bool: True if monitor-only, false otherwise.
 func (c Container) IsMonitorOnly(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.MonitorOnly, monitorOnlyLabel, params.LabelPrecedence)
 }
 
-// IsNoPull determines if the container should skip image pulls.
-// It considers the global NoPull parameter, the no-pull label, and label precedence,
-// returning true if either the label or global setting (depending on precedence) indicates no pull.
+// IsNoPull determines if image pulls should be skipped.
+//
+// It uses UpdateParams.NoPull and label precedence.
+//
+// Parameters:
+//   - params: Update parameters from types.UpdateParams.
+//
+// Returns:
+//   - bool: True if no-pull, false otherwise.
 func (c Container) IsNoPull(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
 }
 
-// Scope retrieves the monitoring scope for the container.
-// It returns the scope label value and true if set, or an empty string and false if not.
+// Scope retrieves the monitoring scope from labels.
+//
+// Returns:
+//   - string: Scope value if set, empty otherwise.
+//   - bool: True if label is set, false if absent.
 func (c Container) Scope() (string, bool) {
 	clog := logrus.WithField("container", c.Name())
 	rawString, ok := c.getLabelValue(scope)
@@ -209,8 +236,10 @@ func (c Container) Scope() (string, bool) {
 	return rawString, true
 }
 
-// IsWatchtower identifies if this is the Watchtower container itself.
-// It returns true if the watchtower label is present and set to "true".
+// IsWatchtower identifies if this is the Watchtower container.
+//
+// Returns:
+//   - bool: True if watchtower label is "true", false otherwise.
 func (c Container) IsWatchtower() bool {
 	clog := logrus.WithField("container", c.Name())
 	isWatchtower := ContainsWatchtowerLabel(c.containerInfo.Config.Labels)
@@ -219,8 +248,10 @@ func (c Container) IsWatchtower() bool {
 	return isWatchtower
 }
 
-// StopSignal returns the custom stop signal for the container.
-// It retrieves the signal label value, returning an empty string if not set.
+// StopSignal returns the custom stop signal from labels.
+//
+// Returns:
+//   - string: Signal value or empty if unset.
 func (c Container) StopSignal() string {
 	clog := logrus.WithField("container", c.Name())
 	signal := c.getLabelValueOrEmpty(signalLabel)
@@ -237,19 +268,23 @@ func (c Container) StopSignal() string {
 	return signal
 }
 
-// General Label Helpers
-// These functions provide utility methods for accessing and interpreting container labels.
-
-// ContainsWatchtowerLabel checks if a container’s labels indicate it is a Watchtower instance.
-// It examines the provided label map for the watchtower label, returning true if set to "true".
+// ContainsWatchtowerLabel checks if the container is Watchtower.
+//
+// Parameters:
+//   - labels: Label map to check.
+//
+// Returns:
+//   - bool: True if watchtower label is "true", false otherwise.
 func ContainsWatchtowerLabel(labels map[string]string) bool {
 	val, ok := labels[watchtowerLabel]
 
 	return ok && val == "true"
 }
 
-// getLabelValueOrEmpty retrieves a label’s value from the container’s metadata.
-// It returns the value associated with the specified label, or an empty string if the label is not present.
+// getLabelValueOrEmpty retrieves a label’s value or empty string.
+//
+// Returns:
+//   - string: Label value or empty if absent.
 func (c Container) getLabelValueOrEmpty(label string) string {
 	var clog *logrus.Entry
 	if c.containerInfo == nil || c.containerInfo.Config == nil {
@@ -258,6 +293,7 @@ func (c Container) getLabelValueOrEmpty(label string) string {
 		clog = logrus.WithField("container", c.Name())
 	}
 
+	// Check for nil metadata.
 	if c.containerInfo == nil || c.containerInfo.Config == nil ||
 		c.containerInfo.Config.Labels == nil {
 		clog.WithField("label", label).Debug("No labels available")
@@ -265,6 +301,7 @@ func (c Container) getLabelValueOrEmpty(label string) string {
 		return ""
 	}
 
+	// Return label value if present.
 	if val, ok := c.containerInfo.Config.Labels[label]; ok {
 		return val
 	}
@@ -274,10 +311,15 @@ func (c Container) getLabelValueOrEmpty(label string) string {
 	return ""
 }
 
-// getLabelValue fetches a label’s value and its presence from the container’s metadata.
-// It returns the value and a boolean indicating whether the label exists in the container’s labels.
+// getLabelValue fetches a label’s value and presence.
+//
+// Returns:
+//   - string: Label value if present.
+//   - bool: True if label exists, false otherwise.
 func (c Container) getLabelValue(label string) (string, bool) {
 	clog := logrus.WithField("container", c.Name())
+
+	// Check for nil metadata.
 	if c.containerInfo == nil || c.containerInfo.Config == nil ||
 		c.containerInfo.Config.Labels == nil {
 		clog.WithField("label", label).Debug("No labels available")
@@ -285,6 +327,7 @@ func (c Container) getLabelValue(label string) (string, bool) {
 		return "", false
 	}
 
+	// Return value and presence.
 	if val, ok := c.containerInfo.Config.Labels[label]; ok {
 		clog.WithFields(logrus.Fields{
 			"label": label,
@@ -299,11 +342,15 @@ func (c Container) getLabelValue(label string) (string, bool) {
 	return "", false
 }
 
-// getBoolLabelValue parses a label’s value as a boolean from the container’s metadata.
-// It returns the parsed boolean value and nil if the label exists and is valid,
-// or false and an error if parsing fails or the label is not found (errLabelNotFound).
+// getBoolLabelValue parses a label as a boolean.
+//
+// Returns:
+//   - bool: Parsed value if valid.
+//   - error: Non-nil if parsing fails or label is absent, nil on success.
 func (c Container) getBoolLabelValue(label string) (bool, error) {
 	clog := logrus.WithField("container", c.Name())
+
+	// Check for nil metadata.
 	if c.containerInfo == nil || c.containerInfo.Config == nil ||
 		c.containerInfo.Config.Labels == nil {
 		clog.WithField("label", label).Debug("No labels available")
@@ -311,6 +358,7 @@ func (c Container) getBoolLabelValue(label string) (bool, error) {
 		return false, errLabelNotFound
 	}
 
+	// Fetch label value.
 	strVal, ok := c.containerInfo.Config.Labels[label]
 	if !ok {
 		clog.WithField("label", label).Debug("Label not found")
@@ -318,6 +366,7 @@ func (c Container) getBoolLabelValue(label string) (bool, error) {
 		return false, errLabelNotFound
 	}
 
+	// Parse as boolean.
 	value, err := strconv.ParseBool(strVal)
 	if err != nil {
 		clog.WithError(err).WithFields(logrus.Fields{
@@ -336,9 +385,17 @@ func (c Container) getBoolLabelValue(label string) (bool, error) {
 	return value, nil
 }
 
-// getContainerOrGlobalBool resolves a boolean value from a label or global parameter.
-// It prefers the label value if precedence is set, otherwise combines it with the global value,
-// logging warnings for parsing errors and defaulting to the global value if the label is absent.
+// getContainerOrGlobalBool resolves a boolean from label or global setting.
+//
+// It respects label precedence if set.
+//
+// Parameters:
+//   - globalVal: Global boolean value.
+//   - label: Label to check.
+//   - contPrecedence: Whether container label takes precedence.
+//
+// Returns:
+//   - bool: Resolved boolean value.
 func (c Container) getContainerOrGlobalBool(
 	globalVal bool,
 	label string,
@@ -346,6 +403,7 @@ func (c Container) getContainerOrGlobalBool(
 ) bool {
 	clog := logrus.WithField("container", c.Name())
 
+	// Fetch container-specific value.
 	contVal, err := c.getBoolLabelValue(label)
 	if err != nil {
 		if !errors.Is(err, errLabelNotFound) {
@@ -362,6 +420,7 @@ func (c Container) getContainerOrGlobalBool(
 		return globalVal
 	}
 
+	// Apply container precedence if set.
 	if contPrecedence {
 		clog.WithFields(logrus.Fields{
 			"label":      label,
@@ -372,6 +431,7 @@ func (c Container) getContainerOrGlobalBool(
 		return contVal
 	}
 
+	// Combine values if no precedence.
 	result := contVal || globalVal
 	clog.WithFields(logrus.Fields{
 		"label":      label,

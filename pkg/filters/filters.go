@@ -15,7 +15,10 @@ import (
 // noScope is the default scope value when none is specified.
 const noScope = "none"
 
-// WatchtowerContainersFilter filters only watchtower containers.
+// WatchtowerContainersFilter selects only Watchtower containers.
+//
+// Returns:
+//   - bool: True if container is Watchtower, false otherwise.
 func WatchtowerContainersFilter(c types.FilterableContainer) bool {
 	clog := logrus.WithField("container", c.Name())
 	isWatchtower := c.IsWatchtower()
@@ -24,14 +27,24 @@ func WatchtowerContainersFilter(c types.FilterableContainer) bool {
 	return isWatchtower
 }
 
-// NoFilter will not filter out any containers.
+// NoFilter allows all containers through.
+//
+// Returns:
+//   - bool: Always true.
 func NoFilter(c types.FilterableContainer) bool {
 	logrus.WithField("container", c.Name()).Debug("No filter applied")
 
 	return true
 }
 
-// FilterByNames returns all containers that match one of the specified names.
+// FilterByNames selects containers matching specified names.
+//
+// Parameters:
+//   - names: List of names or regex patterns to match.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function combining name check with base filter.
 func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 	if len(names) == 0 {
 		return baseFilter
@@ -44,12 +57,14 @@ func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 		})
 
 		for _, name := range names {
+			// Match exact name with or without leading slash.
 			if name == c.Name() || name == c.Name()[1:] {
 				clog.Debug("Matched container by exact name")
 
 				return baseFilter(c)
 			}
 
+			// Try regex match if name is a pattern.
 			if re, err := regexp.Compile(name); err == nil {
 				indices := re.FindStringIndex(c.Name())
 				if indices == nil {
@@ -75,7 +90,14 @@ func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByDisableNames returns all containers that don't match any of the specified names.
+// FilterByDisableNames excludes containers matching specified names.
+//
+// Parameters:
+//   - disableNames: Names to exclude.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function excluding names and applying base filter.
 func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.Filter {
 	if len(disableNames) == 0 {
 		return baseFilter
@@ -101,11 +123,15 @@ func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.
 	}
 }
 
-// FilterByEnableLabel returns all containers that have the enabled label set.
+// FilterByEnableLabel selects containers with enable label set.
+//
+// Parameters:
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function requiring enable label and applying base filter.
 func FilterByEnableLabel(baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
-		// If label filtering is enabled, containers should only be considered
-		// if the label is specifically set.
 		clog := logrus.WithField("container", c.Name())
 		_, ok := c.Enabled()
 
@@ -121,7 +147,13 @@ func FilterByEnableLabel(baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByDisabledLabel returns all containers that have the enabled label set to disable.
+// FilterByDisabledLabel excludes containers with enable label set to false.
+//
+// Parameters:
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function excluding disabled containers and applying base filter.
 func FilterByDisabledLabel(baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
 		clog := logrus.WithField("container", c.Name())
@@ -139,7 +171,14 @@ func FilterByDisabledLabel(baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByScope returns all containers that belong to a specific scope.
+// FilterByScope selects containers in a specific scope.
+//
+// Parameters:
+//   - scope: Scope to match.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function matching scope and applying base filter.
 func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
 		clog := logrus.WithFields(logrus.Fields{
@@ -149,7 +188,7 @@ func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
 
 		containerScope, containerHasScope := c.Scope()
 		if !containerHasScope || containerScope == "" {
-			containerScope = noScope
+			containerScope = noScope // Default to "none" if unset.
 		}
 
 		if containerScope == scope {
@@ -164,7 +203,14 @@ func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByImage returns all containers that have a specific image.
+// FilterByImage selects containers with specific images.
+//
+// Parameters:
+//   - images: List of image names to match (without tags).
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function matching images and applying base filter.
 func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	if images == nil {
 		return baseFilter
@@ -176,7 +222,7 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 			"images":    images,
 		})
 
-		image := strings.Split(c.ImageName(), ":")[0]
+		image := strings.Split(c.ImageName(), ":")[0] // Strip tag from image name.
 		if slices.Contains(images, image) {
 			clog.WithField("image", image).Debug("Container matched image")
 
@@ -189,7 +235,17 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	}
 }
 
-// BuildFilter creates the needed filter of containers.
+// BuildFilter constructs a composite filter for containers.
+//
+// Parameters:
+//   - names: Names to include.
+//   - disableNames: Names to exclude.
+//   - enableLabel: Require enable label if true.
+//   - scope: Scope to match.
+//
+// Returns:
+//   - types.Filter: Combined filter function.
+//   - string: Description of the filter.
 func BuildFilter(
 	names []string,
 	disableNames []string,
@@ -204,11 +260,13 @@ func BuildFilter(
 	})
 	clog.Debug("Building container filter")
 
+	// Start with no filter and chain additional filters.
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
 	filter = FilterByNames(names, filter)
 	filter = FilterByDisableNames(disableNames, filter)
 
+	// Add name-based filter description.
 	if len(names) > 0 {
 		stringBuilder.WriteString("which name matches \"")
 
@@ -223,6 +281,7 @@ func BuildFilter(
 		stringBuilder.WriteString(`", `)
 	}
 
+	// Add disable-name-based filter description.
 	if len(disableNames) > 0 {
 		stringBuilder.WriteString("not named one of \"")
 
@@ -237,17 +296,15 @@ func BuildFilter(
 		stringBuilder.WriteString(`", `)
 	}
 
-	// If label filtering is enabled, containers should only be considered
-	// if the label is specifically set.
+	// Apply enable label filter if specified.
 	if enableLabel {
 		filter = FilterByEnableLabel(filter)
 
 		stringBuilder.WriteString("using enable label, ")
 	}
 
-	// If a scope has explicitly defined as "none", containers should only be considered
-	// if they do not have a scope defined, or if it's explicitly set to "none".
-	if scope == noScope {
+	// Apply scope filter based on value.
+	if scope == noScope { // "none"
 		filter = FilterByScope(scope, filter)
 
 		stringBuilder.WriteString(`without a scope, "`)
@@ -259,12 +316,14 @@ func BuildFilter(
 		stringBuilder.WriteString(`", `)
 	}
 
+	// Exclude explicitly disabled containers.
 	filter = FilterByDisabledLabel(filter)
 
+	// Build filter description.
 	filterDesc := "Checking all containers (except explicitly disabled with label)"
 	if stringBuilder.Len() > 0 {
 		filterDesc = "Only checking containers " + stringBuilder.String()
-		filterDesc = filterDesc[:len(filterDesc)-2] // Remove last ", "
+		filterDesc = filterDesc[:len(filterDesc)-2] // Trim trailing ", ".
 	}
 
 	clog.WithField("filter_desc", filterDesc).Debug("Filter built")

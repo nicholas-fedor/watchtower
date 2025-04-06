@@ -1,23 +1,23 @@
 package types
 
-// Report contains reports for all the containers processed during a session.
+// Report defines container session results.
 type Report interface {
-	Scanned() []ContainerReport
-	Updated() []ContainerReport
-	Failed() []ContainerReport
-	Skipped() []ContainerReport
-	Stale() []ContainerReport
-	Fresh() []ContainerReport
-	All() []ContainerReport
+	Scanned() []ContainerReport // Scanned containers.
+	Updated() []ContainerReport // Updated containers.
+	Failed() []ContainerReport  // Failed containers.
+	Skipped() []ContainerReport // Skipped containers.
+	Stale() []ContainerReport   // Stale containers.
+	Fresh() []ContainerReport   // Fresh containers.
+	All() []ContainerReport     // All unique containers.
 }
 
-// ContainerReport represents a container that was included in watchtower session.
+// ContainerReport defines a container’s session status.
 type ContainerReport interface {
-	ID() ContainerID
-	Name() string
-	CurrentImageID() ImageID
-	LatestImageID() ImageID
-	ImageName() string
-	Error() string
-	State() string
+	ID() ContainerID         // Container ID.
+	Name() string            // Container name.
+	CurrentImageID() ImageID // Original image ID.
+	LatestImageID() ImageID  // Latest image ID.
+	ImageName() string       // Image name with tag.
+	Error() string           // Error message, if any.
+	State() string           // Human-readable state.
 }

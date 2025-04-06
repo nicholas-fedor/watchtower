@@ -6,10 +6,18 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// Progress contains the current session container status.
+// Progress tracks container statuses during a session.
 type Progress map[types.ContainerID]*ContainerStatus
 
-// UpdateFromContainer sets various status fields from their corresponding container equivalents.
+// UpdateFromContainer creates a status from container data.
+//
+// Parameters:
+//   - cont: Container to update from.
+//   - newImage: Latest image ID.
+//   - state: Container state.
+//
+// Returns:
+//   - *ContainerStatus: Updated status.
 func UpdateFromContainer(
 	cont types.Container,
 	newImage types.ImageID,
@@ -33,7 +41,11 @@ func UpdateFromContainer(
 	return update
 }
 
-// AddSkipped adds a container to the Progress with the state set as skipped.
+// AddSkipped adds a container as skipped with an error.
+//
+// Parameters:
+//   - cont: Container to add.
+//   - err: Skip reason error.
 func (m Progress) AddSkipped(cont types.Container, err error) {
 	update := UpdateFromContainer(cont, cont.SafeImageID(), SkippedState)
 	update.containerError = err
@@ -44,7 +56,11 @@ func (m Progress) AddSkipped(cont types.Container, err error) {
 	}).WithError(err).Debug("Added container as skipped")
 }
 
-// AddScanned adds a container to the Progress with the state set as scanned.
+// AddScanned adds a container as scanned with a new image.
+//
+// Parameters:
+//   - cont: Container to add.
+//   - newImage: Latest image ID.
 func (m Progress) AddScanned(cont types.Container, newImage types.ImageID) {
 	m.Add(UpdateFromContainer(cont, newImage, ScannedState))
 	logrus.WithFields(logrus.Fields{
@@ -54,7 +70,10 @@ func (m Progress) AddScanned(cont types.Container, newImage types.ImageID) {
 	}).Debug("Added container as scanned")
 }
 
-// UpdateFailed updates the containers passed, setting their state as failed with the supplied error.
+// UpdateFailed marks containers as failed with errors.
+//
+// Parameters:
+//   - failures: Map of container IDs to errors.
 func (m Progress) UpdateFailed(failures map[types.ContainerID]error) {
 	for id, err := range failures {
 		update := m[id]
@@ -67,7 +86,10 @@ func (m Progress) UpdateFailed(failures map[types.ContainerID]error) {
 	}
 }
 
-// Add a container to the map using container ID as the key.
+// Add inserts a container status into the progress map.
+//
+// Parameters:
+//   - update: Status to add.
 func (m Progress) Add(update *ContainerStatus) {
 	m[update.containerID] = update
 	logrus.WithFields(logrus.Fields{
@@ -77,7 +99,10 @@ func (m Progress) Add(update *ContainerStatus) {
 	}).Debug("Added container status to progress map")
 }
 
-// MarkForUpdate marks the container identified by containerID for update.
+// MarkForUpdate sets a container’s state to updated.
+//
+// Parameters:
+//   - containerID: ID of container to mark.
 func (m Progress) MarkForUpdate(containerID types.ContainerID) {
 	update := m[containerID]
 	update.state = UpdatedState
@@ -87,11 +112,12 @@ func (m Progress) MarkForUpdate(containerID types.ContainerID) {
 	}).Debug("Marked container for update")
 }
 
-// Report creates a new Report from a Progress instance.
+// Report generates a report from the progress data.
+//
+// Returns:
+//   - types.Report: New report instance.
 func (m Progress) Report() types.Report {
-	logrus.WithFields(logrus.Fields{
-		"count": len(m),
-	}).Debug("Generating report from progress")
+	logrus.WithField("count", len(m)).Debug("Generating report")
 
 	return NewReport(m)
 }

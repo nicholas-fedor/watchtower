@@ -11,58 +11,67 @@ import (
 
 var metrics *Metrics
 
-// Metric represents the data points collected from a single Watchtower scan.
-// It includes counts of scanned, updated, and failed containers.
+// Metric holds data points from a Watchtower scan.
 type Metric struct {
-	Scanned int
-	Updated int
-	Failed  int
+	Scanned int // Number of containers scanned.
+	Updated int // Number of containers updated (includes stale).
+	Failed  int // Number of containers failed.
 }
 
-// Metrics is the handler for processing and exposing scan metrics.
-// It maintains a channel for queueing metrics and Prometheus gauges/counters for tracking.
+// Metrics handles processing and exposing scan metrics.
 type Metrics struct {
-	channel chan *Metric
-	scanned prometheus.Gauge
-	updated prometheus.Gauge
-	failed  prometheus.Gauge
-	total   prometheus.Counter
-	skipped prometheus.Counter
+	channel chan *Metric       // Channel for queuing metrics.
+	scanned prometheus.Gauge   // Gauge for scanned containers.
+	updated prometheus.Gauge   // Gauge for updated containers.
+	failed  prometheus.Gauge   // Gauge for failed containers.
+	total   prometheus.Counter // Counter for total scans.
+	skipped prometheus.Counter // Counter for skipped scans.
 }
 
-// NewMetric creates a new Metric instance from a types.Report.
-// It counts scanned, updated (including stale for compatibility), and failed containers.
+// NewMetric creates a Metric from a scan report.
+//
+// Parameters:
+//   - report: Scan report from types.Report.
+//
+// Returns:
+//   - *Metric: New metric instance.
 func NewMetric(report types.Report) *Metric {
 	return &Metric{
 		Scanned: len(report.Scanned()),
-		// Note: This is for backwards compatibility. ideally, stale containers should be counted separately
-		Updated: len(report.Updated()) + len(report.Stale()),
+		Updated: len(report.Updated()) + len(report.Stale()), // Includes stale for compatibility.
 		Failed:  len(report.Failed()),
 	}
 }
 
-// QueueIsEmpty checks whether any metric messages are currently enqueued in the channel.
-// It returns true if the channel is empty, false otherwise.
+// QueueIsEmpty checks if the metrics channel is empty.
+//
+// Returns:
+//   - bool: True if empty, false otherwise.
 func (m *Metrics) QueueIsEmpty() bool {
 	return len(m.channel) == 0
 }
 
-// Register enqueues a metric for processing by the metrics handler.
-// It sends the metric to the channel for asynchronous handling.
+// Register enqueues a metric for processing.
+//
+// Parameters:
+//   - metric: Metric to register.
 func (m *Metrics) Register(metric *Metric) {
 	m.channel <- metric
 }
 
-// Default creates a new Metrics handler if none exists, or returns the existing singleton.
-// It initializes Prometheus gauges and counters, and starts a goroutine to handle metric updates.
+// Default initializes or returns the singleton Metrics handler.
+//
+// Returns:
+//   - *Metrics: Metrics handler with Prometheus metrics and goroutine.
 func Default() *Metrics {
 	if metrics != nil {
 		return metrics
 	}
 
-	// channelBufferSize defines the buffer capacity for the metrics channel.
+	// channelBufferSize sets the metrics channel capacity.
 	const channelBufferSize = 10
 
+	// Initialize metrics with Prometheus gauges and counters.
 	metrics = &Metrics{
 		scanned: promauto.NewGauge(prometheus.GaugeOpts{
 			Name: "watchtower_containers_scanned",
@@ -87,19 +96,24 @@ func Default() *Metrics {
 		channel: make(chan *Metric, channelBufferSize),
 	}
 
+	// Start goroutine to process metrics.
 	go metrics.HandleUpdate(metrics.channel)
 
 	return metrics
 }
 
-// RegisterScan fetches the default metrics handler and enqueues a metric for processing.
-// It provides a convenient way to register a scan’s metrics without directly accessing the handler.
+// RegisterScan enqueues a scan metric using the default handler.
+//
+// Parameters:
+//   - metric: Metric to register.
 func (m *Metrics) RegisterScan(metric *Metric) {
 	m.Register(metric)
 }
 
-// HandleUpdate dequeues metrics from the channel and updates Prometheus metrics accordingly.
-// It processes each metric, incrementing counters and setting gauges based on scan outcomes.
+// HandleUpdate processes metrics from the channel.
+//
+// Parameters:
+//   - channel: Channel to dequeue metrics from.
 func (m *Metrics) HandleUpdate(channel <-chan *Metric) {
 	for change := range channel {
 		if change == nil {
@@ -112,7 +126,7 @@ func (m *Metrics) HandleUpdate(channel <-chan *Metric) {
 
 			continue
 		}
-		// Update metrics with the new values
+		// Update metrics with scan results.
 		m.total.Inc()
 		m.scanned.Set(float64(change.Scanned))
 		m.updated.Set(float64(change.Updated))

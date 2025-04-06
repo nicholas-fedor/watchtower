@@ -1,6 +1,6 @@
 package types
 
-// TokenResponse is returned by the registry on successful authentication.
+// TokenResponse holds a registry authentication token.
 type TokenResponse struct {
-	Token string `json:"token"`
+	Token string `json:"token"` // Authentication token.
 }

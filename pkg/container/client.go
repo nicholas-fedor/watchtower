@@ -20,29 +20,36 @@ import (
 )
 
 // Client defines the interface for interacting with the Docker API within Watchtower.
+//
 // It provides methods for managing containers, images, and executing commands, abstracting the underlying Docker client operations.
 type Client interface {
 	// ListContainers retrieves a filtered list of containers running on the host.
+	//
 	// The provided filter determines which containers are included in the result.
 	ListContainers(filter types.Filter) ([]types.Container, error)
 
 	// GetContainer fetches detailed information about a specific container by its ID.
+	//
 	// Returns the container object or an error if the container cannot be retrieved.
 	GetContainer(containerID types.ContainerID) (types.Container, error)
 
 	// StopContainer stops and removes a specified container, respecting the given timeout.
+	//
 	// It ensures the container is no longer running or present on the host.
 	StopContainer(container types.Container, timeout time.Duration) error
 
 	// StartContainer creates and starts a new container based on the provided container's configuration.
+	//
 	// Returns the new container's ID or an error if creation or startup fails.
 	StartContainer(container types.Container) (types.ContainerID, error)
 
 	// RenameContainer renames an existing container to the specified new name.
+	//
 	// Returns an error if the rename operation fails.
 	RenameContainer(container types.Container, newName string) error
 
 	// IsContainerStale checks if a container's image is outdated compared to the latest available version.
+	//
 	// Returns whether the container is stale, the latest image ID, and any error encountered.
 	IsContainerStale(
 		container types.Container,
@@ -50,14 +57,17 @@ type Client interface {
 	) (bool, types.ImageID, error)
 
 	// ExecuteCommand runs a command inside a container and returns whether to skip updates based on the result.
+	//
 	// The timeout specifies how long to wait for the command to complete.
 	ExecuteCommand(containerID types.ContainerID, command string, timeout int) (bool, error)
 
 	// RemoveImageByID deletes an image from the Docker host by its ID.
+	//
 	// Returns an error if the removal fails.
 	RemoveImageByID(imageID types.ImageID) error
 
 	// WarnOnHeadPullFailed determines whether to log a warning when a HEAD request fails during image pulls.
+	//
 	// The decision is based on the configured warning strategy and container context.
 	WarnOnHeadPullFailed(container types.Container) bool
 
@@ -66,6 +76,7 @@ type Client interface {
 }
 
 // client is the concrete implementation of the Client interface.
+//
 // It wraps the Docker API client and applies custom behavior via ClientOptions.
 type client struct {
 	api dockerClient.APIClient
@@ -73,6 +84,7 @@ type client struct {
 }
 
 // ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
+//
 // It controls container management and warning behaviors.
 type ClientOptions struct {
 	RemoveVolumes     bool
@@ -82,11 +94,17 @@ type ClientOptions struct {
 	WarnOnHeadFailed  WarningStrategy
 }
 
-// NewClient initializes a new Client instance for interacting with the Docker API.
-// It configures the client using environment variables and the provided options.
-// Environment variables used include DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
-// Panics if the Docker client cannot be instantiated due to invalid configuration.
+// NewClient initializes a new Client instance for Docker API interactions.
+//
+// It uses environment variables (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_API_VERSION) for configuration.
+//
+// Parameters:
+//   - opts: Client options for custom behavior.
+//
+// Returns:
+//   - Client: Initialized client instance (panics on failure).
 func NewClient(opts ClientOptions) Client {
+	// Create Docker client from environment settings.
 	cli, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to initialize Docker client")
@@ -103,10 +121,16 @@ func NewClient(opts ClientOptions) Client {
 	}
 }
 
-// ListContainers retrieves a list of existing containers.
-// It delegates to ListSourceContainers to fetch and filter containers based on the provided function.
-// Returns a slice of containers or an error if listing fails.
+// ListContainers retrieves a filtered list of containers running on the host.
+//
+// Parameters:
+//   - filter: Filter to apply to container list.
+//
+// Returns:
+//   - []types.Container: List of matching containers.
+//   - error: Non-nil if listing fails, nil on success.
 func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
+	// Fetch and filter containers using helper function.
 	containers, err := ListSourceContainers(c.api, c.ClientOptions, filter)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
@@ -119,11 +143,16 @@ func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
 	return containers, nil
 }
 
-// GetContainer fetches detailed information about an existing container by its ID.
-// It delegates to GetSourceContainer to retrieve the container details.
-// Returns the container object as a types.Container interface, which is intentional to support multiple container implementations.
-// Returns an error if retrieval fails.
+// GetContainer fetches detailed information about a specific container by its ID.
+//
+// Parameters:
+//   - containerID: ID of the container to retrieve.
+//
+// Returns:
+//   - types.Container: Container details if found.
+//   - error: Non-nil if retrieval fails, nil on success.
 func (c client) GetContainer(containerID types.ContainerID) (types.Container, error) {
+	// Retrieve container details using helper function.
 	container, err := GetSourceContainer(c.api, containerID)
 	if err != nil {
 		logrus.WithError(err).
@@ -138,10 +167,16 @@ func (c client) GetContainer(containerID types.ContainerID) (types.Container, er
 	return container, nil
 }
 
-// StopContainer stops and removes an existing container within the given timeout.
-// It delegates to StopSourceContainer to handle the stopping and removal process.
-// Returns an error if stopping or removal fails.
+// StopContainer stops and removes a specified container.
+//
+// Parameters:
+//   - container: Container to stop and remove.
+//   - timeout: Duration to wait before forcing stop.
+//
+// Returns:
+//   - error: Non-nil if stop/removal fails, nil on success.
 func (c client) StopContainer(container types.Container, timeout time.Duration) error {
+	// Stop and remove container using helper function with volume option.
 	err := StopSourceContainer(c.api, container, timeout, c.RemoveVolumes)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
@@ -160,9 +195,14 @@ func (c client) StopContainer(container types.Container, timeout time.Duration) 
 	return nil
 }
 
-// StartContainer creates and starts a new container based on the source container’s configuration.
-// It extracts the network configuration from the source and passes it to StartTargetContainer.
-// Returns the new container’s ID or an error if creation or startup fails.
+// StartContainer creates and starts a new container from an existing one’s config.
+//
+// Parameters:
+//   - container: Source container to replicate.
+//
+// Returns:
+//   - types.ContainerID: ID of the new container.
+//   - error: Non-nil if creation/start fails, nil on success.
 func (c client) StartContainer(container types.Container) (types.ContainerID, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
@@ -174,10 +214,9 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 	clientVersion := c.GetVersion()
 	minSupportedVersion := flags.DockerAPIMinVersion
 
-	// Obtain the container's network configuration based on the client's API version
+	// Select network config based on API version.
 	switch {
-	// If the client is using version 1.44 or greater
-	case versions.GreaterThanOrEqualTo(clientVersion, minSupportedVersion):
+	case versions.GreaterThanOrEqualTo(clientVersion, minSupportedVersion): // versions 1.44 or greater
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"client_version": clientVersion,
 			"min_version":    minSupportedVersion,
@@ -185,8 +224,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 
 		networkConfig = getNetworkConfig(container)
 
-		// If the client is using versions less than 1.44
-	case versions.LessThan(clientVersion, minSupportedVersion):
+	case versions.LessThan(clientVersion, minSupportedVersion): // versions less than 1.44
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"client_version": clientVersion,
 			"min_version":    minSupportedVersion,
@@ -195,6 +233,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		networkConfig = getLegacyNetworkConfig(container, clientVersion)
 	}
 
+	// Start new container with selected config.
 	newID, err := StartTargetContainer(
 		c.api,
 		container,
@@ -214,10 +253,16 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 	return newID, nil
 }
 
-// RenameContainer renames an existing container to the specified new name.
-// It delegates to RenameTargetContainer to perform the renaming.
-// Returns an error if the rename operation fails.
+// RenameContainer renames an existing container to a new name.
+//
+// Parameters:
+//   - container: Container to rename.
+//   - newName: New name for the container.
+//
+// Returns:
+//   - error: Non-nil if rename fails, nil on success.
 func (c client) RenameContainer(container types.Container, newName string) error {
+	// Perform rename using helper function.
 	err := RenameTargetContainer(c.api, container, newName)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
@@ -236,10 +281,15 @@ func (c client) RenameContainer(container types.Container, newName string) error
 	return nil
 }
 
-// WarnOnHeadPullFailed decides whether to warn about failed HEAD requests during image pulls.
-// It returns true if a warning should be logged, based on the configured strategy.
-// Uses WarnAlways, WarnNever, or delegates to registry logic for WarnAuto.
+// WarnOnHeadPullFailed decides whether to warn about failed HEAD requests.
+//
+// Parameters:
+//   - container: Container to evaluate.
+//
+// Returns:
+//   - bool: True if warning is needed, false otherwise.
 func (c client) WarnOnHeadPullFailed(container types.Container) bool {
+	// Apply warning strategy based on configuration.
 	if c.WarnOnHeadFailed == WarnAlways {
 		return true
 	}
@@ -248,16 +298,25 @@ func (c client) WarnOnHeadPullFailed(container types.Container) bool {
 		return false
 	}
 
+	// Delegate to registry logic for auto strategy.
 	return registry.WarnOnAPIConsumption(container)
 }
 
-// IsContainerStale determines if a container’s image is outdated compared to the latest available version.
-// It delegates to the imageClient to check staleness.
-// Returns whether the container is stale, the latest image ID, and any error encountered.
+// IsContainerStale checks if a container’s image is outdated.
+//
+// Parameters:
+//   - container: Container to check.
+//   - params: Update parameters for staleness check.
+//
+// Returns:
+//   - bool: True if stale, false otherwise.
+//   - types.ImageID: Latest image ID.
+//   - error: Non-nil if check fails, nil on success.
 func (c client) IsContainerStale(
 	container types.Container,
 	params types.UpdateParams,
 ) (bool, types.ImageID, error) {
+	// Use image client to perform staleness check.
 	imgClient := newImageClient(c.api)
 
 	stale, newestImage, err := imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
@@ -279,8 +338,15 @@ func (c client) IsContainerStale(
 }
 
 // ExecuteCommand runs a command inside a container and evaluates its result.
-// It creates an exec instance, runs it, and waits for completion or timeout.
-// Returns whether to skip updates (based on exit code) and any error encountered.
+//
+// Parameters:
+//   - containerID: ID of the container.
+//   - command: Command to execute.
+//   - timeout: Minutes to wait before timeout (0 for no timeout).
+//
+// Returns:
+//   - bool: True if updates should be skipped, false otherwise.
+//   - error: Non-nil if execution fails, nil on success.
 func (c client) ExecuteCommand(
 	containerID types.ContainerID,
 	command string,
@@ -289,7 +355,7 @@ func (c client) ExecuteCommand(
 	ctx := context.Background()
 	clog := logrus.WithField("container_id", containerID)
 
-	// Configure and create the exec instance.
+	// Set up exec configuration with command.
 	clog.WithField("command", command).Debug("Creating exec instance")
 	execConfig := dockerContainer.ExecOptions{
 		Tty:    true,
@@ -297,6 +363,7 @@ func (c client) ExecuteCommand(
 		Cmd:    []string{"sh", "-c", command},
 	}
 
+	// Create the exec instance.
 	exec, err := c.api.ContainerExecCreate(ctx, string(containerID), execConfig)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to create exec instance")
@@ -320,7 +387,7 @@ func (c client) ExecuteCommand(
 		clog.WithError(err).Warn("Failed to capture command output")
 	}
 
-	// Wait for completion and interpret the result.
+	// Wait for completion and evaluate result.
 	skipUpdate, err := c.waitForExecOrTimeout(ctx, exec.ID, output, timeout)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to inspect exec instance")
@@ -338,10 +405,18 @@ func (c client) ExecuteCommand(
 }
 
 // captureExecOutput attaches to an exec instance and captures its output.
-// It logs errors internally and returns the trimmed output or an error if attachment or reading fails.
+//
+// Parameters:
+//   - ctx: Context for lifecycle control.
+//   - execID: ID of the exec instance.
+//
+// Returns:
+//   - string: Captured output if successful.
+//   - error: Non-nil if attachment or reading fails, nil on success.
 func (c client) captureExecOutput(ctx context.Context, execID string) (string, error) {
 	clog := logrus.WithField("exec_id", execID)
 
+	// Attach to the exec instance for output.
 	clog.Debug("Attaching to exec instance")
 
 	response, err := c.api.ContainerExecAttach(
@@ -357,6 +432,7 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 
 	defer response.Close()
 
+	// Read output into a buffer.
 	var writer bytes.Buffer
 
 	written, err := writer.ReadFrom(response.Reader)
@@ -366,6 +442,7 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, err)
 	}
 
+	// Return trimmed output if any was captured.
 	if written > 0 {
 		output := strings.TrimSpace(writer.String())
 		clog.WithField("output", output).Debug("Captured exec output")
@@ -377,8 +454,16 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 }
 
 // waitForExecOrTimeout waits for an exec instance to complete or times out.
-// It checks the exit code: 75 (ExTempFail) skips updates, >0 indicates failure.
-// Returns whether to skip updates and any error encountered.
+//
+// Parameters:
+//   - ctx: Parent context.
+//   - execID: ID of the exec instance.
+//   - execOutput: Captured output for error reporting.
+//   - timeout: Minutes to wait (0 for no timeout).
+//
+// Returns:
+//   - bool: True if updates should be skipped (exit code 75), false otherwise.
+//   - error: Non-nil if inspection fails or command errors, nil on success.
 func (c client) waitForExecOrTimeout(
 	ctx context.Context,
 	execID string,
@@ -401,6 +486,7 @@ func (c client) waitForExecOrTimeout(
 		execCtx = ctx
 	}
 
+	// Poll exec status until completion.
 	for {
 		execInspect, err := c.api.ContainerExecInspect(execCtx, execID)
 		if err != nil {
@@ -415,17 +501,19 @@ func (c client) waitForExecOrTimeout(
 		}).Debug("Checked exec status")
 
 		if execInspect.Running {
-			time.Sleep(1 * time.Second)
+			time.Sleep(1 * time.Second) // Wait before rechecking.
 
 			continue
 		}
 
+		// Log output if present.
 		if len(execOutput) > 0 {
 			clog.WithField("output", execOutput).Info("Command output captured")
 		}
 
+		// Handle specific exit codes.
 		if execInspect.ExitCode == ExTempFail {
-			return true, nil
+			return true, nil // Skip updates on temporary failure.
 		}
 
 		if execInspect.ExitCode > 0 {
@@ -447,9 +535,14 @@ func (c client) waitForExecOrTimeout(
 }
 
 // RemoveImageByID deletes an image from the Docker host by its ID.
-// It delegates to the imageClient to perform the removal.
-// Returns an error if the removal fails.
+//
+// Parameters:
+//   - imageID: ID of the image to remove.
+//
+// Returns:
+//   - error: Non-nil if removal fails, nil on success.
 func (c client) RemoveImageByID(imageID types.ImageID) error {
+	// Use image client to remove the image.
 	imgClient := newImageClient(c.api)
 
 	err := imgClient.RemoveImageByID(imageID)
@@ -464,7 +557,10 @@ func (c client) RemoveImageByID(imageID types.ImageID) error {
 	return nil
 }
 
-// GetVersion gets the client API version from the Docker host.
+// GetVersion returns the client’s API version.
+//
+// Returns:
+//   - string: Docker API version (e.g., "1.44").
 func (c client) GetVersion() string {
 	return c.api.ClientVersion()
 }

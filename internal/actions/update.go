@@ -35,20 +35,28 @@ var (
 	errStartContainerFailed = errors.New("failed to start container")
 )
 
-// Update examines running Docker containers for outdated images and updates them.
-// It scans containers, sorts them by dependencies, and performs updates based on provided parameters,
-// returning a report of the operation’s outcome.
+// Update scans and updates containers based on parameters.
+//
+// Parameters:
+//   - client: Container client.
+//   - params: Update options.
+//
+// Returns:
+//   - types.Report: Session report.
+//   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(client container.Client, params types.UpdateParams) (types.Report, error) {
 	logrus.Debug("Starting container update check")
 
 	progress := &session.Progress{}
 	staleCount := 0
 
+	// Run pre-check hooks if enabled.
 	if params.LifecycleHooks {
 		logrus.Debug("Executing pre-check lifecycle hooks")
 		lifecycle.ExecutePreChecks(client, params)
 	}
 
+	// List containers.
 	containers, err := client.ListContainers(params.Filter)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
@@ -61,6 +69,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	staleCheckFailed := 0
 
 	for i, sourceContainer := range containers {
+		// Check staleness.
 		stale, newestImage, err := client.IsContainerStale(sourceContainer, params)
 		shouldUpdate := stale && !params.NoRestart && !sourceContainer.IsMonitorOnly(params)
 
@@ -69,6 +78,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 			"image":     sourceContainer.ImageName(),
 		}
 
+		// Verify config if updating.
 		if err == nil && shouldUpdate {
 			// Verify configuration for recreating the container.
 			err = sourceContainer.VerifyConfiguration()
@@ -82,6 +92,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 			}
 		}
 
+		// Handle staleness result.
 		if err != nil {
 			logrus.WithFields(fields).
 				WithError(err).
@@ -112,6 +123,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 		"failed": staleCheckFailed,
 	}).Info("Completed container staleness check")
 
+	// Sort by dependencies.
 	containers, err = sorter.SortByDependencies(containers)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to sort containers by dependencies")
@@ -121,6 +133,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 
 	UpdateImplicitRestart(containers)
 
+	// Filter containers to update.
 	var containersToUpdate []types.Container
 
 	for _, c := range containers {
@@ -132,6 +145,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 
 	logrus.WithField("count", len(containersToUpdate)).Debug("Prepared containers for update")
 
+	// Perform updates.
 	if params.RollingRestart {
 		progress.UpdateFailed(performRollingRestart(containersToUpdate, client, params))
 	} else {
@@ -142,6 +156,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 		progress.UpdateFailed(failedStart)
 	}
 
+	// Run post-check hooks if enabled.
 	if params.LifecycleHooks {
 		logrus.Debug("Executing post-check lifecycle hooks")
 		lifecycle.ExecutePostChecks(client, params)
@@ -150,9 +165,15 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 	return progress.Report(), nil
 }
 
-// performRollingRestart updates containers using a rolling restart strategy.
-// It processes containers in reverse order, stopping and restarting stale ones,
-// and returns a map of container IDs to any errors encountered.
+// performRollingRestart updates containers with rolling restarts.
+//
+// Parameters:
+//   - containers: List to update.
+//   - client: Container client.
+//   - params: Update options.
+//
+// Returns:
+//   - map[types.ContainerID]error: Failed updates.
 func performRollingRestart(
 	containers []types.Container,
 	client container.Client,
@@ -161,6 +182,7 @@ func performRollingRestart(
 	cleanupImageIDs := make(map[types.ImageID]bool, len(containers))
 	failed := make(map[types.ContainerID]error, len(containers))
 
+	// Process in reverse order.
 	for i := len(containers) - 1; i >= 0; i-- {
 		// Only add (previously) stale containers' images to cleanup
 		c := containers[i]
@@ -186,6 +208,7 @@ func performRollingRestart(
 		}
 	}
 
+	// Cleanup images if enabled.
 	if params.Cleanup {
 		cleanupImages(client, cleanupImageIDs)
 	}
@@ -193,8 +216,16 @@ func performRollingRestart(
 	return failed
 }
 
-// stopContainersInReversedOrder stops containers in reverse order based on their update needs.
-// It returns maps of failed stops and stopped image IDs for further processing.
+// stopContainersInReversedOrder stops containers in reverse order.
+//
+// Parameters:
+//   - containers: List to stop.
+//   - client: Container client.
+//   - params: Update options.
+//
+// Returns:
+//   - map[types.ContainerID]error: Failed stops.
+//   - map[types.ImageID]bool: Stopped image IDs.
 func stopContainersInReversedOrder(
 	containers []types.Container,
 	client container.Client,
@@ -203,6 +234,7 @@ func stopContainersInReversedOrder(
 	failed := make(map[types.ContainerID]error, len(containers))
 	stopped := make(map[types.ImageID]bool, len(containers))
 
+	// Stop in reverse order.
 	for i := len(containers) - 1; i >= 0; i-- {
 		c := containers[i]
 		if err := stopStaleContainer(c, client, params); err != nil {
@@ -220,8 +252,15 @@ func stopContainersInReversedOrder(
 	return failed, stopped
 }
 
-// stopStaleContainer stops a container if it is stale and eligible for update.
-// It skips Watchtower containers and non-restart candidates, handling lifecycle hooks if enabled.
+// stopStaleContainer stops a stale container if eligible.
+//
+// Parameters:
+//   - container: Container to stop.
+//   - client: Container client.
+//   - params: Update options.
+//
+// Returns:
+//   - error: Non-nil if stop fails, nil on success or skip.
 func stopStaleContainer(
 	container types.Container,
 	client container.Client,
@@ -232,6 +271,7 @@ func stopStaleContainer(
 		"image":     container.ImageName(),
 	}
 
+	// Skip Watchtower or non-restart containers.
 	if container.IsWatchtower() {
 		logrus.WithFields(fields).Debug("Skipping Watchtower container")
 
@@ -242,7 +282,7 @@ func stopStaleContainer(
 		return nil
 	}
 
-	// Prevent stopping a linked container we cannot restart by verifying its configuration.
+	// Verify config for linked containers.
 	if container.IsLinkedToRestarting() {
 		if err := container.VerifyConfiguration(); err != nil {
 			logrus.WithFields(fields).
@@ -253,6 +293,7 @@ func stopStaleContainer(
 		}
 	}
 
+	// Run pre-update hook if enabled.
 	if params.LifecycleHooks {
 		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(client, container)
 		if err != nil {
@@ -268,6 +309,7 @@ func stopStaleContainer(
 		}
 	}
 
+	// Stop the container.
 	if err := client.StopContainer(container, params.Timeout); err != nil {
 		logrus.WithFields(fields).WithError(err).Error("Failed to stop container")
 
@@ -277,8 +319,16 @@ func stopStaleContainer(
 	return nil
 }
 
-// restartContainersInSortedOrder restarts containers in sorted order based on prior stops.
-// It processes only previously stopped containers and returns a map of failed restarts.
+// restartContainersInSortedOrder restarts stopped containers.
+//
+// Parameters:
+//   - containers: List to restart.
+//   - client: Container client.
+//   - params: Update options.
+//   - stoppedImages: Previously stopped image IDs.
+//
+// Returns:
+//   - map[types.ContainerID]error: Failed restarts.
 func restartContainersInSortedOrder(
 	containers []types.Container,
 	client container.Client,
@@ -288,6 +338,7 @@ func restartContainersInSortedOrder(
 	cleanupImageIDs := make(map[types.ImageID]bool, len(containers))
 	failed := make(map[types.ContainerID]error, len(containers))
 
+	// Restart in sorted order.
 	for _, c := range containers {
 		if !c.ToRestart() {
 			continue
@@ -311,6 +362,7 @@ func restartContainersInSortedOrder(
 		}
 	}
 
+	// Cleanup images if enabled.
 	if params.Cleanup {
 		cleanupImages(client, cleanupImageIDs)
 	}
@@ -318,8 +370,11 @@ func restartContainersInSortedOrder(
 	return failed
 }
 
-// cleanupImages removes specified image IDs from the client.
-// It skips empty IDs and logs any errors encountered during removal.
+// cleanupImages removes specified image IDs.
+//
+// Parameters:
+//   - client: Container client.
+//   - imageIDs: Image IDs to remove.
 func cleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 	for imageID := range imageIDs {
 		if imageID == "" {
@@ -334,8 +389,15 @@ func cleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 	}
 }
 
-// restartStaleContainer restarts a stale container, handling Watchtower renaming if needed.
-// It starts the new container and executes post-update hooks if applicable, returning any errors.
+// restartStaleContainer restarts a stale container.
+//
+// Parameters:
+//   - container: Container to restart.
+//   - client: Container client.
+//   - params: Update options.
+//
+// Returns:
+//   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
 	container types.Container,
 	client container.Client,
@@ -346,7 +408,7 @@ func restartStaleContainer(
 		"image":     container.ImageName(),
 	}
 
-	// Rename the current Watchtower instance to free its name for the new one.
+	// Rename Watchtower if applicable.
 	if container.IsWatchtower() {
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
@@ -363,6 +425,7 @@ func restartStaleContainer(
 			Debug("Renamed Watchtower container")
 	}
 
+	// Start new container if not disabled.
 	if !params.NoRestart {
 		newContainerID, err := client.StartContainer(container)
 		if err != nil {
@@ -371,6 +434,7 @@ func restartStaleContainer(
 			return fmt.Errorf("%w: %w", errStartContainerFailed, err)
 		}
 
+		// Run post-update hook if applicable.
 		if container.ToRestart() && params.LifecycleHooks {
 			logrus.WithFields(fields).Debug("Executing post-update command")
 			lifecycle.ExecutePostUpdateCommand(client, newContainerID)
@@ -380,8 +444,10 @@ func restartStaleContainer(
 	return nil
 }
 
-// UpdateImplicitRestart updates containers’ LinkedToRestarting flag based on linked dependencies.
-// It marks containers linked to restarting ones, ensuring dependent updates are triggered.
+// UpdateImplicitRestart marks containers linked to restarting ones.
+//
+// Parameters:
+//   - containers: List to update.
 func UpdateImplicitRestart(containers []types.Container) {
 	for i, c := range containers {
 		if c.ToRestart() {
@@ -400,8 +466,14 @@ func UpdateImplicitRestart(containers []types.Container) {
 	}
 }
 
-// linkedContainerMarkedForRestart finds the first linked container marked for restart.
-// It returns the name of the linked container if found, or an empty string otherwise.
+// linkedContainerMarkedForRestart finds a restarting linked container.
+//
+// Parameters:
+//   - links: List of linked container names.
+//   - containers: List to check against.
+//
+// Returns:
+//   - string: Name of restarting linked container, or empty if none.
 func linkedContainerMarkedForRestart(links []string, containers []types.Container) string {
 	for _, linkName := range links {
 		for _, candidate := range containers {

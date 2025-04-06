@@ -13,17 +13,30 @@ import (
 // ErrCircularReference indicates a circular dependency between containers.
 var ErrCircularReference = errors.New("circular reference detected")
 
-// Implements sort.Interface.
+// ByCreated implements sort.Interface for creation time sorting.
 type ByCreated []types.Container
 
-// Len returns the number of containers in the list.
+// Len returns the number of containers.
+//
+// Returns:
+//   - int: Container count.
 func (c ByCreated) Len() int { return len(c) }
 
-// Swap exchanges two containers in the list by their indices.
+// Swap exchanges two containers by index.
+//
+// Parameters:
+//   - i, indexJ: Indices to swap.
 func (c ByCreated) Swap(i, indexJ int) { c[i], c[indexJ] = c[indexJ], c[i] }
 
-// Uses current time as fallback if parsing fails.
+// Less compares creation times, using now as fallback.
+//
+// Parameters:
+//   - i, indexJ: Indices to compare.
+//
+// Returns:
+//   - bool: True if i was created before j.
 func (c ByCreated) Less(i, indexJ int) bool {
+	// Parse creation time for container i.
 	createdTimeI, err := time.Parse(time.RFC3339Nano, c[i].ContainerInfo().Created)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
@@ -35,6 +48,7 @@ func (c ByCreated) Less(i, indexJ int) bool {
 		createdTimeI = time.Now()
 	}
 
+	// Parse creation time for container j.
 	createdTimeJ, err := time.Parse(time.RFC3339Nano, c[indexJ].ContainerInfo().Created)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
@@ -49,7 +63,14 @@ func (c ByCreated) Less(i, indexJ int) bool {
 	return createdTimeI.Before(createdTimeJ)
 }
 
-// Places containers with no outgoing links first, followed by their dependents.
+// SortByDependencies sorts containers by dependencies.
+//
+// Parameters:
+//   - containers: List to sort.
+//
+// Returns:
+//   - []types.Container: Sorted list.
+//   - error: Non-nil if circular reference detected, nil on success.
 func SortByDependencies(containers []types.Container) ([]types.Container, error) {
 	logrus.WithField("container_count", len(containers)).Debug("Starting dependency sort")
 
@@ -69,30 +90,37 @@ func SortByDependencies(containers []types.Container) ([]types.Container, error)
 	return sorted, err
 }
 
-// dependencySorter manages the topological sort of containers by dependencies.
+// dependencySorter handles topological sorting by dependencies.
 type dependencySorter struct {
-	unvisited []types.Container // Containers yet to be visited
-	marked    map[string]bool   // Marks visited containers for cycle detection
-	sorted    []types.Container // Sorted result
+	unvisited []types.Container // Yet-to-visit containers.
+	marked    map[string]bool   // Visited markers for cycle detection.
+	sorted    []types.Container // Sorted result.
 }
 
-// Prioritizes containers with no links, then processes dependents; returns an error for circular references.
+// Sort performs topological sort on containers.
+//
+// Parameters:
+//   - containers: List to sort.
+//
+// Returns:
+//   - []types.Container: Sorted list.
+//   - error: Non-nil if circular reference detected, nil on success.
 func (ds *dependencySorter) Sort(containers []types.Container) ([]types.Container, error) {
 	ds.unvisited = containers
 	ds.marked = map[string]bool{}
 
-	// Process containers with no links first
+	// Process containers with no links first.
 	for i := 0; i < len(ds.unvisited); i++ {
 		if len(ds.unvisited[i].Links()) == 0 {
 			if err := ds.visit(ds.unvisited[i]); err != nil {
 				return nil, err
 			}
 
-			i-- // Adjust for removal
+			i-- // Adjust for removal.
 		}
 	}
 
-	// Process remaining containers with links
+	// Process remaining containers.
 	for len(ds.unvisited) > 0 {
 		if err := ds.visit(ds.unvisited[0]); err != nil {
 			return nil, err
@@ -102,8 +130,15 @@ func (ds *dependencySorter) Sort(containers []types.Container) ([]types.Containe
 	return ds.sorted, nil
 }
 
-// Adds the container to the sorted list after all its links are visited.
+// visit adds a container to the sorted list after its links.
+//
+// Parameters:
+//   - c: Container to visit.
+//
+// Returns:
+//   - error: Non-nil if circular reference detected, nil on success.
 func (ds *dependencySorter) visit(c types.Container) error {
+	// Check for circular reference.
 	if _, ok := ds.marked[c.Name()]; ok {
 		logrus.WithFields(logrus.Fields{
 			"container_id": c.ID().ShortID(),
@@ -113,11 +148,11 @@ func (ds *dependencySorter) visit(c types.Container) error {
 		return fmt.Errorf("%w: %s", ErrCircularReference, c.Name())
 	}
 
-	// Mark container as visited to detect cycles
+	// Mark as visited, unmark on exit.
 	ds.marked[c.Name()] = true
 	defer delete(ds.marked, c.Name())
 
-	// Visit each linked container recursively
+	// Visit all linked containers.
 	for _, linkName := range c.Links() {
 		if linkedContainer := ds.findUnvisited(linkName); linkedContainer != nil {
 			if err := ds.visit(*linkedContainer); err != nil {
@@ -126,7 +161,7 @@ func (ds *dependencySorter) visit(c types.Container) error {
 		}
 	}
 
-	// Move container from unvisited to sorted
+	// Add to sorted list.
 	ds.removeUnvisited(c)
 	ds.sorted = append(ds.sorted, c)
 	logrus.WithFields(logrus.Fields{
@@ -137,7 +172,13 @@ func (ds *dependencySorter) visit(c types.Container) error {
 	return nil
 }
 
-// Returns a pointer to the container or nil if not found.
+// findUnvisited finds an unvisited container by name.
+//
+// Parameters:
+//   - name: Name to find.
+//
+// Returns:
+//   - *types.Container: Found container or nil.
 func (ds *dependencySorter) findUnvisited(name string) *types.Container {
 	for _, c := range ds.unvisited {
 		if c.Name() == name {
@@ -148,7 +189,10 @@ func (ds *dependencySorter) findUnvisited(name string) *types.Container {
 	return nil
 }
 
-// Adjusts the slice to exclude the matching container.
+// removeUnvisited removes a container from the unvisited list.
+//
+// Parameters:
+//   - c: Container to remove.
 func (ds *dependencySorter) removeUnvisited(c types.Container) {
 	var idx int
 

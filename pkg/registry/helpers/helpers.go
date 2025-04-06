@@ -13,8 +13,11 @@ import (
 
 // Domains for Docker Hub, the default registry.
 const (
-	DefaultRegistryDomain       = "docker.io"
-	DefaultRegistryHost         = "index.docker.io"
+	// Canonical domain for Docker Hub.
+	DefaultRegistryDomain = "docker.io"
+	// Canonical host address for Docker Hub.
+	DefaultRegistryHost = "index.docker.io"
+	// Legacy domain alias for Docker Hub.
 	LegacyDefaultRegistryDomain = "index.docker.io"
 )
 
@@ -25,9 +28,17 @@ var (
 )
 
 // GetRegistryAddress extracts the registry address from an image reference.
-// It returns the domain part of the reference, mapping Docker Hub’s default domain
-// to its canonical host address if applicable.
+//
+// It returns the domain part of the reference, mapping Docker Hub’s default domain to its canonical host if needed.
+//
+// Parameters:
+//   - imageRef: Image reference string (e.g., "docker.io/library/alpine").
+//
+// Returns:
+//   - string: Registry address (e.g., "index.docker.io") if successful.
+//   - error: Non-nil if parsing fails, nil on success.
 func GetRegistryAddress(imageRef string) (string, error) {
+	// Parse the image reference into a normalized form for consistent domain extraction.
 	normalizedRef, err := reference.ParseNormalizedNamed(imageRef)
 	if err != nil {
 		logrus.WithError(err).
@@ -37,7 +48,10 @@ func GetRegistryAddress(imageRef string) (string, error) {
 		return "", fmt.Errorf("%w: %w", errFailedParseImageReference, err)
 	}
 
+	// Extract the domain from the normalized reference.
 	address := reference.Domain(normalizedRef)
+
+	// Map Docker Hub’s default domain to its canonical host for registry requests.
 	if address == DefaultRegistryDomain {
 		logrus.WithFields(logrus.Fields{
 			"image_ref": imageRef,
@@ -56,12 +70,20 @@ func GetRegistryAddress(imageRef string) (string, error) {
 }
 
 // NormalizeDigest standardizes a digest string for consistent comparison.
-// It trims common prefixes (e.g., "sha256:") to return the raw digest value,
-// ensuring compatibility across different registry formats.
+//
+// It trims common prefixes (e.g., "sha256:") to return the raw digest value.
+//
+// Parameters:
+//   - digest: Digest string (e.g., "sha256:abc123").
+//
+// Returns:
+//   - string: Normalized digest (e.g., "abc123").
 func NormalizeDigest(digest string) string {
+	// List of prefixes to strip from the digest.
 	prefixes := []string{"sha256:"}
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(digest, prefix) {
+			// Trim the prefix to get the raw digest value.
 			normalized := strings.TrimPrefix(digest, prefix)
 			logrus.WithFields(logrus.Fields{
 				"original":   digest,
@@ -72,5 +94,6 @@ func NormalizeDigest(digest string) string {
 		}
 	}
 
+	// Return unchanged if no prefix matches.
 	return digest
 }
