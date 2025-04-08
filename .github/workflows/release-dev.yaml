@@ -19,15 +19,53 @@ jobs:
     permissions:
       contents: read
 
-  Build:
-    uses: ./.github/workflows/build.yaml
+  Build-and-Push:
+    needs:
+      - Test
     permissions:
-      contents: write
+      contents: read
       packages: write
       attestations: write
       id-token: write
-    secrets: inherit
-    needs:
-      - Test
-    with:
-      snapshot: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@fcd3152d8ad392d0e9c14d3f0de40f0a88b8ca0e
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@941183f0a080fa6be59a9e3d3f4108c19a528204
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker images
+        uses: docker/build-push-action@66147ca503440c95dd9a97e9047c11af18d5cfeb
+        with:
+          context: .
+          file: dockerfiles/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v6,linux/386
+          push: true
+          tags: |
+            nickfedor/watchtower:amd64-latest-dev
+            nickfedor/watchtower:arm64v8-latest-dev
+            nickfedor/watchtower:armhf-latest-dev
+            nickfedor/watchtower:i386-latest-dev
+            ghcr.io/nicholas-fedor/watchtower:amd64-latest-dev
+            ghcr.io/nicholas-fedor/watchtower:arm64v8-latest-dev
+            ghcr.io/nicholas-fedor/watchtower:armhf-latest-dev
+            ghcr.io/nicholas-fedor/watchtower:i386-latest-dev
