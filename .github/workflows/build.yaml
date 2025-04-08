@@ -2,12 +2,6 @@ name: Build
 
 on:
   workflow_call:
-    inputs:
-      snapshot:
-        description: "Whether to run in snapshot mode"
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   build:
@@ -51,7 +45,7 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release ${{ inputs.snapshot && '--snapshot' || '' }}
+          args: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -46,9 +46,9 @@ dockers:
     dockerfile: dockerfiles/Dockerfile
     image_templates:
       - nickfedor/watchtower:amd64-{{ .Version }}
-      - nickfedor/watchtower:amd64-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - nickfedor/watchtower:amd64-latest
       - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
-      - ghcr.io/nicholas-fedor/watchtower:amd64-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - ghcr.io/nicholas-fedor/watchtower:amd64-latest
   - use: buildx
     build_flag_templates:
       - "--platform=linux/i386"
@@ -61,9 +61,9 @@ dockers:
     dockerfile: dockerfiles/Dockerfile
     image_templates:
       - nickfedor/watchtower:i386-{{ .Version }}
-      - nickfedor/watchtower:i386-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - nickfedor/watchtower:i386-latest
       - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Version }}
-      - ghcr.io/nicholas-fedor/watchtower:i386-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - ghcr.io/nicholas-fedor/watchtower:i386-latest
   - use: buildx
     build_flag_templates:
       - "--platform=linux/arm/v6"
@@ -76,9 +76,9 @@ dockers:
     dockerfile: dockerfiles/Dockerfile
     image_templates:
       - nickfedor/watchtower:armhf-{{ .Version }}
-      - nickfedor/watchtower:armhf-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - nickfedor/watchtower:armhf-latest
       - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
-      - ghcr.io/nicholas-fedor/watchtower:armhf-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - ghcr.io/nicholas-fedor/watchtower:armhf-latest
   - use: buildx
     build_flag_templates:
       - "--platform=linux/arm64/v8"
@@ -91,9 +91,9 @@ dockers:
     dockerfile: dockerfiles/Dockerfile
     image_templates:
       - nickfedor/watchtower:arm64v8-{{ .Version }}
-      - nickfedor/watchtower:arm64v8-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - nickfedor/watchtower:arm64v8-latest
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
-      - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ if .IsSnapshot }}latest-dev{{ else }}latest{{ end }}
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
 
 checksum:
   name_template: checksums.txt
