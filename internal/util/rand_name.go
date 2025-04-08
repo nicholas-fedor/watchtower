@@ -6,20 +6,20 @@ import (
 	"math/big"
 )
 
-// randomNameLength defines the length of randomly generated container names.
-// It ensures a consistent, Docker-compatible 32-character name.
+// randomNameLength sets the length of random container names (32).
 const randomNameLength = 32
 
-// letters defines the character set for random container names.
-// It includes all alphabetic characters, both uppercase and lowercase.
+// letters defines the character set for random names.
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-// RandName generates a random, 32-character, Docker-compatible container name.
-// It uses a cryptographically secure random number generator for enhanced security.
+// RandName generates a 32-character random container name.
+//
+// Returns:
+//   - string: Random Docker-compatible name.
 func RandName() string {
 	nameBuffer := make([]rune, randomNameLength)
 	for i := range nameBuffer {
-		// Use crypto/rand for secure random index selection.
+		// Use crypto/rand for secure randomness.
 		index, _ := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
 		nameBuffer[i] = letters[index.Int64()]
 	}

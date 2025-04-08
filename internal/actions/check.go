@@ -15,25 +15,30 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// stopContainerTimeout defines the timeout duration for stopping containers.
-// It ensures consistent timing in cleanup operations.
+// stopContainerTimeout sets the container stop timeout.
 const stopContainerTimeout = 10 * time.Minute
 
 // Errors for sanity and instance checks.
 var (
-	// errRollingRestartDependency indicates a container has dependencies incompatible with rolling restarts.
+	// errRollingRestartDependency flags incompatible dependencies for rolling restarts.
 	errRollingRestartDependency = errors.New(
 		"container has dependencies incompatible with rolling restarts",
 	)
-	// errStopWatchtowerFailed indicates a failure to stop excess Watchtower instances.
+	// errStopWatchtowerFailed flags failures in stopping excess Watchtower instances.
 	errStopWatchtowerFailed = errors.New("errors occurred while stopping watchtower containers")
-	// errListContainersFailed indicates a failure to list containers during checks.
+	// errListContainersFailed flags failures in listing containers.
 	errListContainersFailed = errors.New("failed to list containers")
 )
 
-// CheckForSanity ensures the environment is suitable before starting updates.
-// It verifies that rolling restarts are not used with dependent containers,
-// returning an error if the configuration is invalid.
+// CheckForSanity validates the environment for updates.
+//
+// Parameters:
+//   - client: Container client.
+//   - filter: Container filter.
+//   - rollingRestarts: Enable rolling restarts if true.
+//
+// Returns:
+//   - error: Non-nil if rolling restarts conflict with dependencies, nil otherwise.
 func CheckForSanity(client container.Client, filter types.Filter, rollingRestarts bool) error {
 	logrus.Debug("Performing pre-update sanity checks")
 
@@ -41,6 +46,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 		return nil // No further checks needed if rolling restarts are disabled.
 	}
 
+	// List containers to check dependencies.
 	containers, err := client.ListContainers(filter)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
@@ -48,6 +54,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 		return fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
+	// Check for dependencies.
 	for _, c := range containers {
 		if links := c.Links(); len(links) > 0 {
 			logrus.WithFields(logrus.Fields{
@@ -65,20 +72,28 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 	return nil
 }
 
-// CheckForMultipleWatchtowerInstances ensures only one Watchtower instance runs at a time.
-// It stops and optionally removes all but the most recently started Watchtower container,
-// unless a scope UID is provided to bypass this check.
+// CheckForMultipleWatchtowerInstances ensures a single Watchtower instance.
+//
+// Parameters:
+//   - client: Container client.
+//   - cleanup: Remove images if true.
+//   - scope: Scope UID to filter instances.
+//
+// Returns:
+//   - error: Non-nil if cleanup fails, nil if single instance or successful cleanup.
 func CheckForMultipleWatchtowerInstances(
 	client container.Client,
 	cleanup bool,
 	scope string,
 ) error {
+	// Apply scope filter if provided.
 	filter := filters.WatchtowerContainersFilter
 	if scope != "" {
 		filter = filters.FilterByScope(scope, filter)
 		logrus.WithField("scope", scope).Debug("Applied scope filter for Watchtower instances")
 	}
 
+	// List Watchtower instances.
 	containers, err := client.ListContainers(filter)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
@@ -98,13 +113,21 @@ func CheckForMultipleWatchtowerInstances(
 	return cleanupExcessWatchtowers(containers, client, cleanup)
 }
 
-// cleanupExcessWatchtowers stops and optionally removes all but the latest Watchtower container.
-// It sorts containers by creation time, processes all except the most recent, and reports any stop errors.
+// cleanupExcessWatchtowers removes all but the latest Watchtower instance.
+//
+// Parameters:
+//   - containers: List of Watchtower instances.
+//   - client: Container client.
+//   - cleanup: Remove images if true.
+//
+// Returns:
+//   - error: Non-nil if stopping fails, nil on success.
 func cleanupExcessWatchtowers(
 	containers []types.Container,
 	client container.Client,
 	cleanup bool,
 ) error {
+	// Sort by creation time, keep newest.
 	sort.Sort(sorter.ByCreated(containers))
 	logrus.WithField("containers", containerNames(containers)).
 		Debug("Sorted Watchtower instances by creation time")
@@ -116,6 +139,7 @@ func cleanupExcessWatchtowers(
 	var stopErrors []error
 
 	for _, c := range excessContainers {
+		// Stop excess container.
 		if err := client.StopContainer(c, stopContainerTimeout); err != nil {
 			logrus.WithError(err).
 				WithField("container", c.Name()).
@@ -128,6 +152,7 @@ func cleanupExcessWatchtowers(
 
 		logrus.WithField("container", c.Name()).Info("Stopped Watchtower instance")
 
+		// Remove image if cleanup enabled.
 		if cleanup {
 			if err := client.RemoveImageByID(c.ImageID()); err != nil {
 				logrus.WithError(err).WithFields(logrus.Fields{
@@ -143,6 +168,7 @@ func cleanupExcessWatchtowers(
 		}
 	}
 
+	// Report stop errors if any.
 	if len(stopErrors) > 0 {
 		logrus.WithField("error_count", len(stopErrors)).
 			Debug("Encountered errors during Watchtower cleanup")
@@ -159,8 +185,13 @@ func cleanupExcessWatchtowers(
 	return nil
 }
 
-// containerNames extracts container names from a slice for logging purposes.
-// It aids in providing readable log output without excessive verbosity.
+// containerNames extracts names from a container list.
+//
+// Parameters:
+//   - containers: List of containers.
+//
+// Returns:
+//   - []string: List of names.
 func containerNames(containers []types.Container) []string {
 	names := make([]string, len(containers))
 	for i, c := range containers {

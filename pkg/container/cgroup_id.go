@@ -17,24 +17,24 @@ import (
 const minMatchGroups = 2
 
 // dockerContainerPattern matches Docker container IDs in cgroup data.
-// The pattern captures a 64-character hexadecimal ID after "/docker/".
-//   - [0-9]+: matches one or more digits followed by a colon (e.g., "11:")
-//   - .*: matches any characters (greedy) followed by a colon (e.g., "perf_event:")
-//   - /docker/ matches the literal string "/docker/"
-//   - ([a-f0-9]{64}) captures exactly 64 lowercase hexadecimal characters as the container ID
+// It captures a 64-character hexadecimal ID after "/docker/" (e.g., "11:perf_event:/docker/abc...def").
 var dockerContainerPattern = regexp.MustCompile(`[0-9]+:.*:/docker/([a-f0-9]{64})`)
 
-// readFileFunc is a variable to allow mocking file reading in tests.
-// Defaults to os.ReadFile but can be overridden for testing purposes.
+// readFileFunc allows mocking file reading in tests; defaults to os.ReadFile.
 var readFileFunc = os.ReadFile
 
 // GetRunningContainerID retrieves the current container ID from the process's cgroup information.
-// It reads the cgroup file (/proc/<pid>/cgroup) for the current process and extracts the ID.
-// Returns an error if the file cannot be read or no valid ID is found.
-// The returned ID is a 64-character hexadecimal string unique to the Docker container.
+//
+// It reads the cgroup file (/proc/<pid>/cgroup) and extracts the Docker container ID.
+//
+// Returns:
+//   - types.ContainerID: 64-character hexadecimal container ID if successful.
+//   - error: Non-nil if file reading or ID extraction fails, nil on success.
 func GetRunningContainerID() (types.ContainerID, error) {
 	// Construct the path to the cgroup file using the current process ID (PID)
 	filePath := fmt.Sprintf("/proc/%d/cgroup", os.Getpid())
+
+	// Read the cgroup file content.
 	file, err := readFileFunc(filePath)
 	if err != nil {
 		logrus.WithError(err).WithField("file", filePath).Debug("Failed to read cgroup file")
@@ -42,9 +42,9 @@ func GetRunningContainerID() (types.ContainerID, error) {
 		return "", fmt.Errorf("%w: %w", errReadCgroupFile, err)
 	}
 
-	// Pass the file content to the extraction function and handle any errors
 	logrus.WithField("file", filePath).Debug("Read cgroup file successfully")
 
+	// Extract the container ID from the file content.
 	containerID, err := getRunningContainerIDFromString(string(file))
 	if err != nil {
 		logrus.WithError(err).
@@ -58,11 +58,17 @@ func GetRunningContainerID() (types.ContainerID, error) {
 }
 
 // getRunningContainerIDFromString extracts a container ID from a cgroup string.
-// It processes the input string, which may be single-line or multiline, to find a 64-character
-// hexadecimal ID following "/docker/". Returns the ID and nil on success, or an empty string
-// and an error if no valid ID is found. Uses regex matching for precision and logs debug info.
+//
+// It uses regex to find a 64-character hexadecimal ID after "/docker/" in single-line or multiline input.
+//
+// Parameters:
+//   - cgroupString: Cgroup data string to parse.
+//
+// Returns:
+//   - types.ContainerID: Extracted container ID if found.
+//   - error: Non-nil if no valid ID is found, nil on success.
 func getRunningContainerIDFromString(cgroupString string) (types.ContainerID, error) {
-	// Define an iterator for lines; behavior depends on whether the input is single-line or multiline
+	// Choose iteration method based on input format.
 	var lines iter.Seq[string]
 	if strings.Contains(cgroupString, "\n") {
 		// For multiline input (e.g., full /proc/<pid>/cgroup content), use strings.Lines to iterate over each line
@@ -78,14 +84,17 @@ func getRunningContainerIDFromString(cgroupString string) (types.ContainerID, er
 	for line := range lines {
 		// Remove trailing newline for consistent matching, as /proc/<pid>/cgroup lines end with \n
 		trimmedLine := strings.TrimRight(line, "\n")
+
 		// Apply the regex to find a Docker container ID in the line
 		matches := dockerContainerPattern.FindStringSubmatch(trimmedLine)
+
 		// Log debug information about the line being processed
 		logrus.WithFields(logrus.Fields{
 			"line":    trimmedLine,
 			"matches": matches,
 		}).Debug("Processed cgroup line for container ID")
-		// Check if the regex found a match with at least the full match and the captured ID
+
+		// Verify a match with the expected groups (full match + ID).
 		if len(matches) >= minMatchGroups {
 			// The captured group (matches[1]) is the 64-character ID; regex ensures length and hex format
 			id := types.ContainerID(matches[1])
@@ -94,6 +103,7 @@ func getRunningContainerIDFromString(cgroupString string) (types.ContainerID, er
 			return id, nil
 		}
 	}
-	// If no valid ID is found after checking all lines, return an error with the input for context
+
+	// Return an error if no ID is found after processing all lines.
 	return "", fmt.Errorf("%w: %q", errNoValidContainerID, cgroupString)
 }

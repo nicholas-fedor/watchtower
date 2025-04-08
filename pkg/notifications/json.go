@@ -20,10 +20,14 @@ var (
 	errMarshalFailed = errors.New("failed to marshal notification data")
 )
 
+// jsonMap is a type alias for a JSON-compatible map.
 type jsonMap = map[string]any
 
-// MarshalJSON implements json.Marshaler for the Data type.
-// It converts the notification data into a JSON structure, including report details and log entries.
+// MarshalJSON implements json.Marshaler for Data.
+//
+// Returns:
+//   - []byte: JSON-encoded data.
+//   - error: Non-nil if marshaling fails, nil on success.
 func (d Data) MarshalJSON() ([]byte, error) {
 	clog := logrus.WithFields(logrus.Fields{
 		"title":   d.Title,
@@ -32,6 +36,7 @@ func (d Data) MarshalJSON() ([]byte, error) {
 	})
 	clog.Debug("Marshaling notification data to JSON")
 
+	// Convert log entries to JSON maps.
 	entries := make([]jsonMap, len(d.Entries))
 	for i, entry := range d.Entries {
 		entries[i] = jsonMap{
@@ -42,6 +47,7 @@ func (d Data) MarshalJSON() ([]byte, error) {
 		}
 	}
 
+	// Include report data if present.
 	var report jsonMap
 
 	if d.Report != nil {
@@ -58,6 +64,7 @@ func (d Data) MarshalJSON() ([]byte, error) {
 		}
 	}
 
+	// Build final JSON structure.
 	data := jsonMap{
 		"report":  report,
 		"title":   d.Title,
@@ -65,6 +72,7 @@ func (d Data) MarshalJSON() ([]byte, error) {
 		"entries": entries,
 	}
 
+	// Marshal to JSON bytes.
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		clog.WithError(err).
@@ -79,11 +87,17 @@ func (d Data) MarshalJSON() ([]byte, error) {
 	return bytes, nil
 }
 
-// marshalReports converts a slice of ContainerReport into a JSON-compatible structure.
-// It includes key fields like ID, name, image IDs, and state, adding an error field if present.
+// marshalReports converts ContainerReport slice to JSON-compatible maps.
+//
+// Parameters:
+//   - reports: List of container reports.
+//
+// Returns:
+//   - []jsonMap: JSON maps of report data.
 func marshalReports(reports []types.ContainerReport) []jsonMap {
 	jsonReports := make([]jsonMap, len(reports))
 	for i, report := range reports {
+		// Populate base report fields.
 		jsonReports[i] = jsonMap{
 			"id":             report.ID().ShortID(),
 			"name":           report.Name(),
@@ -92,6 +106,7 @@ func marshalReports(reports []types.ContainerReport) []jsonMap {
 			"imageName":      report.ImageName(),
 			"state":          report.State(),
 		}
+		// Add error if present.
 		if errorMessage := report.Error(); errorMessage != "" {
 			jsonReports[i]["error"] = errorMessage
 		}

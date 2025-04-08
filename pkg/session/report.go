@@ -6,48 +6,70 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// Implements Report type interface.
+// report implements the Report interface for session results.
 type report struct {
-	scanned []types.ContainerReport
-	updated []types.ContainerReport
-	failed  []types.ContainerReport
-	skipped []types.ContainerReport
-	stale   []types.ContainerReport
-	fresh   []types.ContainerReport
+	scanned []types.ContainerReport // Scanned containers.
+	updated []types.ContainerReport // Updated containers.
+	failed  []types.ContainerReport // Failed containers.
+	skipped []types.ContainerReport // Skipped containers.
+	stale   []types.ContainerReport // Stale containers.
+	fresh   []types.ContainerReport // Fresh containers.
 }
 
-// Scanned returns containers scanned during the session.
+// Scanned returns scanned containers.
+//
+// Returns:
+//   - []types.ContainerReport: Scanned list.
 func (r *report) Scanned() []types.ContainerReport {
 	return r.scanned
 }
 
-// Updated returns containers updated during the session.
+// Updated returns updated containers.
+//
+// Returns:
+//   - []types.ContainerReport: Updated list.
 func (r *report) Updated() []types.ContainerReport {
 	return r.updated
 }
 
-// Failed returns containers that failed during the session.
+// Failed returns failed containers.
+//
+// Returns:
+//   - []types.ContainerReport: Failed list.
 func (r *report) Failed() []types.ContainerReport {
 	return r.failed
 }
 
-// Skipped returns containers skipped during the session.
+// Skipped returns skipped containers.
+//
+// Returns:
+//   - []types.ContainerReport: Skipped list.
 func (r *report) Skipped() []types.ContainerReport {
 	return r.skipped
 }
 
-// Stale returns containers marked as stale during the session.
+// Stale returns stale containers.
+//
+// Returns:
+//   - []types.ContainerReport: Stale list.
 func (r *report) Stale() []types.ContainerReport {
 	return r.stale
 }
 
-// Fresh returns containers marked as fresh during the session.
+// Fresh returns fresh containers.
+//
+// Returns:
+//   - []types.ContainerReport: Fresh list.
 func (r *report) Fresh() []types.ContainerReport {
 	return r.fresh
 }
 
-// Deduplicates by container ID, prioritizing updated, failed, skipped, stale, fresh, then scanned.
+// All returns deduplicated containers, prioritized by state.
+//
+// Returns:
+//   - []types.ContainerReport: Sorted, unique list.
 func (r *report) All() []types.ContainerReport {
+	// Calculate total capacity for all containers.
 	allLen := len(
 		r.scanned,
 	) + len(
@@ -64,6 +86,7 @@ func (r *report) All() []types.ContainerReport {
 	all := make([]types.ContainerReport, 0, allLen)
 	presentIDs := map[types.ContainerID][]string{}
 
+	// Append unique containers in priority order.
 	appendUnique := func(reports []types.ContainerReport) {
 		for _, report := range reports {
 			if _, found := presentIDs[report.ID()]; found {
@@ -87,11 +110,13 @@ func (r *report) All() []types.ContainerReport {
 	return all
 }
 
-// NewReport creates a new Report from a Progress instance, categorizing and sorting container statuses.
-// It processes each container in the progress map, assigns them to appropriate categories (scanned,
-// updated, failed, skipped, stale, fresh), and ensures each category is sorted by container ID.
-// Non-skipped containers are added to the scanned list, with further categorization based on their state
-// or image comparison.
+// NewReport creates a report from progress data.
+//
+// Parameters:
+//   - progress: Progress map to process.
+//
+// Returns:
+//   - types.Report: Categorized and sorted report.
 func NewReport(progress Progress) types.Report {
 	report := &report{
 		scanned: make([]types.ContainerReport, 0, len(progress)),
@@ -102,21 +127,22 @@ func NewReport(progress Progress) types.Report {
 		fresh:   make([]types.ContainerReport, 0),
 	}
 
-	// Categorize all containers from progress
+	// Categorize each container status.
 	for _, update := range progress {
 		categorizeContainer(report, update)
 	}
 
-	// Sort all categories by container ID
+	// Sort all categories by ID.
 	sortCategories(report)
 
 	return report
 }
 
-// categorizeContainer assigns a container status to the appropriate report categories based on its state
-// and image IDs. Skipped containers go to the skipped list only. Non-skipped containers are added to
-// scanned and may also be categorized as fresh, updated, failed, or stale depending on their state
-// and whether their images match.
+// categorizeContainer assigns a status to report categories.
+//
+// Parameters:
+//   - report: Report to update.
+//   - update: Container status to categorize.
 func categorizeContainer(report *report, update *ContainerStatus) {
 	if update.state == SkippedState {
 		report.skipped = append(report.skipped, update)
@@ -124,10 +150,10 @@ func categorizeContainer(report *report, update *ContainerStatus) {
 		return
 	}
 
-	// All non-skipped containers are scanned
+	// Add non-skipped to scanned list.
 	report.scanned = append(report.scanned, update)
 
-	// Categorize based on image comparison or state
+	// Categorize based on image or state.
 	if update.newImage == update.oldImage {
 		update.state = FreshState
 		report.fresh = append(report.fresh, update)
@@ -135,8 +161,8 @@ func categorizeContainer(report *report, update *ContainerStatus) {
 		return
 	}
 
-	// Handle remaining states explicitly
-	//nolint:exhaustive // Missing states handled above.
+	// Handle explicit states.
+	//nolint:exhaustive // Other states handled above.
 	switch update.state {
 	case UpdatedState:
 		report.updated = append(report.updated, update)
@@ -145,14 +171,15 @@ func categorizeContainer(report *report, update *ContainerStatus) {
 	case StaleState:
 		report.stale = append(report.stale, update)
 	default:
-		// Default to stale for unhandled or unknown states
 		update.state = StaleState
 		report.stale = append(report.stale, update)
 	}
 }
 
-// sortCategories sorts each category in the report by container ID in ascending order.
-// This ensures consistent ordering when retrieving containers from the report.
+// sortCategories sorts all report categories by container ID.
+//
+// Parameters:
+//   - report: Report to sort.
 func sortCategories(report *report) {
 	sort.Sort(sortableContainers(report.scanned))
 	sort.Sort(sortableContainers(report.updated))
@@ -162,14 +189,32 @@ func sortCategories(report *report) {
 	sort.Sort(sortableContainers(report.fresh))
 }
 
-// sortableContainers implements sort.Interface for sorting container reports by ID.
+// sortableContainers implements sort.Interface for reports.
 type sortableContainers []types.ContainerReport
 
-// Len returns the length of the container report slice.
-func (s sortableContainers) Len() int { return len(s) }
+// Len returns the slice length.
+//
+// Returns:
+//   - int: Number of reports.
+func (s sortableContainers) Len() int {
+	return len(s)
+}
 
-// Less determines if one container report’s ID is less than another’s.
-func (s sortableContainers) Less(i, j int) bool { return s[i].ID() < s[j].ID() }
+// Less compares container IDs.
+//
+// Parameters:
+//   - i, j: Indices to compare.
+//
+// Returns:
+//   - bool: True if i’s ID is less than j’s.
+func (s sortableContainers) Less(i, j int) bool {
+	return s[i].ID() < s[j].ID()
+}
 
-// Swap exchanges two container reports in the slice.
-func (s sortableContainers) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+// Swap exchanges two reports.
+//
+// Parameters:
+//   - i, j: Indices to swap.
+func (s sortableContainers) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}

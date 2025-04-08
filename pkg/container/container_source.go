@@ -17,13 +17,21 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// defaultStopSignal defines the default signal used to stop containers when no custom signal is specified.
-// It is set to "SIGTERM" to allow containers to terminate gracefully by default.
+// defaultStopSignal is the default signal for stopping containers ("SIGTERM").
 const defaultStopSignal = "SIGTERM"
 
-// ListSourceContainers retrieves a list of containers from the Docker host, filtered by the provided function.
-// It respects the IncludeStopped and IncludeRestarting options to determine which container states to include.
-// Returns a slice of containers or an error if the listing fails.
+// ListSourceContainers retrieves a list of containers from the Docker host.
+//
+// It filters containers based on options and a provided filter function.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - opts: Client options for filtering.
+//   - filter: Function to filter containers.
+//
+// Returns:
+//   - []types.Container: Filtered list of containers.
+//   - error: Non-nil if listing fails, nil on success.
 func ListSourceContainers(
 	api dockerClient.APIClient,
 	opts ClientOptions,
@@ -37,7 +45,7 @@ func ListSourceContainers(
 
 	clog.Debug("Retrieving container list")
 
-	// Apply filters based on configured options.
+	// Build filter arguments for container states.
 	filterArgs := dockerFiltersType.NewArgs()
 	filterArgs.Add("status", "running")
 
@@ -50,7 +58,7 @@ func ListSourceContainers(
 		filterArgs.Add("status", "restarting")
 	}
 
-	// Apply filters based on configured options.
+	// Fetch containers with applied filters.
 	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{Filters: filterArgs})
 	if err != nil {
 		clog.WithError(err).Debug("Failed to list containers")
@@ -58,6 +66,7 @@ func ListSourceContainers(
 		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
+	// Convert and filter containers.
 	hostContainers := []types.Container{}
 
 	for _, runningContainer := range containers {
@@ -77,8 +86,16 @@ func ListSourceContainers(
 }
 
 // GetSourceContainer retrieves detailed information about a container by its ID.
-// It resolves network container references by replacing IDs with names when possible.
-// Returns a Container object or an error if inspection fails.
+//
+// It resolves network container references where possible.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - containerID: ID of the container to inspect.
+//
+// Returns:
+//   - types.Container: Container object if successful.
+//   - error: Non-nil if inspection fails, nil on success.
 func GetSourceContainer(
 	api dockerClient.APIClient,
 	containerID types.ContainerID,
@@ -88,7 +105,7 @@ func GetSourceContainer(
 
 	clog.Debug("Inspecting container")
 
-	// Fetch basic container information.
+	// Inspect the container to get its details.
 	containerInfo, err := api.ContainerInspect(ctx, string(containerID))
 	if err != nil {
 		clog.WithError(err).Debug("Failed to inspect container")
@@ -96,7 +113,7 @@ func GetSourceContainer(
 		return nil, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
 	}
 
-	// Resolve network container references.
+	// Resolve network mode if it references another container.
 	netType, netContainerID, found := strings.Cut(string(containerInfo.HostConfig.NetworkMode), ":")
 	if found && netType == "container" {
 		parentContainer, err := api.ContainerInspect(ctx, netContainerID)
@@ -114,7 +131,7 @@ func GetSourceContainer(
 		}
 	}
 
-	// Fetch image info, tolerating failure.
+	// Fetch image info, falling back if it fails.
 	imageInfo, err := api.ImageInspect(ctx, containerInfo.Image)
 	if err != nil {
 		clog.WithError(err).Warn("Failed to retrieve image info")
@@ -127,9 +144,16 @@ func GetSourceContainer(
 	return NewContainer(&containerInfo, &imageInfo), nil
 }
 
-// StopSourceContainer stops and removes the specified container within the given timeout.
-// It first attempts to stop the container gracefully, then removes it unless AutoRemove is enabled.
-// Returns an error if stopping or removal fails.
+// StopSourceContainer stops and removes the specified container.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - sourceContainer: Container to stop and remove.
+//   - timeout: Duration to wait before forcing stop.
+//   - removeVolumes: Whether to remove associated volumes.
+//
+// Returns:
+//   - error: Non-nil if stop/removal fails, nil on success.
 func StopSourceContainer(
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
@@ -142,12 +166,13 @@ func StopSourceContainer(
 		"id":        sourceContainer.ID().ShortID(),
 	})
 
-	// Stop the container if it’s running.
+	// Determine stop signal, defaulting to SIGTERM.
 	signal := sourceContainer.StopSignal()
 	if signal == "" {
 		signal = defaultStopSignal
 	}
 
+	// Stop the container if it’s running.
 	if sourceContainer.IsRunning() {
 		clog.WithField("signal", signal).Info("Stopping container")
 
@@ -158,11 +183,20 @@ func StopSourceContainer(
 		}
 	}
 
+	// Proceed with removal process.
 	return stopAndRemoveContainer(api, sourceContainer, timeout, removeVolumes)
 }
 
 // stopAndRemoveContainer waits for a container to stop and removes it if needed.
-// It respects AutoRemove and logs progress, returning an error if the process fails.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - sourceContainer: Container to process.
+//   - timeout: Duration to wait for stop/removal.
+//   - removeVolumes: Whether to remove volumes.
+//
+// Returns:
+//   - error: Non-nil if process fails, nil on success.
 func stopAndRemoveContainer(
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
@@ -175,7 +209,7 @@ func stopAndRemoveContainer(
 		"id":        sourceContainer.ID().ShortID(),
 	})
 
-	// Wait for the container to stop or timeout.
+	// Wait for the container to stop.
 	stopped, err := waitForStopOrTimeout(api, sourceContainer, timeout)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to wait for container stop")
@@ -187,13 +221,14 @@ func stopAndRemoveContainer(
 		clog.WithField("timeout", timeout).Warn("Container did not stop within timeout")
 	}
 
-	// If already gone and AutoRemove is enabled, no further action needed.
+	// Skip removal if AutoRemove is enabled and container stopped.
 	if stopped && sourceContainer.ContainerInfo().HostConfig.AutoRemove {
 		clog.Debug("Skipping removal due to AutoRemove")
 
 		return nil
 	}
 
+	// Remove the container with force and volume options.
 	clog.Debug("Removing container")
 
 	err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainerType.RemoveOptions{
@@ -207,11 +242,10 @@ func stopAndRemoveContainer(
 	}
 
 	if dockerClient.IsErrNotFound(err) {
-		// Container was already gone after removal attempt; no need for second wait.
-		return nil
+		return nil // Container already gone.
 	}
 
-	// Confirm removal if it succeeded or container wasn’t gone before.
+	// Confirm removal completed.
 	stopped, err = waitForStopOrTimeout(api, sourceContainer, timeout)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to confirm container removal")
@@ -236,8 +270,15 @@ func stopAndRemoveContainer(
 }
 
 // waitForStopOrTimeout waits for a container to stop or times out.
-// Returns true if stopped (or gone), false if still running after timeout, and any error.
-// Treats a 404 (not found) as stopped, indicating successful removal or prior stop.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - container: Container to monitor.
+//   - waitTime: Duration to wait.
+//
+// Returns:
+//   - bool: True if stopped or gone, false if still running.
+//   - error: Non-nil if inspection fails, nil otherwise.
 func waitForStopOrTimeout(
 	api dockerClient.APIClient,
 	container types.Container,
@@ -246,15 +287,16 @@ func waitForStopOrTimeout(
 	ctx := context.Background()
 	timeout := time.After(waitTime)
 
+	// Poll container state until stopped or timeout.
 	for {
 		select {
 		case <-timeout:
-			return false, nil // Timed out, container still running
+			return false, nil // Timeout reached, still running.
 		default:
 			containerInfo, err := api.ContainerInspect(ctx, string(container.ID()))
 			if err != nil {
 				if dockerClient.IsErrNotFound(err) {
-					return true, nil // Container gone, treat as stopped
+					return true, nil // Container gone, treat as stopped.
 				}
 
 				logrus.WithError(err).WithFields(logrus.Fields{
@@ -266,16 +308,21 @@ func waitForStopOrTimeout(
 			}
 
 			if !containerInfo.State.Running {
-				return true, nil // Stopped successfully
+				return true, nil // Container stopped.
 			}
 		}
 		time.Sleep(1 * time.Second)
 	}
 }
 
-// getLegacyNetworkConfig returns the network configuration of the source container.
-// It duplicates Watchtower's original function to maintain compatibility with pre-version 1.44 API clients.
-// See Docker's source code for implementation details: https://github.com/moby/moby/blob/master/client/container_create.go
+// getLegacyNetworkConfig returns the network config for pre-1.44 API clients.
+//
+// Parameters:
+//   - sourceContainer: Container to extract config from.
+//   - clientVersion: API version of the client.
+//
+// Returns:
+//   - *dockerNetworkType.NetworkingConfig: Legacy network configuration.
 func getLegacyNetworkConfig(
 	sourceContainer types.Container,
 	clientVersion string,
@@ -294,6 +341,7 @@ func getLegacyNetworkConfig(
 		}
 	}
 
+	// Build minimal config without MAC addresses.
 	config := &dockerNetworkType.NetworkingConfig{
 		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
 	}
@@ -331,6 +379,13 @@ func getLegacyNetworkConfig(
 }
 
 // filterAliases removes the container’s short ID from the list of aliases.
+//
+// Parameters:
+//   - aliases: List of aliases to filter.
+//   - shortID: Short ID to remove.
+//
+// Returns:
+//   - []string: Filtered list of aliases.
 func filterAliases(aliases []string, shortID string) []string {
 	result := make([]string, 0, len(aliases))
 
@@ -343,9 +398,15 @@ func filterAliases(aliases []string, shortID string) []string {
 	return result
 }
 
-// getNetworkConfig extracts the network configuration from the source container.
-// It preserves essential settings (e.g., IP, MAC) while resetting DNSNames and Aliases to minimal values.
-// Returns a sanitized network configuration for use in creating the target container.
+// getNetworkConfig extracts the network configuration from a container.
+//
+// It preserves essential settings while sanitizing aliases and DNS names.
+//
+// Parameters:
+//   - sourceContainer: Container to extract config from.
+//
+// Returns:
+//   - *dockerNetworkType.NetworkingConfig: Sanitized network configuration.
 func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.NetworkingConfig {
 	config := &dockerNetworkType.NetworkingConfig{
 		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
@@ -353,7 +414,7 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 	clog := logrus.WithField("container", sourceContainer.Name())
 
 	for networkName, originalEndpoint := range sourceContainer.ContainerInfo().NetworkSettings.Networks {
-		// Copy all fields from the original endpoint
+		// Process each network endpoint.
 		endpoint := &dockerNetworkType.EndpointSettings{
 			IPAMConfig:          originalEndpoint.IPAMConfig,          // Preserve full IPAM config
 			Links:               originalEndpoint.Links,               // Preserve container links
@@ -370,13 +431,13 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 			MacAddress:          originalEndpoint.MacAddress,          // Preserve endpoint MAC address if API Version > 1.43
 		}
 
-		// Only set Aliases and DNSNames for user-defined networks and not the default "bridge" network.
+		// Sanitize aliases and DNS names for non-bridge networks.
 		if networkName != "bridge" {
 			endpoint.Aliases = []string{sourceContainer.Name()[1:]}  // Reset to container name only
 			endpoint.DNSNames = []string{sourceContainer.Name()[1:]} // Reset to container name only
 		}
 
-		// Preserve IPAMConfig if present
+		// Copy IPAM config if present.
 		if originalEndpoint.IPAMConfig != nil {
 			endpoint.IPAMConfig = &dockerNetworkType.EndpointIPAMConfig{
 				IPv4Address:  originalEndpoint.IPAMConfig.IPv4Address,
@@ -396,12 +457,13 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 	return config
 }
 
-// debugLogMacAddress logs MAC address information for a container's network configuration.
-// It verifies that at least one MAC address exists for the container across its network
-// endpoints, logging each found address at debug level.
-// If no MAC addresses are found, then it emits a warning since containers typically require
-// at least one MAC address for network communication.
-// Multiple MAC addresses are supported as a container may be connected to multiple networks.
+// debugLogMacAddress logs MAC address info for a container’s network config.
+//
+// Parameters:
+//   - networkConfig: Network configuration to check.
+//   - containerID: ID of the container.
+//   - clientVersion: API version of the client.
+//   - minSupportedVersion: Minimum API version for MAC preservation.
 func debugLogMacAddress(
 	networkConfig *dockerNetworkType.NetworkingConfig,
 	containerID types.ContainerID,
@@ -414,7 +476,7 @@ func debugLogMacAddress(
 		"min_version": minSupportedVersion,
 	})
 
-	// Log any MAC addresses found in the config
+	// Check for MAC addresses in the config.
 	foundMac := false
 
 	for networkName, endpoint := range networkConfig.EndpointsConfig {
@@ -428,15 +490,15 @@ func debugLogMacAddress(
 		}
 	}
 
-	// Determine logging behavior based on API version
+	// Log based on API version and MAC presence.
 	switch {
-	case versions.LessThan(clientVersion, minSupportedVersion):
+	case versions.LessThan(clientVersion, minSupportedVersion): // API < v1.44
 		if foundMac {
 			clog.Warn("Unexpected MAC address in legacy config")
 		} else {
 			clog.Debug("No MAC address in legacy config, Docker will assign")
 		}
-	default: // API >= 1.44
+	default: // API >= v1.44
 		if foundMac {
 			clog.Debug("Verified MAC address configuration")
 		} else {

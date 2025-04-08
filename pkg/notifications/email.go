@@ -14,9 +14,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-const (
-	emailType = "email"
-)
+// emailType is the identifier for email notifications.
+const emailType = "email"
 
 // Errors for email notification configuration.
 var (
@@ -24,19 +23,25 @@ var (
 	errInvalidPortRange = errors.New("port out of valid range (0-65535)")
 )
 
-// emailTypeNotifier handles email notifications using SMTP configuration.
-// It supports batching log entries with a configurable delay.
+// emailTypeNotifier handles email notifications via SMTP.
+//
+// It batches log entries with a configurable delay.
 type emailTypeNotifier struct {
-	From, To               string
-	Server, User, Password string
-	Port                   int
-	tlsSkipVerify          bool
-	entries                []*logrus.Entry
-	delay                  time.Duration
+	From, To               string          // Sender and recipient email addresses.
+	Server, User, Password string          // SMTP server details.
+	Port                   int             // SMTP server port.
+	tlsSkipVerify          bool            // Skip TLS verification if true.
+	entries                []*logrus.Entry // Queued log entries.
+	delay                  time.Duration   // Delay for batching notifications.
 }
 
-// newEmailNotifier creates a new email notifier from command-line flags.
-// It initializes SMTP settings and delay for notification batching.
+// newEmailNotifier creates an email notifier from command-line flags.
+//
+// Parameters:
+//   - c: Cobra command with flags.
+//
+// Returns:
+//   - types.ConvertibleNotifier: New email notifier instance.
 func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
@@ -59,7 +64,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	})
 	clog.Debug("Initializing email notifier from flags")
 
-	// Only log sensitive fields (user, password) at trace level
+	// Log sensitive fields only at trace level.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		clog.WithFields(logrus.Fields{
 			"user":     user,
@@ -80,8 +85,14 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	}
 }
 
-// GetURL generates the SMTP URL for the email notifier based on its configuration.
-// It configures authentication, TLS settings, and returns the formatted URL, validating the port range.
+// GetURL generates the SMTP URL from the notifier’s configuration.
+//
+// Parameters:
+//   - c: Cobra command (unused here).
+//
+// Returns:
+//   - string: SMTP URL.
+//   - error: Non-nil if port is invalid, nil on success.
 func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithFields(logrus.Fields{
 		"from":   e.From,
@@ -91,13 +102,14 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	})
 	clog.Debug("Generating SMTP URL")
 
-	// Validate port range (0-65535)
+	// Validate port range (0-65535).
 	if e.Port < 0 || e.Port > 65535 {
 		clog.WithField("port", e.Port).Debug("Invalid SMTP port")
 
 		return "", fmt.Errorf("port %d: %w", e.Port, errInvalidPortRange)
 	}
 
+	// Configure SMTP settings.
 	port := uint16(e.Port)
 
 	conf := &smtp.Config{
@@ -115,12 +127,14 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		ClientHost:  "localhost",
 	}
 
+	// Enable authentication if credentials provided.
 	if len(e.User) > 0 {
 		conf.Auth = smtp.AuthTypes.Plain
 
 		clog.Debug("Using plain authentication")
 	}
 
+	// Disable encryption if TLS verification is skipped.
 	if e.tlsSkipVerify {
 		conf.Encryption = smtp.EncMethods.None
 
@@ -137,8 +151,10 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	return url, nil
 }
 
-// GetDelay returns the configured delay for batching email notifications.
-// It provides the duration to wait before sending queued messages.
+// GetDelay returns the delay for batching email notifications.
+//
+// Returns:
+//   - time.Duration: Configured delay.
 func (e *emailTypeNotifier) GetDelay() time.Duration {
 	clog := logrus.WithFields(logrus.Fields{
 		"from":   e.From,
