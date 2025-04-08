@@ -61,5 +61,5 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            nickfedor/watchtower:amd64-latest-dev
-            ghcr.io/nicholas-fedor/watchtower:amd64-latest-dev
+            nickfedor/watchtower:latest-dev
+            ghcr.io/nicholas-fedor/watchtower:latest-dev
