@@ -33,7 +33,7 @@ var (
 	errFailedMarshalAuthConfig = errors.New("failed to marshal auth config to JSON")
 )
 
-// EncodedAuth attempts to retrieve encoded authentication credentials for a given image reference.
+// EncodedAuth attempts to retrieve encoded authentication credentials for a given image name.
 //
 // It checks environment variables first, then falls back to the Docker config file if needed.
 //
@@ -41,32 +41,32 @@ var (
 //   - ref: Image reference string (e.g., "docker.io/library/alpine").
 //
 // Returns:
-//   - string: Base64-encoded auth string if successful, empty if none found.
-//   - error: Non-nil if both methods fail, nil on success or if no auth is available.
-func EncodedAuth(ref string) (string, error) {
+//   - string: Base64-encoded credentials string if successful, empty if none found.
+//   - error: Non-nil if both methods fail, nil on success or if no credentials are available.
+func EncodedAuth(imageName string) (string, error) {
 	// Set up logging fields for tracking.
 	fields := logrus.Fields{
-		"image_ref": ref,
+		"image_ref": imageName,
 	}
 
 	logrus.WithFields(fields).Debug("Attempting to retrieve auth credentials")
 
 	// Try environment variables first.
-	auth, err := EncodedEnvAuth()
+	credentials, err := EncodedEnvAuth()
 	if err != nil {
 		// Fallback to config file if env vars are unavailable.
 		logrus.WithError(err).
 			WithFields(fields).
 			Debug("Environment auth not available, trying config file")
 
-		auth, err = EncodedConfigAuth(ref)
+		credentials, err = EncodedConfigCredentials(imageName)
 	}
 
 	if err == nil {
-		logrus.WithFields(fields).Debug("Successfully retrieved auth credentials")
+		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials")
 	}
 
-	return auth, err
+	return credentials, err
 }
 
 // EncodedEnvAuth checks for REPO_USER and REPO_PASS environment variables and encodes them.
@@ -83,7 +83,7 @@ func EncodedEnvAuth() (string, error) {
 
 	// Check if both variables are set.
 	if username != "" && password != "" {
-		auth := dockerConfigTypes.AuthConfig{
+		credentials := dockerConfigTypes.AuthConfig{
 			Username: username,
 			Password: password,
 		}
@@ -101,7 +101,7 @@ func EncodedEnvAuth() (string, error) {
 		}
 
 		// Encode and return the auth config.
-		return EncodeAuth(auth)
+		return EncodeCredentials(credentials)
 	}
 
 	// Return error if variables are missing.
@@ -110,7 +110,7 @@ func EncodedEnvAuth() (string, error) {
 	return "", errUnsetRegAuthVars
 }
 
-// EncodedConfigAuth retrieves authentication credentials from the Docker config file.
+// EncodedConfigCredentials retrieves authentication credentials from the Docker config file.
 //
 // The Docker config must be mounted on the container.
 //
@@ -118,9 +118,9 @@ func EncodedEnvAuth() (string, error) {
 //   - imageRef: Image reference string for registry lookup.
 //
 // Returns:
-//   - string: Base64-encoded auth string if found, empty if none.
+//   - string: Base64-encoded credentials string if found, empty if none.
 //   - error: Non-nil if config loading or address retrieval fails, nil on success or if no auth is found.
-func EncodedConfigAuth(imageRef string) (string, error) {
+func EncodedConfigCredentials(imageRef string) (string, error) {
 	// Set up logging fields for tracking.
 	fields := logrus.Fields{
 		"image_ref": imageRef,
@@ -155,10 +155,10 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 
 	// Retrieve credentials from the config’s store.
 	credStore := CredentialsStore(*configFile)
-	auth, _ := credStore.Get(server)
+	credentials, _ := credStore.Get(server)
 
 	// Return empty string if no credentials are found.
-	if auth == (dockerConfigTypes.AuthConfig{}) {
+	if credentials == (dockerConfigTypes.AuthConfig{}) {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"server":      server,
 			"config_file": configFile.Filename,
@@ -169,7 +169,7 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 
 	// Log successful credential retrieval, hiding password unless in trace mode.
 	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"username":    auth.Username,
+		"username":    credentials.Username,
 		"server":      server,
 		"config_file": configFile.Filename,
 	}).Debug("Loaded auth credentials from config")
@@ -177,14 +177,14 @@ func EncodedConfigAuth(imageRef string) (string, error) {
 	// Log password only in trace mode
 	if logrus.GetLevel() == logrus.TraceLevel {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"username": auth.Username,
-			"password": auth.Password,
+			"username": credentials.Username,
+			"password": credentials.Password,
 			"server":   server,
 		}).Trace("Using config credentials")
 	}
 
 	// Encode and return the auth config.
-	return EncodeAuth(auth)
+	return EncodeCredentials(credentials)
 }
 
 // CredentialsStore returns a new credentials store based on the configuration file settings.
@@ -206,7 +206,7 @@ func CredentialsStore(configFile dockerConfigConfigfile.ConfigFile) dockerConfig
 	return dockerConfigCredentials.NewFileStore(&configFile)
 }
 
-// EncodeAuth Base64 encodes an AuthConfig struct for HTTP transmission.
+// EncodeCredentials Base64 encodes an AuthConfig struct for HTTP transmission.
 //
 // It marshals the struct to JSON and applies URL-safe base64 encoding.
 //
@@ -216,7 +216,7 @@ func CredentialsStore(configFile dockerConfigConfigfile.ConfigFile) dockerConfig
 // Returns:
 //   - string: Base64-encoded auth string if successful.
 //   - error: Non-nil if marshaling fails, nil on success.
-func EncodeAuth(authConfig dockerConfigTypes.AuthConfig) (string, error) {
+func EncodeCredentials(authConfig dockerConfigTypes.AuthConfig) (string, error) {
 	// Set up logging fields with username for tracking.
 	fields := logrus.Fields{
 		"username": authConfig.Username,

@@ -183,9 +183,15 @@ func fetchDigest(
 		return "", fmt.Errorf("%w: %w", errFailedCreateRequest, err)
 	}
 
-	// Set standard headers for Docker registry manifest requests.
+	// Set standard headers for registry manifest requests.
 	req.Header.Set("Authorization", token)
-	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+	// Set Accept header to support both OCI image indexes and Docker V2 manifests.
+	// This ensures compatibility with registries like GHCR that return OCI indexes (e.g., for multi-arch images)
+	// instead of single V2 manifests, which caused 404 errors with the previous V2-only header.
+	req.Header.Set(
+		"Accept",
+		"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+	)
 	req.Header.Set("User-Agent", UserAgent)
 
 	// Execute the request using the configured auth client.

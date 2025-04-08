@@ -14,11 +14,9 @@ import (
 // Domains for Docker Hub, the default registry.
 const (
 	// Canonical domain for Docker Hub.
-	DefaultRegistryDomain = "docker.io"
+	DockerRegistryDomain = "docker.io"
 	// Canonical host address for Docker Hub.
-	DefaultRegistryHost = "index.docker.io"
-	// Legacy domain alias for Docker Hub.
-	LegacyDefaultRegistryDomain = "index.docker.io"
+	DockerRegistryHost = "index.docker.io"
 )
 
 // Errors for helper operations.
@@ -52,13 +50,13 @@ func GetRegistryAddress(imageRef string) (string, error) {
 	address := reference.Domain(normalizedRef)
 
 	// Map Docker Hub’s default domain to its canonical host for registry requests.
-	if address == DefaultRegistryDomain {
+	if address == DockerRegistryDomain {
 		logrus.WithFields(logrus.Fields{
 			"image_ref": imageRef,
 			"address":   address,
 		}).Debug("Mapped Docker Hub domain to canonical host")
 
-		address = DefaultRegistryHost
+		address = DockerRegistryHost
 	}
 
 	logrus.WithFields(logrus.Fields{

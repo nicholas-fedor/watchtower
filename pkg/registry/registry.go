@@ -39,8 +39,8 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 
 	logrus.WithFields(fields).Debug("Retrieving pull options")
 
-	// Fetch encoded auth credentials for the image.
-	auth, err := EncodedAuth(imageName)
+	// Fetch encoded registry credentials for the image.
+	registryCredentials, err := EncodedAuth(imageName)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get authentication credentials")
 
@@ -48,8 +48,8 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 	}
 
 	// Return empty options if no auth is available.
-	if auth == "" {
-		logrus.WithFields(fields).Debug("No authentication credentials found")
+	if registryCredentials == "" {
+		logrus.WithFields(fields).Debug("No authentication credentials retrieved")
 
 		return image.PullOptions{}, nil
 	}
@@ -57,13 +57,13 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 	// Log auth details only in trace mode to protect sensitive data.
 	if logrus.GetLevel() == logrus.TraceLevel {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"auth": auth,
+			"auth": registryCredentials,
 		}).Trace("Retrieved authentication credentials")
 	}
 
 	// Configure pull options with auth and a default privilege handler.
 	pullOptions := image.PullOptions{
-		RegistryAuth:  auth,
+		RegistryAuth:  registryCredentials,
 		PrivilegeFunc: DefaultAuthHandler,
 	}
 
@@ -126,7 +126,7 @@ func WarnOnAPIConsumption(container types.Container) bool {
 	}
 
 	// Check if the registry is known to support HEAD requests.
-	if containerHost == helpers.DefaultRegistryHost || containerHost == "ghcr.io" {
+	if containerHost == helpers.DockerRegistryHost || containerHost == "ghcr.io" {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"host": containerHost,
 		}).Debug("Registry supports HEAD requests, warning on API consumption")

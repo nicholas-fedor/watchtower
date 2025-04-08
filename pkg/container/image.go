@@ -211,7 +211,7 @@ func (c imageClient) PullImage(
 func (c imageClient) shouldSkipPull(
 	ctx context.Context,
 	sourceContainer types.Container,
-	auth string,
+	registryAuth string,
 	warnOnHeadFailed WarningStrategy,
 	fields logrus.Fields,
 ) bool {
@@ -220,7 +220,7 @@ func (c imageClient) shouldSkipPull(
 
 	warn := c.warnOnHeadFailed(sourceContainer, warnOnHeadFailed)
 	// Compare current and remote digests.
-	match, err := digest.CompareDigest(ctx, sourceContainer, auth)
+	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth)
 	if err != nil {
 		clog.WithFields(logrus.Fields{
 			"match": match,
