@@ -121,7 +121,7 @@ func Update(client container.Client, params types.UpdateParams) (types.Report, e
 		"total":  len(containers),
 		"stale":  staleCount,
 		"failed": staleCheckFailed,
-	}).Info("Completed container staleness check")
+	}).Debug("Completed container staleness check")
 
 	// Sort by dependencies.
 	containers, err = sorter.SortByDependencies(containers)
