@@ -20,7 +20,7 @@ jobs:
       id-token: write
     env:
       CGO_ENABLED: 0
-      GO_VERSION: 1.24.1
+      GO_VERSION: 1.24.x
       TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout
@@ -62,5 +62,5 @@ jobs:
           subject-checksums: ./dist/checksums.txt
 
       - name: Clean up dist directory
-        if: always()  # Runs even if previous steps fail
+        if: always() # Runs even if previous steps fail
         run: rm -rf dist
