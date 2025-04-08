@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("Registry credential helpers", func() {
 			err = os.Setenv("DOCKER_CONFIG", "/dev/null/should-fail")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			_, err = EncodedConfigAuth("")
+			_, err = EncodedConfigCredentials("")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 		})
 	})
