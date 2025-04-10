@@ -87,6 +87,7 @@ func StartTargetContainer(
 		return createdContainerID, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
 
+	// Log detailed start message
 	clog.WithField("new_id", createdContainerID.ShortID()).Info("Started new container")
 
 	return createdContainerID, nil
