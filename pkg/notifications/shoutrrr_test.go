@@ -154,7 +154,7 @@ updt1 (mock/updt1:latest): Updated
 
 				s, err := shoutrrr.buildMessage(Data{Entries: entries})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(s).To(gomega.Equal("foo bar\n"))
+				gomega.Expect(s).To(gomega.Equal("foo bar"))
 			})
 		})
 		ginkgo.When("given a valid custom template", func() {

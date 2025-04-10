@@ -174,6 +174,7 @@ func StopSourceContainer(
 
 	// Stop the container if it’s running.
 	if sourceContainer.IsRunning() {
+		// Log detailed stop message
 		clog.WithField("signal", signal).Info("Stopping container")
 
 		if err := api.ContainerKill(ctx, string(sourceContainer.ID()), signal); err != nil {
@@ -370,9 +371,9 @@ func getLegacyNetworkConfig(
 		}
 	}
 
-	// Warn if MAC preservation is desired but not possible
+	// Provide debug log message if MAC preservation is desired but not possible
 	if len(networks) > 0 {
-		clog.Warn("MAC addresses not preserved in legacy config")
+		clog.Debug("MAC addresses not preserved in legacy config")
 	}
 
 	return config

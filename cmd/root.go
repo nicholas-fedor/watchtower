@@ -809,6 +809,19 @@ func runUpdatesWithNotifications(filter types.Filter) *metrics.Metric {
 		logrus.WithError(err).Error("Update execution failed")
 	}
 
+	// Debug report
+	updatedNames := make([]string, 0, len(result.Updated()))
+	for _, r := range result.Updated() {
+		updatedNames = append(updatedNames, r.Name())
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"scanned":       len(result.Scanned()),
+		"updated":       len(result.Updated()),
+		"failed":        len(result.Failed()),
+		"updated_names": updatedNames,
+	}).Debug("Report before notification")
+
 	// Send the batched notification with update results (successes, failures, etc.).
 	notifier.SendNotification(result)
 

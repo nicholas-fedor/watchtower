@@ -16,7 +16,7 @@ system, [logrus](http://github.com/sirupsen/logrus).
 
 ## Settings
 
-- `--notifications-level` (env. `WATCHTOWER_NOTIFICATIONS_LEVEL`): Controls the log level which is used for the notifications. If omitted, the default log level is `info`. Possible values are: `panic`, `fatal`, `error`, `warn`, `info`, `debug` or `trace`.
+- `--notifications-level` (env. `WATCHTOWER_NOTIFICATIONS_LEVEL`): Controls the log level for notifications. Defaults to `info`. In legacy mode (`--notification-report=false`), only `info`-level logs trigger notifications, ensuring a focused step-by-step update summary. Possible values: `panic`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`.
 - `--notifications-hostname` (env. `WATCHTOWER_NOTIFICATIONS_HOSTNAME`): Custom hostname specified in subject/title. Useful to override the operating system hostname.
 - `--notifications-delay` (env. `WATCHTOWER_NOTIFICATIONS_DELAY`): Delay before sending notifications expressed in seconds.
 - Watchtower will post a notification every time it is started. This behavior [can be changed](https://nicholas-fedor.github.io/watchtower/arguments/#without_sending_a_startup_message) with an argument.
@@ -47,17 +47,47 @@ Simple templates are used unless the `notification-report` flag is specified:
 
 ## Simple templates
 
-The default value if not set is `{{range .}}{{.Message}}{{println}}{{end}}`. The example below uses a template that also
-outputs timestamp and log level.
+The default template for simple notifications (used when `WATCHTOWER_NOTIFICATION_REPORT` is not set) is:
+
+```go
+{{- range $i, $e := . -}}
+{{- if $i}}{{- println -}}{{- end -}}
+{{- $msg := $e.Message -}}
+{{- if eq $msg "Found new image" -}}
+    Found new image: {{$e.Data.image}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Stopping container" -}}
+    Stopped stale container: {{$e.Data.container}} ({{with $e.Data.id}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Started new container" -}}
+    Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Removing image" -}}
+    Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if $e.Data -}}
+    {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
+{{- else -}}
+    {{$msg}}
+{{- end -}}
+{{- end -}}
+```
+
+This template processes `info`-level log entries as they occur, formatting key update events in past tense with container and image details from `logrus` fields. It sends each event immediately in legacy mode, mimicking a step-by-step log.
+
+Example output for a single container update with `WATCHTOWER_CLEANUP` enabled:
+
+```text
+Found new image: /app:latest (bb7ba9626731)
+Stopped stale container: /app (4a2a8f7298a2)
+Started new container: /app (f52721881bed)
+Removed stale image: 78612560eb20
+```
+
+!!! note "Field Handling"
+    If expected fields (e.g., `new_id`, `id`, `image_id`) are missing, the template uses "unknown" as a fallback to ensure readable output (e.g., `Stopped stale container: /app (unknown)`).
 
 !!! tip "Custom date format"
-    If you want to adjust the date/time format it must show how the
-    [reference time](https://golang.org/pkg/time/#pkg-constants) (_Mon Jan 2 15:04:05 MST 2006_) would be displayed in your
-    custom format.  
-    i.e., The day of the year has to be 1, the month has to be 2 (february), the hour 3 (or 15 for 24h time) etc.
+    To include timestamps, modify the template with .Time.Format, e.g., {{.Time.Format "2006-01-02 15:04:05"}} {{$msg}}. The reference time format is Mon Jan 2 15:04:05 MST 2006, so adjust accordingly (e.g., day as 1, month as 2, hour as 3 or 15).
 
 !!! note "Skipping notifications"
-    To skip sending notifications that do not contain any information, you can wrap your template with `{{if .}}` and `{{end}}`.
+    To skip sending notifications that do not contain any information, you can wrap your template with `{{if .}}` and `{{end}}`. The default template does not skip empty messages in legacy mode, as it processes logs as they occur.
 
 Example:
 

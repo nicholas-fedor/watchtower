@@ -182,6 +182,7 @@ func createNotifier(
 //   - notifier: Notifier instance.
 func sendNotifications(notifier *shoutrrrTypeNotifier) {
 	for msg := range notifier.messages {
+		LocalLog.WithField("message", msg).Debug("Sending notification")
 		time.Sleep(notifier.delay)
 		errs := notifier.Router.Send(msg, notifier.params)
 
@@ -223,7 +224,10 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	return body.String(), nil
+	msg := body.String()
+	LocalLog.WithField("message", msg).Debug("Generated notification message")
+
+	return msg, nil
 }
 
 // sendEntries sends batched entries and optional report.
@@ -233,6 +237,10 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 //   - report: Optional scan report.
 func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types.Report) {
 	msg, err := n.buildMessage(Data{n.data, entries, report})
+
+	LocalLog.WithError(err).
+		WithFields(logrus.Fields{"message": msg}).
+		Debug("Preparing to send entries")
 
 	if msg == "" {
 		// Log in go func in case we entered from Fire to avoid stalling
@@ -244,8 +252,12 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 			}
 		}()
 
+		LocalLog.Debug("Message empty, skipping send")
+
 		return
 	}
+
+	LocalLog.Debug("Queuing notification message")
 	n.messages <- msg
 }
 

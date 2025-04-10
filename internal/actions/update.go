@@ -384,6 +384,7 @@ func cleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 		if err := client.RemoveImageByID(imageID); err != nil {
 			logrus.WithError(err).WithField("image_id", imageID).Warn("Failed to remove image")
 		} else {
+			// Log detailed removal message
 			logrus.WithField("image_id", imageID).Debug("Removed image")
 		}
 	}

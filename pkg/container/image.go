@@ -138,6 +138,7 @@ func (c imageClient) HasNewImage(
 		return false, currentImageID, nil
 	}
 
+	// Log full image name and ID
 	clog.WithField("new_id", newImageID.ShortID()).Info("Found new image")
 
 	return true, newImageID, nil
