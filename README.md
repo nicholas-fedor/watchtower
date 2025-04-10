@@ -3,7 +3,7 @@
   
 # Watchtower
   
-  A process for automating Docker container base image updates.
+  Automate Docker container image updates
   <br/><br/>
   
   [![CircleCI](https://dl.circleci.com/status-badge/img/gh/nicholas-fedor/watchtower/tree/main.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/gh/nicholas-fedor/watchtower/tree/main)
@@ -41,6 +41,17 @@ Manually setting the `DOCKER_API_VERSION` [variable](https://nicholas-fedor.gith
 ## Documentation
 
 The full documentation is available at <https://nicholas-fedor.github.io/watchtower/>.
+
+## Star History
+<!-- markdownlint-disable -->
+<a href="https://www.star-history.com/">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=Date" />
+ </picture>
+</a>
+<!-- markdownlint-restore -->
 
 ## Contributors
 
