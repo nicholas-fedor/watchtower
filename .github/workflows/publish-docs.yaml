@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - docs
+      - docs/**
       - README.md
   workflow_run:
     workflows: ["Release (Production)"]
