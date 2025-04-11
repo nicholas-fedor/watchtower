@@ -10,7 +10,7 @@ require (
 	github.com/docker/cli v28.0.4+incompatible
 	github.com/docker/docker v28.0.4+incompatible
 	github.com/docker/go-connections v0.5.0
-	github.com/nicholas-fedor/shoutrrr v0.8.7
+	github.com/nicholas-fedor/shoutrrr v0.8.8
 	github.com/onsi/gomega v1.37.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/robfig/cron v1.2.0
