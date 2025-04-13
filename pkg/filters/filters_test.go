@@ -247,6 +247,36 @@ func TestFilterByImage(t *testing.T) {
 	assert.False(t, filterSingle(container))
 	assert.True(t, filterMultiple(container))
 	container.AssertExpectations(t)
+
+	filterEmptyTagged := FilterByImage(nil, NoFilter)
+	filterSingleTagged := FilterByImage([]string{"registry:develop"}, NoFilter)
+	filterMultipleTagged := FilterByImage([]string{"registry:develop", "registry:latest"}, NoFilter)
+	assert.NotNil(t, filterSingleTagged)
+	assert.NotNil(t, filterMultipleTagged)
+
+	container = new(mocks.FilterableContainer)
+	container.On("ImageName").Return("bla:latest")
+	container.On("Name").Return("/test")
+	assert.True(t, filterEmptyTagged(container))
+	assert.False(t, filterSingleTagged(container))
+	assert.False(t, filterMultipleTagged(container))
+	container.AssertExpectations(t)
+
+	container = new(mocks.FilterableContainer)
+	container.On("ImageName").Return("registry:latest")
+	container.On("Name").Return("/test")
+	assert.True(t, filterEmptyTagged(container))
+	assert.False(t, filterSingleTagged(container))
+	assert.True(t, filterMultipleTagged(container))
+	container.AssertExpectations(t)
+
+	container = new(mocks.FilterableContainer)
+	container.On("ImageName").Return("registry:develop")
+	container.On("Name").Return("/test")
+	assert.True(t, filterEmptyTagged(container))
+	assert.True(t, filterSingleTagged(container))
+	assert.True(t, filterMultipleTagged(container))
+	container.AssertExpectations(t)
 }
 
 func TestBuildFilter(t *testing.T) {

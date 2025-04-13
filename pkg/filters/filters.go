@@ -4,7 +4,6 @@ package filters
 
 import (
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -222,14 +221,21 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 			"images":    images,
 		})
 
-		image := strings.Split(c.ImageName(), ":")[0] // Strip tag from image name.
-		if slices.Contains(images, image) {
-			clog.WithField("image", image).Debug("Container matched image")
-
-			return baseFilter(c)
+		imageParts := strings.Split(c.ImageName(), ":")
+		for _, targetImage := range images {
+			targetImageParts := strings.Split(targetImage, ":")
+			if imageParts[0] == targetImageParts[0] {
+				if len(imageParts) == 2 && len(targetImageParts) == 2 {
+					if imageParts[1] != targetImageParts[1] {
+						continue
+					}
+				}
+				clog.WithField("image", c.ImageName()).Debug("Container matched image")
+				return baseFilter(c)
+			}
 		}
 
-		clog.WithField("image", image).Debug("Container image did not match")
+		clog.WithField("image", c.ImageName()).Debug("Container image did not match")
 
 		return false
 	}
