@@ -279,6 +279,31 @@ func TestFilterByImage(t *testing.T) {
 	container.AssertExpectations(t)
 }
 
+func TestFilterByImageMalformed(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByImage([]string{"valid:image", "invalid::tag", "image:", ":tag", ""}, NoFilter)
+	assert.NotNil(t, filter)
+
+	container := new(mocks.FilterableContainer)
+	container.On("ImageName").Return("valid:image")
+	container.On("Name").Return("/test")
+	assert.True(t, filter(container)) // Valid match
+	container.AssertExpectations(t)
+
+	container = new(mocks.FilterableContainer)
+	container.On("ImageName").Return("valid:other")
+	container.On("Name").Return("/test")
+	assert.False(t, filter(container)) // Tag mismatch
+	container.AssertExpectations(t)
+
+	container = new(mocks.FilterableContainer)
+	container.On("ImageName").Return("invalid:tag")
+	container.On("Name").Return("/test")
+	assert.False(t, filter(container)) // Malformed input ignored
+	container.AssertExpectations(t)
+}
+
 func TestBuildFilter(t *testing.T) {
 	t.Parallel()
 

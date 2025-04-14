@@ -45,3 +45,11 @@ In order to update only certain images, the image names can be provided as URL q
 ```bash
 curl -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar,foo/baz
 ```
+
+You can also specify image tags to target containers running a specific version (e.g., `foo/bar:1.0`). For example, to update only containers using `foo/bar:1.0` and `foo/baz:latest`:
+
+```bash
+curl -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar:1.0,foo/baz:latest
+```
+
+If no tag is provided, Watchtower matches containers regardless of their tag, maintaining compatibility with untagged image filtering.
