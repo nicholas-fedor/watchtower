@@ -1,11 +1,11 @@
 <div align="center">
   <img src="./logo.png" width="450" />
-  
+
 # Watchtower
-  
+
   Automate Docker container image updates
   <br/><br/>
-  
+
   [![CircleCI](https://dl.circleci.com/status-badge/img/gh/nicholas-fedor/watchtower/tree/main.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/gh/nicholas-fedor/watchtower/tree/main)
   [![codecov](https://codecov.io/gh/nicholas-fedor/watchtower/branch/main/graph/badge.svg)](https://codecov.io/gh/nicholas-fedor/watchtower)
   [![GoDoc](https://godoc.org/github.com/nicholas-fedor/watchtower?status.svg)](https://godoc.org/github.com/nicholas-fedor/watchtower)
@@ -64,6 +64,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/nicholas-fedor"><img src="https://avatars2.githubusercontent.com/u/71477161?v=4?s=100" width="100px;" alt="Nicholas Fedor"/><br /><sub><b>Nicholas Fedor</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=nicholas-fedor" title="Code">💻</a> <a href="https://github.com/nicholas-fedor/watchtower/commits?author=nicholas-fedor" title="Documentation">📖</a> <a href="#maintenance-nicholas-fedor" title="Maintenance">🚧</a> <a href="https://github.com/nicholas-fedor/watchtower/pulls?q=is%3Apr+reviewed-by%3Anicholas-fedor" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://ko-fi.com/foxite"><img src="https://avatars.githubusercontent.com/u/20421657?v=4?s=100" width="100px;" alt="Dirk Kok"/><br /><sub><b>Dirk Kok</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=Foxite" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://piksel.se"><img src="https://avatars2.githubusercontent.com/u/807383?v=4?s=100" width="100px;" alt="nils måsén"/><br /><sub><b>nils måsén</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=piksel" title="Code">💻</a> <a href="https://github.com/nicholas-fedor/watchtower/commits?author=piksel" title="Documentation">📖</a> <a href="https://github.com/nicholas-fedor/watchtower/pulls?q=is%3Apr+reviewed-by%3Apiksel" title="Reviewed Pull Requests">👀</a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://simme.dev"><img src="https://avatars0.githubusercontent.com/u/1596025?v=4?s=100" width="100px;" alt="Simon Aronsson"/><br /><sub><b>Simon Aronsson</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=simskij" title="Code">💻</a> <a href="https://github.com/nicholas-fedor/watchtower/commits?author=simskij" title="Documentation">📖</a> <a href="https://github.com/nicholas-fedor/watchtower/pulls?q=is%3Apr+reviewed-by%3Asimskij" title="Reviewed Pull Requests">👀</a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://codelica.com"><img src="https://avatars3.githubusercontent.com/u/386101?v=4?s=100" width="100px;" alt="James"/><br /><sub><b>James</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=Codelica" title="Tests">⚠️</a> <a href="#ideas-Codelica" title="Ideas, Planning, & Feedback">🤔</a></td>
@@ -175,7 +176,6 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/hypnoglow"><img src="https://avatars.githubusercontent.com/u/4853075?v=4?s=100" width="100px;" alt="Igor Zibarev"/><br /><sub><b>Igor Zibarev</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=hypnoglow" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/patricegautier"><img src="https://avatars.githubusercontent.com/u/38435239?v=4?s=100" width="100px;" alt="Patrice"/><br /><sub><b>Patrice</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=patricegautier" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://jamesw.link/me"><img src="https://avatars.githubusercontent.com/u/8067792?v=4?s=100" width="100px;" alt="James White"/><br /><sub><b>James White</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=jamesmacwhite" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://ko-fi.com/foxite"><img src="https://avatars.githubusercontent.com/u/20421657?v=4?s=100" width="100px;" alt="Dirk Kok"/><br /><sub><b>Dirk Kok</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=Foxite" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/EDIflyer"><img src="https://avatars.githubusercontent.com/u/13610277?v=4?s=100" width="100px;" alt="EDIflyer"/><br /><sub><b>EDIflyer</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=EDIflyer" title="Documentation">📖</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/jauderho"><img src="https://avatars.githubusercontent.com/u/13562?v=4?s=100" width="100px;" alt="Jauder Ho"/><br /><sub><b>Jauder Ho</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=jauderho" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://tamal.vercel.app/"><img src="https://avatars.githubusercontent.com/u/72851613?v=4?s=100" width="100px;" alt="Tamal Das "/><br /><sub><b>Tamal Das </b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=IAmTamal" title="Documentation">📖</a></td>

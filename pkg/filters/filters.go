@@ -4,7 +4,6 @@ package filters
 
 import (
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -203,17 +202,17 @@ func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
 	}
 }
 
-// FilterByImage selects containers with specific images.
+// FilterByImage selects containers with specific images, optionally including tags.
 //
 // Parameters:
-//   - images: List of image names to match (without tags).
+//   - images: List of image names (with optional tags) to match.
 //   - baseFilter: Base filter to chain.
 //
 // Returns:
 //   - types.Filter: Filter function matching images and applying base filter.
 func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	if images == nil {
-		return baseFilter
+		return baseFilter // No images specified, apply base filter only.
 	}
 
 	return func(c types.FilterableContainer) bool {
@@ -222,17 +221,41 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 			"images":    images,
 		})
 
-		image := strings.Split(c.ImageName(), ":")[0] // Strip tag from image name.
-		if slices.Contains(images, image) {
-			clog.WithField("image", image).Debug("Container matched image")
+		for _, targetImage := range images {
+			if matchImageAndTag(c.ImageName(), targetImage) {
+				clog.WithField("image", c.ImageName()).Debug("Container matched image")
 
-			return baseFilter(c)
+				return baseFilter(c) // Image matches, proceed with base filter.
+			}
 		}
 
-		clog.WithField("image", image).Debug("Container image did not match")
+		clog.WithField("image", c.ImageName()).Debug("Container image did not match")
 
-		return false
+		return false // No matching image found.
 	}
+}
+
+// matchImageAndTag checks if a container's image matches a target image, including optional tag.
+//
+// Parameters:
+//   - containerImage: The container's image name (e.g., "registry:develop").
+//   - targetImage: The target image name or image:tag to match (e.g., "registry").
+//
+// Returns:
+//   - bool: True if the image (and tag, if specified) matches, false otherwise.
+func matchImageAndTag(containerImage, targetImage string) bool {
+	containerParts := strings.Split(containerImage, ":") // Split into name and tag.
+	targetParts := strings.Split(targetImage, ":")       // Split target into name and tag.
+
+	if containerParts[0] != targetParts[0] { // Compare image names.
+		return false // Image names don't match.
+	}
+
+	if len(targetParts) > 1 && len(containerParts) > 1 { // Both have tags.
+		return containerParts[1] == targetParts[1] // Compare tags.
+	}
+
+	return true // No tag in target or container, name match sufficient.
 }
 
 // BuildFilter constructs a composite filter for containers.

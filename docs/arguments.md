@@ -105,8 +105,8 @@ Environment Variable: WATCHTOWER_REMOVE_VOLUMES
 
 Enable debug mode with verbose logging.
 
-!!! note "Notes"  
-    Alias for `--log-level debug`. See [Maximum log level](#maximum-log-level).  
+!!! note "Notes"
+    Alias for `--log-level debug`. See [Maximum log level](#maximum-log-level).
     Does _not_ take an argument when used as an argument. Using `--debug true` will **not** work.
 
 ```text
@@ -120,8 +120,8 @@ Environment Variable: WATCHTOWER_DEBUG
 
 Enable trace mode with very verbose logging. Caution: exposes credentials!
 
-!!! note "Notes"  
-    Alias for `--log-level trace`. See [Maximum log level](#maximum-log-level).  
+!!! note "Notes"
+    Alias for `--log-level trace`. See [Maximum log level](#maximum-log-level).
     Does _not_ take an argument when used as an argument. Using `--trace true` will **not** work.
 
 ```text
@@ -351,6 +351,8 @@ Environment Variable: WATCHTOWER_RUN_ONCE
 ## HTTP API Mode
 
 Runs Watchtower in HTTP API mode, only allowing image updates to be triggered by an HTTP request.
+
+Supports filtering by specific image tags (e.g., `image=foo/bar:1.0`) in HTTP requests.
 For details see [HTTP API](https://nicholas-fedor.github.io/watchtower/http-api-mode).
 
 ```text
@@ -374,7 +376,7 @@ Environment Variable: WATCHTOWER_HTTP_API_TOKEN
 
 ## HTTP API periodic polls
 
-Keep running periodic updates if the HTTP API mode is enabled, otherwise the HTTP API would prevent periodic polls.  
+Keep running periodic updates if the HTTP API mode is enabled, otherwise the HTTP API would prevent periodic polls.
 
 ```text
             Argument: --http-api-periodic-polls
@@ -401,7 +403,7 @@ Environment Variable: WATCHTOWER_SCOPE
 
 ## HTTP API Metrics
 
-Enables a metrics endpoint, exposing prometheus metrics via HTTP. See [Metrics](metrics.md) for details.  
+Enables a metrics endpoint, exposing prometheus metrics via HTTP. See [Metrics](metrics.md) for details.
 
 ```text
             Argument: --http-api-metrics
@@ -493,8 +495,8 @@ Returns a success exit code to enable usage with docker `HEALTHCHECK`. This chec
 
 ## Programmatic Output (porcelain)
 
-Writes the session results to STDOUT using a stable, machine-readable format (indicated by the argument VERSION).  
-  
+Writes the session results to STDOUT using a stable, machine-readable format (indicated by the argument VERSION).
+
 Alias for:
 
 ```text

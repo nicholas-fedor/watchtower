@@ -2,7 +2,9 @@ package notifications_test
 
 import (
 	"fmt"
+	"io"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -328,6 +330,62 @@ var _ = ginkgo.Describe("notifications", func() {
 				}
 
 				testURL(args, expectedOutput, time.Duration(0))
+			})
+		})
+		ginkgo.When("initializing a gotify notifier via NewNotifier", func() {
+			ginkgo.BeforeEach(func() {
+				// Reset logrus state.
+				logrus.SetLevel(logrus.InfoLevel)
+				logrus.SetOutput(os.Stderr)
+			})
+
+			ginkgo.It("should configure with valid flags", func() {
+				command := cmd.NewRootCommand()
+				flags.RegisterNotificationFlags(command)
+
+				args := []string{
+					"--notifications",
+					"gotify",
+					"--notification-gotify-url",
+					"https://gotify.example.com",
+					"--notification-gotify-token",
+					"test-token",
+					"--notification-gotify-tls-skip-verify",
+				}
+				gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
+
+				notifier := notifications.NewNotifier(command)
+				names := notifier.GetNames()
+				gomega.Expect(names).To(gomega.ContainElement("gotify"))
+				urls := notifier.GetURLs()
+				gomega.Expect(urls).
+					To(gomega.ContainElement(gomega.ContainSubstring("gotify://gotify.example.com/test-token")))
+			})
+
+			ginkgo.It("should log token at trace level", func() {
+				command := cmd.NewRootCommand()
+				flags.RegisterNotificationFlags(command)
+
+				args := []string{
+					"--notifications",
+					"gotify",
+					"--notification-gotify-url",
+					"https://gotify.example.com",
+					"--notification-gotify-token",
+					"test-token",
+				}
+				gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
+
+				logrus.SetLevel(logrus.TraceLevel)
+				logrus.SetOutput(io.Discard)
+				defer logrus.SetOutput(os.Stderr)
+
+				notifier := notifications.NewNotifier(command)
+				names := notifier.GetNames()
+				gomega.Expect(names).To(gomega.ContainElement("gotify"))
+				urls := notifier.GetURLs()
+				gomega.Expect(urls).
+					To(gomega.ContainElement(gomega.ContainSubstring("gotify://gotify.example.com/test-token")))
 			})
 		})
 	})
