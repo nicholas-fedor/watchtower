@@ -654,6 +654,10 @@
 <p>In order to update only certain images, the image names can be provided as URL query parameters. The following <code>curl</code> command would trigger an update for the images <code>foo/bar</code> and <code>foo/baz</code>:</p>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar,foo/baz
 </code></pre></div>
+<p>You can also specify image tags to target containers running a specific version (e.g., <code>foo/bar:1.0</code>). For example, to update only containers using <code>foo/bar:1.0</code> and <code>foo/baz:latest</code>:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar:1.0,foo/baz:latest
+</code></pre></div>
+<p>If no tag is provided, Watchtower matches containers regardless of their tag, maintaining compatibility with untagged image filtering.</p>
 
 
 

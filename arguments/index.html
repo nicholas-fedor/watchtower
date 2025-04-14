@@ -1454,7 +1454,7 @@ Environment Variable: WATCHTOWER_REMOVE_VOLUMES
 <p>Enable debug mode with verbose logging.</p>
 <div class="admonition note">
 <p class="admonition-title">Notes</p>
-<p>Alias for <code>--log-level debug</code>. See <a href="#maximum-log-level">Maximum log level</a>.<br />
+<p>Alias for <code>--log-level debug</code>. See <a href="#maximum-log-level">Maximum log level</a>.
 Does <em>not</em> take an argument when used as an argument. Using <code>--debug true</code> will <strong>not</strong> work.</p>
 </div>
 <div class="highlight"><pre><span></span><code>            Argument: --debug, -d
@@ -1466,7 +1466,7 @@ Environment Variable: WATCHTOWER_DEBUG
 <p>Enable trace mode with very verbose logging. Caution: exposes credentials!</p>
 <div class="admonition note">
 <p class="admonition-title">Notes</p>
-<p>Alias for <code>--log-level trace</code>. See <a href="#maximum-log-level">Maximum log level</a>.<br />
+<p>Alias for <code>--log-level trace</code>. See <a href="#maximum-log-level">Maximum log level</a>.
 Does <em>not</em> take an argument when used as an argument. Using <code>--trace true</code> will <strong>not</strong> work.</p>
 </div>
 <div class="highlight"><pre><span></span><code>            Argument: --trace
@@ -1618,7 +1618,8 @@ Environment Variable: WATCHTOWER_RUN_ONCE
              Default: false
 </code></pre></div>
 <h2 id="http_api_mode">HTTP API Mode<a class="headerlink" href="#http_api_mode" title="Permanent link">&para;</a></h2>
-<p>Runs Watchtower in HTTP API mode, only allowing image updates to be triggered by an HTTP request.
+<p>Runs Watchtower in HTTP API mode, only allowing image updates to be triggered by an HTTP request.</p>
+<p>Supports filtering by specific image tags (e.g., <code>image=foo/bar:1.0</code>) in HTTP requests.
 For details see <a href="https://nicholas-fedor.github.io/watchtower/http-api-mode">HTTP API</a>.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --http-api-update
 Environment Variable: WATCHTOWER_HTTP_API_UPDATE
@@ -1634,7 +1635,7 @@ Environment Variable: WATCHTOWER_HTTP_API_TOKEN
              Default: -
 </code></pre></div>
 <h2 id="http_api_periodic_polls">HTTP API periodic polls<a class="headerlink" href="#http_api_periodic_polls" title="Permanent link">&para;</a></h2>
-<p>Keep running periodic updates if the HTTP API mode is enabled, otherwise the HTTP API would prevent periodic polls.  </p>
+<p>Keep running periodic updates if the HTTP API mode is enabled, otherwise the HTTP API would prevent periodic polls.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --http-api-periodic-polls
 Environment Variable: WATCHTOWER_HTTP_API_PERIODIC_POLLS
                 Type: Boolean
@@ -1654,7 +1655,7 @@ Environment Variable: WATCHTOWER_SCOPE
              Default: -
 </code></pre></div>
 <h2 id="http_api_metrics">HTTP API Metrics<a class="headerlink" href="#http_api_metrics" title="Permanent link">&para;</a></h2>
-<p>Enables a metrics endpoint, exposing prometheus metrics via HTTP. See <a href="../metrics/">Metrics</a> for details.  </p>
+<p>Enables a metrics endpoint, exposing prometheus metrics via HTTP. See <a href="../metrics/">Metrics</a> for details.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --http-api-metrics
 Environment Variable: WATCHTOWER_HTTP_API_METRICS
                 Type: Boolean
@@ -1715,7 +1716,7 @@ Environment Variable: WATCHTOWER_WARN_ON_HEAD_FAILURE
 <div class="highlight"><pre><span></span><code>            Argument: --health-check
 </code></pre></div>
 <h2 id="programmatic_output_porcelain">Programmatic Output (porcelain)<a class="headerlink" href="#programmatic_output_porcelain" title="Permanent link">&para;</a></h2>
-<p>Writes the session results to STDOUT using a stable, machine-readable format (indicated by the argument VERSION).  </p>
+<p>Writes the session results to STDOUT using a stable, machine-readable format (indicated by the argument VERSION).</p>
 <p>Alias for:</p>
 <div class="highlight"><pre><span></span><code>  --notification-url logger://
   --notification-log-stdout
