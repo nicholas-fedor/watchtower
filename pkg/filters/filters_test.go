@@ -251,6 +251,7 @@ func TestFilterByImage(t *testing.T) {
 	filterEmptyTagged := FilterByImage(nil, NoFilter)
 	filterSingleTagged := FilterByImage([]string{"registry:develop"}, NoFilter)
 	filterMultipleTagged := FilterByImage([]string{"registry:develop", "registry:latest"}, NoFilter)
+
 	assert.NotNil(t, filterSingleTagged)
 	assert.NotNil(t, filterMultipleTagged)
 
