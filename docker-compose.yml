@@ -33,7 +33,7 @@ services:
     image: nginx@sha256:5ed8fcc66f4ed123c1b2560ed708dc148755b6e4cbd8b943fab094f2c6bfa91e
     container_name: parent
   child:
-    image: nginx:alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
+    image: nginx:alpine@sha256:7c8883131cfba033d0bc312936f37732f51f4351e2d9130411f26e52d80c829e
     labels:
       com.centurylinklabs.watchtower.depends-on: parent
     container_name: child
