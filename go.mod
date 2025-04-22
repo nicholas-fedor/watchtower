@@ -8,7 +8,7 @@ retract [v1.7.2, v1.7.9]
 require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.1.1+incompatible
-	github.com/docker/docker v28.0.4+incompatible
+	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/nicholas-fedor/shoutrrr v0.8.8
 	github.com/onsi/gomega v1.37.0
