@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@fcd3152d8ad392d0e9c14d3f0de40f0a88b8ca0e
+        uses: docker/setup-qemu-action@5a7ea16bc43404b0ee30fcc96778665e20456847
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@941183f0a080fa6be59a9e3d3f4108c19a528204
