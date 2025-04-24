@@ -38,7 +38,7 @@ jobs:
         uses: docker/setup-qemu-action@5a7ea16bc43404b0ee30fcc96778665e20456847
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@941183f0a080fa6be59a9e3d3f4108c19a528204
+        uses: docker/setup-buildx-action@e600775e527acba2317260cadb64b7e19efd5362
 
       - name: Login to Docker Hub
         uses: docker/login-action@abd3abc99c62be8f17fda11fadefceaa006f6f9e
