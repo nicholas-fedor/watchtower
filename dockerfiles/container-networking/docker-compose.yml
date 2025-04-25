@@ -11,7 +11,7 @@ services:
   consumer:
     depends_on:
       - producer
-    image: nginx:1.27.5@sha256:5ed8fcc66f4ed123c1b2560ed708dc148755b6e4cbd8b943fab094f2c6bfa91e
+    image: nginx:1.28.0@sha256:9334faa48d730571746a7baab46d62896cb685502bc29d270c4495e26fc78afd
     network_mode: "service:producer"
     labels:
       - "com.centurylinklabs.watchtower.depends-on=/wt-contnet-producer-1"
