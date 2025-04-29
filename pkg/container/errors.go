@@ -42,6 +42,12 @@ var (
 	errRemoveContainerFailed = errors.New("failed to remove container")
 	// errContainerNotRemoved indicates a container was not removed after the stop operation.
 	errContainerNotRemoved = errors.New("container not removed after timeout")
+	// errUnexpectedMacInLegacy indicates a MAC address was found in a legacy API configuration where it should not be.
+	errUnexpectedMacInLegacy = errors.New("unexpected MAC address in legacy config")
+	// errUnexpectedMacInHost indicates a MAC address was found in a host network configuration where it should not be.
+	errUnexpectedMacInHost = errors.New("unexpected MAC address in host network config")
+	// errNoMacInNonHost indicates no MAC address was found in a non-host network configuration where one is expected.
+	errNoMacInNonHost = errors.New("no MAC address found in non-host network config")
 )
 
 // Errors for container start and rename operations in container_target.go.

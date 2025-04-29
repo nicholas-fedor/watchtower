@@ -100,31 +100,31 @@ func StartTargetContainer(
 	return createdContainerID, nil
 }
 
-// RenameTargetContainer renames an existing container to the specified new name.
+// RenameTargetContainer renames an existing container to the specified target name.
 //
 // Parameters:
 //   - api: Docker API client.
 //   - targetContainer: Container to rename.
-//   - newName: New name for the container.
+//   - targetName: New name for the container.
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
 func RenameTargetContainer(
 	api dockerClient.APIClient,
 	targetContainer types.Container,
-	newName string,
+	targetName string,
 ) error {
 	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
-		"container": targetContainer.Name(),
-		"id":        targetContainer.ID().ShortID(),
-		"new_name":  newName,
+		"container":   targetContainer.Name(),
+		"id":          targetContainer.ID().ShortID(),
+		"target_name": targetName,
 	})
 
 	// Attempt to rename the container.
 	clog.Debug("Renaming container")
 
-	if err := api.ContainerRename(ctx, string(targetContainer.ID()), newName); err != nil {
+	if err := api.ContainerRename(ctx, string(targetContainer.ID()), targetName); err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 
 		return fmt.Errorf("%w: %w", errRenameContainerFailed, err)
