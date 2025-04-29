@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
@@ -209,29 +207,13 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		"image":     container.ImageName(),
 	}
 
-	var networkConfig *network.NetworkingConfig
-
 	clientVersion := c.GetVersion()
-	minSupportedVersion := flags.DockerAPIMinVersion
 
-	// Select network config based on API version.
-	switch {
-	case versions.GreaterThanOrEqualTo(clientVersion, minSupportedVersion): // versions 1.44 or greater
-		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"client_version": clientVersion,
-			"min_version":    minSupportedVersion,
-		}).Debug("Using modern network config")
+	logrus.WithFields(fields).WithField("client_version", clientVersion).
+		Debug("Obtaining source container network configuration")
 
-		networkConfig = getNetworkConfig(container)
-
-	case versions.LessThan(clientVersion, minSupportedVersion): // versions less than 1.44
-		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"client_version": clientVersion,
-			"min_version":    minSupportedVersion,
-		}).Debug("Using legacy network config")
-
-		networkConfig = getLegacyNetworkConfig(container, clientVersion)
-	}
+	// Get unified network config.
+	networkConfig := getNetworkConfig(container, clientVersion)
 
 	// Start new container with selected config.
 	newID, err := StartTargetContainer(
@@ -240,7 +222,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		networkConfig,
 		c.ReviveStopped,
 		clientVersion,
-		minSupportedVersion,
+		flags.DockerAPIMinVersion,
 	)
 	if err != nil {
 		logrus.WithFields(fields).WithError(err).Debug("Failed to start new container")
