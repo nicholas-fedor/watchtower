@@ -1,10 +1,15 @@
 package container
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -64,7 +69,7 @@ var _ = ginkgo.Describe("the container", func() {
 		ginkgo.When(
 			"verifying a container with port bindings and exposed ports is non-nil",
 			func() {
-				ginkgo.It("should return an error", func() {
+				ginkgo.It("should not return an error", func() {
 					c := MockContainer(WithPortBindings("80/tcp"))
 					c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{"80/tcp": {}}
 					err := c.VerifyConfiguration()
@@ -265,7 +270,7 @@ var _ = ginkgo.Describe("the container", func() {
 						"com.centurylinklabs.zodiac.original-image": "the-original-image",
 					}))
 					imageName := container.ImageName()
-					gomega.Expect(imageName).To(gomega.Equal(imageName))
+					gomega.Expect(imageName).To(gomega.Equal("the-original-image:latest"))
 				})
 			})
 			ginkgo.It("should return the image name", func() {
@@ -414,6 +419,176 @@ var _ = ginkgo.Describe("the container", func() {
 				gomega.Expect(preTimeout).To(gomega.Equal(3))
 				postTimeout := container.PostUpdateTimeout()
 				gomega.Expect(postTimeout).To(gomega.Equal(5))
+			})
+		})
+	})
+
+	ginkgo.Describe("Network Configuration", func() {
+		ginkgo.When("using host network mode", func() {
+			ginkgo.It("should not set aliases or DNS names in getNetworkConfig", func() {
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				container := MockContainer(
+					WithNetworkMode("host"),
+					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						"host": {
+							IPAddress:  "",
+							MacAddress: "",
+							Aliases:    nil,
+							DNSNames:   nil,
+						},
+					}),
+				)
+
+				// Debug: Log NetworkMode details
+				networkMode := container.containerInfo.HostConfig.NetworkMode
+				logrus.WithFields(logrus.Fields{
+					"network_mode":      networkMode,
+					"network_mode_type": fmt.Sprintf("%T", networkMode),
+					"network_mode_str":  string(networkMode),
+					"test":              "host_network_mode",
+				}).Debug("Test network mode check")
+
+				config := getNetworkConfig(container)
+				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("host"))
+				endpoint := config.EndpointsConfig["host"]
+				gomega.Expect(endpoint.Aliases).
+					To(gomega.BeEmpty(), "Aliases should not be set for host mode")
+				gomega.Expect(endpoint.DNSNames).
+					To(gomega.BeEmpty(), "DNSNames should not be set for host mode")
+				gomega.Expect(endpoint.IPAddress).To(gomega.BeEmpty())
+				gomega.Expect(endpoint.MacAddress).To(gomega.BeEmpty())
+
+				// Debug: Verify NetworkMode
+				gomega.Expect(container.containerInfo.HostConfig.NetworkMode).
+					To(gomega.Equal(dockerContainerType.NetworkMode("host")))
+			})
+
+			ginkgo.It("should log no MAC address as expected in debugLogMacAddress", func() {
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				container := MockContainer(
+					WithNetworkMode("host"),
+					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						"host": {
+							IPAddress:  "",
+							MacAddress: "",
+							Aliases:    nil,
+							DNSNames:   nil,
+						},
+					}),
+				)
+				config := getNetworkConfig(container)
+				debugLogMacAddress(config, types.ContainerID("test-id"), "1.44", "1.44", true)
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("No MAC address in host network mode, as expected"))
+			})
+		})
+
+		ginkgo.When("using bridge network mode", func() {
+			ginkgo.It("should not set aliases and DNS names in getNetworkConfig", func() {
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				container := MockContainer(
+					WithNetworkMode("bridge"),
+					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						"bridge": {
+							IPAddress:  "172.17.0.2",
+							MacAddress: "02:42:ac:11:00:02",
+							Aliases:    nil,
+							DNSNames:   nil,
+						},
+					}),
+				)
+
+				// Debug: Log NetworkMode details
+				networkMode := container.containerInfo.HostConfig.NetworkMode
+				logrus.WithFields(logrus.Fields{
+					"network_mode":      networkMode,
+					"network_mode_type": fmt.Sprintf("%T", networkMode),
+					"network_mode_str":  string(networkMode),
+					"test":              "bridge_network_mode",
+				}).Debug("Test network mode check")
+
+				config := getNetworkConfig(container)
+				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
+				endpoint := config.EndpointsConfig["bridge"]
+				gomega.Expect(endpoint.Aliases).
+					To(gomega.BeEmpty(), "Aliases should not be set for bridge mode")
+				gomega.Expect(endpoint.DNSNames).
+					To(gomega.BeEmpty(), "DNSNames should not be set for bridge mode")
+				gomega.Expect(endpoint.IPAddress).To(gomega.Equal("172.17.0.2"))
+				gomega.Expect(endpoint.MacAddress).To(gomega.Equal("02:42:ac:11:00:02"))
+			})
+
+			ginkgo.It("should log MAC address presence in debugLogMacAddress", func() {
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				container := MockContainer(
+					WithNetworkMode("bridge"),
+					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						"bridge": {
+							IPAddress:  "172.17.0.2",
+							MacAddress: "02:42:ac:11:00:02",
+						},
+					}),
+				)
+				config := getNetworkConfig(container)
+				debugLogMacAddress(config, types.ContainerID("test-id"), "1.44", "1.44", false)
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Found MAC address in config"))
+			})
+		})
+
+		ginkgo.When("using legacy API version (<1.44)", func() {
+			ginkgo.It("should preserve existing aliases in getLegacyNetworkConfig", func() {
+				container := MockContainer(
+					WithNetworkMode("bridge"),
+					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						"bridge": {
+							IPAddress:  "172.17.0.2",
+							MacAddress: "02:42:ac:11:00:02",
+							Aliases:    []string{"old-alias"},
+							DNSNames:   []string{"old-dns"},
+						},
+					}),
+				)
+				config := getLegacyNetworkConfig(container, "1.43")
+				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
+				endpoint := config.EndpointsConfig["bridge"]
+				gomega.Expect(endpoint.IPAddress).To(gomega.Equal("172.17.0.2"))
+				gomega.Expect(endpoint.MacAddress).
+					To(gomega.BeEmpty(), "MAC address should not be preserved in legacy config")
+				gomega.Expect(endpoint.Aliases[0]).To(gomega.Equal("old-alias"))
+				gomega.Expect(endpoint.DNSNames).To(gomega.BeEmpty())
+			})
+
+			ginkgo.It("should log no MAC address in debugLogMacAddress", func() {
+				logOutput := &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+
+				container := MockContainer(
+					WithNetworkMode("bridge"),
+					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						"bridge": {
+							IPAddress:  "172.17.0.2",
+							MacAddress: "02:42:ac:11:00:02",
+						},
+					}),
+				)
+				config := getLegacyNetworkConfig(container, "1.43")
+				debugLogMacAddress(config, types.ContainerID("test-id"), "1.43", "1.44", false)
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("No MAC address in legacy config, Docker will handle"))
 			})
 		})
 	})

@@ -47,7 +47,14 @@ func StartTargetContainer(
 	hostConfig := sourceContainer.GetCreateHostConfig()
 
 	// Log network details for debugging.
-	debugLogMacAddress(networkConfig, sourceContainer.ID(), clientVersion, minSupportedVersion)
+	isHostNetwork := sourceContainer.ContainerInfo().HostConfig.NetworkMode.IsHost()
+	debugLogMacAddress(
+		networkConfig,
+		sourceContainer.ID(),
+		clientVersion,
+		minSupportedVersion,
+		isHostNetwork,
+	)
 
 	clog.Debug("Creating new container")
 

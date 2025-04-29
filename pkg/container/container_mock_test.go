@@ -1,8 +1,11 @@
 package container
 
 import (
+	"github.com/sirupsen/logrus"
+
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
 )
 
@@ -77,5 +80,31 @@ func WithHealthcheck(healthConfig dockerContainerType.HealthConfig) MockContaine
 func WithImageHealthcheck(healthConfig dockerContainerType.HealthConfig) MockContainerUpdate {
 	return func(_ *dockerContainerType.InspectResponse, img *dockerImageType.InspectResponse) {
 		img.Config.Healthcheck = &healthConfig
+	}
+}
+
+func WithNetworkMode(mode string) MockContainerUpdate {
+	return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainerType.HostConfig{}
+		}
+
+		c.HostConfig.NetworkMode = dockerContainerType.NetworkMode(mode)
+		logrus.WithFields(logrus.Fields{
+			"mode":    mode,
+			"is_host": mode == "host",
+		}).Debug("MockContainer set NetworkMode")
+	}
+}
+
+func WithNetworkSettings(
+	networks map[string]*dockerNetworkType.EndpointSettings,
+) MockContainerUpdate {
+	return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+		if c.NetworkSettings == nil {
+			c.NetworkSettings = &dockerContainerType.NetworkSettings{}
+		}
+
+		c.NetworkSettings.Networks = networks
 	}
 }

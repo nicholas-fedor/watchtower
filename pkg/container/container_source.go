@@ -347,33 +347,49 @@ func getLegacyNetworkConfig(
 		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
 	}
 
-	for networkName, endpoint := range networks {
-		if endpoint == nil {
+	for networkName, sourceEndpoint := range networks {
+		if sourceEndpoint == nil {
 			clog.WithField("network", networkName).Warn("Nil endpoint in network settings")
 
 			continue
 		}
-		// Create a minimal endpoint config without MAC address
-		newEndpoint := &dockerNetworkType.EndpointSettings{
-			NetworkID:  endpoint.NetworkID,
-			EndpointID: endpoint.EndpointID,
-			Gateway:    endpoint.Gateway,
-			IPAddress:  endpoint.IPAddress,
-			Aliases:    filterAliases(endpoint.Aliases, sourceContainer.ID().ShortID()),
+
+		// Use Copy() to preserve all fields
+		targetEndpoint := sourceEndpoint.Copy()
+
+		// Clear MAC address in legacy mode
+		targetEndpoint.MacAddress = ""
+
+		// Preserve existing aliases if set, otherwise keep empty
+		if len(sourceEndpoint.Aliases) > 1 {
+			targetEndpoint.Aliases = filterAliases(
+				targetEndpoint.Aliases,
+				sourceContainer.ID().ShortID(),
+			)
+			clog.WithFields(logrus.Fields{
+				"source aliases": sourceEndpoint.Aliases,
+				"target aliases": targetEndpoint.Aliases,
+			}).Debug("Preserving aliases")
 		}
-		config.EndpointsConfig[networkName] = newEndpoint
+
+		// DNSNames not used in legacy mode
+		targetEndpoint.DNSNames = nil
+
+		config.EndpointsConfig[networkName] = targetEndpoint
 		// Log MAC address for visibility, but don’t include it
-		if endpoint.MacAddress != "" {
+		if sourceEndpoint.MacAddress != "" {
 			clog.WithFields(logrus.Fields{
 				"network":     networkName,
-				"mac_address": endpoint.MacAddress,
+				"mac_address": targetEndpoint.MacAddress,
+				"ip_address":  targetEndpoint.IPAddress,
+				"aliases":     targetEndpoint.Aliases,
 			}).Debug("Found MAC address in legacy config")
 		}
 	}
 
 	// Provide debug log message if MAC preservation is desired but not possible
 	if len(networks) > 0 {
-		clog.Debug("MAC addresses not preserved in legacy config")
+		clog.Debug("MAC address preservation not guaranteed in legacy config")
 	}
 
 	return config
@@ -401,8 +417,6 @@ func filterAliases(aliases []string, shortID string) []string {
 
 // getNetworkConfig extracts the network configuration from a container.
 //
-// It preserves essential settings while sanitizing aliases and DNS names.
-//
 // Parameters:
 //   - sourceContainer: Container to extract config from.
 //
@@ -414,44 +428,46 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 	}
 	clog := logrus.WithField("container", sourceContainer.Name())
 
-	for networkName, originalEndpoint := range sourceContainer.ContainerInfo().NetworkSettings.Networks {
-		// Process each network endpoint.
-		endpoint := &dockerNetworkType.EndpointSettings{
-			IPAMConfig:          originalEndpoint.IPAMConfig,          // Preserve full IPAM config
-			Links:               originalEndpoint.Links,               // Preserve container links
-			DriverOpts:          originalEndpoint.DriverOpts,          // Preserve driver options
-			GwPriority:          originalEndpoint.GwPriority,          // Preserve gateway priority
-			NetworkID:           originalEndpoint.NetworkID,           // Preserve network ID
-			EndpointID:          originalEndpoint.EndpointID,          // Preserve endpoint ID
-			Gateway:             originalEndpoint.Gateway,             // Preserve gateway
-			IPAddress:           originalEndpoint.IPAddress,           // Preserve IP address
-			IPPrefixLen:         originalEndpoint.IPPrefixLen,         // Preserve IP prefix length
-			IPv6Gateway:         originalEndpoint.IPv6Gateway,         // Preserve IPv6 gateway
-			GlobalIPv6Address:   originalEndpoint.GlobalIPv6Address,   // Preserve global IPv6 address
-			GlobalIPv6PrefixLen: originalEndpoint.GlobalIPv6PrefixLen, // Preserve IPv6 prefix length
-			MacAddress:          originalEndpoint.MacAddress,          // Preserve endpoint MAC address if API Version > 1.43
-		}
+	// Check if the network mode is host
+	networkMode := sourceContainer.ContainerInfo().HostConfig.NetworkMode
+	isHostNetwork := string(networkMode) == "host"
+	clog.WithFields(logrus.Fields{
+		"network_mode": networkMode,
+		"is_host":      isHostNetwork,
+	}).Debug("Network mode check")
 
-		// Sanitize aliases and DNS names for non-bridge networks.
-		if networkName != "bridge" {
-			endpoint.Aliases = []string{sourceContainer.Name()[1:]}  // Reset to container name only
-			endpoint.DNSNames = []string{sourceContainer.Name()[1:]} // Reset to container name only
+	// Process each network endpoint.
+	for networkName, sourceEndpoint := range sourceContainer.ContainerInfo().NetworkSettings.Networks {
+		// Use Copy() to preserve all fields
+		targetEndpoint := sourceEndpoint.Copy()
+
+		// Preserve existing aliases if set, otherwise keep empty
+		if len(targetEndpoint.Aliases) > 0 {
+			targetEndpoint.Aliases = filterAliases(
+				targetEndpoint.Aliases,
+				sourceContainer.ID().ShortID(),
+			)
+			clog.WithFields(logrus.Fields{
+				"source aliases": targetEndpoint.Aliases,
+				"target aliases": targetEndpoint.Aliases,
+			}).Debug("Preserving aliases")
 		}
 
 		// Copy IPAM config if present.
-		if originalEndpoint.IPAMConfig != nil {
-			endpoint.IPAMConfig = &dockerNetworkType.EndpointIPAMConfig{
-				IPv4Address:  originalEndpoint.IPAMConfig.IPv4Address,
-				IPv6Address:  originalEndpoint.IPAMConfig.IPv6Address,
-				LinkLocalIPs: originalEndpoint.IPAMConfig.LinkLocalIPs,
+		if sourceEndpoint.IPAMConfig != nil {
+			targetEndpoint.IPAMConfig = &dockerNetworkType.EndpointIPAMConfig{
+				IPv4Address:  sourceEndpoint.IPAMConfig.IPv4Address,
+				IPv6Address:  sourceEndpoint.IPAMConfig.IPv6Address,
+				LinkLocalIPs: sourceEndpoint.IPAMConfig.LinkLocalIPs,
 			}
 		}
 
-		config.EndpointsConfig[networkName] = endpoint
+		config.EndpointsConfig[networkName] = targetEndpoint
 		clog.WithFields(logrus.Fields{
 			"network":     networkName,
-			"mac_address": endpoint.MacAddress,
-			"ip_address":  endpoint.IPAddress,
+			"mac_address": targetEndpoint.MacAddress,
+			"ip_address":  targetEndpoint.IPAddress,
+			"aliases":     targetEndpoint.Aliases,
 		}).Debug("Preserved network config")
 	}
 
@@ -465,11 +481,13 @@ func getNetworkConfig(sourceContainer types.Container) *dockerNetworkType.Networ
 //   - containerID: ID of the container.
 //   - clientVersion: API version of the client.
 //   - minSupportedVersion: Minimum API version for MAC preservation.
+//   - isHostNetwork: Whether the container uses host network mode.
 func debugLogMacAddress(
 	networkConfig *dockerNetworkType.NetworkingConfig,
 	containerID types.ContainerID,
 	clientVersion string,
 	minSupportedVersion string,
+	isHostNetwork bool,
 ) {
 	clog := logrus.WithFields(logrus.Fields{
 		"container":   containerID,
@@ -491,19 +509,21 @@ func debugLogMacAddress(
 		}
 	}
 
-	// Log based on API version and MAC presence.
+	// Log based on API version, MAC presence, and network mode.
 	switch {
 	case versions.LessThan(clientVersion, minSupportedVersion): // API < v1.44
 		if foundMac {
 			clog.Warn("Unexpected MAC address in legacy config")
-		} else {
-			clog.Debug("No MAC address in legacy config, Docker will assign")
+
+			return
 		}
-	default: // API >= v1.44
-		if foundMac {
-			clog.Debug("Verified MAC address configuration")
-		} else {
-			clog.Warn("No MAC address found in config")
-		}
+
+		clog.Debug("No MAC address in legacy config, Docker will handle")
+	case foundMac: // API >= v1.44, MAC present
+		clog.Debug("Verified MAC address configuration")
+	case !isHostNetwork: // API >= v1.44, no MAC, non-host network
+		clog.Warn("No MAC address found in config")
+	default: // API >= v1.44, no MAC, host network
+		clog.Debug("No MAC address in host network mode, as expected")
 	}
 }
