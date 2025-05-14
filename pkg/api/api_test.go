@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -80,7 +81,7 @@ var _ = ginkgo.Describe("API", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			logrus.SetOutput(nil)
+			logrus.SetOutput(os.Stderr)
 			logrus.SetLevel(logrus.InfoLevel)
 		})
 
