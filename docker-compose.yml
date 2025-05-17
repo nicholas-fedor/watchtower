@@ -13,7 +13,7 @@ services:
     command: --interval 10 --http-api-metrics --http-api-token demotoken --debug prometheus grafana parent child
   prometheus:
     container_name: prometheus
-    image: prom/prometheus@sha256:e2b8aa62b64855956e3ec1e18b4f9387fb6203174a4471936f4662f437f04405
+    image: prom/prometheus@sha256:78ed1f9050eb9eaf766af6e580230b1c4965728650e332cd1ee918c0c4699775
     volumes:
       - ./prometheus/:/etc/prometheus/
       - prometheus:/prometheus/
