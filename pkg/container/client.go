@@ -85,11 +85,12 @@ type client struct {
 //
 // It controls container management and warning behaviors.
 type ClientOptions struct {
-	RemoveVolumes     bool
-	IncludeStopped    bool
-	ReviveStopped     bool
-	IncludeRestarting bool
-	WarnOnHeadFailed  WarningStrategy
+	RemoveVolumes           bool
+	IncludeStopped          bool
+	ReviveStopped           bool
+	IncludeRestarting       bool
+	DisableMemorySwappiness bool
+	WarnOnHeadFailed        WarningStrategy
 }
 
 // NewClient initializes a new Client instance for Docker API interactions.
@@ -223,6 +224,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		c.ReviveStopped,
 		clientVersion,
 		flags.DockerAPIMinVersion,
+		c.DisableMemorySwappiness,
 	)
 	if err != nil {
 		logrus.WithFields(fields).WithError(err).Debug("Failed to start new container")

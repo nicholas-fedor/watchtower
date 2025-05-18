@@ -626,3 +626,17 @@ func testGetSecretsFromFiles(t *testing.T, flagName string, expected string, arg
 
 	assert.Equal(t, expected, value)
 }
+
+func TestDisableMemorySwappinessFlag(t *testing.T) {
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterSystemFlags(cmd)
+
+	err := cmd.ParseFlags([]string{"--disable-memory-swappiness"})
+	require.NoError(t, err)
+
+	disableMemorySwappiness, err := cmd.PersistentFlags().GetBool("disable-memory-swappiness")
+	require.NoError(t, err)
+	assert.True(t, disableMemorySwappiness, "disable-memory-swappiness flag should be true")
+}

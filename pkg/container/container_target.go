@@ -24,6 +24,7 @@ import (
 //   - reviveStopped: Whether to start stopped containers.
 //   - clientVersion: API version of the client.
 //   - minSupportedVersion: Minimum API version for full features.
+//   - disableMemorySwappiness: Whether to disable memory swappiness for Podman compatibility.
 //
 // Returns:
 //   - types.ContainerID: ID of the new container.
@@ -35,6 +36,7 @@ func StartTargetContainer(
 	reviveStopped bool,
 	clientVersion string,
 	minSupportedVersion string,
+	disableMemorySwappiness bool,
 ) (types.ContainerID, error) {
 	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
@@ -45,6 +47,13 @@ func StartTargetContainer(
 	// Extract configuration from the source container.
 	config := sourceContainer.GetCreateConfig()
 	hostConfig := sourceContainer.GetCreateHostConfig()
+
+	// Set MemorySwappiness to nil for Podman compatibility if flag is enabled.
+	if disableMemorySwappiness {
+		hostConfig.MemorySwappiness = nil
+
+		clog.Debug("Disabled memory swappiness for Podman compatibility")
+	}
 
 	// Log network details for debugging.
 	isHostNetwork := sourceContainer.ContainerInfo().HostConfig.NetworkMode.IsHost()
