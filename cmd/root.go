@@ -252,6 +252,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 	reviveStopped, _ := flagsSet.GetBool("revive-stopped")
 	removeVolumes, _ := flagsSet.GetBool("remove-volumes")
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
+	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
 	if monitorOnly && noPull {
@@ -263,11 +264,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Initialize the Docker client with options reflecting the desired container handling behavior.
 	client = container.NewClient(container.ClientOptions{
-		IncludeStopped:    includeStopped,
-		ReviveStopped:     reviveStopped,
-		RemoveVolumes:     removeVolumes,
-		IncludeRestarting: includeRestarting,
-		WarnOnHeadFailed:  container.WarningStrategy(warnOnHeadPullFailed),
+		IncludeStopped:          includeStopped,
+		ReviveStopped:           reviveStopped,
+		RemoveVolumes:           removeVolumes,
+		IncludeRestarting:       includeRestarting,
+		DisableMemorySwappiness: disableMemorySwappiness,
+		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
 	})
 
 	// Set up the notification system with types specified via flags (e.g., email, Slack).
