@@ -5,6 +5,7 @@ import (
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerMountType "github.com/docker/docker/api/types/mount"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
 )
@@ -106,5 +107,11 @@ func WithNetworkSettings(
 		}
 
 		c.NetworkSettings.Networks = networks
+	}
+}
+
+func WithMounts(mounts []dockerMountType.Mount) MockContainerUpdate {
+	return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+		c.HostConfig.Mounts = mounts
 	}
 }

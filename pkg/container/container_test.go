@@ -10,6 +10,7 @@ import (
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerMountType "github.com/docker/docker/api/types/mount"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
 
@@ -716,6 +717,38 @@ var _ = ginkgo.Describe("the container", func() {
 						"MemorySwappiness should remain unchanged when DisableMemorySwappiness is false")
 				gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
 					"Disabled memory swappiness for Podman compatibility"))
+			})
+		})
+	})
+
+	ginkgo.Describe("GetCreateHostConfig", func() {
+		ginkgo.When("container has a volume mount with subpath", func() {
+			ginkgo.It("preserves the subpath in the host config mounts", func() {
+				volumeMount := dockerMountType.Mount{
+					Type:   dockerMountType.TypeVolume,
+					Source: "test_volume",
+					Target: "/config/nest",
+					VolumeOptions: &dockerMountType.VolumeOptions{
+						Subpath: "ha/nest",
+					},
+				}
+
+				container := MockContainer(WithMounts([]dockerMountType.Mount{volumeMount}))
+
+				hostConfig := container.GetCreateHostConfig()
+
+				gomega.Expect(hostConfig.Mounts).To(gomega.HaveLen(1), "Expected exactly one mount")
+				mount := hostConfig.Mounts[0]
+				gomega.Expect(mount.Type).
+					To(gomega.Equal(dockerMountType.TypeVolume), "Mount type should be volume")
+				gomega.Expect(mount.Source).
+					To(gomega.Equal("test_volume"), "Mount source should match")
+				gomega.Expect(mount.Target).
+					To(gomega.Equal("/config/nest"), "Mount target should match")
+				gomega.Expect(mount.VolumeOptions).
+					ToNot(gomega.BeNil(), "VolumeOptions should be set")
+				gomega.Expect(mount.VolumeOptions.Subpath).
+					To(gomega.Equal("ha/nest"), "Subpath should be preserved")
 			})
 		})
 	})
