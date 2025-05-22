@@ -21,7 +21,7 @@ services:
       - 9090:9090
   grafana:
     container_name: grafana
-    image: grafana/grafana@sha256:6fc2fee54f8551a3ae452a2dd14fd524143026e46a0f06b0302c79117fe89fcf
+    image: grafana/grafana@sha256:06dc8d60e184705e5dc00e051a6d92342a44010d7d5e538d0a36339e85abb9b7
     ports:
       - 3000:3000
     environment:
