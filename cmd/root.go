@@ -765,15 +765,15 @@ func runUpgradesOnSchedule(
 	// Wait for shutdown signal or context cancellation, stopping the scheduler cleanly.
 	select {
 	case <-ctx.Done():
-		logrus.Info("Context canceled, stopping scheduler...")
+		logrus.Debug("Context canceled, stopping scheduler...")
 	case <-interrupt:
-		logrus.Info("Received interrupt signal, stopping scheduler...")
+		logrus.Debug("Received interrupt signal, stopping scheduler...")
 	}
 
 	scheduler.Stop()
-	logrus.Info("Waiting for running update to be finished...")
+	logrus.Debug("Waiting for running update to be finished...")
 	<-lock
-	logrus.Info("Scheduler stopped and update completed.")
+	logrus.Debug("Scheduler stopped and update completed.")
 
 	return nil
 }
