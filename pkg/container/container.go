@@ -276,7 +276,7 @@ func (c Container) GetCreateConfig() *dockerContainerType.Config {
 	config.Volumes = util.StructMapSubtract(config.Volumes, imageConfig.Volumes)
 
 	for k := range config.ExposedPorts {
-		if _, ok := imageConfig.ExposedPorts[k]; ok {
+		if _, ok := imageConfig.ExposedPorts[string(k)]; ok {
 			delete(config.ExposedPorts, k) // Remove ports exposed by image.
 		}
 	}

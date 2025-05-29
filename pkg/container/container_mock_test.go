@@ -1,6 +1,7 @@
 package container
 
 import (
+	v1 "github.com/moby/docker-image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
@@ -26,7 +27,7 @@ func MockContainer(updates ...MockContainerUpdate) *Container {
 	}
 	image := dockerImageType.InspectResponse{
 		ID:     "image_id",
-		Config: &dockerContainerType.Config{},
+		Config: &v1.DockerOCIImageConfig{},
 	}
 
 	for _, update := range updates {
