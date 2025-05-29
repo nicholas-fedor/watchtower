@@ -8,6 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerImageType "github.com/docker/docker/api/types/image"
 	dockerClient "github.com/docker/docker/client"
 
@@ -321,7 +322,7 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
 		},
 	)
 	if err != nil {
-		if dockerClient.IsErrNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			clog.WithError(err).Debug("Image not found, no removal needed")
 
 			return fmt.Errorf("%w: %s", err, imageID)
