@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerFiltersType "github.com/docker/docker/api/types/filters"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
@@ -237,13 +238,13 @@ func stopAndRemoveContainer(
 		Force:         true,
 		RemoveVolumes: removeVolumes,
 	})
-	if err != nil && !dockerClient.IsErrNotFound(err) {
+	if err != nil && !cerrdefs.IsNotFound(err) {
 		clog.WithError(err).Debug("Failed to remove container")
 
 		return fmt.Errorf("%w: %w", errRemoveContainerFailed, err)
 	}
 
-	if dockerClient.IsErrNotFound(err) {
+	if cerrdefs.IsNotFound(err) {
 		return nil // Container already gone.
 	}
 
@@ -297,7 +298,7 @@ func waitForStopOrTimeout(
 		default:
 			containerInfo, err := api.ContainerInspect(ctx, string(container.ID()))
 			if err != nil {
-				if dockerClient.IsErrNotFound(err) {
+				if cerrdefs.IsNotFound(err) {
 					return true, nil // Container gone, treat as stopped.
 				}
 

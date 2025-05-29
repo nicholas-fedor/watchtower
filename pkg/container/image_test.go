@@ -9,8 +9,8 @@ import (
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerClient "github.com/docker/docker/client"
-	dockerErrdefs "github.com/docker/docker/errdefs"
 	gomegaTypes "github.com/onsi/gomega/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("the client", func() {
 				mockServer.AppendHandlers(mocks.RemoveImageHandler(nil))
 				c := client{api: docker}
 				err := c.RemoveImageByID(types.ImageID(image))
-				gomega.Expect(dockerErrdefs.IsNotFound(err)).To(gomega.BeTrue())
+				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
 			})
 		})
 	})
