@@ -1,7 +1,6 @@
 package container
 
 import (
-	v1 "github.com/moby/docker-image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
@@ -9,6 +8,7 @@ import (
 	dockerMountType "github.com/docker/docker/api/types/mount"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
+	v1 "github.com/moby/docker-image-spec/specs-go/v1"
 )
 
 type MockContainerUpdate func(*dockerContainerType.InspectResponse, *dockerImageType.InspectResponse)
