@@ -2,7 +2,9 @@ Watchtower is itself packaged as a Docker container so installation is as simple
 
 Since the watchtower code needs to interact with the Docker API in order to monitor the running containers, you need to mount _/var/run/docker.sock_ into the container with the `-v` flag when you run it.
 
-**⚠️ Note:** Docker v25 / API v1.44 is the minimum supported version. This can be checked using the [CLI command](https://docs.docker.com/reference/cli/docker/version/) `docker version`. Manually setting the `DOCKER_API_VERSION` [variable](https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version) is a temporary override until you are able to update to Docker version 25 or newer.
+**⚠️ Note:** It is recommended to use the latest version of Docker. You can check your host's Docker version using the [CLI command](https://docs.docker.com/reference/cli/docker/version/) `docker version`.
+This version of Watchtower has been tested to support v1.43 and higher; however, don't be surprised if you experience unexpected behavior when attempting to use newer features on older versions of Docker.
+This version autonegotiates the API version by default. If the `DOCKER_API_VERSION` [variable](https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version) is explicitly set, Watchtower validates the version and falls back to autonegotiation on failure.
 
 Run the `watchtower` container with the following command:
 
@@ -43,7 +45,7 @@ docker run -d \
     If you mount `config.json` in the manner above, changes from the host system will (generally) not be propagated to the
     running container. Mounting files into the Docker daemon uses bind mounts, which are based on inodes. Most
     applications (including `docker login` and `vim`) will not directly edit the file, but instead make a copy and replace
-    the original file, which results in a new inode which in turn _breaks_ the bind mount.  
+    the original file, which results in a new inode which in turn _breaks_ the bind mount.
     **As a workaround**, you can create a symlink to your `config.json` file and then mount the symlink in the container.
     The symlinked file will always have the same inode, which keeps the bind mount intact and will ensure changes
     to the original file are propagated to the running container (regardless of the inode of the source file!).
