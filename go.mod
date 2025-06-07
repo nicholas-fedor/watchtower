@@ -1,6 +1,6 @@
 module github.com/nicholas-fedor/watchtower
 
-go 1.24.3
+go 1.24.4
 
 // Retract prematurely published versions
 retract [v1.7.2, v1.7.9]
