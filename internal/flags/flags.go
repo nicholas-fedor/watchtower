@@ -61,8 +61,8 @@ func RegisterDockerFlags(rootCmd *cobra.Command) {
 	flags.StringP(
 		"api-version",
 		"a",
-		envString("DOCKER_API_VERSION"),
 		"api version to use by docker client",
+		strings.Trim(envString("DOCKER_API_VERSION"), "\""),
 	)
 }
 
