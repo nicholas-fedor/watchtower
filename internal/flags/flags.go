@@ -17,7 +17,7 @@ import (
 )
 
 // DockerAPIMinVersion sets the minimum Docker API version supported by Watchtower.
-const DockerAPIMinVersion string = "1.44"
+const DockerAPIMinVersion string = "1.24"
 
 // defaultPollIntervalSeconds sets the default polling interval (24 hours).
 const defaultPollIntervalSeconds = 86400 // 24 * 60 * 60 seconds
@@ -61,8 +61,8 @@ func RegisterDockerFlags(rootCmd *cobra.Command) {
 	flags.StringP(
 		"api-version",
 		"a",
-		"api version to use by docker client",
 		strings.Trim(envString("DOCKER_API_VERSION"), "\""),
+		"api version to use by docker client (omit for autonegotiation)",
 	)
 }
 
@@ -522,7 +522,6 @@ func envDuration(key string) time.Duration {
 func SetDefaults() {
 	viper.AutomaticEnv()
 	viper.SetDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
-	viper.SetDefault("DOCKER_API_VERSION", DockerAPIMinVersion)
 	viper.SetDefault("WATCHTOWER_POLL_INTERVAL", defaultPollIntervalSeconds)
 	viper.SetDefault("WATCHTOWER_TIMEOUT", time.Second*defaultStopTimeoutSeconds)
 	viper.SetDefault("WATCHTOWER_HTTP_API_PORT", "8080")
