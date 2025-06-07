@@ -621,7 +621,9 @@
 
 <p>Watchtower is itself packaged as a Docker container so installation is as simple as pulling the <code>nickfedor/watchtower</code> image. If you are using ARM based architecture, pull the appropriate <code>nickfedor/watchtower:armhf-&lt;tag&gt;</code> image from the <a href="https://hub.docker.com/r/nickfedor/watchtower/tags/">nickfedor Docker Hub</a>.</p>
 <p>Since the watchtower code needs to interact with the Docker API in order to monitor the running containers, you need to mount <em>/var/run/docker.sock</em> into the container with the <code>-v</code> flag when you run it.</p>
-<p><strong>⚠️ Note:</strong> Docker v25 / API v1.44 is the minimum supported version. This can be checked using the <a href="https://docs.docker.com/reference/cli/docker/version/">CLI command</a> <code>docker version</code>. Manually setting the <code>DOCKER_API_VERSION</code> <a href="https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version">variable</a> is a temporary override until you are able to update to Docker version 25 or newer.</p>
+<p><strong>⚠️ Note:</strong> It is recommended to use the latest version of Docker. You can check your host's Docker version using the <a href="https://docs.docker.com/reference/cli/docker/version/">CLI command</a> <code>docker version</code>.
+This version of Watchtower has been tested to support v1.43 and higher; however, don't be surprised if you experience unexpected behavior when attempting to use newer features on older versions of Docker.
+This version autonegotiates the API version by default. If the <code>DOCKER_API_VERSION</code> <a href="https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version">variable</a> is explicitly set, Watchtower validates the version and falls back to autonegotiation on failure.</p>
 <p>Run the <code>watchtower</code> container with the following command:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
@@ -651,7 +653,7 @@ or by mounting the host's docker config file into the container (at the root of 
 <p>If you mount <code>config.json</code> in the manner above, changes from the host system will (generally) not be propagated to the
 running container. Mounting files into the Docker daemon uses bind mounts, which are based on inodes. Most
 applications (including <code>docker login</code> and <code>vim</code>) will not directly edit the file, but instead make a copy and replace
-the original file, which results in a new inode which in turn <em>breaks</em> the bind mount.<br />
+the original file, which results in a new inode which in turn <em>breaks</em> the bind mount.
 <strong>As a workaround</strong>, you can create a symlink to your <code>config.json</code> file and then mount the symlink in the container.
 The symlinked file will always have the same inode, which keeps the bind mount intact and will ensure changes
 to the original file are propagated to the running container (regardless of the inode of the source file!).</p>

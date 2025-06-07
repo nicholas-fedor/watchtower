@@ -1521,12 +1521,12 @@ Environment Variable: DOCKER_HOST
              Default: &quot;unix:///var/run/docker.sock&quot;
 </code></pre></div>
 <h2 id="docker_api_version">Docker API version<a class="headerlink" href="#docker_api_version" title="Permanent link">&para;</a></h2>
-<p>The API version to use by the Docker client for connecting to the Docker daemon. Using this argument/variable enables overriding the minimum supported version of 1.44.
+<p>The API version to use by the Docker client for connecting to the Docker daemon. By default, Watchtower autonegotiates the API version for compatibility. Set this only if autonegotiation fails or a specific version is required. The minimum supported version is 1.24.
 Use Docker's <a href="https://docs.docker.com/reference/api/engine/#api-version-matrix">API version matrix</a> chart as a reference for comparing your version of Docker and the maximum supported API version.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --api-version, -a
 Environment Variable: DOCKER_API_VERSION
                 Type: String
-             Default: &quot;1.44&quot;
+             Default: (autonegotiated)
 </code></pre></div>
 <h2 id="include_restarting">Include restarting<a class="headerlink" href="#include_restarting" title="Permanent link">&para;</a></h2>
 <p>Will also include restarting containers.</p>
