@@ -4,6 +4,7 @@ package actions
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -478,7 +479,8 @@ func UpdateImplicitRestart(containers []types.Container) {
 func linkedContainerMarkedForRestart(links []string, containers []types.Container) string {
 	for _, linkName := range links {
 		for _, candidate := range containers {
-			if candidate.Name() == linkName && candidate.ToRestart() {
+			if strings.TrimPrefix(candidate.Name(), "/") == strings.TrimPrefix(linkName, "/") &&
+				candidate.ToRestart() {
 				return linkName
 			}
 		}

@@ -35,7 +35,11 @@ func TestEnvConfig_Defaults(t *testing.T) {
 
 	assert.Equal(t, "unix:///var/run/docker.sock", os.Getenv("DOCKER_HOST"))
 	assert.Empty(t, os.Getenv("DOCKER_TLS_VERIFY"))
-	assert.Equal(t, DockerAPIMinVersion, os.Getenv("DOCKER_API_VERSION"))
+	assert.Empty(
+		t,
+		os.Getenv("DOCKER_API_VERSION"),
+		"DOCKER_API_VERSION should be unset for autonegotiation",
+	)
 }
 
 // TestEnvConfig_Custom verifies that custom Docker flags override default environment variables.

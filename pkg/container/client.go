@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -95,24 +96,64 @@ type ClientOptions struct {
 
 // NewClient initializes a new Client instance for Docker API interactions.
 //
-// It uses environment variables (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_API_VERSION) for configuration.
+// It configures the client using environment variables (e.g., DOCKER_HOST, DOCKER_API_VERSION) and validates the API version, falling back to autonegotiation if necessary.
 //
 // Parameters:
-//   - opts: Client options for custom behavior.
+//   - opts: Options to customize container management behavior.
 //
 // Returns:
 //   - Client: Initialized client instance (panics on failure).
 func NewClient(opts ClientOptions) Client {
-	// Create Docker client from environment settings.
-	cli, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv)
+	ctx := context.Background()
+
+	// Initialize client with autonegotiation, ignoring DOCKER_API_VERSION initially.
+	cli, err := dockerClient.NewClientWithOpts(
+		dockerClient.WithHost(os.Getenv("DOCKER_HOST")),
+		dockerClient.WithAPIVersionNegotiation(),
+	)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to initialize Docker client")
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"version": cli.ClientVersion(),
-		"opts":    fmt.Sprintf("%+v", opts),
-	}).Debug("Initialized Docker client")
+	// Apply forced API version if set and valid.
+	if version := strings.Trim(os.Getenv("DOCKER_API_VERSION"), "\""); version != "" {
+		pingCli, err := dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(cli.DaemonHost()),
+			dockerClient.WithVersion(version),
+		)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to create test client")
+		}
+
+		if _, err := pingCli.Ping(ctx); err != nil &&
+			strings.Contains(err.Error(), "page not found") {
+			logrus.WithFields(logrus.Fields{
+				"version":  version,
+				"error":    err,
+				"endpoint": "/_ping",
+			}).Warn("Invalid API version; falling back to autonegotiation")
+			cli.NegotiateAPIVersion(ctx)
+		} else {
+			cli = pingCli
+		}
+	} else {
+		cli.NegotiateAPIVersion(ctx)
+	}
+
+	// Log client and server API versions.
+	selectedVersion := cli.ClientVersion()
+
+	if serverVersion, err := cli.ServerVersion(ctx); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"error":    err,
+			"endpoint": "/version",
+		}).Error("Failed to retrieve server version")
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"client_version": selectedVersion,
+			"server_version": serverVersion.APIVersion,
+		}).Debug("Initialized Docker client")
+	}
 
 	return &client{
 		api:           cli,
@@ -223,7 +264,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		networkConfig,
 		c.ReviveStopped,
 		clientVersion,
-		flags.DockerAPIMinVersion,
+		flags.DockerAPIMinVersion, // Docker API Version 1.24
 		c.DisableMemorySwappiness,
 	)
 	if err != nil {
@@ -546,5 +587,5 @@ func (c client) RemoveImageByID(imageID types.ImageID) error {
 // Returns:
 //   - string: Docker API version (e.g., "1.44").
 func (c client) GetVersion() string {
-	return c.api.ClientVersion()
+	return strings.Trim(c.api.ClientVersion(), "\"")
 }

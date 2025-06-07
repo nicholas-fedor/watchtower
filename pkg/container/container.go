@@ -138,9 +138,9 @@ func (c Container) IsRestarting() bool {
 // Name returns the name of the container.
 //
 // Returns:
-//   - string: Container name (with leading slash).
+//   - string: Container name.
 func (c Container) Name() string {
-	return c.containerInfo.Name
+	return strings.TrimPrefix(c.containerInfo.Name, "/")
 }
 
 // ImageID returns the ID of the container’s image.

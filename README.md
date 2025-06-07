@@ -34,9 +34,9 @@ $ docker run --detach \
 Watchtower is intended to be used in homelabs, media centers, local dev environments, and similar. We do **not** recommend using Watchtower in a commercial or production environment.
 If that is you, you should be looking into using Kubernetes enabled with CI/CD, such as onedr0p's Talos Linux with FluxCD setup [here](https://github.com/onedr0p/cluster-template).
 
-**⚠️ Note:** Docker v25 / API v1.44 is the minimum supported version. This can be checked using the [CLI command](https://docs.docker.com/reference/cli/docker/version/) `docker version`.
-This will impact your ability to utilize more advanced Docker features, such as IPAM and static MAC address management, which require using version 1.44 or greater.
-Manually setting the `DOCKER_API_VERSION` [variable](https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version) is recommended until you are able to update to Docker version 25 or newer.
+**⚠️ Note:** It is recommended to use the latest version of Docker. You can check your host's Docker version using the [CLI command](https://docs.docker.com/reference/cli/docker/version/) `docker version`.
+This version of Watchtower has been tested to support v1.43 and higher; however, don't be surprised if you experience unexpected behavior when attempting to use newer features on older versions of Docker.
+This version autonegotiates the API version by default. If the `DOCKER_API_VERSION` [variable](https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version) is explicitly set, Watchtower validates the version and falls back to autonegotiation on failure.
 
 ## Documentation
 

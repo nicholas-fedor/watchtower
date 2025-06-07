@@ -354,6 +354,29 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 	})
+	ginkgo.When("listing containers with 404 response", func() {
+		ginkgo.It("should return empty list and log warning", func() {
+			// Capture logrus output
+			resetLogrus, logbuf := captureLogrus(logrus.WarnLevel)
+			defer resetLogrus()
+
+			// Setup mock server to return 404 for /containers/json
+			mockServer.AppendHandlers(ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/containers/json$`)),
+				ghttp.RespondWith(http.StatusNotFound, "page not found"),
+			))
+
+			// Create client instance
+			client := client{api: docker, ClientOptions: ClientOptions{}}
+			containers, err := client.ListContainers(filters.NoFilter)
+
+			// Verify results
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.BeEmpty())
+			gomega.Eventually(logbuf).
+				Should(gbytes.Say("Docker API returned 404 for container list"))
+		})
+	})
 })
 
 // Capture logrus output in buffer.
