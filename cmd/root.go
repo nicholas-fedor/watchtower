@@ -374,7 +374,7 @@ func runMain(cfg RunConfig) int {
 	if err := actions.CheckForSanity(client, cfg.Filter, rollingRestart); err != nil {
 		logNotify("Sanity check failed", err)
 
-		return 1
+		return 1 // Exit immediately after logging
 	}
 
 	// Handle one-time update mode, executing updates immediately and exiting cleanly.

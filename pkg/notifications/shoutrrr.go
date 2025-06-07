@@ -287,7 +287,7 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 func (n *shoutrrrTypeNotifier) Close() {
 	close(n.messages)
 
-	LocalLog.Info("Waiting for the notification goroutine to finish")
+	LocalLog.Debug("Waiting for the notification goroutine to finish")
 
 	<-n.done
 }

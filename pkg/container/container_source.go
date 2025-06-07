@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerClient "github.com/docker/docker/client"
 
-	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -63,6 +63,17 @@ func ListSourceContainers(
 	// Fetch containers with applied filters.
 	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{Filters: filterArgs})
 	if err != nil {
+		if strings.Contains(err.Error(), "page not found") {
+			clog.WithFields(logrus.Fields{
+				"error":       err,
+				"endpoint":    "/containers/json",
+				"api_version": strings.Trim(api.ClientVersion(), "\""),
+				"docker_host": os.Getenv("DOCKER_HOST"),
+			}).Warn("Docker API returned 404 for container list; treating as empty list")
+
+			return []types.Container{}, nil
+		}
+
 		clog.WithError(err).Debug("Failed to list containers")
 
 		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
@@ -455,7 +466,7 @@ func processEndpoint(
 	}
 
 	// Handle MAC address, IP address, and DNS names based on API version and network mode.
-	if versions.LessThan(clientVersion, flags.DockerAPIMinVersion) || isHostNetwork {
+	if versions.LessThan(clientVersion, "1.44") || isHostNetwork {
 		targetEndpoint.MacAddress = ""
 		targetEndpoint.IPAddress = ""
 		targetEndpoint.DNSNames = nil
@@ -463,7 +474,7 @@ func processEndpoint(
 		if isHostNetwork {
 			clog.Debug("Cleared MAC address, IP address, and DNS names for host network mode")
 		} else {
-			clog.Debug("Cleared MAC address and DNS names for legacy API")
+			clog.Debug("Cleared MAC address, IP address, and DNS names for legacy API")
 		}
 	}
 
@@ -504,18 +515,32 @@ func validateMacAddresses(
 		}
 	}
 
-	switch {
-	case versions.LessThan(clientVersion, flags.DockerAPIMinVersion):
+	// Handle legacy API versions (< 1.44).
+	if versions.LessThan(clientVersion, "1.44") && !isHostNetwork {
 		if foundMac {
 			return fmt.Errorf("%w: API version %s", errUnexpectedMacInLegacy, clientVersion)
 		}
 
 		clog.Debug("No MAC address in legacy config, as expected")
+
+		return nil
+	}
+
+	switch {
+	case versions.LessThan(clientVersion, "1.44"):
+		// Already handled above, but included for completeness.
+		return nil
 	case foundMac && isHostNetwork:
 		return errUnexpectedMacInHost
 	case foundMac:
 		clog.Debug("Verified MAC address presence")
 	case !isHostNetwork:
+		clog.Warnf(
+			"Negotiated API version %s is at least %s but no MAC address found; preservation may not be supported",
+			clientVersion,
+			"1.44",
+		)
+
 		return errNoMacInNonHost
 	default:
 		clog.Debug("No MAC address in host network mode, as expected")
@@ -589,6 +614,14 @@ func debugLogMacAddress(
 		}
 
 		clog.Debug("No MAC address in legacy config, Docker will handle")
+	case versions.LessThan(clientVersion, "1.44") && !isHostNetwork:
+		if foundMac {
+			clog.Warn("Unexpected MAC address in legacy config")
+
+			return
+		}
+
+		clog.Debug("No MAC address in legacy config, as expected")
 	case foundMac: // API >= v1.44, MAC present
 		clog.Debug("Verified MAC address configuration")
 	case !isHostNetwork: // API >= v1.44, no MAC, non-host network
