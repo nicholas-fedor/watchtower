@@ -16,6 +16,7 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -31,22 +32,10 @@ const (
 	DefaultMaxIdleConns               = 100 // Maximum number of idle connections in the pool
 	DefaultIdleConnTimeoutSeconds     = 90  // Timeout for idle connections in seconds
 	DefaultTLSHandshakeTimeoutSeconds = 10  // Timeout for TLS handshake in seconds
-	DefaultExpectContinueTimeout      = 1
+	DefaultExpectContinueTimeout      = 1   // Timeout for expecting continue response in seconds
 )
 
-// Client is the HTTP client used for making requests to registries.
-// It is exposed at the package level to allow customization (e.g., in tests).
-var Client = &http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
-		MaxIdleConns:          DefaultMaxIdleConns,
-		IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,
-		TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second,
-		ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,
-	},
-	Timeout: DefaultTimeoutSeconds * time.Second,
-}
-
+// Errors for authentication operations.
 var (
 	// errNoCredentials indicates no authentication credentials were provided when required.
 	errNoCredentials = errors.New("no credentials available")
@@ -72,19 +61,125 @@ var (
 	errFailedParseImageName = errors.New("failed to parse image name")
 )
 
-// GetToken fetches a token for the registry hosting the provided image.
+// TLSVersionMap maps string names to TLS version constants.
+// It provides a lookup for configuring the minimum TLS version based on user settings.
+var TLSVersionMap = map[string]uint16{
+	"TLS1.0": tls.VersionTLS10,
+	"TLS1.1": tls.VersionTLS11,
+	"TLS1.2": tls.VersionTLS12,
+	"TLS1.3": tls.VersionTLS13,
+}
+
+// Client defines the interface for executing HTTP requests to container registries.
 //
-// It uses the registry authentication string to obtain the token, respecting the context for cancellation.
+// This interface abstracts the HTTP client used for authentication operations, enabling
+// dependency injection and facilitating unit testing with mock implementations.
+type Client interface {
+	// Do executes the provided HTTP request and returns the response or an error.
+	//
+	// Parameters:
+	//   - req: The HTTP request to execute.
+	//
+	// Returns:
+	//   - *http.Response: The HTTP response from the registry, if successful.
+	//   - error: Non-nil if the request fails, nil otherwise.
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// registryClient is a concrete implementation of the Client interface.
+//
+// It encapsulates an HTTP client configured for registry interactions, providing a
+// mechanism to execute authenticated requests with customizable TLS settings.
+type registryClient struct {
+	client *http.Client // The underlying HTTP client for making requests.
+}
+
+// Do executes an HTTP request using the underlying HTTP client.
+//
+// This method satisfies the Client interface, delegating the request execution
+// to the embedded HTTP client.
 //
 // Parameters:
-//   - ctx: Context for request lifecycle control.
+//   - req: The HTTP request to execute.
+//
+// Returns:
+//   - *http.Response: The HTTP response from the registry, if successful.
+//   - error: Non-nil if the request fails, nil otherwise.
+func (r *registryClient) Do(req *http.Request) (*http.Response, error) {
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
+	}
+
+	return resp, nil
+}
+
+// NewAuthClient creates a new Client instance configured with TLS settings.
+//
+// It initializes the HTTP client based on Viper configuration values for
+// WATCHTOWER_REGISTRY_TLS_SKIP and WATCHTOWER_REGISTRY_TLS_MIN_VERSION, setting
+// appropriate TLS verification and minimum version requirements. The client is
+// configured with default timeouts and connection limits for robust registry access.
+//
+// Returns:
+//   - Client: A new Client instance ready for registry authentication requests.
+func NewAuthClient() Client {
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12, // Default to TLS 1.2 for secure communication.
+	}
+
+	// Configure TLS verification based on WATCHTOWER_REGISTRY_TLS_SKIP.
+	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		tlsConfig.InsecureSkipVerify = true
+
+		logrus.Debug("TLS verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP configuration")
+	}
+
+	// Configure minimum TLS version based on WATCHTOWER_REGISTRY_TLS_MIN_VERSION.
+	if minVersion := viper.GetString("WATCHTOWER_REGISTRY_TLS_MIN_VERSION"); minVersion != "" {
+		if version, ok := TLSVersionMap[strings.ToUpper(minVersion)]; ok {
+			tlsConfig.MinVersion = version
+
+			logrus.WithField("min_version", minVersion).Debug("Configured TLS minimum version")
+		} else {
+			logrus.WithField("min_version", minVersion).Warn("Invalid TLS minimum version specified; defaulting to TLS 1.2")
+		}
+	}
+
+	return &registryClient{
+		client: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig:       tlsConfig,
+				MaxIdleConns:          DefaultMaxIdleConns,
+				IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,
+				TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second,
+				ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,
+			},
+			Timeout: DefaultTimeoutSeconds * time.Second,
+		},
+	}
+}
+
+// GetToken fetches a token for the registry hosting the provided image.
+//
+// It uses the registry authentication string to obtain the token, respecting the context
+// for cancellation and leveraging the provided Client for HTTP requests.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control, enabling cancellation or timeouts.
 //   - container: Container with image info for token retrieval.
 //   - registryAuth: Base64-encoded auth string (e.g., "username:password").
+//   - client: Client instance for executing HTTP requests.
 //
 // Returns:
 //   - string: Authentication token (e.g., "Basic ..." or "Bearer ...") if successful.
 //   - error: Non-nil if the operation fails, nil on success.
-func GetToken(ctx context.Context, container types.Container, registryAuth string) (string, error) {
+func GetToken(
+	ctx context.Context,
+	container types.Container,
+	registryAuth string,
+	client Client,
+) (string, error) {
 	// Parse image name into a normalized reference for registry access.
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
@@ -108,7 +203,7 @@ func GetToken(ctx context.Context, container types.Container, registryAuth strin
 		return "", err
 	}
 
-	res, err := Client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"image": container.ImageName(),
@@ -119,6 +214,16 @@ func GetToken(ctx context.Context, container types.Container, registryAuth strin
 	}
 	defer res.Body.Close()
 
+	// If the response is 200 OK, no authentication is required.
+	if res.StatusCode == http.StatusOK {
+		logrus.WithFields(logrus.Fields{
+			"image": container.ImageName(),
+			"url":   url.String(),
+		}).Debug("No authentication required (200 OK)")
+
+		return "", nil
+	}
+
 	// Extract and process the challenge header.
 	values := res.Header.Get(ChallengeHeader)
 	logrus.WithFields(logrus.Fields{
@@ -126,6 +231,16 @@ func GetToken(ctx context.Context, container types.Container, registryAuth strin
 		"status": res.Status,
 		"header": values,
 	}).Debug("Received challenge response")
+
+	// If the header is empty, assume no authentication is required.
+	if values == "" {
+		logrus.WithFields(logrus.Fields{
+			"image": container.ImageName(),
+			"url":   url.String(),
+		}).Debug("Empty WWW-Authenticate header; assuming no authentication required")
+
+		return "", nil
+	}
 
 	challenge := strings.ToLower(values)
 	logrus.WithFields(logrus.Fields{
@@ -144,7 +259,7 @@ func GetToken(ctx context.Context, container types.Container, registryAuth strin
 
 	// Handle Bearer auth by fetching a token.
 	if strings.HasPrefix(challenge, "bearer") {
-		return GetBearerHeader(ctx, challenge, normalizedRef, registryAuth)
+		return GetBearerHeader(ctx, challenge, normalizedRef, registryAuth, client)
 	}
 
 	// Unknown challenge type encountered.
@@ -190,10 +305,11 @@ func GetChallengeRequest(ctx context.Context, url url.URL) (*http.Request, error
 // GetBearerHeader fetches a bearer token based on challenge instructions.
 //
 // Parameters:
-//   - ctx: Context for request lifecycle control.
-//   - challenge: Challenge string from the registry.
-//   - imageRef: Normalized image reference.
-//   - registryAuth: Base64-encoded auth string.
+//   - ctx: Context for request lifecycle control, enabling cancellation or timeouts.
+//   - challenge: Challenge string from the registry’s WWW-Authenticate header.
+//   - imageRef: Normalized image reference for scoping the token request.
+//   - registryAuth: Base64-encoded auth string (e.g., "username:password").
+//   - client: Client instance for executing HTTP requests.
 //
 // Returns:
 //   - string: Bearer token header (e.g., "Bearer ...") if successful.
@@ -203,6 +319,7 @@ func GetBearerHeader(
 	challenge string,
 	imageRef reference.Named,
 	registryAuth string,
+	client Client,
 ) (string, error) {
 	// Construct the auth URL from the challenge details.
 	authURL, err := GetAuthURL(challenge, imageRef)
@@ -242,7 +359,7 @@ func GetBearerHeader(
 	}
 
 	// Execute the token request.
-	authResponse, err := Client.Do(r)
+	authResponse, err := client.Do(r)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"image": imageRef.Name(),
@@ -357,8 +474,17 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 func GetChallengeURL(imageRef reference.Named) url.URL {
 	// Extract registry host from the image reference.
 	host, _ := helpers.GetRegistryAddress(imageRef.Name())
+
+	scheme := "https"
+	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		scheme = "http"
+
+		logrus.WithField("host", host).
+			Debug("Using HTTP scheme due to WATCHTOWER_REGISTRY_TLS_SKIP")
+	}
+
 	URL := url.URL{
-		Scheme: "https",
+		Scheme: scheme,
 		Host:   host,
 		Path:   "/v2/",
 	}
