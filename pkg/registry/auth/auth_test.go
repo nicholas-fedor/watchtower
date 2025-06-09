@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/spf13/viper"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
 
@@ -285,10 +286,38 @@ func (m mockContainer) IsRestarting() bool {
 	return false // Minimal stub, not used in these tests
 }
 
+// testAuthClient is a custom implementation of the AuthClient interface for testing.
+// It wraps an HTTP client with configurable TLS settings to bypass certificate
+// verification in test scenarios involving mock TLS servers.
+type testAuthClient struct {
+	client *http.Client // The underlying HTTP client for making requests.
+}
+
+// Do executes an HTTP request using the underlying HTTP client.
+//
+// This method satisfies the AuthClient interface, delegating the request execution
+// to the embedded HTTP client.
+//
+// Parameters:
+//   - req: The HTTP request to execute.
+//
+// Returns:
+//   - *http.Response: The HTTP response from the registry, if successful.
+//   - error: Non-nil if the request fails, nil otherwise.
+func (t *testAuthClient) Do(req *http.Request) (*http.Response, error) {
+	return t.client.Do(req)
+}
+
 var GHCRCredentials = &types.RegistryCredentials{
 	Username: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_USERNAME"),
 	Password: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_PASSWORD"),
 }
+
+var _ = ginkgo.BeforeSuite(func() {
+	// Reset Viper configuration to ensure a clean state for tests.
+	viper.Reset()
+	viper.AutomaticEnv()
+})
 
 var _ = ginkgo.Describe("the auth module", func() {
 	// mockID is a constant identifier used across test cases to represent a container’s
@@ -315,6 +344,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 	// runBasicAuthTest is a helper function to reduce duplication in GetToken tests
 	// that use a mock HTTPS server to simulate basic auth challenges.
 	runBasicAuthTest := func(challengeHeader, creds, expectedToken, expectedErr string) {
+		// Create a TLS test server to simulate the registry.
 		testServer := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set(auth.ChallengeHeader, challengeHeader)
@@ -323,24 +353,33 @@ var _ = ginkgo.Describe("the auth module", func() {
 		)
 		defer testServer.Close()
 
+		// Configure the container with the test server’s address.
+		serverURL, _ := url.Parse(testServer.URL)
 		containerInstance := mockContainer{
 			id:        mockID,
 			name:      mockName,
-			imageName: strings.TrimPrefix(testServer.URL, "https://") + "/test/image",
+			imageName: serverURL.Host + "/test/image",
 		}
 
-		// Create an HTTP client that skips TLS verification for the mock server
-		client := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// Create an authentication client with TLS verification disabled for the mock server.
+		client := &testAuthClient{
+			client: &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+						MinVersion:         tls.VersionTLS12,
+					},
+				},
 			},
 		}
-		// Temporarily replace the default client in auth package for this test
-		origClient := auth.Client
-		auth.Client = client
-		defer func() { auth.Client = origClient }()
 
-		token, err := auth.GetToken(context.Background(), containerInstance, creds)
+		// Temporarily disable WATCHTOWER_REGISTRY_TLS_SKIP to ensure HTTPS scheme.
+		originalTLSSkip := viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP")
+		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+		defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", originalTLSSkip)
+
+		// Execute GetToken and verify the result.
+		token, err := auth.GetToken(context.Background(), containerInstance, creds, client)
 		if expectedErr != "" {
 			gomega.Expect(err).
 				To(gomega.MatchError(expectedErr), fmt.Sprintf("Expected error '%s'", expectedErr))
@@ -354,6 +393,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 	// runBearerHeaderTest is a helper function to reduce duplication in GetBearerHeader tests
 	// that use a mock HTTPS server to simulate bearer token retrieval.
 	runBearerHeaderTest := func(creds, expectedToken string, expectAuthFailure bool) {
+		// Create a TLS test server to simulate the registry.
 		testServer := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if expectAuthFailure {
@@ -370,23 +410,24 @@ var _ = ginkgo.Describe("the auth module", func() {
 		)
 		defer testServer.Close()
 
-		// Create an HTTP client that skips TLS verification for the mock server
-		client := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// Create an authentication client with TLS verification disabled for the mock server.
+		client := &testAuthClient{
+			client: &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
 			},
 		}
-		// Temporarily replace the default client in auth package for this test
-		origClient := auth.Client
-		auth.Client = client
-		defer func() { auth.Client = origClient }()
 
+		// Construct the challenge header for the bearer token request.
 		challenge := fmt.Sprintf(
 			`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`,
 			testServer.URL,
 		)
 		ref, _ := reference.ParseNormalizedNamed("test/image")
-		token, err := auth.GetBearerHeader(context.Background(), challenge, ref, creds)
+
+		// Execute GetBearerHeader and verify the result.
+		token, err := auth.GetBearerHeader(context.Background(), challenge, ref, creds, client)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(token).To(gomega.Equal("Bearer " + expectedToken))
 	}
@@ -398,7 +439,13 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should parse the token from a bearer response",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
-				token, err := auth.GetToken(context.Background(), mockContainerInstance, creds)
+				client := auth.NewAuthClient()
+				token, err := auth.GetToken(
+					context.Background(),
+					mockContainerInstance,
+					creds,
+					client,
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(token).NotTo(gomega.Equal(""))
 			}),
@@ -407,18 +454,24 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Ensures GetToken returns a basic auth token when the registry
 		// responds with a "Basic" challenge.
 		ginkgo.It("should return basic auth token when challenged with basic", func() {
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			runBasicAuthTest("Basic realm=\"test\"", "user:pass", "Basic user:pass", "")
 		})
 
 		// Test case: Verifies that GetToken fails when no credentials are provided for
 		// a basic auth challenge.
 		ginkgo.It("should fail with no credentials for basic auth", func() {
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			runBasicAuthTest("Basic realm=\"test\"", "", "", "no credentials available")
 		})
 
 		// Test case: Ensures GetToken returns an error for an unsupported challenge type
 		// (e.g., "Digest").
 		ginkgo.It("should fail with unsupported challenge type", func() {
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			runBasicAuthTest(
 				"Digest realm=\"test\"",
 				"user:pass",
@@ -438,10 +491,255 @@ var _ = ginkgo.Describe("the auth module", func() {
 				imageName: "nonexistent.local/test/image",
 			}
 
-			token, err := auth.GetToken(context.Background(), containerInstance, "user:pass")
+			client := auth.NewAuthClient()
+			token, err := auth.GetToken(
+				context.Background(),
+				containerInstance,
+				"user:pass",
+				client,
+			)
 			gomega.Expect(err).
 				To(gomega.HaveOccurred(), "Expected error due to HTTP request failure")
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
+		})
+
+		// Test case: Verifies that GetToken returns an empty token for an unauthenticated
+		// local HTTP registry responding with 200 OK when TLS verification is skipped.
+		ginkgo.It(
+			"should return empty token for local HTTP registry (200 OK) with TLS skip",
+			func() {
+				// Create an HTTP test server to simulate the registry.
+				mux := http.NewServeMux()
+				server := httptest.NewServer(mux)
+				defer server.Close()
+
+				// Parse the server URL to extract the host for the container’s image name.
+				serverURL, _ := url.Parse(server.URL)
+				containerInstance := mockContainer{
+					id:        mockID,
+					name:      mockName,
+					imageName: serverURL.Host + "/test/image:latest",
+				}
+
+				// Configure the server to return 200 OK, indicating no authentication required.
+				mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				})
+
+				// Simulate WATCHTOWER_REGISTRY_TLS_SKIP=true to disable TLS verification.
+				viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+				// Create a custom authentication client with HTTP-only transport.
+				client := &testAuthClient{
+					client: &http.Client{
+						Transport: &http.Transport{
+							TLSClientConfig: nil, // Disable TLS for HTTP requests
+						},
+					},
+				}
+
+				// Execute GetToken and verify the result.
+				token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(token).To(gomega.Equal(""))
+			},
+		)
+
+		// Test case: Ensures GetToken fails when attempting to connect to an HTTP registry
+		// using HTTPS without TLS verification skipped, resulting in a connection error.
+		ginkgo.It("should fail for HTTPS to HTTP registry without TLS skip", func() {
+			// Create an HTTP test server to simulate the registry.
+			mux := http.NewServeMux()
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			// Parse the server URL to extract the host for the container’s image name.
+			serverURL, _ := url.Parse(server.URL)
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverURL.Host + "/test/image:latest",
+			}
+
+			// Configure the server to return 200 OK, but it’s unreachable due to TLS mismatch.
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Ensure TLS verification is enabled.
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			// Create a new authentication client with default TLS settings.
+			client := auth.NewAuthClient()
+
+			// Execute GetToken and verify the expected failure.
+			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("http: server gave HTTP response to HTTPS client"))
+			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		// Test case: Verifies that GetToken handles an empty WWW-Authenticate header with
+		// 401 status, returning an empty token, as expected for registries requiring no auth.
+		ginkgo.It("should handle empty WWW-Authenticate header with 401 status", func() {
+			// Create a TLS test server to simulate the registry.
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusUnauthorized)
+				}),
+			)
+			defer testServer.Close()
+
+			// Parse the server URL to extract the host for the container’s image name.
+			serverURL, _ := url.Parse(testServer.URL)
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverURL.Host + "/test/image:latest",
+			}
+
+			// Create an authentication client with TLS verification disabled for the mock server.
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{
+							InsecureSkipVerify: true,
+						},
+					},
+				},
+			}
+
+			// Simulate WATCHTOWER_REGISTRY_TLS_SKIP=true to allow HTTP scheme.
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			// Execute GetToken and verify the result.
+			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		// Test case: Verifies that GetToken returns an empty token for an HTTPS registry
+		// responding with 200 OK without requiring authentication, even without TLS skip.
+		ginkgo.It("should handle HTTPS registry with 200 OK without TLS skip", func() {
+			// Create a TLS test server to simulate a secure registry.
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			// Parse the server URL to extract the host for the container’s image name.
+			serverURL, _ := url.Parse(server.URL)
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverURL.Host + "/test/image:latest",
+			}
+
+			// Configure the server to return 200 OK, indicating no authentication required.
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Create an authentication client with TLS verification disabled for the mock server.
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{
+							InsecureSkipVerify: true,
+						},
+					},
+				},
+			}
+
+			// Ensure TLS verification is enabled.
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			// Execute GetToken and verify the result.
+			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		// Test case: Verifies that GetToken handles an invalid TLS minimum version by
+		// defaulting to TLS 1.2, successfully connecting to a TLS-enabled registry.
+		ginkgo.It("should handle invalid TLS min version", func() {
+			// Create a TLS test server to simulate a secure registry.
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			// Parse the server URL to extract the host for the container’s image name.
+			serverURL, _ := url.Parse(server.URL)
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverURL.Host + "/test/image:latest",
+			}
+
+			// Configure the server to return 200 OK, indicating no authentication required.
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Simulate an invalid TLS minimum version.
+			viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS9.9")
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "")
+
+			// Create a new authentication client with TLS verification disabled.
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{
+							MinVersion:         tls.VersionTLS12,
+							InsecureSkipVerify: true,
+						},
+					},
+				},
+			}
+
+			// Execute GetToken and verify the result.
+			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		// Test case: Ensures GetToken fails when the TLS minimum version is set to an
+		// incompatible value (e.g., TLS 1.3) for a registry supporting a lower version.
+		ginkgo.It("should fail with TLS version mismatch", func() {
+			// Create a TLS test server to simulate a secure registry.
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			// Parse the server URL to extract the host for the container’s image name.
+			serverURL, _ := url.Parse(server.URL)
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverURL.Host + "/test/image:latest",
+			}
+
+			// Configure the server to return 200 OK, but it’s unreachable due to TLS mismatch.
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Simulate TLS 1.3, which is incompatible with the test server’s TLS version.
+			viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS1.3")
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "")
+
+			// Create a new authentication client with the specified TLS settings.
+			client := auth.NewAuthClient()
+
+			// Execute GetToken and verify the expected failure.
+			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("failed to execute challenge request"))
+			gomega.Expect(token).To(gomega.Equal(""))
 		})
 	})
 
@@ -481,27 +779,33 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Verifies that GetBearerHeader fetches a bearer token successfully from
 		// a mock registry response without credentials.
 		ginkgo.It("should fetch a bearer token successfully", func() {
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			runBearerHeaderTest("", "test-token", false)
 		})
 
 		// Test case: Ensures GetBearerHeader fetches a bearer token when credentials are
 		// provided, validating the Authorization header.
 		ginkgo.It("should fetch a bearer token with credentials", func() {
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			runBearerHeaderTest("user:pass", "auth-token", true)
 		})
 
 		// Test case: Tests GetBearerHeader’s error handling when the HTTP request fails
 		// (e.g., due to an unreachable host). Ensures proper error propagation.
 		ginkgo.It("should fail on HTTP request error", func() {
+			client := auth.NewAuthClient()
 			challenge := `bearer realm="http://nonexistent.local/token",service="test-service",scope="repository:test/image:pull"`
 			ref, _ := reference.ParseNormalizedNamed("test/image")
-			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "")
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
 
 		// Test case: Verifies GetBearerHeader fails when the registry returns invalid JSON.
 		ginkgo.It("should fail on invalid JSON response", func() {
+			// Create a TLS test server to simulate the registry.
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
@@ -510,23 +814,24 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 			defer testServer.Close()
 
-			// Create an HTTP client that skips TLS verification for the mock server
-			client := &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			// Create an authentication client with TLS verification disabled.
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
 				},
 			}
-			// Temporarily replace the default client in auth package for this test
-			origClient := auth.Client
-			auth.Client = client
-			defer func() { auth.Client = origClient }()
 
+			// Construct the challenge header.
 			challenge := fmt.Sprintf(
 				`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`,
 				testServer.URL,
 			)
 			ref, _ := reference.ParseNormalizedNamed("test/image")
-			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "")
+
+			// Execute GetBearerHeader and verify the failure.
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
