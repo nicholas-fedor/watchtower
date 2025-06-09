@@ -14,7 +14,7 @@
         <link rel="prev" href="../usage-overview/">
       
       
-        <link rel="next" href="../notifications/">
+        <link rel="next" href="../container-selection/">
       
       
       <link rel="icon" href="../images/favicon.ico">
@@ -277,6 +277,44 @@
   
   
   
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../introduction/" class="md-nav__link">
         
@@ -292,9 +330,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -305,7 +344,7 @@
   
   
   <span class="md-ellipsis">
-    Usage overview
+    Usage Overview
     
   </span>
   
@@ -314,9 +353,57 @@
     </li>
   
 
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
       
       
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Configuration
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
     
@@ -378,9 +465,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#example_docker-compose_usage" class="md-nav__link">
+  <a href="#example_docker_compose_usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Example docker-compose usage
+      Example Docker Compose Usage
     </span>
   </a>
   
@@ -388,15 +475,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#help" class="md-nav__link">
-    <span class="md-ellipsis">
-      Help
-    </span>
-  </a>
   
 </li>
       
@@ -410,24 +488,25 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cleanup" class="md-nav__link">
+  <a href="#general_options" class="md-nav__link">
     <span class="md-ellipsis">
-      Cleanup
+      General Options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#remove_anonymous_volumes" class="md-nav__link">
-    <span class="md-ellipsis">
-      Remove anonymous volumes
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#debug" class="md-nav__link">
     <span class="md-ellipsis">
       Debug
@@ -435,8 +514,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#trace" class="md-nav__link">
     <span class="md-ellipsis">
       Trace
@@ -444,170 +523,326 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#maximum_log_level" class="md-nav__link">
     <span class="md-ellipsis">
-      Maximum log level
+      Maximum Log Level
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#logging_format" class="md-nav__link">
     <span class="md-ellipsis">
-      Logging format
+      Logging Format
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#ansi_colors" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#disable_ansi_colors" class="md-nav__link">
     <span class="md-ellipsis">
-      ANSI colors
+      Disable ANSI Colors
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#docker_host" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker host
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#docker_api_version" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker API version
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#include_restarting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Include restarting
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#include_stopped" class="md-nav__link">
-    <span class="md-ellipsis">
-      Include stopped
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#revive_stopped" class="md-nav__link">
-    <span class="md-ellipsis">
-      Revive stopped
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#poll_interval" class="md-nav__link">
-    <span class="md-ellipsis">
-      Poll interval
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_enable_label" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by enable label
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_disable_label" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by disable label
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_disabling_specific_container_names" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by disabling specific container names
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_updating_containers" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without updating containers
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#with_label_taking_precedence_over_arguments" class="md-nav__link">
-    <span class="md-ellipsis">
-      With label taking precedence over arguments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_restarting_containers" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without restarting containers
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_pulling_new_images" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without pulling new images
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_sending_a_startup_message" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without sending a startup message
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#run_once" class="md-nav__link">
     <span class="md-ellipsis">
-      Run once
+      Run Once
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#scheduling_polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scheduling &amp; Polling
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduling &amp; Polling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schedule
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#poll_interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      Poll Interval
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#http_api_periodic_polls" class="md-nav__link">
+    <span class="md-ellipsis">
+      HTTP API Periodic Polls
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#container_management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Container Management
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Container Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#include_stopped_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Include Stopped Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#revive_stopped_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Revive Stopped Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#include_restarting_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Include Restarting Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_container_restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Container Restart
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rolling Restart
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cleanup_old_images" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cleanup Old Images
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remove_anonymous_volumes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Remove Anonymous Volumes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitor_only" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitor Only
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_image_pulling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Image Pulling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enable_label_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enable Label Filter
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_specific_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Specific Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scope_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scope Filter
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#label_precedence" class="md-nav__link">
+    <span class="md-ellipsis">
+      Label Precedence
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registry_authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Registry &amp; Authentication
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registry &amp; Authentication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skip_registry_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Skip Registry TLS Verification
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimum_registry_tls_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Minimum Registry TLS Version
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warn_on_head_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Warn on HEAD Failure
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker_connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Connection
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Connection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker_host" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Host
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_api_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker API Version
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enable_docker_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enable Docker TLS Verification
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_memory_swappiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Memory Swappiness
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#http_api_metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      HTTP API &amp; Metrics
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="HTTP API &amp; Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#http_api_mode" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Mode
@@ -615,8 +850,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#http_api_token" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Token
@@ -624,35 +859,17 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#http_api_periodic_polls" class="md-nav__link">
-    <span class="md-ellipsis">
-      HTTP API periodic polls
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by scope
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#http_api_metrics" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#http_api_metrics_1" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Metrics
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#http_api_port" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Port
@@ -660,76 +877,135 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#scheduling" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scheduling
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rolling_restart" class="md-nav__link">
+  <a href="#notifications" class="md-nav__link">
     <span class="md-ellipsis">
-      Rolling restart
+      Notifications
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#notification_url" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notification URL
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#wait_until_timeout" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#notification_email_server_password" class="md-nav__link">
     <span class="md-ellipsis">
-      Wait until timeout
+      Notification Email Server Password
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#tls_verification" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#notification_slack_hook_url" class="md-nav__link">
     <span class="md-ellipsis">
-      TLS Verification
+      Notification Slack Hook URL
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#head_failure_warnings" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#notification_microsoft_teams_hook" class="md-nav__link">
     <span class="md-ellipsis">
-      HEAD failure warnings
+      Notification Microsoft Teams Hook
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#notification_gotify_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notification Gotify Token
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_startup_message" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Startup Message
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#lifecycle_health" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lifecycle &amp; Health
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lifecycle &amp; Health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#container_stop_timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      Container Stop Timeout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#health_check" class="md-nav__link">
     <span class="md-ellipsis">
-      Health check
+      Health Check
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#output_compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output &amp; Compatibility
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output &amp; Compatibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#programmatic_output_porcelain" class="md-nav__link">
     <span class="md-ellipsis">
-      Programmatic Output (porcelain)
+      Programmatic Output (Porcelain)
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility_with_podman_disable_memory_swappiness" class="md-nav__link">
-    <span class="md-ellipsis">
-      Compatibility with podman (Disable memory swappiness)
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -740,9 +1016,124 @@
     </li>
   
 
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Container Selection
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../private-registries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Private Registries
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../secure-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Secure Connections
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
       
       
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Monitoring & Integration
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Monitoring & Integration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
   
@@ -762,25 +1153,34 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../container-selection/" class="md-nav__link">
+      <a href="../metrics/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Container selection
+    Metrics
     
   </span>
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -791,24 +1191,40 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../private-registries/" class="md-nav__link">
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
-    Private registries
+    Advanced Features
     
   </span>
   
 
-      </a>
-    </li>
-  
-
-    
-      
-      
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Advanced Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
   
@@ -819,7 +1235,7 @@
   
   
   <span class="md-ellipsis">
-    Linked containers
+    Linked Containers
     
   </span>
   
@@ -828,9 +1244,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -841,7 +1258,7 @@
   
   
   <span class="md-ellipsis">
-    Remote hosts
+    Remote Hosts
     
   </span>
   
@@ -850,31 +1267,10 @@
     </li>
   
 
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../secure-connections/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Secure connections
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -885,7 +1281,7 @@
   
   
   <span class="md-ellipsis">
-    Stop signals
+    Stop Signals
     
   </span>
   
@@ -894,9 +1290,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -907,7 +1304,7 @@
   
   
   <span class="md-ellipsis">
-    Lifecycle hooks
+    Lifecycle Hooks
     
   </span>
   
@@ -916,9 +1313,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -929,7 +1327,7 @@
   
   
   <span class="md-ellipsis">
-    Running multiple instances
+    Running Multiple Instances
     
   </span>
   
@@ -938,9 +1336,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -960,25 +1359,11 @@
     </li>
   
 
-    
+              
+            
+          </ul>
+        </nav>
       
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Metrics
-    
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1018,9 +1403,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#example_docker-compose_usage" class="md-nav__link">
+  <a href="#example_docker_compose_usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Example docker-compose usage
+      Example Docker Compose Usage
     </span>
   </a>
   
@@ -1028,15 +1413,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#help" class="md-nav__link">
-    <span class="md-ellipsis">
-      Help
-    </span>
-  </a>
   
 </li>
       
@@ -1050,24 +1426,25 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cleanup" class="md-nav__link">
+  <a href="#general_options" class="md-nav__link">
     <span class="md-ellipsis">
-      Cleanup
+      General Options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#help" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#remove_anonymous_volumes" class="md-nav__link">
-    <span class="md-ellipsis">
-      Remove anonymous volumes
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#debug" class="md-nav__link">
     <span class="md-ellipsis">
       Debug
@@ -1075,8 +1452,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#trace" class="md-nav__link">
     <span class="md-ellipsis">
       Trace
@@ -1084,170 +1461,326 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#maximum_log_level" class="md-nav__link">
     <span class="md-ellipsis">
-      Maximum log level
+      Maximum Log Level
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#logging_format" class="md-nav__link">
     <span class="md-ellipsis">
-      Logging format
+      Logging Format
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#ansi_colors" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#disable_ansi_colors" class="md-nav__link">
     <span class="md-ellipsis">
-      ANSI colors
+      Disable ANSI Colors
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#docker_host" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker host
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#docker_api_version" class="md-nav__link">
-    <span class="md-ellipsis">
-      Docker API version
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#include_restarting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Include restarting
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#include_stopped" class="md-nav__link">
-    <span class="md-ellipsis">
-      Include stopped
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#revive_stopped" class="md-nav__link">
-    <span class="md-ellipsis">
-      Revive stopped
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#poll_interval" class="md-nav__link">
-    <span class="md-ellipsis">
-      Poll interval
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_enable_label" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by enable label
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_disable_label" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by disable label
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_disabling_specific_container_names" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by disabling specific container names
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_updating_containers" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without updating containers
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#with_label_taking_precedence_over_arguments" class="md-nav__link">
-    <span class="md-ellipsis">
-      With label taking precedence over arguments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_restarting_containers" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without restarting containers
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_pulling_new_images" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without pulling new images
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#without_sending_a_startup_message" class="md-nav__link">
-    <span class="md-ellipsis">
-      Without sending a startup message
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#run_once" class="md-nav__link">
     <span class="md-ellipsis">
-      Run once
+      Run Once
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#scheduling_polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scheduling &amp; Polling
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduling &amp; Polling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schedule
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#poll_interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      Poll Interval
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#http_api_periodic_polls" class="md-nav__link">
+    <span class="md-ellipsis">
+      HTTP API Periodic Polls
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#container_management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Container Management
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Container Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#include_stopped_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Include Stopped Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#revive_stopped_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Revive Stopped Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#include_restarting_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Include Restarting Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_container_restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Container Restart
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rolling Restart
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cleanup_old_images" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cleanup Old Images
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remove_anonymous_volumes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Remove Anonymous Volumes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitor_only" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitor Only
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_image_pulling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Image Pulling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enable_label_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enable Label Filter
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_specific_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Specific Containers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scope_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scope Filter
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#label_precedence" class="md-nav__link">
+    <span class="md-ellipsis">
+      Label Precedence
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registry_authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Registry &amp; Authentication
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registry &amp; Authentication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skip_registry_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Skip Registry TLS Verification
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimum_registry_tls_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Minimum Registry TLS Version
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warn_on_head_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Warn on HEAD Failure
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker_connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Connection
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Connection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker_host" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker Host
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_api_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Docker API Version
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enable_docker_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enable Docker TLS Verification
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_memory_swappiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Memory Swappiness
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#http_api_metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      HTTP API &amp; Metrics
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="HTTP API &amp; Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#http_api_mode" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Mode
@@ -1255,8 +1788,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#http_api_token" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Token
@@ -1264,35 +1797,17 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#http_api_periodic_polls" class="md-nav__link">
-    <span class="md-ellipsis">
-      HTTP API periodic polls
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#filter_by_scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filter by scope
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#http_api_metrics" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#http_api_metrics_1" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Metrics
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#http_api_port" class="md-nav__link">
     <span class="md-ellipsis">
       HTTP API Port
@@ -1300,76 +1815,135 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#scheduling" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scheduling
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rolling_restart" class="md-nav__link">
+  <a href="#notifications" class="md-nav__link">
     <span class="md-ellipsis">
-      Rolling restart
+      Notifications
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#notification_url" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notification URL
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#wait_until_timeout" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#notification_email_server_password" class="md-nav__link">
     <span class="md-ellipsis">
-      Wait until timeout
+      Notification Email Server Password
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#tls_verification" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#notification_slack_hook_url" class="md-nav__link">
     <span class="md-ellipsis">
-      TLS Verification
+      Notification Slack Hook URL
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#head_failure_warnings" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#notification_microsoft_teams_hook" class="md-nav__link">
     <span class="md-ellipsis">
-      HEAD failure warnings
+      Notification Microsoft Teams Hook
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#notification_gotify_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notification Gotify Token
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable_startup_message" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disable Startup Message
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#lifecycle_health" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lifecycle &amp; Health
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lifecycle &amp; Health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#container_stop_timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      Container Stop Timeout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#health_check" class="md-nav__link">
     <span class="md-ellipsis">
-      Health check
+      Health Check
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#output_compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output &amp; Compatibility
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output &amp; Compatibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#programmatic_output_porcelain" class="md-nav__link">
     <span class="md-ellipsis">
-      Programmatic Output (porcelain)
+      Programmatic Output (Porcelain)
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility_with_podman_disable_memory_swappiness" class="md-nav__link">
-    <span class="md-ellipsis">
-      Compatibility with podman (Disable memory swappiness)
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1394,40 +1968,58 @@
 
   <h1>Arguments</h1>
 
-<p>By default, watchtower will monitor all containers running within the Docker daemon to which it is pointed (in most cases this
-will be the local Docker daemon, but you can override it with the <code>--host</code> option described in the next section). However, you
-can restrict watchtower to monitoring a subset of the running containers by specifying the container names as arguments when
-launching watchtower.</p>
+<p>By default, Watchtower monitors all containers running on the Docker daemon it connects to (typically the local daemon, configurable via the <code>--host</code> flag). To limit monitoring to specific containers, provide their names as arguments when starting Watchtower.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>nginx<span class="w"> </span>redis
 </code></pre></div>
-<p>In the example above, watchtower will only monitor the containers named "nginx" and "redis" for updates -- all of the other
-running containers will be ignored. If you do not want watchtower to run as a daemon you can pass the <code>--run-once</code> flag and remove
-the watchtower container after its execution.</p>
+<p>In this example, Watchtower monitors only the "nginx" and "redis" containers, ignoring others. To run a single update attempt and exit, use the <code>--run-once</code> flag with the <code>--rm</code> option to remove the Watchtower container afterward.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--run-once<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>nginx<span class="w"> </span>redis
 </code></pre></div>
-<p>In the example above, watchtower will execute an upgrade attempt on the containers named "nginx" and "redis". Using this mode will enable debugging output showing all actions performed, as usage is intended for interactive users. Once the attempt is completed, the container will exit and remove itself due to the <code>--rm</code> flag.</p>
-<p>When no arguments are specified, watchtower will monitor all running containers.</p>
+<p>This command triggers an update attempt for "nginx" and "redis" containers, displays debug output, and removes the Watchtower container upon completion. Without arguments, Watchtower monitors all running containers.</p>
 <h2 id="secretsfiles">Secrets/Files<a class="headerlink" href="#secretsfiles" title="Permanent link">&para;</a></h2>
-<p>Some arguments can also reference a file, in which case the contents of the file are used as the value.
-This can be used to avoid putting secrets in the configuration file or command line.</p>
-<p>The following arguments are currently supported (including their corresponding <code>WATCHTOWER_</code> environment variables):</p>
-<ul>
-<li><code>notification-url</code></li>
-<li><code>notification-email-server-password</code></li>
-<li><code>notification-slack-hook-url</code></li>
-<li><code>notification-msteams-hook</code></li>
-<li><code>notification-gotify-token</code></li>
-<li><code>http-api-token</code></li>
-</ul>
-<h3 id="example_docker-compose_usage">Example docker-compose usage<a class="headerlink" href="#example_docker-compose_usage" title="Permanent link">&para;</a></h3>
+<p>Certain flags support referencing a file, using its contents as the value, to securely handle sensitive data like passwords or tokens, avoiding exposure in configuration files or command lines.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment Variable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--notification-url</code></td>
+<td><code>WATCHTOWER_NOTIFICATION_URL</code></td>
+</tr>
+<tr>
+<td><code>--notification-email-server-password</code></td>
+<td><code>WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</code></td>
+</tr>
+<tr>
+<td><code>--notification-slack-hook-url</code></td>
+<td><code>WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</code></td>
+</tr>
+<tr>
+<td><code>--notification-msteams-hook</code></td>
+<td><code>WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK</code></td>
+</tr>
+<tr>
+<td><code>--notification-gotify-token</code></td>
+<td><code>WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</code></td>
+</tr>
+<tr>
+<td><code>--http-api-token</code></td>
+<td><code>WATCHTOWER_HTTP_API_TOKEN</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="example_docker_compose_usage">Example Docker Compose Usage<a class="headerlink" href="#example_docker_compose_usage" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="nt">secrets</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">access_token</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">access_token</span>
@@ -1439,321 +2031,396 @@ This can be used to avoid putting secrets in the configuration file or command l
 <span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=/run/secrets/access_token</span>
 </code></pre></div>
-<h2 id="help">Help<a class="headerlink" href="#help" title="Permanent link">&para;</a></h2>
-<p>Shows documentation about the supported flags.</p>
+<h2 id="time_zone">Time Zone<a class="headerlink" href="#time_zone" title="Permanent link">&para;</a></h2>
+<p>Sets the time zone for Watchtower's logs and the <code>--schedule</code> flag's cron expressions. Without this setting, Watchtower defaults to UTC. To specify a time zone, use a value from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">TZ Database</a> (e.g., <code>Europe/Rome</code>). Alternatively, mount the host's <code>/etc/localtime</code> file using <code>-v /etc/localtime:/etc/localtime:ro</code>.</p>
+<div class="highlight"><pre><span></span><code>            Argument: None
+Environment Variable: TZ
+                Type: String
+             Default: UTC
+</code></pre></div>
+<h2 id="general_options">General Options<a class="headerlink" href="#general_options" title="Permanent link">&para;</a></h2>
+<h3 id="help">Help<a class="headerlink" href="#help" title="Permanent link">&para;</a></h3>
+<p>Displays documentation for supported flags.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --help
 Environment Variable: N/A
                 Type: N/A
              Default: N/A
 </code></pre></div>
-<h2 id="time_zone">Time Zone<a class="headerlink" href="#time_zone" title="Permanent link">&para;</a></h2>
-<p>Sets the time zone to be used by WatchTower's logs and the optional Cron scheduling argument (--schedule). If this environment variable is not set, Watchtower will use the default time zone: UTC.
-To find out the right value, see <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">this list</a>, find your location and use the value in <em>TZ Database Name</em>, e.g <em>Europe/Rome</em>. The timezone can alternatively be set by volume mounting your hosts /etc/localtime file. <code>-v /etc/localtime:/etc/localtime:ro</code></p>
-<div class="highlight"><pre><span></span><code>            Argument: N/A
-Environment Variable: TZ
-                Type: String
-             Default: &quot;UTC&quot;
-</code></pre></div>
-<h2 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h2>
-<p>Removes old images after updating. When this flag is specified, watchtower will remove the old image after restarting a container with a new image. Use this option to prevent the accumulation of orphaned images on your system as containers are updated.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --cleanup
-Environment Variable: WATCHTOWER_CLEANUP
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="remove_anonymous_volumes">Remove anonymous volumes<a class="headerlink" href="#remove_anonymous_volumes" title="Permanent link">&para;</a></h2>
-<p>Removes anonymous volumes after updating. When this flag is specified, watchtower will remove all anonymous volumes from the container before restarting with a new image. Named volumes will not be removed!</p>
-<div class="highlight"><pre><span></span><code>            Argument: --remove-volumes
-Environment Variable: WATCHTOWER_REMOVE_VOLUMES
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="debug">Debug<a class="headerlink" href="#debug" title="Permanent link">&para;</a></h2>
-<p>Enable debug mode with verbose logging.</p>
-<div class="admonition note">
-<p class="admonition-title">Notes</p>
-<p>Alias for <code>--log-level debug</code>. See <a href="#maximum-log-level">Maximum log level</a>.
-Does <em>not</em> take an argument when used as an argument. Using <code>--debug true</code> will <strong>not</strong> work.</p>
-</div>
+<h3 id="debug">Debug<a class="headerlink" href="#debug" title="Permanent link">&para;</a></h3>
+<p>Enables debug mode with verbose logging.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --debug, -d
 Environment Variable: WATCHTOWER_DEBUG
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="trace">Trace<a class="headerlink" href="#trace" title="Permanent link">&para;</a></h2>
-<p>Enable trace mode with very verbose logging. Caution: exposes credentials!</p>
 <div class="admonition note">
-<p class="admonition-title">Notes</p>
-<p>Alias for <code>--log-level trace</code>. See <a href="#maximum-log-level">Maximum log level</a>.
-Does <em>not</em> take an argument when used as an argument. Using <code>--trace true</code> will <strong>not</strong> work.</p>
+<p class="admonition-title">Note</p>
+<p>Equivalent to <code>--log-level debug</code>. See <a href="#maximum-log-level">Maximum Log Level</a>. As an argument, does not accept a value (e.g., <code>--debug true</code> is invalid).</p>
 </div>
+<h3 id="trace">Trace<a class="headerlink" href="#trace" title="Permanent link">&para;</a></h3>
+<p>Enables trace mode with highly verbose logging, including sensitive information like credentials.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --trace
 Environment Variable: WATCHTOWER_TRACE
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="maximum_log_level">Maximum log level<a class="headerlink" href="#maximum_log_level" title="Permanent link">&para;</a></h2>
-<p>The maximum log level that will be written to STDERR (shown in <code>docker log</code> when used in a container).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Equivalent to <code>--log-level trace</code>. See <a href="#maximum-log-level">Maximum Log Level</a>. As an argument, does not accept a value (e.g., <code>--trace true</code> is invalid). Use with caution due to credential exposure.</p>
+</div>
+<h3 id="maximum_log_level">Maximum Log Level<a class="headerlink" href="#maximum_log_level" title="Permanent link">&para;</a></h3>
+<p>Sets the maximum log level output to STDERR, visible in <code>docker logs</code> when running Watchtower in a container.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --log-level
 Environment Variable: WATCHTOWER_LOG_LEVEL
-     Possible values: panic, fatal, error, warn, info, debug or trace
+     Possible Values: panic, fatal, error, warn, info, debug, trace
              Default: info
 </code></pre></div>
-<h2 id="logging_format">Logging format<a class="headerlink" href="#logging_format" title="Permanent link">&para;</a></h2>
-<p>Sets what logging format to use for console output.</p>
+<h3 id="logging_format">Logging Format<a class="headerlink" href="#logging_format" title="Permanent link">&para;</a></h3>
+<p>Specifies the format for console log output.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --log-format, -l
 Environment Variable: WATCHTOWER_LOG_FORMAT
-     Possible values: Auto, LogFmt, Pretty or JSON
+     Possible Values: Auto, LogFmt, Pretty, JSON
              Default: Auto
 </code></pre></div>
-<h2 id="ansi_colors">ANSI colors<a class="headerlink" href="#ansi_colors" title="Permanent link">&para;</a></h2>
-<p>Disable ANSI color escape codes in log output.</p>
+<h3 id="disable_ansi_colors">Disable ANSI Colors<a class="headerlink" href="#disable_ansi_colors" title="Permanent link">&para;</a></h3>
+<p>Disables ANSI color escape codes in log output for plain text logs.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --no-color
 Environment Variable: NO_COLOR
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="docker_host">Docker host<a class="headerlink" href="#docker_host" title="Permanent link">&para;</a></h2>
-<p>Docker daemon socket to connect to. Can be pointed at a remote Docker host by specifying a TCP endpoint as "tcp://hostname:port".</p>
-<div class="highlight"><pre><span></span><code>            Argument: --host, -H
-Environment Variable: DOCKER_HOST
-                Type: String
-             Default: &quot;unix:///var/run/docker.sock&quot;
-</code></pre></div>
-<h2 id="docker_api_version">Docker API version<a class="headerlink" href="#docker_api_version" title="Permanent link">&para;</a></h2>
-<p>The API version to use by the Docker client for connecting to the Docker daemon. By default, Watchtower autonegotiates the API version for compatibility. Set this only if autonegotiation fails or a specific version is required. The minimum supported version is 1.24.
-Use Docker's <a href="https://docs.docker.com/reference/api/engine/#api-version-matrix">API version matrix</a> chart as a reference for comparing your version of Docker and the maximum supported API version.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --api-version, -a
-Environment Variable: DOCKER_API_VERSION
-                Type: String
-             Default: (autonegotiated)
-</code></pre></div>
-<h2 id="include_restarting">Include restarting<a class="headerlink" href="#include_restarting" title="Permanent link">&para;</a></h2>
-<p>Will also include restarting containers.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --include-restarting
-Environment Variable: WATCHTOWER_INCLUDE_RESTARTING
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="include_stopped">Include stopped<a class="headerlink" href="#include_stopped" title="Permanent link">&para;</a></h2>
-<p>Will also include created and exited containers.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --include-stopped, -S
-Environment Variable: WATCHTOWER_INCLUDE_STOPPED
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="revive_stopped">Revive stopped<a class="headerlink" href="#revive_stopped" title="Permanent link">&para;</a></h2>
-<p>Start any stopped containers that have had their image updated. This argument is only usable with the <code>--include-stopped</code> argument.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --revive-stopped
-Environment Variable: WATCHTOWER_REVIVE_STOPPED
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="poll_interval">Poll interval<a class="headerlink" href="#poll_interval" title="Permanent link">&para;</a></h2>
-<p>Poll interval (in seconds). This value controls how frequently watchtower will poll for new images. Either <code>--schedule</code> or a poll interval can be defined, but not both.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --interval, -i
-Environment Variable: WATCHTOWER_POLL_INTERVAL
-                Type: Integer
-             Default: 86400 (24 hours)
-</code></pre></div>
-<h2 id="filter_by_enable_label">Filter by enable label<a class="headerlink" href="#filter_by_enable_label" title="Permanent link">&para;</a></h2>
-<p>Monitor and update containers that have a <code>com.centurylinklabs.watchtower.enable</code> label set to true.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --label-enable
-Environment Variable: WATCHTOWER_LABEL_ENABLE
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="filter_by_disable_label">Filter by disable label<a class="headerlink" href="#filter_by_disable_label" title="Permanent link">&para;</a></h2>
-<p><strong>Do not</strong> Monitor and update containers that have <code>com.centurylinklabs.watchtower.enable</code> label set to false and
-no <code>--label-enable</code> argument is passed. Note that only one or the other (targeting by enable label) can be
-used at the same time to target containers.</p>
-<h2 id="filter_by_disabling_specific_container_names">Filter by disabling specific container names<a class="headerlink" href="#filter_by_disabling_specific_container_names" title="Permanent link">&para;</a></h2>
-<p>Monitor and update containers whose names are not in a given set of names.</p>
-<p>This can be used to exclude specific containers, when setting labels is not an option.
-The listed containers will be excluded even if they have the enable filter set to true.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --disable-containers, -x
-Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
-                Type: Comma- or space-separated string list
-             Default: &quot;&quot;
-</code></pre></div>
-<h2 id="without_updating_containers">Without updating containers<a class="headerlink" href="#without_updating_containers" title="Permanent link">&para;</a></h2>
-<p>Will only monitor for new images, send notifications and invoke
-the <a href="https://nicholas-fedor.github.io/watchtower/lifecycle-hooks/">pre-check/post-check hooks</a>, but will <strong>not</strong> update the
-containers.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Due to Docker API limitations the latest image will still be pulled from the registry.
-The HEAD digest checks allows watchtower to skip pulling when there are no changes, but to know <em>what</em> has changed it
-will still do a pull whenever the repository digest doesn't match the local image digest.</p>
-</div>
-<div class="highlight"><pre><span></span><code>            Argument: --monitor-only
-Environment Variable: WATCHTOWER_MONITOR_ONLY
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<p>Note that monitor-only can also be specified on a per-container basis with the <code>com.centurylinklabs.watchtower.monitor-only</code> label set on those containers.</p>
-<p>See <a href="#with-label-taking-precedence-over-arguments">With label taking precedence over arguments</a> for behavior when both argument and label are set</p>
-<h2 id="with_label_taking_precedence_over_arguments">With label taking precedence over arguments<a class="headerlink" href="#with_label_taking_precedence_over_arguments" title="Permanent link">&para;</a></h2>
-<p>By default, arguments will take precedence over labels. This means that if you set <code>WATCHTOWER_MONITOR_ONLY</code> to true or use <code>--monitor-only</code>, a container with <code>com.centurylinklabs.watchtower.monitor-only</code> set to false will not be updated. If you set <code>WATCHTOWER_LABEL_TAKE_PRECEDENCE</code> to true or use <code>--label-take-precedence</code>, then the container will also be updated. This also apply to the no pull option. if you set <code>WATCHTOWER_NO_PULL</code> to true or use <code>--no-pull</code>, a container with <code>com.centurylinklabs.watchtower.no-pull</code> set to false will not pull the new image. If you set <code>WATCHTOWER_LABEL_TAKE_PRECEDENCE</code> to true or use <code>--label-take-precedence</code>, then the container will pull image</p>
-<div class="highlight"><pre><span></span><code>            Argument: --label-take-precedence
-Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="without_restarting_containers">Without restarting containers<a class="headerlink" href="#without_restarting_containers" title="Permanent link">&para;</a></h2>
-<p>Do not restart containers after updating. This option can be useful when the start of the containers
-is managed by an external system such as systemd.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --no-restart
-Environment Variable: WATCHTOWER_NO_RESTART
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="without_pulling_new_images">Without pulling new images<a class="headerlink" href="#without_pulling_new_images" title="Permanent link">&para;</a></h2>
-<p>Do not pull new images. When this flag is specified, watchtower will not attempt to pull
-new images from the registry. Instead it will only monitor the local image cache for changes.
-Use this option if you are building new images directly on the Docker host without pushing
-them to a registry.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --no-pull
-Environment Variable: WATCHTOWER_NO_PULL
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<p>Note that no-pull can also be specified on a per-container basis with the
-<code>com.centurylinklabs.watchtower.no-pull</code> label set on those containers.</p>
-<p>See <a href="#with-label-taking-precedence-over-arguments">With label taking precedence over arguments</a> for behavior when both argument and label are set</p>
-<h2 id="without_sending_a_startup_message">Without sending a startup message<a class="headerlink" href="#without_sending_a_startup_message" title="Permanent link">&para;</a></h2>
-<p>Do not send a message after watchtower started. Otherwise there will be an info-level notification.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --no-startup-message
-Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="run_once">Run once<a class="headerlink" href="#run_once" title="Permanent link">&para;</a></h2>
-<p>Run an update attempt against a container name list one time immediately and exit.</p>
+<h3 id="run_once">Run Once<a class="headerlink" href="#run_once" title="Permanent link">&para;</a></h3>
+<p>Triggers a single update attempt for specified containers and exits immediately.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --run-once, -R
 Environment Variable: WATCHTOWER_RUN_ONCE
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="http_api_mode">HTTP API Mode<a class="headerlink" href="#http_api_mode" title="Permanent link">&para;</a></h2>
-<p>Runs Watchtower in HTTP API mode, only allowing image updates to be triggered by an HTTP request.</p>
-<p>Supports filtering by specific image tags (e.g., <code>image=foo/bar:1.0</code>) in HTTP requests.
-For details see <a href="https://nicholas-fedor.github.io/watchtower/http-api-mode">HTTP API</a>.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --http-api-update
-Environment Variable: WATCHTOWER_HTTP_API_UPDATE
-                Type: Boolean
-             Default: false
-</code></pre></div>
-<h2 id="http_api_token">HTTP API Token<a class="headerlink" href="#http_api_token" title="Permanent link">&para;</a></h2>
-<p>Sets an authentication token to HTTP API requests.
-Can also reference a file, in which case the contents of the file are used.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --http-api-token
-Environment Variable: WATCHTOWER_HTTP_API_TOKEN
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Enables debug output during execution, suitable for interactive use. Use with <code>--rm</code> to remove the Watchtower container after completion.</p>
+</div>
+<h2 id="scheduling_polling">Scheduling &amp; Polling<a class="headerlink" href="#scheduling_polling" title="Permanent link">&para;</a></h2>
+<h3 id="schedule">Schedule<a class="headerlink" href="#schedule" title="Permanent link">&para;</a></h3>
+<p>Defines when and how often Watchtower checks for new images using a 6-field <a href="https://pkg.go.dev/github.com/robfig/cron@v1.2.0?tab=doc#hdr-CRON_Expression_Format">Cron expression</a>. Example: <code>--schedule "0 0 4 * * *"</code> runs daily at 4 AM.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --schedule, -s
+Environment Variable: WATCHTOWER_SCHEDULE
                 Type: String
-             Default: -
+             Default: None
 </code></pre></div>
-<h2 id="http_api_periodic_polls">HTTP API periodic polls<a class="headerlink" href="#http_api_periodic_polls" title="Permanent link">&para;</a></h2>
-<p>Keep running periodic updates if the HTTP API mode is enabled, otherwise the HTTP API would prevent periodic polls.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Cannot be used with <code>--interval</code>. Requires a time zone set via <code>TZ</code> or a mounted <code>/etc/localtime</code> file (see <a href="#time-zone">Time Zone</a>).</p>
+</div>
+<h3 id="poll_interval">Poll Interval<a class="headerlink" href="#poll_interval" title="Permanent link">&para;</a></h3>
+<p>Sets the interval (in seconds) for polling new images.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --interval, -i
+Environment Variable: WATCHTOWER_POLL_INTERVAL
+                Type: Integer
+             Default: 86400 (24 hours)
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Cannot be used with <code>--schedule</code>. Overrides cron-based scheduling.</p>
+</div>
+<h3 id="http_api_periodic_polls">HTTP API Periodic Polls<a class="headerlink" href="#http_api_periodic_polls" title="Permanent link">&para;</a></h3>
+<p>Enables periodic updates when HTTP API mode is active, allowing both API-triggered and scheduled updates.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --http-api-periodic-polls
 Environment Variable: WATCHTOWER_HTTP_API_PERIODIC_POLLS
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="filter_by_scope">Filter by scope<a class="headerlink" href="#filter_by_scope" title="Permanent link">&para;</a></h2>
-<p>Update containers that have a <code>com.centurylinklabs.watchtower.scope</code> label set with the same value as the given argument.
-This enables <a href="https://nicholas-fedor.github.io/watchtower/running-multiple-instances">running multiple instances</a>.</p>
 <div class="admonition note">
-<p class="admonition-title">Filter by lack of scope</p>
-<p>If you want other instances of watchtower to ignore the scoped containers, set this argument to <code>none</code>.
-When omitted, watchtower will update all containers regardless of scope.</p>
+<p class="admonition-title">Note</p>
+<p>Requires <code>--http-api-update</code>. See <a href="#http-api-mode">HTTP API Mode</a>.</p>
 </div>
-<div class="highlight"><pre><span></span><code>            Argument: --scope
-Environment Variable: WATCHTOWER_SCOPE
-                Type: String
-             Default: -
-</code></pre></div>
-<h2 id="http_api_metrics">HTTP API Metrics<a class="headerlink" href="#http_api_metrics" title="Permanent link">&para;</a></h2>
-<p>Enables a metrics endpoint, exposing prometheus metrics via HTTP. See <a href="../metrics/">Metrics</a> for details.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --http-api-metrics
-Environment Variable: WATCHTOWER_HTTP_API_METRICS
+<h2 id="container_management">Container Management<a class="headerlink" href="#container_management" title="Permanent link">&para;</a></h2>
+<h3 id="include_stopped_containers">Include Stopped Containers<a class="headerlink" href="#include_stopped_containers" title="Permanent link">&para;</a></h3>
+<p>Includes created and exited containers in monitoring and updates.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --include-stopped, -S
+Environment Variable: WATCHTOWER_INCLUDE_STOPPED
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="http_api_port">HTTP API Port<a class="headerlink" href="#http_api_port" title="Permanent link">&para;</a></h2>
-<p>Specifies the HTTP API listening port.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --http-api-port
-Environment Variable: WATCHTOWER_HTTP_API_PORT
-                Type: String
-             Default: 8080
+<h3 id="revive_stopped_containers">Revive Stopped Containers<a class="headerlink" href="#revive_stopped_containers" title="Permanent link">&para;</a></h3>
+<p>Restarts stopped containers after their images are updated.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --revive-stopped
+Environment Variable: WATCHTOWER_REVIVE_STOPPED
+                Type: Boolean
+             Default: false
 </code></pre></div>
-<h2 id="scheduling">Scheduling<a class="headerlink" href="#scheduling" title="Permanent link">&para;</a></h2>
-<p><a href="https://pkg.go.dev/github.com/robfig/cron@v1.2.0?tab=doc#hdr-CRON_Expression_Format">Cron expression</a> in 6 fields (rather than the traditional 5) which defines when and how often to check for new images. Either <code>--interval</code> or the schedule expression
-can be defined, but not both. An example: <code>--schedule "0 0 4 * * *"</code></p>
-<div class="highlight"><pre><span></span><code>            Argument: --schedule, -s
-Environment Variable: WATCHTOWER_SCHEDULE
-                Type: String
-             Default: -
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Requires <code>--include-stopped</code>.</p>
+</div>
+<h3 id="include_restarting_containers">Include Restarting Containers<a class="headerlink" href="#include_restarting_containers" title="Permanent link">&para;</a></h3>
+<p>Includes containers in the restarting state for monitoring and updates.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --include-restarting
+Environment Variable: WATCHTOWER_INCLUDE_RESTARTING
+                Type: Boolean
+             Default: false
 </code></pre></div>
-<h2 id="rolling_restart">Rolling restart<a class="headerlink" href="#rolling_restart" title="Permanent link">&para;</a></h2>
-<p>Restart one image at time instead of stopping and starting all at once.  Useful in conjunction with lifecycle hooks
-to implement zero-downtime deploy.</p>
+<h3 id="disable_container_restart">Disable Container Restart<a class="headerlink" href="#disable_container_restart" title="Permanent link">&para;</a></h3>
+<p>Prevents restarting containers after updating, useful when an external system (e.g., systemd) manages container lifecycle.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --no-restart
+Environment Variable: WATCHTOWER_NO_RESTART
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<h3 id="rolling_restart">Rolling Restart<a class="headerlink" href="#rolling_restart" title="Permanent link">&para;</a></h3>
+<p>Restarts containers one at a time to minimize downtime, ideal for zero-downtime deployments with lifecycle hooks.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --rolling-restart
 Environment Variable: WATCHTOWER_ROLLING_RESTART
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="wait_until_timeout">Wait until timeout<a class="headerlink" href="#wait_until_timeout" title="Permanent link">&para;</a></h2>
-<p>Timeout before the container is forcefully stopped. When set, this option will change the default (<code>10s</code>) wait time to the given value. An example: <code>--stop-timeout 30s</code> will set the timeout to 30 seconds.</p>
-<div class="highlight"><pre><span></span><code>            Argument: --stop-timeout
-Environment Variable: WATCHTOWER_TIMEOUT
-                Type: Duration
-             Default: 10s
+<h3 id="cleanup_old_images">Cleanup Old Images<a class="headerlink" href="#cleanup_old_images" title="Permanent link">&para;</a></h3>
+<p>Removes old images after updating containers to free disk space.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --cleanup
+Environment Variable: WATCHTOWER_CLEANUP
+                Type: Boolean
+             Default: false
 </code></pre></div>
-<h2 id="tls_verification">TLS Verification<a class="headerlink" href="#tls_verification" title="Permanent link">&para;</a></h2>
-<p>Use TLS when connecting to the Docker socket and verify the server's certificate. See below for options used to
-configure notifications.</p>
+<h3 id="remove_anonymous_volumes">Remove Anonymous Volumes<a class="headerlink" href="#remove_anonymous_volumes" title="Permanent link">&para;</a></h3>
+<p>Deletes anonymous volumes when updating containers. Named volumes remain unaffected.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --remove-volumes
+Environment Variable: WATCHTOWER_REMOVE_VOLUMES
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<h3 id="monitor_only">Monitor Only<a class="headerlink" href="#monitor_only" title="Permanent link">&para;</a></h3>
+<p>Monitors for new images, sends notifications, and runs lifecycle hooks without updating containers.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --monitor-only
+Environment Variable: WATCHTOWER_MONITOR_ONLY
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Images may still be pulled due to Docker API limitations for digest comparison. Can be set per container via the <code>com.centurylinklabs.watchtower.monitor-only</code> label. See <a href="#label-precedence">Label Precedence</a>.</p>
+</div>
+<h3 id="disable_image_pulling">Disable Image Pulling<a class="headerlink" href="#disable_image_pulling" title="Permanent link">&para;</a></h3>
+<p>Prevents pulling new images from registries, monitoring only local image cache changes. Useful for locally built images.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --no-pull
+Environment Variable: WATCHTOWER_NO_PULL
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Can be set per container via the <code>com.centurylinklabs.watchtower.no-pull</code> label. See <a href="#label-precedence">Label Precedence</a>.</p>
+</div>
+<h3 id="enable_label_filter">Enable Label Filter<a class="headerlink" href="#enable_label_filter" title="Permanent link">&para;</a></h3>
+<p>Restricts monitoring to containers with the <code>com.centurylinklabs.watchtower.enable</code> label set to <code>true</code> when the <code>--label-enable</code> flag is specified. Without <code>--label-enable</code>, containers with this label set to <code>false</code> are excluded, while others are monitored by default.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --label-enable
+Environment Variable: WATCHTOWER_LABEL_ENABLE
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When <code>--label-enable</code> is unset, containers without the <code>com.centurylinklabs.watchtower.enable</code> label or with it set to <code>true</code> are monitored, and those with <code>false</code> are excluded. When <code>--label-enable</code> is set, only containers with <code>true</code> are monitored, ignoring those with <code>false</code> or no label.</p>
+</div>
+<h3 id="disable_specific_containers">Disable Specific Containers<a class="headerlink" href="#disable_specific_containers" title="Permanent link">&para;</a></h3>
+<p>Excludes containers by name from monitoring, even if they have the enable label set to <code>true</code>.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --disable-containers, -x
+Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
+                Type: Comma- or space-separated string list
+             Default: None
+</code></pre></div>
+<h3 id="scope_filter">Scope Filter<a class="headerlink" href="#scope_filter" title="Permanent link">&para;</a></h3>
+<p>Monitors containers with a <code>com.centurylinklabs.watchtower.scope</code> label matching the specified value, enabling multiple Watchtower instances.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --scope
+Environment Variable: WATCHTOWER_SCOPE
+                Type: String
+             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Set to <code>none</code> to ignore scoped containers. Without this flag, Watchtower monitors all containers regardless of scope. See <a href="https://nicholas-fedor.github.io/watchtower/running-multiple-instances">Running Multiple Instances</a>.</p>
+</div>
+<h3 id="label_precedence">Label Precedence<a class="headerlink" href="#label_precedence" title="Permanent link">&para;</a></h3>
+<p>Allows container labels (e.g., <code>com.centurylinklabs.watchtower.monitor-only</code>, <code>com.centurylinklabs.watchtower.no-pull</code>) to override corresponding flags.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --label-take-precedence
+Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<h2 id="registry_authentication">Registry &amp; Authentication<a class="headerlink" href="#registry_authentication" title="Permanent link">&para;</a></h2>
+<h3 id="skip_registry_tls_verification">Skip Registry TLS Verification<a class="headerlink" href="#skip_registry_tls_verification" title="Permanent link">&para;</a></h3>
+<p>Disables TLS certificate verification for registry connections, useful for self-signed certificates or insecure registries.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --registry-tls-skip
+Environment Variable: WATCHTOWER_REGISTRY_TLS_SKIP
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Use cautiously, as it reduces security. Suitable for testing or private registries.</p>
+</div>
+<h3 id="minimum_registry_tls_version">Minimum Registry TLS Version<a class="headerlink" href="#minimum_registry_tls_version" title="Permanent link">&para;</a></h3>
+<p>Sets the minimum TLS version for registry connections, overriding the default (TLS 1.2).</p>
+<div class="highlight"><pre><span></span><code>            Argument: --registry-tls-min-version
+Environment Variable: WATCHTOWER_REGISTRY_TLS_MIN_VERSION
+     Possible Values: TLS1.0, TLS1.1, TLS1.2, TLS1.3
+             Default: TLS1.2
+</code></pre></div>
+<h3 id="warn_on_head_failure">Warn on HEAD Failure<a class="headerlink" href="#warn_on_head_failure" title="Permanent link">&para;</a></h3>
+<p>Controls warnings for failed HEAD requests to registries. <code>Auto</code> warns for registries known to support HEAD requests (e.g., docker.io) that may rate-limit.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --warn-on-head-failure
+Environment Variable: WATCHTOWER_WARN_ON_HEAD_FAILURE
+     Possible Values: always, auto, never
+             Default: auto
+</code></pre></div>
+<h2 id="docker_connection">Docker Connection<a class="headerlink" href="#docker_connection" title="Permanent link">&para;</a></h2>
+<h3 id="docker_host">Docker Host<a class="headerlink" href="#docker_host" title="Permanent link">&para;</a></h3>
+<p>Specifies the Docker daemon socket to connect to, supporting remote hosts via TCP (e.g., <code>tcp://hostname:port</code>).</p>
+<div class="highlight"><pre><span></span><code>            Argument: --host, -H
+Environment Variable: DOCKER_HOST
+                Type: String
+             Default: unix:///var/run/docker.sock
+</code></pre></div>
+<h3 id="docker_api_version">Docker API Version<a class="headerlink" href="#docker_api_version" title="Permanent link">&para;</a></h3>
+<p>Sets the Docker API version for client-daemon communication. Defaults to autonegotiation.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --api-version, -a
+Environment Variable: DOCKER_API_VERSION
+                Type: String
+             Default: Autonegotiated
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Minimum supported version is 1.24. Refer to Docker's <a href="https://docs.docker.com/reference/api/engine/#api-version-matrix">API version matrix</a> for compatibility.</p>
+</div>
+<h3 id="enable_docker_tls_verification">Enable Docker TLS Verification<a class="headerlink" href="#enable_docker_tls_verification" title="Permanent link">&para;</a></h3>
+<p>Enables TLS verification for Docker socket connections.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --tlsverify
 Environment Variable: DOCKER_TLS_VERIFY
                 Type: Boolean
              Default: false
 </code></pre></div>
-<h2 id="head_failure_warnings">HEAD failure warnings<a class="headerlink" href="#head_failure_warnings" title="Permanent link">&para;</a></h2>
-<p>When to warn about HEAD pull requests failing. Auto means that it will warn when the registry is known to handle the
-requests and may rate limit pull requests (mainly docker.io).</p>
-<div class="highlight"><pre><span></span><code>            Argument: --warn-on-head-failure
-Environment Variable: WATCHTOWER_WARN_ON_HEAD_FAILURE
-     Possible values: always, auto, never
-             Default: auto
-</code></pre></div>
-<h2 id="health_check">Health check<a class="headerlink" href="#health_check" title="Permanent link">&para;</a></h2>
-<p>Returns a success exit code to enable usage with docker <code>HEALTHCHECK</code>. This check is naive and only returns checks whether there is another process running inside the container, as it is the only known form of failure state for watchtowers container.</p>
-<div class="admonition note">
-<p class="admonition-title">Only for HEALTHCHECK use</p>
-<p>Never put this on the main container executable command line as it is only meant to be run from docker HEALTHCHECK.</p>
-</div>
-<div class="highlight"><pre><span></span><code>            Argument: --health-check
-</code></pre></div>
-<h2 id="programmatic_output_porcelain">Programmatic Output (porcelain)<a class="headerlink" href="#programmatic_output_porcelain" title="Permanent link">&para;</a></h2>
-<p>Writes the session results to STDOUT using a stable, machine-readable format (indicated by the argument VERSION).</p>
-<p>Alias for:</p>
-<div class="highlight"><pre><span></span><code>  --notification-url logger://
-  --notification-log-stdout
-  --notification-report
-  --notification-template porcelain.VERSION.summary-no-log
-
-            Argument: --porcelain, -P
-Environment Variable: WATCHTOWER_PORCELAIN
-     Possible values: v1
-             Default: -
-</code></pre></div>
-<h2 id="compatibility_with_podman_disable_memory_swappiness">Compatibility with podman (Disable memory swappiness)<a class="headerlink" href="#compatibility_with_podman_disable_memory_swappiness" title="Permanent link">&para;</a></h2>
-<p>Disable memory swappiness. By default, podman sets the memory-swappiness value to 0 when no memory-swappiness is defined
-When this flag is specified, watchtower will set the memory-swappiness to nil, fixing a compatibility issue with podman running with crun and cgroupv2</p>
+<h3 id="disable_memory_swappiness">Disable Memory Swappiness<a class="headerlink" href="#disable_memory_swappiness" title="Permanent link">&para;</a></h3>
+<p>Sets memory swappiness to <code>nil</code> for Podman compatibility with crun and cgroupv2, overriding Podman's default of <code>0</code>.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --disable-memory-swappiness
 Environment Variable: WATCHTOWER_DISABLE_MEMORY_SWAPPINESS
                 Type: Boolean
              Default: false
 </code></pre></div>
+<h2 id="http_api_metrics">HTTP API &amp; Metrics<a class="headerlink" href="#http_api_metrics" title="Permanent link">&para;</a></h2>
+<h3 id="http_api_mode">HTTP API Mode<a class="headerlink" href="#http_api_mode" title="Permanent link">&para;</a></h3>
+<p>Runs Watchtower in HTTP API mode, allowing updates only via HTTP requests, with support for tag-specific filtering (e.g., <code>image=foo/bar:1.0</code>).</p>
+<div class="highlight"><pre><span></span><code>            Argument: --http-api-update
+Environment Variable: WATCHTOWER_HTTP_API_UPDATE
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a href="https://nicholas-fedor.github.io/watchtower/http-api-mode">HTTP API Mode</a> for details.</p>
+</div>
+<h3 id="http_api_token">HTTP API Token<a class="headerlink" href="#http_api_token" title="Permanent link">&para;</a></h3>
+<p>Sets an authentication token for HTTP API requests. Can reference a file for security.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --http-api-token
+Environment Variable: WATCHTOWER_HTTP_API_TOKEN
+                Type: String
+             Default: None
+</code></pre></div>
+<h3 id="http_api_metrics_1">HTTP API Metrics<a class="headerlink" href="#http_api_metrics_1" title="Permanent link">&para;</a></h3>
+<p>Enables a Prometheus metrics endpoint via HTTP.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --http-api-metrics
+Environment Variable: WATCHTOWER_HTTP_API_METRICS
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a href="https://nicholas-fedor.github.io/watchtower/metrics">Metrics</a> for details.</p>
+</div>
+<h3 id="http_api_port">HTTP API Port<a class="headerlink" href="#http_api_port" title="Permanent link">&para;</a></h3>
+<p>Sets the listening port for the HTTP API.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --http-api-port
+Environment Variable: WATCHTOWER_HTTP_API_PORT
+                Type: String
+             Default: 8080
+</code></pre></div>
+<h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
+<h3 id="notification_url">Notification URL<a class="headerlink" href="#notification_url" title="Permanent link">&para;</a></h3>
+<p>Configures the notification service URL. Can reference a file for sensitive values.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --notification-url
+Environment Variable: WATCHTOWER_NOTIFICATION_URL
+                Type: String
+             Default: None
+</code></pre></div>
+<h3 id="notification_email_server_password">Notification Email Server Password<a class="headerlink" href="#notification_email_server_password" title="Permanent link">&para;</a></h3>
+<p>Sets the password for the email notification server. Can reference a file for security.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --notification-email-server-password
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
+                Type: String
+             Default: None
+</code></pre></div>
+<h3 id="notification_slack_hook_url">Notification Slack Hook URL<a class="headerlink" href="#notification_slack_hook_url" title="Permanent link">&para;</a></h3>
+<p>Sets the Slack webhook URL for notifications. Can reference a file for security.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --notification-slack-hook-url
+Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
+                Type: String
+             Default: None
+</code></pre></div>
+<h3 id="notification_microsoft_teams_hook">Notification Microsoft Teams Hook<a class="headerlink" href="#notification_microsoft_teams_hook" title="Permanent link">&para;</a></h3>
+<p>Sets the Microsoft Teams webhook URL for notifications. Can reference a file for security.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --notification-msteams-hook
+Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK
+                Type: String
+             Default: None
+</code></pre></div>
+<h3 id="notification_gotify_token">Notification Gotify Token<a class="headerlink" href="#notification_gotify_token" title="Permanent link">&para;</a></h3>
+<p>Sets the Gotify token for notifications. Can reference a file for security.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --notification-gotify-token
+Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
+                Type: String
+             Default: None
+</code></pre></div>
+<h3 id="disable_startup_message">Disable Startup Message<a class="headerlink" href="#disable_startup_message" title="Permanent link">&para;</a></h3>
+<p>Suppresses the info-level notification sent when Watchtower starts.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --no-startup-message
+Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
+                Type: Boolean
+             Default: false
+</code></pre></div>
+<h2 id="lifecycle_health">Lifecycle &amp; Health<a class="headerlink" href="#lifecycle_health" title="Permanent link">&para;</a></h2>
+<h3 id="container_stop_timeout">Container Stop Timeout<a class="headerlink" href="#container_stop_timeout" title="Permanent link">&para;</a></h3>
+<p>Sets the timeout (e.g., <code>30s</code>) before forcibly stopping a container during updates.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --stop-timeout
+Environment Variable: WATCHTOWER_TIMEOUT
+                Type: Duration
+             Default: 10s
+</code></pre></div>
+<h3 id="health_check">Health Check<a class="headerlink" href="#health_check" title="Permanent link">&para;</a></h3>
+<p>Returns a success exit code for Docker <code>HEALTHCHECK</code>, verifying another process is running in the container.</p>
+<div class="highlight"><pre><span></span><code>            Argument: --health-check
+Environment Variable: None
+                Type: N/A
+             Default: N/A
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Intended solely for Docker <code>HEALTHCHECK</code>. Do not use on the main command line.</p>
+</div>
+<h2 id="output_compatibility">Output &amp; Compatibility<a class="headerlink" href="#output_compatibility" title="Permanent link">&para;</a></h2>
+<h3 id="programmatic_output_porcelain">Programmatic Output (Porcelain)<a class="headerlink" href="#programmatic_output_porcelain" title="Permanent link">&para;</a></h3>
+<p>Outputs session results in a machine-readable format (version specified by <code>VERSION</code>).</p>
+<div class="highlight"><pre><span></span><code>            Argument: --porcelain, -P
+Environment Variable: WATCHTOWER_PORCELAIN
+     Possible Values: v1
+             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Equivalent to:
+<div class="highlight"><pre><span></span><code>--notification-url logger://
+--notification-log-stdout
+--notification-report
+--notification-template porcelain.VERSION.summary-no-log
+</code></pre></div></p>
+</div>
 
 
 
