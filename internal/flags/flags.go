@@ -267,6 +267,20 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		envBool("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS"),
 		"Label used for setting memory swappiness as nil when recreating the container, used for compatibility with podman",
 	)
+
+	flags.Bool(
+		"registry-tls-skip",
+		envBool("WATCHTOWER_REGISTRY_TLS_SKIP"),
+		"Disable TLS verification for registry connections; allows HTTP or insecure TLS registries (use with caution)",
+	)
+	viper.MustBindEnv("WATCHTOWER_REGISTRY_TLS_SKIP")
+
+	flags.String(
+		"registry-tls-min-version",
+		envString("WATCHTOWER_REGISTRY_TLS_MIN_VERSION"),
+		"Minimum TLS version for registry connections (e.g., TLS1.0, TLS1.1, TLS1.2, TLS1.3); default is TLS1.2",
+	)
+	viper.MustBindEnv("WATCHTOWER_REGISTRY_TLS_MIN_VERSION")
 }
 
 // RegisterNotificationFlags adds notification flags to the root command.
@@ -533,6 +547,8 @@ func SetDefaults() {
 	viper.SetDefault("WATCHTOWER_LOG_LEVEL", "info")
 	viper.SetDefault("WATCHTOWER_LOG_FORMAT", "auto")
 	viper.SetDefault("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS", false)
+	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS1.2")
 }
 
 // EnvConfig sets Docker environment variables from flags.

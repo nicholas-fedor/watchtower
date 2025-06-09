@@ -10,6 +10,7 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -25,7 +26,8 @@ var (
 
 // BuildManifestURL constructs a URL for accessing a container’s image manifest from its registry.
 //
-// It parses the image name into a normalized reference, extracts the registry host, and builds a URL with path and tag.
+// It parses the image name into a normalized reference, extracts the registry host, and builds a URL with path and tag,
+// using the appropriate scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
 //
 // Parameters:
 //   - container: Container with image info for URL construction.
@@ -62,15 +64,25 @@ func BuildManifestURL(container types.Container) (string, error) {
 	host, _ := helpers.GetRegistryAddress(normalizedTaggedRef.Name())
 	img, tag := reference.Path(normalizedTaggedRef), normalizedTaggedRef.Tag()
 
+	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
+	scheme := "https"
+	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		scheme = "http"
+
+		logrus.WithField("host", host).
+			Debug("Using HTTP scheme due to WATCHTOWER_REGISTRY_TLS_SKIP")
+	}
+
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"host":       host,
 		"image_path": img,
 		"tag":        tag,
+		"scheme":     scheme,
 	}).Debug("Constructed manifest URL components")
 
 	// Build the manifest URL with scheme, host, and path.
 	url := url.URL{
-		Scheme: "https",
+		Scheme: scheme,
 		Host:   host,
 		Path:   fmt.Sprintf("/v2/%s/manifests/%s", img, tag),
 	}

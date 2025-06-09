@@ -151,12 +151,21 @@ func fetchDigest(
 	// Transform the provided auth string into a usable format for registry authentication.
 	registryAuth = TransformAuth(registryAuth)
 
+	// Create an authentication client for registry requests.
+	client := auth.NewAuthClient()
+
 	// Obtain an authentication token for the registry, leveraging the container’s image reference.
-	token, err := auth.GetToken(ctx, container, registryAuth)
+	token, err := auth.GetToken(ctx, container, registryAuth, client)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
 
 		return "", fmt.Errorf("%w: %w", errFailedGetToken, err)
+	}
+
+	if token == "" {
+		logrus.WithFields(fields).Debug("Empty token received; authentication likely failed")
+
+		return "", fmt.Errorf("%w: empty token received from registry", errFailedGetToken)
 	}
 
 	// Build the manifest URL based on the container’s image name and tag.
@@ -185,17 +194,16 @@ func fetchDigest(
 
 	// Set standard headers for registry manifest requests.
 	req.Header.Set("Authorization", token)
+
 	// Set Accept header to support both OCI image indexes and Docker V2 manifests.
-	// This ensures compatibility with registries like GHCR that return OCI indexes (e.g., for multi-arch images)
-	// instead of single V2 manifests, which caused 404 errors with the previous V2-only header.
 	req.Header.Set(
 		"Accept",
 		"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 	)
 	req.Header.Set("User-Agent", UserAgent)
 
-	// Execute the request using the configured auth client.
-	resp, err := auth.Client.Do(req)
+	// Execute the request using the configured authentication client.
+	resp, err := client.Do(req)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
 			"method": method,
