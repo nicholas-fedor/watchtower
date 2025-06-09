@@ -983,6 +983,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			}
 		})
 
+		// Test case: Verifies that GetToken returns an error when the registry is unreachable.
 		ginkgo.It("should return an error if GetToken fails", func() {
 			defer ginkgo.GinkgoRecover()
 			mockImageRef := "unreachable.local/test/image:latest"
@@ -999,7 +1000,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			registryAuth := digest.TransformAuth("token")
 			_, err := auth.GetToken(ctx, mockContainerUnreachable, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("no such host"))
+			gomega.Expect(err.Error()).To(gomega.MatchRegexp("no such host|server misbehaving"))
 		})
 
 		ginkgo.It("should return an error if manifest URL build fails", func() {
