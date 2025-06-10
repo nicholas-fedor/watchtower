@@ -20,6 +20,10 @@ func MockContainer(updates ...MockContainerUpdate) *Container {
 			Image:      "image",
 			Name:       "test-watchtower",
 			HostConfig: &dockerContainerType.HostConfig{},
+			State: &dockerContainerType.State{
+				Running: true,
+				Status:  "running",
+			}, // Default to running
 		},
 		Config: &dockerContainerType.Config{
 			Labels: map[string]string{},

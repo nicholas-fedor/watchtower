@@ -124,6 +124,10 @@ func (c Container) ID() types.ContainerID {
 // Returns:
 //   - bool: True if running, false otherwise.
 func (c Container) IsRunning() bool {
+	if c.containerInfo == nil || c.containerInfo.State == nil {
+		return false
+	}
+
 	return c.containerInfo.State.Running
 }
 
