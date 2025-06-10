@@ -654,7 +654,7 @@ func debugLogMacAddress(
 	switch {
 	case versions.LessThan(clientVersion, minSupportedVersion): // API < v1.44
 		if foundMac {
-			clog.Warn("Unexpected MAC address in legacy config")
+			clog.Debug("Unexpected MAC address in legacy config")
 
 			return
 		}
@@ -662,7 +662,7 @@ func debugLogMacAddress(
 		clog.Debug("No MAC address in legacy config, Docker will handle")
 	case versions.LessThan(clientVersion, "1.44") && !isHostNetwork:
 		if foundMac {
-			clog.Warn("Unexpected MAC address in legacy config")
+			clog.Debug("Unexpected MAC address in legacy config")
 
 			return
 		}
@@ -671,7 +671,7 @@ func debugLogMacAddress(
 	case foundMac: // API >= v1.44, MAC present
 		clog.Debug("Verified MAC address configuration")
 	case !isHostNetwork: // API >= v1.44, no MAC, non-host network
-		clog.Warn("No MAC address found in config")
+		clog.Debug("No MAC address found in config")
 	default: // API >= v1.44, no MAC, host network
 		clog.Debug("No MAC address in host network mode, as expected")
 	}
