@@ -359,7 +359,7 @@ func runMain(cfg RunConfig) int {
 	// Log the container names being processed for debugging visibility.
 	logrus.WithField("names", cfg.Names).Debug("Processing specified containers")
 
-	// Validate flag compatibility to prevent conflicting operational modes (e.g., rolling restarts with monitor-only).
+	// Validate flag compatibility to prevent conflicting operational modes.
 	if rollingRestart && monitorOnly {
 		logrus.WithFields(logrus.Fields{
 			"rolling_restart": rollingRestart,
@@ -370,50 +370,52 @@ func runMain(cfg RunConfig) int {
 	// Ensure the Docker client is fully initialized before proceeding.
 	awaitDockerClient()
 
-	// Perform sanity checks on the Docker environment and container setup to catch misconfigurations.
+	// Perform sanity checks on the environment and container setup.
 	if err := actions.CheckForSanity(client, cfg.Filter, rollingRestart); err != nil {
 		logNotify("Sanity check failed", err)
 
 		return 1 // Exit immediately after logging
 	}
 
-	// Handle one-time update mode, executing updates immediately and exiting cleanly.
+	// Handle one-time update mode, executing updates and registering metrics.
 	if cfg.RunOnce {
 		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc)
-		runUpdatesWithNotifications(cfg.Filter)
+		metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
+		metrics.Default().RegisterScan(metric)
 		notifier.Close()
 
 		return 0
 	}
 
-	// Check for and resolve conflicts with multiple Watchtower instances running concurrently.
-	if err := actions.CheckForMultipleWatchtowerInstances(client, cleanup, scope); err != nil {
+	// Initialize a lock channel to prevent concurrent updates.
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Check for and resolve conflicts with multiple Watchtower instances.
+	cleanupImageIDs := make(map[types.ImageID]bool)
+	if err := actions.CheckForMultipleWatchtowerInstances(client, cleanup, scope, cleanupImageIDs); err != nil {
 		logNotify("Multiple Watchtower instances detected", err)
 
 		return 1
 	}
 
-	// Setup API and scheduling by initializing a lock channel to prevent concurrent conflicting updates.
-	updateLock := make(chan bool, 1)
-	updateLock <- true
-
 	// Create a cancellable context for managing API and scheduler shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Configure and start the HTTP API, handling any startup errors gracefully.
+	// Configure and start the HTTP API, handling any startup errors.
 	if err := setupAndStartAPI(ctx, cfg, updateLock); err != nil {
-		return 1 // Error logged in setupAndStartAPI
+		return 1
 	}
 
-	// Schedule and execute periodic updates, returning on error or shutdown.
-	if err := runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock); err != nil {
+	// Schedule and execute periodic updates, handling errors or shutdown.
+	if err := runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup); err != nil {
 		logNotify("Scheduled upgrades failed", err)
 
 		return 1
 	}
 
-	// Default to failure if execution completes unexpectedly (e.g., no shutdown signal received).
+	// Default to failure if execution completes unexpectedly.
 	return 1
 }
 
@@ -437,7 +439,10 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	// Register the update API endpoint if enabled, linking it to the update handler.
 	if cfg.EnableUpdateAPI {
 		updateHandler := update.New(func(images []string) {
-			metric := runUpdatesWithNotifications(filters.FilterByImage(images, cfg.Filter))
+			metric := runUpdatesWithNotifications(
+				filters.FilterByImage(images, cfg.Filter),
+				cleanup,
+			)
 			metrics.Default().RegisterScan(metric)
 		}, updateLock)
 		httpAPI.RegisterFunc(updateHandler.Path, updateHandler.Handle)
@@ -453,7 +458,7 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 		httpAPI.RegisterHandler(metricsHandler.Path, metricsHandler.Handle)
 	}
 
-	// Start the API server, logging errors unless it’s a clean shutdown triggered by context.
+	// Start the API server, logging errors unless it’s a clean shutdown.
 	if err := httpAPI.Start(ctx, cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI); err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
 		logrus.WithError(err).Error("Failed to start API")
@@ -709,6 +714,7 @@ func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 //   - filter: The types.Filter determining which containers are updated.
 //   - filtering: A string describing the filter, used in startup messaging.
 //   - lock: A channel ensuring only one update runs at a time, or nil to create a new one.
+//   - cleanup: Boolean indicating whether to remove old images after updates.
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
@@ -718,6 +724,7 @@ func runUpgradesOnSchedule(
 	filter types.Filter,
 	filtering string,
 	lock chan bool,
+	cleanup bool,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -735,15 +742,12 @@ func runUpgradesOnSchedule(
 			select {
 			case v := <-lock:
 				defer func() { lock <- v }()
-				metric := runUpdatesWithNotifications(filter)
+				metric := runUpdatesWithNotifications(filter, cleanup)
 				metrics.Default().RegisterScan(metric)
 			default:
-				// Skip if another update is running, logging and registering a nil metric.
 				metrics.Default().RegisterScan(nil)
 				logrus.Debug("Skipped another update already running.")
 			}
-
-			// Log the next scheduled run for visibility if entries exist.
 			nextRuns := scheduler.Entries()
 			if len(nextRuns) > 0 {
 				logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
@@ -758,11 +762,11 @@ func runUpgradesOnSchedule(
 	// Start the scheduler to begin periodic execution.
 	scheduler.Start()
 
-	// Set up signal handling for graceful shutdown on interrupt or termination signals.
+	// Set up signal handling for graceful shutdown.
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	// Wait for shutdown signal or context cancellation, stopping the scheduler cleanly.
+	// Wait for shutdown signal or context cancellation.
 	select {
 	case <-ctx.Done():
 		logrus.Debug("Context canceled, stopping scheduler...")
@@ -770,6 +774,7 @@ func runUpgradesOnSchedule(
 		logrus.Debug("Received interrupt signal, stopping scheduler...")
 	}
 
+	// Stop the scheduler and wait for any running update to complete.
 	scheduler.Stop()
 	logrus.Debug("Waiting for running update to be finished...")
 	<-lock
@@ -785,11 +790,12 @@ func runUpgradesOnSchedule(
 //
 // Parameters:
 //   - filter: The types.Filter determining which containers are targeted for updates.
+//   - cleanup: Boolean indicating whether to remove old images after updates.
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-func runUpdatesWithNotifications(filter types.Filter) *metrics.Metric {
-	// Start batching notifications to group update messages into a single alert.
+func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Metric {
+	// Start batching notifications to group update messages.
 	notifier.StartNotification()
 
 	// Configure update parameters based on global flags and settings.
@@ -805,13 +811,18 @@ func runUpdatesWithNotifications(filter types.Filter) *metrics.Metric {
 		NoPull:          noPull,
 	}
 
-	// Execute the update action, capturing results and handling any errors.
-	result, err := actions.Update(client, updateParams)
+	// Execute the update action, capturing results and image IDs for cleanup.
+	result, cleanupImageIDs, err := actions.Update(client, updateParams)
 	if err != nil {
 		logrus.WithError(err).Error("Update execution failed")
 	}
 
-	// Debug report
+	// Perform deferred image cleanup if enabled.
+	if cleanup {
+		actions.CleanupImages(client, cleanupImageIDs)
+	}
+
+	// Log update report for debugging.
 	updatedNames := make([]string, 0, len(result.Updated()))
 	for _, r := range result.Updated() {
 		updatedNames = append(updatedNames, r.Name())
@@ -824,7 +835,7 @@ func runUpdatesWithNotifications(filter types.Filter) *metrics.Metric {
 		"updated_names": updatedNames,
 	}).Debug("Report before notification")
 
-	// Send the batched notification with update results (successes, failures, etc.).
+	// Send the batched notification with update results.
 	notifier.SendNotification(result)
 
 	// Generate and log a metric summarizing the update session.
