@@ -149,7 +149,7 @@ func cleanupExcessWatchtowers(
 
 	// Select all but the most recent container for stopping.
 	excessContainers := containers[:len(containers)-1]
-	logrus.WithField("containers", containerNames(excessContainers)).
+	logrus.WithField("excess_containers", containerNames(excessContainers)).
 		Debug("Stopping excess Watchtower instances")
 
 	var stopErrors []error
@@ -157,6 +157,10 @@ func cleanupExcessWatchtowers(
 	// Get the newest container’s image ID (kept running).
 	newestContainer := containers[len(containers)-1]
 	newestImageID := newestContainer.ImageID()
+	logrus.WithFields(logrus.Fields{
+		"newest_container": newestContainer.Name(),
+		"newest_image_id":  newestImageID,
+	}).Debug("Identified newest container")
 
 	// Stop each excess container and collect image IDs for cleanup.
 	for _, c := range excessContainers {
