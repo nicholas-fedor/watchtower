@@ -22,6 +22,8 @@ type MockClient struct {
 // It defines container states, staleness, and mock operation results.
 type TestData struct {
 	TriedToRemoveImageCount int               // Number of times RemoveImageByID was called.
+	RenameContainerCount    int               // Number of times RenameContainer was called.
+	StopContainerCount      int               // Number of times StopContainer was called.
 	NameOfContainerToKeep   string            // Name of the container to avoid stopping.
 	Containers              []types.Container // List of mock containers.
 	Staleness               map[string]bool   // Map of container names to staleness status.
@@ -52,10 +54,11 @@ func (client MockClient) ListContainers(_ types.Filter) ([]types.Container, erro
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.
-// It records the container’s ID as stopped and always returns nil for simplicity.
+// It records the container’s ID as stopped, increments the StopContainerCount,
+// and returns nil for simplicity.
 func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
 	client.Stopped[string(c.ID())] = true
-
+	client.TestData.StopContainerCount++
 	return nil
 }
 
@@ -71,17 +74,17 @@ func (client MockClient) StartContainer(_ types.Container) (types.ContainerID, e
 	return "", nil
 }
 
-// RenameContainer simulates renaming a container, always succeeding with no action.
+// RenameContainer simulates renaming a container, incrementing the RenameContainerCount.
 // It returns nil to indicate success without modifying any state.
 func (client MockClient) RenameContainer(_ types.Container, _ string) error {
+	client.TestData.RenameContainerCount++
 	return nil
 }
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
-// It simulates image cleanup and always returns nil to indicate success.
+// It simulates image cleanup and returns nil to indicate success.
 func (client MockClient) RemoveImageByID(_ types.ImageID) error {
 	client.TestData.TriedToRemoveImageCount++
-
 	return nil
 }
 
@@ -91,10 +94,10 @@ func (client MockClient) GetContainer(_ types.ContainerID) (types.Container, err
 	return client.TestData.Containers[0], nil
 }
 
-// GetVersion returns the Docker host API client version.
-// It provides a mock response for testing the function.
+// GetVersion returns a mock Docker API client version.
+// It provides a static version string for testing purposes.
 func (client MockClient) GetVersion() string {
-	return client.GetVersion()
+	return "1.50"
 }
 
 // errCommandFailed is a static error indicating a command exited with a non-zero code.
@@ -131,7 +134,6 @@ func (client MockClient) IsContainerStale(
 	if !found {
 		stale = true // Default to stale if not specified.
 	}
-
 	return stale, "", nil
 }
 

@@ -240,6 +240,9 @@ Environment Variable: WATCHTOWER_NO_RESTART
              Default: false
 ```
 
+!!! warning
+    Combining `--no-restart` with `--cleanup` during Watchtower self-update may leave a renamed Watchtower container running without starting a new one, preventing cleanup of the old image. Use cautiously for self-updating Watchtower instances, and consider external lifecycle management (e.g., Docker Compose) to restart containers manually.
+
 ### Rolling Restart
 
 Restarts containers one at a time to minimize downtime, ideal for zero-downtime deployments with lifecycle hooks.
@@ -251,6 +254,9 @@ Environment Variable: WATCHTOWER_ROLLING_RESTART
              Default: false
 ```
 
+!!! note
+    When combined with `--cleanup`, image cleanup is deferred until all containers are updated, which may temporarily increase disk usage for large numbers of containers (>50). This is typically negligible for homelab setups but monitor disk space on resource-constrained hosts.
+
 ### Cleanup Old Images
 
 Removes old images after updating containers to free disk space.
@@ -261,6 +267,9 @@ Environment Variable: WATCHTOWER_CLEANUP
                 Type: Boolean
              Default: false
 ```
+
+!!! note
+    During Watchtower self-updates, cleanup is deferred to the new container to prevent premature image deletion. Ensure `--no-restart` is not used with `--cleanup` to avoid incomplete updates.
 
 ### Remove Anonymous Volumes
 
@@ -338,7 +347,7 @@ Environment Variable: WATCHTOWER_SCOPE
 ```
 
 !!! note
-    Set to `none` to ignore scoped containers. Without this flag, Watchtower monitors all containers regardless of scope. See [Running Multiple Instances](https://nicholas-fedor.github.io/watchtower/running-multiple-instances).
+    Set to `none` to ignore scoped containers. Without this flag, Watchtower monitors all containers regardless of scope. For self-updates, ensure all Watchtower containers share the same `com.centurylinklabs.watchtower.scope` label to guarantee cleanup of renamed containers and old images. Mismatched labels may prevent detection, leaving resources running. See [Running Multiple Instances](https://nicholas-fedor.github.io/watchtower/running-multiple-instances).
 
 ### Label Precedence
 

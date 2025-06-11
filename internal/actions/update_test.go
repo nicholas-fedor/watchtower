@@ -11,6 +11,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -29,8 +30,8 @@ func getCommonTestData(keepContainer string) *mocks.TestData {
 				"fake-image:latest",
 				time.Now()),
 			mocks.CreateMockContainer(
-				"test-container-02",
-				"test-container-02",
+				"test-container-03",
+				"test-container-03",
 				"fake-image:latest",
 				time.Now()),
 		},
@@ -67,17 +68,206 @@ func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 }
 
 var _ = ginkgo.Describe("the update action", func() {
+	ginkgo.When("updating a Watchtower container", func() {
+		ginkgo.It("should rename and start a new container without cleanup", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+				},
+				false,
+				false,
+			)
+			report, cleanupImageIDs, err := actions.Update(
+				client,
+				types.UpdateParams{
+					Cleanup: true,
+					Filter:  filters.WatchtowerContainersFilter,
+				},
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
+			gomega.Expect(client.TestData.TriedToRemoveImageCount).
+				To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
+			gomega.Expect(client.TestData.RenameContainerCount).
+				To(gomega.Equal(1), "RenameContainer should be called once")
+		})
+
+		ginkgo.It("should skip rename with no-restart for Watchtower", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower":              "true",
+									"com.centurylinklabs.watchtower.monitor-only": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+				},
+				false,
+				false,
+			)
+			params := types.UpdateParams{
+				Cleanup:   true,
+				NoRestart: true,
+				Filter:    filters.WatchtowerContainersFilter,
+			}
+			report, cleanupImageIDs, err := actions.Update(client, params)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Scanned()).
+				To(gomega.HaveLen(1), "Container should be scanned but not updated")
+			gomega.Expect(report.Updated()).
+				To(gomega.BeEmpty(), "No containers should be updated with no-restart")
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.BeEmpty(), "No images should be collected for cleanup")
+			gomega.Expect(client.TestData.RenameContainerCount).
+				To(gomega.Equal(0), "RenameContainer should not be called with no-restart")
+		})
+
+		ginkgo.It("should detect renamed Watchtower without scope for cleanup", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now().Add(-time.Hour),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower":       "true",
+									"com.centurylinklabs.watchtower.scope": "prod",
+								},
+							}),
+						mocks.CreateMockContainerWithConfig(
+							"renamed",
+							"/watchtower",
+							"watchtower:old",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+				},
+				false,
+				false,
+			)
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				true,
+				"prod",
+				cleanupImageIDs,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(client.TestData.StopContainerCount).
+				To(gomega.Equal(1), "StopContainer should be called for renamed container")
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.HaveKey(types.ImageID("watchtower:latest")))
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.HaveLen(1), "cleanupImageIDs should include renamed container’s image")
+			gomega.Expect(client.TestData.TriedToRemoveImageCount).
+				To(gomega.Equal(1), "RemoveImageByID should be called for old image")
+		})
+
+		ginkgo.It("should skip cleanup for shared image", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"old",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now().Add(-time.Hour),
+							&container.Config{
+								Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"new",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
+							},
+						),
+					},
+				},
+				false,
+				false,
+			)
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			err := actions.CheckForMultipleWatchtowerInstances(client, true, "", cleanupImageIDs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty(), "No image cleanup for shared image")
+			gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+		})
+	})
+
 	ginkgo.When("watchtower has been instructed to clean up", func() {
 		ginkgo.When("there are multiple containers using the same image", func() {
-			ginkgo.It("should only try to remove the image once", func() {
+			ginkgo.It("should collect the image ID once for deferred cleanup", func() {
 				client := mocks.CreateMockClient(getCommonTestData(""), false, false)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true})
+				client.TestData.Staleness = map[string]bool{
+					"test-container-01": true,
+					"test-container-02": true,
+					"test-container-03": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
+
 		ginkgo.When("there are multiple containers using different images", func() {
-			ginkgo.It("should try to remove each of them", func() {
+			ginkgo.It("should collect each image ID for deferred cleanup", func() {
 				testData := getCommonTestData("")
 				testData.Containers = append(
 					testData.Containers,
@@ -89,47 +279,91 @@ var _ = ginkgo.Describe("the update action", func() {
 					),
 				)
 				client := mocks.CreateMockClient(testData, false, false)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true})
+				client.TestData.Staleness = map[string]bool{
+					"test-container-01":     true,
+					"test-container-02":     true,
+					"test-container-03":     true,
+					"unique-test-container": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(2))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(4))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("unique-fake-image:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(2))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
+
 		ginkgo.When("there are linked containers being updated", func() {
-			ginkgo.It("should not try to remove their images", func() {
+			ginkgo.It("should collect only the stale container’s image ID", func() {
 				client := mocks.CreateMockClient(getLinkedTestData(true), false, false)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true})
+				client.TestData.Staleness["test-container-01"] = true
+				report, cleanupImageIDs, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image1:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
+
 		ginkgo.When("performing a rolling restart update", func() {
-			ginkgo.It("should try to remove the image once", func() {
+			ginkgo.It("should collect the image ID for deferred cleanup", func() {
 				client := mocks.CreateMockClient(getCommonTestData(""), false, false)
-				_, err := actions.Update(
+				client.TestData.Staleness = map[string]bool{
+					"test-container-01": true,
+					"test-container-02": true,
+					"test-container-03": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
 					client,
 					types.UpdateParams{Cleanup: true, RollingRestart: true},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
-		ginkgo.When("updating a linked container with missing image info", func() {
-			ginkgo.It("should gracefully fail", func() {
-				client := mocks.CreateMockClient(getLinkedTestData(false), false, false)
 
-				report, err := actions.Update(client, types.UpdateParams{})
+		ginkgo.When("updating a linked container with missing image info", func() {
+			ginkgo.It("should gracefully fail and collect no image IDs", func() {
+				client := mocks.CreateMockClient(getLinkedTestData(false), false, false)
+				client.TestData.Staleness["test-container-01"] = true
+				report, cleanupImageIDs, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				// Note: Linked containers that were skipped for recreation is not counted in Failed
-				// If this happens, an error is emitted to the logs, so a notification should still be sent.
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 				gomega.Expect(report.Fresh()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image1:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
 	})
 
 	ginkgo.When("watchtower has been instructed to monitor only", func() {
 		ginkgo.When("certain containers are set to monitor only", func() {
-			ginkgo.It("should not update those containers", func() {
+			ginkgo.It("should not update those containers and collect no image IDs", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
 						NameOfContainerToKeep: "test-container-02",
@@ -156,14 +390,26 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(client, types.UpdateParams{Cleanup: true})
+				client.TestData.Staleness = map[string]bool{
+					"test-container-01": true,
+					"test-container-02": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
+					client,
+					types.UpdateParams{Cleanup: true},
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image1:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
 
 		ginkgo.When("monitor only is set globally", func() {
-			ginkgo.It("should not update any containers", func() {
+			ginkgo.It("should not update any containers and collect no image IDs", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
 						Containers: []types.Container{
@@ -182,18 +428,25 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(
+				client.TestData.Staleness = map[string]bool{
+					"test-container-01": true,
+					"test-container-02": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
 					client,
 					types.UpdateParams{Cleanup: true, MonitorOnly: true},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
+				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
+
 			ginkgo.When("watchtower has been instructed to have label take precedence", func() {
 				ginkgo.It("it should update containers when monitor only is set to false", func() {
 					client := mocks.CreateMockClient(
 						&mocks.TestData{
-							// NameOfContainerToKeep: "test-container-02",
 							Containers: []types.Container{
 								mocks.CreateMockContainerWithConfig(
 									"test-container-02",
@@ -212,19 +465,31 @@ var _ = ginkgo.Describe("the update action", func() {
 						false,
 						false,
 					)
-					_, err := actions.Update(
+					client.TestData.Staleness = map[string]bool{
+						"test-container-02": true,
+					}
+					report, cleanupImageIDs, err := actions.Update(
 						client,
-						types.UpdateParams{Cleanup: true, MonitorOnly: true, LabelPrecedence: true},
+						types.UpdateParams{
+							Cleanup:         true,
+							MonitorOnly:     true,
+							LabelPrecedence: true,
+						},
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+					gomega.Expect(cleanupImageIDs).
+						To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
+					gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+					gomega.Expect(client.TestData.TriedToRemoveImageCount).
+						To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 				})
+
 				ginkgo.It(
-					"it should update not containers when monitor only is set to true",
+					"it should not update containers when monitor only is set to true",
 					func() {
 						client := mocks.CreateMockClient(
 							&mocks.TestData{
-								// NameOfContainerToKeep: "test-container-02",
 								Containers: []types.Container{
 									mocks.CreateMockContainerWithConfig(
 										"test-container-02",
@@ -243,7 +508,10 @@ var _ = ginkgo.Describe("the update action", func() {
 							false,
 							false,
 						)
-						_, err := actions.Update(
+						client.TestData.Staleness = map[string]bool{
+							"test-container-02": true,
+						}
+						report, cleanupImageIDs, err := actions.Update(
 							client,
 							types.UpdateParams{
 								Cleanup:         true,
@@ -252,10 +520,14 @@ var _ = ginkgo.Describe("the update action", func() {
 							},
 						)
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
-						gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+						gomega.Expect(report.Updated()).To(gomega.BeEmpty())
+						gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+						gomega.Expect(client.TestData.TriedToRemoveImageCount).
+							To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 					},
 				)
-				ginkgo.It("it should update not containers when monitor only is not set", func() {
+
+				ginkgo.It("it should not update containers when monitor only is not set", func() {
 					client := mocks.CreateMockClient(
 						&mocks.TestData{
 							Containers: []types.Container{
@@ -269,12 +541,22 @@ var _ = ginkgo.Describe("the update action", func() {
 						false,
 						false,
 					)
-					_, err := actions.Update(
+					client.TestData.Staleness = map[string]bool{
+						"test-container-01": true,
+					}
+					report, cleanupImageIDs, err := actions.Update(
 						client,
-						types.UpdateParams{Cleanup: true, MonitorOnly: true, LabelPrecedence: true},
+						types.UpdateParams{
+							Cleanup:         true,
+							MonitorOnly:     true,
+							LabelPrecedence: true,
+						},
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+					gomega.Expect(report.Updated()).To(gomega.BeEmpty())
+					gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+					gomega.Expect(client.TestData.TriedToRemoveImageCount).
+						To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 				})
 			})
 		})
@@ -282,10 +564,9 @@ var _ = ginkgo.Describe("the update action", func() {
 
 	ginkgo.When("watchtower has been instructed to run lifecycle hooks", func() {
 		ginkgo.When("pre-update script returns 1", func() {
-			ginkgo.It("should not update those containers", func() {
+			ginkgo.It("should not update those containers and collect no image IDs", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -306,21 +587,28 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-
-				_, err := actions.Update(
+				client.TestData.Staleness = map[string]bool{
+					"test-container-02": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+					types.UpdateParams{
+						Cleanup:        true,
+						LifecycleHooks: true,
+					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
+				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
 
 		ginkgo.When("preupdate script returns 75", func() {
-			ginkgo.It("should not update those containers", func() {
+			ginkgo.It("should not update those containers and collect no image IDs", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -341,20 +629,28 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(
+				client.TestData.Staleness = map[string]bool{
+					"test-container-02": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+					types.UpdateParams{
+						Cleanup:        true,
+						LifecycleHooks: true,
+					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
+				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
 
 		ginkgo.When("preupdate script returns 0", func() {
-			ginkgo.It("should update those containers", func() {
+			ginkgo.It("should update those containers and collect image IDs", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -375,17 +671,28 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(
+				client.TestData.Staleness = map[string]bool{
+					"test-container-02": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+					types.UpdateParams{
+						Cleanup:        true,
+						LifecycleHooks: true,
+					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
 
 		ginkgo.When("container is linked to restarting containers", func() {
-			ginkgo.It("should be marked for restart", func() {
+			ginkgo.It("should be marked for restart and collect image IDs", func() {
 				provider := mocks.CreateMockContainerWithConfig(
 					"test-container-provider",
 					"/test-container-provider",
@@ -430,10 +737,9 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.When("container is not running", func() {
-			ginkgo.It("skip running preupdate", func() {
+			ginkgo.It("should skip running preupdate and collect image IDs", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -454,20 +760,30 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(
+				client.TestData.Staleness = map[string]bool{
+					"test-container-02": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+					types.UpdateParams{
+						Cleanup:        true,
+						LifecycleHooks: true,
+					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
 
 		ginkgo.When("container is restarting", func() {
-			ginkgo.It("skip running preupdate", func() {
+			ginkgo.It("should skip running preupdate and collect image IDs", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
-						// NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
@@ -488,12 +804,23 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				_, err := actions.Update(
+				client.TestData.Staleness = map[string]bool{
+					"test-container-02": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, LifecycleHooks: true},
+					types.UpdateParams{
+						Cleanup:        true,
+						LifecycleHooks: true,
+					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(1))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
 		})
 	})

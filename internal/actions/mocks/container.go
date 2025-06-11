@@ -10,7 +10,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
 
-	dockerContainer "github.com/docker/docker/api/types/container" // Alias to avoid conflict.
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -28,7 +28,7 @@ func CreateMockContainer(id string, name string, image string, created time.Time
 			ID:      id,
 			Image:   image,
 			Name:    name,
-			Created: created.String(),
+			Created: created.Format(time.RFC3339Nano), // Use RFC3339Nano format
 			HostConfig: &dockerContainer.HostConfig{
 				PortBindings: map[nat.Port][]nat.PortBinding{},
 			},
@@ -52,7 +52,11 @@ func CreateMockImageInfo(mockImage string) *image.InspectResponse {
 	return &image.InspectResponse{
 		ID: mockImage,
 		RepoDigests: []string{
-			mockImage,
+			fmt.Sprintf(
+				"%s@sha256:%s",
+				mockImage,
+				strings.ReplaceAll(mockImage, ":", "_"),
+			), // Unique digest
 		},
 	}
 }
@@ -132,7 +136,7 @@ func CreateMockContainerWithConfig(
 				Running:    running,
 				Restarting: restarting,
 			},
-			Created: created.String(),
+			Created: created.Format(time.RFC3339Nano), // Use RFC3339Nano format
 			HostConfig: &dockerContainer.HostConfig{
 				PortBindings: map[nat.Port][]nat.PortBinding{},
 			},
