@@ -350,69 +350,6 @@ func (_c *MockClient_ListContainers_Call) RunAndReturn(run func(filter types.Fil
 	return _c
 }
 
-// RemoveContainer provides a mock function for the type MockClient
-func (_mock *MockClient) RemoveContainer(container types.Container, force bool, removeVolumes bool) error {
-	ret := _mock.Called(container, force, removeVolumes)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RemoveContainer")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(types.Container, bool, bool) error); ok {
-		r0 = returnFunc(container, force, removeVolumes)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockClient_RemoveContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveContainer'
-type MockClient_RemoveContainer_Call struct {
-	*mock.Call
-}
-
-// RemoveContainer is a helper method to define mock.On call
-//   - container types.Container
-//   - force bool
-//   - removeVolumes bool
-func (_e *MockClient_Expecter) RemoveContainer(container interface{}, force interface{}, removeVolumes interface{}) *MockClient_RemoveContainer_Call {
-	return &MockClient_RemoveContainer_Call{Call: _e.mock.On("RemoveContainer", container, force, removeVolumes)}
-}
-
-func (_c *MockClient_RemoveContainer_Call) Run(run func(container types.Container, force bool, removeVolumes bool)) *MockClient_RemoveContainer_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.Container
-		if args[0] != nil {
-			arg0 = args[0].(types.Container)
-		}
-		var arg1 bool
-		if args[1] != nil {
-			arg1 = args[1].(bool)
-		}
-		var arg2 bool
-		if args[2] != nil {
-			arg2 = args[2].(bool)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockClient_RemoveContainer_Call) Return(err error) *MockClient_RemoveContainer_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockClient_RemoveContainer_Call) RunAndReturn(run func(container types.Container, force bool, removeVolumes bool) error) *MockClient_RemoveContainer_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // RemoveImageByID provides a mock function for the type MockClient
 func (_mock *MockClient) RemoveImageByID(imageID types.ImageID) error {
 	ret := _mock.Called(imageID)

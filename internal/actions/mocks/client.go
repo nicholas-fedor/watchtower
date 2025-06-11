@@ -77,12 +77,6 @@ func (client MockClient) RenameContainer(_ types.Container, _ string) error {
 	return nil
 }
 
-// RemoveContainer simulates removing a container, always succeeding with no action.
-// It returns nil to indicate success without modifying any state.
-func (client MockClient) RemoveContainer(_ types.Container, _ bool, _ bool) error {
-	return nil
-}
-
 // RemoveImageByID increments the count of image removal attempts in TestData.
 // It simulates image cleanup and always returns nil to indicate success.
 func (client MockClient) RemoveImageByID(_ types.ImageID) error {
