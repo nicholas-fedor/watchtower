@@ -35,7 +35,7 @@ jobs:
           TAG="${GITHUB_REF_NAME#v}"
 
           # Architectures to include in manifests
-          ARCHES=("amd64" "i386" "armhf" "arm64v8")
+          ARCHES=("amd64" "i386" "armhf" "arm64v8" "riscv64")
 
           # Function to create and push manifests
           create_and_push_manifest() {
