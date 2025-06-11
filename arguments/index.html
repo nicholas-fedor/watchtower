@@ -2167,6 +2167,10 @@ Environment Variable: WATCHTOWER_NO_RESTART
                 Type: Boolean
              Default: false
 </code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Combining <code>--no-restart</code> with <code>--cleanup</code> during Watchtower self-update may leave a renamed Watchtower container running without starting a new one, preventing cleanup of the old image. Use cautiously for self-updating Watchtower instances, and consider external lifecycle management (e.g., Docker Compose) to restart containers manually.</p>
+</div>
 <h3 id="rolling_restart">Rolling Restart<a class="headerlink" href="#rolling_restart" title="Permanent link">&para;</a></h3>
 <p>Restarts containers one at a time to minimize downtime, ideal for zero-downtime deployments with lifecycle hooks.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --rolling-restart
@@ -2174,6 +2178,10 @@ Environment Variable: WATCHTOWER_ROLLING_RESTART
                 Type: Boolean
              Default: false
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When combined with <code>--cleanup</code>, image cleanup is deferred until all containers are updated, which may temporarily increase disk usage for large numbers of containers (&gt;50). This is typically negligible for homelab setups but monitor disk space on resource-constrained hosts.</p>
+</div>
 <h3 id="cleanup_old_images">Cleanup Old Images<a class="headerlink" href="#cleanup_old_images" title="Permanent link">&para;</a></h3>
 <p>Removes old images after updating containers to free disk space.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --cleanup
@@ -2181,6 +2189,10 @@ Environment Variable: WATCHTOWER_CLEANUP
                 Type: Boolean
              Default: false
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>During Watchtower self-updates, cleanup is deferred to the new container to prevent premature image deletion. Ensure <code>--no-restart</code> is not used with <code>--cleanup</code> to avoid incomplete updates.</p>
+</div>
 <h3 id="remove_anonymous_volumes">Remove Anonymous Volumes<a class="headerlink" href="#remove_anonymous_volumes" title="Permanent link">&para;</a></h3>
 <p>Deletes anonymous volumes when updating containers. Named volumes remain unaffected.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --remove-volumes
@@ -2237,7 +2249,7 @@ Environment Variable: WATCHTOWER_SCOPE
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Set to <code>none</code> to ignore scoped containers. Without this flag, Watchtower monitors all containers regardless of scope. See <a href="https://nicholas-fedor.github.io/watchtower/running-multiple-instances">Running Multiple Instances</a>.</p>
+<p>Set to <code>none</code> to ignore scoped containers. Without this flag, Watchtower monitors all containers regardless of scope. For self-updates, ensure all Watchtower containers share the same <code>com.centurylinklabs.watchtower.scope</code> label to guarantee cleanup of renamed containers and old images. Mismatched labels may prevent detection, leaving resources running. See <a href="https://nicholas-fedor.github.io/watchtower/running-multiple-instances">Running Multiple Instances</a>.</p>
 </div>
 <h3 id="label_precedence">Label Precedence<a class="headerlink" href="#label_precedence" title="Permanent link">&para;</a></h3>
 <p>Allows container labels (e.g., <code>com.centurylinklabs.watchtower.monitor-only</code>, <code>com.centurylinklabs.watchtower.no-pull</code>) to override corresponding flags.</p>
