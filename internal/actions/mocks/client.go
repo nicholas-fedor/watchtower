@@ -77,6 +77,12 @@ func (client MockClient) RenameContainer(_ types.Container, _ string) error {
 	return nil
 }
 
+// RemoveContainer simulates removing a container, always succeeding with no action.
+// It returns nil to indicate success without modifying any state.
+func (client MockClient) RemoveContainer(_ types.Container, _ bool, _ bool) error {
+	return nil
+}
+
 // RemoveImageByID increments the count of image removal attempts in TestData.
 // It simulates image cleanup and always returns nil to indicate success.
 func (client MockClient) RemoveImageByID(_ types.ImageID) error {
@@ -91,10 +97,10 @@ func (client MockClient) GetContainer(_ types.ContainerID) (types.Container, err
 	return client.TestData.Containers[0], nil
 }
 
-// GetVersion returns the Docker host API client version.
-// It provides a mock response for testing the function.
+// GetVersion returns a mock Docker API client version.
+// It provides a static version string for testing purposes.
 func (client MockClient) GetVersion() string {
-	return client.GetVersion()
+	return "1.50"
 }
 
 // errCommandFailed is a static error indicating a command exited with a non-zero code.
