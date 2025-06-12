@@ -22,8 +22,8 @@ const DockerAPIMinVersion string = "1.24"
 // defaultPollIntervalSeconds sets the default polling interval (24 hours).
 const defaultPollIntervalSeconds = 86400 // 24 * 60 * 60 seconds
 
-// defaultStopTimeoutSeconds sets the default container stop timeout (10 seconds).
-const defaultStopTimeoutSeconds = 10
+// defaultStopTimeoutSeconds sets the default container stop timeout (30 seconds).
+const defaultStopTimeoutSeconds = 30
 
 // defaultEmailServerPort sets the default SMTP port (25).
 const defaultEmailServerPort = 25

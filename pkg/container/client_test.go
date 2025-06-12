@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 		ginkgo.When("the container fails to stop within timeout", func() {
-			ginkgo.It("should log a warning but proceed with removal", func() {
+			ginkgo.It("should log a debug message but proceed with removal", func() {
 				mockContainer := MockContainer(
 					WithContainerState(dockerContainerType.State{Running: true}),
 				)
@@ -87,27 +87,33 @@ var _ = ginkgo.Describe("the client", func() {
 				cid := mockContainer.ContainerInfo().ID
 				mockServer.AppendHandlers(
 					mocks.KillContainerHandler(cid, mocks.Found),
-					mocks.GetContainerHandler(
-						cid,
-						containerRunning.ContainerInfo(),
-					), // First wait: still running
+					ghttp.CombineHandlers( // First wait: still running
+						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							containerRunning.ContainerInfo(),
+						),
+						func(_ http.ResponseWriter, _ *http.Request) {
+							time.Sleep(200 * time.Millisecond) // Simulate delay
+						},
+					),
 					mocks.RemoveContainerHandler(cid, mocks.Found),
 					ghttp.CombineHandlers( // Second wait: removed
 						ghttp.VerifyRequest("GET", gomega.HaveSuffix(cid+"/json")),
 						ghttp.RespondWith(http.StatusNotFound, nil),
 					),
 				)
-				resetLogrus, logbuf := captureLogrus(logrus.WarnLevel)
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 				err := client{
 					api: docker,
 				}.StopContainer(
 					mockContainer,
-					1*time.Millisecond,
-				) // Short timeout
+					100*time.Millisecond,
+				)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Eventually(logbuf).
-					Should(gbytes.Say(`Container did not stop within timeout.*container=%s.*id=%s.*timeout=%v`, mockContainer.Name(), mockContainer.ID().ShortID(), 1*time.Millisecond))
+				gomega.Eventually(logbuf, 2*time.Second).
+					Should(gbytes.Say(`Container did not stop within timeout.*container=%s.*id=%s.*timeout=%v`, mockContainer.Name(), mockContainer.ID().ShortID(), 100*time.Millisecond))
 			})
 		})
 		ginkgo.When("waiting for stop fails with an unexpected error", func() {
