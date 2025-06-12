@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("the client", func() {
 							http.StatusOK,
 							containerRunning.ContainerInfo(),
 						),
-						func(w http.ResponseWriter, r *http.Request) {
+						func(_ http.ResponseWriter, _ *http.Request) {
 							time.Sleep(200 * time.Millisecond) // Simulate delay
 						},
 					),
