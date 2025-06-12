@@ -232,7 +232,7 @@ func stopAndRemoveContainer(
 	}
 
 	if !stopped {
-		clog.WithField("timeout", timeout).Warn("Container did not stop within timeout")
+		clog.WithField("timeout", timeout).Debug("Container did not stop within timeout")
 	}
 
 	// Skip removal if AutoRemove is enabled and container stopped.
