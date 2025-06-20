@@ -1,6 +1,8 @@
 // Package util provides utility functions for Watchtower operations.
 package util
 
+import "slices"
+
 // SliceEqual checks if two string slices are identical.
 //
 // Parameters:
@@ -23,27 +25,19 @@ func SliceEqual(slice1, slice2 []string) bool {
 	return true
 }
 
-// SliceEqual checks if two string slices are identical.
+// SliceSubtract returns elements in the first slice that are not in the second slice.
 //
 // Parameters:
-//   - slice1: First slice.
-//   - slice2: Second slice.
+//   - slice: Source slice.
+//   - subtractFrom: Slice containing elements to exclude.
 //
 // Returns:
-//   - bool: True if equal, false otherwise.
+//   - []string: Slice containing elements unique to the source slice.
 func SliceSubtract(slice, subtractFrom []string) []string {
 	result := []string{}
 
 	for _, element1 := range slice {
-		found := false
-
-		for _, element2 := range subtractFrom {
-			if element1 == element2 {
-				found = true
-
-				break
-			}
-		}
+		found := slices.Contains(subtractFrom, element1)
 
 		if !found {
 			result = append(result, element1)
