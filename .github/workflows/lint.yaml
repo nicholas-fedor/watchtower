@@ -28,7 +28,7 @@ jobs:
         run: go mod download
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@dee96aca053461fddba9559fc8e2152f068ccdf5
+        uses: golangci/golangci-lint-action@8861dcf4f1514cc06341214d9cd34fd312346345
         with:
           args: --timeout=5m
 
