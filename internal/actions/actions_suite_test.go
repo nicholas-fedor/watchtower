@@ -18,6 +18,7 @@ func TestActions(t *testing.T) {
 	t.Parallel()
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	logrus.SetOutput(ginkgo.GinkgoWriter)
+	logrus.SetLevel(logrus.DebugLevel) // Enable debug logging for tests.
 	ginkgo.RunSpecs(t, "Actions Suite")
 }
 

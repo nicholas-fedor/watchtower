@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
@@ -34,12 +35,15 @@ var (
 	errStopContainerFailed = errors.New("failed to stop container")
 	// errStartContainerFailed indicates a failure to start a container after an update.
 	errStartContainerFailed = errors.New("failed to start container")
+	// errParseImageReference indicates a failure to parse a container’s image reference.
+	errParseImageReference = errors.New("failed to parse image reference")
 )
 
 // Update scans and updates containers based on parameters.
 //
 // It checks container staleness, sorts by dependencies, and updates or restarts containers as needed,
 // collecting image IDs for cleanup. Non-stale linked containers are restarted but not marked as updated.
+// Containers with pinned images (referenced by digest) are skipped to preserve immutability.
 //
 // Parameters:
 //   - client: Container client for interacting with Docker API.
@@ -73,19 +77,47 @@ func Update(
 		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
-	logrus.WithField("count", len(containers)).Debug("Retrieved containers for update check")
+	// Log container details for debugging.
+	containerNames := make([]string, len(containers))
+	for i, c := range containers {
+		containerNames[i] = fmt.Sprintf("%s (%s)", c.Name(), c.ImageName())
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"count":      len(containers),
+		"containers": containerNames,
+		"filter":     fmt.Sprintf("%T", params.Filter),
+	}).Debug("Retrieved containers for update check")
 
 	staleCheckFailed := 0
 
 	// Check each container for staleness and prepare for updates.
 	for i, sourceContainer := range containers {
-		stale, newestImage, err := client.IsContainerStale(sourceContainer, params)
-		shouldUpdate := stale && !params.NoRestart && !sourceContainer.IsMonitorOnly(params)
-
 		fields := logrus.Fields{
 			"container": sourceContainer.Name(),
 			"image":     sourceContainer.ImageName(),
 		}
+		clog := logrus.WithFields(fields)
+
+		// Check if the image is pinned by digest.
+		isPinned, err := isPinned(sourceContainer, progress)
+		if err != nil {
+			clog.WithError(err).Debug("Failed to check pinned image, skipping container")
+			progress.AddSkipped(sourceContainer, fmt.Errorf("%w: %w", errParseImageReference, err))
+
+			staleCheckFailed++
+
+			continue
+		}
+
+		if isPinned {
+			clog.Debug("Skipping staleness check for pinned image")
+
+			continue
+		}
+
+		stale, newestImage, err := client.IsContainerStale(sourceContainer, params)
+		shouldUpdate := stale && !params.NoRestart && !sourceContainer.IsMonitorOnly(params)
 
 		// Verify configuration for containers that will be updated.
 		if err == nil && shouldUpdate {
@@ -102,16 +134,14 @@ func Update(
 
 		// Handle staleness check results, logging skips or adding to report.
 		if err != nil {
-			logrus.WithFields(fields).
-				WithError(err).
-				Debug("Cannot update container, skipping")
+			clog.WithError(err).Debug("Cannot update container, skipping")
 
 			stale = false
 			staleCheckFailed++
 
 			progress.AddSkipped(sourceContainer, err)
 		} else {
-			logrus.WithFields(fields).WithFields(logrus.Fields{
+			clog.WithFields(logrus.Fields{
 				"stale":        stale,
 				"newest_image": newestImage,
 			}).Debug("Checked container staleness")
@@ -162,6 +192,12 @@ func Update(
 		Debug("Prepared containers for restart")
 
 	// Perform updates and restarts based on the rolling restart setting.
+	var failedStop map[types.ContainerID]error
+
+	var stoppedImages map[types.ImageID]bool
+
+	var failedStart map[types.ContainerID]error
+
 	if params.RollingRestart {
 		progress.UpdateFailed(
 			performRollingRestart(containersToUpdate, client, params, cleanupImageIDs),
@@ -170,10 +206,10 @@ func Update(
 			performRollingRestart(containersToRestart, client, params, cleanupImageIDs),
 		)
 	} else {
-		failedStop, stoppedImages := stopContainersInReversedOrder(containersToUpdate, client, params)
+		failedStop, stoppedImages = stopContainersInReversedOrder(containersToUpdate, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart := restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, cleanupImageIDs)
+		failedStart = restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, cleanupImageIDs)
 		progress.UpdateFailed(failedStart)
 
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToRestart, client, params)
@@ -190,6 +226,94 @@ func Update(
 	}
 
 	return progress.Report(), cleanupImageIDs, nil
+}
+
+// isPinned checks if a container’s image is pinned by a digest reference.
+//
+// It parses the image reference, handling invalid ImageName() outputs and falling back to Config.Image
+// or a default name based on the container name. If the image is pinned (digest-based), it updates
+// the progress report and returns true.
+//
+// Parameters:
+//   - container: The container to check for a pinned image.
+//   - progress: The progress tracker to update for scanned or skipped containers.
+//
+// Returns:
+//   - bool: True if the image is pinned by digest, false otherwise.
+//   - error: Non-nil if no valid image reference can be parsed, nil on success.
+func isPinned(container types.Container, progress *session.Progress) (bool, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+	clog := logrus.WithFields(fields)
+
+	imageName := container.ImageName()
+	configImage := container.ContainerInfo().Config.Image
+
+	var fallbackImage string
+	// Try to derive a fallback from imageInfo.ID or container name.
+	if container.HasImageInfo() {
+		fallbackImage = container.ImageInfo().ID
+		// Sanitize imageInfo.ID, removing sha256: prefix and ensuring a tag.
+		fallbackImage = strings.TrimPrefix(fallbackImage, "sha256:")
+		if !strings.Contains(fallbackImage, ":") {
+			fallbackImage = container.Name() + ":latest"
+		}
+	} else {
+		fallbackImage = container.Name() + ":latest"
+	}
+
+	if strings.HasPrefix(imageName, ":") || imageName == ":latest" || imageName == "" {
+		clog.WithField("invalid_image", imageName).
+			Debug("Invalid ImageName detected, trying Config.Image")
+
+		if configImage != "" {
+			imageName = configImage
+		} else {
+			clog.WithField("config_image", configImage).Debug("Config.Image is empty, using fallback image")
+
+			imageName = fallbackImage
+		}
+	}
+
+	normalizedRef, err := reference.ParseDockerRef(imageName)
+	if err != nil {
+		clog.WithError(err).
+			WithField("image_name", imageName).
+			Debug("Failed to parse image reference, trying fallback")
+
+		if imageName != fallbackImage {
+			imageName = fallbackImage
+			normalizedRef, err = reference.ParseDockerRef(imageName)
+			if err != nil {
+				clog.WithError(err).
+					WithField("image_name", imageName).
+					Debug("Failed to parse fallback image reference")
+
+				return false, fmt.Errorf("failed to parse image reference %s: %w", imageName, err)
+			}
+		} else {
+			clog.WithError(err).WithField("image_name", imageName).Debug("No valid fallback available")
+
+			return false, fmt.Errorf("failed to parse image reference %s: %w", imageName, err)
+		}
+	}
+
+	_, isDigested := normalizedRef.(reference.Digested)
+	clog.WithFields(logrus.Fields{
+		"image_name":     imageName,
+		"config_image":   configImage,
+		"fallback_image": fallbackImage,
+		"ref_type":       fmt.Sprintf("%T", normalizedRef),
+		"is_digested":    isDigested,
+	}).Debug("Parsed image reference")
+
+	if isDigested {
+		progress.AddScanned(container, container.SafeImageID())
+	}
+
+	return isDigested, nil
 }
 
 // performRollingRestart updates containers with rolling restarts.
@@ -278,15 +402,17 @@ func stopContainersInReversedOrder(
 	// Stop containers in reverse order to avoid breaking dependencies.
 	for i := len(containers) - 1; i >= 0; i-- {
 		c := containers[i]
+		fields := logrus.Fields{
+			"container": c.Name(),
+			"image":     c.ImageName(),
+		}
+
 		if err := stopStaleContainer(c, client, params); err != nil {
 			failed[c.ID()] = err
 		} else {
 			stopped[c.SafeImageID()] = true
 
-			logrus.WithFields(logrus.Fields{
-				"container": c.Name(),
-				"image":     c.ImageName(),
-			}).Debug("Stopped container")
+			logrus.WithFields(fields).Debug("Stopped container")
 		}
 	}
 
@@ -389,7 +515,7 @@ func restartContainersInSortedOrder(
 	// Track renamed containers to skip cleanup.
 	renamedContainers := make(map[types.ContainerID]bool)
 
-	// Restart containers in sorted order to respect dependencies.
+	// Restart containers in sorted order to respect dependency chains.
 	for _, c := range containers {
 		if !c.ToRestart() {
 			continue
@@ -449,7 +575,7 @@ func restartStaleContainer(
 	}
 
 	renamed := false
-	// Rename Watchtower container only if restarts are enabled.
+	// Rename Watchtower containers only if restarts are enabled.
 	if container.IsWatchtower() && !params.NoRestart {
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {

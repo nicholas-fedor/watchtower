@@ -24,6 +24,7 @@ type TestData struct {
 	TriedToRemoveImageCount int               // Number of times RemoveImageByID was called.
 	RenameContainerCount    int               // Number of times RenameContainer was called.
 	StopContainerCount      int               // Number of times StopContainer was called.
+	IsContainerStaleCount   int               // Number of times IsContainerStale was called.
 	NameOfContainerToKeep   string            // Name of the container to avoid stopping.
 	Containers              []types.Container // List of mock containers.
 	Staleness               map[string]bool   // Map of container names to staleness status.
@@ -130,6 +131,7 @@ func (client MockClient) IsContainerStale(
 	cont types.Container,
 	_ types.UpdateParams,
 ) (bool, types.ImageID, error) {
+	client.TestData.IsContainerStaleCount++
 	stale, found := client.TestData.Staleness[cont.Name()]
 	if !found {
 		stale = true // Default to stale if not specified.
