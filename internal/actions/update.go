@@ -57,51 +57,59 @@ func Update(
 	client container.Client,
 	params types.UpdateParams,
 ) (types.Report, map[types.ImageID]bool, error) {
+	// Initialize logging for the update process start.
 	logrus.Debug("Starting container update check")
 
+	// Create a progress tracker for reporting scanned, updated, and skipped containers.
 	progress := &session.Progress{}
+	// Track the number of stale containers for logging.
 	staleCount := 0
+	// Initialize a map to collect image IDs for cleanup after updates.
 	cleanupImageIDs := make(map[types.ImageID]bool)
 
-	// Execute pre-check lifecycle hooks if enabled to validate the environment.
+	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if params.LifecycleHooks {
 		logrus.Debug("Executing pre-check lifecycle hooks")
 		lifecycle.ExecutePreChecks(client, params)
 	}
 
-	// Retrieve the list of containers matching the filter.
+	// Fetch the list of containers based on the provided filter (e.g., all, specific names).
 	containers, err := client.ListContainers(params.Filter)
 	if err != nil {
+		// Log and return an error if container listing fails.
 		logrus.WithError(err).Debug("Failed to list containers")
 
 		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
-	// Log container details for debugging.
+	// Prepare a list of container names and images for detailed debugging output.
 	containerNames := make([]string, len(containers))
 	for i, c := range containers {
 		containerNames[i] = fmt.Sprintf("%s (%s)", c.Name(), c.ImageName())
 	}
-
+	// Log the retrieved containers and filter details.
 	logrus.WithFields(logrus.Fields{
 		"count":      len(containers),
 		"containers": containerNames,
 		"filter":     fmt.Sprintf("%T", params.Filter),
 	}).Debug("Retrieved containers for update check")
 
+	// Track containers that fail staleness checks for reporting.
 	staleCheckFailed := 0
 
-	// Check each container for staleness and prepare for updates.
+	// Iterate through containers to check staleness and prepare for updates or restarts.
 	for i, sourceContainer := range containers {
+		// Set up logging fields for the current container.
 		fields := logrus.Fields{
 			"container": sourceContainer.Name(),
 			"image":     sourceContainer.ImageName(),
 		}
 		clog := logrus.WithFields(fields)
 
-		// Check if the image is pinned by digest.
+		// Check if the container uses a pinned (digest-based) image to skip updates.
 		isPinned, err := isPinned(sourceContainer, progress)
 		if err != nil {
+			// Log and skip containers with unparsable image references, marking as skipped.
 			clog.WithError(err).Debug("Failed to check pinned image, skipping container")
 			progress.AddSkipped(sourceContainer, fmt.Errorf("%w: %w", errParseImageReference, err))
 
@@ -111,18 +119,23 @@ func Update(
 		}
 
 		if isPinned {
+			// Skip staleness checks for pinned images and mark as scanned.
 			clog.Debug("Skipping staleness check for pinned image")
+			progress.AddScanned(sourceContainer, sourceContainer.SafeImageID())
 
 			continue
 		}
 
+		// Check if the container’s image is stale (outdated) and get the newest image ID.
 		stale, newestImage, err := client.IsContainerStale(sourceContainer, params)
+		// Determine if the container should be updated based on staleness and params.
 		shouldUpdate := stale && !params.NoRestart && !sourceContainer.IsMonitorOnly(params)
 
-		// Verify configuration for containers that will be updated.
+		// Verify the container’s configuration if it’s slated for update to ensure recreation is possible.
 		if err == nil && shouldUpdate {
 			err = sourceContainer.VerifyConfiguration()
 			if err != nil {
+				// Log configuration verification failure with detailed context.
 				logrus.WithError(err).WithFields(logrus.Fields{
 					"container_name": sourceContainer.Name(),
 					"container_id":   sourceContainer.ID().ShortID(),
@@ -132,8 +145,9 @@ func Update(
 			}
 		}
 
-		// Handle staleness check results, logging skips or adding to report.
+		// Handle staleness check results, logging skips or adding to the progress report.
 		if err != nil {
+			// Skip containers with staleness check errors, marking them as skipped.
 			clog.WithError(err).Debug("Cannot update container, skipping")
 
 			stale = false
@@ -141,6 +155,7 @@ func Update(
 
 			progress.AddSkipped(sourceContainer, err)
 		} else {
+			// Log successful staleness check and add to scanned containers.
 			clog.WithFields(logrus.Fields{
 				"stale":        stale,
 				"newest_image": newestImage,
@@ -148,50 +163,57 @@ func Update(
 			progress.AddScanned(sourceContainer, newestImage)
 		}
 
+		// Update the container’s stale status for dependency sorting.
 		containers[i].SetStale(stale)
 
+		// Increment stale count for logging summary.
 		if stale {
 			staleCount++
 		}
 	}
 
+	// Log the summary of staleness checks, including total, stale, and failed counts.
 	logrus.WithFields(logrus.Fields{
 		"total":  len(containers),
 		"stale":  staleCount,
 		"failed": staleCheckFailed,
 	}).Debug("Completed container staleness check")
 
-	// Sort containers to respect dependency order for updates and restarts.
+	// Sort containers by dependencies to ensure correct update and restart order.
 	containers, err = sorter.SortByDependencies(containers)
 	if err != nil {
+		// Log and return an error if dependency sorting fails.
 		logrus.WithError(err).Debug("Failed to sort containers by dependencies")
 
 		return nil, nil, fmt.Errorf("%w: %w", errSortDependenciesFailed, err)
 	}
 
-	// Mark containers linked to restarting ones for restart, not update.
+	// Mark containers linked to restarting ones for restart without updating.
 	UpdateImplicitRestart(containers)
 
-	// Split containers into those to update (stale) and those to restart (linked).
+	// Separate containers into those to update (stale) and those to restart (linked).
 	var containersToUpdate []types.Container
 
 	var containersToRestart []types.Container
 
 	for _, c := range containers {
 		if c.IsStale() && !c.IsMonitorOnly(params) {
+			// Add stale containers to the update list and mark for update in progress.
 			containersToUpdate = append(containersToUpdate, c)
 			progress.MarkForUpdate(c.ID())
 		} else if c.ToRestart() && !c.IsMonitorOnly(params) {
+			// Add linked containers to the restart list.
 			containersToRestart = append(containersToRestart, c)
 		}
 	}
 
+	// Log the number of containers prepared for update and restart.
 	logrus.WithField("update_count", len(containersToUpdate)).
 		Debug("Prepared containers for update")
 	logrus.WithField("restart_count", len(containersToRestart)).
 		Debug("Prepared containers for restart")
 
-	// Perform updates and restarts based on the rolling restart setting.
+	// Perform updates and restarts, either with rolling restarts or in batches.
 	var failedStop map[types.ContainerID]error
 
 	var stoppedImages map[types.ImageID]bool
@@ -199,6 +221,7 @@ func Update(
 	var failedStart map[types.ContainerID]error
 
 	if params.RollingRestart {
+		// Apply rolling restarts for updates and linked containers sequentially.
 		progress.UpdateFailed(
 			performRollingRestart(containersToUpdate, client, params, cleanupImageIDs),
 		)
@@ -206,6 +229,7 @@ func Update(
 			performRollingRestart(containersToRestart, client, params, cleanupImageIDs),
 		)
 	} else {
+		// Stop and restart containers in batches, respecting dependency order.
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToUpdate, client, params)
 		progress.UpdateFailed(failedStop)
 
@@ -219,20 +243,75 @@ func Update(
 		progress.UpdateFailed(failedStart)
 	}
 
-	// Execute post-check lifecycle hooks if enabled to finalize the update process.
+	// Run post-check lifecycle hooks if enabled to finalize the update process.
 	if params.LifecycleHooks {
 		logrus.Debug("Executing post-check lifecycle hooks")
 		lifecycle.ExecutePostChecks(client, params)
 	}
 
+	// Return the final report summarizing the session and the cleanup image IDs.
 	return progress.Report(), cleanupImageIDs, nil
+}
+
+// isInvalidImageName checks if an image name is invalid.
+// Returns true if the name is empty, ":latest", or starts with ":".
+func isInvalidImageName(name string) bool {
+	return name == "" || name == ":latest" || strings.HasPrefix(name, ":")
+}
+
+// getFallbackImage derives a fallback image name from container info.
+// Uses imageInfo.ID (sanitized) if available, otherwise uses container name with ":latest".
+func getFallbackImage(container types.Container) string {
+	if container.HasImageInfo() {
+		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
+		if !strings.Contains(fallback, ":") {
+			return container.Name() + ":latest"
+		}
+
+		return fallback
+	}
+
+	return container.Name() + ":latest"
+}
+
+// parseReference parses a Docker image reference with logging.
+// Logs the parsing result or error, including image details and reference type.
+func parseReference(
+	imageName, configImage, fallbackImage string,
+	container types.Container,
+) (reference.Reference, error) {
+	// Set up logging with container and image details.
+	clog := logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"image":     imageName,
+	})
+
+	// Parse the image reference using the Docker reference library.
+	normalizedRef, err := reference.ParseDockerRef(imageName)
+	if err != nil {
+		clog.WithError(err).
+			WithField("image_name", imageName).
+			Debug("Failed to parse image reference")
+
+		return nil, fmt.Errorf("failed to parse image reference %s: %w", imageName, err)
+	}
+
+	// Log successful parsing with reference type and context.
+	clog.WithFields(logrus.Fields{
+		"image_name":     imageName,
+		"config_image":   configImage,
+		"fallback_image": fallbackImage,
+		"ref_type":       fmt.Sprintf("%T", normalizedRef),
+	}).Debug("Parsed image reference")
+
+	return normalizedRef, nil
 }
 
 // isPinned checks if a container’s image is pinned by a digest reference.
 //
-// It parses the image reference, handling invalid ImageName() outputs and falling back to Config.Image
-// or a default name based on the container name. If the image is pinned (digest-based), it updates
-// the progress report and returns true.
+// It selects a valid image name from ImageName(), Config.Image, or a fallback (imageInfo.ID or container name),
+// parsing it to detect digest-based references (e.g., @sha256:...). If pinned, it marks the container as scanned
+// in the progress report to skip updates, preserving immutability.
 //
 // Parameters:
 //   - container: The container to check for a pinned image.
@@ -242,74 +321,48 @@ func Update(
 //   - bool: True if the image is pinned by digest, false otherwise.
 //   - error: Non-nil if no valid image reference can be parsed, nil on success.
 func isPinned(container types.Container, progress *session.Progress) (bool, error) {
-	fields := logrus.Fields{
+	// Set up logging with container and image details for debugging.
+	clog := logrus.WithFields(logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
-	}
-	clog := logrus.WithFields(fields)
+	})
 
+	// Get initial image name and configuration.
 	imageName := container.ImageName()
 	configImage := container.ContainerInfo().Config.Image
+	fallbackImage := getFallbackImage(container)
 
-	var fallbackImage string
-	// Try to derive a fallback from imageInfo.ID or container name.
-	if container.HasImageInfo() {
-		fallbackImage = container.ImageInfo().ID
-		// Sanitize imageInfo.ID, removing sha256: prefix and ensuring a tag.
-		fallbackImage = strings.TrimPrefix(fallbackImage, "sha256:")
-		if !strings.Contains(fallbackImage, ":") {
-			fallbackImage = container.Name() + ":latest"
-		}
-	} else {
-		fallbackImage = container.Name() + ":latest"
-	}
-
-	if strings.HasPrefix(imageName, ":") || imageName == ":latest" || imageName == "" {
-		clog.WithField("invalid_image", imageName).
-			Debug("Invalid ImageName detected, trying Config.Image")
+	// Check if ImageName is invalid and fall back to Config.Image or a derived name.
+	if isInvalidImageName(imageName) {
+		clog.WithField("invalid_image", imageName).Debug("Invalid ImageName detected")
 
 		if configImage != "" {
 			imageName = configImage
+			clog.WithField("config_image", configImage).Debug("Using Config.Image as fallback")
 		} else {
-			clog.WithField("config_image", configImage).Debug("Config.Image is empty, using fallback image")
-
 			imageName = fallbackImage
+			clog.WithField("fallback_image", fallbackImage).Debug("Using derived fallback image")
 		}
 	}
 
-	normalizedRef, err := reference.ParseDockerRef(imageName)
+	// Parse the selected image name to check for a digest-based reference.
+	normalizedRef, err := parseReference(imageName, configImage, fallbackImage, container)
+	if err != nil && imageName != fallbackImage {
+		// Retry parsing with the fallback image if the initial attempt failed.
+		clog.Debug("Retrying with fallback image")
+
+		normalizedRef, err = parseReference(fallbackImage, configImage, fallbackImage, container)
+	}
+
 	if err != nil {
-		clog.WithError(err).
-			WithField("image_name", imageName).
-			Debug("Failed to parse image reference, trying fallback")
-
-		if imageName != fallbackImage {
-			imageName = fallbackImage
-			normalizedRef, err = reference.ParseDockerRef(imageName)
-			if err != nil {
-				clog.WithError(err).
-					WithField("image_name", imageName).
-					Debug("Failed to parse fallback image reference")
-
-				return false, fmt.Errorf("failed to parse image reference %s: %w", imageName, err)
-			}
-		} else {
-			clog.WithError(err).WithField("image_name", imageName).Debug("No valid fallback available")
-
-			return false, fmt.Errorf("failed to parse image reference %s: %w", imageName, err)
-		}
+		return false, err
 	}
 
+	// Check if the parsed reference is digest-based (pinned).
 	_, isDigested := normalizedRef.(reference.Digested)
-	clog.WithFields(logrus.Fields{
-		"image_name":     imageName,
-		"config_image":   configImage,
-		"fallback_image": fallbackImage,
-		"ref_type":       fmt.Sprintf("%T", normalizedRef),
-		"is_digested":    isDigested,
-	}).Debug("Parsed image reference")
-
 	if isDigested {
+		// Mark the container as scanned to skip updates for pinned images.
+		clog.WithField("is_digested", isDigested).Debug("Pinned image detected, marking as scanned")
 		progress.AddScanned(container, container.SafeImageID())
 	}
 
