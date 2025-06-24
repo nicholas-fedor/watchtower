@@ -92,6 +92,8 @@ github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/nicholas-fedor/shoutrrr v0.8.14 h1:G7KKCtajHbeZf0AeXPtwbY9+3lKpXL19cFqwFcfaiWY=
 github.com/nicholas-fedor/shoutrrr v0.8.14/go.mod h1:n0h/l4L6OrcE9mDtH4CGlC6ZjJEEsrK6r4mrWO+aX9Y=
+github.com/nicholas-fedor/shoutrrr v0.8.15 h1:kPFBGcuen8/FlcDqSZAMUi1ITbjXRW/vYThp5Pmpsi0=
+github.com/nicholas-fedor/shoutrrr v0.8.15/go.mod h1:iCO6mfrMBrNMyMludLmj4EIgr+tx4tmwcZ5Hxjx1jwI=
 github.com/onsi/ginkgo/v2 v2.23.4 h1:ktYTpKJAVZnDT4VjxSbiBenUjmlL/5QkBEocaWXiQus=
 github.com/onsi/ginkgo/v2 v2.23.4/go.mod h1:Bt66ApGPBFzHyR+JO10Zbt0Gsp4uWxu5mIOTusL46e8=
 github.com/onsi/gomega v1.37.0 h1:CdEG8g0S133B4OswTDC/5XPSzE1OeP29QOioj2PID2Y=
