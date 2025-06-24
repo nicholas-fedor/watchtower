@@ -1,6 +1,8 @@
 package container
 
 import (
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
@@ -27,6 +29,9 @@ func MockContainer(updates ...MockContainerUpdate) *Container {
 		},
 		Config: &dockerContainerType.Config{
 			Labels: map[string]string{},
+		},
+		NetworkSettings: &dockerContainerType.NetworkSettings{
+			Networks: map[string]*dockerNetworkType.EndpointSettings{},
 		},
 	}
 	image := dockerImageType.InspectResponse{
@@ -118,5 +123,28 @@ func WithNetworkSettings(
 func WithMounts(mounts []dockerMountType.Mount) MockContainerUpdate {
 	return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
 		c.HostConfig.Mounts = mounts
+	}
+}
+
+func WithNetworks(networkNames ...string) MockContainerUpdate {
+	return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+		if c.NetworkSettings == nil {
+			c.NetworkSettings = &dockerContainerType.NetworkSettings{}
+		}
+
+		if c.NetworkSettings.Networks == nil {
+			c.NetworkSettings.Networks = make(map[string]*dockerNetworkType.EndpointSettings)
+		}
+
+		for _, name := range networkNames {
+			c.NetworkSettings.Networks[name] = &dockerNetworkType.EndpointSettings{
+				NetworkID: fmt.Sprintf("network_%s_id", name),
+				Aliases:   []string{c.Name},
+			}
+			logrus.WithFields(logrus.Fields{
+				"container": c.Name,
+				"network":   name,
+			}).Debug("MockContainer added network")
+		}
 	}
 }
