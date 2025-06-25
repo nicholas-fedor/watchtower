@@ -4,6 +4,7 @@
 package container
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -12,10 +13,43 @@ import (
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerNetworkType "github.com/docker/docker/api/types/network"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// Operations defines the minimal interface for container operations in Watchtower.
+type Operations interface {
+	ContainerCreate(
+		ctx context.Context,
+		config *dockerContainerType.Config,
+		hostConfig *dockerContainerType.HostConfig,
+		networkingConfig *dockerNetworkType.NetworkingConfig,
+		platform *ocispec.Platform,
+		containerName string,
+	) (dockerContainerType.CreateResponse, error)
+	ContainerStart(
+		ctx context.Context,
+		containerID string,
+		options dockerContainerType.StartOptions,
+	) error
+	ContainerRemove(
+		ctx context.Context,
+		containerID string,
+		options dockerContainerType.RemoveOptions,
+	) error
+	NetworkConnect(
+		ctx context.Context,
+		networkID, containerID string,
+		config *dockerNetworkType.EndpointSettings,
+	) error
+	ContainerRename(
+		ctx context.Context,
+		containerID, newContainerName string,
+	) error
+}
 
 // Constants for container operations.
 const (

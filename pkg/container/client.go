@@ -235,7 +235,7 @@ func (c client) StopContainer(container types.Container, timeout time.Duration) 
 	return nil
 }
 
-// StartContainer creates and starts a new container from an existing one’s config.
+// StartContainer creates and starts a new container based on an existing container's configuration.
 //
 // Parameters:
 //   - container: Source container to replicate.
