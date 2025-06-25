@@ -9,12 +9,11 @@ import (
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
-	dockerClient "github.com/docker/docker/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// StartTargetContainer creates and starts a new container using the source container’s configuration.
+// StartTargetContainer creates and starts a new container based on the source container’s configuration.
 //
 // It applies the provided network configuration and respects the reviveStopped option.
 // For legacy Docker API versions (< 1.44) with multiple networks, it creates the container with a single
@@ -22,19 +21,19 @@ import (
 // For modern API versions (>= 1.44) or single networks, it attaches all networks at creation.
 //
 // Parameters:
-//   - api: Docker API client.
-//   - sourceContainer: Container to replicate.
-//   - networkConfig: Network settings to apply.
-//   - reviveStopped: Whether to start stopped containers.
-//   - clientVersion: API version of the client.
-//   - minSupportedVersion: Minimum API version for full features.
-//   - disableMemorySwappiness: Whether to disable memory swappiness for Podman compatibility.
+//   - api: Interface for container operations (Operations).
+//   - sourceContainer: Source container to replicate.
+//   - networkConfig: Network configuration to apply to the new container.
+//   - reviveStopped: If true, starts the new container even if the source is stopped.
+//   - clientVersion: Docker API version used by the client.
+//   - minSupportedVersion: Minimum Docker API version required for full network features.
+//   - disableMemorySwappiness: If true, disables memory swappiness for Podman compatibility.
 //
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation or start fails, nil on success.
 func StartTargetContainer(
-	api dockerClient.APIClient,
+	api Operations,
 	sourceContainer types.Container,
 	networkConfig *dockerNetworkType.NetworkingConfig,
 	reviveStopped bool,
@@ -149,24 +148,24 @@ func StartTargetContainer(
 	return createdContainerID, nil
 }
 
-// attachNetworks connects a container to additional networks for legacy API versions.
+// attachNetworks connects a container to additional networks for legacy Docker API versions (< 1.44).
 //
 // It iterates through the provided network config, attaching all networks not included in the initial
 // creation config, ensuring compatibility with Docker API < 1.44 where multiple network endpoints may fail.
 //
 // Parameters:
-//   - ctx: Context for API operations.
-//   - api: Docker API client.
+//   - ctx: Context for container API operations.
+//   - api: Interface for container operations (Operations).
 //   - containerID: ID of the container to attach networks to.
 //   - networkConfig: Full network configuration with all desired endpoints.
-//   - initialNetworkConfig: Network config used during container creation.
-//   - clog: Logger with container context for consistent logging.
+//   - initialNetworkConfig: Network configuration used during container creation.
+//   - clog: Logger with container-specific context for logging.
 //
 // Returns:
 //   - error: Non-nil if attaching any network fails, nil on success.
 func attachNetworks(
 	ctx context.Context,
-	api dockerClient.APIClient,
+	api Operations,
 	containerID string,
 	networkConfig *dockerNetworkType.NetworkingConfig,
 	initialNetworkConfig *dockerNetworkType.NetworkingConfig,
@@ -200,17 +199,17 @@ func attachNetworks(
 	return nil
 }
 
-// RenameTargetContainer renames an existing container to the specified target name.
+// RenameTargetContainer renames an existing container to the specified target name in Watchtower.
 //
 // Parameters:
-//   - api: Docker API client.
-//   - targetContainer: Container to rename.
+//   - api: Interface for container operations (Operations).
+//   - targetContainer: Container to be renamed.
 //   - targetName: New name for the container.
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
 func RenameTargetContainer(
-	api dockerClient.APIClient,
+	api Operations,
 	targetContainer types.Container,
 	targetName string,
 ) error {

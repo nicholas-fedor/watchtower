@@ -2,6 +2,8 @@ package container
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
@@ -13,6 +15,7 @@ import (
 	dockerMountType "github.com/docker/docker/api/types/mount"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -1004,6 +1007,247 @@ var _ = ginkgo.Describe("Container", func() {
 			gomega.Expect(mount.VolumeOptions).ToNot(gomega.BeNil(), "VolumeOptions should be set")
 			gomega.Expect(mount.VolumeOptions.Subpath).
 				To(gomega.Equal("ha/nest"), "Subpath should be preserved")
+		})
+	})
+
+	// Container Creation and Startup tests the StartTargetContainer function, covering
+	// network configuration, memory swappiness, and error handling scenarios.
+	ginkgo.Describe("Container Creation and Startup", func() {
+		var (
+			logOutput               *bytes.Buffer
+			client                  *MockClient
+			container               *Container
+			networkConfig           *dockerNetworkType.NetworkingConfig
+			defaultMemorySwappiness int64 = 60
+		)
+
+		ginkgo.BeforeEach(func() {
+			logOutput = &bytes.Buffer{}
+			logrus.SetOutput(logOutput)
+			logrus.SetLevel(logrus.DebugLevel)
+
+			client = &MockClient{}
+			container = MockContainer(
+				WithNetworkMode("bridge"),
+				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					"bridge": {
+						NetworkID:  "network_bridge_id",
+						IPAddress:  "172.17.0.2",
+						MacAddress: "02:42:ac:11:00:02",
+						Aliases:    []string{"test-watchtower"},
+					},
+				}),
+				func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+					if c.HostConfig == nil {
+						c.HostConfig = &dockerContainerType.HostConfig{}
+					}
+					c.HostConfig.MemorySwappiness = &defaultMemorySwappiness
+				},
+			)
+			networkConfig = getNetworkConfig(container, "1.44")
+		})
+
+		ginkgo.It("disables memory swappiness when flag is true", func() {
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				true,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Disabled memory swappiness for Podman compatibility"))
+		})
+
+		ginkgo.It("logs MAC address details", func() {
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Found MAC address in config"))
+		})
+
+		ginkgo.It("uses full network config for API >= 1.44", func() {
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Using full network config for API version >= 1.44 or single network"))
+		})
+
+		ginkgo.It("handles ContainerCreate failure", func() {
+			createErr := errors.New("create failed")
+			client.createFunc = func(_ context.Context, _ *dockerContainerType.Config, _ *dockerContainerType.HostConfig, _ *dockerNetworkType.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainerType.CreateResponse, error) {
+				return dockerContainerType.CreateResponse{}, createErr
+			}
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(newID).To(gomega.BeEmpty())
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("create failed"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Failed to create new container"))
+		})
+
+		ginkgo.It("logs successful container creation", func() {
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Created container successfully"))
+		})
+
+		ginkgo.It("skips starting stopped container when reviveStopped is false", func() {
+			container = MockContainer(
+				WithNetworkMode("bridge"),
+				WithContainerState(dockerContainerType.State{Running: false, Status: "exited"}),
+			)
+			networkConfig = getNetworkConfig(container, "1.44")
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				false,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Created container, not starting due to stopped state"))
+		})
+
+		ginkgo.It("handles ContainerStart failure", func() {
+			startErr := errors.New("start failed")
+			client.startFunc = func(_ context.Context, _ string, _ dockerContainerType.StartOptions) error {
+				return startErr
+			}
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("start failed"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Failed to start new container"))
+		})
+
+		ginkgo.It("logs successful container start", func() {
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.44",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("Started new container"))
+		})
+
+		ginkgo.It("attaches multiple networks for legacy API and handles success", func() {
+			container = MockContainer(
+				WithNetworkMode("bridge"),
+				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+				WithNetworks("network1", "network2"),
+			)
+			networkConfig = getNetworkConfig(container, "1.23")
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.23",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Selected first network for container creation"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Attaching additional network to container"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Successfully attached additional network"))
+		})
+
+		ginkgo.It("attaches multiple networks for legacy API and handles failure", func() {
+			container = MockContainer(
+				WithNetworkMode("bridge"),
+				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+				WithNetworks("network1", "network2"),
+			)
+			networkConfig = getNetworkConfig(container, "1.23")
+			connectErr := errors.New("network connect failed")
+			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetworkType.EndpointSettings) error {
+				return connectErr
+			}
+			client.removeFunc = func(_ context.Context, _ string, _ dockerContainerType.RemoveOptions) error {
+				return nil
+			}
+			newID, err := StartTargetContainer(
+				client,
+				container,
+				networkConfig,
+				true,
+				"1.23",
+				flags.DockerAPIMinVersion,
+				false,
+			)
+			gomega.Expect(newID).To(gomega.BeEmpty())
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("network connect failed"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Selected first network for container creation"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Attaching additional network to container"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring("Failed to attach additional network"))
 		})
 	})
 })

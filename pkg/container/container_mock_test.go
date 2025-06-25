@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -10,7 +11,8 @@ import (
 	dockerMountType "github.com/docker/docker/api/types/mount"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
-	v1 "github.com/moby/docker-image-spec/specs-go/v1"
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type MockContainerUpdate func(*dockerContainerType.InspectResponse, *dockerImageType.InspectResponse)
@@ -36,7 +38,7 @@ func MockContainer(updates ...MockContainerUpdate) *Container {
 	}
 	image := dockerImageType.InspectResponse{
 		ID:     "image_id",
-		Config: &v1.DockerOCIImageConfig{},
+		Config: &dockerspec.DockerOCIImageConfig{},
 	}
 
 	for _, update := range updates {
@@ -147,4 +149,75 @@ func WithNetworks(networkNames ...string) MockContainerUpdate {
 			}).Debug("MockContainer added network")
 		}
 	}
+}
+
+// MockClient is a mock implementation of the Operations interface for testing container operations.
+type MockClient struct {
+	createFunc  func(context.Context, *dockerContainerType.Config, *dockerContainerType.HostConfig, *dockerNetworkType.NetworkingConfig, *ocispec.Platform, string) (dockerContainerType.CreateResponse, error)
+	startFunc   func(context.Context, string, dockerContainerType.StartOptions) error
+	removeFunc  func(context.Context, string, dockerContainerType.RemoveOptions) error
+	connectFunc func(context.Context, string, string, *dockerNetworkType.EndpointSettings) error
+	renameFunc  func(context.Context, string, string) error
+}
+
+func (m *MockClient) ContainerCreate(
+	ctx context.Context,
+	config *dockerContainerType.Config,
+	hostConfig *dockerContainerType.HostConfig,
+	networkingConfig *dockerNetworkType.NetworkingConfig,
+	platform *ocispec.Platform,
+	containerName string,
+) (dockerContainerType.CreateResponse, error) {
+	if m.createFunc != nil {
+		return m.createFunc(ctx, config, hostConfig, networkingConfig, platform, containerName)
+	}
+
+	return dockerContainerType.CreateResponse{ID: "new_container_id"}, nil
+}
+
+func (m *MockClient) ContainerStart(
+	ctx context.Context,
+	containerID string,
+	options dockerContainerType.StartOptions,
+) error {
+	if m.startFunc != nil {
+		return m.startFunc(ctx, containerID, options)
+	}
+
+	return nil
+}
+
+func (m *MockClient) ContainerRemove(
+	ctx context.Context,
+	containerID string,
+	options dockerContainerType.RemoveOptions,
+) error {
+	if m.removeFunc != nil {
+		return m.removeFunc(ctx, containerID, options)
+	}
+
+	return nil
+}
+
+func (m *MockClient) NetworkConnect(
+	ctx context.Context,
+	networkID, containerID string,
+	config *dockerNetworkType.EndpointSettings,
+) error {
+	if m.connectFunc != nil {
+		return m.connectFunc(ctx, networkID, containerID, config)
+	}
+
+	return nil
+}
+
+func (m *MockClient) ContainerRename(
+	ctx context.Context,
+	containerID, newContainerName string,
+) error {
+	if m.renameFunc != nil {
+		return m.renameFunc(ctx, containerID, newContainerName)
+	}
+
+	return nil
 }
