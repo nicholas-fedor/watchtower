@@ -177,7 +177,7 @@ func extractChallengeHost(realm string, fields logrus.Fields) string {
 		Debug("Trimmed realm for host extraction")
 
 	for _, prefix := range []string{"https://", "http://"} {
-		if after, ok :=strings.CutPrefix(realm, prefix); ok  {
+		if after, ok := strings.CutPrefix(realm, prefix); ok {
 			realm = after
 			if idx := strings.Index(realm, "/"); idx != -1 {
 				return realm[:idx]
