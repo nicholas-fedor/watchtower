@@ -59,6 +59,8 @@ var (
 	errFailedUnmarshalBearerResponse = errors.New("failed to unmarshal bearer token response")
 	// errFailedParseImageName indicates a failure to parse the container image name into a normalized reference.
 	errFailedParseImageName = errors.New("failed to parse image name")
+	// errFailedDecodeResponse indicates a failure to decode the token response from the registry.
+	errFailedDecodeResponse = errors.New("failed to decode response")
 )
 
 // TLSVersionMap maps string names to TLS version constants.
@@ -160,115 +162,300 @@ func NewAuthClient() Client {
 	}
 }
 
-// GetToken fetches a token for the registry hosting the provided image.
-//
-// It uses the registry authentication string to obtain the token, respecting the context
-// for cancellation and leveraging the provided Client for HTTP requests.
+// extractChallengeHost extracts the host from a realm URL (e.g., "https://ghcr.io/token" -> "ghcr.io").
 //
 // Parameters:
-//   - ctx: Context for request lifecycle control, enabling cancellation or timeouts.
-//   - container: Container with image info for token retrieval.
-//   - registryAuth: Base64-encoded auth string (e.g., "username:password").
-//   - client: Client instance for executing HTTP requests.
+//   - realm: The realm URL from the WWW-Authenticate header.
+//   - fields: Logging fields for context.
 //
 // Returns:
-//   - string: Authentication token (e.g., "Basic ..." or "Bearer ...") if successful.
-//   - error: Non-nil if the operation fails, nil on success.
+//   - string: The extracted host, or empty if extraction fails.
+func extractChallengeHost(realm string, fields logrus.Fields) string {
+	realm = strings.TrimSpace(realm)
+	logrus.WithFields(fields).
+		WithField("trimmed_realm", realm).
+		Debug("Trimmed realm for host extraction")
+
+	for _, prefix := range []string{"https://", "http://"} {
+		if after, ok := strings.CutPrefix(realm, prefix); ok {
+			realm = after
+			if idx := strings.Index(realm, "/"); idx != -1 {
+				return realm[:idx]
+			}
+
+			return realm
+		}
+	}
+
+	logrus.WithFields(fields).
+		WithField("realm", realm).
+		Debug("Failed to extract challenge host from realm")
+
+	return ""
+}
+
+// handleBearerAuth processes Bearer authentication for a container registry.
+//
+// It parses the challenge header, extracts the challenge host, and fetches a bearer token.
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - wwwAuthHeader: The WWW-Authenticate header value.
+//   - container: Container with image info.
+//   - registryAuth: Base64-encoded auth string.
+//   - client: Client for HTTP requests.
+//   - fields: Logging fields for context.
+//
+// Returns:
+//   - string: Bearer token header (e.g., "Bearer ...").
+//   - string: Challenge host (e.g., "ghcr.io").
+//   - error: Non-nil if processing fails, nil on success.
+func handleBearerAuth(
+	ctx context.Context,
+	wwwAuthHeader string,
+	container types.Container,
+	registryAuth string,
+	client Client,
+	fields logrus.Fields,
+) (string, string, error) {
+	logrus.WithFields(fields).Debug("Entering Bearer auth path")
+
+	var challengeHost string
+
+	// Parse the WWW-Authenticate header.
+	scope, realm, service, err := processChallenge(wwwAuthHeader, container.ImageName())
+	logrus.WithFields(fields).
+		WithField("realm", realm).
+		WithField("service", service).
+		WithField("scope", scope).
+		WithField("err", err).
+		Debug("Processed challenge header")
+
+	switch {
+	case err != nil:
+		logrus.WithError(err).WithFields(fields).Debug("Failed to process challenge header")
+		// Proceed with token retrieval, as challengeHost is optional.
+	case realm != "":
+		challengeHost = extractChallengeHost(realm, fields)
+		if challengeHost != "" {
+			logrus.WithFields(fields).
+				WithField("challenge_host", challengeHost).
+				Debug("Extracted challenge host")
+		}
+	default:
+		logrus.WithFields(fields).Debug("Empty realm in challenge header")
+	}
+
+	// Fetch the bearer token.
+	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to parse image name")
+
+		return "", "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
+	}
+
+	token, err := GetBearerHeader(
+		ctx,
+		strings.ToLower(wwwAuthHeader),
+		normalizedRef,
+		registryAuth,
+		client,
+	)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to get bearer token")
+
+		return "", "", fmt.Errorf("%w: %w", errFailedDecodeResponse, err)
+	}
+
+	if token == "" {
+		logrus.WithFields(fields).Debug("Empty bearer token received")
+
+		return "", "", fmt.Errorf("%w: empty token in response", errFailedDecodeResponse)
+	}
+
+	logrus.WithFields(fields).
+		WithField("token_present", token != "").
+		WithField("challenge_host", challengeHost).
+		Debug("Returning Bearer token and challenge host")
+
+	return token, challengeHost, nil
+}
+
+// GetToken fetches a token and the challenge host for the registry hosting the provided image.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - container: Container with image info.
+//   - registryAuth: Base64-encoded auth string.
+//   - client: Client for HTTP requests.
+//
+// Returns:
+//   - string: Authentication token (e.g., "Basic ..." or "Bearer ...").
+//   - string: Challenge host (e.g., "ghcr.io"), empty if not applicable.
+//   - error: Non-nil if operation fails, nil on success.
 func GetToken(
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 	client Client,
-) (string, error) {
-	// Parse image name into a normalized reference for registry access.
-	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
-	if err != nil {
-		logrus.WithError(err).
-			WithField("image", container.ImageName()).
-			Debug("Failed to parse image name")
-
-		return "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
+) (string, string, error) {
+	fields := logrus.Fields{
+		"image": container.ImageName(),
 	}
 
-	// Generate the challenge URL to initiate authentication.
-	url := GetChallengeURL(normalizedRef)
-	logrus.WithFields(logrus.Fields{
-		"image": container.ImageName(),
-		"url":   url.String(),
-	}).Debug("Constructed challenge URL")
-
-	// Build and execute the challenge request to get auth instructions.
-	req, err := GetChallengeRequest(ctx, url)
+	// Parse image name into a normalized reference.
+	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
-		return "", err
+		logrus.WithError(err).WithFields(fields).Debug("Failed to parse image name")
+
+		return "", "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
+	}
+
+	// Generate the challenge URL.
+	challengeURL := GetChallengeURL(normalizedRef)
+	logrus.WithFields(fields).
+		WithField("url", challengeURL.String()).
+		Debug("Constructed challenge URL")
+
+	// Build and execute the challenge request.
+	req, err := GetChallengeRequest(ctx, challengeURL)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to create challenge request")
+
+		return "", "", fmt.Errorf("%w: %w", errFailedCreateChallengeRequest, err)
 	}
 
 	res, err := client.Do(req)
 	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"image": container.ImageName(),
-			"url":   url.String(),
-		}).Debug("Failed to execute challenge request")
+		logrus.WithError(err).
+			WithFields(fields).
+			WithField("url", challengeURL.String()).
+			Debug("Failed to execute challenge request")
 
-		return "", fmt.Errorf("%w: %w", errFailedExecuteChallengeRequest, err)
+		return "", "", fmt.Errorf("%w: %w", errFailedExecuteChallengeRequest, err)
 	}
 	defer res.Body.Close()
 
-	// If the response is 200 OK, no authentication is required.
+	// Handle 200 OK response (no auth required).
 	if res.StatusCode == http.StatusOK {
-		logrus.WithFields(logrus.Fields{
-			"image": container.ImageName(),
-			"url":   url.String(),
-		}).Debug("No authentication required (200 OK)")
+		logrus.WithFields(fields).
+			WithField("url", challengeURL.String()).
+			Debug("No authentication required (200 OK)")
 
-		return "", nil
+		return "", "", nil
 	}
 
-	// Extract and process the challenge header.
-	values := res.Header.Get(ChallengeHeader)
-	logrus.WithFields(logrus.Fields{
-		"image":  container.ImageName(),
+	// Extract the challenge header.
+	wwwAuthHeader := res.Header.Get(ChallengeHeader)
+	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"status": res.Status,
-		"header": values,
+		"header": wwwAuthHeader,
 	}).Debug("Received challenge response")
 
 	// If the header is empty, assume no authentication is required.
-	if values == "" {
-		logrus.WithFields(logrus.Fields{
-			"image": container.ImageName(),
-			"url":   url.String(),
-		}).Debug("Empty WWW-Authenticate header; assuming no authentication required")
+	if wwwAuthHeader == "" {
+		logrus.WithFields(fields).
+			WithField("url", challengeURL.String()).
+			Debug("Empty WWW-Authenticate header; assuming no authentication required")
 
-		return "", nil
+		return "", "", nil
 	}
 
-	challenge := strings.ToLower(values)
-	logrus.WithFields(logrus.Fields{
-		"image":     container.ImageName(),
-		"challenge": challenge,
-	}).Debug("Processing challenge type")
+	// Normalize challenge for comparison.
+	challenge := strings.ToLower(strings.TrimSpace(wwwAuthHeader))
+	logrus.WithFields(fields).WithField("challenge", challenge).Debug("Processing challenge type")
 
 	// Handle Basic auth if specified.
 	if strings.HasPrefix(challenge, "basic") {
 		if registryAuth == "" {
-			return "", errNoCredentials // No creds provided for Basic auth.
+			logrus.WithFields(fields).Debug("No credentials provided for Basic auth")
+
+			return "", "", fmt.Errorf("%w: basic auth required", errNoCredentials)
 		}
 
-		return "Basic " + registryAuth, nil // Return pre-formatted Basic auth header.
+		logrus.WithFields(fields).Debug("Using Basic auth")
+
+		return "Basic " + registryAuth, "", nil
 	}
 
-	// Handle Bearer auth by fetching a token.
+	// Handle Bearer auth.
 	if strings.HasPrefix(challenge, "bearer") {
-		return GetBearerHeader(ctx, challenge, normalizedRef, registryAuth, client)
+		return handleBearerAuth(ctx, wwwAuthHeader, container, registryAuth, client, fields)
 	}
 
-	// Unknown challenge type encountered.
-	logrus.WithFields(logrus.Fields{
-		"image":     container.ImageName(),
-		"challenge": challenge,
-	}).Error("Unsupported challenge type from registry")
+	// Handle unknown challenge types.
+	logrus.WithFields(fields).
+		WithField("challenge", challenge).
+		Error("Unsupported challenge type from registry")
 
-	return "", errUnsupportedChallenge
+	return "", "", fmt.Errorf("%w: %s", errUnsupportedChallenge, challenge)
+}
+
+// processChallenge parses the WWW-Authenticate header to extract authentication details.
+//
+// It supports Bearer authentication, extracting the realm, service, and optional scope for token requests.
+//
+// Parameters:
+//   - wwwAuthHeader: The WWW-Authenticate header value (e.g., 'Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:linuxserver/nginx:pull"').
+//   - image: The image name for logging context.
+//
+// Returns:
+//   - string: The scope for the token request (e.g., "repository:linuxserver/nginx:pull"), or empty if not provided.
+//   - string: The realm URL for the token request (e.g., "https://ghcr.io/token").
+//   - string: The service identifier (e.g., "ghcr.io").
+//   - error: Non-nil if parsing fails critically (missing realm or service), nil otherwise.
+func processChallenge(wwwAuthHeader, image string) (string, string, string, error) {
+	fields := logrus.Fields{
+		"image":     image,
+		"challenge": wwwAuthHeader,
+	}
+	logrus.WithFields(fields).Debug("Processing challenge type")
+
+	if !strings.HasPrefix(strings.ToLower(wwwAuthHeader), "bearer") {
+		logrus.WithFields(fields).Debug("Unsupported challenge type")
+
+		return "", "", "", fmt.Errorf("%w: %s", errUnsupportedChallenge, wwwAuthHeader)
+	}
+
+	// Split header into key-value pairs (e.g., realm="...",service="...").
+	parts := strings.Split(strings.TrimPrefix(strings.ToLower(wwwAuthHeader), "bearer "), ",")
+	values := make(map[string]string)
+
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if key, val, ok := strings.Cut(trimmed, "="); ok {
+			// Remove quotes from value if present.
+			values[key] = strings.Trim(val, `"`)
+		}
+	}
+
+	realm, realmOK := values["realm"]
+	service, serviceOK := values["service"]
+	scope := values["scope"] // Scope is optional
+
+	if !realmOK || !serviceOK {
+		logrus.WithFields(fields).Warn("Missing required challenge header values: realm or service")
+
+		return "", "", "", fmt.Errorf(
+			"%w: missing realm or service in header: %s",
+			errInvalidChallengeHeader,
+			wwwAuthHeader,
+		)
+	}
+
+	if scope == "" {
+		logrus.WithFields(fields).
+			Debug("Scope missing in WWW-Authenticate header; will be constructed dynamically")
+	} else {
+		logrus.WithFields(fields).WithField("scope", scope).Debug("Set auth token scope")
+	}
+
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"realm":   realm,
+		"service": service,
+		"scope":   scope,
+	}).Debug("Parsed challenge header")
+
+	return scope, realm, service, nil
 }
 
 // GetChallengeRequest creates a request for retrieving challenge instructions.
@@ -359,6 +546,8 @@ func GetBearerHeader(
 	}
 
 	// Execute the token request.
+	logrus.WithField("url", r.URL.String()).Debug("Sending bearer token request")
+
 	authResponse, err := client.Do(r)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
@@ -368,6 +557,7 @@ func GetBearerHeader(
 
 		return "", fmt.Errorf("%w: %w", errFailedExecuteBearerRequest, err)
 	}
+
 	defer authResponse.Body.Close()
 
 	// Read and parse the response body into a token structure.
