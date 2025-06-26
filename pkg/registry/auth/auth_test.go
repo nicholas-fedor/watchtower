@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	dockerContainerType "github.com/docker/docker/api/types/container"
@@ -317,6 +318,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	// Reset Viper configuration to ensure a clean state for tests.
 	viper.Reset()
 	viper.AutomaticEnv()
+	// Set logrus to Debug level for all tests
+	logrus.SetLevel(logrus.DebugLevel)
+	logrus.WithField("event", "BeforeSuite").Debug("Initialized logrus to Debug level")
 })
 
 var _ = ginkgo.Describe("the auth module", func() {
@@ -379,10 +383,12 @@ var _ = ginkgo.Describe("the auth module", func() {
 		defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", originalTLSSkip)
 
 		// Execute GetToken and verify the result.
-		token, err := auth.GetToken(context.Background(), containerInstance, creds, client)
+		token, _, err := auth.GetToken(context.Background(), containerInstance, creds, client)
 		if expectedErr != "" {
 			gomega.Expect(err).
-				To(gomega.MatchError(expectedErr), fmt.Sprintf("Expected error '%s'", expectedErr))
+				To(gomega.HaveOccurred(), fmt.Sprintf("Expected an error for challenge '%s'", challengeHeader))
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring(expectedErr), fmt.Sprintf("Expected error to contain '%s'", expectedErr))
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
 		} else {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Expected no error when fetching basic auth token")
@@ -440,7 +446,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
 				client := auth.NewAuthClient()
-				token, err := auth.GetToken(
+				token, _, err := auth.GetToken(
 					context.Background(),
 					mockContainerInstance,
 					creds,
@@ -492,7 +498,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 
 			client := auth.NewAuthClient()
-			token, err := auth.GetToken(
+			token, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"user:pass",
@@ -540,7 +546,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				}
 
 				// Execute GetToken and verify the result.
-				token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+				token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(token).To(gomega.Equal(""))
 			},
@@ -575,7 +581,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			client := auth.NewAuthClient()
 
 			// Execute GetToken and verify the expected failure.
-			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("http: server gave HTTP response to HTTPS client"))
@@ -617,7 +623,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify the result.
-			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
@@ -658,7 +664,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify the result.
-			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
@@ -701,7 +707,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 
 			// Execute GetToken and verify the result.
-			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
@@ -735,11 +741,67 @@ var _ = ginkgo.Describe("the auth module", func() {
 			client := auth.NewAuthClient()
 
 			// Execute GetToken and verify the expected failure.
-			token, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("failed to execute challenge request"))
 			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		ginkgo.It("should extract the challenge host for bearer token", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			redirectMux := http.NewServeMux()
+			redirectServer := httptest.NewTLSServer(redirectMux)
+			defer redirectServer.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			redirectAddr := redirectServer.Listener.Addr().String()
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverAddr + "/test/image:latest",
+			}
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().Set(
+					"WWW-Authenticate",
+					fmt.Sprintf(
+						`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+						redirectAddr,
+					),
+				)
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			token, challengeHost, err := auth.GetToken(
+				context.Background(),
+				containerInstance,
+				"",
+				client,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
+			gomega.Expect(challengeHost).To(gomega.Equal(redirectAddr))
 		})
 	})
 
@@ -834,6 +896,60 @@ var _ = ginkgo.Describe("the auth module", func() {
 			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		ginkgo.It("should handle missing scope in WWW-Authenticate header gracefully", func() {
+			// Create a ServeMux to handle multiple paths
+			mux := http.NewServeMux()
+			// Create a TLS test server
+			testServer := httptest.NewTLSServer(mux)
+			defer testServer.Close()
+
+			// Set up the mock reference
+			ref, err := reference.ParseNormalizedNamed("test/image:latest")
+			gomega.Expect(err).
+				NotTo(gomega.HaveOccurred(), "Expected no error parsing image reference")
+
+			// Configure the server to handle /v2/ and /token paths
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, r *http.Request) {
+				logrus.WithField("path", r.URL.Path).Debug("Mock server received request")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s/token",service="test-service"`, testServer.URL))
+				w.WriteHeader(http.StatusUnauthorized)
+				logrus.Debug("Mock server sent WWW-Authenticate header")
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+				logrus.WithField("path", r.URL.Path).Debug("Mock server received request")
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"token": "mock-token"}`))
+				logrus.Debug("Mock server sent token response")
+			})
+
+			// Create a client with TLS skip
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			// Set TLS skip
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			// Construct the challenge header
+			challenge := fmt.Sprintf(
+				`bearer realm="%s/token",service="test-service"`,
+				testServer.URL,
+			)
+
+			// Call GetBearerHeader directly to test processChallenge
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
+			gomega.Expect(err).
+				NotTo(gomega.HaveOccurred(), "Expected no error from GetBearerHeader")
+			gomega.Expect(token).
+				To(gomega.Equal("Bearer mock-token"), "Expected token to be 'Bearer mock-token'")
 		})
 	})
 

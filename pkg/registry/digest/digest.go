@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -154,8 +155,45 @@ func fetchDigest(
 	// Create an authentication client for registry requests.
 	client := auth.NewAuthClient()
 
-	// Obtain an authentication token for the registry, leveraging the container’s image reference.
-	token, err := auth.GetToken(ctx, container, registryAuth, client)
+	// Build the initial manifest URL based on the container’s image name and tag.
+	manifestURL, err := manifest.BuildManifestURL(container)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+
+		return "", fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
+	}
+
+	// Parse the initial manifest URL to extract the original host.
+	parsedURL, err := url.Parse(manifestURL)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to parse initial manifest URL")
+
+		return "", fmt.Errorf(
+			"%w: failed to parse manifest URL: %w",
+			errFailedBuildManifestURL,
+			err,
+		)
+	}
+
+	if parsedURL.Host == "" {
+		logrus.WithFields(fields).
+			WithField("url", manifestURL).
+			Debug("Parsed manifest URL has no host")
+
+		return "", fmt.Errorf(
+			"%w: manifest URL has no host: %s",
+			errFailedBuildManifestURL,
+			manifestURL,
+		)
+	}
+
+	originalHost := parsedURL.Host
+	logrus.WithFields(fields).
+		WithField("original_host", originalHost).
+		Debug("Extracted original host from manifest URL")
+
+	// Obtain an authentication token and challenge host for the registry.
+	token, challengeHost, err := auth.GetToken(ctx, container, registryAuth, client)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
 
@@ -163,30 +201,46 @@ func fetchDigest(
 	}
 
 	if token == "" {
-		logrus.WithFields(fields).Debug("Empty token received; authentication likely failed")
+		logrus.WithFields(fields).Debug("Empty token received; authentication likely not required")
 
 		return "", fmt.Errorf("%w: empty token received from registry", errFailedGetToken)
 	}
 
-	// Build the manifest URL based on the container’s image name and tag.
-	url, err := manifest.BuildManifestURL(container)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+	logrus.WithFields(fields).
+		WithField("challenge_host", challengeHost).
+		Debug("Received challenge host from GetToken")
 
-		return "", fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
+	// If the challenge response indicates a different host (e.g., due to a proxy redirect),
+	// reconstruct the manifest URL using the challenge host.
+	if challengeHost != "" && challengeHost != originalHost {
+		logrus.WithFields(fields).WithFields(logrus.Fields{
+			"original_host":  originalHost,
+			"challenge_host": challengeHost,
+		}).Debug("Detected registry redirect, updating manifest URL host")
+
+		parsedURL.Host = challengeHost
+		manifestURL = parsedURL.String()
+		logrus.WithFields(fields).
+			WithField("updated_url", manifestURL).
+			Debug("Reconstructed manifest URL")
+	} else {
+		logrus.WithFields(fields).
+			WithField("challenge_host", challengeHost).
+			WithField("original_host", originalHost).
+			Debug("No manifest URL update needed; challenge host empty or same as original")
 	}
 
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"method": method,
-		"url":    url,
+		"url":    manifestURL,
 	}).Debug("Fetching digest")
 
 	// Construct the HTTP request with the appropriate method, headers, and context.
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	req, err := http.NewRequestWithContext(ctx, method, manifestURL, nil)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
 			"method": method,
-			"url":    url,
+			"url":    manifestURL,
 		}).Debug("Failed to create request")
 
 		return "", fmt.Errorf("%w: %w", errFailedCreateRequest, err)
@@ -202,12 +256,12 @@ func fetchDigest(
 	)
 	req.Header.Set("User-Agent", UserAgent)
 
-	// Execute the request using the configured authentication client.
+	// Execute the request using the provided authentication client.
 	resp, err := client.Do(req)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
 			"method": method,
-			"url":    url,
+			"url":    manifestURL,
 		}).Debug("Failed to execute request")
 
 		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
