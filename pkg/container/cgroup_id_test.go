@@ -15,6 +15,7 @@ var (
 
 func TestGetRunningContainerID(t *testing.T) {
 	originalReadFileFunc := readFileFunc
+
 	defer func() {
 		readFileFunc = originalReadFileFunc
 	}()

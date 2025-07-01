@@ -31,6 +31,7 @@ func TestFilterByNames(t *testing.T) {
 	t.Parallel()
 
 	var names []string
+
 	filter := FilterByNames(names, nil)
 	assert.Nil(t, filter)
 
@@ -354,6 +355,7 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 	t.Parallel()
 
 	var names []string
+
 	names = append(names, "test")
 
 	filter, desc := BuildFilter(names, []string{}, true, "")

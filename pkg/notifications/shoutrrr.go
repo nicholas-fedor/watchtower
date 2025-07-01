@@ -258,6 +258,7 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 	}
 
 	LocalLog.Debug("Queuing notification message")
+
 	n.messages <- msg
 }
 

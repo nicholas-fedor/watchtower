@@ -381,6 +381,7 @@ type blockingRouter struct {
 
 func (b blockingRouter) Send(_ string, _ *types.Params) []error {
 	<-b.unlock
+
 	b.sent <- true
 
 	return nil

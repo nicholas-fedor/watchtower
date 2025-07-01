@@ -325,6 +325,7 @@ func waitForStopOrTimeout(
 				return true, nil // Container stopped.
 			}
 		}
+
 		time.Sleep(1 * time.Second)
 	}
 }
