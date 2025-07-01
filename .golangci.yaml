@@ -50,7 +50,7 @@ linters:
     - usestdlibvars # A linter that detect the possibility to use variables/constants from the Go standard library.
     - usetesting # Reports uses of functions with replacement inside the testing package.
     - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc.
-    - wsl # Add or remove empty lines.
+    - wsl_v5 # Add or remove empty lines.
     ##################################################################################################
     # Enabled linters that require manual issue resolution
     - asasalint # Check for pass []any as any in variadic func(...any).
