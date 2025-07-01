@@ -141,6 +141,7 @@ func TestMetrics_Register(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.m.Register(tt.args.metric)
+
 			select {
 			case got := <-tt.m.channel:
 				if !reflect.DeepEqual(got, tt.args.metric) {
@@ -236,6 +237,7 @@ func TestRegisterScan(t *testing.T) {
 			// Reset metrics and set up a fresh instance
 			metrics = &Metrics{channel: make(chan *Metric, 10)}
 			metrics.RegisterScan(tt.args.metric)
+
 			select {
 			case got := <-metrics.channel:
 				if !reflect.DeepEqual(got, tt.args.metric) {
@@ -301,6 +303,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Run HandleUpdate in a goroutine and wait briefly for it to process
 			go tt.m.HandleUpdate(tt.args.channel)
+
 			time.Sleep(100 * time.Millisecond) // Allow time for processing
 
 			// Check Prometheus metrics (simplified check since we can't directly access values easily in tests)

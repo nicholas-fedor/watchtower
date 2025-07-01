@@ -391,6 +391,7 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 // TestReadFlags_FlagErrors tests error handling in ReadFlags with mocked logrus.Fatal.
 func TestReadFlags_FlagErrors(t *testing.T) {
 	originalExit := logrus.StandardLogger().ExitFunc
+
 	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
 
 	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
@@ -482,6 +483,7 @@ func TestEnvConfig_FlagRetrievalErrors(t *testing.T) {
 
 func TestReadFlags_Errors(t *testing.T) {
 	originalExit := logrus.StandardLogger().ExitFunc
+
 	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
 
 	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
@@ -540,6 +542,7 @@ func TestGetSecretFromFile_SliceReplaceError(t *testing.T) {
 // TestProcessFlagAliases_InvalidPorcelain tests invalid porcelain version handling.
 func TestProcessFlagAliases_InvalidPorcelain(t *testing.T) {
 	originalExit := logrus.StandardLogger().ExitFunc
+
 	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
 
 	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }

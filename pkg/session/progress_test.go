@@ -531,6 +531,7 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 					t.Errorf("Progress.MarkForUpdate() panicked unexpectedly: %v", r)
 				}
 			}()
+
 			tt.m.MarkForUpdate(tt.args.containerID)
 
 			if len(tt.m) != len(tt.want) {

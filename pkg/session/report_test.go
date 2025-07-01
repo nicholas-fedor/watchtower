@@ -647,8 +647,8 @@ func compareReports(got, want *report) bool {
 
 		for i := range gotSlice {
 			g := gotSlice[i].(*ContainerStatus)
-			w := wantSlice[i].(*ContainerStatus)
 
+			w := wantSlice[i].(*ContainerStatus)
 			if g.containerID != w.containerID ||
 				g.state != w.state ||
 				g.oldImage != w.oldImage ||

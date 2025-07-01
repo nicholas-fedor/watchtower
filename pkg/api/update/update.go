@@ -86,13 +86,16 @@ func (handle *Handler) Handle(_ http.ResponseWriter, r *http.Request) {
 	// Execute update with lock handling.
 	if len(images) > 0 {
 		chanValue := <-lock
+
 		defer func() { lock <- chanValue }()
+
 		logrus.WithField("images", images).Info("Executing targeted update")
 		handle.fn(images)
 	} else {
 		select {
 		case chanValue := <-lock:
 			defer func() { lock <- chanValue }()
+
 			logrus.Info("Executing full update")
 			handle.fn(images)
 		default:
