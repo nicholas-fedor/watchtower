@@ -208,6 +208,15 @@ linters:
           - promlinter
           - wrapcheck
           - varnamelen
+      # Exclude revive from flagging the util package's name.
+      - path: "internal/util/.*"
+        linters:
+          - revive
+        text: "avoid meaningless package names"
+      - path: "pkg/types/.*"
+        linters:
+          - revive
+        text: "avoid meaningless package names"
 
       # Run some linter only for test files by excluding its issues for everything else.
       # - path-except: _test\.go
