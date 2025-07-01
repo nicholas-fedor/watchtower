@@ -200,15 +200,14 @@ func fetchDigest(
 		return "", fmt.Errorf("%w: %w", errFailedGetToken, err)
 	}
 
+	// If no token is returned, authentication is not required.
 	if token == "" {
-		logrus.WithFields(fields).Debug("Empty token received; authentication likely not required")
-
-		return "", fmt.Errorf("%w: empty token received from registry", errFailedGetToken)
+		logrus.WithFields(fields).Debug("No authentication required, proceeding with request")
+	} else {
+		logrus.WithFields(fields).
+			WithField("challenge_host", challengeHost).
+			Debug("Received challenge host from GetToken")
 	}
-
-	logrus.WithFields(fields).
-		WithField("challenge_host", challengeHost).
-		Debug("Received challenge host from GetToken")
 
 	// If the challenge response indicates a different host (e.g., due to a proxy redirect),
 	// reconstruct the manifest URL using the challenge host.
@@ -246,8 +245,10 @@ func fetchDigest(
 		return "", fmt.Errorf("%w: %w", errFailedCreateRequest, err)
 	}
 
-	// Set standard headers for registry manifest requests.
-	req.Header.Set("Authorization", token)
+	// Set headers only if a token is provided.
+	if token != "" {
+		req.Header.Set("Authorization", token)
+	}
 
 	// Set Accept header to support both OCI image indexes and Docker V2 manifests.
 	req.Header.Set(
@@ -268,12 +269,33 @@ func fetchDigest(
 	}
 	defer resp.Body.Close()
 
-	// Extract the digest based on the request method (HEAD from headers, GET from body).
-	if method == http.MethodHead {
-		return extractHeadDigest(resp)
+	// Handle 404 response for HEAD requests, assuming no update is needed.
+	if method == http.MethodHead && resp.StatusCode == http.StatusNotFound {
+		logrus.WithFields(fields).WithField("status", resp.Status).
+			Debug("Registry returned 404 for HEAD request, assuming no update needed")
+
+		return "", nil // Treat as no update available
 	}
 
-	return extractGetDigest(resp)
+	// Extract the digest based on the request method (HEAD from headers, GET from body).
+	var digest string
+	if method == http.MethodHead {
+		digest, err = extractHeadDigest(resp)
+	} else {
+		digest, err = extractGetDigest(resp)
+	}
+
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).WithField("status", resp.Status).
+			Debug("Failed to extract digest")
+
+		return "", err
+	}
+
+	logrus.WithFields(fields).WithField("remote_digest", digest).
+		Debug("Fetched remote digest")
+
+	return digest, nil
 }
 
 // extractHeadDigest extracts the image digest from a HEAD response’s headers.

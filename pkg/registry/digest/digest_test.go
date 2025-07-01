@@ -1142,9 +1142,15 @@ var _ = ginkgo.Describe("Digests", func() {
 			})
 			mux.HandleFunc(
 				"/v2/test/image/manifests/latest",
-				func(w http.ResponseWriter, _ *http.Request) {
-					logrus.Debug("Handled GET /v2/test/image/manifests/latest request")
-					w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
+				func(w http.ResponseWriter, r *http.Request) {
+					logrus.Debug("Handled HEAD /v2/test/image/manifests/latest request")
+					if r.Method == http.MethodHead {
+						w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+						w.WriteHeader(http.StatusOK)
+					} else {
+						w.Header().Set("Content-Type", "application/json")
+						w.Write([]byte(`{"digest": "` + mockDigestHash + `"}`))
+					}
 				},
 			)
 
@@ -1152,11 +1158,9 @@ var _ = ginkgo.Describe("Digests", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			registryAuth := digest.TransformAuth("token")
-			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).
-				To(gomega.ContainSubstring("empty token received from registry"))
-			gomega.Expect(result).To(gomega.Equal(""))
+			result, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeTrue())
 		})
 	})
 
