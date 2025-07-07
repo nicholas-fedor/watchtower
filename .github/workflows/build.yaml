@@ -29,7 +29,7 @@ jobs:
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
       - name: Set up Go
-        uses: actions/setup-go@fa96338abe5531f6e34c5cc0bbe28c1a533d5505
+        uses: actions/setup-go@8d4083a006463573cfc77227acf5b80c61a5713a
         with:
           go-version: ${{ env.GO_VERSION }}
 
