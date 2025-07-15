@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../images/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
     
     
       
@@ -748,6 +748,33 @@
   
     <nav class="md-nav" aria-label="Registry &amp; Authentication">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#repo_user" class="md-nav__link">
+    <span class="md-ellipsis">
+      REPO_USER
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repo_pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      REPO_PASS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_config" class="md-nav__link">
+    <span class="md-ellipsis">
+      DOCKER_CONFIG
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#skip_registry_tls_verification" class="md-nav__link">
@@ -1688,6 +1715,33 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#repo_user" class="md-nav__link">
+    <span class="md-ellipsis">
+      REPO_USER
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repo_pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      REPO_PASS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_config" class="md-nav__link">
+    <span class="md-ellipsis">
+      DOCKER_CONFIG
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#skip_registry_tls_verification" class="md-nav__link">
     <span class="md-ellipsis">
       Skip Registry TLS Verification
@@ -2259,6 +2313,39 @@ Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
              Default: false
 </code></pre></div>
 <h2 id="registry_authentication">Registry &amp; Authentication<a class="headerlink" href="#registry_authentication" title="Permanent link">&para;</a></h2>
+<h3 id="repo_user">REPO_USER<a class="headerlink" href="#repo_user" title="Permanent link">&para;</a></h3>
+<p>Sets the username for authenticating with a private registry, such as Docker Hub.</p>
+<div class="highlight"><pre><span></span><code>            Argument: None
+Environment Variable: REPO_USER
+                Type: String
+             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Must be used with <code>REPO_PASS</code> to provide valid credentials. For Docker Hub, the registry is implicitly <code>https://index.docker.io/v1/</code>. Suitable for simple username/password authentication.</p>
+</div>
+<h3 id="repo_pass">REPO_PASS<a class="headerlink" href="#repo_pass" title="Permanent link">&para;</a></h3>
+<p>Sets the password for authenticating with a private registry, such as Docker Hub.</p>
+<div class="highlight"><pre><span></span><code>            Argument: None
+Environment Variable: REPO_PASS
+                Type: String
+             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Must be used with <code>REPO_USER</code>. Can be a password or a personal access token for registries requiring 2FA (e.g., Docker Hub). Use Docker secrets (e.g., <code>WATCHTOWER_PASS=/run/secrets/repo_pass</code>) or environment files to avoid exposing sensitive data in command lines.</p>
+</div>
+<h3 id="docker_config">DOCKER_CONFIG<a class="headerlink" href="#docker_config" title="Permanent link">&para;</a></h3>
+<p>Specifies the directory containing the Docker configuration file (<code>config.json</code>) for registry authentication.</p>
+<div class="highlight"><pre><span></span><code>            Argument: None
+Environment Variable: DOCKER_CONFIG
+                Type: String
+             Default: `/`
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Useful for registries requiring complex authentication (e.g., 2FA on Docker Hub) or credential helpers (e.g., AWS ECR). Mount the <code>config.json</code> file to the container (e.g., <code>-v ~/.docker/config.json:/config.json</code>) and set this variable to the directory containing the file (e.g., <code>/</code>). Changes to the mounted file may require a symlink to ensure updates propagate (see <a href="../usage-overview/">Usage Overview</a> and <a href="../private-registries/">Private Registries</a>).</p>
+</div>
 <h3 id="skip_registry_tls_verification">Skip Registry TLS Verification<a class="headerlink" href="#skip_registry_tls_verification" title="Permanent link">&para;</a></h3>
 <p>Disables TLS certificate verification for registry connections, useful for self-signed certificates or insecure registries.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --registry-tls-skip
@@ -2484,7 +2571,7 @@ Environment Variable: WATCHTOWER_PORCELAIN
       <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      <script src="../assets/javascripts/bundle.56ea9cef.min.js"></script>
       
     
   </body>
