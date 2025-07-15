@@ -362,6 +362,48 @@ Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
 
 ## Registry & Authentication
 
+### REPO_USER
+
+Sets the username for authenticating with a private registry, such as Docker Hub.
+
+```text
+            Argument: None
+Environment Variable: REPO_USER
+                Type: String
+             Default: None
+```
+
+!!! note
+    Must be used with `REPO_PASS` to provide valid credentials. For Docker Hub, the registry is implicitly `https://index.docker.io/v1/`. Suitable for simple username/password authentication.
+
+### REPO_PASS
+
+Sets the password for authenticating with a private registry, such as Docker Hub.
+
+```text
+            Argument: None
+Environment Variable: REPO_PASS
+                Type: String
+             Default: None
+```
+
+!!! note
+    Must be used with `REPO_USER`. Can be a password or a personal access token for registries requiring 2FA (e.g., Docker Hub). Use Docker secrets (e.g., `WATCHTOWER_PASS=/run/secrets/repo_pass`) or environment files to avoid exposing sensitive data in command lines.
+
+### DOCKER_CONFIG
+
+Specifies the directory containing the Docker configuration file (`config.json`) for registry authentication.
+
+```text
+            Argument: None
+Environment Variable: DOCKER_CONFIG
+                Type: String
+             Default: `/`
+```
+
+!!! note
+    Useful for registries requiring complex authentication (e.g., 2FA on Docker Hub) or credential helpers (e.g., AWS ECR). Mount the `config.json` file to the container (e.g., `-v ~/.docker/config.json:/config.json`) and set this variable to the directory containing the file (e.g., `/`). Changes to the mounted file may require a symlink to ensure updates propagate (see [Usage Overview](usage-overview.md) and [Private Registries](private-registries.md)).
+
 ### Skip Registry TLS Verification
 
 Disables TLS certificate verification for registry connections, useful for self-signed certificates or insecure registries.
