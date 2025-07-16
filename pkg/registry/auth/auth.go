@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -33,6 +34,8 @@ const (
 	DefaultIdleConnTimeoutSeconds     = 90  // Timeout for idle connections in seconds
 	DefaultTLSHandshakeTimeoutSeconds = 10  // Timeout for TLS handshake in seconds
 	DefaultExpectContinueTimeout      = 1   // Timeout for expecting continue response in seconds
+	DefaultDialTimeoutSeconds         = 30  // Timeout for establishing TCP connections in seconds
+	DefaultDialKeepAliveSeconds       = 30  // Keep-alive probes for persistent connections in seconds
 )
 
 // Errors for authentication operations.
@@ -151,14 +154,18 @@ func NewAuthClient() Client {
 	return &registryClient{
 		client: &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig:       tlsConfig,
-				Proxy:                 http.ProxyFromEnvironment,
-				MaxIdleConns:          DefaultMaxIdleConns,
-				IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,
-				TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second,
-				ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,
+				TLSClientConfig: tlsConfig,                 // TLS configuration for secure registry connections.
+				Proxy:           http.ProxyFromEnvironment, // Respect proxy environment variables (e.g., HTTP_PROXY, HTTPS_PROXY).
+				DialContext: (&net.Dialer{
+					Timeout:   DefaultDialTimeoutSeconds * time.Second,   // Timeout for establishing TCP connections.
+					KeepAlive: DefaultDialKeepAliveSeconds * time.Second, // Keep-alive probes for persistent connections.
+				}).DialContext,
+				MaxIdleConns:          DefaultMaxIdleConns,                             // Maximum number of idle connections to keep open.
+				IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,     // Timeout for closing idle connections.
+				TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second, // Timeout for completing TLS handshakes.
+				ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,      // Timeout for receiving HTTP 100-Continue responses.
 			},
-			Timeout: DefaultTimeoutSeconds * time.Second,
+			Timeout: DefaultTimeoutSeconds * time.Second, // Overall timeout for HTTP requests.
 		},
 	}
 }
