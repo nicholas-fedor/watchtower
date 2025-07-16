@@ -803,6 +803,76 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
 			gomega.Expect(challengeHost).To(gomega.Equal(redirectAddr))
 		})
+
+		// Test case: Ensures GetToken fails with an error when the HTTP client exceeds
+		// the maximum number of redirects, verifying proper handling of redirect limits.
+		ginkgo.It("should fail when exceeding maximum redirects", func() {
+			// Create a chain of test servers to simulate multiple redirects
+			redirectCount := auth.DefaultMaxRedirects + 1 // Exceed limit (3 + 1 = 4 redirects)
+			servers := make([]*httptest.Server, redirectCount)
+			for i := range redirectCount {
+				// Capture range variable
+				mux := http.NewServeMux()
+				mux.HandleFunc("/v2/", func(w http.ResponseWriter, r *http.Request) {
+					logrus.WithField("server", i).
+						WithField("path", r.URL.Path).
+						Debug("Handling /v2/ request")
+					if i < redirectCount-1 {
+						// Redirect to the next server’s /v2/
+						nextURL := servers[i+1].URL + "/v2/"
+						w.Header().Set("Location", nextURL)
+						w.WriteHeader(http.StatusTemporaryRedirect)
+						logrus.WithField("server", i).Debug("Sent redirect response")
+					} else {
+						// Final server returns a token response
+						w.Header().Set("Content-Type", "application/json")
+						w.Write([]byte(`{"token": "final-token"}`))
+						logrus.WithField("server", i).Debug("Sent token response")
+					}
+				})
+				servers[i] = httptest.NewServer(mux)
+				defer servers[i].Close()
+			}
+
+			// Configure container with the first server’s address
+			serverURL, _ := url.Parse(servers[0].URL)
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverURL.Host + "/test/image:latest",
+			}
+
+			// Create a custom client to enforce redirect limit
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+					CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+						if len(via) >= auth.DefaultMaxRedirects {
+							return fmt.Errorf(
+								"stopped after %d redirects",
+								auth.DefaultMaxRedirects,
+							)
+						}
+
+						return nil
+					},
+				},
+			}
+
+			// Use HTTP scheme to match non-TLS servers
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			// Execute GetToken and verify failure due to too many redirects
+			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			gomega.Expect(err).
+				To(gomega.HaveOccurred(), "Expected error due to exceeding redirect limit")
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("stopped after 3 redirects"), "Expected error indicating redirect limit exceeded")
+			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on redirect failure")
+		})
 	})
 
 	ginkgo.Describe("GetChallengeRequest", func() {
