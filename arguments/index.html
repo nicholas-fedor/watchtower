@@ -795,6 +795,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#proxy_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Proxy Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#warn_on_head_failure" class="md-nav__link">
     <span class="md-ellipsis">
       Warn on HEAD Failure
@@ -1760,6 +1769,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#proxy_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Proxy Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#warn_on_head_failure" class="md-nav__link">
     <span class="md-ellipsis">
       Warn on HEAD Failure
@@ -2364,6 +2382,29 @@ Environment Variable: WATCHTOWER_REGISTRY_TLS_MIN_VERSION
      Possible Values: TLS1.0, TLS1.1, TLS1.2, TLS1.3
              Default: TLS1.2
 </code></pre></div>
+<h3 id="proxy_configuration">Proxy Configuration<a class="headerlink" href="#proxy_configuration" title="Permanent link">&para;</a></h3>
+<p>Watchtower supports HTTP/HTTPS proxies for registry connections by respecting standard environment variables. Set these in the Watchtower container to route requests (e.g., to Docker Hub or private registries) through a proxy. This is useful in environments without direct internet access.</p>
+<p>Proxy settings are read from the following variables (uppercase and lowercase variants are supported for compatibility):</p>
+<div class="highlight"><pre><span></span><code>            Argument: None
+Environment Variable: HTTP_PROXY / http_proxy
+                Type: String (e.g., &quot;http://proxy.example.com:3128&quot;)
+             Default: None
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>            Argument: None
+Environment Variable: HTTPS_PROXY / https_proxy
+                Type: String (e.g., &quot;http://proxy.example.com:3128&quot;)
+             Default: None
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>            Argument: None
+Environment Variable: NO_PROXY / no_proxy
+                Type: Comma-separated string (e.g., &quot;localhost,127.0.0.1,internal.example.com&quot;)
+             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Proxies may require authentication; include it in the URL (e.g., <code>http://user:pass@proxy.example.com:3128</code>), but avoid exposing credentials in the command line by using Docker secrets or environment files instead. If your proxy uses a self-signed certificate, combine with <code>--registry-tls-skip</code> to disable TLS verification (use cautiously).</p>
+</div>
+<p>For details on how Go handles these variables, see the <a href="https://pkg.go.dev/net/http#ProxyFromEnvironment">net/http.ProxyFromEnvironment</a> documentation.</p>
 <h3 id="warn_on_head_failure">Warn on HEAD Failure<a class="headerlink" href="#warn_on_head_failure" title="Permanent link">&para;</a></h3>
 <p>Controls warnings for failed HEAD requests to registries. <code>Auto</code> warns for registries known to support HEAD requests (e.g., docker.io) that may rate-limit.</p>
 <div class="highlight"><pre><span></span><code>            Argument: --warn-on-head-failure
