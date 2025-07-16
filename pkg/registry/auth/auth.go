@@ -152,6 +152,7 @@ func NewAuthClient() Client {
 		client: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig:       tlsConfig,
+				Proxy:                 http.ProxyFromEnvironment,
 				MaxIdleConns:          DefaultMaxIdleConns,
 				IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,
 				TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second,
