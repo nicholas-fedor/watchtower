@@ -36,6 +36,7 @@ const (
 	DefaultExpectContinueTimeout      = 1   // Timeout for expecting continue response in seconds
 	DefaultDialTimeoutSeconds         = 30  // Timeout for establishing TCP connections in seconds
 	DefaultDialKeepAliveSeconds       = 30  // Keep-alive probes for persistent connections in seconds
+	DefaultMaxRedirects               = 3   // Maximum number of redirects to follow (reduced from Go's default of 10)
 )
 
 // Errors for authentication operations.
@@ -166,6 +167,15 @@ func NewAuthClient() Client {
 				ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,      // Timeout for receiving HTTP 100-Continue responses.
 			},
 			Timeout: DefaultTimeoutSeconds * time.Second, // Overall timeout for HTTP requests.
+			CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+				if len(
+					via,
+				) >= DefaultMaxRedirects { // Limit redirects to prevent excessive loops or attacks.
+					return http.ErrUseLastResponse
+				}
+
+				return nil
+			},
 		},
 	}
 }
