@@ -429,6 +429,38 @@ Environment Variable: WATCHTOWER_REGISTRY_TLS_MIN_VERSION
              Default: TLS1.2
 ```
 
+### Proxy Configuration
+
+Watchtower supports HTTP/HTTPS proxies for registry connections by respecting standard environment variables. Set these in the Watchtower container to route requests (e.g., to Docker Hub or private registries) through a proxy. This is useful in environments without direct internet access.
+
+Proxy settings are read from the following variables (uppercase and lowercase variants are supported for compatibility):
+
+```text
+            Argument: None
+Environment Variable: HTTP_PROXY / http_proxy
+                Type: String (e.g., "http://proxy.example.com:3128")
+             Default: None
+```
+
+```text
+            Argument: None
+Environment Variable: HTTPS_PROXY / https_proxy
+                Type: String (e.g., "http://proxy.example.com:3128")
+             Default: None
+```
+
+```text
+            Argument: None
+Environment Variable: NO_PROXY / no_proxy
+                Type: Comma-separated string (e.g., "localhost,127.0.0.1,internal.example.com")
+             Default: None
+```
+
+!!! note
+    Proxies may require authentication; include it in the URL (e.g., `http://user:pass@proxy.example.com:3128`), but avoid exposing credentials in the command line by using Docker secrets or environment files instead. If your proxy uses a self-signed certificate, combine with `--registry-tls-skip` to disable TLS verification (use cautiously).
+
+For details on how Go handles these variables, see the [net/http.ProxyFromEnvironment](https://pkg.go.dev/net/http#ProxyFromEnvironment) documentation.
+
 ### Warn on HEAD Failure
 
 Controls warnings for failed HEAD requests to registries. `Auto` warns for registries known to support HEAD requests (e.g., docker.io) that may rate-limit.
