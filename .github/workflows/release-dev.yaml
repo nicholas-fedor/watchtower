@@ -19,20 +19,62 @@ jobs:
     permissions:
       contents: read
 
-  Build-and-Push:
-    needs:
-      - Test
+  Build-Binaries:
+    needs: Test
     permissions:
       contents: read
-      packages: write
-      attestations: write
-      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
         with:
           fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
+        with:
+          go-version: 1.24.x
+          cache: true
+
+      - name: Run GoReleaser for dev binaries
+        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: build --snapshot --clean --config build/goreleaser/dev.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload binaries and SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-binaries-sboms
+          path: dist/
+
+  Build-and-Push-Per-Arch:
+    needs: Build-Binaries
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, 386, arm_6, arm64_v8.0, riscv64_rva20u64]
+        platform: [amd64, 386, arm/v6, arm64, riscv64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        with:
+          fetch-depth: 0
+
+      - name: Download binaries and SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          name: dev-binaries-sboms
+          path: dist/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
@@ -53,28 +95,93 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Docker images
+      - name: Build and Push per-arch image
         id: build
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
         with:
           context: .
           file: dockerfiles/Dockerfile.dev-self-contained
-          platforms: linux/amd64,linux/arm64,linux/386,linux/riscv64
+          platforms: linux/${{ matrix.platform }}
           push: true
           tags: |
-            nickfedor/watchtower:latest-dev
-            ghcr.io/nicholas-fedor/watchtower:latest-dev
+            nickfedor/watchtower:${{ matrix.platform }}-latest-dev
+            ghcr.io/nicholas-fedor/watchtower:${{ matrix.platform }}-latest-dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            TARGETARCH=${{ matrix.platform }}
+            TARGETOS=linux
 
-      - name: Attest GHCR dev image
+      - name: Attest per-arch GHCR dev image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: ghcr.io/${{ github.repository }}
+          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.platform }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
-      - name: Attest Docker Hub dev image
+      - name: Attest per-arch Docker Hub dev image
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower/${{ matrix.platform }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  Create-Manifest-and-Attest:
+    needs: Build-and-Push-Per-Arch
+    permissions:
+      packages: write
+      attestations: write
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifests
+        run: |
+          ARCHES=("amd64" "386" "arm/v6" "arm64" "riscv64")
+          for repo in "nickfedor/watchtower" "ghcr.io/nicholas-fedor/watchtower"; do
+            manifest="${repo}:latest-dev"
+            images=()
+            for arch in "${ARCHES[@]}"; do
+              images+=("${repo}:${arch}-latest-dev")
+            done
+            docker manifest create "$manifest" "${images[@]}"
+            docker manifest push "$manifest"
+          done
+
+      - name: Get manifest digest for GHCR
+        id: digest-ghcr
+        run: |
+          digest=$(docker manifest inspect ghcr.io/${{ github.repository }}:latest-dev | jq -r .Descriptor.digest)
+          echo "digest=$digest" >> $GITHUB_OUTPUT
+
+      - name: Attest GHCR manifest
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.digest-ghcr.outputs.digest }}
+          push-to-registry: true
+
+      - name: Get manifest digest for Docker Hub
+        id: digest-docker
+        run: |
+          digest=$(docker manifest inspect docker.io/nickfedor/watchtower:latest-dev | jq -r .Descriptor.digest)
+          echo "digest=$digest" >> $GITHUB_OUTPUT
+
+      - name: Attest Docker Hub manifest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/nickfedor/watchtower
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.digest-docker.outputs.digest }}
           push-to-registry: true
