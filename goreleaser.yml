@@ -18,7 +18,8 @@ builds:
       - goos: windows
         goarch: riscv64
     ldflags:
-      - -s -w -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
+      - -s -w
+      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
       - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
 
 archives:
