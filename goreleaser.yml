@@ -120,3 +120,33 @@ dockers:
 
 checksum:
   name_template: checksums.txt
+
+docker_manifests:
+  - name_template: nickfedor/watchtower:{{ .Version }}
+    image_templates:
+      - nickfedor/watchtower:amd64-{{ .Version }}
+      - nickfedor/watchtower:i386-{{ .Version }}
+      - nickfedor/watchtower:armhf-{{ .Version }}
+      - nickfedor/watchtower:arm64v8-{{ .Version }}
+      - nickfedor/watchtower:riscv64-{{ .Version }}
+  - name_template: nickfedor/watchtower:latest
+    image_templates:
+      - nickfedor/watchtower:amd64-latest
+      - nickfedor/watchtower:i386-latest
+      - nickfedor/watchtower:armhf-latest
+      - nickfedor/watchtower:arm64v8-latest
+      - nickfedor/watchtower:riscv64-latest
+  - name_template: ghcr.io/nicholas-fedor/watchtower:{{ .Version }}
+    image_templates:
+      - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Version }}
+  - name_template: ghcr.io/nicholas-fedor/watchtower:latest
+    image_templates:
+      - ghcr.io/nicholas-fedor/watchtower:amd64-latest
+      - ghcr.io/nicholas-fedor/watchtower:i386-latest
+      - ghcr.io/nicholas-fedor/watchtower:armhf-latest
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
+      - ghcr.io/nicholas-fedor/watchtower:riscv64-latest
