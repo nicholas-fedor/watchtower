@@ -69,7 +69,7 @@ jobs:
         run: echo "image_tag=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Get GHCR version manifest digest
-        id: digest-version
+        id: digest-version-ghcr
         run: |
           digest=$(docker manifest inspect ghcr.io/${{ github.repository }}:${{ steps.extract-tag.outputs.image_tag }} | jq -r .Descriptor.digest)
           echo "digest=$digest" >> $GITHUB_OUTPUT
@@ -78,11 +78,11 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.digest-version.outputs.digest }}
+          subject-digest: ${{ steps.digest-version-ghcr.outputs.digest }}
           push-to-registry: true
 
       - name: Get GHCR latest manifest digest
-        id: digest-latest
+        id: digest-latest-ghcr
         run: |
           digest=$(docker manifest inspect ghcr.io/${{ github.repository }}:latest | jq -r .Descriptor.digest)
           echo "digest=$digest" >> $GITHUB_OUTPUT
@@ -91,7 +91,33 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.digest-latest.outputs.digest }}
+          subject-digest: ${{ steps.digest-latest-ghcr.outputs.digest }}
+          push-to-registry: true
+
+      - name: Get Docker Hub version manifest digest
+        id: digest-version-docker
+        run: |
+          digest=$(docker manifest inspect docker.io/nickfedor/watchtower:${{ steps.extract-tag.outputs.image_tag }} | jq -r .Descriptor.digest)
+          echo "digest=$digest" >> $GITHUB_OUTPUT
+
+      - name: Attest Docker Hub version manifest
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower
+          subject-digest: ${{ steps.digest-version-docker.outputs.digest }}
+          push-to-registry: true
+
+      - name: Get Docker Hub latest manifest digest
+        id: digest-latest-docker
+        run: |
+          digest=$(docker manifest inspect docker.io/nickfedor/watchtower:latest | jq -r .Descriptor.digest)
+          echo "digest=$digest" >> $GITHUB_OUTPUT
+
+      - name: Attest Docker Hub latest manifest
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower
+          subject-digest: ${{ steps.digest-latest-docker.outputs.digest }}
           push-to-registry: true
 
       - name: Clean up dist directory
