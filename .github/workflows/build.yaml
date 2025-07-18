@@ -66,13 +66,13 @@ jobs:
 
       - name: Extract image tag
         id: extract-tag
-        run: echo "image_tag=${TAG#v}" >> $GITHUB_OUTPUT
+        run: echo "image_tag=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Get GHCR version manifest digest
         id: digest-version-ghcr
         run: |
-          digest=$(docker manifest inspect ghcr.io/${{ github.repository }}:${{ steps.extract-tag.outputs.image_tag }} | jq -r .Descriptor.digest)
-          echo "digest=$digest" >> $GITHUB_OUTPUT
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest GHCR version manifest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -84,8 +84,8 @@ jobs:
       - name: Get GHCR latest manifest digest
         id: digest-latest-ghcr
         run: |
-          digest=$(docker manifest inspect ghcr.io/${{ github.repository }}:latest | jq -r .Descriptor.digest)
-          echo "digest=$digest" >> $GITHUB_OUTPUT
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest" | jq -r '.Descriptor.digest')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest GHCR latest manifest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -97,8 +97,8 @@ jobs:
       - name: Get Docker Hub version manifest digest
         id: digest-version-docker
         run: |
-          digest=$(docker manifest inspect docker.io/nickfedor/watchtower:${{ steps.extract-tag.outputs.image_tag }} | jq -r .Descriptor.digest)
-          echo "digest=$digest" >> $GITHUB_OUTPUT
+          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest Docker Hub version manifest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -110,8 +110,8 @@ jobs:
       - name: Get Docker Hub latest manifest digest
         id: digest-latest-docker
         run: |
-          digest=$(docker manifest inspect docker.io/nickfedor/watchtower:latest | jq -r .Descriptor.digest)
-          echo "digest=$digest" >> $GITHUB_OUTPUT
+          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest" | jq -r '.Descriptor.digest')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest Docker Hub latest manifest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
