@@ -54,12 +54,27 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push Docker images
+        id: build
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
         with:
           context: .
           file: dockerfiles/Dockerfile.dev-self-contained
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64,linux/arm/v6,linux/386,linux/riscv64
           push: true
           tags: |
             nickfedor/watchtower:latest-dev
             ghcr.io/nicholas-fedor/watchtower:latest-dev
+
+      - name: Attest GHCR dev image
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest Docker Hub dev image
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
