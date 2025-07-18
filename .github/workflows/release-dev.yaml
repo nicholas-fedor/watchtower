@@ -163,8 +163,8 @@ jobs:
       - name: Get manifest digest for GHCR
         id: digest-ghcr
         run: |
-          digest=$(docker manifest inspect ghcr.io/${{ github.repository }}:latest-dev | jq -r .Descriptor.digest)
-          echo "digest=$digest" >> $GITHUB_OUTPUT
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest-dev" | jq -r '.Descriptor.digest')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest GHCR manifest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -176,8 +176,8 @@ jobs:
       - name: Get manifest digest for Docker Hub
         id: digest-docker
         run: |
-          digest=$(docker manifest inspect docker.io/nickfedor/watchtower:latest-dev | jq -r .Descriptor.digest)
-          echo "digest=$digest" >> $GITHUB_OUTPUT
+          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest-dev" | jq -r '.Descriptor.digest')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest Docker Hub manifest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
