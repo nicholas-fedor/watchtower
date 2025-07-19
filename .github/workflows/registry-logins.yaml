@@ -1,0 +1,27 @@
+name: Registry Logins
+
+on:
+  workflow_call:
+    inputs:
+      dry_run:
+        required: true
+        type: boolean
+
+jobs:
+  logins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Docker Hub
+        if: inputs.dry_run != true
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        if: inputs.dry_run != true
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
