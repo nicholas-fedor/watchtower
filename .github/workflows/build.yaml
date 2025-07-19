@@ -58,11 +58,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload SBOMs
+      - name: Upload binary SBOMs
         uses: actions/upload-artifact@v4
         with:
-          name: prod-binaries-sboms
+          name: prod-binary-sboms
           path: dist/*.sbom
+          if-no-files-found: error
+
+      - name: Upload Docker image SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-docker-sboms
+          path: dist/*.docker.sbom
+          if-no-files-found: error
 
       - name: Generate artifact attestation
         if: inputs.dry_run != true
