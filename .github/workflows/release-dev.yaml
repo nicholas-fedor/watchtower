@@ -206,32 +206,20 @@ jobs:
           artifact-name: ghcr-latest-dev.sbom.json
           upload-artifact: true
 
-      - name: Calculate digest for Docker Hub
-        if: github.event.inputs.dry_run != 'true'
-        id: digest-docker
-        run: |
-          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest-dev" | jq -r '.Descriptor.digest')
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-
       - name: Attest Docker Hub manifest
         if: github.event.inputs.dry_run != 'true'
+        id: attest-docker
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/nickfedor/watchtower
-          subject-digest: ${{ steps.digest-docker.outputs.digest }}
+          subject-digest: sha256:$(docker manifest inspect docker.io/nickfedor/watchtower:latest-dev | jq -r '.Descriptor.digest')
           push-to-registry: true
-
-      - name: Calculate digest for GHCR
-        if: github.event.inputs.dry_run != 'true'
-        id: digest-ghcr
-        run: |
-          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest-dev" | jq -r '.Descriptor.digest')
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - name: Attest GHCR manifest
         if: github.event.inputs.dry_run != 'true'
+        id: attest-ghcr
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.digest-ghcr.outputs.digest }}
+          subject-digest: sha256:$(docker manifest inspect ghcr.io/${{ github.repository }}:latest-dev | jq -r '.Descriptor.digest')
           push-to-registry: true
