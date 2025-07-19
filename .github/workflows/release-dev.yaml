@@ -88,10 +88,10 @@ jobs:
             norm_arch: armv6
           - platform: arm64/v8
             arch_tag: arm64v8
-            norm_arch: arm64
+            norm_arch: arm64_v8
           - platform: riscv64
             arch_tag: riscv64
-            norm_arch: riscv64
+            norm_arch: riscv64_rva20u64
     steps:
       - name: Checkout
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
@@ -134,8 +134,8 @@ jobs:
           platforms: linux/${{ matrix.platform }}
           push: ${{ github.event.inputs.dry_run != 'true' }}
           tags: |
-            nickfedor/watchtower:${{ matrix.arch_tag }}-latest-dev
-            ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-latest-dev
+            nickfedor/watchtower:${{ matrix.arch_tag }}-dev
+            ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -189,7 +189,7 @@ jobs:
             manifest="${repo}:latest-dev"
             images=()
             for arch in "${ARCHES[@]}"; do
-              images+=("${repo}:${arch}-latest-dev")
+              images+=("${repo}:${arch}-dev")
             done
             docker manifest create "$manifest" "${images[@]}"
             docker manifest push "$manifest"
