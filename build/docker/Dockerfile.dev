@@ -21,11 +21,11 @@ LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtowe
   "org.opencontainers.image.base.name"="alpine"
 
 # Copy ca-certs and timezone from builder
-COPY ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY zoneinfo /usr/share/zoneinfo
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
-# Copy prebuilt binary from GoReleaser dist/ (e.g., dist/linux_amd64/watchtower)
-COPY dist/${TARGETOS}_${TARGETARCH}/watchtower /watchtower
+# Copy prebuilt binary from GoReleaser dist/ (e.g., dist/watchtower_linux_amd64_v1/watchtower)
+COPY dist/watchtower_${TARGETOS}_${TARGETARCH}/watchtower /watchtower
 
 HEALTHCHECK CMD ["/watchtower", "--health-check"]
 
