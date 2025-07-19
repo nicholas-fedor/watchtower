@@ -75,18 +75,23 @@ jobs:
           - platform: amd64
             arch_tag: amd64
             norm_arch: amd64_v1
+            prefix: watchtower-multiarch
           - platform: i386
             arch_tag: i386
             norm_arch: 386
+            prefix: watchtower-multiarch
           - platform: arm/v6
             arch_tag: armhf
             norm_arch: arm_v6
+            prefix: watchtower-armv6
           - platform: arm64/v8
             arch_tag: arm64v8
             norm_arch: arm64
+            prefix: watchtower-multiarch
           - platform: riscv64
             arch_tag: riscv64
             norm_arch: riscv64_rva20u64
+            prefix: watchtower-multiarch
     steps:
       - name: Checkout
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
@@ -127,6 +132,7 @@ jobs:
           build-args: |
             TARGETARCH=${{ matrix.norm_arch }}
             TARGETOS=linux
+            PREFIX=${{ matrix.prefix }}
 
       - name: Generate per-arch SBOM for Docker Hub
         if: github.event.inputs.dry_run != 'true'
