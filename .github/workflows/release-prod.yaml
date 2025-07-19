@@ -62,6 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload binary SBOMs
+        if: inputs.dry_run != true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: prod-binary-sboms
@@ -199,6 +200,7 @@ jobs:
     needs:
       - Test
       - Build
+    if: inputs.dry_run != true
     permissions:
       contents: read
     uses: ./.github/workflows/update-go-docs.yaml
