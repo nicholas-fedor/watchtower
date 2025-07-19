@@ -1,7 +1,13 @@
 name: Release (Dev)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run the workflow without pushing"
+        type: boolean
+        default: false
+        required: false
   push:
     branches:
       - main
@@ -70,8 +76,22 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [amd64, 386, arm_6, arm64_v8.0, riscv64_rva20u64]
-        platform: [amd64, 386, arm/v6, arm64, riscv64]
+        include:
+          - platform: amd64
+            arch_tag: amd64
+            norm_arch: amd64_v1
+          - platform: i386
+            arch_tag: i386
+            norm_arch: 386
+          - platform: arm/v6
+            arch_tag: armhf
+            norm_arch: armv6
+          - platform: arm64/v8
+            arch_tag: arm64v8
+            norm_arch: arm64
+          - platform: riscv64
+            arch_tag: riscv64
+            norm_arch: riscv64
     steps:
       - name: Checkout
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
@@ -91,12 +111,14 @@ jobs:
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
       - name: Login to Docker Hub
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           registry: ghcr.io
@@ -110,27 +132,29 @@ jobs:
           context: .
           file: build/docker/Dockerfile.dev
           platforms: linux/${{ matrix.platform }}
-          push: true
+          push: ${{ github.event.inputs.dry_run != 'true' }}
           tags: |
-            nickfedor/watchtower:${{ matrix.platform }}-latest-dev
-            ghcr.io/nicholas-fedor/watchtower:${{ matrix.platform }}-latest-dev
+            nickfedor/watchtower:${{ matrix.arch_tag }}-latest-dev
+            ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-latest-dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            TARGETARCH=${{ matrix.platform }}
+            TARGETARCH=${{ matrix.norm_arch }}
             TARGETOS=linux
 
       - name: Attest per-arch GHCR dev image
+        if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.platform }}
+          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.arch_tag }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
       - name: Attest per-arch Docker Hub dev image
+        if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: docker.io/nickfedor/watchtower/${{ matrix.platform }}
+          subject-name: docker.io/nickfedor/watchtower/${{ matrix.arch_tag }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
@@ -143,12 +167,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Login to Docker Hub
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           registry: ghcr.io
@@ -156,8 +182,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push manifests
+        if: github.event.inputs.dry_run != 'true'
         run: |
-          ARCHES=("amd64" "386" "arm/v6" "arm64" "riscv64")
+          ARCHES=("amd64" "i386" "armhf" "arm64v8" "riscv64")
           for repo in "nickfedor/watchtower" "ghcr.io/nicholas-fedor/watchtower"; do
             manifest="${repo}:latest-dev"
             images=()
@@ -169,12 +196,14 @@ jobs:
           done
 
       - name: Get manifest digest for GHCR
+        if: github.event.inputs.dry_run != 'true'
         id: digest-ghcr
         run: |
           digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest-dev" | jq -r '.Descriptor.digest')
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest GHCR manifest
+        if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/${{ github.repository }}
@@ -182,12 +211,14 @@ jobs:
           push-to-registry: true
 
       - name: Get manifest digest for Docker Hub
+        if: github.event.inputs.dry_run != 'true'
         id: digest-docker
         run: |
           digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest-dev" | jq -r '.Descriptor.digest')
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest Docker Hub manifest
+        if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/nickfedor/watchtower
