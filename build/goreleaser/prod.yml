@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
 builds:
@@ -9,9 +10,10 @@ builds:
     goarch:
       - amd64
       - "386"
-      - arm
       - arm64
       - riscv64
+    goamd64:
+      - v1
     goriscv64:
       - rva20u64
     ignore:
@@ -21,6 +23,22 @@ builds:
       - -s -w
       - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
       - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
+  - main: ./main.go
+    binary: watchtower
+    goos:
+      - linux
+      - windows
+    goarch:
+      - arm
+    goarm:
+      - "6"
+    ldflags:
+      - -s -w
+      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
+      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
+    ignore:
+      - goos: windows
+        goarch: arm
 
 archives:
   - name_template: >-
@@ -50,6 +68,7 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
     goos: linux
     goarch: amd64
+    goamd64: v1
     goarm: ""
     dockerfile: build/docker/Dockerfile.prod
     image_templates:
