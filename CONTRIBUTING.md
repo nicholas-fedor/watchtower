@@ -71,7 +71,9 @@ go test ./... -v
 
 ### Binary
 
-To build the Watchtower binary, run the following from the root directory:
+To build the Watchtower binary, you can use either `go build` directly or GoReleaser for multi-architecture binaries. The following commands are run from the root directory:
+
+#### Using go build
 
 ```bash
 go build                               # compiles and packages an executable binary, watchtower
@@ -80,6 +82,18 @@ go test ./... -v                       # runs tests with verbose output
 ```
 
 If you don't have it enabled, you'll either have to prefix each command with `GO111MODULE=on` or run `export GO111MODULE=on` before running the commands. [You can read more about modules here.](https://github.com/golang/go/wiki/Modules)
+
+#### Using GoReleaser
+
+To build binaries for multiple architectures (matching dev workflow), use GoReleaser with the dev configuration:
+
+```bash
+goreleaser build --snapshot --clean --config build/goreleaser/dev.yml  # builds binaries to dist/
+```
+
+* Ensure GoReleaser is installed locally: `go install github.com/goreleaser/goreleaser/v2@latest`.
+* The `--snapshot` flag avoids requiring a Git tag, suitable for dev.
+* This generates binaries for linux/amd64, linux/arm64, linux/arm/v6, linux/386, linux/riscv64, and windows/amd64, windows/386, windows/arm, windows/arm64 in `dist/`. Use these for local testing or Docker builds with `/build/docker/Dockerfile.dev`.
 
 ### Docker Image
 
