@@ -22,7 +22,7 @@ jobs:
   Build:
     needs: Test
     permissions:
-      contents: write
+      contents: read
       packages: write
       attestations: write
       id-token: write
