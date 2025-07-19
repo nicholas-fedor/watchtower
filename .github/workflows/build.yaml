@@ -58,19 +58,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload binary SBOMs
+      - name: Upload SBOMs
         uses: actions/upload-artifact@v4
         with:
-          name: prod-binary-sboms
+          name: prod-binaries-sboms
           path: dist/*.sbom
-          if-no-files-found: error
-
-      - name: Upload Docker image SBOMs
-        uses: actions/upload-artifact@v4
-        with:
-          name: prod-docker-sboms
-          path: dist/*.docker.sbom
-          if-no-files-found: error
 
       - name: Generate artifact attestation
         if: inputs.dry_run != true
@@ -146,6 +138,38 @@ jobs:
           subject-name: docker.io/nickfedor/watchtower
           subject-digest: ${{ steps.digest-latest-docker.outputs.digest }}
           push-to-registry: true
+
+      - name: Generate SBOMs for Docker images
+        if: inputs.dry_run != true
+        run: |
+          ARCHES=("amd64" "i386" "armhf" "arm64v8" "riscv64")
+          REPOS=("docker.io/nickfedor/watchtower" "ghcr.io/nicholas-fedor/watchtower")
+          VERSION="${{ steps.extract-tag.outputs.image_tag }}"
+          for repo in "${REPOS[@]}"; do
+            for arch in "${ARCHES[@]}"; do
+              echo "Generating SBOM for $repo:$arch-$VERSION"
+              anchore/sbom-action@v0 \
+                image: $repo:$arch-$VERSION \
+                format: spdx-json \
+                output-file: dist/$arch-$VERSION.sbom.json
+            done
+            echo "Generating SBOM for $repo:$VERSION (manifest)"
+            anchore/sbom-action@v0 \
+              image: $repo:$VERSION \
+              format: spdx-json \
+              output-file: dist/manifest-$VERSION.sbom.json
+            echo "Generating SBOM for $repo:latest (manifest)"
+            anchore/sbom-action@v0 \
+              image: $repo:latest \
+              format: spdx-json \
+              output-file: dist/manifest-latest.sbom.json
+          done
+
+      - name: Upload Docker image SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-docker-sboms
+          path: dist/*.sbom.json
 
       - name: Clean up dist directory
         if: always() # Runs even if previous steps fail
