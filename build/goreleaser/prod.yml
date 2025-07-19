@@ -150,3 +150,6 @@ docker_manifests:
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
       - ghcr.io/nicholas-fedor/watchtower:riscv64-latest
+
+sboms:
+  - artifacts: binary # SBOMs for security (Syft format)
