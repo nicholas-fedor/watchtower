@@ -52,19 +52,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload binaries
+      - name: Upload binaries and SBOMs
         uses: actions/upload-artifact@v4
         with:
-          name: dev-binaries
-          path: |
-            dist/*/watchtower*
-            !dist/*.sbom
-
-      - name: Upload SBOMs
-        uses: actions/upload-artifact@v4
-        with:
-          name: dev-sboms
-          path: dist/*.sbom
+          name: dev-artifacts
+          path: dist/*
+          if-no-files-found: warn
 
   Build-and-Push-Per-Arch:
     needs: Build-Binaries
@@ -98,10 +91,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download binaries and SBOMs
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dev-binaries
+          name: dev-artifacts
           path: dist/
 
       - name: Set up QEMU
@@ -110,20 +103,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
-      - name: Login to Docker Hub
+      - name: Registry Logins
         if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        uses: ./.github/workflows/registry-logins.yaml
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to GHCR
-        if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          dry_run: false
 
       - name: Build and Push per-arch image
         id: build
@@ -142,33 +126,37 @@ jobs:
             TARGETARCH=${{ matrix.norm_arch }}
             TARGETOS=linux
 
-      - name: Generate SBOM for per-arch dev image
+      - name: Generate per-arch SBOM for Docker Hub
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@v0
         with:
           image: nickfedor/watchtower:${{ matrix.arch_tag }}-dev
           format: spdx-json
-          output-file: dist/${{ matrix.arch_tag }}-dev.sbom.json
+          artifact-name: ${{ matrix.arch_tag }}-dev.sbom.json
+          upload-artifact: true
 
-      - name: Upload per-arch Docker SBOM
-        uses: actions/upload-artifact@v4
-        with:
-          name: dev-docker-sboms-${{ matrix.arch_tag }}
-          path: dist/${{ matrix.arch_tag }}-dev.sbom.json
-
-      - name: Attest per-arch GHCR dev image
+      - name: Generate per-arch SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: anchore/sbom-action@v0
         with:
-          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.arch_tag }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+          image: ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
+          format: spdx-json
+          artifact-name: ghcr-${{ matrix.arch_tag }}-dev.sbom.json
+          upload-artifact: true
 
-      - name: Attest per-arch Docker Hub dev image
+      - name: Attest per-arch Docker Hub image
         if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/nickfedor/watchtower/${{ matrix.arch_tag }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest per-arch GHCR image
+        if: github.event.inputs.dry_run != 'true'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.arch_tag }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
@@ -180,20 +168,11 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     steps:
-      - name: Login to Docker Hub
+      - name: Registry Logins
         if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        uses: ./.github/workflows/registry-logins.yaml
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to GHCR
-        if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          dry_run: false
 
       - name: Create and push manifests
         if: github.event.inputs.dry_run != 'true'
@@ -209,41 +188,30 @@ jobs:
             docker manifest push "$manifest"
           done
 
-      - name: Generate SBOM for latest-dev manifest
+      - name: Generate manifest SBOM for Docker Hub
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@v0
         with:
           image: nickfedor/watchtower:latest-dev
           format: spdx-json
-          output-file: dist/latest-dev.sbom.json
+          artifact-name: latest-dev.sbom.json
+          upload-artifact: true
 
-      - name: Upload manifest Docker SBOM
-        uses: actions/upload-artifact@v4
-        with:
-          name: dev-docker-sboms-manifest
-          path: dist/latest-dev.sbom.json
-
-      - name: Get manifest digest for GHCR
+      - name: Generate manifest SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
-        id: digest-ghcr
-        run: |
-          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest-dev" | jq -r '.Descriptor.digest')
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-
-      - name: Attest GHCR manifest
-        if: github.event.inputs.dry_run != 'true'
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: anchore/sbom-action@v0
         with:
-          subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.digest-ghcr.outputs.digest }}
-          push-to-registry: true
+          image: ghcr.io/nicholas-fedor/watchtower:latest-dev
+          format: spdx-json
+          artifact-name: ghcr-latest-dev.sbom.json
+          upload-artifact: true
 
-      - name: Get manifest digest for Docker Hub
+      - name: Calculate digest for Docker Hub
         if: github.event.inputs.dry_run != 'true'
         id: digest-docker
         run: |
           digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest-dev" | jq -r '.Descriptor.digest')
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - name: Attest Docker Hub manifest
         if: github.event.inputs.dry_run != 'true'
@@ -251,4 +219,19 @@ jobs:
         with:
           subject-name: docker.io/nickfedor/watchtower
           subject-digest: ${{ steps.digest-docker.outputs.digest }}
+          push-to-registry: true
+
+      - name: Calculate digest for GHCR
+        if: github.event.inputs.dry_run != 'true'
+        id: digest-ghcr
+        run: |
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest-dev" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest GHCR manifest
+        if: github.event.inputs.dry_run != 'true'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.digest-ghcr.outputs.digest }}
           push-to-registry: true
