@@ -2,7 +2,8 @@
 version: 2
 
 builds:
-  - main: ./main.go
+  - id: watchtower-multiarch
+    main: ./main.go
     binary: watchtower
     goos:
       - linux
@@ -23,7 +24,8 @@ builds:
       - -s -w
       - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
       - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
-  - main: ./main.go
+  - id: watchtower-armv6
+    main: ./main.go
     binary: watchtower
     goos:
       - linux
