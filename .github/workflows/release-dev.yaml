@@ -59,22 +59,12 @@ jobs:
           path: |
             dist/*/watchtower*
             !dist/*.sbom
-            !dist/*.docker.sbom
-          if-no-files-found: error
 
-      - name: Upload binary SBOMs
+      - name: Upload SBOMs
         uses: actions/upload-artifact@v4
         with:
-          name: dev-binary-sboms
+          name: dev-sboms
           path: dist/*.sbom
-          if-no-files-found: error
-
-      - name: Upload Docker image SBOMs
-        uses: actions/upload-artifact@v4
-        with:
-          name: dev-docker-sboms
-          path: dist/*.docker.sbom
-          if-no-files-found: error
 
   Build-and-Push-Per-Arch:
     needs: Build-Binaries
@@ -152,6 +142,20 @@ jobs:
             TARGETARCH=${{ matrix.norm_arch }}
             TARGETOS=linux
 
+      - name: Generate SBOM for per-arch dev image
+        if: github.event.inputs.dry_run != 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          image: nickfedor/watchtower:${{ matrix.arch_tag }}-dev
+          format: spdx-json
+          output-file: dist/${{ matrix.arch_tag }}-dev.sbom.json
+
+      - name: Upload per-arch Docker SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-docker-sboms-${{ matrix.arch_tag }}
+          path: dist/${{ matrix.arch_tag }}-dev.sbom.json
+
       - name: Attest per-arch GHCR dev image
         if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -204,6 +208,20 @@ jobs:
             docker manifest create "$manifest" "${images[@]}"
             docker manifest push "$manifest"
           done
+
+      - name: Generate SBOM for latest-dev manifest
+        if: github.event.inputs.dry_run != 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          image: nickfedor/watchtower:latest-dev
+          format: spdx-json
+          output-file: dist/latest-dev.sbom.json
+
+      - name: Upload manifest Docker SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-docker-sboms-manifest
+          path: dist/latest-dev.sbom.json
 
       - name: Get manifest digest for GHCR
         if: github.event.inputs.dry_run != 'true'
