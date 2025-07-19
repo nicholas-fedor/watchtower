@@ -38,7 +38,7 @@ cd watchtower
 
 Watchtower uses [Golangci-lint](https://golangci-lint.run/) to help maintain code quality.
 It uses a `.golangci.yaml` configuration file in the root directory.
-It can be installed locally using the instructions [here](https://golangci-lint.run/welcome/install/#local-installation).
+It can be installed locally using the following [instructions](https://golangci-lint.run/welcome/install/#local-installation).
 
 To use the linter, run the following from the root directory:
 
@@ -83,14 +83,16 @@ If you don't have it enabled, you'll either have to prefix each command with `GO
 
 ### Docker Image
 
-To build a Watchtower image of your own, use the self-contained Dockerfiles. As the main Dockerfile, they can be found in `dockerfiles/`:
+To build a Watchtower image of your own, use the self-contained Dockerfiles in /build/docker/:
 
-* `dockerfiles/Dockerfile.dev-self-contained` will build an image based on your current local Watchtower files.
-* `dockerfiles/Dockerfile.self-contained` will build an image based on current Watchtower's repository on GitHub.
+* `/build/docker/Dockerfile.self-local` will build an image based on your current local Watchtower files.
+* `/build/docker/Dockerfile.self-github` will build an image based on current Watchtower's repository on GitHub.
 
 ```bash
-sudo docker build . -f dockerfiles/Dockerfile.dev-self-contained -t nickfedor/watchtower # to build an image from local files
+sudo docker build . -f build/docker/Dockerfile.self-local -t nickfedor/watchtower # to build an image from local files
 ```
+
+For multi-arch builds, use Docker Buildx and GoReleaser configs in /build/goreleaser/ for prebuilding binaries.
 
 ## Submitting Pull Requests
 
