@@ -26,6 +26,7 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+      actions: write
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: 0
@@ -151,7 +152,7 @@ jobs:
     if: inputs.dry_run != true
     permissions:
       packages: read
-      contents: write
+      actions: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -175,7 +176,7 @@ jobs:
     if: inputs.dry_run != true
     permissions:
       packages: read
-      contents: write
+      actions: write
     runs-on: ubuntu-latest
     strategy:
       matrix:

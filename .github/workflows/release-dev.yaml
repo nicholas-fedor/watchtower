@@ -29,6 +29,7 @@ jobs:
     needs: Test
     permissions:
       contents: read
+      actions: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -66,6 +67,7 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+      actions: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -166,7 +168,7 @@ jobs:
       packages: write
       attestations: write
       id-token: write
-      contents: write
+      actions: write
     runs-on: ubuntu-latest
     steps:
       - name: Registry Logins
