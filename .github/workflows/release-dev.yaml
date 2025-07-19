@@ -80,10 +80,10 @@ jobs:
             norm_arch: 386
           - platform: arm/v6
             arch_tag: armhf
-            norm_arch: armv6
+            norm_arch: arm_6
           - platform: arm64/v8
             arch_tag: arm64v8
-            norm_arch: arm64_v8
+            norm_arch: arm64
           - platform: riscv64
             arch_tag: riscv64
             norm_arch: riscv64_rva20u64
