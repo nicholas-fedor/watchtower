@@ -51,7 +51,7 @@ dockers:
     goos: linux
     goarch: amd64
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:amd64-{{ .Version }}
       - nickfedor/watchtower:amd64-latest
@@ -66,7 +66,7 @@ dockers:
     goos: linux
     goarch: "386"
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:i386-{{ .Version }}
       - nickfedor/watchtower:i386-latest
@@ -81,7 +81,7 @@ dockers:
     goos: linux
     goarch: arm
     goarm: 6
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:armhf-{{ .Version }}
       - nickfedor/watchtower:armhf-latest
@@ -96,7 +96,7 @@ dockers:
     goos: linux
     goarch: arm64
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:arm64v8-{{ .Version }}
       - nickfedor/watchtower:arm64v8-latest
@@ -111,7 +111,7 @@ dockers:
     goos: linux
     goarch: riscv64
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:riscv64-{{ .Version }}
       - nickfedor/watchtower:riscv64-latest
