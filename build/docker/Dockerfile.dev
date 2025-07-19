@@ -26,7 +26,7 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifi
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 # Copy prebuilt binary from GoReleaser dist/ (e.g., dist/watchtower_linux_amd64_v1/watchtower)
-COPY dist/${PREFIX}_${TARGETOS}_${TARGETARCH}/watchtower /watchtower
+COPY ${PREFIX}_${TARGETOS}_${TARGETARCH}/watchtower /watchtower
 
 HEALTHCHECK CMD ["/watchtower", "--health-check"]
 
