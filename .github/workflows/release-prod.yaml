@@ -82,20 +82,65 @@ jobs:
         id: extract-tag
         run: echo "image_tag=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Attest Docker manifests
+      - name: Calculate digest for Docker Hub version
         if: inputs.dry_run != true
+        id: digest-docker-version
         run: |
-          REPOS=("docker.io/nickfedor/watchtower" "ghcr.io/nicholas-fedor/watchtower")
-          for repo in "${REPOS[@]}"; do
-            for tag in "${{ steps.extract-tag.outputs.image_tag }}" "latest"; do
-              digest=$(docker manifest inspect "$repo:$tag" | jq -r '.Descriptor.digest')
-              uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-              with:
-                subject-name: $repo
-                subject-digest: $digest
-                push-to-registry: true
-            done
-          done
+          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest Docker Hub version manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower
+          subject-digest: ${{ steps.digest-docker-version.outputs.digest }}
+          push-to-registry: true
+
+      - name: Calculate digest for Docker Hub latest
+        if: inputs.dry_run != true
+        id: digest-docker-latest
+        run: |
+          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest Docker Hub latest manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower
+          subject-digest: ${{ steps.digest-docker-latest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Calculate digest for GHCR version
+        if: inputs.dry_run != true
+        id: digest-ghcr-version
+        run: |
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest GHCR version manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.digest-ghcr-version.outputs.digest }}
+          push-to-registry: true
+
+      - name: Calculate digest for GHCR latest
+        if: inputs.dry_run != true
+        id: digest-ghcr-latest
+        run: |
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest GHCR latest manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.digest-ghcr-latest.outputs.digest }}
+          push-to-registry: true
 
       - name: Clean up dist directory
         if: always()
