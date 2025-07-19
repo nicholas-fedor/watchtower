@@ -130,7 +130,7 @@ jobs:
 
       - name: Generate per-arch SBOM for Docker Hub
         if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
           image: nickfedor/watchtower:${{ matrix.arch_tag }}-dev
           format: spdx-json
@@ -139,7 +139,7 @@ jobs:
 
       - name: Generate per-arch SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
           image: ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
           format: spdx-json
@@ -193,7 +193,7 @@ jobs:
 
       - name: Generate manifest SBOM for Docker Hub
         if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
           image: nickfedor/watchtower:latest-dev
           format: spdx-json
@@ -202,7 +202,7 @@ jobs:
 
       - name: Generate manifest SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
           image: ghcr.io/nicholas-fedor/watchtower:latest-dev
           format: spdx-json
