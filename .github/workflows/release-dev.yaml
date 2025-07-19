@@ -80,7 +80,7 @@ jobs:
             norm_arch: 386
           - platform: arm/v6
             arch_tag: armhf
-            norm_arch: arm_6
+            norm_arch: arm_v6
           - platform: arm64/v8
             arch_tag: arm64v8
             norm_arch: arm64
@@ -97,7 +97,7 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: dev-artifacts
-          path: dist/
+          path: .
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
