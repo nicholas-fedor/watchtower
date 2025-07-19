@@ -46,11 +46,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload binaries and SBOMs
+      - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: dev-binaries-sboms
-          path: dist/
+          name: dev-binaries
+          path: |
+            dist/*/watchtower*
+            !dist/*.sbom
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-sboms
+          path: dist/*.sbom
 
   Build-and-Push-Per-Arch:
     needs: Build-Binaries
@@ -73,7 +81,7 @@ jobs:
       - name: Download binaries and SBOMs
         uses: actions/download-artifact@v4
         with:
-          name: dev-binaries-sboms
+          name: dev-binaries
           path: dist/
 
       - name: Set up QEMU
