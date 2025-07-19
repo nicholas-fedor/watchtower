@@ -2,6 +2,12 @@ name: Build
 
 on:
   workflow_call:
+    inputs:
+      dry_run:
+        description: "Dry run mode"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -29,12 +35,14 @@ jobs:
           cache: true
 
       - name: Login to Docker Hub
+        if: inputs.dry_run != true
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
+        if: inputs.dry_run != true
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           registry: ghcr.io
@@ -46,7 +54,7 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --config build/goreleaser/prod.yml
+          args: release --config build/goreleaser/prod.yml ${{ inputs.dry_run && '--snapshot --clean --skip-publish' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -57,25 +65,29 @@ jobs:
           path: dist/*.sbom
 
       - name: Generate artifact attestation
+        if: inputs.dry_run != true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        if: success()
         with:
           subject-checksums: ./dist/checksums.txt
 
       - name: Install jq
+        if: inputs.dry_run != true
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Extract image tag
+        if: inputs.dry_run != true
         id: extract-tag
         run: echo "image_tag=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Get GHCR version manifest digest
+        if: inputs.dry_run != true
         id: digest-version-ghcr
         run: |
           digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest GHCR version manifest
+        if: inputs.dry_run != true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/${{ github.repository }}
@@ -83,12 +95,14 @@ jobs:
           push-to-registry: true
 
       - name: Get GHCR latest manifest digest
+        if: inputs.dry_run != true
         id: digest-latest-ghcr
         run: |
           digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest" | jq -r '.Descriptor.digest')
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest GHCR latest manifest
+        if: inputs.dry_run != true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/${{ github.repository }}
@@ -96,12 +110,14 @@ jobs:
           push-to-registry: true
 
       - name: Get Docker Hub version manifest digest
+        if: inputs.dry_run != true
         id: digest-version-docker
         run: |
           digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest Docker Hub version manifest
+        if: inputs.dry_run != true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/nickfedor/watchtower
@@ -109,12 +125,14 @@ jobs:
           push-to-registry: true
 
       - name: Get Docker Hub latest manifest digest
+        if: inputs.dry_run != true
         id: digest-latest-docker
         run: |
           digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest" | jq -r '.Descriptor.digest')
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest Docker Hub latest manifest
+        if: inputs.dry_run != true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/nickfedor/watchtower
