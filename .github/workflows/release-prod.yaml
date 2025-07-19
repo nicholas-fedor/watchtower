@@ -1,7 +1,13 @@
 name: Release (Production)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run the workflow without pushing"
+        type: boolean
+        default: false
+        required: false
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
@@ -23,6 +29,8 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+    with:
+      dry_run: ${{ github.event.inputs.dry_run }}
 
   Update-Go-docs:
     uses: ./.github/workflows/update-go-docs.yaml
