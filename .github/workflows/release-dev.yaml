@@ -82,7 +82,7 @@ jobs:
             prefix: watchtower-multiarch
           - platform: arm/v6
             arch_tag: armhf
-            norm_arch: arm_v6
+            norm_arch: arm_6
             prefix: watchtower-armv6
           - platform: arm64/v8
             arch_tag: arm64v8
