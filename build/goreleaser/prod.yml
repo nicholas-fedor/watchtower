@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
 builds:
@@ -9,9 +10,10 @@ builds:
     goarch:
       - amd64
       - "386"
-      - arm
       - arm64
       - riscv64
+    goamd64:
+      - v1
     goriscv64:
       - rva20u64
     ignore:
@@ -21,6 +23,22 @@ builds:
       - -s -w
       - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
       - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
+  - main: ./main.go
+    binary: watchtower
+    goos:
+      - linux
+      - windows
+    goarch:
+      - arm
+    goarm:
+      - "6"
+    ldflags:
+      - -s -w
+      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
+      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
+    ignore:
+      - goos: windows
+        goarch: arm
 
 archives:
   - name_template: >-
@@ -50,8 +68,9 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
     goos: linux
     goarch: amd64
+    goamd64: v1
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:amd64-{{ .Version }}
       - nickfedor/watchtower:amd64-latest
@@ -66,7 +85,7 @@ dockers:
     goos: linux
     goarch: "386"
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:i386-{{ .Version }}
       - nickfedor/watchtower:i386-latest
@@ -81,7 +100,7 @@ dockers:
     goos: linux
     goarch: arm
     goarm: 6
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:armhf-{{ .Version }}
       - nickfedor/watchtower:armhf-latest
@@ -96,7 +115,7 @@ dockers:
     goos: linux
     goarch: arm64
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:arm64v8-{{ .Version }}
       - nickfedor/watchtower:arm64v8-latest
@@ -111,7 +130,7 @@ dockers:
     goos: linux
     goarch: riscv64
     goarm: ""
-    dockerfile: dockerfiles/Dockerfile
+    dockerfile: build/docker/Dockerfile.prod
     image_templates:
       - nickfedor/watchtower:riscv64-{{ .Version }}
       - nickfedor/watchtower:riscv64-latest
@@ -150,3 +169,6 @@ docker_manifests:
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
       - ghcr.io/nicholas-fedor/watchtower:riscv64-latest
+
+sboms:
+  - artifacts: binary # SBOMs for security (Syft format)

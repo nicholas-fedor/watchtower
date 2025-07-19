@@ -1,7 +1,13 @@
 name: Release (Dev)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run the workflow without pushing"
+        type: boolean
+        default: false
+        required: false
   push:
     branches:
       - main
@@ -19,20 +25,79 @@ jobs:
     permissions:
       contents: read
 
-  Build-and-Push:
-    needs:
-      - Test
+  Build-Binaries:
+    needs: Test
     permissions:
       contents: read
-      packages: write
-      attestations: write
-      id-token: write
+      actions: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
         with:
           fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
+        with:
+          go-version: 1.24.x
+          cache: true
+
+      - name: Run GoReleaser for dev binaries
+        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: build --snapshot --clean --config build/goreleaser/dev.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload binaries and SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-artifacts
+          path: dist/*
+          if-no-files-found: warn
+
+  Build-and-Push-Per-Arch:
+    needs: Build-Binaries
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+      actions: write
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: amd64
+            arch_tag: amd64
+            norm_arch: amd64_v1
+          - platform: i386
+            arch_tag: i386
+            norm_arch: 386
+          - platform: arm/v6
+            arch_tag: armhf
+            norm_arch: arm_6
+          - platform: arm64/v8
+            arch_tag: arm64v8
+            norm_arch: arm64
+          - platform: riscv64
+            arch_tag: riscv64
+            norm_arch: riscv64_rva20u64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dev-artifacts
+          path: dist/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
@@ -40,41 +105,124 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+      - name: Registry Logins
+        if: github.event.inputs.dry_run != 'true'
+        uses: ./.github/workflows/registry-logins.yaml
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          dry_run: false
 
-      - name: Login to GHCR
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and Push Docker images
+      - name: Build and Push per-arch image
         id: build
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
         with:
           context: .
-          file: dockerfiles/Dockerfile.dev-self-contained
-          platforms: linux/amd64,linux/arm64,linux/386,linux/riscv64
-          push: true
+          file: build/docker/Dockerfile.dev
+          platforms: linux/${{ matrix.platform }}
+          push: ${{ github.event.inputs.dry_run != 'true' }}
           tags: |
-            nickfedor/watchtower:latest-dev
-            ghcr.io/nicholas-fedor/watchtower:latest-dev
+            nickfedor/watchtower:${{ matrix.arch_tag }}-dev
+            ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            TARGETARCH=${{ matrix.norm_arch }}
+            TARGETOS=linux
 
-      - name: Attest GHCR dev image
+      - name: Generate per-arch SBOM for Docker Hub
+        if: github.event.inputs.dry_run != 'true'
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        with:
+          image: nickfedor/watchtower:${{ matrix.arch_tag }}-dev
+          format: spdx-json
+          artifact-name: ${{ matrix.arch_tag }}-dev.sbom.json
+          upload-artifact: true
+
+      - name: Generate per-arch SBOM for GHCR
+        if: github.event.inputs.dry_run != 'true'
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        with:
+          image: ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
+          format: spdx-json
+          artifact-name: ghcr-${{ matrix.arch_tag }}-dev.sbom.json
+          upload-artifact: true
+
+      - name: Attest per-arch Docker Hub image
+        if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: ghcr.io/${{ github.repository }}
+          subject-name: docker.io/nickfedor/watchtower/${{ matrix.arch_tag }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
-      - name: Attest Docker Hub dev image
+      - name: Attest per-arch GHCR image
+        if: github.event.inputs.dry_run != 'true'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.arch_tag }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  Create-Manifest-and-Attest:
+    needs: Build-and-Push-Per-Arch
+    permissions:
+      packages: write
+      attestations: write
+      id-token: write
+      actions: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Registry Logins
+        if: github.event.inputs.dry_run != 'true'
+        uses: ./.github/workflows/registry-logins.yaml
+        with:
+          dry_run: false
+
+      - name: Create and push manifests
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          ARCHES=("amd64" "i386" "armhf" "arm64v8" "riscv64")
+          for repo in "nickfedor/watchtower" "ghcr.io/nicholas-fedor/watchtower"; do
+            manifest="${repo}:latest-dev"
+            images=()
+            for arch in "${ARCHES[@]}"; do
+              images+=("${repo}:${arch}-dev")
+            done
+            docker manifest create "$manifest" "${images[@]}"
+            docker manifest push "$manifest"
+          done
+
+      - name: Generate manifest SBOM for Docker Hub
+        if: github.event.inputs.dry_run != 'true'
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        with:
+          image: nickfedor/watchtower:latest-dev
+          format: spdx-json
+          artifact-name: latest-dev.sbom.json
+          upload-artifact: true
+
+      - name: Generate manifest SBOM for GHCR
+        if: github.event.inputs.dry_run != 'true'
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        with:
+          image: ghcr.io/nicholas-fedor/watchtower:latest-dev
+          format: spdx-json
+          artifact-name: ghcr-latest-dev.sbom.json
+          upload-artifact: true
+
+      - name: Attest Docker Hub manifest
+        if: github.event.inputs.dry_run != 'true'
+        id: attest-docker
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: docker.io/nickfedor/watchtower
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: sha256:$(docker manifest inspect docker.io/nickfedor/watchtower:latest-dev | jq -r '.Descriptor.digest')
+          push-to-registry: true
+
+      - name: Attest GHCR manifest
+        if: github.event.inputs.dry_run != 'true'
+        id: attest-ghcr
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: sha256:$(docker manifest inspect ghcr.io/${{ github.repository }}:latest-dev | jq -r '.Descriptor.digest')
           push-to-registry: true

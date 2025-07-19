@@ -1,7 +1,13 @@
 name: Release (Production)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run the workflow without pushing"
+        type: boolean
+        default: false
+        required: false
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
@@ -14,20 +20,185 @@ jobs:
       contents: read
 
   Build:
-    uses: ./.github/workflows/build.yaml
-    needs:
-      - Test
-    secrets: inherit
+    needs: Test
     permissions:
-      contents: write
+      contents: read
       packages: write
       attestations: write
       id-token: write
+      actions: write
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      GO_VERSION: 1.24.x
+      TAG: ${{ github.ref_name }}
+    outputs:
+      image_tag: ${{ steps.extract-tag.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Registry Logins
+        if: inputs.dry_run != true
+        uses: ./.github/workflows/registry-logins.yaml
+        with:
+          dry_run: false
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --config build/goreleaser/prod.yml ${{ inputs.dry_run && '--snapshot --clean --skip-publish' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload binary SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-binary-sboms
+          path: dist/*.sbom
+          if-no-files-found: warn
+
+      - name: Generate artifact attestation
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-checksums: ./dist/checksums.txt
+
+      - name: Install jq
+        if: inputs.dry_run != true
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Extract image tag
+        if: inputs.dry_run != true
+        id: extract-tag
+        run: echo "image_tag=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate digest for Docker Hub version
+        if: inputs.dry_run != true
+        id: digest-docker-version
+        run: |
+          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest Docker Hub version manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower
+          subject-digest: ${{ steps.digest-docker-version.outputs.digest }}
+          push-to-registry: true
+
+      - name: Calculate digest for Docker Hub latest
+        if: inputs.dry_run != true
+        id: digest-docker-latest
+        run: |
+          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest Docker Hub latest manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: docker.io/nickfedor/watchtower
+          subject-digest: ${{ steps.digest-docker-latest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Calculate digest for GHCR version
+        if: inputs.dry_run != true
+        id: digest-ghcr-version
+        run: |
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest GHCR version manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.digest-ghcr-version.outputs.digest }}
+          push-to-registry: true
+
+      - name: Calculate digest for GHCR latest
+        if: inputs.dry_run != true
+        id: digest-ghcr-latest
+        run: |
+          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest" | jq -r '.Descriptor.digest')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest GHCR latest manifest
+        if: inputs.dry_run != true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.digest-ghcr-latest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Clean up dist directory
+        if: always()
+        run: rm -rf dist
+
+  Generate-Per-Arch-SBOMs:
+    needs: Build
+    if: inputs.dry_run != true
+    permissions:
+      packages: read
+      actions: write
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: ["amd64", "i386", "armhf", "arm64v8", "riscv64"]
+        repo:
+          [
+            "docker.io/nickfedor/watchtower",
+            "ghcr.io/nicholas-fedor/watchtower",
+          ]
+    steps:
+      - name: Generate SBOM
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        with:
+          image: ${{ matrix.repo }}:${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}
+          format: spdx-json
+          artifact-name: ${{ matrix.repo }}-${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}.sbom.json
+          upload-artifact: true
+
+  Generate-Manifest-SBOMs:
+    needs: Build
+    if: inputs.dry_run != true
+    permissions:
+      packages: read
+      actions: write
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tag: ["${{ needs.Build.outputs.image_tag }}", "latest"]
+        repo:
+          [
+            "docker.io/nickfedor/watchtower",
+            "ghcr.io/nicholas-fedor/watchtower",
+          ]
+    steps:
+      - name: Generate SBOM
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
+        with:
+          image: ${{ matrix.repo }}:${{ matrix.tag }}
+          format: spdx-json
+          artifact-name: ${{ matrix.repo }}-manifest-${{ matrix.tag }}.sbom.json
+          upload-artifact: true
 
   Update-Go-docs:
-    uses: ./.github/workflows/update-go-docs.yaml
     needs:
       - Test
       - Build
     permissions:
       contents: read
+    uses: ./.github/workflows/update-go-docs.yaml

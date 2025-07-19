@@ -38,7 +38,7 @@ cd watchtower
 
 Watchtower uses [Golangci-lint](https://golangci-lint.run/) to help maintain code quality.
 It uses a `.golangci.yaml` configuration file in the root directory.
-It can be installed locally using the instructions [here](https://golangci-lint.run/welcome/install/#local-installation).
+It can be installed locally using the following [instructions](https://golangci-lint.run/welcome/install/#local-installation).
 
 To use the linter, run the following from the root directory:
 
@@ -71,7 +71,9 @@ go test ./... -v
 
 ### Binary
 
-To build the Watchtower binary, run the following from the root directory:
+To build the Watchtower binary, you can use either `go build` directly or GoReleaser for multi-architecture binaries. The following commands are run from the root directory:
+
+#### Using go build
 
 ```bash
 go build                               # compiles and packages an executable binary, watchtower
@@ -81,16 +83,30 @@ go test ./... -v                       # runs tests with verbose output
 
 If you don't have it enabled, you'll either have to prefix each command with `GO111MODULE=on` or run `export GO111MODULE=on` before running the commands. [You can read more about modules here.](https://github.com/golang/go/wiki/Modules)
 
-### Docker Image
+#### Using GoReleaser
 
-To build a Watchtower image of your own, use the self-contained Dockerfiles. As the main Dockerfile, they can be found in `dockerfiles/`:
-
-* `dockerfiles/Dockerfile.dev-self-contained` will build an image based on your current local Watchtower files.
-* `dockerfiles/Dockerfile.self-contained` will build an image based on current Watchtower's repository on GitHub.
+To build binaries for multiple architectures (matching dev workflow), use GoReleaser with the dev configuration:
 
 ```bash
-sudo docker build . -f dockerfiles/Dockerfile.dev-self-contained -t nickfedor/watchtower # to build an image from local files
+goreleaser build --snapshot --clean --config build/goreleaser/dev.yml  # builds binaries to dist/
 ```
+
+* Ensure GoReleaser is installed locally: `go install github.com/goreleaser/goreleaser/v2@latest`.
+* The `--snapshot` flag avoids requiring a Git tag, suitable for dev.
+* This generates binaries for linux/amd64, linux/arm64, linux/arm/v6, linux/386, linux/riscv64, and windows/amd64, windows/386, windows/arm, windows/arm64 in `dist/`. Use these for local testing or Docker builds with `/build/docker/Dockerfile.dev`.
+
+### Docker Image
+
+To build a Watchtower image of your own, use the self-contained Dockerfiles in /build/docker/:
+
+* `/build/docker/Dockerfile.self-local` will build an image based on your current local Watchtower files.
+* `/build/docker/Dockerfile.self-github` will build an image based on current Watchtower's repository on GitHub.
+
+```bash
+sudo docker build . -f build/docker/Dockerfile.self-local -t nickfedor/watchtower # to build an image from local files
+```
+
+For multi-arch builds, use Docker Buildx and GoReleaser configs in /build/goreleaser/ for prebuilding binaries.
 
 ## Submitting Pull Requests
 

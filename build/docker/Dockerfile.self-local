@@ -15,15 +15,15 @@ COPY go.sum .
 RUN go mod download
 
 RUN apk add --no-cache \
-  alpine-sdk \
-  ca-certificates \
-  git \
-  tzdata
+    alpine-sdk \
+    ca-certificates \
+    git \
+    tzdata
 
 COPY . /watchtower
 
 RUN cd /watchtower && \
-  GO111MODULE=on CGO_ENABLED=0 go build -a -ldflags "-extldflags '-static' -X github.com/nicholas-fedor/watchtower/internal/meta.Version=$(git describe --tags) -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v$(git describe --tags)" .
+    GO111MODULE=on CGO_ENABLED=0 go build -a -ldflags "-extldflags '-static' -X github.com/nicholas-fedor/watchtower/internal/meta.Version=$(git describe --tags) -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v$(git describe --tags)" .
 
 
 #
@@ -34,12 +34,12 @@ FROM scratch
 
 LABEL "com.centurylinklabs.watchtower"="true"
 LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtower/" \
-  "org.opencontainers.image.documentation"="https://nicholas-fedor.github.io/watchtower/" \
-  "org.opencontainers.image.source"="https://github.com/nicholas-fedor/watchtower" \
-  "org.opencontainers.image.licenses"="Apache-2.0" \
-  "org.opencontainers.image.title"="Watchtower" \
-  "org.opencontainers.image.description"="A process for automating Docker container base image updates." \
-  "org.opencontainers.image.base.name"="alpine"
+    "org.opencontainers.image.documentation"="https://nicholas-fedor.github.io/watchtower/" \
+    "org.opencontainers.image.source"="https://github.com/nicholas-fedor/watchtower" \
+    "org.opencontainers.image.licenses"="Apache-2.0" \
+    "org.opencontainers.image.title"="Watchtower" \
+    "org.opencontainers.image.description"="A process for automating Docker container base image updates." \
+    "org.opencontainers.image.base.name"="alpine"
 
 # copy files from other container
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt

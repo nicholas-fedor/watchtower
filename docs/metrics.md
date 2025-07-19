@@ -9,7 +9,7 @@ as well as creating a port mapping for your container for port `8080`.
 
 The metrics API endpoint is `/v1/metrics`.
 
-## Available Metrics 
+## Available Metrics
 
 | Name                            | Type    | Description                                                                 |
 | ------------------------------- | ------- | --------------------------------------------------------------------------- |
@@ -36,7 +36,7 @@ Replace `demotoken` with the Bearer token you have set accordingly.
 
 ## Demo
 
-The repository contains a demo with prometheus and grafana, available through `docker-compose.yml`. This demo
+The repository contains a demo with prometheus and grafana, available through `/examples/metrics/docker-compose.yml`. This demo
 is preconfigured with a dashboard, which will look something like this:
 
 ![grafana metrics](assets/grafana-dashboard.png)
