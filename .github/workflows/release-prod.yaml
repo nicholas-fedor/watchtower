@@ -160,7 +160,7 @@ jobs:
           ]
     steps:
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
         with:
           image: ${{ matrix.repo }}:${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}
           format: spdx-json
@@ -181,7 +181,7 @@ jobs:
           ]
     steps:
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@cee1b8e05ae5b2593a75e197229729eabaa9f8ec
         with:
           image: ${{ matrix.repo }}:${{ matrix.tag }}
           format: spdx-json
