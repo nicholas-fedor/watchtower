@@ -9,7 +9,6 @@ builds:
     goarch:
       - amd64
       - "386"
-      - arm
       - arm64
       - riscv64
     goriscv64:
@@ -21,6 +20,22 @@ builds:
       - -s -w
       - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
       - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
+  - main: ./main.go
+    binary: watchtower
+    goos:
+      - linux
+      - windows
+    goarch:
+      - arm
+    goarm:
+      - 6
+    ldflags:
+      - -s -w
+      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
+      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
+    ignore:
+      - goos: windows
+        goarch: arm
 
 sboms:
   - artifacts: binary # SBOMs for security (Syft format)
