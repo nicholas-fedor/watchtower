@@ -119,7 +119,6 @@ jobs:
         with:
           image: ${{ matrix.repo }}:${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}
           format: spdx-json
-          output-file: ${{ matrix.repo }}-${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}.sbom.json
           artifact-name: ${{ matrix.repo }}-${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}.sbom.json
           upload-artifact: true
 
@@ -141,7 +140,6 @@ jobs:
         with:
           image: ${{ matrix.repo }}:${{ matrix.tag }}
           format: spdx-json
-          output-file: ${{ matrix.repo }}-manifest-${{ matrix.tag }}.sbom.json
           artifact-name: ${{ matrix.repo }}-manifest-${{ matrix.tag }}.sbom.json
           upload-artifact: true
 
