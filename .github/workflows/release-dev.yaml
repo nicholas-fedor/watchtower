@@ -59,12 +59,22 @@ jobs:
           path: |
             dist/*/watchtower*
             !dist/*.sbom
+            !dist/*.docker.sbom
+          if-no-files-found: error
 
-      - name: Upload SBOMs
+      - name: Upload binary SBOMs
         uses: actions/upload-artifact@v4
         with:
-          name: dev-sboms
+          name: dev-binary-sboms
           path: dist/*.sbom
+          if-no-files-found: error
+
+      - name: Upload Docker image SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-docker-sboms
+          path: dist/*.docker.sbom
+          if-no-files-found: error
 
   Build-and-Push-Per-Arch:
     needs: Build-Binaries
