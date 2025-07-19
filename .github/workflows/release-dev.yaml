@@ -166,6 +166,7 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Registry Logins

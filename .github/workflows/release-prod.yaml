@@ -149,6 +149,9 @@ jobs:
   Generate-Per-Arch-SBOMs:
     needs: Build
     if: inputs.dry_run != true
+    permissions:
+      packages: read
+      contents: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -170,6 +173,9 @@ jobs:
   Generate-Manifest-SBOMs:
     needs: Build
     if: inputs.dry_run != true
+    permissions:
+      packages: read
+      contents: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
