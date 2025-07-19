@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
 builds:
@@ -11,6 +12,8 @@ builds:
       - "386"
       - arm64
       - riscv64
+    goamd64:
+      - v1
     goriscv64:
       - rva20u64
     ignore:
@@ -28,7 +31,7 @@ builds:
     goarch:
       - arm
     goarm:
-      - 6
+      - "6"
     ldflags:
       - -s -w
       - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
