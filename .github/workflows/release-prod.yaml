@@ -3,39 +3,36 @@ name: Release (Production)
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Dry run the workflow without pushing"
-        type: boolean
-        default: false
+      dry-run:
+        description: "Run in test mode without publishing artifacts"
         required: false
+        default: false
+        type: boolean
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
-      - "**/v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
 
 jobs:
-  Test:
+  test:
     uses: ./.github/workflows/test.yaml
     permissions:
       contents: read
 
-  Build:
-    needs: Test
+  build-binaries-and-release:
+    needs: test
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
       attestations: write
       id-token: write
-      actions: write
-    runs-on: ubuntu-latest
-    env:
-      CGO_ENABLED: 0
-      GO_VERSION: 1.24.x
-      TAG: ${{ github.ref_name }}
-    outputs:
-      image_tag: ${{ steps.extract-tag.outputs.image_tag }}
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
         with:
           fetch-depth: 0
@@ -43,21 +40,17 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Install Syft
-        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          go-version: 1.24.x
 
       - name: Login to Docker Hub
-        if: inputs.dry_run != true
+        if: ${{ !inputs.dry-run }}
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
-        if: inputs.dry_run != true
+        if: ${{ !inputs.dry-run }}
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           registry: ghcr.io
@@ -69,150 +62,31 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --config build/goreleaser/prod.yml ${{ inputs.dry_run && '--snapshot --clean --skip=publish' || '' }}
+          args: release --config build/goreleaser/prod.yml ${{ inputs.dry-run && '--snapshot --clean --skip=publish' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload binary SBOMs
-        if: inputs.dry_run != true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ !inputs.dry-run }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: prod-binary-sboms
           path: dist/*.sbom
           if-no-files-found: warn
 
       - name: Generate artifact attestation
-        if: inputs.dry_run != true
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        if: ${{ !inputs.dry-run }}
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
         with:
           subject-checksums: ./dist/checksums.txt
-
-      - name: Install jq
-        if: inputs.dry_run != true
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Extract image tag
-        if: inputs.dry_run != true
-        id: extract-tag
-        run: echo "image_tag=${TAG#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Calculate digest for Docker Hub version
-        if: inputs.dry_run != true
-        id: digest-docker-version
-        run: |
-          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-
-      - name: Attest Docker Hub version manifest
-        if: inputs.dry_run != true
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: docker.io/nickfedor/watchtower
-          subject-digest: ${{ steps.digest-docker-version.outputs.digest }}
-          push-to-registry: true
-
-      - name: Calculate digest for Docker Hub latest
-        if: inputs.dry_run != true
-        id: digest-docker-latest
-        run: |
-          digest=$(docker manifest inspect "docker.io/nickfedor/watchtower:latest" | jq -r '.Descriptor.digest')
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-
-      - name: Attest Docker Hub latest manifest
-        if: inputs.dry_run != true
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: docker.io/nickfedor/watchtower
-          subject-digest: ${{ steps.digest-docker-latest.outputs.digest }}
-          push-to-registry: true
-
-      - name: Calculate digest for GHCR version
-        if: inputs.dry_run != true
-        id: digest-ghcr-version
-        run: |
-          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:${{ steps.extract-tag.outputs.image_tag }}" | jq -r '.Descriptor.digest')
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-
-      - name: Attest GHCR version manifest
-        if: inputs.dry_run != true
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.digest-ghcr-version.outputs.digest }}
-          push-to-registry: true
-
-      - name: Calculate digest for GHCR latest
-        if: inputs.dry_run != true
-        id: digest-ghcr-latest
-        run: |
-          digest=$(docker manifest inspect "ghcr.io/${{ github.repository }}:latest" | jq -r '.Descriptor.digest')
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-
-      - name: Attest GHCR latest manifest
-        if: inputs.dry_run != true
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.digest-ghcr-latest.outputs.digest }}
-          push-to-registry: true
 
       - name: Clean up dist directory
         if: always()
         run: rm -rf dist
 
-  Generate-Per-Arch-SBOMs:
-    needs: Build
-    if: inputs.dry_run != true
-    permissions:
-      packages: read
-      actions: write
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: ["amd64", "i386", "armhf", "arm64v8", "riscv64"]
-        repo:
-          [
-            "docker.io/nickfedor/watchtower",
-            "ghcr.io/nicholas-fedor/watchtower",
-          ]
-    steps:
-      - name: Generate SBOM
-        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
-        with:
-          image: ${{ matrix.repo }}:${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}
-          format: spdx-json
-          artifact-name: ${{ matrix.repo }}-${{ matrix.arch }}-${{ needs.Build.outputs.image_tag }}.sbom.json
-          upload-artifact: true
-
-  Generate-Manifest-SBOMs:
-    needs: Build
-    if: inputs.dry_run != true
-    permissions:
-      packages: read
-      actions: write
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        tag: ["${{ needs.Build.outputs.image_tag }}", "latest"]
-        repo:
-          [
-            "docker.io/nickfedor/watchtower",
-            "ghcr.io/nicholas-fedor/watchtower",
-          ]
-    steps:
-      - name: Generate SBOM
-        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
-        with:
-          image: ${{ matrix.repo }}:${{ matrix.tag }}
-          format: spdx-json
-          artifact-name: ${{ matrix.repo }}-manifest-${{ matrix.tag }}.sbom.json
-          upload-artifact: true
-
-  Update-Go-docs:
-    needs:
-      - Test
-      - Build
-    if: inputs.dry_run != true
+  update-go-docs:
+    needs: [test, build-binaries-and-release]
+    if: ${{ !inputs.dry-run }}
     permissions:
       contents: read
     uses: ./.github/workflows/update-go-docs.yaml

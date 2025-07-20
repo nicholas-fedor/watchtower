@@ -1,0 +1,107 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+builds:
+  - main: ./main.go
+    binary: watchtower
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - "386"
+      - arm
+      - arm64
+      - riscv64
+    goriscv64:
+      - rva20u64
+    ignore:
+      - goos: windows
+        goarch: riscv64
+    ldflags:
+      - -s -w
+      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version=dev
+      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/dev
+
+dockers:
+  - use: buildx
+    dockerfile: build/docker/Dockerfile
+    image_templates:
+      - nickfedor/watchtower:amd64-dev
+      - ghcr.io/nicholas-fedor/watchtower:amd64-dev
+    build_flag_templates:
+      - "--attest=type=provenance,mode=max"
+      - "--attest=type=sbom"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+  - use: buildx
+    dockerfile: build/docker/Dockerfile
+    goarch: "386"
+    image_templates:
+      - nickfedor/watchtower:i386-dev
+      - ghcr.io/nicholas-fedor/watchtower:i386-dev
+    build_flag_templates:
+      - "--attest=type=provenance,mode=max"
+      - "--attest=type=sbom"
+      - "--platform=linux/386"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+  - use: buildx
+    dockerfile: build/docker/Dockerfile
+    goarch: arm
+    goarm: "6"
+    image_templates:
+      - nickfedor/watchtower:armhf-dev
+      - ghcr.io/nicholas-fedor/watchtower:armhf-dev
+    build_flag_templates:
+      - "--attest=type=provenance,mode=max"
+      - "--attest=type=sbom"
+      - "--platform=linux/arm/v6"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+  - use: buildx
+    dockerfile: build/docker/Dockerfile
+    goarch: arm64
+    image_templates:
+      - nickfedor/watchtower:arm64v8-dev
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
+    build_flag_templates:
+      - "--attest=type=provenance,mode=max"
+      - "--attest=type=sbom"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+  - use: buildx
+    dockerfile: build/docker/Dockerfile
+    goarch: riscv64
+    image_templates:
+      - nickfedor/watchtower:riscv64-dev
+      - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
+    build_flag_templates:
+      - "--attest=type=provenance,mode=max"
+      - "--attest=type=sbom"
+      - "--platform=linux/riscv64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+
+docker_manifests:
+  - name_template: nickfedor/watchtower:latest-dev
+    image_templates:
+      - nickfedor/watchtower:amd64-dev
+      - nickfedor/watchtower:i386-dev
+      - nickfedor/watchtower:armhf-dev
+      - nickfedor/watchtower:arm64v8-dev
+      - nickfedor/watchtower:riscv64-dev
+  - name_template: ghcr.io/nicholas-fedor/watchtower:latest-dev
+    image_templates:
+      - ghcr.io/nicholas-fedor/watchtower:amd64-dev
+      - ghcr.io/nicholas-fedor/watchtower:i386-dev
+      - ghcr.io/nicholas-fedor/watchtower:armhf-dev
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
+      - ghcr.io/nicholas-fedor/watchtower:riscv64-dev

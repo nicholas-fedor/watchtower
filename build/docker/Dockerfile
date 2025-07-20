@@ -8,10 +8,6 @@ RUN apk add --no-cache \
 
 FROM scratch
 
-ARG TARGETOS
-ARG TARGETARCH
-ARG PREFIX=watchtower
-
 LABEL "com.centurylinklabs.watchtower"="true"
 LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtower/" \
   "org.opencontainers.image.documentation"="https://nicholas-fedor.github.io/watchtower/" \
@@ -19,14 +15,16 @@ LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtowe
   "org.opencontainers.image.licenses"="Apache-2.0" \
   "org.opencontainers.image.title"="Watchtower" \
   "org.opencontainers.image.description"="A process for automating Docker container base image updates." \
-  "org.opencontainers.image.base.name"="alpine"
+  "org.opencontainers.image.base.name"="$BASE_IMAGE"
 
 # Copy ca-certs and timezone from builder
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
-# Copy prebuilt binary from dist/ (e.g., dist/watchtower_linux_amd64/watchtower)
-COPY dist/${PREFIX}_${TARGETOS}_${TARGETARCH}/watchtower /watchtower
+# Copy prebuilt binary (GoReleaser places it as 'watchtower' in context)
+COPY watchtower /watchtower
+
+EXPOSE 8080
 
 HEALTHCHECK CMD ["/watchtower", "--health-check"]
 

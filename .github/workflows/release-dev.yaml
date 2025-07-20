@@ -32,29 +32,6 @@ jobs:
   build-images:
     needs: test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch:
-          - goarch: amd64
-            goarm: ""
-            docker_platform: amd64
-            tag_suffix: amd64
-          - goarch: "386"
-            goarm: ""
-            docker_platform: "386"
-            tag_suffix: i386
-          - goarch: arm
-            goarm: "7"
-            docker_platform: arm/v7
-            tag_suffix: armhf
-          - goarch: arm64
-            goarm: ""
-            docker_platform: arm64
-            tag_suffix: arm64v8
-          - goarch: riscv64
-            goarm: ""
-            docker_platform: riscv64
-            tag_suffix: riscv64
     steps:
       - name: Checkout code
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
@@ -66,15 +43,6 @@ jobs:
         with:
           go-version: 1.24.x
 
-      - name: Install dependencies
-        run: go mod download
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
-
       - name: Login to Docker Hub
         if: ${{ !inputs.dry-run }}
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
@@ -90,69 +58,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build binary for ${{ matrix.arch.goarch }}
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --config build/goreleaser/dev.yml --snapshot --clean ${{ inputs.dry-run && '--skip=publish' || '' }}
         env:
-          GOOS: linux
-          GOARCH: ${{ matrix.arch.goarch }}
-          GOARM: ${{ matrix.arch.goarm }}
-          CGO_ENABLED: 0
-          PREFIX: watchtower
-        run: |
-          mkdir -p dist/${PREFIX}_${GOOS}_${GOARCH}
-          go build -o dist/${PREFIX}_${GOOS}_${GOARCH}/watchtower \
-            -ldflags="-s -w -X github.com/nicholas-fedor/watchtower/internal/meta.Version=dev -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/dev" \
-            main.go
-
-      - name: Build and optionally push image for ${{ matrix.arch.goarch }}
-        run: |
-          docker buildx build \
-            --file build/docker/Dockerfile.dev \
-            --build-arg PREFIX=watchtower \
-            --build-arg TARGETOS=linux \
-            --build-arg TARGETARCH=${{ matrix.arch.goarch }} \
-            --tag docker.io/nickfedor/watchtower:${{ matrix.arch.tag_suffix }}-dev \
-            --tag ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch.tag_suffix }}-dev \
-            --attest=type=provenance,mode=max \
-            --attest=type=sbom \
-            --platform=linux/${{ matrix.arch.docker_platform }} \
-            ${{ inputs.dry-run == true && '' || '--push' }} \
-            .
-
-  create-manifests:
-    runs-on: ubuntu-latest
-    needs: build-images
-    if: ${{ !inputs.dry-run }}
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to GHCR
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create and push manifest for Docker Hub
-        run: |
-          docker buildx imagetools create -t docker.io/nickfedor/watchtower:latest-dev \
-            docker.io/nickfedor/watchtower:amd64-dev \
-            docker.io/nickfedor/watchtower:i386-dev \
-            docker.io/nickfedor/watchtower:armhf-dev \
-            docker.io/nickfedor/watchtower:arm64v8-dev \
-            docker.io/nickfedor/watchtower:riscv64-dev
-
-      - name: Create and push manifest for GHCR
-        run: |
-          docker buildx imagetools create -t ghcr.io/nicholas-fedor/watchtower:latest-dev \
-            ghcr.io/nicholas-fedor/watchtower:amd64-dev \
-            ghcr.io/nicholas-fedor/watchtower:i386-dev \
-            ghcr.io/nicholas-fedor/watchtower:armhf-dev \
-            ghcr.io/nicholas-fedor/watchtower:arm64v8-dev \
-            ghcr.io/nicholas-fedor/watchtower:riscv64-dev
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
