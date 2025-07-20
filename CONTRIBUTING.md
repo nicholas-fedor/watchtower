@@ -71,7 +71,7 @@ go test ./... -v
 
 ### Binary
 
-To build the Watchtower binary, you can use either `go build` directly or GoReleaser for multi-architecture binaries. The following commands are run from the root directory:
+To build the Watchtower binary, use `go build` for your local architecture or cross-compile for others. The following commands are run from the root directory:
 
 #### Using go build
 
@@ -83,17 +83,11 @@ go test ./... -v                       # runs tests with verbose output
 
 If you don't have it enabled, you'll either have to prefix each command with `GO111MODULE=on` or run `export GO111MODULE=on` before running the commands. [You can read more about modules here.](https://github.com/golang/go/wiki/Modules)
 
-#### Using GoReleaser
-
-To build binaries for multiple architectures (matching dev workflow), use GoReleaser with the dev configuration:
+For cross-compiling to other architectures (e.g., amd64, arm64, arm/v7, 386, riscv64), set environment variables like `GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0` before running `go build`. Example for arm/v7:
 
 ```bash
-goreleaser build --snapshot --clean --config build/goreleaser/dev.yml  # builds binaries to dist/
+GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -o watchtower-armhf
 ```
-
-* Ensure GoReleaser is installed locally: `go install github.com/goreleaser/goreleaser/v2@latest`.
-* The `--snapshot` flag avoids requiring a Git tag, suitable for dev.
-* This generates binaries for linux/amd64, linux/arm64, linux/arm/v6, linux/386, linux/riscv64, and windows/amd64, windows/386, windows/arm, windows/arm64 in `dist/`. Use these for local testing or Docker builds with `/build/docker/Dockerfile.dev`.
 
 ### Docker Image
 
@@ -103,10 +97,10 @@ To build a Watchtower image of your own, use the self-contained Dockerfiles in /
 * `/build/docker/Dockerfile.self-github` will build an image based on current Watchtower's repository on GitHub.
 
 ```bash
-sudo docker build . -f build/docker/Dockerfile.self-local -t nickfedor/watchtower # to build an image from local files
+docker build . -f build/docker/Dockerfile.self-local -t nickfedor/watchtower # to build an image from local files
 ```
 
-For multi-arch builds, use Docker Buildx and GoReleaser configs in /build/goreleaser/ for prebuilding binaries.
+For multi-architecture dev images (amd64, i386, armhf, arm64v8, riscv64), use Docker Buildx after cross-compiling binaries to `dist/watchtower_linux_{GOARCH}/watchtower` (matching the dev workflow structure). Alternatively, trigger the `release-dev.yaml` workflow manually via GitHub Actions for dev image builds with SBOM and provenance attestations.
 
 ## Submitting Pull Requests
 
