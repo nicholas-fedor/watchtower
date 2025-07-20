@@ -61,14 +61,14 @@ jobs:
 
       - name: Login to Docker Hub
         if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
         if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -111,13 +111,13 @@ jobs:
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
       - name: Login to Docker Hub
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
