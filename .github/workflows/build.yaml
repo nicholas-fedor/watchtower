@@ -1,0 +1,98 @@
+name: Build Release
+
+on:
+  workflow_call:
+    inputs:
+      build-type:
+        description: "Type of build (prod or dev)"
+        required: true
+        type: string
+      dry-run:
+        description: "Run in test mode without publishing artifacts"
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - name: Validate build-type input
+        run: |
+          if [[ "${{ inputs.build-type }}" != "prod" && "${{ inputs.build-type }}" != "dev" ]]; then
+            echo "Error: build-type must be 'prod' or 'dev', got '${{ inputs.build-type }}'"
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
+        with:
+          go-version: 1.24.x
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
+        with:
+          platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+        with:
+          driver: docker-container
+          platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
+          use: true
+
+      - name: Login to Docker Hub
+        if: ${{ !inputs.dry-run }}
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        if: ${{ !inputs.dry-run }}
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
+        with:
+          distribution: goreleaser
+          version: v2.3.2
+          args: release --config build/goreleaser/${{ inputs.build-type }}.yml --snapshot --clean ${{ inputs.dry-run && '--skip=publish' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload binary SBOMs
+        if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
+        uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
+        with:
+          name: ${{ inputs.build-type }}-binary-sboms
+          path: dist/*.sbom
+          if-no-files-found: warn
+
+      - name: Generate artifact attestation
+        if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
+        uses: actions/attest-build-provenance@f923cf69427d7ac614fbcc05e12232908c3f031b
+        with:
+          subject-checksums: ./dist/checksums.txt
+
+      - name: Clean up dist directory
+        if: always()
+        run: rm -rf dist
