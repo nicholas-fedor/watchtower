@@ -1,284 +1,144 @@
-name: Release (Dev)
+name: Release Dev Images
 
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Dry run the workflow without pushing"
-        type: boolean
-        default: false
+      dry-run:
+        description: "Run in test mode without publishing artifacts"
         required: false
-  push:
-    branches:
-      - main
-    paths:
-      - cmd/**
-      - internal/**
-      - pkg/**
-      - go.mod
-      - go.sum
-      - main.go
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write # For GHCR
 
 jobs:
-  Test:
-    uses: ./.github/workflows/test.yaml
-    permissions:
-      contents: read
-
-  Build-Binaries:
-    needs: Test
-    permissions:
-      contents: read
-      actions: write
+  build-images:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - goarch: amd64
+            goarm: ""
+            docker_platform: amd64
+            tag_suffix: amd64
+          - goarch: "386"
+            goarm: ""
+            docker_platform: "386"
+            tag_suffix: i386
+          - goarch: arm
+            goarm: "7"
+            docker_platform: arm/v7
+            tag_suffix: armhf
+          - goarch: arm64
+            goarm: ""
+            docker_platform: arm64
+            tag_suffix: arm64v8
+          - goarch: riscv64
+            goarm: ""
+            docker_platform: riscv64
+            tag_suffix: riscv64
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
         with:
           fetch-depth: 0
-          fetch-tags: true
 
       - name: Set up Go
         uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
         with:
           go-version: 1.24.x
-          cache: true
 
-      - name: Run GoReleaser for dev binaries
-        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: build --snapshot --clean --config build/goreleaser/dev.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload binaries and SBOMs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: dev-artifacts
-          path: dist/*
-          if-no-files-found: warn
-
-  Build-and-Push-Per-Arch:
-    needs: Build-Binaries
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-      actions: write
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - platform: amd64
-            arch_tag: amd64
-            norm_arch: amd64_v1
-            prefix: watchtower-multiarch
-          - platform: i386
-            arch_tag: i386
-            norm_arch: 386_sse2
-            prefix: watchtower-multiarch
-          - platform: arm/v6
-            arch_tag: armhf
-            norm_arch: arm_6
-            prefix: watchtower-armv6
-          - platform: arm64/v8
-            arch_tag: arm64v8
-            norm_arch: arm64_v8.0
-            prefix: watchtower-multiarch
-          - platform: riscv64
-            arch_tag: riscv64
-            norm_arch: riscv64_rva20u64
-            prefix: watchtower-multiarch
-    steps:
-      - name: Checkout
-        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
-        with:
-          fetch-depth: 0
-
-      - name: Download artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: dev-artifacts
-          path: .
+      - name: Install dependencies
+        run: go mod download
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
       - name: Login to Docker Hub
-        if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        if: ${{ !inputs.dry-run }}
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
-        if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        if: ${{ !inputs.dry-run }}
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push per-arch image
-        id: build
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
-        with:
-          context: .
-          file: build/docker/Dockerfile.dev
-          platforms: linux/${{ matrix.platform }}
-          push: ${{ github.event.inputs.dry_run != 'true' }}
-          tags: |
-            nickfedor/watchtower:${{ matrix.arch_tag }}-dev
-            ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            TARGETARCH=${{ matrix.norm_arch }}
-            TARGETOS=linux
-            PREFIX=${{ matrix.prefix }}
-
-      - name: Pull per-arch image for SBOM
-        if: github.event.inputs.dry_run != 'true'
+      - name: Build binary for ${{ matrix.arch.goarch }}
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch.goarch }}
+          GOARM: ${{ matrix.arch.goarm }}
+          CGO_ENABLED: 0
+          PREFIX: watchtower
         run: |
-          docker pull --platform linux/${{ matrix.platform }} nickfedor/watchtower:${{ matrix.arch_tag }}-dev || { echo "Failed to pull Docker Hub image"; exit 1; }
-          docker pull --platform linux/${{ matrix.platform }} ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev || { echo "Failed to pull GHCR image"; exit 1; }
+          mkdir -p dist/${PREFIX}_${GOOS}_${GOARCH}
+          go build -o dist/${PREFIX}_${GOOS}_${GOARCH}/watchtower \
+            -ldflags="-s -w -X github.com/nicholas-fedor/watchtower/internal/meta.Version=dev -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/dev" \
+            main.go
 
-      - name: Generate per-arch SBOM for Docker Hub
-        if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
-        with:
-          image: nickfedor/watchtower:${{ matrix.arch_tag }}-dev
-          format: spdx-json
-          artifact-name: ${{ matrix.arch_tag }}-dev.sbom.json
-          upload-artifact: true
-
-      - name: Generate per-arch SBOM for GHCR
-        if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
-        with:
-          image: ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
-          format: spdx-json
-          artifact-name: ghcr-${{ matrix.arch_tag }}-dev.sbom.json
-          upload-artifact: true
-
-      - name: Clean up pulled images
-        if: github.event.inputs.dry_run != 'true'
+      - name: Build and optionally push image for ${{ matrix.arch.goarch }}
         run: |
-          docker image rm nickfedor/watchtower:${{ matrix.arch_tag }}-dev || true
-          docker image rm ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev || true
+          docker buildx build \
+            --file build/docker/Dockerfile.dev \
+            --build-arg PREFIX=watchtower \
+            --build-arg TARGETOS=linux \
+            --build-arg TARGETARCH=${{ matrix.arch.goarch }} \
+            --tag docker.io/nickfedor/watchtower:${{ matrix.arch.tag_suffix }}-dev \
+            --tag ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch.tag_suffix }}-dev \
+            --attest=type=provenance,mode=max \
+            --attest=type=sbom \
+            --platform=linux/${{ matrix.arch.docker_platform }} \
+            ${{ inputs.dry-run == true && '' || '--push' }} \
+            .
 
-      - name: Verify Docker Hub auth
-        if: github.event.inputs.dry_run != 'true'
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
-
-      - name: Attest per-arch Docker Hub image
-        if: github.event.inputs.dry_run != 'true'
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: docker.io/nickfedor/watchtower/${{ matrix.arch_tag }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
-          github-token: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Attest per-arch GHCR image
-        if: github.event.inputs.dry_run != 'true'
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: ghcr.io/${{ github.repository }}/${{ matrix.arch_tag }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  Create-Manifest-and-Attest:
-    needs: Build-and-Push-Per-Arch
-    permissions:
-      packages: write
-      attestations: write
-      id-token: write
-      actions: write
+  create-manifests:
     runs-on: ubuntu-latest
+    needs: build-images
+    if: ${{ !inputs.dry-run }}
     steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+
       - name: Login to Docker Hub
-        if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
-        if: github.event.inputs.dry_run != 'true'
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create and push manifests
-        if: github.event.inputs.dry_run != 'true'
+      - name: Create and push manifest for Docker Hub
         run: |
-          ARCHES=("amd64" "i386" "armhf" "arm64v8" "riscv64")
-          for repo in "nickfedor/watchtower" "ghcr.io/nicholas-fedor/watchtower"; do
-            manifest="${repo}:latest-dev"
-            images=()
-            for arch in "${ARCHES[@]}"; do
-              images+=("${repo}:${arch}-dev")
-            done
-            docker manifest create "$manifest" "${images[@]}"
-            docker manifest push "$manifest"
-          done
+          docker manifest create docker.io/nickfedor/watchtower:latest-dev \
+            --amend docker.io/nickfedor/watchtower:amd64-dev \
+            --amend docker.io/nickfedor/watchtower:i386-dev \
+            --amend docker.io/nickfedor/watchtower:armhf-dev \
+            --amend docker.io/nickfedor/watchtower:arm64v8-dev \
+            --amend docker.io/nickfedor/watchtower:riscv64-dev
+          docker manifest push docker.io/nickfedor/watchtower:latest-dev
 
-      - name: Pull manifest images for SBOM
-        if: github.event.inputs.dry_run != 'true'
+      - name: Create and push manifest for GHCR
         run: |
-          docker pull nickfedor/watchtower:latest-dev || { echo "Failed to pull Docker Hub manifest"; exit 1; }
-          docker pull ghcr.io/nicholas-fedor/watchtower:latest-dev || { echo "Failed to pull GHCR manifest"; exit 1; }
-
-      - name: Generate manifest SBOM for Docker Hub
-        if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
-        with:
-          image: nickfedor/watchtower:latest-dev
-          format: spdx-json
-          artifact-name: latest-dev.sbom.json
-          upload-artifact: true
-
-      - name: Generate manifest SBOM for GHCR
-        if: github.event.inputs.dry_run != 'true'
-        uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
-        with:
-          image: ghcr.io/nicholas-fedor/watchtower:latest-dev
-          format: spdx-json
-          artifact-name: ghcr-latest-dev.sbom.json
-          upload-artifact: true
-
-      - name: Verify Docker Hub auth
-        if: github.event.inputs.dry_run != 'true'
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
-
-      - name: Attest Docker Hub manifest
-        if: github.event.inputs.dry_run != 'true'
-        id: attest-docker
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: docker.io/nickfedor/watchtower
-          subject-digest: sha256:$(docker manifest inspect docker.io/nickfedor/watchtower:latest-dev | jq -r '.Descriptor.digest')
-          push-to-registry: true
-          github-token: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Attest GHCR manifest
-        if: github.event.inputs.dry_run != 'true'
-        id: attest-ghcr
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: sha256:$(docker manifest inspect ghcr.io/${{ github.repository }}:latest-dev | jq -r '.Descriptor.digest')
-          push-to-registry: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          docker manifest create ghcr.io/nicholas-fedor/watchtower:latest-dev \
+            --amend ghcr.io/nicholas-fedor/watchtower:amd64-dev \
+            --amend ghcr.io/nicholas-fedor/watchtower:i386-dev \
+            --amend ghcr.io/nicholas-fedor/watchtower:armhf-dev \
+            --amend ghcr.io/nicholas-fedor/watchtower:arm64v8-dev \
+            --amend ghcr.io/nicholas-fedor/watchtower:riscv64-dev
+          docker manifest push ghcr.io/nicholas-fedor/watchtower:latest-dev
