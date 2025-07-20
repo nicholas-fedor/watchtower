@@ -1,4 +1,4 @@
-name: Release Dev Images
+name: Release Development
 
 on:
   workflow_dispatch:
