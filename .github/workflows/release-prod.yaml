@@ -49,11 +49,20 @@ jobs:
       - name: Install Syft
         run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Registry Logins
+      - name: Login to Docker Hub
         if: inputs.dry_run != true
-        uses: ./.github/workflows/registry-logins.yaml
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
-          dry_run: false
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        if: inputs.dry_run != true
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
