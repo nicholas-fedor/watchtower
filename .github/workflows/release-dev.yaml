@@ -176,7 +176,7 @@ jobs:
       - name: Verify Docker Hub auth
         if: github.event.inputs.dry_run != 'true'
         run: |
-          docker login --username ${{ secrets.DOCKERHUB_USERNAME }} registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
 
       - name: Attest per-arch Docker Hub image
         if: github.event.inputs.dry_run != 'true'
@@ -261,7 +261,7 @@ jobs:
       - name: Verify Docker Hub auth
         if: github.event.inputs.dry_run != 'true'
         run: |
-          docker login --username ${{ secrets.DOCKERHUB_USERNAME }} registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
 
       - name: Attest Docker Hub manifest
         if: github.event.inputs.dry_run != 'true'
