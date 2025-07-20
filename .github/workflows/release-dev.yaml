@@ -143,27 +143,35 @@ jobs:
             TARGETOS=linux
             PREFIX=${{ matrix.prefix }}
 
+      - name: Pull per-arch image for SBOM
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          docker pull --platform linux/${{ matrix.platform }} nickfedor/watchtower:${{ matrix.arch_tag }}-dev || { echo "Failed to pull Docker Hub image"; exit 1; }
+          docker pull --platform linux/${{ matrix.platform }} ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev || { echo "Failed to pull GHCR image"; exit 1; }
+
       - name: Generate per-arch SBOM for Docker Hub
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: nickfedor/watchtower:${{ matrix.arch_tag }}-dev
+          image: docker://nickfedor/watchtower:${{ matrix.arch_tag }}-dev
           format: spdx-json
           artifact-name: ${{ matrix.arch_tag }}-dev.sbom.json
           upload-artifact: true
-          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Generate per-arch SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
+          image: docker://ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
           format: spdx-json
           artifact-name: ghcr-${{ matrix.arch_tag }}-dev.sbom.json
           upload-artifact: true
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up pulled images
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          docker image rm nickfedor/watchtower:${{ matrix.arch_tag }}-dev || true
+          docker image rm ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev || true
 
       - name: Attest per-arch Docker Hub image
         if: github.event.inputs.dry_run != 'true'
@@ -219,27 +227,29 @@ jobs:
             docker manifest push "$manifest"
           done
 
+      - name: Pull manifest images for SBOM
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          docker pull nickfedor/watchtower:latest-dev || { echo "Failed to pull Docker Hub manifest"; exit 1; }
+          docker pull ghcr.io/nicholas-fedor/watchtower:latest-dev || { echo "Failed to pull GHCR manifest"; exit 1; }
+
       - name: Generate manifest SBOM for Docker Hub
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: nickfedor/watchtower:latest-dev
+          image: docker://nickfedor/watchtower:latest-dev
           format: spdx-json
           artifact-name: latest-dev.sbom.json
           upload-artifact: true
-          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Generate manifest SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: ghcr.io/nicholas-fedor/watchtower:latest-dev
+          image: docker://ghcr.io/nicholas-fedor/watchtower:latest-dev
           format: spdx-json
           artifact-name: ghcr-latest-dev.sbom.json
           upload-artifact: true
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Attest Docker Hub manifest
         if: github.event.inputs.dry_run != 'true'
