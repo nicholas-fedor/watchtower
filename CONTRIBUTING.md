@@ -69,9 +69,7 @@ go test ./... -v
 
 ## Building
 
-### Binary
-
-To build the Watchtower binary, use `go build` for your local architecture or cross-compile for others. The following commands are run from the root directory:
+### Binary and Archives
 
 #### Using go build
 
@@ -89,7 +87,29 @@ For cross-compiling to other architectures (e.g., amd64, arm64, arm/v7, 386, ris
 GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -o watchtower-armhf
 ```
 
+#### Using GoReleaser
+
+To build the Watchtower binary and archives for production releases, use GoReleaser with the `prod.yml` configuration. This handles cross-compilation, versioning, and packaging for multiple architectures (amd64, i386, armhf, arm64v8, riscv64) and OS (Linux, Windows).
+
+Trigger the `release-prod.yaml` workflow manually via GitHub Actions or on a tag push (e.g., `v1.2.3`) for full builds with SBOM and provenance attestations.
+
+For local testing, run GoReleaser in snapshot mode:
+
+```bash
+goreleaser release --config build/goreleaser/prod.yml --snapshot --clean
+```
+
+This produces binaries in `dist/` (e.g., `dist/watchtower_linux_amd64/watchtower`) and archives (e.g., `watchtower_linux_amd64_1.11.6.tar.gz` if versioned).
+
 ### Docker Image
+
+To build Watchtower images, use GoReleaser for multi-architecture support with attestations.
+
+For dev images, trigger the `release-dev.yaml` workflow manually or on main pushes to core files. Locally:
+
+```bash
+goreleaser release --config build/goreleaser/dev.yml --snapshot --clean
+```
 
 To build a Watchtower image of your own, use the self-contained Dockerfiles in /build/docker/:
 
@@ -101,6 +121,10 @@ docker build . -f build/docker/Dockerfile.self-local -t nickfedor/watchtower # t
 ```
 
 For multi-architecture dev images (amd64, i386, armhf, arm64v8, riscv64), use Docker Buildx after cross-compiling binaries to `dist/watchtower_linux_{GOARCH}/watchtower` (matching the dev workflow structure). Alternatively, trigger the `release-dev.yaml` workflow manually via GitHub Actions for dev image builds with SBOM and provenance attestations.
+
+For prod images (with binaries/archives), use the prod config as above.
+
+The shared `build/docker/Dockerfile` is used for both, with COPY watchtower /watchtower matching GoReleaser's binary placement.
 
 ## Submitting Pull Requests
 
