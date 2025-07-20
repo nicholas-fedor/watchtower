@@ -125,20 +125,18 @@ jobs:
 
       - name: Create and push manifest for Docker Hub
         run: |
-          docker manifest create docker.io/nickfedor/watchtower:latest-dev \
-            --amend docker.io/nickfedor/watchtower:amd64-dev \
-            --amend docker.io/nickfedor/watchtower:i386-dev \
-            --amend docker.io/nickfedor/watchtower:armhf-dev \
-            --amend docker.io/nickfedor/watchtower:arm64v8-dev \
-            --amend docker.io/nickfedor/watchtower:riscv64-dev
-          docker manifest push docker.io/nickfedor/watchtower:latest-dev
+          docker buildx imagetools create -t docker.io/nickfedor/watchtower:latest-dev \
+            docker.io/nickfedor/watchtower:amd64-dev \
+            docker.io/nickfedor/watchtower:i386-dev \
+            docker.io/nickfedor/watchtower:armhf-dev \
+            docker.io/nickfedor/watchtower:arm64v8-dev \
+            docker.io/nickfedor/watchtower:riscv64-dev
 
       - name: Create and push manifest for GHCR
         run: |
-          docker manifest create ghcr.io/nicholas-fedor/watchtower:latest-dev \
-            --amend ghcr.io/nicholas-fedor/watchtower:amd64-dev \
-            --amend ghcr.io/nicholas-fedor/watchtower:i386-dev \
-            --amend ghcr.io/nicholas-fedor/watchtower:armhf-dev \
-            --amend ghcr.io/nicholas-fedor/watchtower:arm64v8-dev \
-            --amend ghcr.io/nicholas-fedor/watchtower:riscv64-dev
-          docker manifest push ghcr.io/nicholas-fedor/watchtower:latest-dev
+          docker buildx imagetools create -t ghcr.io/nicholas-fedor/watchtower:latest-dev \
+            ghcr.io/nicholas-fedor/watchtower:amd64-dev \
+            ghcr.io/nicholas-fedor/watchtower:i386-dev \
+            ghcr.io/nicholas-fedor/watchtower:armhf-dev \
+            ghcr.io/nicholas-fedor/watchtower:arm64v8-dev \
+            ghcr.io/nicholas-fedor/watchtower:riscv64-dev
