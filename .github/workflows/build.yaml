@@ -17,8 +17,6 @@ on:
         required: true
       DOCKERHUB_TOKEN:
         required: true
-      GITHUB_TOKEN:
-        required: true
 
 jobs:
   build:
@@ -70,7 +68,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
@@ -79,7 +77,7 @@ jobs:
           version: v2.3.2
           args: release --config build/goreleaser/${{ inputs.build-type }}.yml --snapshot --clean ${{ inputs.dry-run && '--skip=publish' || '' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Upload binary SBOMs
         if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
