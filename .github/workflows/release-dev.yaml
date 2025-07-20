@@ -153,7 +153,7 @@ jobs:
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: docker://nickfedor/watchtower:${{ matrix.arch_tag }}-dev
+          image: nickfedor/watchtower:${{ matrix.arch_tag }}-dev
           format: spdx-json
           artifact-name: ${{ matrix.arch_tag }}-dev.sbom.json
           upload-artifact: true
@@ -162,7 +162,7 @@ jobs:
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: docker://ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
+          image: ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev
           format: spdx-json
           artifact-name: ghcr-${{ matrix.arch_tag }}-dev.sbom.json
           upload-artifact: true
@@ -237,7 +237,7 @@ jobs:
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: docker://nickfedor/watchtower:latest-dev
+          image: nickfedor/watchtower:latest-dev
           format: spdx-json
           artifact-name: latest-dev.sbom.json
           upload-artifact: true
@@ -246,7 +246,7 @@ jobs:
         if: github.event.inputs.dry_run != 'true'
         uses: anchore/sbom-action@9e07fd7fd4c7754e8b7de48b7823674442d75a35
         with:
-          image: docker://ghcr.io/nicholas-fedor/watchtower:latest-dev
+          image: ghcr.io/nicholas-fedor/watchtower:latest-dev
           format: spdx-json
           artifact-name: ghcr-latest-dev.sbom.json
           upload-artifact: true
