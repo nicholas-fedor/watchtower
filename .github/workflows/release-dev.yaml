@@ -173,6 +173,11 @@ jobs:
           docker image rm nickfedor/watchtower:${{ matrix.arch_tag }}-dev || true
           docker image rm ghcr.io/nicholas-fedor/watchtower:${{ matrix.arch_tag }}-dev || true
 
+      - name: Verify Docker Hub auth
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          docker login --username ${{ secrets.DOCKERHUB_USERNAME }} registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
+
       - name: Attest per-arch Docker Hub image
         if: github.event.inputs.dry_run != 'true'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -180,6 +185,7 @@ jobs:
           subject-name: docker.io/nickfedor/watchtower/${{ matrix.arch_tag }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
+          github-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Attest per-arch GHCR image
         if: github.event.inputs.dry_run != 'true'
@@ -188,6 +194,7 @@ jobs:
           subject-name: ghcr.io/${{ github.repository }}/${{ matrix.arch_tag }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   Create-Manifest-and-Attest:
     needs: Build-and-Push-Per-Arch
@@ -251,6 +258,11 @@ jobs:
           artifact-name: ghcr-latest-dev.sbom.json
           upload-artifact: true
 
+      - name: Verify Docker Hub auth
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          docker login --username ${{ secrets.DOCKERHUB_USERNAME }} registry-1.docker.io || { echo "Docker Hub auth failed"; exit 1; }
+
       - name: Attest Docker Hub manifest
         if: github.event.inputs.dry_run != 'true'
         id: attest-docker
@@ -259,6 +271,7 @@ jobs:
           subject-name: docker.io/nickfedor/watchtower
           subject-digest: sha256:$(docker manifest inspect docker.io/nickfedor/watchtower:latest-dev | jq -r '.Descriptor.digest')
           push-to-registry: true
+          github-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Attest GHCR manifest
         if: github.event.inputs.dry_run != 'true'
@@ -268,3 +281,4 @@ jobs:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: sha256:$(docker manifest inspect ghcr.io/${{ github.repository }}:latest-dev | jq -r '.Descriptor.digest')
           push-to-registry: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
