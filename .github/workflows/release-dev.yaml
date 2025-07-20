@@ -8,13 +8,29 @@ on:
         required: false
         default: false
         type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - cmd/**
+      - internal/**
+      - pkg/**
+      - go.mod
+      - go.sum
+      - main.go
 
 permissions:
   contents: read
   packages: write # For GHCR
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yaml
+    permissions:
+      contents: read
+
   build-images:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
