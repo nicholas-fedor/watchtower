@@ -30,6 +30,7 @@ dockers:
       - nickfedor/watchtower:amd64-dev
       - ghcr.io/nicholas-fedor/watchtower:amd64-dev
     build_flag_templates:
+      - "--exporter=oci"
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/amd64"
@@ -43,6 +44,7 @@ dockers:
       - nickfedor/watchtower:i386-dev
       - ghcr.io/nicholas-fedor/watchtower:i386-dev
     build_flag_templates:
+      - "--exporter=oci"
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/386"
@@ -57,6 +59,7 @@ dockers:
       - nickfedor/watchtower:armhf-dev
       - ghcr.io/nicholas-fedor/watchtower:armhf-dev
     build_flag_templates:
+      - "--exporter=oci"
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/arm/v6"
@@ -70,6 +73,7 @@ dockers:
       - nickfedor/watchtower:arm64v8-dev
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
     build_flag_templates:
+      - "--exporter=oci"
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/arm64"
@@ -83,6 +87,7 @@ dockers:
       - nickfedor/watchtower:riscv64-dev
       - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
     build_flag_templates:
+      - "--exporter=oci"
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/riscv64"
