@@ -151,6 +151,8 @@ jobs:
           format: spdx-json
           artifact-name: ${{ matrix.arch_tag }}-dev.sbom.json
           upload-artifact: true
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Generate per-arch SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
@@ -160,6 +162,8 @@ jobs:
           format: spdx-json
           artifact-name: ghcr-${{ matrix.arch_tag }}-dev.sbom.json
           upload-artifact: true
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Attest per-arch Docker Hub image
         if: github.event.inputs.dry_run != 'true'
@@ -223,6 +227,8 @@ jobs:
           format: spdx-json
           artifact-name: latest-dev.sbom.json
           upload-artifact: true
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Generate manifest SBOM for GHCR
         if: github.event.inputs.dry_run != 'true'
@@ -232,6 +238,8 @@ jobs:
           format: spdx-json
           artifact-name: ghcr-latest-dev.sbom.json
           upload-artifact: true
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Attest Docker Hub manifest
         if: github.event.inputs.dry_run != 'true'
