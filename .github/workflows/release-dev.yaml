@@ -110,11 +110,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
 
-      - name: Registry Logins
+      - name: Login to Docker Hub
         if: github.event.inputs.dry_run != 'true'
-        uses: ./.github/workflows/registry-logins.yaml
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
-          dry_run: false
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        if: github.event.inputs.dry_run != 'true'
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push per-arch image
         id: build
@@ -177,11 +186,20 @@ jobs:
       actions: write
     runs-on: ubuntu-latest
     steps:
-      - name: Registry Logins
+      - name: Login to Docker Hub
         if: github.event.inputs.dry_run != 'true'
-        uses: ./.github/workflows/registry-logins.yaml
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
-          dry_run: false
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        if: github.event.inputs.dry_run != 'true'
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push manifests
         if: github.event.inputs.dry_run != 'true'
