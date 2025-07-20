@@ -21,7 +21,7 @@ on:
 
 permissions:
   contents: read
-  packages: write # For GHCR
+  packages: write
 
 jobs:
   test:
@@ -29,46 +29,13 @@ jobs:
     permissions:
       contents: read
 
-  build-images:
+  build:
     needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
-        with:
-          go-version: 1.24.x
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
-
-      - name: Login to Docker Hub
-        if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to GHCR
-        if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --config build/goreleaser/dev.yml --snapshot --clean ${{ inputs.dry-run && '--skip=publish' || '' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: ./.github/workflows/build.yaml
+    with:
+      build-type: dev
+      dry-run: ${{ inputs.dry-run }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

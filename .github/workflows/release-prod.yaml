@@ -24,74 +24,19 @@ jobs:
     permissions:
       contents: read
 
-  build-binaries-and-release:
+  build:
     needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      attestations: write
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
-        with:
-          go-version: 1.24.x
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
-
-      - name: Login to Docker Hub
-        if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to GHCR
-        if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@0931acf1f7634c2ee911eea11a334fb00a5180ab
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --config build/goreleaser/prod.yml ${{ inputs.dry-run && '--snapshot --clean --skip=publish' || '' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload binary SBOMs
-        if: ${{ !inputs.dry-run }}
-        uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
-        with:
-          name: prod-binary-sboms
-          path: dist/*.sbom
-          if-no-files-found: warn
-
-      - name: Generate artifact attestation
-        if: ${{ !inputs.dry-run }}
-        uses: actions/attest-build-provenance@f923cf69427d7ac614fbcc05e12232908c3f031b
-        with:
-          subject-checksums: ./dist/checksums.txt
-
-      - name: Clean up dist directory
-        if: always()
-        run: rm -rf dist
+    uses: ./.github/workflows/build.yaml
+    with:
+      build-type: prod
+      dry-run: ${{ inputs.dry-run }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-go-docs:
-    needs: [test, build-binaries-and-release]
+    needs: [test, build]
     if: ${{ !inputs.dry-run }}
     permissions:
       contents: read
