@@ -10,7 +10,7 @@ FROM scratch
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG PREFIX=watchtower-multiarch
+ARG PREFIX=watchtower
 
 LABEL "com.centurylinklabs.watchtower"="true"
 LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtower/" \
@@ -25,8 +25,8 @@ LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtowe
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
-# Copy prebuilt binary from GoReleaser dist/ (e.g., dist/watchtower_linux_amd64_v1/watchtower)
-COPY ${PREFIX}_${TARGETOS}_${TARGETARCH}/watchtower /watchtower
+# Copy prebuilt binary from dist/ (e.g., dist/watchtower_linux_amd64/watchtower)
+COPY dist/${PREFIX}_${TARGETOS}_${TARGETARCH}/watchtower /watchtower
 
 HEALTHCHECK CMD ["/watchtower", "--health-check"]
 
