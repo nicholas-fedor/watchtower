@@ -13,12 +13,6 @@ builds:
       - arm
       - arm64
       - riscv64
-    goamd64:
-      - v1
-    goarm:
-      - "6"
-    goriscv64:
-      - rva20u64
     ignore:
       - goos: windows
         goarch: riscv64
@@ -29,9 +23,6 @@ builds:
 
 dockers:
   - use: buildx
-    goos: linux
-    goarch: amd64
-    goamd64: "v1"
     dockerfile: build/docker/Dockerfile
     image_templates:
       - nickfedor/watchtower:amd64-dev
@@ -48,9 +39,8 @@ dockers:
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    goos: linux
-    goarch: "386"
     dockerfile: build/docker/Dockerfile
+    goarch: "386"
     image_templates:
       - nickfedor/watchtower:i386-dev
       - ghcr.io/nicholas-fedor/watchtower:i386-dev
@@ -61,14 +51,14 @@ dockers:
       - "--platform=linux/386"
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=386"
+      - "--build-arg=GO386=sse2"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    goos: linux
+    dockerfile: build/docker/Dockerfile
     goarch: arm
     goarm: "6"
-    dockerfile: build/docker/Dockerfile
     image_templates:
       - nickfedor/watchtower:armhf-dev
       - ghcr.io/nicholas-fedor/watchtower:armhf-dev
@@ -84,9 +74,8 @@ dockers:
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    goos: linux
-    goarch: arm64
     dockerfile: build/docker/Dockerfile
+    goarch: arm64
     image_templates:
       - nickfedor/watchtower:arm64v8-dev
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
@@ -97,13 +86,13 @@ dockers:
       - "--platform=linux/arm64"
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=arm64"
+      - "--build-arg=GOARM64=v8.0"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    goos: linux
-    goarch: riscv64
     dockerfile: build/docker/Dockerfile
+    goarch: riscv64
     image_templates:
       - nickfedor/watchtower:riscv64-dev
       - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
