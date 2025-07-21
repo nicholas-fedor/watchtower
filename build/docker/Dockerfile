@@ -1,4 +1,3 @@
-# Dockerfile
 ARG BASE_IMAGE=alpine:3.22.1@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1
 ARG GOOS=linux
 ARG GOARCH
@@ -18,7 +17,7 @@ LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtowe
   "org.opencontainers.image.licenses"="Apache-2.0" \
   "org.opencontainers.image.title"="Watchtower" \
   "org.opencontainers.image.description"="A process for automating Docker container base image updates." \
-  "org.opencontainers.image.base.name"="$BASE_IMAGE"
+  "org.opencontainers.image.base.name"="${BASE_IMAGE:-alpine:3.22.1}"
 
 # Copy ca-certs and timezone from builder
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
