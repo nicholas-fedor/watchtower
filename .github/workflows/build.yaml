@@ -78,6 +78,7 @@ jobs:
           args: release --config build/goreleaser/${{ inputs.build-type }}.yml --snapshot --clean ${{ inputs.dry-run && '--skip=publish' || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry-run }}
 
       - name: Upload binary SBOMs
         if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
