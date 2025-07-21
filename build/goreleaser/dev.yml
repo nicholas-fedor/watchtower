@@ -2,7 +2,9 @@
 version: 2
 
 builds:
-  - main: ./main.go
+  - env:
+      - CGO_ENABLED=0
+    main: ./main.go
     binary: watchtower
     goos:
       - linux
