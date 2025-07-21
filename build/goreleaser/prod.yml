@@ -51,7 +51,7 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:amd64-latest
     build_flag_templates:
-      - "--output=type=image"
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/amd64"
@@ -67,7 +67,7 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:i386-latest
     build_flag_templates:
-      - "--output=type=image"
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/386"
@@ -84,7 +84,7 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
     build_flag_templates:
-      - "--output=type=image"
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/arm/v6"
@@ -100,7 +100,7 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
     build_flag_templates:
-      - "--output=type=image"
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/arm64/v8"
@@ -116,7 +116,7 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:riscv64-latest
     build_flag_templates:
-      - "--output=type=image"
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
       - "--attest=type=provenance,mode=max"
       - "--attest=type=sbom"
       - "--platform=linux/riscv64"
@@ -132,6 +132,7 @@ docker_manifests:
       - nickfedor/watchtower:armhf-{{ .Version }}
       - nickfedor/watchtower:arm64v8-{{ .Version }}
       - nickfedor/watchtower:riscv64-{{ .Version }}
+    skip_push: "{{ .Env.DRY_RUN }}"
   - name_template: nickfedor/watchtower:latest
     image_templates:
       - nickfedor/watchtower:amd64-latest
@@ -139,6 +140,7 @@ docker_manifests:
       - nickfedor/watchtower:armhf-latest
       - nickfedor/watchtower:arm64v8-latest
       - nickfedor/watchtower:riscv64-latest
+    skip_push: "{{ .Env.DRY_RUN }}"
   - name_template: ghcr.io/nicholas-fedor/watchtower:{{ .Version }}
     image_templates:
       - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
@@ -146,6 +148,7 @@ docker_manifests:
       - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Version }}
+    skip_push: "{{ .Env.DRY_RUN }}"
   - name_template: ghcr.io/nicholas-fedor/watchtower:latest
     image_templates:
       - ghcr.io/nicholas-fedor/watchtower:amd64-latest
@@ -153,6 +156,7 @@ docker_manifests:
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
       - ghcr.io/nicholas-fedor/watchtower:riscv64-latest
+    skip_push: "{{ .Env.DRY_RUN }}"
 
 checksum:
   name_template: checksums.txt
