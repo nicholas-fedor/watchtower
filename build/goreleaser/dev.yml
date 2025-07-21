@@ -13,6 +13,10 @@ builds:
       - arm
       - arm64
       - riscv64
+    goamd64:
+      - v1
+    goarm:
+      - "6"
     goriscv64:
       - rva20u64
     ignore:
@@ -25,6 +29,9 @@ builds:
 
 dockers:
   - use: buildx
+    goos: linux
+    goarch: amd64
+    goamd64: "v1"
     dockerfile: build/docker/Dockerfile
     image_templates:
       - nickfedor/watchtower:amd64-dev
@@ -34,12 +41,16 @@ dockers:
       - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
       - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
       - "--platform=linux/amd64"
+      - "--build-arg=GOOS=linux"
+      - "--build-arg=GOARCH=amd64"
+      - "--build-arg=GOAMD64=v1"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    dockerfile: build/docker/Dockerfile
+    goos: linux
     goarch: "386"
+    dockerfile: build/docker/Dockerfile
     image_templates:
       - nickfedor/watchtower:i386-dev
       - ghcr.io/nicholas-fedor/watchtower:i386-dev
@@ -48,13 +59,16 @@ dockers:
       - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
       - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
       - "--platform=linux/386"
+      - "--build-arg=GOOS=linux"
+      - "--build-arg=GOARCH=386"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    dockerfile: build/docker/Dockerfile
+    goos: linux
     goarch: arm
     goarm: "6"
+    dockerfile: build/docker/Dockerfile
     image_templates:
       - nickfedor/watchtower:armhf-dev
       - ghcr.io/nicholas-fedor/watchtower:armhf-dev
@@ -63,12 +77,16 @@ dockers:
       - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
       - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
       - "--platform=linux/arm/v6"
+      - "--build-arg=GOOS=linux"
+      - "--build-arg=GOARCH=arm"
+      - "--build-arg=GOARM=6"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    dockerfile: build/docker/Dockerfile
+    goos: linux
     goarch: arm64
+    dockerfile: build/docker/Dockerfile
     image_templates:
       - nickfedor/watchtower:arm64v8-dev
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
@@ -77,12 +95,15 @@ dockers:
       - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
       - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
       - "--platform=linux/arm64"
+      - "--build-arg=GOOS=linux"
+      - "--build-arg=GOARCH=arm64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
-    dockerfile: build/docker/Dockerfile
+    goos: linux
     goarch: riscv64
+    dockerfile: build/docker/Dockerfile
     image_templates:
       - nickfedor/watchtower:riscv64-dev
       - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
@@ -91,6 +112,9 @@ dockers:
       - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
       - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
       - "--platform=linux/riscv64"
+      - "--build-arg=GOOS=linux"
+      - "--build-arg=GOARCH=riscv64"
+      - "--build-arg=GORISCV64=rva20u64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
