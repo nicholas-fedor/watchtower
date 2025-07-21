@@ -1,0 +1,88 @@
+name: Create Docker Manifests
+
+on:
+  workflow_call:
+    inputs:
+      build-type:
+        description: "Type of build (prod or dev)"
+        required: true
+        type: string
+      version:
+        description: "Version tag for production builds (ignored for dev)"
+        required: false
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        with:
+          fetch-depth: 0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Create Docker manifests for dev
+        if: ${{ inputs.build-type == 'dev' }}
+        run: |
+          docker buildx imagetools create -t nickfedor/watchtower:latest-dev \
+            nickfedor/watchtower:amd64-dev \
+            nickfedor/watchtower:i386-dev \
+            nickfedor/watchtower:armhf-dev \
+            nickfedor/watchtower:arm64v8-dev \
+            nickfedor/watchtower:riscv64-dev
+          docker buildx imagetools create -t ghcr.io/nicholas-fedor/watchtower:latest-dev \
+            ghcr.io/nicholas-fedor/watchtower:amd64-dev \
+            ghcr.io/nicholas-fedor/watchtower:i386-dev \
+            ghcr.io/nicholas-fedor/watchtower:armhf-dev \
+            ghcr.io/nicholas-fedor/watchtower:arm64v8-dev \
+            ghcr.io/nicholas-fedor/watchtower:riscv64-dev
+
+      - name: Create Docker manifests for prod
+        if: ${{ inputs.build-type == 'prod' }}
+        run: |
+          docker buildx imagetools create -t nickfedor/watchtower:${{ inputs.version }} \
+            nickfedor/watchtower:amd64-${{ inputs.version }} \
+            nickfedor/watchtower:i386-${{ inputs.version }} \
+            nickfedor/watchtower:armhf-${{ inputs.version }} \
+            nickfedor/watchtower:arm64v8-${{ inputs.version }} \
+            nickfedor/watchtower:riscv64-${{ inputs.version }}
+          docker buildx imagetools create -t nickfedor/watchtower:latest \
+            nickfedor/watchtower:amd64-latest \
+            nickfedor/watchtower:i386-latest \
+            nickfedor/watchtower:armhf-latest \
+            nickfedor/watchtower:arm64v8-latest \
+            nickfedor/watchtower:riscv64-latest
+          docker buildx imagetools create -t ghcr.io/nicholas-fedor/watchtower:${{ inputs.version }} \
+            ghcr.io/nicholas-fedor/watchtower:amd64-${{ inputs.version }} \
+            ghcr.io/nicholas-fedor/watchtower:i386-${{ inputs.version }} \
+            ghcr.io/nicholas-fedor/watchtower:armhf-${{ inputs.version }} \
+            ghcr.io/nicholas-fedor/watchtower:arm64v8-${{ inputs.version }} \
+            ghcr.io/nicholas-fedor/watchtower:riscv64-${{ inputs.version }}
+          docker buildx imagetools create -t ghcr.io/nicholas-fedor/watchtower:latest \
+            ghcr.io/nicholas-fedor/watchtower:amd64-latest \
+            ghcr.io/nicholas-fedor/watchtower:i386-latest \
+            ghcr.io/nicholas-fedor/watchtower:armhf-latest \
+            ghcr.io/nicholas-fedor/watchtower:arm64v8-latest \
+            ghcr.io/nicholas-fedor/watchtower:riscv64-latest

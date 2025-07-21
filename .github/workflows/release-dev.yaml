@@ -40,3 +40,11 @@ jobs:
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  manifest:
+    needs: build
+    if: ${{ !inputs.dry-run }}
+    uses: ./.github/workflows/create-manifests.yaml
+    secrets: inherit
+    with:
+      build-type: dev

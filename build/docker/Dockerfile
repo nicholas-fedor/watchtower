@@ -1,11 +1,7 @@
+# Dockerfile
 ARG BASE_IMAGE=alpine:3.22.1@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1
 ARG GOOS=linux
 ARG GOARCH
-ARG GOAMD64=v1
-ARG GO386=sse2
-ARG GOARM=6
-ARG GOARM64=v8.0
-ARG GORISCV64=rva20u64
 
 FROM --platform=$BUILDPLATFORM $BASE_IMAGE AS builder
 
@@ -28,8 +24,8 @@ LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtowe
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
-# Copy binary based on GOOS, GOARCH, and variant
-COPY dist/watchtower_${GOOS}_${GOARCH}${GOAMD64:+_${GOAMD64}}${GO386:+_${GO386}}${GOARM:+_${GOARM}}${GOARM64:+_${GOARM64}}${GORISCV64:+_${GORISCV64}}/watchtower /watchtower
+# Copy binary (GoReleaser places the platform-specific binary at the context root as 'watchtower')
+COPY watchtower /watchtower
 
 EXPOSE 8080
 
