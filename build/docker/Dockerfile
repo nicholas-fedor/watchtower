@@ -24,7 +24,7 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifi
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 # Copy binary (GoReleaser places the platform-specific binary at the context root as 'watchtower')
-COPY watchtower /watchtower
+COPY watchtower /
 
 EXPOSE 8080
 
