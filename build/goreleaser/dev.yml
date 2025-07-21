@@ -30,9 +30,9 @@ dockers:
       - nickfedor/watchtower:amd64-dev
       - ghcr.io/nicholas-fedor/watchtower:amd64-dev
     build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - '{{ if eq .Env.DRY_RUN "true" }}--load{{ else }}--push{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true") }}--attest=type=provenance,mode=max{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true") }}--attest=type=sbom{{ end }}'
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
@@ -44,9 +44,9 @@ dockers:
       - nickfedor/watchtower:i386-dev
       - ghcr.io/nicholas-fedor/watchtower:i386-dev
     build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - '{{ if eq .Env.DRY_RUN "true" }}--load{{ else }}--push{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true") }}--attest=type=provenance,mode=max{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true") }}--attest=type=sbom{{ end }}'
       - "--platform=linux/386"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
@@ -59,9 +59,9 @@ dockers:
       - nickfedor/watchtower:armhf-dev
       - ghcr.io/nicholas-fedor/watchtower:armhf-dev
     build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - '{{ if eq .Env.DRY_RUN "true" }}--load{{ else }}--push{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true") }}--attest=type=provenance,mode=max{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true") }}--attest=type=sbom{{ end }}'
       - "--platform=linux/arm/v6"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
@@ -73,9 +73,9 @@ dockers:
       - nickfedor/watchtower:arm64v8-dev
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
     build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - '{{ if eq .Env.DRY_RUN "true" }}--load{{ else }}--push{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true" ) }}--attest=type=provenance,mode=max{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true" ) }}--attest=type=sbom{{ end }}'
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
@@ -87,9 +87,9 @@ dockers:
       - nickfedor/watchtower:riscv64-dev
       - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
     build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - '{{ if eq .Env.DRY_RUN "true" }}--load{{ else }}--push{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true" ) }}--attest=type=provenance,mode=max{{ end }}'
+      - '{{ if not (eq .Env.DRY_RUN "true" ) }}--attest=type=sbom{{ end }}'
       - "--platform=linux/riscv64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
