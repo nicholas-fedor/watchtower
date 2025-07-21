@@ -31,7 +31,7 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@6ea6b35e61f367312f4ec362440c98891830286d
+        uses: securego/gosec@2ef6017991fdf27d40052196a32571a0ba71dc9a
         with:
           args: "-no-fail -fmt sarif -out results.sarif ./..."
       - name: Upload SARIF file
