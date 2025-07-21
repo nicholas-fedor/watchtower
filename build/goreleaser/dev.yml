@@ -1,3 +1,4 @@
+# dev.yml
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
@@ -29,12 +30,11 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:amd64-dev
     build_flag_templates:
       - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - --attest=type=provenance,mode=max
+      - --attest=type=sbom
       - "--platform=linux/amd64"
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=amd64"
-      - "--build-arg=GOAMD64=v1"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
@@ -46,12 +46,11 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:i386-dev
     build_flag_templates:
       - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - --attest=type=provenance,mode=max
+      - --attest=type=sbom
       - "--platform=linux/386"
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=386"
-      - "--build-arg=GO386=sse2"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
@@ -64,12 +63,11 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:armhf-dev
     build_flag_templates:
       - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - --attest=type=provenance,mode=max
+      - --attest=type=sbom
       - "--platform=linux/arm/v6"
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=arm"
-      - "--build-arg=GOARM=6"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
@@ -81,12 +79,11 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
     build_flag_templates:
       - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - --attest=type=provenance,mode=max
+      - --attest=type=sbom
       - "--platform=linux/arm64"
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=arm64"
-      - "--build-arg=GOARM64=v8.0"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
@@ -98,30 +95,11 @@ dockers:
       - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
     build_flag_templates:
       - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - "{{ if not .Env.DRY_RUN }}--attest=type=provenance,mode=max{{ end }}"
-      - "{{ if not .Env.DRY_RUN }}--attest=type=sbom{{ end }}"
+      - --attest=type=provenance,mode=max
+      - --attest=type=sbom
       - "--platform=linux/riscv64"
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=riscv64"
-      - "--build-arg=GORISCV64=rva20u64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
       - "--label=org.opencontainers.image.version=dev"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-
-docker_manifests:
-  - name_template: nickfedor/watchtower:latest-dev
-    image_templates:
-      - nickfedor/watchtower:amd64-dev
-      - nickfedor/watchtower:i386-dev
-      - nickfedor/watchtower:armhf-dev
-      - nickfedor/watchtower:arm64v8-dev
-      - nickfedor/watchtower:riscv64-dev
-    skip_push: "{{ .Env.DRY_RUN }}"
-  - name_template: ghcr.io/nicholas-fedor/watchtower:latest-dev
-    image_templates:
-      - ghcr.io/nicholas-fedor/watchtower:amd64-dev
-      - ghcr.io/nicholas-fedor/watchtower:i386-dev
-      - ghcr.io/nicholas-fedor/watchtower:armhf-dev
-      - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
-      - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
-    skip_push: "{{ .Env.DRY_RUN }}"
