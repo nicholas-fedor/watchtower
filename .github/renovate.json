@@ -1,10 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices"],
-  "dependencyDashboard": true,
-  "automerge": true,
+  "extends": ["config:best-practices", ":semanticCommits"],
+  "postUpdateOptions": ["gomodTidy"],
   "packageRules": [
-      {
+    {
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump",
+      "semanticCommitType": "feat"
+    },
+    {
       "description": "Automerge non-major updates",
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true
