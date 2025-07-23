@@ -66,14 +66,14 @@ jobs:
         run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Login to Docker Hub
-        if: ${{ !inputs.dry-run }}
+        if: ${{ !fromJson(inputs.dry-run) }}
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
-        if: ${{ !inputs.dry-run }}
+        if: ${{ !fromJson(inputs.dry-run) }}
         uses: docker/login-action@3d100841f68d4548bf57e52eb27bd33ec5069f55
         with:
           registry: ghcr.io
@@ -85,13 +85,13 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --config build/goreleaser/${{ inputs.build-type }}.yml --snapshot --clean ${{ inputs.dry-run && '--skip=publish' || '' }}
+          args: release --config build/goreleaser/${{ inputs.build-type }}.yml --snapshot --clean ${{ fromJson(inputs.dry-run) && '--skip=publish' || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           DRY_RUN: ${{ inputs.dry-run }}
 
       - name: Upload binary SBOMs
-        if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
+        if: ${{ !fromJson(inputs.dry-run) && inputs.build-type == 'prod' }}
         uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
         with:
           name: ${{ inputs.build-type }}-binary-sboms
@@ -99,7 +99,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Generate artifact attestation
-        if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
+        if: ${{ !fromJson(inputs.dry-run) && inputs.build-type == 'prod' }}
         uses: actions/attest-build-provenance@7a3eb4a84e7d1c943af9ac9bd5fe7e5a0fdfb18f
         with:
           subject-checksums: ./dist/checksums.txt
