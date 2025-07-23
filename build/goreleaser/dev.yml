@@ -1,6 +1,9 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
+snapshot:
+  name_template: "{{ .Tag }}-{{ .ShortCommit }}"
+
 builds:
   - env:
       - CGO_ENABLED=0
