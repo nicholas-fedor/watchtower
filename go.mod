@@ -11,7 +11,7 @@ require (
 	github.com/docker/docker v28.3.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/nicholas-fedor/shoutrrr v0.8.15
-	github.com/onsi/gomega v1.37.0
+	github.com/onsi/gomega v1.38.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
