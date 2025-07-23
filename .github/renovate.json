@@ -8,7 +8,7 @@
       "matchDepNames": ["go"],
       "matchDepTypes": ["golang"],
       "rangeStrategy": "bump",
-      "semanticCommitType": "feat"
+      "semanticCommitType": "chore"
     },
     {
       "description": "Automerge non-major updates",
