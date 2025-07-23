@@ -36,14 +36,14 @@ jobs:
     uses: ./.github/workflows/build.yaml
     with:
       build-type: dev
-      dry-run: ${{ inputs.dry-run }}
+      dry-run: ${{ fromJson(inputs.dry-run || 'false') }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   manifest:
     needs: build
-    if: ${{ !inputs.dry-run }}
+    if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:
       contents: read
       packages: write
