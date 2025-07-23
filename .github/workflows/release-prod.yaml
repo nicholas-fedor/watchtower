@@ -29,14 +29,14 @@ jobs:
     uses: ./.github/workflows/build.yaml
     with:
       build-type: prod
-      dry-run: ${{ inputs.dry-run }}
+      dry-run: ${{ fromJson(inputs.dry-run || 'false') }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   manifest:
     needs: build
-    if: ${{ !inputs.dry-run }}
+    if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:
       contents: read
       packages: write
@@ -48,7 +48,7 @@ jobs:
 
   update-go-docs:
     needs: [test, build, manifest]
-    if: ${{ !inputs.dry-run }}
+    if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:
       contents: read
     uses: ./.github/workflows/update-go-docs.yaml
