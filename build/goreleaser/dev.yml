@@ -20,8 +20,8 @@ builds:
         goarch: riscv64
     ldflags:
       - -s -w
-      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version=dev
-      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/dev
+      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
+      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
 
 dockers:
   - use: buildx
@@ -37,7 +37,7 @@ dockers:
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=amd64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
     dockerfile: build/docker/Dockerfile
@@ -53,7 +53,7 @@ dockers:
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=386"
       - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
     dockerfile: build/docker/Dockerfile
@@ -70,7 +70,7 @@ dockers:
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=arm"
       - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
     dockerfile: build/docker/Dockerfile
@@ -86,7 +86,7 @@ dockers:
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=arm64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
   - use: buildx
     dockerfile: build/docker/Dockerfile
@@ -102,5 +102,5 @@ dockers:
       - "--build-arg=GOOS=linux"
       - "--build-arg=GOARCH=riscv64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version=dev"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
