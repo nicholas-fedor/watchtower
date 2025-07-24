@@ -7,7 +7,7 @@ setup: true
 
 # Orbs for reusable packages.
 orbs:
-  path-filtering: circleci/path-filtering@2.0.1
+  path-filtering: circleci/path-filtering@2.0.2
 
 # Orchestrate jobs using workflows.
 # See: https://circleci.com/docs/workflows/ & https://circleci.com/docs/configuration-reference/#workflows
