@@ -8,7 +8,7 @@ on:
       - docs/**
       - README.md
   workflow_run:
-    workflows: ["Release (Production)"]
+    workflows: ["Release Production"]
     branches: [main]
     types:
       - completed

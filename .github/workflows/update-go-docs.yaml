@@ -1,7 +1,8 @@
 name: Refresh pkg.go.dev
 
 on:
-  workflow_call:
+  - workflow_dispatch
+  - workflow_call
 
 permissions:
   contents: read
