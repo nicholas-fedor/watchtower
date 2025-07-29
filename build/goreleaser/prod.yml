@@ -34,8 +34,8 @@ builds:
     # and https://pkg.go.dev/cmd/link
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
       - -X main.date={{ .CommitDate }}
       - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
       - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
@@ -174,9 +174,9 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
-      - nickfedor/watchtower:amd64-{{ .Version }}
+      - nickfedor/watchtower:amd64-{{ .Tag }}
       - nickfedor/watchtower:amd64-latest
-      - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Tag }}
       - ghcr.io/nicholas-fedor/watchtower:amd64-latest
 
     # Path to the Dockerfile (from the project root).
@@ -227,9 +227,9 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
-      - nickfedor/watchtower:i386-{{ .Version }}
+      - nickfedor/watchtower:i386-{{ .Tag }}
       - nickfedor/watchtower:i386-latest
-      - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Tag }}
       - ghcr.io/nicholas-fedor/watchtower:i386-latest
 
     # Path to the Dockerfile (from the project root).
@@ -284,9 +284,9 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
-      - nickfedor/watchtower:armhf-{{ .Version }}
+      - nickfedor/watchtower:armhf-{{ .Tag }}
       - nickfedor/watchtower:armhf-latest
-      - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Tag }}
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
 
     # Path to the Dockerfile (from the project root).
@@ -340,9 +340,9 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
-      - nickfedor/watchtower:arm64v8-{{ .Version }}
+      - nickfedor/watchtower:arm64v8-{{ .Tag }}
       - nickfedor/watchtower:arm64v8-latest
-      - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Tag }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
 
     # Path to the Dockerfile (from the project root).
@@ -394,9 +394,9 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
-      - nickfedor/watchtower:riscv64-{{ .Version }}
+      - nickfedor/watchtower:riscv64-{{ .Tag }}
       - nickfedor/watchtower:riscv64-latest
-      - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Version }}
+      - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Tag }}
       - ghcr.io/nicholas-fedor/watchtower:riscv64-latest
 
     # Path to the Dockerfile (from the project root).
@@ -450,5 +450,5 @@ checksum:
 ######################################################################################################
 sboms:
   # Which artifacts to catalog.
-  - artifacts: archive
+  - artifacts: any
 ######################################################################################################
