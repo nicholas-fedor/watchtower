@@ -1,6 +1,7 @@
 name: Release Production
 
 on:
+  # Manual runs with option of dry-run (for testing CI pipeline)
   workflow_dispatch:
     inputs:
       dry-run:
@@ -8,47 +9,55 @@ on:
         required: false
         default: false
         type: boolean
+  # Tag pushes (e.g., v1.2.3)
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-
-permissions:
-  contents: read
-  packages: write
-  attestations: write
-  id-token: write
+      - "v[0-9]+.[0-9]+.[0-9]+" # Semantic version tags
 
 jobs:
+  # Run Go tests and upload coverage
   test:
     uses: ./.github/workflows/test.yaml
     permissions:
-      contents: read
+      contents: read # For code checkout
 
+  # Build binaries, images, SBOMs, and attestations
   build:
-    needs: test
+    needs: test # Requires tests to pass
     uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: read # For code checkout
+      packages: write # For pushing images to registries
+      attestations: write # For generating provenance and SBOMs
+      id-token: write # For OIDC auth to Docker Hub and GHCR
     with:
-      build-type: prod
-      dry-run: ${{ fromJson(inputs.dry-run || 'false') }}
+      build-type: prod # Production release.
+      dry-run: ${{ fromJson(inputs.dry-run || 'false') }} # String to boolean, defaults false
     secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }} # Docker Hub username
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }} # Docker Hub token
 
+  # Create multi-platform manifests
   manifest:
+    # Runs after build
     needs: build
+    # Skips in dry-run
     if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:
-      contents: read
-      packages: write
+      contents: read # For code checkout
+      packages: write # For pushing manifests
     uses: ./.github/workflows/create-manifests.yaml
     secrets: inherit
     with:
-      build-type: prod
-      version: ${{ github.ref_name }}
+      build-type: prod # Tags images with version and latest
+      version: ${{ github.ref_name }} # Tag name (e.g., v1.2.3)
 
+  # Update pkg.go.dev
   update-go-docs:
+    # Runs after all jobs
     needs: [test, build, manifest]
+    # Skips in dry-run
     if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:
-      contents: read
+      contents: read # For code checkout
     uses: ./.github/workflows/update-go-docs.yaml

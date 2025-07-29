@@ -1,109 +1,385 @@
+######################################################################################################
+#                                                                                                    #
+#                        Watchtower GoReleaser Development Release Configuration                     #
+#                                                                                                    #
+# Watchtower: https://github.com/nicholas-fedor/watchtower/                                          #
+# GoReleaser: https://goreleaser.com/                                                                #
+#                                                                                                    #
+######################################################################################################
+
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
-snapshot:
-  name_template: "{{ .Tag }}-{{ .ShortCommit }}"
+# https://goreleaser.com/customization/project/
+project_name: Watchtower
 
+######################################################################################################
+# Snapshot Configuration
+# https://goreleaser.com/customization/snapshots/
+######################################################################################################
+snapshot:
+  # Change the name of the generated snapshot.
+  # Default: `{{ .Version }}-SNAPSHOT-{{.ShortCommit}}`
+  # Expected:
+  version_template: "{{ .Tag }}-{{ .ShortCommit }}"
+######################################################################################################
+
+######################################################################################################
+# Go Binary Build Configuration
+# https://goreleaser.com/customization/builds/go/
+######################################################################################################
 builds:
-  - env:
-      - CGO_ENABLED=0
+  - # ID of the build.
+    id: watchtower-multi-arch
+
+    # Path to main.go file or main package.
     main: ./main.go
+
+    # Binary name.
     binary: watchtower
+
+    # Custom flags.
+    flags:
+      # trims path
+      - -trimpath
+
+    # Custom ldflags.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies
+    # and https://pkg.go.dev/cmd/link
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{ .CommitDate }}
+      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
+      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
+
+    # Custom environment variables to be set during the builds.
+    # Invalid environment variables will be ignored.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Environment_variables
+    env:
+      - CGO_ENABLED=0
+
+    # GOOS list to build for.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Environment_variables
     goos:
       - linux
       - windows
+      - darwin
+
+    # GOARCH to build for.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Environment_variables
     goarch:
       - amd64
       - "386"
       - arm
       - arm64
       - riscv64
+
+    # GOARM to build for when GOARCH is arm.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Environment_variables
+    # and https://go.dev/wiki/MinimumRequirements#microarchitecture-support
+    # Default: [ 6 ].
+
+    # GOAMD64 to build when GOARCH is amd64.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Environment_variables
+    # and https://go.dev/wiki/MinimumRequirements#microarchitecture-support
+    # Default: [ 'v1' ].
+
+    # GO386 to build when GOARCH is 386.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Environment_variables
+    # and https://go.dev/wiki/MinimumRequirements#microarchitecture-support
+    # Default: [ 'sse2' ].
+    # Since: v2.4.
+
+    # GORISCV64 to build when GOARCH is RISCV64.
+    # For more info refer to: https://pkg.go.dev/cmd/go#hdr-Environment_variables
+    # and https://go.dev/wiki/MinimumRequirements#microarchitecture-support
+    # Default: [ 'rva20u64' ].
+    # Since: v2.4.
+
+    # List of combinations of GOOS + GOARCH + GOARM to ignore.
     ignore:
       - goos: windows
         goarch: riscv64
-    ldflags:
-      - -s -w
-      - -X github.com/nicholas-fedor/watchtower/internal/meta.Version={{ .Version }}
-      - -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v{{ .Version }}
 
+    # Set the modified timestamp on the output binary, typically
+    # you would do this to ensure a build was reproducible.
+    # Pass an empty string to skip modifying the output.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+######################################################################################################
+
+# Skip building archives for development releases
+
+######################################################################################################
+# Docker Image Build Configuration
+# https://goreleaser.com/customization/docker/
+######################################################################################################
 dockers:
-  - use: buildx
-    dockerfile: build/docker/Dockerfile
+  - ##################################################################################################
+    # watchtower:amd64
+    ##################################################################################################
+    # GOOS of the built binaries/packages that should be used.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
+    goarch: amd64
+
+    # GOAMD64 of the built binaries/packages that should be used.
+    # Default: 'v1'.
+
+    # Templates of the Docker image names.
+    # Templates: allowed.
     image_templates:
       - nickfedor/watchtower:amd64-dev
       - ghcr.io/nicholas-fedor/watchtower:amd64-dev
-    build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - --attest=type=provenance,mode=max
-      - --attest=type=sbom
-      - "--platform=linux/amd64"
-      - "--build-arg=GOOS=linux"
-      - "--build-arg=GOARCH=amd64"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-  - use: buildx
+
+    # Path to the Dockerfile (from the project root).
+    # Templates: allowed.
+    # Default: 'Dockerfile'.
     dockerfile: build/docker/Dockerfile
+
+    # Set the "backend" for the Docker pipe.
+    # Valid options are: docker, buildx, podman.
+    # Podman is a GoReleaser Pro feature and is only available on Linux.
+    # Default: 'docker'.
+    use: buildx
+
+    # Docker build flags.
+    # Templates: allowed.
+    build_flag_templates:
+      # Conditionally set Docker Buildx output to local (type=docker) if DRY_RUN=true, otherwise pushes to a registry (type=registry).
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
+      # Enables maximum provenance attestation for the Docker Buildx build, generating detailed build metadata for supply chain security.
+      - --attest=type=provenance,mode=max
+      # Generates a Software Bill of Materials (SBOM) attestation for the Docker Buildx build, documenting the software components in the image.
+      - --attest=type=sbom
+      # Specifies the target platform for the Docker image as Linux on AMD64 architecture.
+      - "--platform=linux/amd64"
+      # Sets the Go build environment variable GOOS to linux, indicating the target operating system for the Go binary.
+      - "--build-arg=GOOS=linux"
+      # Sets the Go build environment variable GOARCH to amd64, indicating the target architecture for the Go binary.
+      - "--build-arg=GOARCH=amd64"
+      # Specifies the name of the image
+      - "--label=org.opencontainers.image.name={{ .ProjectName }}"
+      # Records the image creation timestamp
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      # Indicates the version of the software in the image
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      # Tracks the exact Git commit SHA used to build the image
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      # Points to the source repository URL
+      - "--label=org.opencontainers.image.source={{ .GitURL }}"
+  - ##################################################################################################
+    # watchtower:i386
+    ##################################################################################################
+    # GOOS of the built binaries/packages that should be used.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
     goarch: "386"
+
+    # Templates of the Docker image names.
+    # Templates: allowed.
     image_templates:
       - nickfedor/watchtower:i386-dev
       - ghcr.io/nicholas-fedor/watchtower:i386-dev
-    build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - --attest=type=provenance,mode=max
-      - --attest=type=sbom
-      - "--platform=linux/386"
-      - "--build-arg=GOOS=linux"
-      - "--build-arg=GOARCH=386"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-  - use: buildx
+
+    # Path to the Dockerfile (from the project root).
+    # Templates: allowed.
+    # Default: 'Dockerfile'.
     dockerfile: build/docker/Dockerfile
+
+    # Set the "backend" for the Docker pipe.
+    # Valid options are: docker, buildx, podman.
+    # Podman is a GoReleaser Pro feature and is only available on Linux.
+    # Default: 'docker'.
+    use: buildx
+
+    # Docker build flags.
+    # Templates: allowed.
+    build_flag_templates:
+      # Conditionally set Docker Buildx output to local (type=docker) if DRY_RUN=true, otherwise pushes to a registry (type=registry).
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
+      # Enables maximum provenance attestation for the Docker Buildx build, generating detailed build metadata for supply chain security.
+      - --attest=type=provenance,mode=max
+      # Generates a Software Bill of Materials (SBOM) attestation for the Docker Buildx build, documenting the software components in the image.
+      - --attest=type=sbom
+      # Specifies the target platform for the Docker image as Linux on 386 architecture.
+      - "--platform=linux/386"
+      # Sets the Go build environment variable GOOS to linux, indicating the target operating system for the Go binary.
+      - "--build-arg=GOOS=linux"
+      # Sets the Go build environment variable GOARCH to 386, indicating the target architecture for the Go binary.
+      - "--build-arg=GOARCH=386"
+      # Specifies the name of the image
+      - "--label=org.opencontainers.image.name={{ .ProjectName }}"
+      # Records the image creation timestamp
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      # Indicates the version of the software in the image
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      # Tracks the exact Git commit SHA used to build the image
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      # Points to the source repository URL
+      - "--label=org.opencontainers.image.source={{ .GitURL }}"
+  - ##################################################################################################
+    # watchtower:armhf
+    ##################################################################################################
+    # GOOS of the built binaries/packages that should be used.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
     goarch: arm
+
+    # GOARM of the built binaries/packages that should be used.
+    # Default: '6'.
     goarm: "6"
+
+    # Templates of the Docker image names.
+    # Templates: allowed.
     image_templates:
       - nickfedor/watchtower:armhf-dev
       - ghcr.io/nicholas-fedor/watchtower:armhf-dev
-    build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - --attest=type=provenance,mode=max
-      - --attest=type=sbom
-      - "--platform=linux/arm/v6"
-      - "--build-arg=GOOS=linux"
-      - "--build-arg=GOARCH=arm"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-  - use: buildx
+
+    # Path to the Dockerfile (from the project root).
+    # Templates: allowed.
+    # Default: 'Dockerfile'.
     dockerfile: build/docker/Dockerfile
+
+    # Set the "backend" for the Docker pipe.
+    # Valid options are: docker, buildx, podman.
+    # Podman is a GoReleaser Pro feature and is only available on Linux.
+    # Default: 'docker'.
+    use: buildx
+
+    # Docker build flags.
+    # Templates: allowed.
+    build_flag_templates:
+      # Conditionally set Docker Buildx output to local (type=docker) if DRY_RUN=true, otherwise pushes to a registry (type=registry).
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
+      # Enables maximum provenance attestation for the Docker Buildx build, generating detailed build metadata for supply chain security.
+      - --attest=type=provenance,mode=max
+      # Generates a Software Bill of Materials (SBOM) attestation for the Docker Buildx build, documenting the software components in the image.
+      - --attest=type=sbom
+      # Specifies the target platform for the Docker image as Linux on ARMv6 architecture.
+      - "--platform=linux/arm/v6"
+      # Sets the Go build environment variable GOOS to linux, indicating the target operating system for the Go binary.
+      - "--build-arg=GOOS=linux"
+      # Sets the Go build environment variable GOARCH to ARM, indicating the target architecture for the Go binary.
+      - "--build-arg=GOARCH=arm"
+      # Specifies the name of the image
+      - "--label=org.opencontainers.image.name={{ .ProjectName }}"
+      # Records the image creation timestamp
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      # Indicates the version of the software in the image
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      # Tracks the exact Git commit SHA used to build the image
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      # Points to the source repository URL
+      - "--label=org.opencontainers.image.source={{ .GitURL }}"
+  - ##################################################################################################
+    # watchtower:arm64v8
+    ##################################################################################################
+    # GOOS of the built binaries/packages that should be used.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
     goarch: arm64
+
+    # GOARM of the built binaries/packages that should be used.
+    # Default: '6'.
+
+    # Templates of the Docker image names.
+    # Templates: allowed.
     image_templates:
       - nickfedor/watchtower:arm64v8-dev
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-dev
-    build_flag_templates:
-      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
-      - --attest=type=provenance,mode=max
-      - --attest=type=sbom
-      - "--platform=linux/arm64"
-      - "--build-arg=GOOS=linux"
-      - "--build-arg=GOARCH=arm64"
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-  - use: buildx
+
+    # Path to the Dockerfile (from the project root).
+    # Templates: allowed.
+    # Default: 'Dockerfile'.
     dockerfile: build/docker/Dockerfile
+
+    # Set the "backend" for the Docker pipe.
+    # Valid options are: docker, buildx, podman.
+    # Podman is a GoReleaser Pro feature and is only available on Linux.
+    # Default: 'docker'.
+    use: buildx
+
+    # Docker build flags.
+    # Templates: allowed.
+    build_flag_templates:
+      # Conditionally set Docker Buildx output to local (type=docker) if DRY_RUN=true, otherwise pushes to a registry (type=registry).
+      - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
+      # Enables maximum provenance attestation for the Docker Buildx build, generating detailed build metadata for supply chain security.
+      - --attest=type=provenance,mode=max
+      # Generates a Software Bill of Materials (SBOM) attestation for the Docker Buildx build, documenting the software components in the image.
+      - --attest=type=sbom
+      # Specifies the target platform for the Docker image as Linux on ARM64 architecture.
+      - "--platform=linux/arm64"
+      # Sets the Go build environment variable GOOS to linux, indicating the target operating system for the Go binary.
+      - "--build-arg=GOOS=linux"
+      # Sets the Go build environment variable GOARCH to arm64, indicating the target architecture for the Go binary.
+      - "--build-arg=GOARCH=arm64"
+      # Specifies the name of the image
+      - "--label=org.opencontainers.image.name={{ .ProjectName }}"
+      # Records the image creation timestamp
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      # Indicates the version of the software in the image
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      # Tracks the exact Git commit SHA used to build the image
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      # Points to the source repository URL
+      - "--label=org.opencontainers.image.source={{ .GitURL }}"
+  - ##################################################################################################
+    # watchtower:riscv64
+    ##################################################################################################
+    # GOOS of the built binaries/packages that should be used.
+    # Default: 'linux'.
+    goos: linux
+
+    # GOARCH of the built binaries/packages that should be used.
     goarch: riscv64
+
+    # Templates of the Docker image names.
+    # Templates: allowed.
     image_templates:
       - nickfedor/watchtower:riscv64-dev
       - ghcr.io/nicholas-fedor/watchtower:riscv64-dev
+
+    # Path to the Dockerfile (from the project root).
+    # Templates: allowed.
+    # Default: 'Dockerfile'
+    dockerfile: build/docker/Dockerfile
+
+    # Set the "backend" for the Docker pipe.
+    # Valid options are: docker, buildx, podman.
+    # Podman is a GoReleaser Pro feature and is only available on Linux.
+    # Default: 'docker'.
+    use: buildx
+
+    # Docker build flags.
+    # Templates: allowed.
     build_flag_templates:
+      # Conditionally set Docker Buildx output to local (type=docker) if DRY_RUN=true, otherwise pushes to a registry (type=registry).
       - '--output={{ if eq .Env.DRY_RUN "true" }}type=docker{{ else }}type=registry{{ end }}'
+      # Enables maximum provenance attestation for the Docker Buildx build, generating detailed build metadata for supply chain security.
       - --attest=type=provenance,mode=max
+      # Generates a Software Bill of Materials (SBOM) attestation for the Docker Buildx build, documenting the software components in the image.
       - --attest=type=sbom
+      # Specifies the target platform for the Docker image as Linux on RISCv64 architecture.
       - "--platform=linux/riscv64"
+      # Sets the Go build environment variable GOOS to linux, indicating the target operating system for the Go binary.
       - "--build-arg=GOOS=linux"
+      # Sets the Go build environment variable GOARCH to riscv64, indicating the target architecture for the Go binary.
       - "--build-arg=GOARCH=riscv64"
+      # Specifies the name of the image
+      - "--label=org.opencontainers.image.name={{ .ProjectName }}"
+      # Records the image creation timestamp
       - "--label=org.opencontainers.image.created={{ .Date }}"
+      # Indicates the version of the software in the image
       - "--label=org.opencontainers.image.version={{ .Version }}"
+      # Tracks the exact Git commit SHA used to build the image
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      # Points to the source repository URL
+      - "--label=org.opencontainers.image.source={{ .GitURL }}"
+######################################################################################################
