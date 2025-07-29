@@ -11,17 +11,14 @@
 version: 2
 
 # https://goreleaser.com/customization/project/
-project_name: Watchtower
+project_name: watchtower
 
 ######################################################################################################
 # Go Binary Build Configuration
 # https://goreleaser.com/customization/builds/go/
 ######################################################################################################
 builds:
-  - # ID of the build.
-    id: watchtower-multi-arch
-
-    # Path to main.go file or main package.
+  - # Path to main.go file or main package.
     main: ./main.go
 
     # Binary name.
