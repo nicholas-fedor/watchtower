@@ -29,10 +29,7 @@ snapshot:
 # https://goreleaser.com/customization/builds/go/
 ######################################################################################################
 builds:
-  - # ID of the build.
-    id: watchtower-multi-arch
-
-    # Path to main.go file or main package.
+  - # Path to main.go file or main package.
     main: ./main.go
 
     # Binary name.
