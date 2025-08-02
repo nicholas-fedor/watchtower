@@ -282,6 +282,9 @@ Environment Variable: WATCHTOWER_REMOVE_VOLUMES
              Default: false
 ```
 
+!!! note
+    Containers with the Docker `AutoRemove` option enabled are automatically removed by the Docker daemon after stopping, and Watchtower skips explicit removal in such cases. This does not affect named volumes.
+
 ### Monitor Only
 
 Monitors for new images, sends notifications, and runs lifecycle hooks without updating containers.

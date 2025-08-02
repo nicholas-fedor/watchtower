@@ -40,8 +40,6 @@ var (
 	errStopContainerFailed = errors.New("failed to stop container")
 	// errRemoveContainerFailed indicates a failure to remove a container from the host.
 	errRemoveContainerFailed = errors.New("failed to remove container")
-	// errContainerNotRemoved indicates a container was not removed after the stop operation.
-	errContainerNotRemoved = errors.New("container not removed after timeout")
 	// errUnexpectedMacInLegacy indicates a MAC address was found in a legacy API configuration where it should not be.
 	errUnexpectedMacInLegacy = errors.New("unexpected MAC address in legacy config")
 	// errUnexpectedMacInHost indicates a MAC address was found in a host network configuration where it should not be.
