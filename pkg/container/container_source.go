@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerFiltersType "github.com/docker/docker/api/types/filters"
 	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerAPIVersion "github.com/docker/docker/api/types/versions"
 	dockerClient "github.com/docker/docker/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -100,7 +100,7 @@ func ListSourceContainers(
 
 // GetSourceContainer retrieves detailed information about a container by its ID.
 //
-// It resolves network container references where possible.
+// It resolves network mode if it references another container.
 //
 // Parameters:
 //   - api: Docker API client.
@@ -157,16 +157,19 @@ func GetSourceContainer(
 	return NewContainer(&containerInfo, &imageInfo), nil
 }
 
-// StopSourceContainer stops and removes the specified container.
+// StopSourceContainer stops and removes the specified container using the Docker API's StopContainer method.
+//
+// It checks if the container is running, sends the configured stop signal (defaulting to SIGTERM if unset),
+// waits for the specified timeout for graceful shutdown, and removes the container with optional volume cleanup.
 //
 // Parameters:
-//   - api: Docker API client.
-//   - sourceContainer: Container to stop and remove.
-//   - timeout: Duration to wait before forcing stop.
-//   - removeVolumes: Whether to remove associated volumes.
+//   - api: Docker API client for interacting with the Docker daemon.
+//   - sourceContainer: Container object to stop and remove, containing metadata like name and ID.
+//   - timeout: Duration to wait for graceful shutdown before forcing termination with SIGKILL.
+//   - removeVolumes: Boolean indicating whether to remove associated volumes during container removal.
 //
 // Returns:
-//   - error: Non-nil if stop/removal fails, nil on success.
+//   - error: Non-nil if stopping or removing the container fails, nil on successful completion.
 func StopSourceContainer(
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
@@ -179,155 +182,91 @@ func StopSourceContainer(
 		"id":        sourceContainer.ID().ShortID(),
 	})
 
-	// Determine stop signal, defaulting to SIGTERM.
-	signal := sourceContainer.StopSignal()
-	if signal == "" {
-		signal = defaultStopSignal
-	}
+	// Check if the container is running to determine if a stop operation is needed.
+	if !sourceContainer.IsRunning() {
+		// Log that the container is not running, so no stop attempt is required.
+		clog.Debug("Container is not running, proceeding directly to removal check")
+	} else {
+		// Retrieve the container's configured stop signal, falling back to SIGTERM if not specified.
+		signal := sourceContainer.StopSignal()
+		if signal == "" {
+			// Use default SIGTERM signal if no custom signal is provided.
+			signal = defaultStopSignal
+		}
 
-	// Stop the container if it’s running.
-	if sourceContainer.IsRunning() {
-		// Log detailed stop message
-		clog.WithField("signal", signal).Info("Stopping container")
+		// Log the stop attempt with the signal and configured timeout for clarity.
+		clog.WithFields(logrus.Fields{
+			"signal":  signal,
+			"timeout": timeout,
+		}).Info("Stopping container")
 
-		if err := api.ContainerKill(ctx, string(sourceContainer.ID()), signal); err != nil {
-			clog.WithError(err).Debug("Failed to stop container")
+		// Record the start time to measure elapsed duration for the stop operation.
+		startTime := time.Now()
 
+		// Convert timeout from time.Duration to seconds for Docker API's StopContainer.
+		timeoutSeconds := int(timeout / time.Second)
+
+		// Call the Docker API's StopContainer with the stop signal and timeout in seconds.
+		// The API sends the signal (SIGTERM or custom), waits for the timeout, and sends SIGKILL if needed.
+		err := api.ContainerStop(ctx, string(sourceContainer.ID()), dockerContainerType.StopOptions{
+			Signal:  signal,
+			Timeout: &timeoutSeconds,
+		})
+		if err != nil {
+			// Log the failure with elapsed time and error details for debugging.
+			clog.WithError(err).WithField("elapsed", time.Since(startTime)).Error("Failed to stop container")
+			// Wrap the error with a specific Watchtower error type for consistent error handling.
 			return fmt.Errorf("%w: %w", errStopContainerFailed, err)
 		}
+
+		// Log successful stop with elapsed time to confirm the operation's duration.
+		clog.WithField("elapsed", time.Since(startTime)).Debug("Container stopped successfully")
 	}
 
-	// Proceed with removal process.
-	return stopAndRemoveContainer(api, sourceContainer, timeout, removeVolumes)
-}
-
-// stopAndRemoveContainer waits for a container to stop and removes it if needed.
-//
-// Parameters:
-//   - api: Docker API client.
-//   - sourceContainer: Container to process.
-//   - timeout: Duration to wait for stop/removal.
-//   - removeVolumes: Whether to remove volumes.
-//
-// Returns:
-//   - error: Non-nil if process fails, nil on success.
-func stopAndRemoveContainer(
-	api dockerClient.APIClient,
-	sourceContainer types.Container,
-	timeout time.Duration,
-	removeVolumes bool,
-) error {
-	ctx := context.Background()
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"id":        sourceContainer.ID().ShortID(),
-	})
-
-	// Wait for the container to stop.
-	stopped, err := waitForStopOrTimeout(api, sourceContainer, timeout)
-	if err != nil {
-		clog.WithError(err).Debug("Failed to wait for container stop")
-
-		return err
-	}
-
-	if !stopped {
-		clog.WithField("timeout", timeout).Debug("Container did not stop within timeout")
-	}
-
-	// Skip removal if AutoRemove is enabled and container stopped.
-	if stopped && sourceContainer.ContainerInfo().HostConfig.AutoRemove {
-		clog.Debug("Skipping removal due to AutoRemove")
+	// Check if the container has AutoRemove enabled in its HostConfig, which automatically removes
+	// the container after stopping, eliminating the need for an explicit removal call.
+	if sourceContainer.ContainerInfo().HostConfig.AutoRemove {
+		// Log that the container is skipped due to AutoRemove configuration.
+		clog.Debug("Skipping container removal due to AutoRemove configuration")
 
 		return nil
 	}
 
-	// Remove the container with force and volume options.
-	clog.Debug("Removing container")
+	// Proceed with explicit container removal, including volumes if specified.
+	// Log the start of the removal process for tracking.
+	clog.Debug("Initiating container removal")
 
-	err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainerType.RemoveOptions{
-		Force:         true,
-		RemoveVolumes: removeVolumes,
+	// Record start time for the removal operation to track its duration.
+	startTime := time.Now()
+
+	// Call the Docker API's ContainerRemove to delete the container, forcing termination of any
+	// lingering processes (via SIGKILL if needed) and removing volumes if specified.
+	err := api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainerType.RemoveOptions{
+		Force:         true,          // Ensure any lingering processes are terminated before removal.
+		RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
 	})
 	if err != nil && !cerrdefs.IsNotFound(err) {
-		clog.WithError(err).Debug("Failed to remove container")
-
+		// Log removal failure with elapsed time and error details, excluding cases where the container
+		// was already removed by another process.
+		clog.WithError(err).
+			WithField("elapsed", time.Since(startTime)).
+			Error("Failed to remove container")
+		// Wrap the error with a specific Watchtower error type for consistent error handling.
 		return fmt.Errorf("%w: %w", errRemoveContainerFailed, err)
 	}
 
 	if cerrdefs.IsNotFound(err) {
+		// Log that the container was already removed, likely by another process or AutoRemove.
+		clog.WithField("elapsed", time.Since(startTime)).
+			Debug("Container already removed by another process")
+
 		return nil // Container already gone.
 	}
 
-	// Confirm removal completed.
-	stopped, err = waitForStopOrTimeout(api, sourceContainer, timeout)
-	if err != nil {
-		clog.WithError(err).Debug("Failed to confirm container removal")
-
-		return err
-	}
-
-	if !stopped {
-		clog.Debug("Container not removed within timeout")
-
-		return fmt.Errorf(
-			"%w: %s (%s)",
-			errContainerNotRemoved,
-			sourceContainer.Name(),
-			sourceContainer.ID().ShortID(),
-		)
-	}
-
-	clog.Debug("Confirmed container removal")
+	// Log successful removal with elapsed time to confirm the operation's duration.
+	clog.WithField("elapsed", time.Since(startTime)).Debug("Container removed successfully")
 
 	return nil
-}
-
-// waitForStopOrTimeout waits for a container to stop or times out.
-//
-// Parameters:
-//   - api: Docker API client.
-//   - container: Container to monitor.
-//   - waitTime: Duration to wait.
-//
-// Returns:
-//   - bool: True if stopped or gone, false if still running.
-//   - error: Non-nil if inspection fails, nil otherwise.
-func waitForStopOrTimeout(
-	api dockerClient.APIClient,
-	container types.Container,
-	waitTime time.Duration,
-) (bool, error) {
-	ctx := context.Background()
-	timeout := time.After(waitTime)
-
-	// Poll container state until stopped or timeout.
-	for {
-		select {
-		case <-timeout:
-			return false, nil // Timeout reached, still running.
-		default:
-			containerInfo, err := api.ContainerInspect(ctx, string(container.ID()))
-			if err != nil {
-				if cerrdefs.IsNotFound(err) {
-					return true, nil // Container gone, treat as stopped.
-				}
-
-				logrus.WithError(err).WithFields(logrus.Fields{
-					"container": container.Name(),
-					"id":        container.ID().ShortID(),
-				}).Debug("Failed to inspect container")
-
-				return false, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
-			}
-
-			if !containerInfo.State.Running {
-				return true, nil // Container stopped.
-			}
-		}
-
-		time.Sleep(1 * time.Second)
-	}
 }
 
 // getNetworkConfig extracts and sanitizes the network configuration from a container.
@@ -465,8 +404,8 @@ func processEndpoint(
 		}
 	}
 
-	// Handle MAC address, IP address, and DNS names based on API version and network mode.
-	if versions.LessThan(clientVersion, "1.44") || isHostNetwork {
+	// Handle aliases, MAC address, IP address, and DNS names based on API version and network mode.
+	if dockerAPIVersion.LessThan(clientVersion, "1.44") || isHostNetwork {
 		targetEndpoint.MacAddress = ""
 		targetEndpoint.IPAddress = ""
 		targetEndpoint.DNSNames = nil
@@ -541,7 +480,7 @@ func validateMacAddresses(
 
 	// Handle legacy Docker API versions (< 1.44), where MAC address preservation is not fully supported.
 	// In legacy APIs, MAC addresses should not appear in non-host networks, as they are managed differently.
-	if versions.LessThan(clientVersion, "1.44") {
+	if dockerAPIVersion.LessThan(clientVersion, "1.44") {
 		if foundMac && !isHostNetwork {
 			// Unexpected MAC address in a legacy API is a potential misconfiguration; log a warning and return an error.
 			clog.Warn("Unexpected MAC address in legacy config")
@@ -632,7 +571,7 @@ func debugLogMacAddress(
 	isHostNetwork bool,
 ) {
 	clog := logrus.WithFields(logrus.Fields{
-		"container":   containerID,
+		"container":   containerID.ShortID(),
 		"version":     clientVersion,
 		"min_version": minSupportedVersion,
 	})
@@ -653,7 +592,7 @@ func debugLogMacAddress(
 
 	// Log based on API version, MAC presence, and network mode.
 	switch {
-	case versions.LessThan(clientVersion, minSupportedVersion): // API < v1.44
+	case dockerAPIVersion.LessThan(clientVersion, minSupportedVersion): // API < v1.44
 		if foundMac {
 			clog.Debug("Unexpected MAC address in legacy config")
 
@@ -661,7 +600,7 @@ func debugLogMacAddress(
 		}
 
 		clog.Debug("No MAC address in legacy config, Docker will handle")
-	case versions.LessThan(clientVersion, "1.44") && !isHostNetwork:
+	case dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork:
 		if foundMac {
 			clog.Debug("Unexpected MAC address in legacy config")
 
