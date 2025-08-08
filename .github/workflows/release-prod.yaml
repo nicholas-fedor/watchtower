@@ -26,7 +26,7 @@ jobs:
     needs: test # Requires tests to pass
     uses: ./.github/workflows/build.yaml
     permissions:
-      contents: read # For code checkout
+      contents: write # For code checkout and publishing releases
       packages: write # For pushing images to registries
       attestations: write # For generating provenance and SBOMs
       id-token: write # For OIDC auth to Docker Hub and GHCR
