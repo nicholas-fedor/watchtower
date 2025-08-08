@@ -10,6 +10,8 @@ RUN apk add --no-cache \
 
 FROM scratch
 
+ARG BASE_IMAGE
+
 LABEL "com.centurylinklabs.watchtower"="true"
 LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtower/" \
   "org.opencontainers.image.documentation"="https://nicholas-fedor.github.io/watchtower/" \
@@ -17,7 +19,7 @@ LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtowe
   "org.opencontainers.image.licenses"="Apache-2.0" \
   "org.opencontainers.image.title"="Watchtower" \
   "org.opencontainers.image.description"="A process for automating Docker container base image updates." \
-  "org.opencontainers.image.base.name"="${BASE_IMAGE:-alpine:3.22.1}"
+  "org.opencontainers.image.base.name"="${BASE_IMAGE}"
 
 # Copy ca-certs and timezone from builder
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
