@@ -517,7 +517,7 @@ func buildExpectedURL(
 	destAddress string,
 	auth string,
 ) string {
-	template := "smtp://%s:%s@%s:%d/?auth=%s&fromaddress=%s&fromname=Watchtower&subject=&toaddresses=%s"
+	template := "smtp://%s:%s@%s:%d/?auth=%s&clienthost=localhost&encryption=Auto&fromaddress=%s&fromname=Watchtower&subject=&toaddresses=%s&usehtml=No&usestarttls=Yes&timeout=10s"
 
 	return fmt.Sprintf(template,
 		url.QueryEscape(username),

@@ -17,6 +17,9 @@ import (
 // emailType is the identifier for email notifications.
 const emailType = "email"
 
+// defaultTimeout is the default duration for SMTP operations.
+const defaultTimeout = 10 * time.Second
+
 // Errors for email notification configuration.
 var (
 	// errInvalidPortRange indicates that the specified SMTP port is outside the valid range (0-65535).
@@ -125,6 +128,7 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		Encryption:  smtp.EncMethods.Auto,
 		Auth:        smtp.AuthTypes.None,
 		ClientHost:  "localhost",
+		Timeout:     defaultTimeout,
 	}
 
 	// Enable authentication if credentials provided.
