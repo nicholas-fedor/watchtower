@@ -8,28 +8,26 @@
       
       
       
-        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/linked-containers.html">
+        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/http-api-mode/">
       
       
-        <link rel="prev" href="metrics.html">
+        <link rel="prev" href="../running-multiple-instances/">
       
       
-        <link rel="next" href="remote-hosts.html">
       
-      
-      <link rel="icon" href="images/favicon.ico">
+      <link rel="icon" href="../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Linked Containers - Watchtower</title>
+        <title>HTTP API Mode - Watchtower</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,9 +46,9 @@
       
     
     
-      <link rel="stylesheet" href="stylesheets/theme.css">
+      <link rel="stylesheet" href="../stylesheets/theme.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -87,9 +85,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -106,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Linked Containers
+              HTTP API Mode
             
           </span>
         </div>
@@ -222,9 +220,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     Watchtower
@@ -251,7 +249,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -311,7 +309,7 @@
   
   
     <li class="md-nav__item">
-      <a href="introduction.html" class="md-nav__link">
+      <a href="../introduction/" class="md-nav__link">
         
   
   
@@ -334,7 +332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="usage-overview.html" class="md-nav__link">
+      <a href="../usage-overview/" class="md-nav__link">
         
   
   
@@ -402,7 +400,7 @@
   
   
     <li class="md-nav__item">
-      <a href="arguments.html" class="md-nav__link">
+      <a href="../arguments/" class="md-nav__link">
         
   
   
@@ -425,7 +423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="container-selection.html" class="md-nav__link">
+      <a href="../container-selection/" class="md-nav__link">
         
   
   
@@ -448,7 +446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="private-registries.html" class="md-nav__link">
+      <a href="../private-registries/" class="md-nav__link">
         
   
   
@@ -471,7 +469,7 @@
   
   
     <li class="md-nav__item">
-      <a href="secure-connections.html" class="md-nav__link">
+      <a href="../secure-connections/" class="md-nav__link">
         
   
   
@@ -539,7 +537,7 @@
   
   
     <li class="md-nav__item">
-      <a href="notifications.html" class="md-nav__link">
+      <a href="../notifications/" class="md-nav__link">
         
   
   
@@ -562,7 +560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="metrics.html" class="md-nav__link">
+      <a href="../metrics/" class="md-nav__link">
         
   
   
@@ -629,17 +627,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-      <a href="linked-containers.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../linked-containers/" class="md-nav__link">
         
   
   
@@ -650,7 +641,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -663,7 +653,7 @@
   
   
     <li class="md-nav__item">
-      <a href="remote-hosts.html" class="md-nav__link">
+      <a href="../remote-hosts/" class="md-nav__link">
         
   
   
@@ -686,7 +676,7 @@
   
   
     <li class="md-nav__item">
-      <a href="stop-signals.html" class="md-nav__link">
+      <a href="../stop-signals/" class="md-nav__link">
         
   
   
@@ -709,7 +699,7 @@
   
   
     <li class="md-nav__item">
-      <a href="lifecycle-hooks.html" class="md-nav__link">
+      <a href="../lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -732,7 +722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="running-multiple-instances.html" class="md-nav__link">
+      <a href="../running-multiple-instances/" class="md-nav__link">
         
   
   
@@ -752,10 +742,17 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="http-api-mode.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -766,6 +763,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -813,12 +811,47 @@
   
 
 
-  <h1>Linked Containers</h1>
+  <h1>HTTP API Mode</h1>
 
-<p>Watchtower will detect if there are links between any of the running containers and ensures that things are stopped/started in a way that won't break any of the links. If an update is detected for one of the dependencies in a group of linked containers, watchtower will stop and start all of the containers in the correct order so that the application comes back up correctly.</p>
-<p>For example, imagine you were running a <em>mysql</em> container and a <em>wordpress</em> container which had been linked to the <em>mysql</em> container. If watchtower were to detect that the <em>mysql</em> container required an update, it would first shut down the linked <em>wordpress</em> container followed by the <em>mysql</em> container. When restarting the containers it would handle <em>mysql</em> first and then <em>wordpress</em> to ensure that the link continued to work.</p>
-<p>If you want to override existing links, or if you are not using links, you can use special <code>com.centurylinklabs.watchtower.depends-on</code> label with dependent container names, separated by a comma.</p>
-<p>When you have a depending container that is using <code>network_mode: service:container</code> then watchtower will treat that container as an implicit link.</p>
+<p>Watchtower provides an HTTP API mode that enables an HTTP endpoint that can be requested to trigger container updating. The current available endpoint list is:</p>
+<ul>
+<li><code>/v1/update</code> - triggers an update for all of the containers monitored by this Watchtower instance.</li>
+</ul>
+<hr />
+<p>To enable this mode, use the flag <code>--http-api-update</code>. For example, in a Docker Compose config file:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3&#39;</span>
+
+<span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">app-monitored-by-watchtower</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
+
+<span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--debug --http-api-update</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=mytoken</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
+<span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080:8080</span>
+</code></pre></div>
+<p>By default, enabling this mode prevents periodic polls (i.e. what is specified using <code>--interval</code> or <code>--schedule</code>). To run periodic updates regardless, pass <code>--http-api-periodic-polls</code>.</p>
+<p>Notice that there is an environment variable named WATCHTOWER_HTTP_API_TOKEN. To prevent external services from accidentally triggering image updates, all of the requests have to contain a "Token" field, valued as the token defined in WATCHTOWER_HTTP_API_TOKEN, in their headers. In this case, there is a port bind to the host machine, allowing to request localhost:8080 to reach Watchtower. The following <code>curl</code> command would trigger an image update:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
+</code></pre></div>
+<p>If port 8080 is used by another service, then the environment variable WATCHTOWER_HTTP_API_PORT can be changed.</p>
+<hr />
+<p>In order to update only certain images, the image names can be provided as URL query parameters. The following <code>curl</code> command would trigger an update for the images <code>foo/bar</code> and <code>foo/baz</code>:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar,foo/baz
+</code></pre></div>
+<p>You can also specify image tags to target containers running a specific version (e.g., <code>foo/bar:1.0</code>). For example, to update only containers using <code>foo/bar:1.0</code> and <code>foo/baz:latest</code>:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar:1.0,foo/baz:latest
+</code></pre></div>
+<p>If no tag is provided, Watchtower matches containers regardless of their tag, maintaining compatibility with untagged image filtering.</p>
 
 
 
@@ -867,10 +900,10 @@
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

@@ -8,28 +8,28 @@
       
       
       
-        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/secure-connections.html">
+        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/container-selection/">
       
       
-        <link rel="prev" href="private-registries.html">
+        <link rel="prev" href="../arguments/">
       
       
-        <link rel="next" href="notifications.html">
+        <link rel="next" href="../private-registries/">
       
       
-      <link rel="icon" href="images/favicon.ico">
+      <link rel="icon" href="../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Secure Connections - Watchtower</title>
+        <title>Container Selection - Watchtower</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,9 +48,9 @@
       
     
     
-      <link rel="stylesheet" href="stylesheets/theme.css">
+      <link rel="stylesheet" href="../stylesheets/theme.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -75,6 +75,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#full_exclude" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -87,9 +92,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -106,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Secure Connections
+              Container Selection
             
           </span>
         </div>
@@ -222,9 +227,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     Watchtower
@@ -251,7 +256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -311,7 +316,7 @@
   
   
     <li class="md-nav__item">
-      <a href="introduction.html" class="md-nav__link">
+      <a href="../introduction/" class="md-nav__link">
         
   
   
@@ -334,7 +339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="usage-overview.html" class="md-nav__link">
+      <a href="../usage-overview/" class="md-nav__link">
         
   
   
@@ -404,58 +409,12 @@
   
   
     <li class="md-nav__item">
-      <a href="arguments.html" class="md-nav__link">
+      <a href="../arguments/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     Arguments
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="container-selection.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Container Selection
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="private-registries.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Private Registries
     
   </span>
   
@@ -480,7 +439,102 @@
       
       
       
-      <a href="secure-connections.html" class="md-nav__link md-nav__link--active">
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Container Selection
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Container Selection
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#full_exclude" class="md-nav__link">
+    <span class="md-ellipsis">
+      Full Exclude
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitor_only" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitor Only
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../private-registries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Private Registries
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../secure-connections/" class="md-nav__link">
         
   
   
@@ -491,7 +545,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -549,7 +602,7 @@
   
   
     <li class="md-nav__item">
-      <a href="notifications.html" class="md-nav__link">
+      <a href="../notifications/" class="md-nav__link">
         
   
   
@@ -572,7 +625,7 @@
   
   
     <li class="md-nav__item">
-      <a href="metrics.html" class="md-nav__link">
+      <a href="../metrics/" class="md-nav__link">
         
   
   
@@ -640,7 +693,7 @@
   
   
     <li class="md-nav__item">
-      <a href="linked-containers.html" class="md-nav__link">
+      <a href="../linked-containers/" class="md-nav__link">
         
   
   
@@ -663,7 +716,7 @@
   
   
     <li class="md-nav__item">
-      <a href="remote-hosts.html" class="md-nav__link">
+      <a href="../remote-hosts/" class="md-nav__link">
         
   
   
@@ -686,7 +739,7 @@
   
   
     <li class="md-nav__item">
-      <a href="stop-signals.html" class="md-nav__link">
+      <a href="../stop-signals/" class="md-nav__link">
         
   
   
@@ -709,7 +762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="lifecycle-hooks.html" class="md-nav__link">
+      <a href="../lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -732,7 +785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="running-multiple-instances.html" class="md-nav__link">
+      <a href="../running-multiple-instances/" class="md-nav__link">
         
   
   
@@ -755,7 +808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="http-api-mode.html" class="md-nav__link">
+      <a href="../http-api-mode/" class="md-nav__link">
         
   
   
@@ -796,6 +849,32 @@
   
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#full_exclude" class="md-nav__link">
+    <span class="md-ellipsis">
+      Full Exclude
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitor_only" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitor Only
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -813,18 +892,74 @@
   
 
 
-  <h1>Secure Connections</h1>
+  <h1>Container Selection</h1>
 
-<p>Watchtower is also capable of connecting to Docker endpoints which are protected by SSL/TLS. If you've used <em>docker-machine</em> to provision your remote Docker host, you simply need to volume mount the certificates generated by <em>docker-machine</em> into the watchtower container and optionally specify <code>--tlsverify</code> flag.</p>
-<p>The <em>docker-machine</em> certificates for a particular host can be located by executing the <code>docker-machine env</code> command for the desired host (note the values for the <code>DOCKER_HOST</code> and <code>DOCKER_CERT_PATH</code> environment variables that are returned from this command). The directory containing the certificates for the remote host needs to be mounted into the watchtower container at <em>/etc/ssl/docker</em>.</p>
-<p>With the certificates mounted into the watchtower container you need to specify the <code>--tlsverify</code> flag to enable verification of the certificate:</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-e<span class="w"> </span><span class="nv">DOCKER_HOST</span><span class="o">=</span><span class="nv">$DOCKER_HOST</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-e<span class="w"> </span><span class="nv">DOCKER_CERT_PATH</span><span class="o">=</span>/etc/ssl/docker<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-v<span class="w"> </span><span class="nv">$DOCKER_CERT_PATH</span>:/etc/ssl/docker<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>nickfedor/watchtower<span class="w"> </span>--tlsverify
+<p>By default, watchtower will watch all containers. However, sometimes only some containers should be updated.</p>
+<p>There are two options:</p>
+<ul>
+<li><strong>Fully exclude</strong>: You can choose to exclude containers entirely from being watched by watchtower.</li>
+<li><strong>Monitor only</strong>: In this mode, watchtower checks for container updates, sends notifications and invokes the <a href="https://nicholas-fedor.github.io/watchtower/lifecycle-hooks/">pre-check/post-check hooks</a> on the containers but does <strong>not</strong> perform the update.</li>
+</ul>
+<h2 id="full_exclude">Full Exclude<a class="headerlink" href="#full_exclude" title="Permanent link">&para;</a></h2>
+<p>If you need to exclude some containers, set the <em>com.centurylinklabs.watchtower.enable</em> label to <code>false</code>.  For clarity this should be set <strong>on the container(s)</strong> you wish to be ignored, this is not set on watchtower.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">dockerfile</label><label for="__tabbed_1_2">docker run</label><label for="__tabbed_1_3">docker-compose</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.enable<span class="o">=</span><span class="s2">&quot;false&quot;</span>
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.enable<span class="o">=</span><span class="nb">false</span><span class="w"> </span>someimage
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;3&quot;</span>
+<span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">someimage</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">someimage</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>If instead you want to <a href="https://nicholas-fedor.github.io/watchtower/arguments/#filter_by_enable_label">only include containers with the enable label</a>, pass the <code>--label-enable</code> flag or the <code>WATCHTOWER_LABEL_ENABLE</code> environment variable on startup for watchtower and set the <em>com.centurylinklabs.watchtower.enable</em> label with a value of <code>true</code> on the containers you want to watch.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">dockerfile</label><label for="__tabbed_2_2">docker run</label><label for="__tabbed_2_3">docker-compose</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.enable<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.enable<span class="o">=</span><span class="nb">true</span><span class="w"> </span>someimage
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;3&quot;</span>
+<span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">someimage</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">someimage</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>If you wish to create a monitoring scope, you will need to <a href="https://nicholas-fedor.github.io/watchtower/running-multiple-instances">run multiple instances and set a scope for each of them</a>.</p>
+<p>Watchtower filters running containers by testing them against each configured criteria. A container is monitored if all criteria are met. For example:</p>
+<ul>
+<li>If a container's name is on the monitoring name list (not empty <code>--name</code> argument) but it is not enabled (<em>centurylinklabs.watchtower.enable=false</em>), it won't be monitored;</li>
+<li>If a container's name is not on the monitoring name list (not empty <code>--name</code> argument), even if it is enabled (<em>centurylinklabs.watchtower.enable=true</em> and <code>--label-enable</code> flag is set), it won't be monitored;</li>
+</ul>
+<h2 id="monitor_only">Monitor Only<a class="headerlink" href="#monitor_only" title="Permanent link">&para;</a></h2>
+<p>Individual containers can be marked to only be monitored (without being updated).</p>
+<p>To do so, set the <em>com.centurylinklabs.watchtower.monitor-only</em> label to <code>true</code> on that container.</p>
+<div class="highlight"><pre><span></span><code><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.monitor-only<span class="o">=</span><span class="s2">&quot;true&quot;</span>
+</code></pre></div>
+<p>Or, it can be specified as part of the <code>docker run</code> command line:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.monitor-only<span class="o">=</span><span class="nb">true</span><span class="w"> </span>someimage
+</code></pre></div>
+<p>When the label is specified on a container, watchtower treats that container exactly as if <a href="https://nicholas-fedor.github.io/watchtower/arguments/#without_updating_containers"><code>WATCHTOWER_MONITOR_ONLY</code></a> was set, but the effect is limited to the individual container. </p>
 
 
 
@@ -873,10 +1008,10 @@
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

@@ -8,28 +8,28 @@
       
       
       
-        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/stop-signals.html">
+        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/running-multiple-instances/">
       
       
-        <link rel="prev" href="remote-hosts.html">
+        <link rel="prev" href="../lifecycle-hooks/">
       
       
-        <link rel="next" href="lifecycle-hooks.html">
+        <link rel="next" href="../http-api-mode/">
       
       
-      <link rel="icon" href="images/favicon.ico">
+      <link rel="icon" href="../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Stop Signals - Watchtower</title>
+        <title>Running Multiple Instances - Watchtower</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,9 +48,9 @@
       
     
     
-      <link rel="stylesheet" href="stylesheets/theme.css">
+      <link rel="stylesheet" href="../stylesheets/theme.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -87,9 +87,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -106,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Stop Signals
+              Running Multiple Instances
             
           </span>
         </div>
@@ -222,9 +222,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     Watchtower
@@ -251,7 +251,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -311,7 +311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="introduction.html" class="md-nav__link">
+      <a href="../introduction/" class="md-nav__link">
         
   
   
@@ -334,7 +334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="usage-overview.html" class="md-nav__link">
+      <a href="../usage-overview/" class="md-nav__link">
         
   
   
@@ -402,7 +402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="arguments.html" class="md-nav__link">
+      <a href="../arguments/" class="md-nav__link">
         
   
   
@@ -425,7 +425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="container-selection.html" class="md-nav__link">
+      <a href="../container-selection/" class="md-nav__link">
         
   
   
@@ -448,7 +448,7 @@
   
   
     <li class="md-nav__item">
-      <a href="private-registries.html" class="md-nav__link">
+      <a href="../private-registries/" class="md-nav__link">
         
   
   
@@ -471,7 +471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="secure-connections.html" class="md-nav__link">
+      <a href="../secure-connections/" class="md-nav__link">
         
   
   
@@ -539,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="notifications.html" class="md-nav__link">
+      <a href="../notifications/" class="md-nav__link">
         
   
   
@@ -562,7 +562,7 @@
   
   
     <li class="md-nav__item">
-      <a href="metrics.html" class="md-nav__link">
+      <a href="../metrics/" class="md-nav__link">
         
   
   
@@ -632,7 +632,7 @@
   
   
     <li class="md-nav__item">
-      <a href="linked-containers.html" class="md-nav__link">
+      <a href="../linked-containers/" class="md-nav__link">
         
   
   
@@ -655,12 +655,58 @@
   
   
     <li class="md-nav__item">
-      <a href="remote-hosts.html" class="md-nav__link">
+      <a href="../remote-hosts/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     Remote Hosts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stop-signals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Stop Signals
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle-hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Lifecycle Hooks
     
   </span>
   
@@ -685,12 +731,12 @@
       
       
       
-      <a href="stop-signals.html" class="md-nav__link md-nav__link--active">
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
-    Stop Signals
+    Running Multiple Instances
     
   </span>
   
@@ -709,53 +755,7 @@
   
   
     <li class="md-nav__item">
-      <a href="lifecycle-hooks.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Lifecycle Hooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="running-multiple-instances.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Running Multiple Instances
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="http-api-mode.html" class="md-nav__link">
+      <a href="../http-api-mode/" class="md-nav__link">
         
   
   
@@ -813,15 +813,47 @@
   
 
 
-  <h1>Stop Signals</h1>
+  <h1>Running Multiple Instances</h1>
 
-<p>When watchtower detects that a running container needs to be updated it will stop the container by sending it a SIGTERM signal.
-If your container should be shutdown with a different signal you can communicate this to watchtower by setting a label named <em>com.centurylinklabs.watchtower.stop-signal</em> with the value of the desired signal.</p>
-<p>This label can be coded directly into your image by using the <code>LABEL</code> instruction in your Dockerfile:</p>
-<div class="highlight"><pre><span></span><code><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.stop-signal<span class="o">=</span><span class="s2">&quot;SIGHUP&quot;</span>
-</code></pre></div>
-<p>Or, it can be specified as part of the <code>docker run</code> command line:</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.stop-signal<span class="o">=</span>SIGHUP<span class="w"> </span>someimage
+<p>By default, Watchtower will clean up other instances and won't allow multiple instances running on the same Docker host or swarm. It is possible to override this behavior by defining a <a href="https://nicholas-fedor.github.io/watchtower/arguments/#filter_by_scope">scope</a> to each running instance.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul>
+<li>Multiple instances can't run with the same scope;</li>
+<li>An instance without a scope will clean up other running instances, even if they have a defined scope;</li>
+<li>Supplying <code>none</code> as the scope will treat <code>com.centurylinklabs.watchtower.scope=none</code>, <code>com.centurylinklabs.watchtower.scope=</code> and the lack of a <code>com.centurylinklabs.watchtower.scope</code> label as the scope <code>none</code>. This effectively enables you to run both scoped and unscoped watchtower instances on the same machine.</li>
+</ul>
+</div>
+<p>To define an instance monitoring scope, use the <code>--scope</code> argument or the <code>WATCHTOWER_SCOPE</code> environment variable on startup and set the <code>com.centurylinklabs.watchtower.scope</code> label with the same value for the containers you want to include in this instance's scope (including the instance itself).</p>
+<p>For example, in a Docker Compose config file:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3&#39;</span>
+
+<span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">app-with-scope</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.scope=myscope&quot;</span><span class="w"> </span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="nt">scoped-watchtower</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">&quot;/var/run/docker.sock:/var/run/docker.sock&quot;</span><span class="w"> </span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--interval 30 --scope myscope</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.scope=myscope&quot;</span><span class="w"> </span><span class="p p-Indicator">]</span><span class="w"> </span>
+
+<span class="w">  </span><span class="nt">unscoped-app-a</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/app-a</span>
+
+<span class="w">  </span><span class="nt">unscoped-app-b</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/app-b</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.scope=none&quot;</span><span class="w"> </span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="nt">unscoped-app-c</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/app-b</span>
+<span class="w">    </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.scope=&quot;</span><span class="w"> </span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="nt">unscoped-watchtower</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">&quot;/var/run/docker.sock:/var/run/docker.sock&quot;</span><span class="w"> </span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--interval 30 --scope none</span>
 </code></pre></div>
 
 
@@ -871,10 +903,10 @@ If your container should be shutdown with a different signal you can communicate
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

@@ -8,28 +8,28 @@
       
       
       
-        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/lifecycle-hooks.html">
+        <link rel="canonical" href="https://nicholas-fedor.github.io/watchtower/linked-containers/">
       
       
-        <link rel="prev" href="stop-signals.html">
+        <link rel="prev" href="../metrics/">
       
       
-        <link rel="next" href="running-multiple-instances.html">
+        <link rel="next" href="../remote-hosts/">
       
       
-      <link rel="icon" href="images/favicon.ico">
+      <link rel="icon" href="../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
     
     
       
-        <title>Lifecycle Hooks - Watchtower</title>
+        <title>Linked Containers - Watchtower</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,9 +48,9 @@
       
     
     
-      <link rel="stylesheet" href="stylesheets/theme.css">
+      <link rel="stylesheet" href="../stylesheets/theme.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -75,11 +75,6 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
-        
-        <a href="#executing_commands_before_and_after_updating" class="md-skip">
-          Skip to content
-        </a>
-      
     </div>
     <div data-md-component="announce">
       
@@ -92,9 +87,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -111,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lifecycle Hooks
+              Linked Containers
             
           </span>
         </div>
@@ -227,9 +222,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href=".." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="images/logo-450px.png" alt="logo">
+  <img src="../images/logo-450px.png" alt="logo">
 
     </a>
     Watchtower
@@ -256,7 +251,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -316,7 +311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="introduction.html" class="md-nav__link">
+      <a href="../introduction/" class="md-nav__link">
         
   
   
@@ -339,7 +334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="usage-overview.html" class="md-nav__link">
+      <a href="../usage-overview/" class="md-nav__link">
         
   
   
@@ -407,7 +402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="arguments.html" class="md-nav__link">
+      <a href="../arguments/" class="md-nav__link">
         
   
   
@@ -430,7 +425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="container-selection.html" class="md-nav__link">
+      <a href="../container-selection/" class="md-nav__link">
         
   
   
@@ -453,7 +448,7 @@
   
   
     <li class="md-nav__item">
-      <a href="private-registries.html" class="md-nav__link">
+      <a href="../private-registries/" class="md-nav__link">
         
   
   
@@ -476,7 +471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="secure-connections.html" class="md-nav__link">
+      <a href="../secure-connections/" class="md-nav__link">
         
   
   
@@ -544,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="notifications.html" class="md-nav__link">
+      <a href="../notifications/" class="md-nav__link">
         
   
   
@@ -567,7 +562,7 @@
   
   
     <li class="md-nav__item">
-      <a href="metrics.html" class="md-nav__link">
+      <a href="../metrics/" class="md-nav__link">
         
   
   
@@ -634,10 +629,17 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="linked-containers.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -648,6 +650,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -660,7 +663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="remote-hosts.html" class="md-nav__link">
+      <a href="../remote-hosts/" class="md-nav__link">
         
   
   
@@ -683,7 +686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="stop-signals.html" class="md-nav__link">
+      <a href="../stop-signals/" class="md-nav__link">
         
   
   
@@ -703,30 +706,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Lifecycle Hooks
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="lifecycle-hooks.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -737,81 +720,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#executing_commands_before_and_after_updating" class="md-nav__link">
-    <span class="md-ellipsis">
-      Executing commands before and after updating
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Executing commands before and after updating">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#specifying_update_commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      Specifying update commands
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#timeouts" class="md-nav__link">
-    <span class="md-ellipsis">
-      Timeouts
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Timeouts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pre-_or_post-update_timeouts" class="md-nav__link">
-    <span class="md-ellipsis">
-      Pre- or Post-update timeouts
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#execution_failure" class="md-nav__link">
-    <span class="md-ellipsis">
-      Execution failure
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -824,7 +732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="running-multiple-instances.html" class="md-nav__link">
+      <a href="../running-multiple-instances/" class="md-nav__link">
         
   
   
@@ -847,7 +755,7 @@
   
   
     <li class="md-nav__item">
-      <a href="http-api-mode.html" class="md-nav__link">
+      <a href="../http-api-mode/" class="md-nav__link">
         
   
   
@@ -888,71 +796,6 @@
   
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#executing_commands_before_and_after_updating" class="md-nav__link">
-    <span class="md-ellipsis">
-      Executing commands before and after updating
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Executing commands before and after updating">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#specifying_update_commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      Specifying update commands
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#timeouts" class="md-nav__link">
-    <span class="md-ellipsis">
-      Timeouts
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Timeouts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pre-_or_post-update_timeouts" class="md-nav__link">
-    <span class="md-ellipsis">
-      Pre- or Post-update timeouts
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#execution_failure" class="md-nav__link">
-    <span class="md-ellipsis">
-      Execution failure
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -970,90 +813,12 @@
   
 
 
-  <h1>Lifecycle Hooks</h1>
+  <h1>Linked Containers</h1>
 
-<h2 id="executing_commands_before_and_after_updating">Executing commands before and after updating<a class="headerlink" href="#executing_commands_before_and_after_updating" title="Permanent link">&para;</a></h2>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>These are shell commands executed with <code>sh</code>, and therefore require the container to provide the <code>sh</code>
-executable.</p>
-</div>
-<blockquote>
-<p><strong>DO NOTE</strong>: If the container is not running, lifecycle hooks (including pre-update hooks) cannot run, as the stop phase is skipped, and the update proceeds directly to removal (if applicable) or completion.</p>
-</blockquote>
-<p>It is possible to execute <em>pre/post-check</em> and <em>pre/post-update</em> commands
-<strong>inside</strong> every container updated by watchtower.</p>
-<ul>
-<li>The <em>pre-check</em> command is executed for each container prior to every update cycle.</li>
-<li>The <em>pre-update</em> command is executed before stopping the container when an update is about to start.</li>
-<li>The <em>post-update</em> command is executed after restarting the updated container</li>
-<li>The <em>post-check</em> command is executed for each container post every update cycle.</li>
-</ul>
-<p>This feature is disabled by default. To enable it, you need to set the option
-<code>--enable-lifecycle-hooks</code> on the command line, or set the environment variable
-<code>WATCHTOWER_LIFECYCLE_HOOKS</code> to <code>true</code>.</p>
-<h3 id="specifying_update_commands">Specifying update commands<a class="headerlink" href="#specifying_update_commands" title="Permanent link">&para;</a></h3>
-<p>The commands are specified using docker container labels, the following are currently available:</p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Docker Container Label</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Pre Check</td>
-<td><code>com.centurylinklabs.watchtower.lifecycle.pre-check</code></td>
-</tr>
-<tr>
-<td>Pre Update</td>
-<td><code>com.centurylinklabs.watchtower.lifecycle.pre-update</code></td>
-</tr>
-<tr>
-<td>Post Update</td>
-<td><code>com.centurylinklabs.watchtower.lifecycle.post-update</code></td>
-</tr>
-<tr>
-<td>Post Check</td>
-<td><code>com.centurylinklabs.watchtower.lifecycle.post-check</code></td>
-</tr>
-</tbody>
-</table>
-<p>These labels can be declared as instructions in a Dockerfile (with some example .sh files) or be specified as part of
-the <code>docker run</code> command line:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Dockerfile</label><label for="__tabbed_1_2">docker run</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.pre-check<span class="o">=</span><span class="s2">&quot;/sync.sh&quot;</span>
-<span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.pre-update<span class="o">=</span><span class="s2">&quot;/dump-data.sh&quot;</span>
-<span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.post-update<span class="o">=</span><span class="s2">&quot;/restore-data.sh&quot;</span>
-<span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.post-check<span class="o">=</span><span class="s2">&quot;/send-heartbeat.sh&quot;</span>
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
---label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.pre-check<span class="o">=</span><span class="s2">&quot;/sync.sh&quot;</span><span class="w"> </span><span class="se">\</span>
---label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.pre-update<span class="o">=</span><span class="s2">&quot;/dump-data.sh&quot;</span><span class="w"> </span><span class="se">\</span>
---label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.post-update<span class="o">=</span><span class="s2">&quot;/restore-data.sh&quot;</span><span class="w"> </span><span class="se">\</span>
-someimage<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.post-check<span class="o">=</span><span class="s2">&quot;/send-heartbeat.sh&quot;</span><span class="w"> </span><span class="se">\</span>
-</code></pre></div>
-</div>
-</div>
-</div>
-<h3 id="timeouts">Timeouts<a class="headerlink" href="#timeouts" title="Permanent link">&para;</a></h3>
-<p>The timeout for all lifecycle commands is 60 seconds. After that, a timeout will
-occur, forcing Watchtower to continue the update loop.</p>
-<h4 id="pre-_or_post-update_timeouts">Pre- or Post-update timeouts<a class="headerlink" href="#pre-_or_post-update_timeouts" title="Permanent link">&para;</a></h4>
-<p>For the <code>pre-update</code> or <code>post-update</code> lifecycle command, it is possible to override this timeout to
-allow the script to finish before forcefully killing it. This is done by adding the
-label <code>com.centurylinklabs.watchtower.lifecycle.pre-update-timeout</code> or post-update-timeout respectively followed by
-the timeout expressed in minutes.</p>
-<p>If the label value is explicitly set to <code>0</code>, the timeout will be disabled.</p>
-<h3 id="execution_failure">Execution failure<a class="headerlink" href="#execution_failure" title="Permanent link">&para;</a></h3>
-<p>The failure of a command to execute, identified by an exit code different than
-0 or 75 (EX_TEMPFAIL), will not prevent watchtower from updating the container. Only an error
-log statement containing the exit code will be reported.</p>
+<p>Watchtower will detect if there are links between any of the running containers and ensures that things are stopped/started in a way that won't break any of the links. If an update is detected for one of the dependencies in a group of linked containers, watchtower will stop and start all of the containers in the correct order so that the application comes back up correctly.</p>
+<p>For example, imagine you were running a <em>mysql</em> container and a <em>wordpress</em> container which had been linked to the <em>mysql</em> container. If watchtower were to detect that the <em>mysql</em> container required an update, it would first shut down the linked <em>wordpress</em> container followed by the <em>mysql</em> container. When restarting the containers it would handle <em>mysql</em> first and then <em>wordpress</em> to ensure that the link continued to work.</p>
+<p>If you want to override existing links, or if you are not using links, you can use special <code>com.centurylinklabs.watchtower.depends-on</code> label with dependent container names, separated by a comma.</p>
+<p>When you have a depending container that is using <code>network_mode: service:container</code> then watchtower will treat that container as an implicit link.</p>
 
 
 
@@ -1102,10 +867,10 @@ log statement containing the exit code will be reported.</p>
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": [], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      <script src="../assets/javascripts/bundle.50899def.min.js"></script>
       
     
   </body>

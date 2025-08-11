@@ -1,71 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/index.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/arguments.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/arguments/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/container-selection.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/container-selection/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/http-api-mode.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/http-api-mode/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/introduction.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/introduction/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/lifecycle-hooks.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/lifecycle-hooks/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/linked-containers.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/linked-containers/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/metrics.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/metrics/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/notifications.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/notifications/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/private-registries.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/private-registries/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/remote-hosts.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/remote-hosts/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/running-multiple-instances.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/running-multiple-instances/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/secure-connections.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/secure-connections/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/stop-signals.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/stop-signals/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/template-preview.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/template-preview/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/updating.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/updating/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
     <url>
-         <loc>https://nicholas-fedor.github.io/watchtower/usage-overview.html</loc>
-         <lastmod>2025-08-02</lastmod>
+         <loc>https://nicholas-fedor.github.io/watchtower/usage-overview/</loc>
+         <lastmod>2025-08-11</lastmod>
     </url>
 </urlset>
