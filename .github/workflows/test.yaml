@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
+        uses: actions/setup-go@e75c3e80bcde46e322cd5845ae46582947c9becd
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
