@@ -2,7 +2,7 @@
 # Builder
 #
 
-FROM golang:alpine@sha256:b917bea5e256aa026b9feb418df97b1c307390b78227af019e308384b8faf989 AS builder
+FROM golang:alpine@sha256:fa0c7cf32e9df17129acf535223b02fd718f30d63e952ad56ea0d5d19f55b2e8 AS builder
 
 # use version (for example "v0.3.3") or "main"
 ARG WATCHTOWER_VERSION=main
