@@ -37,14 +37,14 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
         with:
           fetch-depth: 0 # Full history for GoReleaser versioning.
 
       - name: Set up Go
-        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
+        uses: actions/setup-go@e75c3e80bcde46e322cd5845ae46582947c9becd
         with:
-          go-version: 1.24.x
+          go-version: 1.25.x
 
       - name: Set up QEMU # Enable multi-platform emulation.
         uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
@@ -83,7 +83,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a
+        uses: goreleaser/goreleaser-action@35b9a27f96d11adbbf695207d0787778ad5be891
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -109,7 +109,7 @@ jobs:
 
       - name: Generate artifact attestation # Generate attestations for prod builds.
         if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
-        uses: actions/attest-build-provenance@f0878de78276446bc2ff4a40ae81f8013db6d773
+        uses: actions/attest-build-provenance@8bd83f1e055c41368a1664e71c43b9783931c8c7
         with:
           subject-checksums: ./dist/checksums.txt
 

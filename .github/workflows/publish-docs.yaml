@@ -26,11 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
+        uses: actions/setup-go@e75c3e80bcde46e322cd5845ae46582947c9becd
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Build tplprev
@@ -38,7 +38,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@9322b3ca74000aeb2c01eb777b646334015ddd72
         with:
-          python-version: "3.13.6"
+          python-version: "3.13.7"
           cache: "pip"
           cache-dependency-path: |
             docs-requirements.txt
