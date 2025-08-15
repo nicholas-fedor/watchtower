@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+<!-- markdownlint-disable -->
 <p style="text-align: center; margin-left: 1.6rem;">
   <img alt="Logotype depicting a lighthouse" src="./images/logo-450px.png" width="450" />
 </p>
@@ -6,7 +12,7 @@
 </h1>
 
 <p align="center">
-  A container-based solution for automating Docker container base image updates.
+  A solution for automating Docker container image updates.
   <br/><br/>
   <a href="https://circleci.com/gh/nicholas-fedor/watchtower">
     <img alt="Circle CI" src="https://circleci.com/gh/nicholas-fedor/watchtower.svg?style=shield" />
@@ -36,24 +42,22 @@
     <img alt="Pulls from DockerHub" src="https://img.shields.io/docker/pulls/nickfedor/watchtower.svg" />
   </a>
 </p>
+<!-- markdownlint-restore -->
 
 ## Quick Start
 
-With watchtower you can update the running version of your containerized app simply by pushing a new image to the Docker
-Hub or your own image registry. Watchtower will pull down your new image, gracefully shut down your existing container
-and restart it with the same options that were used when it was deployed initially. Run the watchtower container with
-the following command:
+With Watchtower you can update the running version of your containerized app simply by pushing a new image to Docker Hub or your own image registry. Watchtower will pull down your new image, gracefully shut down your existing container and restart it with the same options that were used when it was deployed initially. Run the Watchtower container with the following command:
 
-=== "docker run"
+=== "Docker CLI"
 
     ```bash
-    $ docker run -d \
+    docker run -d \
     --name watchtower \
     -v /var/run/docker.sock:/var/run/docker.sock \
     nickfedor/watchtower
     ```
 
-=== "docker-compose.yml"
+=== "Docker Compose"
 
     ```yaml
     version: "3"

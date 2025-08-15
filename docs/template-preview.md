@@ -1,11 +1,13 @@
+# Template Preview
+
 <style>
     #tplprev {
         margin: 0;
-        display: flex; 
-        flex-direction: column; 
-        row-gap: 1rem; 
-        box-sizing: border-box; 
-        position: relative; 
+        display: flex;
+        flex-direction: column;
+        row-gap: 1rem;
+        box-sizing: border-box;
+        position: relative;
         margin-right: -13.3rem
     }
     #tplprev textarea {
@@ -20,8 +22,8 @@
         flex: 1;
     }
     #tplprev .controls {
-        display: flex; 
-        flex-direction: row; 
+        display: flex;
+        flex-direction: row;
         column-gap: 0.5rem
     }
     #tplprev textarea, #tplprev input {
@@ -42,8 +44,8 @@
         border-radius: 0.1rem;
         color: var(--md-primary-bg-color);
         background-color: var(--md-primary-fg-color);
-        flex:1; 
-        min-width: 12ch; 
+        flex:1;
+        min-width: 12ch;
         padding: 0.5rem
     }
     #tplprev button:hover {
@@ -57,12 +59,12 @@
         column-gap: 0.5rem;
     }
     #tplprev .template-wrapper {
-        display: flex; 
-        flex:1; 
+        display: flex;
+        flex:1;
         column-gap: 1rem;
     }
     #tplprev .result-wrapper {
-        flex: 1; 
+        flex: 1;
         display: flex
     }
     #result {
@@ -75,18 +77,18 @@
         padding: 0.77em 1.18em;
         margin:0;
         height: 540px;
-        flex:1; 
+        flex:1;
         width:100%
     }
     #result b {color: var(--md-code-hl-special-color)}
     #result i {color: var(--md-code-hl-keyword-color)}
     #tplprev .loading {
-        position: absolute; 
-        inset: 0; 
-        display: flex; 
-        padding: 1rem; 
-        box-sizing: border-box; 
-        background: var(--md-code-bg-color); 
+        position: absolute;
+        inset: 0;
+        display: flex;
+        padding: 1rem;
+        box-sizing: border-box;
+        background: var(--md-code-bg-color);
         margin-top: 0
     }
 </style>
@@ -209,7 +211,7 @@ Logs:
     <input type="hidden" name="log" value="yes" />
     <legend><label><input type="checkbox" data-toggle="log" checked /> Log entries</label></legend>
     <label class="numfield">
-        Error: 
+        Error:
         <input type="number" name="error" value="1" />
     </label>
     <label class="numfield">

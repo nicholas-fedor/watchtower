@@ -1,3 +1,5 @@
+# Lifecycle Hooks
+
 ## Executing commands before and after updating
 
 !!! note

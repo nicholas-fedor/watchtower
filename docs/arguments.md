@@ -1,3 +1,5 @@
+# Arguments
+
 By default, Watchtower monitors all containers running on the Docker daemon it connects to (typically the local daemon, configurable via the `--host` flag). To limit monitoring to specific containers, provide their names as arguments when starting Watchtower.
 
 ```bash
