@@ -40,6 +40,6 @@ jobs:
           go test -v -coverprofile coverage.out -covermode atomic ./...
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@2db07e317924c76f654a414629d71c65876882e2
+        uses: codecov/codecov-action@39a2af19d997be74586469d4062e173ecae614f6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
