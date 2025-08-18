@@ -52,7 +52,7 @@ jobs:
           platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
 
       - name: Set up Docker Buildx # Configure multi-platform builds.
-        uses: docker/setup-buildx-action@af1b253b8dc984466d22633f04ef341c1520ed2f
+        uses: docker/setup-buildx-action@4cc794f83e4b7488282e879f4469e86246e52ddd
         with:
           driver: docker-container
           platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
