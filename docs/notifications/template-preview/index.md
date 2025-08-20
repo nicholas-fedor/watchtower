@@ -92,7 +92,7 @@
         margin-top: 0
     }
 </style>
-<script src="../assets/wasm_exec.js"></script>
+<script src="../../assets/wasm_exec.js"></script>
 <script>
     let wasmLoaded = false;
     const updatePreview = () => {
@@ -145,7 +145,7 @@
         updatePreview()
     }
     const go = new Go();
-    WebAssembly.instantiateStreaming(fetch("../assets/tplprev.wasm"), go.importObject).then((result) => {
+    WebAssembly.instantiateStreaming(fetch("../../assets/tplprev.wasm"), go.importObject).then((result) => {
         go.run(result.instance);
         document.querySelector('#tplprev .loading').style.display = "none";
         wasmLoaded = true;
