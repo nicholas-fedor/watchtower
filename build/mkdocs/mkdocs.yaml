@@ -117,7 +117,8 @@ markdown_extensions:
   - pymdownx.details
   # Enables code highlighting for fenced code blocks.
   # https://facelessuser.github.io/pymdown-extensions/extensions/highlight/
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      anchor_linenums: true
   # Enables inline code highlighting.
   # https://facelessuser.github.io/pymdown-extensions/extensions/inlinehilite/
   - pymdownx.inlinehilite
