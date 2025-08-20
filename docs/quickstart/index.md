@@ -4,6 +4,8 @@ hide:
 ---
 # Quickstart
 
+## Overview
+
 Despite offering extensive configuration options, Watchtower's default settings are suitable for most deployments.
 If you need to modify the configuration, then review the available [documentation](../configuration/arguments/index.md).
 
@@ -13,45 +15,46 @@ If you need to modify the configuration, then review the available [documentatio
 
 ```bash title="Pull and run Watchtower"
 docker run -d \
---name watchtower \
---restart unless-stopped \
--v /var/run/docker.sock:/var/run/docker.sock \
-nickfedor/watchtower
+  --name watchtower \
+  --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  nickfedor/watchtower
 ```
 
 ## Docker Compose
 
 [Docker Compose File Reference](https://docs.docker.com/reference/compose-file/){target="_blank" rel="noopener noreferrer"}
 
-1) Download or copy the example Docker Compose file:
-<!-- markdownlint-disable -->
-=== "Windows"
+1. Obtain the example Docker Compose file:
 
-    ```powershell
-    iwr -Uri https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -OutFile docker-compose.yaml
-    ```
+    === "Download via PowerShell (Windows)"
 
-=== "Linux"
+        ```powershell
+        iwr -Uri https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -OutFile docker-compose.yaml
+        ```
+
+    === "Download via Bash (Linux)"
+
+        ```bash
+        curl -L https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -o docker-compose.yaml
+        ```
+
+    === "Copy"
+
+        ```yaml title="docker-compose.yaml"
+        services:
+          watchtower:
+            image: nickfedor/watchtower:latest
+            restart: unless-stopped
+            volumes:
+              - /var/run/docker.sock:/var/run/docker.sock
+        ```
+
+2. Run the Compose file:
 
     ```bash
-    curl -L https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -o docker-compose.yaml
+    docker compose up -d
     ```
-
-```yaml title="docker-compose.yaml"
-services:
-  watchtower:
-    image: nickfedor/watchtower:latest
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-```
-
-2) Run the Compose file:
-<!-- markdownlint-restore -->
-
-  ```bash
-  docker compose up -d
-  ```
 
 ## Expected Behavior
 
