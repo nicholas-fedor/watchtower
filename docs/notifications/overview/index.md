@@ -5,343 +5,647 @@
 Watchtower uses [Shoutrrr](https://github.com/nicholas-fedor/shoutrrr){target="_blank" rel="noopener noreferrer"} to provide notification functionality.
 Notifications are sent via hooks in the [logrus](http://github.com/sirupsen/logrus){target="_blank" rel="noopener noreferrer"} logging system.
 
-Watchtower will post a notification every time it is started.
-This behavior can be changed with an [argument](../../configuration/arguments/index.md#disable_startup_message).
+### Enabling Notifications
+
+To send notifications, use the [`NOTIFICATION URL`](../../configuration/arguments/index.md#notification_url) configuration option to specify the Shoutrrr service URL.
+
+The Shoutrrr URL follows the format:
+
+```text
+<service>://<required-credentials>[:<optional-credentials>]@<required-service>/<required-path>?<key>=<value>&...
+```
+
+The format is the same for all services, but the parameters, path, and credentials vary between them.
+
+The [`NOTIFICATION URL`](../../configuration/arguments/index.md#notification_url) configuration option can also reference a file, in which case the contents of the file are used.
+
+### Using Multiple Notification Services
+
+The [`NOTIFICATION URL`](../../configuration/arguments/index.md#notification_url) configuration option can also be used multiple times or use a comma-separated list in the `WATCHTOWER_NOTIFICATION_URL` environment variable to utilize multiple notification services.
 
 !!! Note "Using multiple notifications with environment variables"
-    There is currently a bug in Viper ([Issue](https://github.com/spf13/viper/issues/380){target="_blank" rel="noopener noreferrer"}), which prevents comma-separated slices to
-    be used when using the environment variable.
+    There is currently a bug in Viper ([Issue](https://github.com/spf13/viper/issues/380){target="_blank" rel="noopener noreferrer"}), which prevents comma-separated slices to be used when using the environment variable.
 
-    A workaround is available where we instead put quotes around the environment variable value and replace the commas with
-    spaces:
+    A workaround is available where we instead put quotes around the environment variable value and replace the commas with spaces:
 
     ```
     WATCHTOWER_NOTIFICATIONS="slack msteams"
     ```
 
-    If you're a `docker-compose` user, make sure to specify environment variables' values in your `.yml` file without double
-    quotes (`"`). This prevents unexpected errors when watchtower starts.
+    If you're a `docker-compose` user, make sure to specify environment variables' values in your `.yml` file without double quotes (`"`).
+    This prevents unexpected errors when Watchtower starts.
+
+### Startup Notifications
+
+Watchtower will log and send a notification every time it is started.
+
+This behavior can be disabled with the [`DISABLE STARTUP MESSAGE`](../../configuration/arguments/index.md#disable_startup_message) configuration option.
 
 ## General Notification Settings
 
-### Notifications Level
+### Level
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notifications-level` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATIONS_LEVEL` |
-| **Description** | Controls the log level for notifications. Defaults to `info`. In legacy mode (`--notification-report=false`), only `info`-level logs trigger notifications, ensuring a focused step-by-step update summary. Possible values: `panic`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+Controls the log level for notifications.
 
-### Notifications Hostname
+Possible values: `panic`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`.
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notifications-hostname` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATIONS_HOSTNAME` |
-| **Description** | Custom hostname specified in subject/title. Useful to override the operating system hostname. |
+```text
+            Argument: --notifications-level
+Environment Variable: WATCHTOWER_NOTIFICATIONS_LEVEL
+                Type: String
+             Default: info
+```
 
-### Notifications Delay
+!!! Note
+    In legacy mode (`--notification-report=false`), only `info`-level logs trigger notifications, ensuring a focused step-by-step update summary.
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notifications-delay` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATIONS_DELAY` |
-| **Description** | Delay before sending notifications expressed in seconds. |
+### Hostname
 
-### Notification Title Tag
+Custom hostname specified in subject/title.
+Useful for overriding the operating system hostname.
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-title-tag` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_TITLE_TAG` |
-| **Description** | Prefix to include in the title. Useful when running multiple watchtowers. |
+```text
+            Argument: --notifications-hostname
+Environment Variable: WATCHTOWER_NOTIFICATIONS_HOSTNAME
+                Type: String
+             Default: None
+```
 
-### Notification Skip Title
+### Delay
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-skip-title` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_SKIP_TITLE` |
-| **Description** | Do not pass the title param to notifications. This will not pass a dynamic title override to notification services. If no title is configured for the service, it will remove the title altogether. |
+Delay before sending notifications expressed in seconds.
 
-### Notification Log Stdout
+```text
+            Argument: --notifications-delay
+Environment Variable: WATCHTOWER_NOTIFICATIONS_DELAY
+                Type: Integer
+             Default: None
+```
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-log-stdout` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_LOG_STDOUT` |
-| **Description** | Enable output from `logger://` shoutrrr service to stdout. |
+### Title Tag
 
-## Legacy Notifications
+Prefix to include in the title.
+Useful when running multiple Watchtower instances.
 
-For backwards compatibility, the notifications can also be configured using legacy notification options. These will automatically be converted to shoutrrr URLs when used.
-The types of notifications to send are set by passing a comma-separated list of values to the `--notifications` option
-(or corresponding environment variable `WATCHTOWER_NOTIFICATIONS`), which has the following valid values:
+```text
+            Argument: --notification-title-tag
+Environment Variable: WATCHTOWER_NOTIFICATION_TITLE_TAG
+                Type: String
+             Default: None
+```
 
-- `email` to send notifications via e-mail
-- `slack` to send notifications through a Slack webhook
-- `msteams` to send notifications via MSTeams webhook
-- `gotify` to send notifications via Gotify
+### Skip Title
 
-### `notify-upgrade`
+Used to not pass the title param to notifications.
+This will not pass a dynamic title override to notification services.
+If no title is configured for the service, it will remove the title altogether.
 
-If watchtower is started with `notify-upgrade` as it's first argument, it will generate a .env file with your current legacy notification options converted to shoutrrr URLs.
-<!-- markdownlint-disable -->
-=== "docker run"
+```text
+            Argument: --notification-skip-title
+Environment Variable: WATCHTOWER_NOTIFICATION_SKIP_TITLE
+                Type: Boolean
+             Default: false
+```
 
-    ```bash
-    $ docker run -d \
-    --name watchtower \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -e WATCHTOWER_NOTIFICATIONS=slack \
-    -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy" \
-    nickfedor/watchtower \
-    notify-upgrade
-    ```
+### Log Stdout
 
-=== "docker-compose.yml"
+Enable output from `logger://` Shoutrrr service to stdout.
 
-    ```yaml
-    version: "3"
-    services:
-      watchtower:
-        image: nickfedor/watchtower
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-        env:
-          WATCHTOWER_NOTIFICATIONS: slack
-          WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL: https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy
-        command: notify-upgrade
-    ```
-<!-- markdownlint-restore -->
-You can then copy this file from the container (a message with the full command to do so will be logged) and use it with your current setup:
-<!-- markdownlint-disable -->
-=== "docker run"
-
-    ```bash
-    $ docker run -d \
-    --name watchtower \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    --env-file watchtower-notifications.env \
-    nickfedor/watchtower
-    ```
-
-=== "docker-compose.yml"
-
-    ```yaml
-    version: "3"
-    services:
-      watchtower:
-        image: nickfedor/watchtower
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-        env_file:
-          - watchtower-notifications.env
-    ```
-<!-- markdownlint-restore -->
+```text
+            Argument: --notification-log-stdout
+Environment Variable: WATCHTOWER_NOTIFICATION_LOG_STDOUT
+                Type: Boolean
+             Default: false
+```
 
 ## Email Notifications
 
-To receive notifications by email, the following command-line options, or their corresponding environment variables, can be set:
+Watchtower uses Shoutrrr's [smtp service](https://nicholas-fedor.github.io/shoutrrr/services/email/){target="_blank" rel="noopener noreferrer"} to send email notifications.
 
-### Email From
+Either legacy email notification flags or Shoutrrr URLs can be used; however, directly using URLs is recommended for greater control and clarity, especially for configuring TLS settings (e.g., STARTTLS or Implicit TLS).
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-from` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_FROM` |
-| **Description** | The e-mail address from which notifications will be sent. |
+To send notifications via e-mail, add `email` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
 
-### Email To
+Email notification flags (e.g., `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, `WATCHTOWER_NOTIFICATION_EMAIL_FROM`) are automatically converted to a Shoutrrr SMTP URL internally.
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-to` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_TO` |
-| **Description** | The e-mail address to which notifications will be sent. |
+### Common SMTP Configurations
 
-### Email Server
+=== "Gmail"
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-server` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER` |
-| **Description** | The SMTP server to send e-mails through. |
+    | Property    | Value         |
+    |-------------|---------------|
+    | Port        | `587`         |
+    | Encryption  | `ExplicitTLS` |
+    | UseStartTLS | `Yes`         |
 
-### Email Server TLS Skip Verify
+    ```text
+    smtp://${USER}:${PASSWORD}@smtp.gmail.com:587/?fromaddress=${FROM}&toaddresses=${TO}&encryption=ExplicitTLS&usestarttls=yes&timeout=30s
+    ```
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-server-tls-skip-verify` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY` |
-| **Description** | Do not verify the TLS certificate of the mail server. This should be used only for testing. |
+    !!! Note
+        For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833){target="_blank" rel="noopener noreferrer"} if two-factor authentication is enabled.
 
-### Email Server Port
+=== "AWS SES"
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-server-port` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT` |
-| **Description** | The port used to connect to the SMTP server to send e-mails through. Defaults to `25`. |
+    | Property    | Value         |
+    |-------------|---------------|
+    | Port        | `587`         |
+    | Encryption  | `ExplicitTLS` |
+    | UseStartTLS | `Yes`         |
 
-### Email Server User
+    ```text
+    smtp://${USER}:${PASSWORD}@email-smtp.us-east-1.amazonaws.com:587/?fromaddress=${FROM}&toaddresses=${TO}&encryption=ExplicitTLS&usestarttls=yes&timeout=30s
+    ```
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-server-user` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER` |
-| **Description** | The username to authenticate with the SMTP server with. |
+=== "Microsoft 365"
 
-### Email Server Password
+    | Property    | Value         |
+    |-------------|---------------|
+    | Port        | `587`         |
+    | Encryption  | `ExplicitTLS` |
+    | UseStartTLS | `Yes`         |
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-server-password` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD` |
-| **Description** | The password to authenticate with the SMTP server with. Can also reference a file, in which case the contents of the file are used. |
+    ```text
+    smtp://${USER}:${PASSWORD}@smtp.office365.com:587/?fromaddress=${FROM}&toaddresses=${TO}&encryption=ExplicitTLS&usestarttls=yes&timeout=30s
+    ```
 
-### Email Delay
+=== "Generic (SSL)"
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-delay` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_DELAY` |
-| **Description** | Delay before sending notifications expressed in seconds. |
+    | Property    | Value         |
+    |-------------|---------------|
+    | Port        | `465`         |
+    | Encryption  | `ImplicitTLS` |
+    | UseStartTLS | `No`          |
 
-### Email Subject Tag
+    ```text
+    smtp://${USER}:${PASSWORD}@smtp.example.com:465/?fromaddress=${FROM}&toaddresses=${TO}&encryption=ImplicitTLS&usestarttls=no&timeout=30s
+    ```
 
-| Property | Value |
-|----------|-------|
-| **CLI Flag** | `--notification-email-subjecttag` |
-| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG` |
-| **Description** | Prefix to include in the subject tag. Useful when running multiple watchtowers. **NOTE:** This will affect all notification types. |
+=== "Generic (Plain)"
 
-Example:
+    | Property    | Value  |
+    |-------------|--------|
+    | Port        | `25`   |
+    | Encryption  | `None` |
+    | UseStartTLS | `No`   |
+
+    ```text
+    smtp://${USER}:${PASSWORD}@smtp.example.com:25/?fromaddress=${FROM}&toaddresses=${TO}&encryption=None&usestarttls=no&timeout=30s
+    ```
+
+#### Notes
+<!-- markdownlint-disable -->
+- **Timeout**:
+
+    * The default SMTP timeout is 10 seconds.
+    * If you experience timeouts (e.g., `failed to send: timed out: using smtp`), add `&timeout=30s` to the URL to allow more time for server responses, especially with proxies or slow networks.
+
+- **Authentication**:
+
+    * Use `&auth=Plain` for username/password authentication (default if credentials provided).
+    * For OAuth2 (e.g., Gmail with app-specific passwords), use `&auth=OAuth2`.
+
+- **Testing**:
+
+    * Install Shoutrrr using one of the various [installation methods](https://nicholas-fedor.github.io/shoutrrr/installation/){target="_blank" rel="noopener noreferrer"}.
+    * Test your URL with the Shoutrrr CLI:
+      ```bash
+      shoutrrr send -u <URL> -m "Test message"
+      ```
+
+- **Proxy Issues**:
+
+    * If using a Docker proxy (e.g., `tcp://dockerproxy:2375`), ensure it allows outbound connections to `${SMTP_HOST}:${SMTP_PORT}`.
+    * Test connectivity with `telnet ${SMTP_HOST} ${SMTP_PORT}` inside the container.
+<!-- markdownlint-restore -->
+
+### Example Legacy Email Configuration
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATIONS=email \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=user \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=secret \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
+      nickfedor/watchtower
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATIONS: email
+          WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: user
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: secret
+          WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 10
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+
+### Legacy Notification Flags
+
+#### Email From
+
+The e-mail address from which notifications will be sent.
+
+```text
+            Argument: --notification-email-from
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_FROM
+                Type: String
+             Default: None
+```
+
+#### Email To
+
+The e-mail address to which notifications will be sent.
+
+```text
+            Argument: --notification-email-to
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_TO
+                Type: String
+             Default: None
+```
+
+#### Email Server
+
+The SMTP server (IP or FQDN) to send notifications through.
+
+```text
+            Argument: --notification-email-server
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER
+                Type: String
+             Default: None
+```
+
+#### Email Server TLS Skip Verify
+
+Skip verification of the server certificate when using TLS.
+
+```text
+            Argument: --notification-email-server-tls-skip-verify
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY
+                Type: Boolean
+             Default: false
+```
+
+#### Email Server User
+
+The username for the SMTP server if it requires authentication.
+
+```text
+            Argument: --notification-email-server-user
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER
+                Type: String
+             Default: None
+```
+
+#### Email Server Password
+
+The password for the SMTP server if it requires authentication.
+
+```text
+            Argument: --notification-email-server-password
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
+                Type: String
+             Default: None
+```
+
+!!! Note
+    This option can also reference a file, in which case the contents of the file are used.
+
+#### Email Server Port
+
+The port the SMTP server listens on.
+
+```text
+            Argument: --notification-email-server-port
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT
+                Type: Integer
+             Default: 25
+```
+
+#### Email Delay
+
+The delay (in seconds) between sending notifications if multiple containers are updated at once.
+
+```text
+            Argument: --notification-email-delay
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_DELAY
+                Type: Integer
+             Default: None
+```
+
+### Transitioning from Legacy Email Notifications to Shoutrrr
+
+Watchtower includes a `watchtower notify-upgrade` command to convert legacy flags to a Shoutrrr URL.
+
+The output is written to a temporary file, which you can copy using:
 
 ```bash
-docker run -d \
-  --name watchtower \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e WATCHTOWER_NOTIFICATIONS=email \
-  -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=fromaddress@gmail.com \
-  -e WATCHTOWER_NOTIFICATION_EMAIL_TO=toaddress@gmail.com \
-  -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.gmail.com \
-  -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
-  -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=fromaddress@gmail.com \
-  -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=app_password \
-  -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=2 \
-  nickfedor/watchtower
+docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
 ```
 
-The previous example assumes, that you already have an SMTP server up and running you can connect to. If you don't or you want to bring up watchtower with your own simple SMTP relay the following `docker-compose.yml` might be a good start for you.
+#### Example Walkthrough
 
-The following example assumes, that your domain is called `your-domain.com` and that you are going to use a certificate valid for `smtp.your-domain.com`. This hostname has to be used as `WATCHTOWER_NOTIFICATION_EMAIL_SERVER` otherwise the TLS connection is going to fail with `Failed to send notification email` or `connect: connection refused`. We also have to add a network for this setup in order to add an alias to it. If you also want to enable DKIM or other features on the SMTP server, you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay){target="_blank" rel="noopener noreferrer"}.
+Example Legacy Configuration:
 
-Example including an SMTP relay:
+=== "Docker CLI"
 
-```yaml
-version: '3.8'
-services:
-  watchtower:
-    image: nickfedor/watchtower:latest
-    container_name: watchtower
-    environment:
-      WATCHTOWER_MONITOR_ONLY: 'true'
-      WATCHTOWER_NOTIFICATIONS: email
-      WATCHTOWER_NOTIFICATION_EMAIL_FROM: from-address@your-domain.com
-      WATCHTOWER_NOTIFICATION_EMAIL_TO: to-address@your-domain.com
-      # you have to use a network alias here, if you use your own certificate
-      WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.your-domain.com
-      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 25
-      WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 2
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - watchtower
-    depends_on:
-      - postfix
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATIONS=email \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=user@example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=secret \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
+      nickfedor/watchtower
+    ```
 
-  # SMTP needed to send out status emails
-  postfix:
-    image: freinet/postfix-relay:latest
-    expose:
-      - 25
-    environment:
-      MAILNAME: somename.your-domain.com
-      TLS_KEY: '/etc/ssl/domains/your-domain.com/your-domain.com.key'
-      TLS_CRT: '/etc/ssl/domains/your-domain.com/your-domain.com.crt'
-      TLS_CA: '/etc/ssl/domains/your-domain.com/intermediate.crt'
-    volumes:
-      - /etc/ssl/domains/your-domain.com/:/etc/ssl/domains/your-domain.com/:ro
-    networks:
+=== "Docker Compose"
+
+    ```yaml
+    services:
       watchtower:
-        # this alias is really important to make your certificate work
-        aliases:
-          - smtp.your-domain.com
-networks:
-  watchtower:
-    external: false
-```
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATIONS: email
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: user@example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: secret
+          WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+
+1. Run the following CLI command:
+
+    ```bash
+    docker compose exec watchtower watchtower notify-upgrade
+    ```
+
+    Converted Shoutrrr URL:
+
+      ```text
+      smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes
+      ```
+
+2. Replace the legacy flags with:
+<!-- markdownlint-disable -->
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATIONS=shoutrrr \
+      -e WATCHTOWER_NOTIFICATION_URL=smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG=Watchtower \
+      nickfedor/watchtower
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATIONS: shoutrrr
+          WATCHTOWER_NOTIFICATION_URL: smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes
+          WATCHTOWER_NOTIFICATION_EMAIL_DELAY: "10"
+          WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG: Watchtower
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+<!-- markdownlint-restore -->
+!!! Note
+    Avoid using unrecognized flags like `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_SSL`, as they are ignored and may cause confusion.
+
+    Use `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY` to disable TLS verification if needed (not recommended for production).
 
 ## Slack Notifications
 
+### Example Slack Configuration
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATIONS=slack \
+      -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy" \
+      -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
+      -e WATCHTOWER_NOTIFICATION_SLACK_CHANNEL=#my-custom-channel \
+      nickfedor/watchtower
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATIONS: slack
+          WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL: "https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy"
+          WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER: watchtower-server-1
+          WATCHTOWER_NOTIFICATION_SLACK_CHANNEL: "#my-custom-channel"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+
+### Slack Configuration Options
+
 To receive notifications in Slack, add `slack` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
 
-Additionally, you should set the Slack webhook URL using the `--notification-slack-hook-url` option or the `WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL` environment variable. This option can also reference a file, in which case the contents of the file are used.
+Watchtower supports the following Slack-related options:
 
-By default, watchtower will send messages under the name `watchtower`, you can customize this string through the `--notification-slack-identifier` option or the `WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER` environment variable.
+#### Slack Hook URL
 
-Other, optional, variables include:
+The Slack webhook URL for notifications.
 
-- `--notification-slack-channel` (env. `WATCHTOWER_NOTIFICATION_SLACK_CHANNEL`): A string which overrides the webhook's default channel. Example: #my-custom-channel.
+```text
+            Argument: --notification-slack-hook-url
+Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
+                Type: String
+             Default: None
+```
 
-Example:
+!!! Note
+    This option can also reference a file, in which case the contents of the file are used.
 
-```bash
-docker run -d \
-  --name watchtower \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e WATCHTOWER_NOTIFICATIONS=slack \
-  -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy" \
-  -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
-  -e WATCHTOWER_NOTIFICATION_SLACK_CHANNEL=#my-custom-channel \
-  nickfedor/watchtower
+#### Slack Identifier
+
+Custom name under which messages are sent.
+
+```text
+            Argument: --notification-slack-identifier
+Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER
+                Type: String
+             Default: watchtower
+```
+
+#### Slack Channel
+
+A string which overrides the webhook's default channel (optional).
+
+```text
+            Argument: --notification-slack-channel
+Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
+                Type: String
+             Default: None
 ```
 
 ## Microsoft Teams Notifications
 
-To receive notifications in MSTeams channel, add `msteams` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
+=== "Docker CLI"
 
-Additionally, you should set the MSTeams webhook URL using the `--notification-msteams-hook` option or the `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL` environment variable. This option can also reference a file, in which case the contents of the file are used.
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATIONS=msteams \
+      -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
+      -e WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA=true \
+      nickfedor/watchtower
+    ```
 
-MSTeams notifier could send keys/values filled by `log.WithField` or `log.WithFields` as MSTeams message facts. To enable this feature add `--notification-msteams-data` flag or set `WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA=true` environment variable.
+=== "Docker Compose"
 
-Example:
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATIONS: msteams
+          WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz"
+          WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA: true
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
 
-```bash
-docker run -d \
-  --name watchtower \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e WATCHTOWER_NOTIFICATIONS=msteams \
-  -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
-  -e WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA=true \
-  nickfedor/watchtower
+### Microsoft Teams Configuration Options
+
+To receive notifications in Microsoft Teams, add `msteams` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
+
+Watchtower supports the following Microsoft Teams-related options:
+
+#### MSTeams Hook URL
+
+The Microsoft Teams webhook URL for notifications.
+
+```text
+            Argument: --notification-msteams-hook
+Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
+                Type: String
+             Default: None
+```
+
+!!! Note
+    This option can also reference a file, in which case the contents of the file are used.
+
+#### MSTeams Use Log Data
+
+Enable sending keys/values filled by `log.WithField` or `log.WithFields` as Microsoft Teams message facts.
+
+```text
+            Argument: --notification-msteams-data
+Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA
+                Type: Boolean
+             Default: false
 ```
 
 ## Gotify Notifications
 
-To push a notification to your Gotify instance, register a Gotify app and specify the Gotify URL and app token:
+=== "Docker CLI"
 
-```bash
-docker run -d \
-  --name watchtower \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e WATCHTOWER_NOTIFICATIONS=gotify \
-  -e WATCHTOWER_NOTIFICATION_GOTIFY_URL="https://my.gotify.tld/" \
-  -e WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN="SuperSecretToken" \
-  nickfedor/watchtower
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATIONS=gotify \
+      -e WATCHTOWER_NOTIFICATION_GOTIFY_URL="https://my.gotify.tld/" \
+      -e WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN="SuperSecretToken" \
+      -e WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY=true \
+      nickfedor/watchtower
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATIONS: gotify
+          WATCHTOWER_NOTIFICATION_GOTIFY_URL: "https://my.gotify.tld/"
+          WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN: "SuperSecretToken"
+          WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY: true
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+
+### Gotify Configuration Options
+
+To push a notification to your Gotify instance, add `gotify` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
+
+Watchtower supports the following Gotify-related options:
+
+#### Gotify URL
+
+The URL of the Gotify instance.
+
+```text
+            Argument: --notification-gotify-url
+Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_URL
+                Type: String
+             Default: None
 ```
 
-`-e WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN` or `--notification-gotify-token` can also reference a file, in which case the contents of the file are used.
+#### Gotify Token
 
-If you want to disable TLS verification for the Gotify instance, you can use either `-e WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY=true` or `--notification-gotify-tls-skip-verify`.
+The app token for the Gotify instance.
+
+```text
+            Argument: --notification-gotify-token
+Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
+                Type: String
+             Default: None
+```
+
+!!! Note
+    This option can also reference a file, in which case the contents of the file are used.
+
+#### Gotify TLS Skip Verify
+
+Skip verification of the server certificate when using TLS.
+
+```text
+            Argument: --notification-gotify-tls-skip-verify
+Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY
+                Type: Boolean
+             Default: false
+```
