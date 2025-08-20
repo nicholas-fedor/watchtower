@@ -4,8 +4,8 @@ You can customize the message posted by setting a template.
 
 - `--notification-template` (env. `WATCHTOWER_NOTIFICATION_TEMPLATE`): The template used for the message.
 
-The template is a Go [template](https://golang.org/pkg/text/template/) that either format a list
-of [log entries](https://pkg.go.dev/github.com/sirupsen/logrus?tab=doc#Entry) or a `notification.Data` struct.
+The template is a Go [template](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"} that either format a list
+of [log entries](https://pkg.go.dev/github.com/sirupsen/logrus?tab=doc#Entry){target="_blank" rel="noopener noreferrer"} or a `notification.Data` struct.
 
 Simple templates are used unless the `notification-report` flag is specified:
 

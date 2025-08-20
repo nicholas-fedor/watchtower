@@ -1,11 +1,15 @@
 # Arguments
 
-By default, Watchtower monitors all containers running on the Docker daemon it connects to (typically the local daemon, configurable via the `--host` flag). To limit monitoring to specific containers, provide their names as arguments when starting Watchtower.
+## Overview
+
+By default, Watchtower monitors all containers running on the Docker daemon it connects to (typically the local daemon, configurable via the `--host` flag).
+To limit monitoring to specific containers, provide their names as arguments when starting Watchtower.
 
 ```bash
-$ docker run -d \
+docker run -d \
     --name watchtower \
     -v /var/run/docker.sock:/var/run/docker.sock \
+    --restart unless-stopped \
     nickfedor/watchtower \
     nginx redis
 ```
@@ -13,7 +17,7 @@ $ docker run -d \
 In this example, Watchtower monitors only the "nginx" and "redis" containers, ignoring others. To run a single update attempt and exit, use the `--run-once` flag with the `--rm` option to remove the Watchtower container afterward.
 
 ```bash
-$ docker run --rm \
+docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     nickfedor/watchtower \
     --run-once \
@@ -52,7 +56,11 @@ services:
 
 ## Time Zone
 
-Sets the time zone for Watchtower's logs and the `--schedule` flag's cron expressions. Without this setting, Watchtower defaults to UTC. To specify a time zone, use a value from the [TZ Database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) (e.g., `Europe/Rome`). Alternatively, mount the host's `/etc/localtime` file using `-v /etc/localtime:/etc/localtime:ro`.
+Sets the time zone for Watchtower's logs and the `--schedule` flag's cron expressions.
+Without this setting, Watchtower defaults to UTC.
+
+To specify a time zone, use a value from the [TZ Database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones){target="_blank" rel="noopener noreferrer"} (e.g., `Europe/Rome`).
+Alternatively, mount the host's `/etc/localtime` file using `-v /etc/localtime:/etc/localtime:ro`.
 
 ```text
             Argument: None
@@ -85,8 +93,11 @@ Environment Variable: WATCHTOWER_DEBUG
              Default: false
 ```
 
-!!! note
-    Equivalent to `--log-level debug`. See [Maximum Log Level](#maximum-log-level). As an argument, does not accept a value (e.g., `--debug true` is invalid).
+!!! Note
+    Equivalent to `--log-level debug`.
+    As an argument, it does not accept a value (e.g., `--debug true` is invalid).
+
+    See [Maximum Log Level](#maximum_log_level).
 
 ### Trace
 
@@ -99,8 +110,14 @@ Environment Variable: WATCHTOWER_TRACE
              Default: false
 ```
 
-!!! note
-    Equivalent to `--log-level trace`. See [Maximum Log Level](#maximum-log-level). As an argument, does not accept a value (e.g., `--trace true` is invalid). Use with caution due to credential exposure.
+!!! Note
+    Equivalent to `--log-level trace`.
+    As an argument, does not accept a value (e.g., `--trace true` is invalid).
+
+    See [Maximum Log Level](#maximum_log_level).
+
+!!! Warning
+    Use with caution due to credential exposure.
 
 ### Maximum Log Level
 
@@ -146,14 +163,17 @@ Environment Variable: WATCHTOWER_RUN_ONCE
              Default: false
 ```
 
-!!! note
-    Enables debug output during execution, suitable for interactive use. Use with `--rm` to remove the Watchtower container after completion.
+!!! Note
+    Enables debug output during execution, suitable for interactive use.
+    Use with `--rm` to remove the Watchtower container after completion.
 
 ## Scheduling & Polling
 
 ### Schedule
 
-Defines when and how often Watchtower checks for new images using a 6-field [Cron expression](https://pkg.go.dev/github.com/robfig/cron@v1.2.0?tab=doc#hdr-CRON_Expression_Format). Example: `--schedule "0 0 4 * * *"` runs daily at 4 AM.
+Defines when and how often Watchtower checks for new images using a 6-field [Cron expression](https://pkg.go.dev/github.com/robfig/cron@v1.2.0?tab=doc#hdr-CRON_Expression_Format){target="_blank" rel="noopener noreferrer"}.
+
+Example: `--schedule "0 0 4 * * *"` runs daily at 4 AM.
 
 ```text
             Argument: --schedule, -s
@@ -162,8 +182,11 @@ Environment Variable: WATCHTOWER_SCHEDULE
              Default: None
 ```
 
-!!! note
-    Cannot be used with `--interval`. Requires a time zone set via `TZ` or a mounted `/etc/localtime` file (see [Time Zone](#time-zone)).
+!!! Note
+    Cannot be used with `--interval`.
+
+    Requires a time zone set via `TZ` or a mounted `/etc/localtime` file.
+    See [Time Zone](#time_zone).
 
 ### Poll Interval
 
@@ -176,8 +199,9 @@ Environment Variable: WATCHTOWER_POLL_INTERVAL
              Default: 86400 (24 hours)
 ```
 
-!!! note
-    Cannot be used with `--schedule`. Overrides cron-based scheduling.
+!!! Note
+    Cannot be used with `--schedule`.
+    Overrides cron-based scheduling.
 
 ### HTTP API Periodic Polls
 
@@ -190,8 +214,10 @@ Environment Variable: WATCHTOWER_HTTP_API_PERIODIC_POLLS
              Default: false
 ```
 
-!!! note
-    Requires `--http-api-update`. See [HTTP API Mode](#http-api-mode).
+!!! Note
+    Requires `--http-api-update`.
+
+    See [HTTP API Mode](#http_api_mode).
 
 ## Container Management
 
@@ -217,7 +243,7 @@ Environment Variable: WATCHTOWER_REVIVE_STOPPED
              Default: false
 ```
 
-!!! note
+!!! Note
     Requires `--include-stopped`.
 
 ### Include Restarting Containers
@@ -233,7 +259,8 @@ Environment Variable: WATCHTOWER_INCLUDE_RESTARTING
 
 ### Disable Container Restart
 
-Prevents restarting containers after updating, useful when an external system (e.g., systemd) manages container lifecycle.
+Prevents restarting containers after updating.
+This is useful when an external system (e.g., systemd) manages the container lifecycle.
 
 ```text
             Argument: --no-restart
@@ -242,12 +269,15 @@ Environment Variable: WATCHTOWER_NO_RESTART
              Default: false
 ```
 
-!!! warning
-    Combining `--no-restart` with `--cleanup` during Watchtower self-update may leave a renamed Watchtower container running without starting a new one, preventing cleanup of the old image. Use cautiously for self-updating Watchtower instances, and consider external lifecycle management (e.g., Docker Compose) to restart containers manually.
+!!! Warning
+    Combining `--no-restart` with `--cleanup` during Watchtower self-update may leave a renamed Watchtower container running without starting a new one, preventing cleanup of the old image.
+
+    Use cautiously for self-updating Watchtower instances and consider external lifecycle management (e.g., Docker Compose) to restart containers manually.
 
 ### Rolling Restart
 
-Restarts containers one at a time to minimize downtime, ideal for zero-downtime deployments with lifecycle hooks.
+Restarts containers one at a time to minimize downtime.
+This is ideal for zero-downtime deployments with lifecycle hooks.
 
 ```text
             Argument: --rolling-restart
@@ -256,8 +286,9 @@ Environment Variable: WATCHTOWER_ROLLING_RESTART
              Default: false
 ```
 
-!!! note
-    When combined with `--cleanup`, image cleanup is deferred until all containers are updated, which may temporarily increase disk usage for large numbers of containers (>50). This is typically negligible for homelab setups but monitor disk space on resource-constrained hosts.
+!!! Note
+    When combined with `--cleanup`, image cleanup is deferred until all containers are updated, which may temporarily increase disk usage for large numbers of containers (>50).
+    This is typically negligible for homelab setups but monitor disk space on resource-constrained hosts.
 
 ### Cleanup Old Images
 
@@ -270,12 +301,15 @@ Environment Variable: WATCHTOWER_CLEANUP
              Default: false
 ```
 
-!!! note
-    During Watchtower self-updates, cleanup is deferred to the new container to prevent premature image deletion. Ensure `--no-restart` is not used with `--cleanup` to avoid incomplete updates.
+!!! Note
+    During Watchtower self-updates, cleanup is deferred to the new container to prevent premature image deletion.
+
+    Ensure `--no-restart` is not used with `--cleanup` to avoid incomplete updates.
 
 ### Remove Anonymous Volumes
 
-Deletes anonymous volumes when updating containers. Named volumes remain unaffected.
+Deletes anonymous volumes when updating containers.
+Named volumes remain unaffected.
 
 ```text
             Argument: --remove-volumes
@@ -284,8 +318,10 @@ Environment Variable: WATCHTOWER_REMOVE_VOLUMES
              Default: false
 ```
 
-!!! note
-    Containers with the Docker `AutoRemove` option enabled are automatically removed by the Docker daemon after stopping, and Watchtower skips explicit removal in such cases. This does not affect named volumes.
+!!! Note
+    Containers with the Docker `AutoRemove` option enabled are automatically removed by the Docker daemon after stopping.
+    Watchtower skips explicit removal in such cases.
+    This does not affect named volumes.
 
 ### Monitor Only
 
@@ -298,12 +334,17 @@ Environment Variable: WATCHTOWER_MONITOR_ONLY
              Default: false
 ```
 
-!!! note
-    Images may still be pulled due to Docker API limitations for digest comparison. Can be set per container via the `com.centurylinklabs.watchtower.monitor-only` label. See [Label Precedence](#label-precedence).
+!!! Note
+    Images may still be pulled due to Docker API limitations for digest comparison.
+
+    Can be set per container via the `com.centurylinklabs.watchtower.monitor-only` label.
+
+    See [Label Precedence](#label_precedence).
 
 ### Disable Image Pulling
 
-Prevents pulling new images from registries, monitoring only local image cache changes. Useful for locally built images.
+Prevents pulling new images from registries, monitoring only local image cache changes.
+Useful for locally built images.
 
 ```text
             Argument: --no-pull
@@ -312,12 +353,15 @@ Environment Variable: WATCHTOWER_NO_PULL
              Default: false
 ```
 
-!!! note
-    Can be set per container via the `com.centurylinklabs.watchtower.no-pull` label. See [Label Precedence](#label-precedence).
+!!! Note
+    Can be set per container via the `com.centurylinklabs.watchtower.no-pull` label.
+
+    See [Label Precedence](#label_precedence).
 
 ### Enable Label Filter
 
-Restricts monitoring to containers with the `com.centurylinklabs.watchtower.enable` label set to `true` when the `--label-enable` flag is specified. Without `--label-enable`, containers with this label set to `false` are excluded, while others are monitored by default.
+Restricts monitoring to containers with the `com.centurylinklabs.watchtower.enable` label set to `true` when the `--label-enable` flag is specified.
+Without `--label-enable`, containers with this label set to `false` are excluded, while others are monitored by default.
 
 ```text
             Argument: --label-enable
@@ -326,8 +370,10 @@ Environment Variable: WATCHTOWER_LABEL_ENABLE
              Default: false
 ```
 
-!!! note
-    When `--label-enable` is unset, containers without the `com.centurylinklabs.watchtower.enable` label or with it set to `true` are monitored, and those with `false` are excluded. When `--label-enable` is set, only containers with `true` are monitored, ignoring those with `false` or no label.
+!!! Note
+    When `--label-enable` is unset, containers without the `com.centurylinklabs.watchtower.enable` label or with it set to `true` are monitored, and those with `false` are excluded.
+
+    When `--label-enable` is set, only containers with `true` are monitored, ignoring those with `false` or no label.
 
 ### Disable Specific Containers
 
@@ -351,8 +397,14 @@ Environment Variable: WATCHTOWER_SCOPE
              Default: None
 ```
 
-!!! note
-    Set to `none` to ignore scoped containers. Without this flag, Watchtower monitors all containers regardless of scope. For self-updates, ensure all Watchtower containers share the same `com.centurylinklabs.watchtower.scope` label to guarantee cleanup of renamed containers and old images. Mismatched labels may prevent detection, leaving resources running. See [Running Multiple Instances](https://nicholas-fedor.github.io/watchtower/running-multiple-instances).
+!!! Note
+    Set to `none` to ignore scoped containers.
+    Without this flag, Watchtower monitors all containers regardless of scope.
+
+    For self-updates, ensure all Watchtower containers share the same `com.centurylinklabs.watchtower.scope` label to guarantee cleanup of renamed containers and old images.
+    Mismatched labels may prevent detection, leaving resources running.
+
+    See [Running Multiple Instances](../../advanced-features/running-multiple-instances/index.md).
 
 ### Label Precedence
 
@@ -378,8 +430,11 @@ Environment Variable: REPO_USER
              Default: None
 ```
 
-!!! note
-    Must be used with `REPO_PASS` to provide valid credentials. For Docker Hub, the registry is implicitly `https://index.docker.io/v1/`. Suitable for simple username/password authentication.
+!!! Note
+    Must be used with `REPO_PASS` to provide valid credentials.
+    Suitable for simple username/password authentication.
+
+    For Docker Hub, the registry is implicitly `https://index.docker.io/v1/`.
 
 ### REPO_PASS
 
@@ -392,8 +447,12 @@ Environment Variable: REPO_PASS
              Default: None
 ```
 
-!!! note
-    Must be used with `REPO_USER`. Can be a password or a personal access token for registries requiring 2FA (e.g., Docker Hub). Use Docker secrets (e.g., `WATCHTOWER_PASS=/run/secrets/repo_pass`) or environment files to avoid exposing sensitive data in command lines.
+!!! Note
+    Must be used with `REPO_USER`.
+
+    Can be a password or a personal access token for registries requiring 2FA (e.g., Docker Hub).
+
+    Use Docker secrets (e.g., `WATCHTOWER_PASS=/run/secrets/repo_pass`) or environment files to avoid exposing sensitive data in command lines.
 
 ### DOCKER_CONFIG
 
@@ -406,8 +465,14 @@ Environment Variable: DOCKER_CONFIG
              Default: `/`
 ```
 
-!!! note
-    Useful for registries requiring complex authentication (e.g., 2FA on Docker Hub) or credential helpers (e.g., AWS ECR). Mount the `config.json` file to the container (e.g., `-v ~/.docker/config.json:/config.json`) and set this variable to the directory containing the file (e.g., `/`). Changes to the mounted file may require a symlink to ensure updates propagate (see [Usage Overview](usage-overview.md) and [Private Registries](private-registries.md)).
+!!! Note
+    Useful for registries requiring complex authentication (e.g., 2FA on Docker Hub) or credential helpers (e.g., AWS ECR).
+
+    Mount the `config.json` file to the container (e.g., `-v ~/.docker/config.json:/config.json`) and set this variable to the directory containing the file (e.g., `/`).
+
+    Changes to the mounted file may require a symlink to ensure updates propagate.
+
+    See [Usage](../../getting-started/usage/index.md) and [Private Registries](../private-registries/index.md).
 
 ### Skip Registry TLS Verification
 
@@ -420,8 +485,9 @@ Environment Variable: WATCHTOWER_REGISTRY_TLS_SKIP
              Default: false
 ```
 
-!!! note
-    Use cautiously, as it reduces security. Suitable for testing or private registries.
+!!! Warning
+    Use cautiously, as it reduces security.
+    Suitable for testing or private registries.
 
 ### Minimum Registry TLS Version
 
@@ -434,9 +500,14 @@ Environment Variable: WATCHTOWER_REGISTRY_TLS_MIN_VERSION
              Default: TLS1.2
 ```
 
+!!! Warning
+    Using older versions of TLS not recommended for security reasons.
+
 ### Proxy Configuration
 
-Watchtower supports HTTP/HTTPS proxies for registry connections by respecting standard environment variables. Set these in the Watchtower container to route requests (e.g., to Docker Hub or private registries) through a proxy. This is useful in environments without direct internet access.
+Watchtower supports HTTP/HTTPS proxies for registry connections by respecting standard environment variables.
+Set these in the Watchtower container to route requests (e.g., to Docker Hub or private registries) through a proxy.
+This is useful in environments without direct internet access.
 
 Proxy settings are read from the following variables (uppercase and lowercase variants are supported for compatibility):
 
@@ -461,14 +532,18 @@ Environment Variable: NO_PROXY / no_proxy
              Default: None
 ```
 
-!!! note
-    Proxies may require authentication; include it in the URL (e.g., `http://user:pass@proxy.example.com:3128`), but avoid exposing credentials in the command line by using Docker secrets or environment files instead. If your proxy uses a self-signed certificate, combine with `--registry-tls-skip` to disable TLS verification (use cautiously).
+!!! Note
+    Proxies may require authentication.
+    Include it in the URL (e.g., `http://user:pass@proxy.example.com:3128`), but avoid exposing credentials in the command line by using Docker secrets or environment files instead.
 
-For details on how Go handles these variables, see the [net/http.ProxyFromEnvironment](https://pkg.go.dev/net/http#ProxyFromEnvironment) documentation.
+    If your proxy uses a self-signed certificate, combine with `--registry-tls-skip` to disable TLS verification (use cautiously).
+
+For details on how Go handles these variables, see the [net/http.ProxyFromEnvironment](https://pkg.go.dev/net/http#ProxyFromEnvironment){target="_blank" rel="noopener noreferrer"} documentation.
 
 ### Warn on HEAD Failure
 
-Controls warnings for failed HEAD requests to registries. `Auto` warns for registries known to support HEAD requests (e.g., docker.io) that may rate-limit.
+Controls warnings for failed HEAD requests to registries.
+`Auto` warns for registries known to support HEAD requests (e.g., docker.io) that may rate-limit.
 
 ```text
             Argument: --warn-on-head-failure
@@ -492,7 +567,7 @@ Environment Variable: DOCKER_HOST
 
 ### Docker API Version
 
-Sets the Docker API version for client-daemon communication. Defaults to autonegotiation.
+Sets the Docker API version for client-daemon communication.
 
 ```text
             Argument: --api-version, -a
@@ -501,8 +576,13 @@ Environment Variable: DOCKER_API_VERSION
              Default: Autonegotiated
 ```
 
-!!! note
-    Minimum supported version is 1.24. Refer to Docker's [API version matrix](https://docs.docker.com/reference/api/engine/#api-version-matrix) for compatibility.
+!!! Note
+    Falls back to autonegotiation on failure.
+
+!!! Warning
+    Minimum supported version is Docker v1.23.
+
+    Refer to Docker's [API version matrix](https://docs.docker.com/reference/api/engine/#api-version-matrix){target="_blank" rel="noopener noreferrer"} for compatibility.
 
 ### Enable Docker TLS Verification
 
@@ -539,12 +619,13 @@ Environment Variable: WATCHTOWER_HTTP_API_UPDATE
              Default: false
 ```
 
-!!! note
-    See [HTTP API Mode](https://nicholas-fedor.github.io/watchtower/http-api-mode) for details.
+!!! Note
+    See [HTTP API Mode](../../advanced-features/http-api-mode/index.md) for details.
 
 ### HTTP API Token
 
-Sets an authentication token for HTTP API requests. Can reference a file for security.
+Sets an authentication token for HTTP API requests.
+Can reference a file for security.
 
 ```text
             Argument: --http-api-token
@@ -564,8 +645,8 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
              Default: false
 ```
 
-!!! note
-    See [Metrics](https://nicholas-fedor.github.io/watchtower/metrics) for details.
+!!! Note
+    See [Metrics](../../advanced-features/metrics/index.md) for details.
 
 ### HTTP API Port
 
@@ -582,7 +663,8 @@ Environment Variable: WATCHTOWER_HTTP_API_PORT
 
 ### Notification URL
 
-Configures the notification service URL. Can reference a file for sensitive values.
+Configures the notification service URL.
+Can reference a file for sensitive values.
 
 ```text
             Argument: --notification-url
@@ -593,7 +675,8 @@ Environment Variable: WATCHTOWER_NOTIFICATION_URL
 
 ### Notification Email Server Password
 
-Sets the password for the email notification server. Can reference a file for security.
+Sets the password for the email notification server.
+Can reference a file for security.
 
 ```text
             Argument: --notification-email-server-password
@@ -604,7 +687,8 @@ Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
 
 ### Notification Slack Hook URL
 
-Sets the Slack webhook URL for notifications. Can reference a file for security.
+Sets the Slack webhook URL for notifications.
+Can reference a file for security.
 
 ```text
             Argument: --notification-slack-hook-url
@@ -615,7 +699,8 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
 
 ### Notification Microsoft Teams Hook
 
-Sets the Microsoft Teams webhook URL for notifications. Can reference a file for security.
+Sets the Microsoft Teams webhook URL for notifications.
+Can reference a file for security.
 
 ```text
             Argument: --notification-msteams-hook
@@ -626,7 +711,8 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK
 
 ### Notification Gotify Token
 
-Sets the Gotify token for notifications. Can reference a file for security.
+Sets the Gotify token for notifications.
+Can reference a file for security.
 
 ```text
             Argument: --notification-gotify-token
@@ -670,8 +756,9 @@ Environment Variable: None
              Default: N/A
 ```
 
-!!! note
-    Intended solely for Docker `HEALTHCHECK`. Do not use on the main command line.
+!!! Note
+    Intended solely for Docker `HEALTHCHECK`.
+    Do not use on the main command line.
 
 ## Output & Compatibility
 
@@ -686,7 +773,7 @@ Environment Variable: WATCHTOWER_PORCELAIN
              Default: None
 ```
 
-!!! note
+!!! Note
     Equivalent to:
     ```text
     --notification-url logger://

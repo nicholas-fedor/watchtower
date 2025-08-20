@@ -6,7 +6,7 @@
 
 Metrics can be used to track how Watchtower behaves over time.
 
-To use this feature, you have to set an [API token](arguments.md#http_api_token) and [enable the metrics API](arguments.md#http_api_metrics),
+To use this feature, you have to set an [API token](../../configuration/arguments/index.md#http_api_token) and [enable the metrics API](../../configuration/arguments/index.md#http_api_metrics),
 as well as creating a port mapping for your container for port `8080`.
 
 The metrics API endpoint is `/v1/metrics`.
@@ -41,4 +41,4 @@ Replace `demotoken` with the Bearer token you have set accordingly.
 The repository contains a demo with prometheus and grafana, available through `/examples/metrics/docker-compose.yml`. This demo
 is preconfigured with a dashboard, which will look something like this:
 
-![grafana metrics](assets/grafana-dashboard.png)
+![grafana metrics](../../assets/media/grafana-dashboard.png)

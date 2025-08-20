@@ -1,15 +1,21 @@
 # Project Information: https://www.mkdocs.org/user-guide/configuration/#project-information
+# https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#repository-name
 site_name: Watchtower
+# https://www.mkdocs.org/user-guide/configuration/#site_url
 site_url: https://nicholas-fedor.github.io/watchtower/
+# https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#repository
 repo_url: https://github.com/nicholas-fedor/watchtower/
 
 # Path from repo_url to the docs directory for direct editing links, set to main branch.
+# https://www.mkdocs.org/user-guide/configuration/#edit_uri
 edit_uri: edit/main/docs/
 
 # Description for meta tags in HTML header.
+# https://www.mkdocs.org/user-guide/configuration/#site_description
 site_description: Documentation for Watchtower, a solution for automating Docker container image updates.
 
 # Copyright information displayed in the documentation footer (Material theme).
+# https://squidfunk.github.io/mkdocs-material/setup/setting-up-the-footer/#copyright-notice
 copyright: Copyright © 2025 Nicholas Fedor
 
 # Theme Configuration: https://www.mkdocs.org/user-guide/configuration/#theme
@@ -28,42 +34,67 @@ theme:
         icon: material/weather-sunny
         name: Switch to light mode
   # Logo image for the site header, relative to docs_dir.
-  logo: images/logo-450px.png
+  logo: assets/media/logo-450px.png
   # Git icon for the site header.
+  # https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#repository-icon
   icon:
     repo: fontawesome/brands/github
   # Favicon for the site, relative to docs_dir.
-  favicon: images/favicon.ico
+  favicon: assets/media/favicon.ico
   # Directory for custom theme overrides, e.g., partials or main.html.
   custom_dir: ../../docs/overrides
   # Material theme features for enhanced navigation and usability.
   features:
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#instant-loading
+    - navigation.instant
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#anchor-tracking
+    - navigation.tracking
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#navigation-tabs
     - navigation.tabs
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#sticky-navigation-tabs-with-sticky-tabs
+    - navigation.tabs.sticky
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#navigation-sections
     - navigation.sections
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#navigation-expansion
     - navigation.expand
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#section-index-pages
+    # - navigation.indexes
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#anchor-following
     - toc.follow
-    - search.suggest
-    - search.highlight
-    - content.code.copy
-    - content.tooltips
-    - content.tabs.link
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#back-to-top-button
     - navigation.top
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search/#search-suggestions
+    - search.suggest
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search/#search-highlighting
+    - search.highlight
+    # https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search/#search-sharing
+    - search.share
+    # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/#code-copy-button
+    - content.code.copy
+    # https://squidfunk.github.io/mkdocs-material/reference/tooltips/#improved-tooltips
+    - content.tooltips
+    # https://squidfunk.github.io/mkdocs-material/reference/content-tabs/#linked-content-tabs
+    - content.tabs.link
 
 # Extra Configuration: Passed to templates for flexibility.
 extra:
   # Version provider for the mike plugin to handle versioned documentation.
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-versioning/#versioning
   version:
     provider: mike
-  # Disables the "Made with MkDocs" generator text in the footer.
-  generator: false
   # Social links displayed as icons in the footer (Material theme).
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-the-footer/#social-links
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/nicholas-fedor/watchtower
+  # Disables the "Made with MkDocs" generator text in the footer.
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-the-footer/#generator-notice
+  generator: false
 
 # Extra CSS: Stylesheets included by the theme, relative to docs_dir.
 extra_css:
-  - stylesheets/theme.css
+  - assets/styles/theme.css
+  - assets/styles/extra.css
 
 # Markdown Extensions: https://www.mkdocs.org/user-guide/configuration/#markdown_extensions
 # Custom formatting extensions beyond default meta, toc, tables, and fenced_code.
@@ -75,6 +106,12 @@ markdown_extensions:
       separator: "_"
   # Enables admonition blocks (e.g., note, warning).
   - admonition
+  # Enables adding HTML attributes and CSS classes to Markdown elements.
+  # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown/#attribute-lists
+  - attr_list
+  # Enable definition lists
+  # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown/#definition-lists
+  - def_list
   # Enables collapsible details blocks.
   # https://facelessuser.github.io/pymdown-extensions/extensions/details/
   - pymdownx.details
@@ -100,36 +137,44 @@ markdown_extensions:
       repo: watchtower
   # https://facelessuser.github.io/pymdown-extensions/extensions/saneheaders/
   - pymdownx.saneheaders
+  # https://facelessuser.github.io/pymdown-extensions/extensions/striphtml/
+  - pymdownx.striphtml
+  # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown-extensions/#superfences
+  - pymdownx.superfences
   # Enables tabbed content blocks for examples or comparisons.
   # https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/
   - pymdownx.tabbed:
       alternate_style: true
+  # https://squidfunk.github.io/mkdocs-material/reference/data-tables/#data-tables
+  - tables
 
-# Navigation: https://www.mkdocs.org/user-guide/configuration/#nav
 # Site structure with paths relative to docs_dir.
+# https://www.mkdocs.org/user-guide/configuration/#documentation-layout
 nav:
-  - Home: "index.md"
+  - Home: index.md
+  - Quickstart: quickstart/index.md
   - Getting Started:
-      - Introduction: "introduction.md"
-      - Usage Overview: "usage-overview.md"
-      - Updating Watchtower: "updating.md"
+      - Overview: getting-started/overview/index.md
+      - Installation: getting-started/installation/index.md
+      - Usage: getting-started/usage/index.md
+      - Updating Watchtower: getting-started/updating-watchtower/index.md
   - Configuration:
-      - Arguments: "arguments.md"
-      - Container Selection: "container-selection.md"
-      - Private Registries: "private-registries.md"
-      - Secure Connections: "secure-connections.md"
-  - Monitoring & Integration:
-      - Notifications: "notifications.md"
-      - Templates: "templates.md"
-      - Template Preview: "template-preview.md"
-      - Metrics: "metrics.md"
+      - Arguments: configuration/arguments/index.md
+      - Container Selection: configuration/container-selection/index.md
+      - Private Registries: configuration/private-registries/index.md
+      - Secure Connections: configuration/secure-connections/index.md
+  - Notifications:
+      - Configuration: notifications/overview/index.md
+      - Templates: notifications/templates/index.md
+      - Template Preview: notifications/template-preview/index.md
   - Advanced Features:
-      - Linked Containers: "linked-containers.md"
-      - Remote Hosts: "remote-hosts.md"
-      - Stop Signals: "stop-signals.md"
-      - Lifecycle Hooks: "lifecycle-hooks.md"
-      - Running Multiple Instances: "running-multiple-instances.md"
-      - HTTP API Mode: "http-api-mode.md"
+      - HTTP API: advanced-features/http-api/index.md
+      - Lifecycle Hooks: advanced-features/lifecycle-hooks/index.md
+      - Linked Containers: advanced-features/linked-containers/index.md
+      - Metrics: advanced-features/metrics/index.md
+      - Remote Hosts: advanced-features/remote-hosts/index.md
+      - Running Multiple Instances: advanced-features/running-multiple-instances/index.md
+      - Stop Signals: advanced-features/stop-signals/index.md
 
 # Plugins: https://www.mkdocs.org/user-guide/configuration/#plugins
 # Additional functionality for the site build.

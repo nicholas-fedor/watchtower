@@ -1,40 +1,78 @@
-# Notifications
+# Configuration
 
-Watchtower can send notifications when containers are updated. Notifications are sent via hooks in the logging
-system, [logrus](http://github.com/sirupsen/logrus).
+## Overview
 
-!!! note "Using multiple notifications with environment variables"
-    There is currently a bug in Viper (<https://github.com/spf13/viper/issues/380>), which prevents comma-separated slices to
+Watchtower uses [Shoutrrr](https://github.com/nicholas-fedor/shoutrrr){target="_blank" rel="noopener noreferrer"} to provide notification functionality.
+Notifications are sent via hooks in the [logrus](http://github.com/sirupsen/logrus){target="_blank" rel="noopener noreferrer"} logging system.
+
+Watchtower will post a notification every time it is started.
+This behavior can be changed with an [argument](../../configuration/arguments/index.md#disable_startup_message).
+
+!!! Note "Using multiple notifications with environment variables"
+    There is currently a bug in Viper ([Issue](https://github.com/spf13/viper/issues/380){target="_blank" rel="noopener noreferrer"}), which prevents comma-separated slices to
     be used when using the environment variable.
+
     A workaround is available where we instead put quotes around the environment variable value and replace the commas with
     spaces:
+
     ```
-WATCHTOWER_NOTIFICATIONS="slack msteams"
+    WATCHTOWER_NOTIFICATIONS="slack msteams"
     ```
+
     If you're a `docker-compose` user, make sure to specify environment variables' values in your `.yml` file without double
     quotes (`"`). This prevents unexpected errors when watchtower starts.
 
-## Settings
+## General Notification Settings
 
-- `--notifications-level` (env. `WATCHTOWER_NOTIFICATIONS_LEVEL`): Controls the log level for notifications. Defaults to `info`. In legacy mode (`--notification-report=false`), only `info`-level logs trigger notifications, ensuring a focused step-by-step update summary. Possible values: `panic`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`.
-- `--notifications-hostname` (env. `WATCHTOWER_NOTIFICATIONS_HOSTNAME`): Custom hostname specified in subject/title. Useful to override the operating system hostname.
-- `--notifications-delay` (env. `WATCHTOWER_NOTIFICATIONS_DELAY`): Delay before sending notifications expressed in seconds.
-- Watchtower will post a notification every time it is started. This behavior [can be changed](https://nicholas-fedor.github.io/watchtower/arguments/#without_sending_a_startup_message) with an argument.
-- `--notification-title-tag` (env. `WATCHTOWER_NOTIFICATION_TITLE_TAG`): Prefix to include in the title. Useful when running multiple watchtowers.
-- `--notification-skip-title` (env. `WATCHTOWER_NOTIFICATION_SKIP_TITLE`): Do not pass the title param to notifications. This will not pass a dynamic title override to notification services. If no title is configured for the service, it will remove the title all together.
-- `--notification-log-stdout` (env. `WATCHTOWER_NOTIFICATION_LOG_STDOUT`): Enable output from `logger://` shoutrrr service to stdout.
+### Notifications Level
 
-## [Shoutrrr](https://github.com/nicholas-fedor/shoutrrr) notifications
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notifications-level` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATIONS_LEVEL` |
+| **Description** | Controls the log level for notifications. Defaults to `info`. In legacy mode (`--notification-report=false`), only `info`-level logs trigger notifications, ensuring a focused step-by-step update summary. Possible values: `panic`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 
-To send notifications via shoutrrr, the following command-line options, or their corresponding environment variables, can be set:
+### Notifications Hostname
 
-- `--notification-url` (env. `WATCHTOWER_NOTIFICATION_URL`): The shoutrrr service URL to be used.  This option can also reference a file, in which case the contents of the file are used.
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notifications-hostname` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATIONS_HOSTNAME` |
+| **Description** | Custom hostname specified in subject/title. Useful to override the operating system hostname. |
 
-Go to [nicholas-fedor.github.io/shoutrrr/services/overview](https://nicholas-fedor.github.io/shoutrrr/services/overview) to
-learn more about the different service URLs you can use. You can define multiple services by space separating the
-URLs. (See example below)
+### Notifications Delay
 
-## Legacy notifications
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notifications-delay` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATIONS_DELAY` |
+| **Description** | Delay before sending notifications expressed in seconds. |
+
+### Notification Title Tag
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-title-tag` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_TITLE_TAG` |
+| **Description** | Prefix to include in the title. Useful when running multiple watchtowers. |
+
+### Notification Skip Title
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-skip-title` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_SKIP_TITLE` |
+| **Description** | Do not pass the title param to notifications. This will not pass a dynamic title override to notification services. If no title is configured for the service, it will remove the title altogether. |
+
+### Notification Log Stdout
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-log-stdout` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_LOG_STDOUT` |
+| **Description** | Enable output from `logger://` shoutrrr service to stdout. |
+
+## Legacy Notifications
 
 For backwards compatibility, the notifications can also be configured using legacy notification options. These will automatically be converted to shoutrrr URLs when used.
 The types of notifications to send are set by passing a comma-separated list of values to the `--notifications` option
@@ -101,19 +139,82 @@ You can then copy this file from the container (a message with the full command 
           - watchtower-notifications.env
     ```
 <!-- markdownlint-restore -->
-### Email
+
+## Email Notifications
 
 To receive notifications by email, the following command-line options, or their corresponding environment variables, can be set:
 
-- `--notification-email-from` (env. `WATCHTOWER_NOTIFICATION_EMAIL_FROM`): The e-mail address from which notifications will be sent.
-- `--notification-email-to` (env. `WATCHTOWER_NOTIFICATION_EMAIL_TO`): The e-mail address to which notifications will be sent.
-- `--notification-email-server` (env. `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`): The SMTP server to send e-mails through.
-- `--notification-email-server-tls-skip-verify` (env. `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY`): Do not verify the TLS certificate of the mail server. This should be used only for testing.
-- `--notification-email-server-port` (env. `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT`): The port used to connect to the SMTP server to send e-mails through. Defaults to `25`.
-- `--notification-email-server-user` (env. `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER`): The username to authenticate with the SMTP server with.
-- `--notification-email-server-password` (env. `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD`): The password to authenticate with the SMTP server with. Can also reference a file, in which case the contents of the file are used.
-- `--notification-email-delay` (env. `WATCHTOWER_NOTIFICATION_EMAIL_DELAY`): Delay before sending notifications expressed in seconds.
-- `--notification-email-subjecttag` (env. `WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG`): Prefix to include in the subject tag. Useful when running multiple watchtowers. **NOTE:** This will affect all notification types.
+### Email From
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-from` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_FROM` |
+| **Description** | The e-mail address from which notifications will be sent. |
+
+### Email To
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-to` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_TO` |
+| **Description** | The e-mail address to which notifications will be sent. |
+
+### Email Server
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-server` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER` |
+| **Description** | The SMTP server to send e-mails through. |
+
+### Email Server TLS Skip Verify
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-server-tls-skip-verify` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY` |
+| **Description** | Do not verify the TLS certificate of the mail server. This should be used only for testing. |
+
+### Email Server Port
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-server-port` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT` |
+| **Description** | The port used to connect to the SMTP server to send e-mails through. Defaults to `25`. |
+
+### Email Server User
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-server-user` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER` |
+| **Description** | The username to authenticate with the SMTP server with. |
+
+### Email Server Password
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-server-password` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD` |
+| **Description** | The password to authenticate with the SMTP server with. Can also reference a file, in which case the contents of the file are used. |
+
+### Email Delay
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-delay` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_DELAY` |
+| **Description** | Delay before sending notifications expressed in seconds. |
+
+### Email Subject Tag
+
+| Property | Value |
+|----------|-------|
+| **CLI Flag** | `--notification-email-subjecttag` |
+| **Environment Variable** | `WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG` |
+| **Description** | Prefix to include in the subject tag. Useful when running multiple watchtowers. **NOTE:** This will affect all notification types. |
 
 Example:
 
@@ -134,7 +235,7 @@ docker run -d \
 
 The previous example assumes, that you already have an SMTP server up and running you can connect to. If you don't or you want to bring up watchtower with your own simple SMTP relay the following `docker-compose.yml` might be a good start for you.
 
-The following example assumes, that your domain is called `your-domain.com` and that you are going to use a certificate valid for `smtp.your-domain.com`. This hostname has to be used as `WATCHTOWER_NOTIFICATION_EMAIL_SERVER` otherwise the TLS connection is going to fail with `Failed to send notification email` or `connect: connection refused`. We also have to add a network for this setup in order to add an alias to it. If you also want to enable DKIM or other features on the SMTP server, you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay).
+The following example assumes, that your domain is called `your-domain.com` and that you are going to use a certificate valid for `smtp.your-domain.com`. This hostname has to be used as `WATCHTOWER_NOTIFICATION_EMAIL_SERVER` otherwise the TLS connection is going to fail with `Failed to send notification email` or `connect: connection refused`. We also have to add a network for this setup in order to add an alias to it. If you also want to enable DKIM or other features on the SMTP server, you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay){target="_blank" rel="noopener noreferrer"}.
 
 Example including an SMTP relay:
 
@@ -182,7 +283,7 @@ networks:
     external: false
 ```
 
-### Slack
+## Slack Notifications
 
 To receive notifications in Slack, add `slack` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
 
@@ -207,7 +308,7 @@ docker run -d \
   nickfedor/watchtower
 ```
 
-### Microsoft Teams
+## Microsoft Teams Notifications
 
 To receive notifications in MSTeams channel, add `msteams` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
 
@@ -227,7 +328,7 @@ docker run -d \
   nickfedor/watchtower
 ```
 
-### Gotify
+## Gotify Notifications
 
 To push a notification to your Gotify instance, register a Gotify app and specify the Gotify URL and app token:
 

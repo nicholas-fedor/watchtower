@@ -4,66 +4,17 @@ hide:
   - toc
 ---
 <!-- markdownlint-disable -->
-<p style="text-align: center; margin-left: 1.6rem;">
-  <img alt="Logotype depicting a lighthouse" src="./images/logo-450px.png" width="450" />
-</p>
-<h1 align="center">
+<h1 style="font-size: clamp(3rem, 8vw, 5rem); text-align: center; margin-bottom: 0;">
   Watchtower
 </h1>
 
-<p align="center">
-  A solution for automating Docker container image updates.
-  <br/><br/>
-  <a href="https://circleci.com/gh/nicholas-fedor/watchtower">
-    <img alt="Circle CI" src="https://circleci.com/gh/nicholas-fedor/watchtower.svg?style=shield" />
-  </a>
-  <a href="https://codecov.io/gh/nicholas-fedor/watchtower">
-    <img alt="Codecov" src="https://codecov.io/gh/nicholas-fedor/watchtower/branch/main/graph/badge.svg">
-  </a>
-  <a href="https://godoc.org/github.com/nicholas-fedor/watchtower">
-    <img alt="GoDoc" src="https://godoc.org/github.com/nicholas-fedor/watchtower?status.svg" />
-  </a>
-  <a href="https://goreportcard.com/report/github.com/nicholas-fedor/watchtower">
-    <img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/nicholas-fedor/watchtower" />
-  </a>
-  <a href="https://github.com/nicholas-fedor/watchtower/releases">
-    <img alt="latest version" src="https://img.shields.io/github/tag/nicholas-fedor/watchtower.svg" />
-  </a>
-  <a href="https://www.apache.org/licenses/LICENSE-2.0">
-    <img alt="Apache-2.0 License" src="https://img.shields.io/github/license/nicholas-fedor/watchtower.svg" />
-  </a>
-  <a href="https://www.codacy.com/gh/nicholas-fedor/watchtower/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=nicholas-fedor/watchtower&amp;utm_campaign=Badge_Grade">
-    <img alt="Codacy Badge" src="https://app.codacy.com/project/badge/Grade/1c48cfb7646d4009aa8c6f71287670b8"/>
-  </a>
-  <a href="https://github.com/nicholas-fedor/watchtower/#contributors">
-    <img alt="All Contributors" src="https://img.shields.io/github/all-contributors/nicholas-fedor/watchtower" />
-  </a>
-  <a href="https://hub.docker.com/r/nickfedor/watchtower">
-    <img alt="Pulls from DockerHub" src="https://img.shields.io/docker/pulls/nickfedor/watchtower.svg" />
-  </a>
+<div style="display: flex; justify-content: center">
+  <p style="">
+    <img src="assets/media/logo-450px.png" alt="Watchtower logo" width="max-width: 100%; height: auto; max-height: 450px;" />
+  </p>
+</div>
+
+<p style="text-align: center; font-size: 1.4em">
+  A solution for automating Docker container image updates
 </p>
 <!-- markdownlint-restore -->
-
-## Quick Start
-
-With Watchtower you can update the running version of your containerized app simply by pushing a new image to Docker Hub or your own image registry. Watchtower will pull down your new image, gracefully shut down your existing container and restart it with the same options that were used when it was deployed initially. Run the Watchtower container with the following command:
-
-=== "Docker CLI"
-
-    ```bash
-    docker run -d \
-    --name watchtower \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    nickfedor/watchtower
-    ```
-
-=== "Docker Compose"
-
-    ```yaml
-    version: "3"
-    services:
-      watchtower:
-        image: nickfedor/watchtower
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```

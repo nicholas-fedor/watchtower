@@ -2,11 +2,12 @@
 
 ## Executing commands before and after updating
 
-!!! note
+!!! Important
     These are shell commands executed with `sh`, and therefore require the container to provide the `sh`
     executable.
 
-> **DO NOTE**: If the container is not running, lifecycle hooks (including pre-update hooks) cannot run, as the stop phase is skipped, and the update proceeds directly to removal (if applicable) or completion.
+!!! Note
+    If the container is not running, lifecycle hooks (including pre-update hooks) cannot run, as the stop phase is skipped, and the update proceeds directly to removal (if applicable) or completion.
 
 It is possible to execute _pre/post\-check_ and _pre/post\-update_ commands
 **inside** every container updated by watchtower.

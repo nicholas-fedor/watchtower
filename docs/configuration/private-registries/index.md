@@ -1,8 +1,11 @@
 # Private Registries
 
-Watchtower supports private Docker image registries. In many cases, accessing a private registry requires a valid username and password (i.e., _credentials_). In order to operate in such an environment, Watchtower needs to know the credentials to access the registry.
+Watchtower supports private Docker image registries.
 
+In many cases, accessing a private registry requires a valid username and password (i.e., _credentials_).
+In order to operate in such an environment, Watchtower needs to know the credentials to access the registry.
 The credentials can be provided to Watchtower in a configuration file called `config.json`.
+
 There are two ways to generate this configuration file:
 
 1. The configuration file can be created manually.
@@ -12,7 +15,7 @@ There are two ways to generate this configuration file:
 
 Create a new configuration file with the following syntax and a base64 encoded username and password `auth` string:
 
-```json
+```json title="config.json"
 {
     "auths": {
         "<REGISTRY_NAME>": {
@@ -50,7 +53,7 @@ The required `auth` string can be generated as follows:
 echo -n 'username:password' | base64
 ```
 
-!!! info "Username and Password for GCloud"
+!!! Info "Username and Password for GCloud"
     For gcloud, we'll use `_json_key` as our username and the content of `gcloudauth.json` as the password.
     ```bash
     bash echo -n "_json_key:$(cat gcloudauth.json)" | base64 -w0
@@ -74,10 +77,9 @@ When the Docker container is started, pass the configuration file to Watchtower:
 docker run [...] -v <PATH_TO_HOME_DIR>/.docker/config.json:/config.json nickfedor/watchtower
 ```
 
-When creating the Watchtower container via docker-compose, use the following lines:
+When creating the Watchtower container via Docker Compose, use the following lines:
 
 ```yaml
-version: "3.4"
 services:
   watchtower:
     image: nickfedor/watchtower:latest
@@ -89,12 +91,12 @@ services:
 
 ### Docker Config path
 
-By default, Watchtower will look for the `config.json` file in `/`, but this can be changed by setting the `DOCKER_CONFIG` environment variable to the directory path where your config is located. This is useful for setups where the config.json file is changed while the Watchtower instance is running, as the changes will not be picked up for a mounted file if the inode changes.
-Example usage:
+By default, Watchtower will look for the `config.json` file in `/`, but this can be changed by setting the `DOCKER_CONFIG` environment variable to the directory path where your config is located.
+This is useful for setups where the config.json file is changed while the Watchtower instance is running, as the changes will not be picked up for a mounted file if the inode changes.
+
+For example:
 
 ```yaml
-version: "3.4"
-
 services:
   watchtower:
     image: nickfedor/watchtower
@@ -115,7 +117,7 @@ helper in a separate container and mount it using volumes.
 
 #### Example
 
-Example implementation for use with the [amazon-ecr-credential-helper](https://github.com/awslabs/amazon-ecr-credential-helper):
+Here is an example implementation for use with the [amazon-ecr-credential-helper](https://github.com/awslabs/amazon-ecr-credential-helper){target="_blank" rel="noopener noreferrer"}:
 
 Use the Dockerfile below to build the `amazon-ecr-credential-helper` image in a volume that may be mounted onto your Watchtower container.
 
@@ -178,10 +180,7 @@ Use the Dockerfile below to build the `amazon-ecr-credential-helper` image in a 
     }
     ```
 
-4. Create a `docker-compose.yaml` file to help launch the container:
-
     ```yaml
-    version: "3.4"
     services:
      # Check for new images and restart things if a new image exists
      # for any of our containers.
@@ -208,5 +207,4 @@ A few additional notes:
 
 3. This may be able to run in an EC2 instance that has credentials assigned to it, so no keys are needed; however, you may need to include the `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables as well.
 
-4. An alternative to adding the various variables is to create `~/.aws/config` and `~/.aws/credentials` files and placing the settings there.
    Then, mount the `~/.aws` directory to `/` in the container.
