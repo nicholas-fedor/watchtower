@@ -9,10 +9,10 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 ## Endpoints
 
-|          **Name**          | **Endpoint**  |          **Parameters**           |                                    **Description**                                    |
-|:--------------------------:|:-------------:|:---------------------------------:|:-------------------------------------------------------------------------------------:|
-| [Update](#http_api_update) | `/v1/update`  | [`image`](#image_parameter_usage) |         Triggers an update of containers monitored by the Watchtower instance         |
-|          Metrics           | `/v1/metrics` |                                   | Provides container scan and update information that's typically only seen via logging |
+|            **Name**            | **Endpoint**  |          **Parameters**           |                                    **Description**                                    |
+|:------------------------------:|:-------------:|:---------------------------------:|:-------------------------------------------------------------------------------------:|
+|   [Update](#http_api_update)   | `/v1/update`  | [`image`](#image_parameter_usage) |         Triggers an update of containers monitored by the Watchtower instance         |
+| [Metrics](../metrics/index.md) | `/v1/metrics` |                                   | Provides container scan and update information that's typically only seen via logging |
 
 ### HTTP API Update
 
