@@ -238,6 +238,23 @@ Email notification flags (e.g., `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, `WATCHTO
       nickfedor/watchtower
     ```
 
+=== "Docker CLI (SMTP Relay)"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATIONS=email \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
+      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=relay.example.com \
+      nickfedor/watchtower
+    ```
+
+    !!! Note
+        This assumes that you already have an SMTP server up and running that you can connect to.
+        If you don't or you want to bring up Watchtower with your own simple SMTP relay, then check out the Docker Compose example.
+
 === "Docker Compose"
 
     ```yaml
@@ -256,6 +273,30 @@ Email notification flags (e.g., `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, `WATCHTO
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
     ```
+
+=== "Docker Compose (SMTP Relay)"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATIONS: email
+          WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
+          WATCHTOWER_NOTIFICATION_EMAIL_SERVER: relay.example.com
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+
+    !!! Note
+        The example assumes that your domain is called `example.com` and that you are going to use a valid certificate for `smtp.example.com`.
+
+        This hostname has to be used as `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, otherwise the TLS connection will fail with `Failed to send notification email` or `connection: connection refused` errors.
+
+        We also have to add a network for this setup in order to add an alias to it.
+
+        If you also want to enable DKIM or other features on the SMTP server, then you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay){target="_blank" rel="noopener noreferrer"}
 
 ### Legacy Notification Flags
 
