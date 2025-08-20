@@ -620,7 +620,7 @@ Environment Variable: WATCHTOWER_HTTP_API_UPDATE
 ```
 
 !!! Note
-    See [HTTP API Mode](../../advanced-features/http-api-mode/index.md) for details.
+    See [HTTP API Mode](../../advanced-features/http-api/index.md) for details.
 
 ### HTTP API Token
 
