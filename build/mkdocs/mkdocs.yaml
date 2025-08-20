@@ -183,7 +183,7 @@ plugins:
   # Enables versioned documentation with version selector.
   - mike:
       version_selector: true
-      css_dir: css
+      css_dir: ../../assets/styles
   # Displays last updated dates on pages, formatted as time ago.
   - git-revision-date-localized:
       enable_creation_date: true
