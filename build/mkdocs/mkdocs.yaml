@@ -139,8 +139,6 @@ markdown_extensions:
   - pymdownx.saneheaders
   # https://facelessuser.github.io/pymdown-extensions/extensions/striphtml/
   - pymdownx.striphtml
-  # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown-extensions/#superfences
-  - pymdownx.superfences
   # Enables tabbed content blocks for examples or comparisons.
   # https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/
   - pymdownx.tabbed:
