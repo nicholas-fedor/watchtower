@@ -22,6 +22,8 @@ require (
 	golang.org/x/text v0.28.0
 )
 
+require github.com/Masterminds/semver/v3 v3.3.1 // indirect
+
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -79,7 +81,7 @@ require (
 )
 
 require (
-	github.com/onsi/ginkgo/v2 v2.23.4
+	github.com/onsi/ginkgo/v2 v2.25.0
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
