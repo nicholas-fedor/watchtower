@@ -20,24 +20,58 @@
 #tplprev textarea {
   box-decoration-break: slice; /* Control box decoration breaking */
   overflow: auto; /* Enable scrolling if content overflows */
-  padding: 0.77em 1.18em; /* Inner padding for content */
+  padding: 0.77em 1.18em; /* Match preview-output padding for consistency */
   scrollbar-color: var(--md-default-fg-color--lighter) transparent; /* Custom scrollbar color */
   scrollbar-width: thin; /* Thin scrollbar for better UI */
   touch-action: auto; /* Allow touch interactions */
-  word-break: normal; /* Prevent word breaking */
-  min-height: 475px; /* Increased from 300px to better handle template length */
-  height: auto; /* Adjust height dynamically */
-  max-height: 50vh; /* Limit to half viewport height */
+  min-height: 475px; /* Set minimum text area height to handle template length */
+  white-space: pre-wrap; /* Preserve whitespace and wrap, matching preview-output */
+  word-break: normal; /* Prevent word breaking, matching preview-output */
   flex: 1; /* Grow to fill available space */
   width: 100%; /* Full width */
   box-sizing: border-box; /* Include padding in height/width */
-  background-color: var(--md-code-bg-color); /* Match code background */
-  border-width: 0; /* No border */
+  background-color: var(
+    --md-code-bg-color
+  ); /* Match preview-output background */
+  border-width: 0; /* No border, matching preview-output */
   border-radius: 0.1rem; /* Slight rounding */
-  color: var(--md-code-fg-color); /* Text color */
+  color: var(--md-code-fg-color); /* Match preview-output text color */
   font-feature-settings: "kern"; /* Enable kerning */
-  font-family: var(--md-code-font-family); /* Use code font */
-  font-size: 0.7rem; /* Match result text size for consistency */
+  font-family: var(--md-code-font-family); /* Match preview-output font */
+  font-size: 0.7rem; /* Match preview-output text size */
+}
+
+/* Focus state for textarea to enhance usability */
+#tplprev textarea:focus {
+  outline: 2px solid var(--md-accent-fg-color); /* Highlight on focus, using theme accent */
+  outline-offset: -1px; /* Keep outline within element bounds */
+}
+
+/* Styles for the template header container, isolating the header for reliable rendering */
+#tplprev .template-wrapper .template-header-container {
+  border-bottom: 1px solid var(--md-default-fg-color--lightest); /* Match tab-header border */
+  position: sticky; /* Stick to top when scrolling textarea */
+  top: 0; /* Align to top edge */
+  z-index: 2; /* Ensure above textarea content */
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+/* Styles for the template header bar within its container */
+#tplprev .template-wrapper .template-header {
+  padding: 0.5rem 1rem; /* Match tab-header padding */
+  color: var(--md-default-fg-color--light); /* Match tab-header text color */
+  font-family: var(--md-default-font-family); /* Match Material theme font */
+  font-size: 0.9rem; /* Slightly larger for header clarity */
+  font-weight: 500; /* Medium weight for consistency with tab labels */
+  transition: background 0.2s, color 0.2s; /* Smooth transitions, matching tab labels */
+}
+
+/* Hover state for template header to match tab label interactivity */
+#tplprev .template-wrapper .template-header:hover {
+  background: var(
+    --md-default-bg-color--light
+  ); /* Match tab label hover background */
+  color: var(--md-default-fg-color); /* Match tab label hover text color */
 }
 
 /* Styles for the controls container, organizing input fields */
@@ -63,16 +97,17 @@
 .numfield {
   font-size: 0.7rem; /* Smaller text for labels */
   display: flex; /* Use flexbox */
-  flex-direction: column; /* Stack label and input vertically */
-  justify-content: space-between; /* Space between label and input */
-  min-width: 80px; /* Minimum width for readability */
+  flex-direction: row; /* Horizontal layout for label and input */
+  align-items: center; /* Center vertically */
+  column-gap: 0.5rem; /* Space between label and input */
+  min-width: 120px; /* Minimum width for alignment */
 }
 
 /* Styles for number inputs */
 #tplprev input[type="number"] {
   width: 5ch; /* Width based on character count */
   flex: 1; /* Grow to fill available space */
-  font-size: 1rem; /* Standard size for input */
+  font-size: 0.7rem; /* Match label size */
 }
 
 /* Styles for fieldsets within controls */
@@ -88,9 +123,10 @@
 /* Styles for template wrapper */
 #tplprev .template-wrapper {
   display: flex; /* Use flexbox */
+  flex-direction: column; /* Stack header container and textarea vertically */
   flex: 1; /* Grow to fill space */
-  column-gap: 1rem; /* Space between columns */
   width: 100%; /* Full width */
+  background: transparent; /* Ensure no background interferes with header */
 }
 
 /* Styles for result wrapper */
@@ -157,11 +193,13 @@
 .tabs .tab-header {
   display: flex; /* Use flexbox */
   flex-direction: row; /* Horizontal layout */
-  background: var(--md-default-bg-color--lighter); /* Lighter background */
-  border-bottom: 1px solid var(--md-default-fg-color--lightest); /* Bottom border */
+  background: var(
+    --md-default-bg-color--lighter
+  ) !important; /* Match template-header background, override parent styles */
+  border-bottom: 1px solid var(--md-default-fg-color--lightest); /* Match template-header border */
   position: sticky; /* Stick to top on scroll */
-  top: 0; /* Stick to top edge */
-  z-index: 2; /* Above tab content */
+  top: 0; /* Align to top edge */
+  z-index: 2; /* Ensure above tab content */
   flex-shrink: 0; /* Prevent shrinking */
 }
 
@@ -232,7 +270,7 @@
 
 /* Error message styling */
 .error {
-  color: var(--md-code-hl-error-color, #d32f2f); /* Error text color */
+  color: var(--md-code-hl-error-color); /* Error text color */
   font-size: 0.7rem; /* Match other text */
   padding: 0.77em 1.18em; /* Inner padding */
   background-color: var(--md-code-bg-color); /* Match background */
@@ -252,11 +290,7 @@
   }
 
   #tplprev textarea {
-    max-height: 40vh; /* Limit height on small screens */
-  }
-
-  #result {
-    max-height: 50vh; /* Limit height on small screens */
+    min-height: 200px; /* Adjusted for small screens */
   }
 
   #tplprev .controls {
@@ -281,4 +315,15 @@
   .tabs .tab .preview-output {
     min-height: 80px; /* Minimum height on small screens */
   }
+}
+
+/* Override for dark mode to make headers distinct */
+[data-md-color-scheme="watchtower-dark"]
+  .template-wrapper
+  .template-header-container {
+  background-color: hsl(var(--md-hue) 15% 25% / 100%) !important;
+}
+
+[data-md-color-scheme="watchtower-dark"] .tabs .tab-header {
+  background-color: hsl(var(--md-hue) 15% 25% / 100%) !important;
 }
