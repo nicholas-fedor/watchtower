@@ -1,16 +1,14 @@
 /* Form Layout */
 /* Styles for the main form container, ensuring proper layout and constraints */
 #tplprev {
-  margin: 0; /* Remove default margins */
   display: flex; /* Use flexbox for column layout */
   flex-direction: column; /* Stack children vertically */
   row-gap: 1rem; /* Space between rows */
   box-sizing: border-box; /* Include padding and border in width/height calculations */
   position: relative; /* Establish positioning context for absolute children */
   width: 100%; /* Full width of parent */
-  max-width: 1200px; /* Limit maximum width for readability */
-  margin: 0 auto; /* Center horizontally */
-  padding: 0 1rem; /* Add horizontal padding */
+  padding: 0; /* Add horizontal padding */
+  margin-left: 0;
   height: 100%; /* Fill available height */
   max-height: 100%; /* Prevent expansion beyond parent height */
   overflow: hidden; /* Clip any overflow to prevent footer issues */
@@ -22,7 +20,7 @@
   overflow: auto; /* Enable scrolling if content overflows */
   padding: 0.77em 1.18em; /* Match preview-output padding for consistency */
   scrollbar-color: var(--md-default-fg-color--lighter) transparent; /* Custom scrollbar color */
-  scrollbar-width: thin; /* Thin scrollbar for better UI */
+  scrollbar-width: auto; /* Thin scrollbar for better UI */
   touch-action: auto; /* Allow touch interactions */
   min-height: 475px; /* Set minimum text area height to handle template length */
   white-space: pre-wrap; /* Preserve whitespace and wrap, matching preview-output */
@@ -49,6 +47,9 @@
 
 /* Styles for the template header container, isolating the header for reliable rendering */
 #tplprev .template-wrapper .template-header-container {
+  display: flex;
+  flex-direction: row;
+  background: var(--md-default-bg-color--lighter) !important;
   border-bottom: 1px solid var(--md-default-fg-color--lightest); /* Match tab-header border */
   position: sticky; /* Stick to top when scrolling textarea */
   top: 0; /* Align to top edge */
@@ -126,7 +127,9 @@
   flex-direction: column; /* Stack header container and textarea vertically */
   flex: 1; /* Grow to fill space */
   width: 100%; /* Full width */
-  background: transparent; /* Ensure no background interferes with header */
+  background: var(
+    --md-code-bg-color
+  ); /* Match tabs and textarea for consistent blending */
 }
 
 /* Styles for result wrapper */
@@ -171,10 +174,17 @@
   position: absolute; /* Position over form */
   inset: 0; /* Cover entire form area */
   display: flex; /* Center content */
+  align-items: center; /* Vertically center text */
+  justify-content: center; /* Horizontally center text */
   padding: 1rem; /* Inner padding */
   box-sizing: border-box; /* Include padding in size */
-  background: var(--md-code-bg-color); /* Match background */
+  background: var(
+    --md-default-bg-color
+  ); /* Solid background to cover elements */
   margin-top: 0; /* No top margin */
+  z-index: 10; /* Ensure on top of other elements */
+  font-size: 1rem; /* Adjust font size for visibility */
+  color: var(--md-default-fg-color--light); /* Text color for readability */
 }
 
 /* Tab Layout */
@@ -318,7 +328,7 @@
 }
 
 /* Override for dark mode to make headers distinct */
-[data-md-color-scheme="watchtower-dark"]
+/* [data-md-color-scheme="watchtower-dark"]
   .template-wrapper
   .template-header-container {
   background-color: hsl(var(--md-hue) 15% 25% / 100%) !important;
@@ -326,4 +336,4 @@
 
 [data-md-color-scheme="watchtower-dark"] .tabs .tab-header {
   background-color: hsl(var(--md-hue) 15% 25% / 100%) !important;
-}
+} */
