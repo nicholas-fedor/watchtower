@@ -217,6 +217,9 @@ linters:
         linters:
           - revive
         text: "avoid meaningless package names"
+      - path: "doc.go$"
+        linters:
+          - dupword
 
       # Run some linter only for test files by excluding its issues for everything else.
       # - path-except: _test\.go

@@ -348,9 +348,10 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 	flags := cmd.PersistentFlags()
 
 	docFiles := []string{
-		"../../docs/arguments.md",
-		"../../docs/lifecycle-hooks.md",
-		"../../docs/notifications.md",
+		"../../docs/configuration/arguments/index.md",
+		"../../docs/advanced-features/lifecycle-hooks/index.md",
+		"../../docs/notifications/overview/index.md",
+		"../../docs/notifications/templates/index.md",
 	}
 	allDocs := ""
 

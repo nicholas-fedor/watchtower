@@ -1,5 +1,3 @@
-version: "3.7"
-
 services:
   watchtower:
     container_name: watchtower

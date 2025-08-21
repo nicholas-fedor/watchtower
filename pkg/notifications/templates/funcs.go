@@ -1,3 +1,11 @@
+// Package templates provides utility functions for use in Watchtower notification templates.
+// This package defines a template.FuncMap with custom functions (e.g., ToJSON, ToUpper, ToLower, Title)
+// that enhance the capabilities of Go templates used in the notification system, particularly for the
+// template preview tool. These functions are integrated with the template rendering process in
+// pkg/notifications/preview/tplprev.go and used with templates defined in
+// pkg/notifications/common_templates.go, enabling dynamic formatting of notification data
+// (e.g., JSON marshaling, string case conversion) for display in the web interface
+// (docs/notifications/template-preview/index.md).
 package templates
 
 import (
