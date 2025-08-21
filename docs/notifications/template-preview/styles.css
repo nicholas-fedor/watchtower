@@ -1,113 +1,284 @@
+/* Form Layout */
+/* Styles for the main form container, ensuring proper layout and constraints */
 #tplprev {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  row-gap: 1rem;
-  box-sizing: border-box;
-  position: relative;
-  margin-right: -13.3rem;
+  margin: 0; /* Remove default margins */
+  display: flex; /* Use flexbox for column layout */
+  flex-direction: column; /* Stack children vertically */
+  row-gap: 1rem; /* Space between rows */
+  box-sizing: border-box; /* Include padding and border in width/height calculations */
+  position: relative; /* Establish positioning context for absolute children */
+  width: 100%; /* Full width of parent */
+  max-width: 1200px; /* Limit maximum width for readability */
+  margin: 0 auto; /* Center horizontally */
+  padding: 0 1rem; /* Add horizontal padding */
+  height: 100%; /* Fill available height */
+  max-height: 100%; /* Prevent expansion beyond parent height */
+  overflow: hidden; /* Clip any overflow to prevent footer issues */
 }
 
+/* Styles for the template textarea, allowing user input for templates */
 #tplprev textarea {
-  box-decoration-break: slice;
-  overflow: auto;
-  padding: 0.77em 1.18em;
-  scrollbar-color: var(--md-default-fg-color--lighter) transparent;
-  scrollbar-width: thin;
-  touch-action: auto;
-  word-break: normal;
-  height: 420px;
-  flex: 1;
+  box-decoration-break: slice; /* Control box decoration breaking */
+  overflow: auto; /* Enable scrolling if content overflows */
+  padding: 0.77em 1.18em; /* Inner padding for content */
+  scrollbar-color: var(--md-default-fg-color--lighter) transparent; /* Custom scrollbar color */
+  scrollbar-width: thin; /* Thin scrollbar for better UI */
+  touch-action: auto; /* Allow touch interactions */
+  word-break: normal; /* Prevent word breaking */
+  min-height: 475px; /* Increased from 300px to better handle template length */
+  height: auto; /* Adjust height dynamically */
+  max-height: 50vh; /* Limit to half viewport height */
+  flex: 1; /* Grow to fill available space */
+  width: 100%; /* Full width */
+  box-sizing: border-box; /* Include padding in height/width */
+  background-color: var(--md-code-bg-color); /* Match code background */
+  border-width: 0; /* No border */
+  border-radius: 0.1rem; /* Slight rounding */
+  color: var(--md-code-fg-color); /* Text color */
+  font-feature-settings: "kern"; /* Enable kerning */
+  font-family: var(--md-code-font-family); /* Use code font */
+  font-size: 0.7rem; /* Match result text size for consistency */
 }
 
+/* Styles for the controls container, organizing input fields */
 #tplprev .controls {
-  display: flex;
-  flex-direction: row;
-  column-gap: 0.5rem;
+  display: flex; /* Use flexbox */
+  flex-direction: row; /* Horizontal layout */
+  flex-wrap: wrap; /* Wrap to next line if needed */
+  column-gap: 0.5rem; /* Space between columns */
+  row-gap: 0.5rem; /* Space between rows */
 }
 
-#tplprev textarea,
+/* Shared styles for input elements within the form */
 #tplprev input {
-  background-color: var(--md-code-bg-color);
-  border-width: 0;
-  border-radius: 0.1rem;
-  color: var(--md-code-fg-color);
-  font-feature-settings: "kern";
-  font-family: var(--md-code-font-family);
+  background-color: var(--md-code-bg-color); /* Match code background */
+  border-width: 0; /* No border */
+  border-radius: 0.1rem; /* Slight rounding */
+  color: var(--md-code-fg-color); /* Text color */
+  font-feature-settings: "kern"; /* Enable kerning */
+  font-family: var(--md-code-font-family); /* Use code font */
 }
 
+/* Styles for number field labels */
 .numfield {
-  font-size: 0.7rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  font-size: 0.7rem; /* Smaller text for labels */
+  display: flex; /* Use flexbox */
+  flex-direction: column; /* Stack label and input vertically */
+  justify-content: space-between; /* Space between label and input */
+  min-width: 80px; /* Minimum width for readability */
 }
 
-#tplprev button {
-  border-radius: 0.1rem;
-  color: var(--md-primary-bg-color);
-  background-color: var(--md-primary-fg-color);
-  flex: 1;
-  min-width: 12ch;
-  padding: 0.5rem;
-}
-
-#tplprev button:hover {
-  background-color: var(--md-accent-fg-color);
-}
-
+/* Styles for number inputs */
 #tplprev input[type="number"] {
-  width: 5ch;
-  flex: 1;
-  font-size: 1rem;
+  width: 5ch; /* Width based on character count */
+  flex: 1; /* Grow to fill available space */
+  font-size: 1rem; /* Standard size for input */
 }
 
+/* Styles for fieldsets within controls */
 #tplprev fieldset {
-  margin-top: -0.5rem;
-  display: flex;
-  flex: 1;
-  column-gap: 0.5rem;
+  margin-top: -0.5rem; /* Adjust spacing above fieldset */
+  display: flex; /* Use flexbox */
+  flex: 1; /* Grow to fill space */
+  column-gap: 0.5rem; /* Space between columns */
+  flex-wrap: wrap; /* Wrap if needed */
+  row-gap: 0.5rem; /* Space between rows */
 }
 
+/* Styles for template wrapper */
 #tplprev .template-wrapper {
-  display: flex;
-  flex: 1;
-  column-gap: 1rem;
+  display: flex; /* Use flexbox */
+  flex: 1; /* Grow to fill space */
+  column-gap: 1rem; /* Space between columns */
+  width: 100%; /* Full width */
 }
 
+/* Styles for result wrapper */
 #tplprev .result-wrapper {
-  flex: 1;
-  display: flex;
+  flex: 1; /* Grow to fill space */
+  display: flex; /* Use flexbox */
+  width: 100%; /* Full width */
+  overflow: hidden; /* Prevent overflow */
+  max-height: 100%; /* Limit to parent height */
 }
 
+/* Styles for result preview area */
 #result {
-  font-size: 0.7rem;
-  background-color: var(--md-code-bg-color);
-  scrollbar-color: var(--md-default-fg-color--lighter) transparent;
-  scrollbar-width: thin;
-  touch-action: auto;
-  overflow: auto;
-  padding: 0.77em 1.18em;
-  margin: 0;
-  height: 540px;
-  flex: 1;
-  width: 100%;
+  font-size: 0.7rem; /* Match textarea text size */
+  background-color: var(--md-code-bg-color); /* Match code background */
+  scrollbar-color: var(--md-default-fg-color--lighter) transparent; /* Custom scrollbar */
+  scrollbar-width: thin; /* Thin scrollbar */
+  touch-action: auto; /* Allow touch interactions */
+  overflow: hidden; /* Prevent overflow */
+  padding: 0; /* No padding */
+  margin: 0; /* No margin */
+  min-height: 200px; /* Minimum height */
+  height: 100%; /* Fill available space */
+  flex: 1; /* Grow to fill space */
+  width: 100%; /* Full width */
+  box-sizing: border-box; /* Include padding in height/width */
+  border-radius: 0.1rem; /* Slight rounding */
 }
 
+/* Styles for bold text in preview */
 #result b {
-  color: var(--md-code-hl-special-color);
+  color: var(--md-code-hl-special-color); /* Highlight color for bold */
 }
 
+/* Styles for italic text in preview */
 #result i {
-  color: var(--md-code-hl-keyword-color);
+  color: var(--md-code-hl-keyword-color); /* Highlight color for italic */
 }
 
+/* Styles for loading indicator */
 #tplprev .loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  padding: 1rem;
-  box-sizing: border-box;
-  background: var(--md-code-bg-color);
-  margin-top: 0;
+  position: absolute; /* Position over form */
+  inset: 0; /* Cover entire form area */
+  display: flex; /* Center content */
+  padding: 1rem; /* Inner padding */
+  box-sizing: border-box; /* Include padding in size */
+  background: var(--md-code-bg-color); /* Match background */
+  margin-top: 0; /* No top margin */
+}
+
+/* Tab Layout */
+.tabs {
+  position: relative; /* Positioning context */
+  margin: 0; /* No margins */
+  background: var(--md-code-bg-color); /* Match background */
+  border-radius: 0.1rem; /* Slight rounding */
+  overflow: hidden; /* Clip content */
+  display: flex; /* Use flexbox */
+  flex-direction: column; /* Stack vertically */
+  height: 100%; /* Fill parent height */
+  min-height: 100px; /* Minimum height */
+}
+
+.tabs .tab-header {
+  display: flex; /* Use flexbox */
+  flex-direction: row; /* Horizontal layout */
+  background: var(--md-default-bg-color--lighter); /* Lighter background */
+  border-bottom: 1px solid var(--md-default-fg-color--lightest); /* Bottom border */
+  position: sticky; /* Stick to top on scroll */
+  top: 0; /* Stick to top edge */
+  z-index: 2; /* Above tab content */
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.tabs input[type="radio"] {
+  position: absolute; /* Position off-screen */
+  opacity: 0; /* Hide visually */
+}
+
+.tabs label {
+  flex: 0 0 auto; /* Fixed size, no shrink/grow */
+  padding: 0.5rem 1rem; /* Inner padding */
+  cursor: pointer; /* Indicate clickable */
+  color: var(--md-default-fg-color--light); /* Light text color */
+  border-bottom: 2px solid transparent; /* Initial border */
+  transition: background 0.2s, color 0.2s; /* Smooth transitions */
+}
+
+.tabs label:hover {
+  background: var(--md-default-bg-color--light); /* Hover background */
+  color: var(--md-default-fg-color); /* Hover text color */
+}
+
+.tabs input:checked + label {
+  background: var(--md-accent-fg-color); /* Selected background */
+  color: var(--md-primary-bg-color); /* Selected text color */
+  border-bottom: 2px solid var(--md-primary-fg-color); /* Selected border */
+}
+
+.tabs .tab {
+  flex: 1; /* Grow to fill remaining space */
+  display: none; /* Hidden by default */
+  padding: 0; /* No padding */
+  background: var(--md-code-bg-color); /* Match background */
+  visibility: hidden; /* Hidden for accessibility */
+  opacity: 0; /* Fully transparent when hidden */
+  overflow: auto; /* Enable scrolling if content overflows */
+  box-sizing: border-box; /* Include padding in size */
+}
+
+.tabs input:checked + .tab {
+  display: block; /* Show when selected */
+  visibility: visible; /* Visible for accessibility */
+  opacity: 1; /* Fully opaque when selected */
+}
+
+/* Preview Output */
+.tabs .tab .preview-output {
+  font-size: 0.7rem; /* Match textarea text size */
+  background-color: var(--md-code-bg-color); /* Match background */
+  scrollbar-color: var(--md-default-fg-color--lighter) transparent; /* Custom scrollbar */
+  scrollbar-width: thin; /* Thin scrollbar */
+  touch-action: auto; /* Allow touch interactions */
+  padding: 0.77em 1.18em; /* Inner padding */
+  margin: 0; /* No margins */
+  white-space: pre-wrap; /* Preserve whitespace and wrap */
+  word-break: normal; /* Prevent word breaking */
+  min-height: 100px; /* Minimum height */
+  height: 100%; /* Fill tab height */
+}
+
+.tabs .tab .preview-output b {
+  color: var(--md-code-hl-special-color); /* Highlight color for bold */
+}
+
+.tabs .tab .preview-output i {
+  color: var(--md-code-hl-keyword-color); /* Highlight color for italic */
+}
+
+/* Error message styling */
+.error {
+  color: var(--md-code-hl-error-color, #d32f2f); /* Error text color */
+  font-size: 0.7rem; /* Match other text */
+  padding: 0.77em 1.18em; /* Inner padding */
+  background-color: var(--md-code-bg-color); /* Match background */
+  border-radius: 0.1rem; /* Slight rounding */
+}
+
+/* Responsive Design */
+@media screen and (max-width: 768px) {
+  #tplprev {
+    padding: 0 0.5rem; /* Reduced padding on small screens */
+  }
+
+  #tplprev .template-wrapper {
+    flex-direction: column; /* Stack on small screens */
+    column-gap: 0; /* No gap */
+    row-gap: 1rem; /* Space between rows */
+  }
+
+  #tplprev textarea {
+    max-height: 40vh; /* Limit height on small screens */
+  }
+
+  #result {
+    max-height: 50vh; /* Limit height on small screens */
+  }
+
+  #tplprev .controls {
+    flex-direction: column; /* Stack controls */
+    align-items: stretch; /* Stretch items */
+  }
+
+  #tplprev fieldset {
+    flex-direction: column; /* Stack fields */
+    align-items: stretch; /* Stretch items */
+  }
+
+  .tabs .tab-header {
+    flex-wrap: wrap; /* Wrap labels on small screens */
+  }
+
+  .tabs label {
+    flex: 1 0 auto; /* Equal width, no shrink */
+    text-align: center; /* Center text */
+  }
+
+  .tabs .tab .preview-output {
+    min-height: 80px; /* Minimum height on small screens */
+  }
 }
