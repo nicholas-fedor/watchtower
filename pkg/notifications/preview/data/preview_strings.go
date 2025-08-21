@@ -1,5 +1,7 @@
 package data
 
+// containerNames is an array of realistic container names used in the preview tool.
+// These are used to simulate container names in the notification output, matching the style of real Watchtower containers.
 var containerNames = []string{
 	"cyberscribe",
 	"datamatrix",
@@ -43,6 +45,8 @@ var containerNames = []string{
 	"innoscan",
 }
 
+// organizationNames is an array of realistic organization names used to construct image names in the preview tool.
+// These prepend container names to form realistic image references (e.g., "techwave/cyberscribe:latest").
 var organizationNames = []string{
 	"techwave",
 	"codecrafters",
@@ -85,94 +89,68 @@ var organizationNames = []string{
 	"innovault",
 }
 
+// infoMessages is an array of realistic info-level log messages based on typical Watchtower operations.
+// These are derived from real Watchtower logs, including container operations, session management, and notifications.
+var infoMessages = []string{
+	"Detected multiple Watchtower instances, initiating cleanup",
+	"Stopping container",
+	"Removing image",
+	"Successfully cleaned up excess Watchtower instances",
+	"Watchtower v1.11.7 using Docker API v1.51",
+	"Using notifications: gotify",
+	"Checking all containers (except explicitly disabled with label)",
+	"Scheduling first run: 2025-08-19 06:00:00 +0000 UTC",
+	"Note that the first check will be performed in 5 hours, 59 minutes, 22 seconds",
+	"Update session completed",
+	"Found new image",
+	"Started new container",
+}
+
+// warningMessages is an array of realistic warning-level messages based on potential Watchtower issues.
+// These reflect non-critical issues that may occur during operations, such as failures in specific tasks.
+var warningMessages = []string{
+	"Failed to stop container",
+	"Failed to remove image",
+	"Failed to start new container",
+	"Update session failed",
+	"Failed to find new image",
+	"Failed to list containers",
+	"Failed to inspect container",
+}
+
+// errorMessages is an array of realistic error-level messages based on critical Watchtower failures.
+// These include issues like update failures or network errors, derived from real logs and error cases.
 var errorMessages = []string{
-	"Error 404: Resource not found",
-	"Critical Error: System meltdown imminent",
-	"Error 500: Internal server error",
-	"Invalid input: Please check your data",
-	"Access denied: Unauthorized access detected",
-	"Network connection lost: Please check your connection",
-	"Error 403: Forbidden access",
-	"Fatal error: System crash imminent",
-	"File not found: Check the file path",
-	"Invalid credentials: Authentication failed",
-	"Error 502: Bad Gateway",
-	"Database connection failed: Please try again later",
-	"Security breach detected: Take immediate action",
-	"Error 400: Bad request",
-	"Out of memory: Close unnecessary applications",
-	"Invalid configuration: Check your settings",
-	"Error 503: Service unavailable",
-	"File is read-only: Cannot modify",
-	"Data corruption detected: Backup your data",
-	"Error 401: Unauthorized",
-	"Disk space full: Free up disk space",
-	"Connection timeout: Retry your request",
-	"Error 504: Gateway timeout",
-	"File access denied: Permission denied",
-	"Unexpected error: Please contact support",
-	"Error 429: Too many requests",
-	"Invalid URL: Check the URL format",
-	"Database query failed: Try again later",
-	"Error 408: Request timeout",
-	"File is in use: Close the file and try again",
-	"Invalid parameter: Check your input",
-	"Error 502: Proxy error",
-	"Database connection lost: Reconnect and try again",
-	"File size exceeds limit: Reduce the file size",
-	"Error 503: Overloaded server",
-	"Operation aborted: Try again",
-	"Invalid API key: Check your API key",
-	"Error 507: Insufficient storage",
-	"Database deadlock: Retry your transaction",
-	"Error 405: Method not allowed",
-	"File format not supported: Choose a different format",
-	"Unknown error: Contact system administrator",
-}
-
-var skippedMessages = []string{
-	"Fear of introducing new bugs",
-	"Don't have time for the update process",
-	"Current version works fine for my needs",
-	"Concerns about compatibility with other software",
-	"Limited bandwidth for downloading updates",
-	"Worries about losing custom settings or configurations",
-	"Lack of trust in the software developer's updates",
-	"Dislike changes to the user interface",
-	"Avoiding potential subscription fees",
-	"Suspicion of hidden data collection in updates",
-	"Apprehension about changes in privacy policies",
-	"Prefer the older version's features or design",
-	"Worry about software becoming more resource-intensive",
-	"Avoiding potential changes in licensing terms",
-	"Waiting for initial bugs to be resolved in the update",
-	"Concerns about update breaking third-party plugins or extensions",
-	"Belief that the software is already secure enough",
-	"Don't want to relearn how to use the software",
-	"Fear of losing access to older file formats",
-	"Avoiding the hassle of having to update multiple devices",
-}
-
-var logMessages = []string{
-	"Checking for available updates...",
-	"Downloading update package...",
-	"Verifying update integrity...",
-	"Preparing to install update...",
-	"Backing up existing configuration...",
-	"Installing update...",
-	"Update installation complete.",
-	"Applying configuration settings...",
-	"Cleaning up temporary files...",
-	"Update successful! Software is now up-to-date.",
-	"Restarting the application...",
-	"Restart complete. Enjoy the latest features!",
-	"Update rollback complete. Your software remains at the previous version.",
-}
-
-var logErrors = []string{
-	"Unable to check for updates. Please check your internet connection.",
-	"Update package download failed. Try again later.",
-	"Update verification failed. Please contact support.",
 	"Update installation failed. Rolling back to the previous version...",
-	"Your configuration settings may have been reset to defaults.",
+	"Unable to check for updates. Please check your internet connection.",
+	"Update verification failed. Please contact support.",
+	"Update package download failed. Try again later.",
+	"Failed to stop container",
+	"Failed to remove image",
+	"Failed to start new container",
+	"Update session failed",
+	"Failed to find new image",
+	"Failed to list containers",
+	"Failed to inspect container",
 }
+
+// skippedMessages is an array of realistic error messages for containers in the SkippedState.
+// These reflect reasons why containers might be skipped during updates, based on typical user scenarios.
+var skippedMessages = []string{
+	"container skipped: Avoiding potential subscription fees",
+	"container skipped: Concerns about update breaking third-party plugins or extensions",
+	"container skipped: Avoiding potential changes in licensing terms",
+	"container skipped: Concerns about compatibility with other software",
+	"container skipped: Fear of losing access to older file formats",
+	"container skipped: Prefer the older version's features or design",
+	"container skipped: Worries about losing custom settings or configurations",
+	"container skipped: Lack of trust in the software developer's updates",
+	"container skipped: Don't want to relearn how to use the software",
+	"container skipped: Current version works fine for my needs",
+	"container skipped: Fear of introducing new bugs",
+	"container skipped: Limited bandwidth for downloading updates",
+}
+
+// Note: These arrays can be expanded with additional messages from real logs to increase variety.
+// The preview tool randomly selects from these to simulate dynamic output.
+// Levels are separated to allow precise mapping in `logs.go` (e.g., error from errorMessages, warning from warningMessages, info from infoMessages).
