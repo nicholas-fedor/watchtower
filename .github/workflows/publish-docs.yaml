@@ -70,4 +70,6 @@ jobs:
           pip install -r build/mkdocs/docs-requirements.txt
 
       - name: Build and Deploy
-        run: mkdocs gh-deploy --force --verbose --config-file build/mkdocs/mkdocs.yaml
+        run: |
+          cd build/mkdocs
+          mkdocs gh-deploy --force --verbose
