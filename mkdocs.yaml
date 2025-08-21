@@ -42,7 +42,7 @@ theme:
   # Favicon for the site, relative to docs_dir.
   favicon: assets/media/favicon.ico
   # Directory for custom theme overrides, e.g., partials or main.html.
-  custom_dir: ../../docs/overrides
+  custom_dir: docs/overrides
   # Material theme features for enhanced navigation and usability.
   features:
     # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#instant-loading
@@ -105,26 +105,26 @@ markdown_extensions:
       # Separator for permalinks in table of contents.
       separator: "_"
   # Enables admonition blocks (e.g., note, warning).
-  - admonition
+  - admonition:
   # Enables adding HTML attributes and CSS classes to Markdown elements.
   # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown/#attribute-lists
-  - attr_list
+  - attr_list:
   # Enable definition lists
   # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown/#definition-lists
-  - def_list
+  - def_list:
   # Enables collapsible details blocks.
   # https://facelessuser.github.io/pymdown-extensions/extensions/details/
-  - pymdownx.details
+  - pymdownx.details:
   # Enables code highlighting for fenced code blocks.
   # https://facelessuser.github.io/pymdown-extensions/extensions/highlight/
   - pymdownx.highlight:
       anchor_linenums: true
   # Enables inline code highlighting.
   # https://facelessuser.github.io/pymdown-extensions/extensions/inlinehilite/
-  - pymdownx.inlinehilite
+  - pymdownx.inlinehilite:
   # Enables nested fenced code blocks.
   # https://facelessuser.github.io/pymdown-extensions/extensions/superfences/
-  - pymdownx.superfences
+  - pymdownx.superfences:
   # Enables link-related functionality.
   # https://facelessuser.github.io/pymdown-extensions/extensions/magiclink/
   - pymdownx.magiclink:
@@ -137,15 +137,15 @@ markdown_extensions:
       # The default repository name to use for the specified user and provider
       repo: watchtower
   # https://facelessuser.github.io/pymdown-extensions/extensions/saneheaders/
-  - pymdownx.saneheaders
+  - pymdownx.saneheaders:
   # https://facelessuser.github.io/pymdown-extensions/extensions/striphtml/
-  - pymdownx.striphtml
+  - pymdownx.striphtml:
   # Enables tabbed content blocks for examples or comparisons.
   # https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/
   - pymdownx.tabbed:
       alternate_style: true
   # https://squidfunk.github.io/mkdocs-material/reference/data-tables/#data-tables
-  - tables
+  - tables:
 
 # Site structure with paths relative to docs_dir.
 # https://www.mkdocs.org/user-guide/configuration/#documentation-layout
@@ -183,7 +183,7 @@ plugins:
   # Enables versioned documentation with version selector.
   - mike:
       version_selector: true
-      css_dir: ../../assets/styles
+      css_dir: assets/styles
   # Displays last updated dates on pages, formatted as time ago.
   - git-revision-date-localized:
       enable_creation_date: true
@@ -191,8 +191,8 @@ plugins:
 
 # Build Directories: https://www.mkdocs.org/user-guide/configuration/#build-directories
 # Default directories for documentation source and output.
-docs_dir: ../../docs
-site_dir: ../../site
+docs_dir: docs
+site_dir: site
 
 # Validation: https://www.mkdocs.org/user-guide/configuration/#validation
 # Strictness settings for link validation during builds.
@@ -215,4 +215,4 @@ validation:
 # Live Reloading: https://www.mkdocs.org/user-guide/configuration/#live-reloading
 # Directories to watch for changes during mkdocs serve.
 watch:
-  - ../../docs
+  - docs
