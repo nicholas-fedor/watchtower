@@ -369,6 +369,17 @@ Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
 !!! Note
     This option can also reference a file, in which case the contents of the file are used.
 
+#### Email Subject Tag
+
+Subject prefix tag for notifications via mail.
+
+```text
+            Argument: --notification-email-subjecttag
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG
+                Type: String
+             Default: ""
+```
+
 #### Email Server Port
 
 The port the SMTP server listens on.
