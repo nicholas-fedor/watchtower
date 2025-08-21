@@ -1,21 +1,38 @@
 # Templates
 
-You can customize the message posted by setting a template.
+## Overview
 
-- `--notification-template` (env. `WATCHTOWER_NOTIFICATION_TEMPLATE`): The template used for the message.
+You can customize the message posted by setting a notification template.
 
-The template is a Go [template](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"} that either format a list
-of [log entries](https://pkg.go.dev/github.com/sirupsen/logrus?tab=doc#Entry){target="_blank" rel="noopener noreferrer"} or a `notification.Data` struct.
+### Notification Template
 
-Simple templates are used unless the `notification-report` flag is specified:
+Sets the Go template used for formatting notification messages.
 
-- `--notification-report` (env. `WATCHTOWER_NOTIFICATION_REPORT`): Use the session report as the notification template data.
+```text
+            Argument: --notification-template
+Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE
+                Type: String
+             Default: See default templates below
+```
 
-## Simple templates
+### Notification Report
 
-The default template for simple notifications (used when `WATCHTOWER_NOTIFICATION_REPORT` is not set) is:
+Enables the session report as the notification template data, including container statuses and logs.
 
-```go
+```text
+            Argument: --notification-report
+Environment Variable: WATCHTOWER_NOTIFICATION_REPORT
+                Type: Boolean
+             Default: false
+```
+
+The template is a [Go template](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"} that processes either a list of [Logrus](https://pkg.go.dev/github.com/sirupsen/logrus?tab=doc#Entry){target="_blank" rel="noopener noreferrer"} log entries or a `notifications.Data` struct, depending on the `--notification-report` flag.
+
+## Simple Templates
+
+Simple templates are used when `--notification-report` is not set, formatting individual log entries as they occur.
+
+```go title="Default Simple Template"
 {{- range $i, $e := . -}}
 {{- if $i}}{{- println -}}{{- end -}}
 {{- $msg := $e.Message -}}
@@ -35,42 +52,47 @@ The default template for simple notifications (used when `WATCHTOWER_NOTIFICATIO
 {{- end -}}
 ```
 
-This template processes `info`-level log entries as they occur, formatting key update events in past tense with container and image details from `logrus` fields. It sends each event immediately in legacy mode, mimicking a step-by-step log.
+- This template processes `info`-level log entries in real-time, formatting key update events in past tense with container and image details from `logrus` fields.
+- It sends each event immediately in legacy mode, mimicking a step-by-step log.
 
-Example output for a single container update with `WATCHTOWER_CLEANUP` enabled:
+### Using Simple Templates in the Preview Tool
+
+The [Template Preview Tool](../template-preview/index.md) uses a `notifications.Data` struct with `.Entries` as the log list.
+
+!!! Note
+    To use the simple template in the preview tool, modify the range to `{{- range $i, $e := .Entries -}}` to match the data structure.
+
+```go title="Example Simple Template for the Template Preview Tool"
+{{- range $i, $e := .Entries -}}
+{{- if $i}}{{- println -}}{{- end -}}
+{{- $msg := $e.Message -}}
+{{- if eq $msg "Found new image" -}}
+    Found new image: {{$e.Data.image}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Stopping container" -}}
+    Stopped stale container: {{$e.Data.container}} ({{with $e.Data.id}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Started new container" -}}
+    Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Removing image" -}}
+    Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if $e.Data -}}
+    {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
+{{- else -}}
+    {{$msg}}
+{{- end -}}
+{{- end -}}
+```
+
+Example output for a log entry with `msg="Found new image"`:
 
 ```text
-Found new image: /app:latest (bb7ba9626731)
-Stopped stale container: /app (4a2a8f7298a2)
-Started new container: /app (f52721881bed)
-Removed stale image: 78612560eb20
+Found new image: repo/image:latest (abcdef123456)
 ```
 
-!!! note "Field Handling"
-    If expected fields (e.g., `new_id`, `id`, `image_id`) are missing, the template uses "unknown" as a fallback to ensure readable output (e.g., `Stopped stale container: /app (unknown)`).
+## Report Templates
 
-!!! tip "Custom date format"
-    To include timestamps, modify the template with .Time.Format, e.g., {{.Time.Format "2006-01-02 15:04:05"}} {{$msg}}. The reference time format is Mon Jan 2 15:04:05 MST 2006, so adjust accordingly (e.g., day as 1, month as 2, hour as 3 or 15).
+When `--notification-report` is set, the template processes a `notifications.Data` struct containing a session report and log entries.
 
-!!! note "Skipping notifications"
-    To skip sending notifications that do not contain any information, you can wrap your template with `{{if .}}` and `{{end}}`. The default template does not skip empty messages in legacy mode, as it processes logs as they occur.
-
-Example:
-
-```bash
-docker run -d \
-  --name watchtower \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e WATCHTOWER_NOTIFICATION_URL="discord://token@channel slack://watchtower@token-a/token-b/token-c" \
-  -e WATCHTOWER_NOTIFICATION_TEMPLATE="{{range .}}{{.Time.Format \"2006-01-02 15:04:05\"}} ({{.Level}}): {{.Message}}{{println}}{{end}}" \
-  nickfedor/watchtower
-```
-
-## Report templates
-
-The default template for report notifications are the following:
-
-```go
+```go title="Default Report Template"
 {{- if .Report -}}
   {{- with .Report -}}
     {{- if ( or .Updated .Failed ) -}}
@@ -80,72 +102,68 @@ The default template for report notifications are the following:
       {{- end -}}
       {{- range .Fresh}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
-   {{- end -}}
-   {{- range .Skipped}}
+      {{- end -}}
+      {{- range .Skipped}}
 - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-   {{- end -}}
-   {{- range .Failed}}
+      {{- end -}}
+      {{- range .Failed}}
 - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-   {{- end -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
-{{- else -}}
-  {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
+{{- if .Entries -}}
+
+Logs:
 {{- end -}}
+{{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
 ```
 
-It will be used to send a summary of every session if there are any containers that were updated or which failed to update.
-<!-- markdownlint-disable -->
-!!! note "Skipping notifications"
-    Whenever the result of applying the template results in an empty string, no notifications will
-    be sent. This is by default used to limit the notifications to only be sent when there something noteworthy occurred.
+- This template generates a summary of container statuses (scanned, updated, failed, etc.) followed by logs, used for notifications like email or Slack messages.
 
-    You can replace `{{- if ( or .Updated .Failed ) -}}` with any logic you want to decide when to send the notifications.
-<!-- markdownlint-restore -->
-Example using a custom report template that always sends a session report after each run:
+### Example Usage
 <!-- markdownlint-disable -->
-=== "docker run"
+=== "Docker CLI"
 
     ```bash
     docker run -d \
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATION_REPORT="true" \
-      -e WATCHTOWER_NOTIFICATION_URL="discord://token@channel slack://watchtower@token-a/token-b/token-c" \
-      -e WATCHTOWER_NOTIFICATION_TEMPLATE="
-      {{- if .Report -}}
-        {{- with .Report -}}
-      {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-            {{- range .Updated}}
-      - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
-            {{- end -}}
-            {{- range .Fresh}}
-      - {{.Name}} ({{.ImageName}}): {{.State}}
+      -e WATCHTOWER_NOTIFICATION_TEMPLATE="\
+    {{- if .Report -}}
+      {{- with .Report -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+          {{- range .Updated}}
+    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+          {{- end -}}
+          {{- range .Fresh}}
+    - {{.Name}} ({{.ImageName}}): {{.State}}
           {{- end -}}
           {{- range .Skipped}}
-      - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+    - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
           {{- end -}}
           {{- range .Failed}}
-      - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+    - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
           {{- end -}}
-        {{- end -}}
-      {{- else -}}
-        {{range .Entries -}}{{.Message}}{{\"\n\"}}{{- end -}}
       {{- end -}}
-      " \
-      nickfedor/watchtower
+    {{- if .Entries -}}
+
+    Logs:
+    {{- end -}}
+    {{range .Entries -}}{{.Time.Format \"2006-01-02T15:04:05Z07:00\"}} [{{.Level}}] {{.Message}}{{\"\n\"}}{{- end -}}
+    " \
+      watchtower-image
     ```
 
-=== "docker-compose"
+=== "Docker Compose"
 
-    ``` yaml
-    version: "3"
+    ```yaml
     services:
       watchtower:
-        image: nickfedor/watchtower
+        image: watchtower-image
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
-        env:
+        environment:
           WATCHTOWER_NOTIFICATION_REPORT: "true"
           WATCHTOWER_NOTIFICATION_URL: >
             discord://token@channel
@@ -154,10 +172,10 @@ Example using a custom report template that always sends a session report after 
             {{- if .Report -}}
               {{- with .Report -}}
             {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-                  {{- range .Updated}}
+                {{- range .Updated}}
             - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
-                  {{- end -}}
-                  {{- range .Fresh}}
+                {{- end -}}
+                {{- range .Fresh}}
             - {{.Name}} ({{.ImageName}}): {{.State}}
                 {{- end -}}
                 {{- range .Skipped}}
@@ -167,8 +185,33 @@ Example using a custom report template that always sends a session report after 
             - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
                 {{- end -}}
               {{- end -}}
-            {{- else -}}
-              {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
+            {{- if .Entries -}}
+
+            Logs:
             {{- end -}}
+            {{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
     ```
 <!-- markdownlint-restore -->
+Example output for a session with one updated container and one error log:
+
+```text
+5 Scanned, 1 Updated, 0 Failed
+- /container (repo/image:latest): abcdef12 updated to 34567890
+
+Logs:
+2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.
+```
+
+## Customizing Templates
+
+You can create custom templates to format notifications differently.
+
+Use the [Template Preview Tool](/watchtower/notifications/template-preview/) to test your templates interactively.
+
+!!! Note
+    When testing simple templates in the preview tool, ensure the range iterates over `.Entries` (e.g., `{{- range $i, $e := .Entries -}}`) to match the `notifications.Data` struct.
+
+## Additional Resources
+
+- For detailed template syntax, refer to the [Go Template documentation](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"}.
+- For log entry fields, see the [Logrus Entry documentation](https://pkg.go.dev/github.com/sirupsen/logrus?tab=doc#Entry){target="_blank" rel="noopener noreferrer"}.
