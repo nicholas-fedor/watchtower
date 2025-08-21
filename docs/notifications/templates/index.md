@@ -206,7 +206,7 @@ Logs:
 
 You can create custom templates to format notifications differently.
 
-Use the [Template Preview Tool](/watchtower/notifications/template-preview/) to test your templates interactively.
+Use the [Template Preview Tool](../template-preview/index.md) to test your templates interactively.
 
 !!! Note
     When testing simple templates in the preview tool, ensure the range iterates over `.Entries` (e.g., `{{- range $i, $e := .Entries -}}`) to match the `notifications.Data` struct.
