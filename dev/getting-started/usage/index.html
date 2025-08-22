@@ -63,6 +63,20 @@
     
     
     
+<meta name="color-scheme" content="light dark" />
+<style>
+  [data-md-color-scheme="watchtower"] {
+    --md-default-bg-color: #f5f5f5;
+  }
+  [data-md-color-scheme="watchtower-dark"] {
+    --md-default-bg-color: hsl(199deg 15% 21% / 100%);
+  }
+  .md-main,
+  .md-content {
+    background-color: var(--md-default-bg-color);
+  }
+</style>
+
   </head>
   
   
@@ -95,11 +109,8 @@
         
           <aside class="md-banner md-banner--warning">
             <div class="md-banner__inner md-grid md-typeset">
-               You're not viewing the latest
-version.
-<a href="../../..">
-  <strong>Click here to go to latest.</strong>
-</a>
+               You're not viewing the latest version.
+<a href="https://watchtower.nickfedor.com/devlatest/">Click here to go to latest.</a>
 
             </div>
             <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("../.."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
