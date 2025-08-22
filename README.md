@@ -36,7 +36,7 @@ If that is you, you should be looking into using Kubernetes enabled with CI/CD, 
 
 **⚠️ Note:** It is recommended to use the latest version of Docker. You can check your host's Docker version using the [CLI command](https://docs.docker.com/reference/cli/docker/version/) `docker version`.
 This version of Watchtower has been tested to support v1.43 and higher; however, don't be surprised if you experience unexpected behavior when attempting to use newer features on older versions of Docker.
-This version autonegotiates the API version by default. If the `DOCKER_API_VERSION` [variable](https://nicholas-fedor.github.io/watchtower/arguments/#docker_api_version) is explicitly set, Watchtower validates the version and falls back to autonegotiation on failure.
+This version autonegotiates the API version by default. If the `DOCKER_API_VERSION` [variable](https://watchtower.nickfedor.com/configuration/arguments/#docker_api_version) is explicitly set, Watchtower validates the version and falls back to autonegotiation on failure.
 
 ## Supported Architectures
 
@@ -50,7 +50,7 @@ Watchtower supports the following architectures for its Docker images:
 
 ## Documentation
 
-The full documentation is available at <https://nicholas-fedor.github.io/watchtower/>.
+The full documentation is available at <https://watchtower.nickfedor.com/>.
 
 ## Star History
 <!-- markdownlint-disable -->

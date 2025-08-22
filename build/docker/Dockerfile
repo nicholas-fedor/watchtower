@@ -12,9 +12,10 @@ FROM scratch
 
 ARG BASE_IMAGE
 
-LABEL "com.centurylinklabs.watchtower"="true"
-LABEL "org.opencontainers.image.url"="https://nicholas-fedor.github.io/watchtower/" \
-  "org.opencontainers.image.documentation"="https://nicholas-fedor.github.io/watchtower/" \
+LABEL \
+  "com.centurylinklabs.watchtower"="true" \
+  "org.opencontainers.image.url"="https://watchtower.nickfedor.com" \
+  "org.opencontainers.image.documentation"="https://watchtower.nickfedor.com" \
   "org.opencontainers.image.source"="https://github.com/nicholas-fedor/watchtower" \
   "org.opencontainers.image.licenses"="Apache-2.0" \
   "org.opencontainers.image.title"="Watchtower" \

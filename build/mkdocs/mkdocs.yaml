@@ -2,7 +2,7 @@
 # https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#repository-name
 site_name: Watchtower
 # https://www.mkdocs.org/user-guide/configuration/#site_url
-site_url: https://nicholas-fedor.github.io/watchtower/
+site_url: https://watchtower.nickfedor.com/
 # https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#repository
 repo_url: https://github.com/nicholas-fedor/watchtower/
 
