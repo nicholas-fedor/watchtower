@@ -42,7 +42,7 @@ theme:
   # Favicon for the site, relative to docs_dir.
   favicon: assets/media/favicon.ico
   # Directory for custom theme overrides, e.g., partials or main.html.
-  custom_dir: docs/overrides
+  custom_dir: ../../docs/overrides
   # Material theme features for enhanced navigation and usability.
   features:
     # https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#instant-loading
@@ -191,8 +191,8 @@ plugins:
 
 # Build Directories: https://www.mkdocs.org/user-guide/configuration/#build-directories
 # Default directories for documentation source and output.
-docs_dir: docs
-site_dir: site
+docs_dir: ../../docs
+site_dir: ../../site
 
 # Validation: https://www.mkdocs.org/user-guide/configuration/#validation
 # Strictness settings for link validation during builds.
@@ -215,4 +215,4 @@ validation:
 # Live Reloading: https://www.mkdocs.org/user-guide/configuration/#live-reloading
 # Directories to watch for changes during mkdocs serve.
 watch:
-  - docs
+  - ../../docs
