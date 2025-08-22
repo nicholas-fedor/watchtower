@@ -20,7 +20,7 @@ env:
   GO_VERSION: 1.25.x
 
 jobs:
-  publish-docs:
+  build-docs:
     name: Publish Docs
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +53,7 @@ jobs:
         with:
           python-version: "3.13.7"
           cache: "pip"
-          cache-dependency-path: docs-requirements.txt
+          cache-dependency-path: build/mkdocs/docs-requirements.txt
 
       - run: echo "cache_id=$(date --utc '+%V')" >> "$GITHUB_ENV"
 
@@ -66,7 +66,7 @@ jobs:
 
       - name: Install mkdocs
         run: |
-          pip install -r docs-requirements.txt
+          pip install -r build/mkdocs/docs-requirements.txt
 
       - name: Build and Deploy
-        run: mkdocs gh-deploy --force --verbose
+        run: mkdocs gh-deploy --force --verbose --config-file build/mkdocs/mkdocs.yaml
