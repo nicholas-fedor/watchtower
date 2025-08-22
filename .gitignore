@@ -184,7 +184,6 @@ pip-wheel-metadata/
 *.whl
 site/
 mkdocs-gen-files/
-assets/
 .nojekyll
 404.html
 sitemap.xml
