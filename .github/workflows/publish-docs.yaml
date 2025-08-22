@@ -66,7 +66,7 @@ jobs:
 
       - name: Install mkdocs
         run: |
-          pip install -r build/mkdocs/docs-requirements.txt
+          pip install -r docs-requirements.txt
 
       - name: Build and Deploy
         run: mkdocs gh-deploy --force --verbose
