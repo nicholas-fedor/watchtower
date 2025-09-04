@@ -99,14 +99,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           DRY_RUN: ${{ inputs.dry-run }}
 
-      - name: Upload binary SBOMs # Upload SBOMs for prod builds.
-        if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
-        uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
-        with:
-          name: ${{ inputs.build-type }}-binary-sboms
-          path: dist/*.sbom
-          if-no-files-found: warn
-
       - name: Generate artifact attestation # Generate attestations for prod builds.
         if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
         uses: actions/attest-build-provenance@0b6e9809265278d02c58acf52849a95818a5a306
