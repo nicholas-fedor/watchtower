@@ -83,7 +83,9 @@ extra:
   version:
     provider: mike
     alias: true
-    default: latest
+    default:
+      - latest
+      - dev
   # Social links displayed as icons in the footer (Material theme).
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-the-footer/#social-links
   social:
