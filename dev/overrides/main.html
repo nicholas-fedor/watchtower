@@ -12,6 +12,7 @@
     background-color: var(--md-default-bg-color);
   }
 </style>
-{% endblock %} {% block outdated %} You're not viewing the latest version.
+{% endblock %} {% block outdated %} {% if "dev" not in page.url %} You're not
+viewing the latest version.
 <a href="{{ config.site_url }}latest/">Click here to go to latest.</a>
-{% endblock %}
+{% endif %} {% endblock %}
