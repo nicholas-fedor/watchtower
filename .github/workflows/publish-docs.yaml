@@ -73,12 +73,18 @@ jobs:
             echo "aliases=latest" >> "$GITHUB_OUTPUT"
           else
             echo "version=dev" >> "$GITHUB_OUTPUT"
-            echo "aliases=latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and Deploy
         run: |
-          mike deploy \
-            --config-file build/mkdocs/mkdocs.yaml \
-            --push \
-            --update-aliases "${{ steps.mike.outputs.version }}" "${{ steps.mike.outputs.aliases }}"
+          if [ -n "${{ steps.mike.outputs.aliases }}" ]; then
+            mike deploy \
+              --config-file build/mkdocs/mkdocs.yaml \
+              --push \
+              --update-aliases "${{ steps.mike.outputs.version }}" "${{ steps.mike.outputs.aliases }}"
+          else
+            mike deploy \
+              --config-file build/mkdocs/mkdocs.yaml \
+              --push \
+              "${{ steps.mike.outputs.version }}"
+          fi
