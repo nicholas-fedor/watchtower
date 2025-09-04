@@ -12,7 +12,7 @@
     background-color: var(--md-default-bg-color);
   }
 </style>
-{% endblock %} {% block outdated %} {% if page and page.url != "dev/" and not
-page.url.startswith("dev/") %} You're not viewing the latest version.
+{% endblock %} {% block outdated %} {% if config.plugins["mike"].version !=
+"dev" %} You're not viewing the latest version.
 <a href="/latest/">Click here to go to latest.</a>
 {% endif %} {% endblock %}
