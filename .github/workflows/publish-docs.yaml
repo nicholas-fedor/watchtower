@@ -69,12 +69,16 @@ jobs:
         id: mike
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
-            echo "aliases=latest" >> $GITHUB_OUTPUT
+            echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "aliases=latest" >> "$GITHUB_OUTPUT"
           else
-            echo "version=dev" >> $GITHUB_OUTPUT
-            echo "aliases=latest" >> $GITHUB_OUTPUT
+            echo "version=dev" >> "$GITHUB_OUTPUT"
+            echo "aliases=latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and Deploy
-        run: mike deploy --config-file build/mkdocs/mkdocs.yaml --push --update-aliases "${{ steps.mike.outputs.version }}" "${{ steps.mike.outputs.aliases }}"
+        run: |
+          mike deploy \
+            --config-file build/mkdocs/mkdocs.yaml \
+            --push \
+            --update-aliases "${{ steps.mike.outputs.version }}" "${{ steps.mike.outputs.aliases }}"
