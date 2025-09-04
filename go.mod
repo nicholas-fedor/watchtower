@@ -8,7 +8,7 @@ retract [v1.7.2, v1.7.9]
 require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v28.4.0+incompatible
-	github.com/docker/docker v28.3.3+incompatible
+	github.com/docker/docker v28.4.0+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/nicholas-fedor/shoutrrr v0.8.17
 	github.com/onsi/gomega v1.38.2
@@ -47,7 +47,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20250903194437-c28834ac2320 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
