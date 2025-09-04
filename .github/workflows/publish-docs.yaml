@@ -77,4 +77,4 @@ jobs:
           fi
 
       - name: Build and Deploy
-        run: mike deploy --config-file build/mkdocs/mkdocs.yaml --push --update-aliases ${{ steps.mike.outputs.version }} ${{ steps.mike.outputs.aliases }}
+        run: mike deploy --config-file build/mkdocs/mkdocs.yaml --push --update-aliases "${{ steps.mike.outputs.version }}" "${{ steps.mike.outputs.aliases }}"
