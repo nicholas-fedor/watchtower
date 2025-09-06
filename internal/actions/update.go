@@ -37,6 +37,8 @@ var (
 	errStartContainerFailed = errors.New("failed to start container")
 	// errParseImageReference indicates a failure to parse a container’s image reference.
 	errParseImageReference = errors.New("failed to parse image reference")
+	// errMultipleWatchtowerInstances indicates multiple Watchtower containers are running.
+	errMultipleWatchtowerInstances = errors.New("multiple Watchtower instances detected")
 )
 
 // Update scans and updates containers based on parameters.
@@ -67,6 +69,25 @@ func Update(
 	// Initialize a map to collect image IDs for cleanup after updates.
 	cleanupImageIDs := make(map[types.ImageID]bool)
 
+	// Check for multiple Watchtower instances
+	containers, err := client.ListContainers(func(c types.FilterableContainer) bool {
+		return c.IsWatchtower()
+	})
+	if err != nil {
+		logrus.WithError(err).Error("Failed to list containers for Watchtower instance check")
+
+		return nil, nil, fmt.Errorf("failed to check Watchtower instances: %w", err)
+	}
+
+	if len(containers) > 1 {
+		logrus.WithField("count", len(containers)).Error("Multiple Watchtower instances detected")
+
+		return nil, nil, fmt.Errorf(
+			"%w: %d instances found",
+			errMultipleWatchtowerInstances,
+			len(containers),
+		)
+	}
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if params.LifecycleHooks {
 		logrus.Debug("Executing pre-check lifecycle hooks")
@@ -74,7 +95,7 @@ func Update(
 	}
 
 	// Fetch the list of containers based on the provided filter (e.g., all, specific names).
-	containers, err := client.ListContainers(params.Filter)
+	containers, err = client.ListContainers(params.Filter)
 	if err != nil {
 		// Log and return an error if container listing fails.
 		logrus.WithError(err).Debug("Failed to list containers")
@@ -192,9 +213,10 @@ func Update(
 	UpdateImplicitRestart(containers)
 
 	// Separate containers into those to update (stale) and those to restart (linked).
-	var containersToUpdate []types.Container
-
-	var containersToRestart []types.Container
+	var (
+		containersToUpdate  []types.Container
+		containersToRestart []types.Container
+	)
 
 	for _, c := range containers {
 		if c.IsStale() && !c.IsMonitorOnly(params) {
@@ -214,11 +236,11 @@ func Update(
 		Debug("Prepared containers for restart")
 
 	// Perform updates and restarts, either with rolling restarts or in batches.
-	var failedStop map[types.ContainerID]error
-
-	var stoppedImages map[types.ImageID]bool
-
-	var failedStart map[types.ContainerID]error
+	var (
+		failedStop    map[types.ContainerID]error
+		stoppedImages map[types.ImageID]bool
+		failedStart   map[types.ContainerID]error
+	)
 
 	if params.RollingRestart {
 		// Apply rolling restarts for updates and linked containers sequentially.
@@ -630,6 +652,16 @@ func restartStaleContainer(
 	renamed := false
 	// Rename Watchtower containers only if restarts are enabled.
 	if container.IsWatchtower() && !params.NoRestart {
+		// Check pull success before renaming
+		stale, _, err := client.IsContainerStale(container, params)
+		if err != nil || !stale {
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Skipping Watchtower self-update due to pull failure or non-stale image")
+
+			return false, nil // Skip self-update without error
+		}
+
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
@@ -652,6 +684,16 @@ func restartStaleContainer(
 		newContainerID, err := client.StartContainer(container)
 		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
+			// Clean up renamed Watchtower container on failure
+			if renamed && container.IsWatchtower() {
+				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
+
+				if cleanupErr := client.StopContainer(container, params.Timeout); cleanupErr != nil {
+					logrus.WithError(cleanupErr).
+						WithFields(fields).
+						Debug("Failed to remove failed Watchtower container")
+				}
+			}
 
 			return renamed, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 		}
