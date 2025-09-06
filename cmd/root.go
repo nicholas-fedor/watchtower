@@ -795,8 +795,12 @@ func runUpgradesOnSchedule(
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
 func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Metric {
-	// Start batching notifications to group update messages.
-	notifier.StartNotification()
+	// Start batching notifications to group update messages, if notifier is initialized
+	if notifier != nil {
+		notifier.StartNotification()
+	} else {
+		logrus.Warn("Notifier is nil, skipping notification batching")
+	}
 
 	// Configure update parameters based on global flags and settings.
 	updateParams := types.UpdateParams{
@@ -815,6 +819,12 @@ func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Met
 	result, cleanupImageIDs, err := actions.Update(client, updateParams)
 	if err != nil {
 		logrus.WithError(err).Error("Update execution failed")
+
+		return &metrics.Metric{
+			Scanned: 0,
+			Updated: 0,
+			Failed:  0,
+		}
 	}
 
 	// Perform deferred image cleanup if enabled.
@@ -835,8 +845,10 @@ func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Met
 		"updated_names": updatedNames,
 	}).Debug("Report before notification")
 
-	// Send the batched notification with update results.
-	notifier.SendNotification(result)
+	// Send the batched notification with update results, if notifier and result are initialized
+	if notifier != nil && result != nil {
+		notifier.SendNotification(result)
+	}
 
 	// Generate and log a metric summarizing the update session.
 	metricResults := metrics.NewMetric(result)
