@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -48,10 +49,20 @@ func CreateMockClient(data *TestData, pullImages bool, removeVolumes bool) MockC
 	}
 }
 
-// ListContainers returns the preconfigured list of containers from TestData.
-// It ignores the filter parameter, providing all containers for test simplicity.
-func (client MockClient) ListContainers(_ types.Filter) ([]types.Container, error) {
-	return client.TestData.Containers, nil
+// ListContainers returns the preconfigured list of containers from TestData, applying the provided filter.
+// If the filter is nil, all containers are returned.
+func (client MockClient) ListContainers(filter types.Filter) ([]types.Container, error) {
+	filtered := []types.Container{}
+	effectiveFilter := filter
+	if effectiveFilter == nil {
+		effectiveFilter = filters.NoFilter
+	}
+	for _, c := range client.TestData.Containers {
+		if effectiveFilter(c) {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered, nil
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.

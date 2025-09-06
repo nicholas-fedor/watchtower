@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
@@ -43,11 +44,20 @@ var _ = ginkgo.Describe("the actions package", func() {
 				client := mocks.CreateMockClient(
 					&mocks.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainer(
+							mocks.CreateMockContainerWithConfig(
 								"test-container",
 								"test-container",
 								"watchtower",
-								time.Now()),
+								true,
+								false,
+								time.Now(),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+									ExposedPorts: map[nat.Port]struct{}{},
+								},
+							),
 						},
 					},
 					false,
@@ -67,16 +77,34 @@ var _ = ginkgo.Describe("the actions package", func() {
 					&mocks.TestData{
 						NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
-							mocks.CreateMockContainer(
+							mocks.CreateMockContainerWithConfig(
 								"test-container-01",
 								"test-container-01",
 								"watchtower:old",
-								time.Now().AddDate(0, 0, -1)),
-							mocks.CreateMockContainer(
+								true,
+								false,
+								time.Now().AddDate(0, 0, -1),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+									ExposedPorts: map[nat.Port]struct{}{},
+								},
+							),
+							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
 								"watchtower:latest",
-								time.Now()),
+								true,
+								false,
+								time.Now(),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+									ExposedPorts: map[nat.Port]struct{}{},
+								},
+							),
 						},
 					},
 					false,
