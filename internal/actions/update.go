@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
@@ -37,9 +38,10 @@ var (
 	errStartContainerFailed = errors.New("failed to start container")
 	// errParseImageReference indicates a failure to parse a container’s image reference.
 	errParseImageReference = errors.New("failed to parse image reference")
-	// errMultipleWatchtowerInstances indicates multiple Watchtower containers are running.
-	errMultipleWatchtowerInstances = errors.New("multiple Watchtower instances detected")
 )
+
+// watchtowerPullFailureDelay sets the delay after failed Watchtower self-update pull to prevent rapid restarts.
+const watchtowerPullFailureDelay = 5 * time.Minute
 
 // Update scans and updates containers based on parameters.
 //
@@ -68,26 +70,9 @@ func Update(
 	staleCount := 0
 	// Initialize a map to collect image IDs for cleanup after updates.
 	cleanupImageIDs := make(map[types.ImageID]bool)
+	// Track if Watchtower self-update pull failed to add safeguard delay.
+	watchtowerPullFailed := false
 
-	// Check for multiple Watchtower instances
-	containers, err := client.ListContainers(func(c types.FilterableContainer) bool {
-		return c.IsWatchtower()
-	})
-	if err != nil {
-		logrus.WithError(err).Error("Failed to list containers for Watchtower instance check")
-
-		return nil, nil, fmt.Errorf("failed to check Watchtower instances: %w", err)
-	}
-
-	if len(containers) > 1 {
-		logrus.WithField("count", len(containers)).Error("Multiple Watchtower instances detected")
-
-		return nil, nil, fmt.Errorf(
-			"%w: %d instances found",
-			errMultipleWatchtowerInstances,
-			len(containers),
-		)
-	}
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if params.LifecycleHooks {
 		logrus.Debug("Executing pre-check lifecycle hooks")
@@ -95,7 +80,7 @@ func Update(
 	}
 
 	// Fetch the list of containers based on the provided filter (e.g., all, specific names).
-	containers, err = client.ListContainers(params.Filter)
+	containers, err := client.ListContainers(params.Filter)
 	if err != nil {
 		// Log and return an error if container listing fails.
 		logrus.WithError(err).Debug("Failed to list containers")
@@ -175,6 +160,11 @@ func Update(
 			staleCheckFailed++
 
 			progress.AddSkipped(sourceContainer, err)
+
+			// Track if Watchtower self-update pull failed for safeguard.
+			if sourceContainer.IsWatchtower() {
+				watchtowerPullFailed = true
+			}
 		} else {
 			// Log successful staleness check and add to scanned containers.
 			clog.WithFields(logrus.Fields{
@@ -269,6 +259,14 @@ func Update(
 	if params.LifecycleHooks {
 		logrus.Debug("Executing post-check lifecycle hooks")
 		lifecycle.ExecutePostChecks(client, params)
+	}
+
+	// Add safeguard delay if Watchtower self-update pull failed to prevent rapid restarts.
+	if watchtowerPullFailed {
+		logrus.Info(
+			"Watchtower self-update pull failed, sleeping for 5 minutes to prevent rapid restarts",
+		)
+		time.Sleep(watchtowerPullFailureDelay)
 	}
 
 	// Return the final report summarizing the session and the cleanup image IDs.
