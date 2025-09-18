@@ -31,11 +31,11 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@5af1117217e476b56a63eaa9ea28eeeb91fbc5ff
+        uses: securego/gosec@506407e7dfe6979d514d362f0b2d2ea77f49f5c8
         with:
           args: "-no-fail -fmt sarif -out results.sarif ./..."
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: results.sarif
@@ -45,13 +45,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: govulncheck
-        uses: nicholas-fedor/govulncheck-action@6bacd52253cfc2ae7ce5d66df2fdfcc40040a8df
+        uses: nicholas-fedor/govulncheck-action@1e9ef2cbd93abefcc8605e05f8c212aa90181f6f
         with:
           output-format: sarif
           output-file: ${{ env.OUTPUT_FILE }}
           go-version-input: ${{ env.GO_VERSION }}
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3
         with:
           sarif_file: ${{ env.OUTPUT_FILE }}
