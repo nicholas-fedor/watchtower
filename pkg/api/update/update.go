@@ -11,14 +11,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var lock chan bool
-
 // Handler triggers container update scans via HTTP.
 //
-// It holds the update function and endpoint path for the /v1/update endpoint.
+// It holds the update function, endpoint path, and concurrency lock for the /v1/update endpoint.
 type Handler struct {
 	fn   func(images []string) // Update execution function.
 	Path string                // API endpoint path (e.g., "/v1/update").
+	lock chan bool             // Channel for synchronizing updates to prevent concurrency.
 }
 
 // New creates a new Handler instance.
@@ -30,15 +29,16 @@ type Handler struct {
 // Returns:
 //   - *Handler: Initialized handler with the specified update function and path.
 func New(updateFn func(images []string), updateLock chan bool) *Handler {
+	var hLock chan bool
 	// Use provided lock or create a new one with capacity 1 for single-update serialization.
 	if updateLock != nil {
-		lock = updateLock
+		hLock = updateLock
 
 		logrus.WithField("source", "provided").
 			Debug("Initialized update lock from provided channel")
 	} else {
-		lock = make(chan bool, 1)
-		lock <- true
+		hLock = make(chan bool, 1)
+		hLock <- true
 
 		logrus.Debug("Initialized new update lock channel")
 	}
@@ -46,6 +46,7 @@ func New(updateFn func(images []string), updateLock chan bool) *Handler {
 	return &Handler{
 		fn:   updateFn,
 		Path: "/v1/update",
+		lock: hLock,
 	}
 }
 
@@ -91,9 +92,9 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// Attempt to acquire lock non-blocking to check for concurrent updates.
 	select {
-	case chanValue := <-lock:
+	case chanValue := <-handle.lock:
 		// Lock acquired, proceed with update.
-		defer func() { lock <- chanValue }()
+		defer func() { handle.lock <- chanValue }()
 
 		if len(images) > 0 {
 			logrus.WithField("images", images).Info("Executing targeted update")
