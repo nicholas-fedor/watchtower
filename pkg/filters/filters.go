@@ -358,16 +358,15 @@ func BuildFilter(
 	}
 
 	// Apply scope filter based on value.
-	if scope == noScope { // "none"
-		filter = FilterByScope(scope, filter)
+	if scope == noScope || scope == "" { // "none" or empty (unscoped)
+		filter = FilterByScope(noScope, filter)
 
-		stringBuilder.WriteString(`without a scope, "`)
+		stringBuilder.WriteString(`without a scope`)
 	} else if scope != "" {
 		filter = FilterByScope(scope, filter)
 
-		stringBuilder.WriteString(`in scope "`)
+		stringBuilder.WriteString(`in scope `)
 		stringBuilder.WriteString(scope)
-		stringBuilder.WriteString(`", `)
 	}
 
 	// Exclude explicitly disabled containers.
@@ -377,7 +376,8 @@ func BuildFilter(
 	filterDesc := "Checking all containers (except explicitly disabled with label)"
 	if stringBuilder.Len() > 0 {
 		filterDesc = "Only checking containers " + stringBuilder.String()
-		filterDesc = filterDesc[:len(filterDesc)-2] // Trim trailing ", ".
+		// Trim trailing ", " if present (for name/enable filters)
+		filterDesc = strings.TrimSuffix(filterDesc, ", ")
 	}
 
 	clog.WithField("filter_desc", filterDesc).Debug("Filter built")

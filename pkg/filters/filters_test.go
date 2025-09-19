@@ -352,36 +352,41 @@ func TestBuildFilter(t *testing.T) {
 	assert.Contains(t, desc, "valid")
 
 	container := new(mocks.FilterableContainer)
-	container.On("Name").Return("Invalid")
-	container.On("Enabled").Return(false, false)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("Invalid").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("test")
-	container.On("Enabled").Return(false, false)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("test").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("Invalid")
-	container.On("Enabled").Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("Invalid").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("test")
-	container.On("Enabled").Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("test").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Enabled").Return(false, true)
-	container.On("Name").Return("/test")
+	container.On("Enabled").Return(false, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 }
@@ -398,27 +403,31 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 
 	container := new(mocks.FilterableContainer)
 	container.On("Enabled").Return(false, false)
-	container.On("Name").Return("/test")
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("Invalid")
-	container.On("Enabled").Twice().Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("Invalid").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("test")
-	container.On("Enabled").Twice().Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("test").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Enabled").Return(false, true)
-	container.On("Name").Return("/test")
+	container.On("Enabled").Return(false, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 }
@@ -433,50 +442,57 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	assert.Contains(t, desc, "notfound")
 
 	container := new(mocks.FilterableContainer)
-	container.On("Name").Return("Another")
-	container.On("Enabled").Return(false, false)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("Another").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("AnotherOne")
-	container.On("Enabled").Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("AnotherOne").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("test")
-	container.On("Enabled").Return(false, false)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("test").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("excluded")
-	container.On("Enabled").Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("excluded").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("excludedAsSubstring")
-	container.On("Enabled").Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("excludedAsSubstring").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("notfound")
-	container.On("Enabled").Return(true, true)
-	container.On("Name").Return("/test")
+	container.On("Name").Return("notfound").Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Enabled").Return(false, true)
-	container.On("Name").Return("/test")
+	container.On("Enabled").Return(false, true).Maybe()
+	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
+	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 }

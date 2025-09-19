@@ -154,13 +154,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(0), "RenameContainer should not be called with no-restart")
 		})
 
-		ginkgo.It("should detect renamed Watchtower without scope for cleanup", func() {
+		ginkgo.It("should not clean up unscoped instances when scope is specified", func() {
 			client := mocks.CreateMockClient(
 				&mocks.TestData{
 					Containers: []types.Container{
 						mocks.CreateMockContainerWithConfig(
-							"watchtower",
-							"/watchtower",
+							"watchtower-scoped",
+							"/watchtower-scoped",
 							"watchtower:latest",
 							true,
 							false,
@@ -172,8 +172,8 @@ var _ = ginkgo.Describe("the update action", func() {
 								},
 							}),
 						mocks.CreateMockContainerWithConfig(
-							"renamed",
-							"/watchtower",
+							"watchtower-unscoped",
+							"/watchtower-unscoped",
 							"watchtower:old",
 							true,
 							false,
@@ -191,19 +191,17 @@ var _ = ginkgo.Describe("the update action", func() {
 			cleanupImageIDs := make(map[types.ImageID]bool)
 			err := actions.CheckForMultipleWatchtowerInstances(
 				client,
-				true,
+				true, // cleanup=true
 				"prod",
 				cleanupImageIDs,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(1), "StopContainer should be called for renamed container")
+				To(gomega.Equal(0), "StopContainer should not be called for unscoped container")
 			gomega.Expect(cleanupImageIDs).
-				To(gomega.HaveKey(types.ImageID("watchtower:latest")))
-			gomega.Expect(cleanupImageIDs).
-				To(gomega.HaveLen(1), "cleanupImageIDs should include renamed container's image")
+				To(gomega.BeEmpty(), "No cleanup should occur for unscoped container")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).
-				To(gomega.Equal(1), "RemoveImageByID should be called for old image")
+				To(gomega.Equal(0), "RemoveImageByID should not be called for unscoped container")
 		})
 
 		ginkgo.It("should skip cleanup for shared image", func() {
