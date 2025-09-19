@@ -18,6 +18,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// defaultPullFailureDelay defines the default delay duration for failed Watchtower self-update pulls.
+const defaultPullFailureDelay = 5 * time.Minute
+
 // Errors for update operations.
 var (
 	// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
@@ -39,9 +42,6 @@ var (
 	// errParseImageReference indicates a failure to parse a container’s image reference.
 	errParseImageReference = errors.New("failed to parse image reference")
 )
-
-// watchtowerPullFailureDelay sets the delay after failed Watchtower self-update pull to prevent rapid restarts.
-const watchtowerPullFailureDelay = 5 * time.Minute
 
 // Update scans and updates containers based on parameters.
 //
@@ -263,10 +263,14 @@ func Update(
 
 	// Add safeguard delay if Watchtower self-update pull failed to prevent rapid restarts.
 	if watchtowerPullFailed {
-		logrus.Info(
-			"Watchtower self-update pull failed, sleeping for 5 minutes to prevent rapid restarts",
-		)
-		time.Sleep(watchtowerPullFailureDelay)
+		delay := params.PullFailureDelay
+		if delay == 0 {
+			delay = defaultPullFailureDelay // Default delay
+		}
+
+		logrus.WithField("delay", delay).
+			Info("Watchtower self-update pull failed, sleeping to prevent rapid restarts")
+		time.Sleep(delay)
 	}
 
 	// Return the final report summarizing the session and the cleanup image IDs.

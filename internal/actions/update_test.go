@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"errors"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -96,8 +97,9 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageIDs, err := actions.Update(
 				client,
 				types.UpdateParams{
-					Cleanup: true,
-					Filter:  filters.WatchtowerContainersFilter,
+					Cleanup:          true,
+					Filter:           filters.WatchtowerContainersFilter,
+					PullFailureDelay: 1 * time.Millisecond, // Test-specific very short delay
 				},
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -199,7 +201,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(cleanupImageIDs).
 				To(gomega.HaveKey(types.ImageID("watchtower:latest")))
 			gomega.Expect(cleanupImageIDs).
-				To(gomega.HaveLen(1), "cleanupImageIDs should include renamed container’s image")
+				To(gomega.HaveLen(1), "cleanupImageIDs should include renamed container's image")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).
 				To(gomega.Equal(1), "RemoveImageByID should be called for old image")
 		})
@@ -300,7 +302,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.When("there are linked containers being updated", func() {
-			ginkgo.It("should collect only the stale container’s image ID", func() {
+			ginkgo.It("should collect only the stale container's image ID", func() {
 				client := mocks.CreateMockClient(getLinkedTestData(true), false, false)
 				client.TestData.Staleness["test-container-01"] = true
 				report, cleanupImageIDs, err := actions.Update(
@@ -1063,6 +1065,58 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(0), "RemoveImageByID should not be called")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
 				To(gomega.Equal(0), "IsContainerStale should not be called")
+		})
+	})
+
+	ginkgo.When("Watchtower self-update pull fails", func() {
+		ginkgo.It("should apply safeguard delay to prevent rapid restarts", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true, // Simulate stale Watchtower
+					},
+				},
+				false,
+				false,
+			)
+
+			// Mock IsContainerStale to return an error (simulating pull failure)
+			client.TestData.IsContainerStaleError = errors.New("failed to pull image")
+
+			startTime := time.Now()
+			report, cleanupImageIDs, err := actions.Update(
+				client,
+				types.UpdateParams{
+					Cleanup:          true,
+					Filter:           filters.WatchtowerContainersFilter,
+					PullFailureDelay: 1 * time.Millisecond, // Test-specific very short delay
+				},
+			)
+			elapsedTime := time.Since(startTime)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).
+				To(gomega.BeEmpty(), "Watchtower should not be updated on pull failure")
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.BeEmpty(), "No cleanup should occur on pull failure")
+
+			// Verify that the delay was applied (using test-specific very short delay from PullFailureDelay)
+			gomega.Expect(elapsedTime).
+				To(gomega.BeNumerically(">=", 1*time.Millisecond), "Delay should have been applied")
 		})
 	})
 })

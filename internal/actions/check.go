@@ -76,10 +76,11 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 	return nil
 }
 
-// CheckForMultipleWatchtowerInstances ensures a single Watchtower instance.
+// CheckForMultipleWatchtowerInstances ensures a single Watchtower instance within the same scope.
 //
-// It identifies multiple Watchtower containers, stops all but the newest, and collects image IDs for
-// deferred cleanup if enabled, preventing conflicts from concurrent instances.
+// It identifies multiple Watchtower containers within the same scope, stops all but the newest,
+// and collects image IDs for deferred cleanup if enabled, preventing conflicts from concurrent instances.
+// Unscoped instances only clean up other unscoped instances, allowing coexistence with scoped instances.
 //
 // Parameters:
 //   - client: Container client for Docker operations.
@@ -96,10 +97,19 @@ func CheckForMultipleWatchtowerInstances(
 	cleanupImageIDs map[types.ImageID]bool,
 ) error {
 	// Apply scope filter to target specific Watchtower instances, if provided.
-	filter := filters.WatchtowerContainersFilter
-	if scope != "" && !cleanup { // Use scope filter only for non-self-update checks
-		filter = filters.FilterByScope(scope, filter)
+	var filter types.Filter
+
+	switch {
+	case scope != "" && !cleanup: // Use scope filter only for non-self-update checks
+		filter = filters.FilterByScope(scope, filters.WatchtowerContainersFilter)
 		logrus.WithField("scope", scope).Debug("Applied scope filter for Watchtower instances")
+	case scope == "" && !cleanup:
+		// For unscoped instances, only check other unscoped instances to allow coexistence with scoped ones
+		filter = filters.UnscopedWatchtowerContainersFilter
+
+		logrus.Debug("Applied unscoped filter for Watchtower instances")
+	default:
+		filter = filters.WatchtowerContainersFilter
 	}
 
 	// List all Watchtower containers matching the filter.

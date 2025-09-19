@@ -18,6 +18,41 @@ func TestWatchtowerContainersFilter(t *testing.T) {
 	container.AssertExpectations(t)
 }
 
+func TestUnscopedWatchtowerContainersFilter(t *testing.T) {
+	t.Parallel()
+
+	// Test unscoped Watchtower container (should pass)
+	unscoped := new(mocks.FilterableContainer)
+	unscoped.On("IsWatchtower").Return(true)
+	unscoped.On("Scope").Return("", false) // No scope set
+	unscoped.On("Name").Return("/unscoped-watchtower")
+	assert.True(t, UnscopedWatchtowerContainersFilter(unscoped))
+	unscoped.AssertExpectations(t)
+
+	// Test explicitly scoped Watchtower container (should fail)
+	scoped := new(mocks.FilterableContainer)
+	scoped.On("IsWatchtower").Return(true)
+	scoped.On("Scope").Return("prod", true) // Has scope
+	scoped.On("Name").Return("/scoped-watchtower")
+	assert.False(t, UnscopedWatchtowerContainersFilter(scoped))
+	scoped.AssertExpectations(t)
+
+	// Test none-scoped Watchtower container (should pass)
+	noneScoped := new(mocks.FilterableContainer)
+	noneScoped.On("IsWatchtower").Return(true)
+	noneScoped.On("Scope").Return("none", true) // Explicitly none scope
+	noneScoped.On("Name").Return("/none-scoped-watchtower")
+	assert.True(t, UnscopedWatchtowerContainersFilter(noneScoped))
+	noneScoped.AssertExpectations(t)
+
+	// Test non-Watchtower container (should fail)
+	nonWatchtower := new(mocks.FilterableContainer)
+	nonWatchtower.On("IsWatchtower").Return(false)
+	nonWatchtower.On("Name").Return("/regular-app")
+	assert.False(t, UnscopedWatchtowerContainersFilter(nonWatchtower))
+	nonWatchtower.AssertExpectations(t)
+}
+
 func TestNoFilter(t *testing.T) {
 	t.Parallel()
 

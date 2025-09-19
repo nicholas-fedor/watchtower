@@ -26,6 +26,37 @@ func WatchtowerContainersFilter(c types.FilterableContainer) bool {
 	return isWatchtower
 }
 
+// UnscopedWatchtowerContainersFilter selects only unscoped Watchtower containers.
+//
+// Returns:
+//   - bool: True if container is Watchtower and has no scope or scope "none", false otherwise.
+func UnscopedWatchtowerContainersFilter(c types.FilterableContainer) bool {
+	clog := logrus.WithField("container", c.Name())
+
+	if !c.IsWatchtower() {
+		clog.Debug("Container is not Watchtower")
+
+		return false
+	}
+
+	containerScope, containerHasScope := c.Scope()
+	if !containerHasScope || containerScope == "" {
+		containerScope = noScope // Default to "none" if unset.
+	}
+
+	if containerScope == noScope {
+		clog.WithField("container_scope", containerScope).
+			Debug("Filtering for unscoped Watchtower container")
+
+		return true
+	}
+
+	clog.WithField("container_scope", containerScope).
+		Debug("Container has scope, excluding from unscoped filter")
+
+	return false
+}
+
 // NoFilter allows all containers through.
 //
 // Returns:

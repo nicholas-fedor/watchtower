@@ -208,5 +208,109 @@ var _ = ginkgo.Describe("the actions package", func() {
 					To(gomega.Equal(1), "RemoveImageByID should be called for old image")
 			})
 		})
+
+		ginkgo.When("unscoped and scoped instances coexist", func() {
+			var client mocks.MockClient
+			ginkgo.BeforeEach(func() {
+				client = mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							// Unscoped Watchtower (older)
+							mocks.CreateMockContainerWithConfig(
+								"unscoped-old",
+								"/unscoped-old",
+								"watchtower:old",
+								true,
+								false,
+								time.Now().AddDate(0, 0, -1),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+									ExposedPorts: map[nat.Port]struct{}{},
+								},
+							),
+							// Scoped Watchtower (should be ignored by unscoped cleanup)
+							mocks.CreateMockContainerWithConfig(
+								"scoped-new",
+								"/scoped-new",
+								"watchtower:new",
+								true,
+								false,
+								time.Now(),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower":       "true",
+										"com.centurylinklabs.watchtower.scope": "prod",
+									},
+									ExposedPorts: map[nat.Port]struct{}{},
+								},
+							),
+							// Unscoped Watchtower (newer)
+							mocks.CreateMockContainerWithConfig(
+								"unscoped-new",
+								"/unscoped-new",
+								"watchtower:latest",
+								true,
+								false,
+								time.Now(),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+									ExposedPorts: map[nat.Port]struct{}{},
+								},
+							),
+						},
+					},
+					false,
+					false,
+				)
+			})
+
+			ginkgo.It("should only clean up unscoped instances when scope is empty", func() {
+				cleanupImageIDs := make(map[types.ImageID]bool)
+				err := actions.CheckForMultipleWatchtowerInstances(
+					client,
+					false,
+					"",
+					cleanupImageIDs,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				// Should stop the older unscoped instance
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).
+					To(gomega.BeFalse(), "unscoped-old should be stopped")
+				// Should keep the scoped instance running (not affected by unscoped cleanup)
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).
+					To(gomega.BeTrue(), "scoped-new should remain running")
+				// Should keep the newer unscoped instance running
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[2])).
+					To(gomega.BeTrue(), "unscoped-new should remain running")
+				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+			})
+
+			ginkgo.It("should clean up within scoped instances when scope is specified", func() {
+				cleanupImageIDs := make(map[types.ImageID]bool)
+				err := actions.CheckForMultipleWatchtowerInstances(
+					client,
+					false,
+					"prod",
+					cleanupImageIDs,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				// Scoped cleanup should only see the scoped container, so no cleanup needed
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).
+					To(gomega.BeTrue(), "unscoped-old should remain running")
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).
+					To(gomega.BeTrue(), "scoped-new should remain running")
+				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[2])).
+					To(gomega.BeTrue(), "unscoped-new should remain running")
+				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+			})
+		})
 	})
 })

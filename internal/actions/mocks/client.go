@@ -29,6 +29,7 @@ type TestData struct {
 	NameOfContainerToKeep   string            // Name of the container to avoid stopping.
 	Containers              []types.Container // List of mock containers.
 	Staleness               map[string]bool   // Map of container names to staleness status.
+	IsContainerStaleError   error             // Error to return from IsContainerStale (for testing).
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -138,11 +139,18 @@ func (client MockClient) ExecuteCommand(_ types.ContainerID, command string, _ i
 
 // IsContainerStale determines if a container is stale based on TestData’s Staleness map.
 // It returns true if the container’s name isn’t explicitly marked as fresh, along with an empty ImageID and no error.
+// If IsContainerStaleError is set, it returns that error instead.
 func (client MockClient) IsContainerStale(
 	cont types.Container,
 	_ types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	client.TestData.IsContainerStaleCount++
+
+	// Return configured error if set (for testing error conditions)
+	if client.TestData.IsContainerStaleError != nil {
+		return false, "", client.TestData.IsContainerStaleError
+	}
+
 	stale, found := client.TestData.Staleness[cont.Name()]
 	if !found {
 		stale = true // Default to stale if not specified.
