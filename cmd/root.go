@@ -379,7 +379,7 @@ func runMain(cfg RunConfig) int {
 
 	// Handle one-time update mode, executing updates and registering metrics.
 	if cfg.RunOnce {
-		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc)
+		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
 		metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
@@ -448,7 +448,7 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 		httpAPI.RegisterFunc(updateHandler.Path, updateHandler.Handle)
 
 		if !cfg.UnblockHTTPAPI {
-			writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc)
+			writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
 		}
 	}
 
@@ -601,7 +601,8 @@ func filterEmpty(parts []string) []string {
 //   - c: The cobra.Command instance, providing access to flags like --no-startup-message.
 //   - sched: The time.Time of the first scheduled run, or zero if no schedule is set.
 //   - filtering: A string describing the container filter applied (e.g., "Watching all containers").
-func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
+//   - scope: The scope name for structured logging, empty string if no scope is set.
+func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string, scope string) {
 	// Retrieve flags controlling startup message behavior and API setup.
 	noStartupMessage, _ := c.PersistentFlags().GetBool("no-startup-message")
 	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
@@ -617,7 +618,13 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string) {
 
 	// Log details about configured notifiers or lack thereof.
 	logNotifierInfo(startupLog, notifier.GetNames())
-	startupLog.Info(filtering)
+
+	// Log filtering information, using structured logging for scope when set
+	if scope != "" {
+		startupLog.WithField("scope", scope).Info("Only checking containers in scope")
+	} else {
+		startupLog.Info(filtering)
+	}
 
 	// Log scheduling or run mode information based on configuration.
 	logScheduleInfo(startupLog, c, sched)
@@ -757,7 +764,7 @@ func runUpgradesOnSchedule(
 	}
 
 	// Log startup message with the first scheduled run time.
-	writeStartupMessage(c, scheduler.Entries()[0].Schedule.Next(time.Now()), filtering)
+	writeStartupMessage(c, scheduler.Entries()[0].Schedule.Next(time.Now()), filtering, scope)
 
 	// Start the scheduler to begin periodic execution.
 	scheduler.Start()
@@ -795,8 +802,12 @@ func runUpgradesOnSchedule(
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
 func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Metric {
-	// Start batching notifications to group update messages.
-	notifier.StartNotification()
+	// Start batching notifications to group update messages, if notifier is initialized
+	if notifier != nil {
+		notifier.StartNotification()
+	} else {
+		logrus.Warn("Notifier is nil, skipping notification batching")
+	}
 
 	// Configure update parameters based on global flags and settings.
 	updateParams := types.UpdateParams{
@@ -815,6 +826,12 @@ func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Met
 	result, cleanupImageIDs, err := actions.Update(client, updateParams)
 	if err != nil {
 		logrus.WithError(err).Error("Update execution failed")
+
+		return &metrics.Metric{
+			Scanned: 0,
+			Updated: 0,
+			Failed:  0,
+		}
 	}
 
 	// Perform deferred image cleanup if enabled.
@@ -835,8 +852,10 @@ func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Met
 		"updated_names": updatedNames,
 	}).Debug("Report before notification")
 
-	// Send the batched notification with update results.
-	notifier.SendNotification(result)
+	// Send the batched notification with update results, if notifier and result are initialized
+	if notifier != nil && result != nil {
+		notifier.SendNotification(result)
+	}
 
 	// Generate and log a metric summarizing the update session.
 	metricResults := metrics.NewMetric(result)

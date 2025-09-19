@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -28,6 +29,7 @@ type TestData struct {
 	NameOfContainerToKeep   string            // Name of the container to avoid stopping.
 	Containers              []types.Container // List of mock containers.
 	Staleness               map[string]bool   // Map of container names to staleness status.
+	IsContainerStaleError   error             // Error to return from IsContainerStale (for testing).
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -48,10 +50,20 @@ func CreateMockClient(data *TestData, pullImages bool, removeVolumes bool) MockC
 	}
 }
 
-// ListContainers returns the preconfigured list of containers from TestData.
-// It ignores the filter parameter, providing all containers for test simplicity.
-func (client MockClient) ListContainers(_ types.Filter) ([]types.Container, error) {
-	return client.TestData.Containers, nil
+// ListContainers returns the preconfigured list of containers from TestData, applying the provided filter.
+// If the filter is nil, all containers are returned.
+func (client MockClient) ListContainers(filter types.Filter) ([]types.Container, error) {
+	filtered := []types.Container{}
+	effectiveFilter := filter
+	if effectiveFilter == nil {
+		effectiveFilter = filters.NoFilter
+	}
+	for _, c := range client.TestData.Containers {
+		if effectiveFilter(c) {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered, nil
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.
@@ -127,11 +139,18 @@ func (client MockClient) ExecuteCommand(_ types.ContainerID, command string, _ i
 
 // IsContainerStale determines if a container is stale based on TestData’s Staleness map.
 // It returns true if the container’s name isn’t explicitly marked as fresh, along with an empty ImageID and no error.
+// If IsContainerStaleError is set, it returns that error instead.
 func (client MockClient) IsContainerStale(
 	cont types.Container,
 	_ types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	client.TestData.IsContainerStaleCount++
+
+	// Return configured error if set (for testing error conditions)
+	if client.TestData.IsContainerStaleError != nil {
+		return false, "", client.TestData.IsContainerStaleError
+	}
+
 	stale, found := client.TestData.Staleness[cont.Name()]
 	if !found {
 		stale = true // Default to stale if not specified.

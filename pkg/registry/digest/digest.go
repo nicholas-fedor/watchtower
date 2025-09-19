@@ -100,6 +100,16 @@ func CompareDigest(
 		return false, err
 	}
 
+	// If HEAD request returned empty digest (due to 404), fall back to GET request.
+	if remoteDigest == "" {
+		logrus.WithFields(fields).Debug("HEAD request returned empty digest, falling back to GET")
+
+		remoteDigest, err = FetchDigest(ctx, container, registryAuth)
+		if err != nil {
+			return false, err
+		}
+	}
+
 	logrus.WithFields(fields).
 		WithField("remote_digest", remoteDigest).
 		Debug("Fetched remote digest")

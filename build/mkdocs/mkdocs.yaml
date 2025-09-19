@@ -83,7 +83,9 @@ extra:
   version:
     provider: mike
     alias: true
-    default: latest
+    default:
+      - latest
+      - dev
   # Social links displayed as icons in the footer (Material theme).
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-the-footer/#social-links
   social:
@@ -186,6 +188,7 @@ plugins:
   - mike:
       version_selector: true
       css_dir: assets/styles
+      alias_type: redirect
   # Displays last updated dates on pages, formatted as time ago.
   - git-revision-date-localized:
       enable_creation_date: true

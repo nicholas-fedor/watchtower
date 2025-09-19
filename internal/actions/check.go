@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -76,10 +77,12 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 	return nil
 }
 
-// CheckForMultipleWatchtowerInstances ensures a single Watchtower instance.
+// CheckForMultipleWatchtowerInstances ensures a single Watchtower instance within the same scope.
 //
-// It identifies multiple Watchtower containers, stops all but the newest, and collects image IDs for
-// deferred cleanup if enabled, preventing conflicts from concurrent instances.
+// It identifies multiple Watchtower containers within the same scope, stops all but the newest,
+// and collects image IDs for deferred cleanup if enabled, preventing conflicts from concurrent instances.
+// Scoped instances only clean up other instances in the same scope, allowing coexistence with different scopes.
+// Cleanup operations respect scope boundaries to prevent cross-scope interference.
 //
 // Parameters:
 //   - client: Container client for Docker operations.
@@ -96,10 +99,16 @@ func CheckForMultipleWatchtowerInstances(
 	cleanupImageIDs map[types.ImageID]bool,
 ) error {
 	// Apply scope filter to target specific Watchtower instances, if provided.
-	filter := filters.WatchtowerContainersFilter
-	if scope != "" && !cleanup { // Use scope filter only for non-self-update checks
-		filter = filters.FilterByScope(scope, filter)
+	var filter types.Filter
+
+	switch {
+	case scope != "": // Scoped instance - filter by scope
+		filter = filters.FilterByScope(scope, filters.WatchtowerContainersFilter)
 		logrus.WithField("scope", scope).Debug("Applied scope filter for Watchtower instances")
+	case scope == "": // Unscoped instance - only unscoped instances
+		filter = filters.UnscopedWatchtowerContainersFilter
+
+		logrus.Debug("Applied unscoped filter for Watchtower instances")
 	}
 
 	// List all Watchtower containers matching the filter.
@@ -226,7 +235,12 @@ func CleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
 		}
 
 		if err := client.RemoveImageByID(imageID); err != nil {
-			logrus.WithError(err).WithField("image_id", imageID).Warn("Failed to remove image")
+			// Check if this is a "No such image" error (expected when multiple instances clean up the same image)
+			if strings.Contains(err.Error(), "No such image") {
+				logrus.WithField("image_id", imageID).Debug("Image already removed")
+			} else {
+				logrus.WithError(err).WithField("image_id", imageID).Warn("Failed to remove image")
+			}
 		} else {
 			logrus.WithField("image_id", imageID).Debug("Removed image")
 		}

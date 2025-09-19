@@ -649,6 +649,106 @@ var _ = ginkgo.Describe("Digests", func() {
 				To(gomega.ContainSubstring("challenge header did not include all values needed to construct an auth url"))
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
+
+		ginkgo.It("should fall back to GET when HEAD returns 404", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, r *http.Request) {
+					logrus.Debug("Handled manifest request")
+					if r.Method == http.MethodHead {
+						w.WriteHeader(http.StatusNotFound)
+					} else {
+						w.Header().Set("Content-Type", "application/json")
+						fmt.Fprintf(w, `{"digest": "%s"}`, mockDigestHash)
+					}
+				},
+			)
+
+			ctx := context.Background()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			registryAuth := digest.TransformAuth("token")
+
+			// Test that CompareDigest falls back to GET and succeeds
+			matches, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(matches).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return error when both HEAD and GET fail", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, r *http.Request) {
+					logrus.Debug("Handled manifest request")
+					if r.Method == http.MethodHead {
+						w.WriteHeader(http.StatusNotFound)
+					} else {
+						w.WriteHeader(http.StatusInternalServerError)
+						w.Write([]byte("server error"))
+					}
+				},
+			)
+
+			ctx := context.Background()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			registryAuth := digest.TransformAuth("token")
+
+			// Test that CompareDigest fails when both HEAD and GET fail
+			_, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to extract digest"))
+		})
 	})
 
 	ginkgo.When("using different registries", func() {

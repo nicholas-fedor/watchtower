@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00
+        uses: actions/setup-go@c0137caad775660c0844396c52da96e560aba63d
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -28,7 +28,7 @@ jobs:
         run: go mod download
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@3c28b2cb75e1933038fca129074454e12a0f45d8
+        uses: golangci/golangci-lint-action@f08454af877ea2a5246a58683951857b61853eab
         with:
           args: --timeout=5m
 
