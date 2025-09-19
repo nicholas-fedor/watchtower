@@ -684,7 +684,7 @@ var _ = ginkgo.Describe("Digests", func() {
 						w.WriteHeader(http.StatusNotFound)
 					} else {
 						w.Header().Set("Content-Type", "application/json")
-						w.Write([]byte(fmt.Sprintf(`{"digest": "%s"}`, mockDigestHash)))
+						fmt.Fprintf(w, `{"digest": "%s"}`, mockDigestHash)
 					}
 				},
 			)
