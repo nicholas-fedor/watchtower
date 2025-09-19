@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
@@ -16,6 +17,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// defaultPullFailureDelay defines the default delay duration for failed Watchtower self-update pulls.
+const defaultPullFailureDelay = 5 * time.Minute
 
 // Errors for update operations.
 var (
@@ -66,6 +70,8 @@ func Update(
 	staleCount := 0
 	// Initialize a map to collect image IDs for cleanup after updates.
 	cleanupImageIDs := make(map[types.ImageID]bool)
+	// Track if Watchtower self-update pull failed to add safeguard delay.
+	watchtowerPullFailed := false
 
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if params.LifecycleHooks {
@@ -154,6 +160,11 @@ func Update(
 			staleCheckFailed++
 
 			progress.AddSkipped(sourceContainer, err)
+
+			// Track if Watchtower self-update pull failed for safeguard.
+			if sourceContainer.IsWatchtower() {
+				watchtowerPullFailed = true
+			}
 		} else {
 			// Log successful staleness check and add to scanned containers.
 			clog.WithFields(logrus.Fields{
@@ -192,9 +203,10 @@ func Update(
 	UpdateImplicitRestart(containers)
 
 	// Separate containers into those to update (stale) and those to restart (linked).
-	var containersToUpdate []types.Container
-
-	var containersToRestart []types.Container
+	var (
+		containersToUpdate  []types.Container
+		containersToRestart []types.Container
+	)
 
 	for _, c := range containers {
 		if c.IsStale() && !c.IsMonitorOnly(params) {
@@ -214,11 +226,11 @@ func Update(
 		Debug("Prepared containers for restart")
 
 	// Perform updates and restarts, either with rolling restarts or in batches.
-	var failedStop map[types.ContainerID]error
-
-	var stoppedImages map[types.ImageID]bool
-
-	var failedStart map[types.ContainerID]error
+	var (
+		failedStop    map[types.ContainerID]error
+		stoppedImages map[types.ImageID]bool
+		failedStart   map[types.ContainerID]error
+	)
 
 	if params.RollingRestart {
 		// Apply rolling restarts for updates and linked containers sequentially.
@@ -247,6 +259,18 @@ func Update(
 	if params.LifecycleHooks {
 		logrus.Debug("Executing post-check lifecycle hooks")
 		lifecycle.ExecutePostChecks(client, params)
+	}
+
+	// Add safeguard delay if Watchtower self-update pull failed to prevent rapid restarts.
+	if watchtowerPullFailed {
+		delay := params.PullFailureDelay
+		if delay == 0 {
+			delay = defaultPullFailureDelay // Default delay
+		}
+
+		logrus.WithField("delay", delay).
+			Info("Watchtower self-update pull failed, sleeping to prevent rapid restarts")
+		time.Sleep(delay)
 	}
 
 	// Return the final report summarizing the session and the cleanup image IDs.
@@ -630,6 +654,16 @@ func restartStaleContainer(
 	renamed := false
 	// Rename Watchtower containers only if restarts are enabled.
 	if container.IsWatchtower() && !params.NoRestart {
+		// Check pull success before renaming
+		stale, _, err := client.IsContainerStale(container, params)
+		if err != nil || !stale {
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Skipping Watchtower self-update due to pull failure or non-stale image")
+
+			return false, nil // Skip self-update without error
+		}
+
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
@@ -652,6 +686,16 @@ func restartStaleContainer(
 		newContainerID, err := client.StartContainer(container)
 		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
+			// Clean up renamed Watchtower container on failure
+			if renamed && container.IsWatchtower() {
+				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
+
+				if cleanupErr := client.StopContainer(container, params.Timeout); cleanupErr != nil {
+					logrus.WithError(cleanupErr).
+						WithFields(fields).
+						Debug("Failed to remove failed Watchtower container")
+				}
+			}
 
 			return renamed, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 		}
