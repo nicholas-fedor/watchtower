@@ -107,6 +107,7 @@ func CheckForMultipleWatchtowerInstances(
 		logrus.WithField("scope", scope).Debug("Applied scope filter for Watchtower instances")
 	case scope == "": // Unscoped instance - only unscoped instances
 		filter = filters.UnscopedWatchtowerContainersFilter
+
 		logrus.Debug("Applied unscoped filter for Watchtower instances")
 	}
 
