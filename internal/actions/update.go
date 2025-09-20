@@ -21,6 +21,9 @@ import (
 // defaultPullFailureDelay defines the default delay duration for failed Watchtower self-update pulls.
 const defaultPullFailureDelay = 5 * time.Minute
 
+// defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
+const defaultHealthCheckTimeout = 5 * time.Minute
+
 // Errors for update operations.
 var (
 	// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
@@ -434,20 +437,28 @@ func performRollingRestart(
 		if err := stopStaleContainer(c, client, params); err != nil {
 			failed[c.ID()] = err
 		} else {
-			renamed, err := restartStaleContainer(c, client, params)
+			newContainerID, renamed, err := restartStaleContainer(c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
-			} else if c.IsStale() && !renamed {
-				// Only collect image IDs for stale containers that were not renamed, as renamed
-				// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
-				// in the new container.
-				cleanupImageIDs[c.ImageID()] = true
+			} else {
+				// Wait for the container to become healthy if it has a health check
+				if waitErr := client.WaitForContainerHealthy(newContainerID, defaultHealthCheckTimeout); waitErr != nil {
+					logrus.WithFields(fields).WithError(waitErr).Warn("Failed to wait for container to become healthy")
+					// Don't fail the update, just log the warning
+				}
 
-				logrus.WithFields(fields).Info("Updated container")
-			}
+				if c.IsStale() && !renamed {
+					// Only collect image IDs for stale containers that were not renamed, as renamed
+					// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
+					// in the new container.
+					cleanupImageIDs[c.ImageID()] = true
 
-			if renamed {
-				renamedContainers[c.ID()] = true
+					logrus.WithFields(fields).Info("Updated container")
+				}
+
+				if renamed {
+					renamedContainers[c.ID()] = true
+				}
 			}
 		}
 	}
@@ -606,7 +617,7 @@ func restartContainersInSortedOrder(
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
 		if stoppedImages[c.SafeImageID()] {
-			renamed, err := restartStaleContainer(c, client, params)
+			_, renamed, err := restartStaleContainer(c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -639,19 +650,21 @@ func restartContainersInSortedOrder(
 //   - params: Update options controlling restart and lifecycle hooks.
 //
 // Returns:
+//   - types.ContainerID: ID of the new container if started, original ID if renamed only, empty otherwise.
 //   - bool: True if the container was renamed, false otherwise.
 //   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
 	container types.Container,
 	client container.Client,
 	params types.UpdateParams,
-) (bool, error) {
+) (types.ContainerID, bool, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
 
 	renamed := false
+	newContainerID := container.ID() // Default to original ID
 	// Rename Watchtower containers only if restarts are enabled.
 	if container.IsWatchtower() && !params.NoRestart {
 		// Check pull success before renaming
@@ -661,7 +674,7 @@ func restartStaleContainer(
 				WithError(err).
 				Debug("Skipping Watchtower self-update due to pull failure or non-stale image")
 
-			return false, nil // Skip self-update without error
+			return container.ID(), false, nil // Skip self-update without error
 		}
 
 		newName := util.RandName()
@@ -671,7 +684,7 @@ func restartStaleContainer(
 				"new_name":  newName,
 			}).Debug("Failed to rename Watchtower container")
 
-			return false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
+			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
 		}
 
 		logrus.WithFields(fields).
@@ -683,7 +696,9 @@ func restartStaleContainer(
 
 	// Start the new container unless restarts are disabled.
 	if !params.NoRestart {
-		newContainerID, err := client.StartContainer(container)
+		var err error
+
+		newContainerID, err = client.StartContainer(container)
 		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
 			// Clean up renamed Watchtower container on failure
@@ -697,7 +712,7 @@ func restartStaleContainer(
 				}
 			}
 
-			return renamed, fmt.Errorf("%w: %w", errStartContainerFailed, err)
+			return "", renamed, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 		}
 
 		// Run post-update lifecycle hooks for restarting containers if enabled.
@@ -707,7 +722,7 @@ func restartStaleContainer(
 		}
 	}
 
-	return renamed, nil
+	return newContainerID, renamed, nil
 }
 
 // UpdateImplicitRestart marks containers linked to restarting ones.

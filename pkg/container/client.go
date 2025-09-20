@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -17,6 +18,14 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// Errors for container health operations.
+var (
+	// errHealthCheckTimeout indicates that waiting for a container to become healthy timed out.
+	errHealthCheckTimeout = errors.New("timeout waiting for container to become healthy")
+	// errHealthCheckFailed indicates that a container's health check failed.
+	errHealthCheckFailed = errors.New("container health check failed")
 )
 
 // Client defines the interface for interacting with the Docker API within Watchtower.
@@ -73,6 +82,12 @@ type Client interface {
 
 	// GetVersion returns the client's API version.
 	GetVersion() string
+
+	// WaitForContainerHealthy waits for a container to become healthy or times out.
+	//
+	// It polls the container's health status until it reports "healthy" or the timeout is reached.
+	// If the container has no health check configured, it returns immediately.
+	WaitForContainerHealthy(containerID types.ContainerID, timeout time.Duration) error
 }
 
 // client is the concrete implementation of the Client interface.
@@ -649,4 +664,66 @@ func (c client) RemoveImageByID(imageID types.ImageID) error {
 //   - string: Docker API version (e.g., "1.44").
 func (c client) GetVersion() string {
 	return strings.Trim(c.api.ClientVersion(), "\"")
+}
+
+// WaitForContainerHealthy waits for a container to become healthy or times out.
+//
+// Parameters:
+//   - containerID: ID of the container to wait for.
+//   - timeout: Maximum duration to wait for health.
+//
+// Returns:
+//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
+func (c client) WaitForContainerHealthy(
+	containerID types.ContainerID,
+	timeout time.Duration,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	clog := logrus.WithField("container_id", containerID)
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			clog.Warn("Timeout waiting for container to become healthy")
+
+			return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
+		case <-ticker.C:
+			// Inspect the container to check health status
+			inspect, err := c.api.ContainerInspect(ctx, string(containerID))
+			if err != nil {
+				clog.WithError(err).Debug("Failed to inspect container for health check")
+
+				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
+			}
+
+			// Check if health check is configured
+			if inspect.State.Health == nil {
+				clog.Debug("No health check configured for container, proceeding")
+
+				return nil
+			}
+
+			status := inspect.State.Health.Status
+			clog.WithField("health_status", status).Debug("Checked container health status")
+
+			if status == "healthy" {
+				clog.Debug("Container is now healthy")
+
+				return nil
+			}
+
+			if status == "unhealthy" {
+				clog.Warn("Container health check failed")
+
+				return fmt.Errorf("%w: %s", errHealthCheckFailed, containerID)
+			}
+
+			// Continue polling for "starting" or other statuses
+		}
+	}
 }

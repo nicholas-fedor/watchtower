@@ -1,6 +1,7 @@
 package container
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -306,6 +307,258 @@ var _ = ginkgo.Describe("the client", func() {
 					networkMode := container.ContainerInfo().HostConfig.NetworkMode
 					gomega.Expect(networkMode.ConnectedContainer()).
 						To(gomega.Equal(mocks.NetSupplierNotFoundID))
+				})
+			})
+
+			// Test suite for waiting for container health.
+			ginkgo.Describe("WaitForContainerHealthy", func() {
+				ginkgo.When("container has no health check", func() {
+					ginkgo.It("should return immediately without error", func() {
+						mockContainer := MockContainer()
+						cid := mockContainer.ContainerInfo().ID
+						// Mock inspect response with no health check
+						mockServer.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest(
+									"GET",
+									gomega.MatchRegexp(
+										fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, cid),
+									),
+								),
+								ghttp.RespondWithJSONEncoded(
+									http.StatusOK,
+									dockerContainerType.InspectResponse{
+										ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+											ID:    cid,
+											State: &dockerContainerType.State{Status: "running"},
+										},
+										Config: &dockerContainerType.Config{},
+									},
+								),
+							),
+						)
+						client := client{api: docker}
+						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
+						gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					})
+				})
+
+				ginkgo.When("container becomes healthy", func() {
+					ginkgo.It("should return without error", func() {
+						mockContainer := MockContainer()
+						cid := mockContainer.ContainerInfo().ID
+						callCount := 0
+						// Mock inspect responses: first starting, then healthy
+						mockServer.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest(
+									"GET",
+									gomega.MatchRegexp(
+										fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, cid),
+									),
+								),
+								func(w http.ResponseWriter, _ *http.Request) {
+									callCount++
+									var response dockerContainerType.InspectResponse
+									if callCount <= 2 { // First two calls return starting
+										response = dockerContainerType.InspectResponse{
+											ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+												ID: cid,
+												State: &dockerContainerType.State{
+													Status: "running",
+													Health: &dockerContainerType.Health{
+														Status: "starting",
+													},
+												},
+											},
+											Config: &dockerContainerType.Config{},
+										}
+									} else { // Third call returns healthy
+										response = dockerContainerType.InspectResponse{
+											ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+												ID: cid,
+												State: &dockerContainerType.State{
+													Status: "running",
+													Health: &dockerContainerType.Health{
+														Status: "healthy",
+													},
+												},
+											},
+											Config: &dockerContainerType.Config{},
+										}
+									}
+									w.Header().Set("Content-Type", "application/json")
+									w.WriteHeader(http.StatusOK)
+									json.NewEncoder(w).Encode(response)
+								},
+							),
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest(
+									"GET",
+									gomega.MatchRegexp(
+										fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, cid),
+									),
+								),
+								func(w http.ResponseWriter, _ *http.Request) {
+									callCount++
+									var response dockerContainerType.InspectResponse
+									if callCount <= 2 { // First two calls return starting
+										response = dockerContainerType.InspectResponse{
+											ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+												ID: cid,
+												State: &dockerContainerType.State{
+													Status: "running",
+													Health: &dockerContainerType.Health{
+														Status: "starting",
+													},
+												},
+											},
+											Config: &dockerContainerType.Config{},
+										}
+									} else { // Third call returns healthy
+										response = dockerContainerType.InspectResponse{
+											ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+												ID: cid,
+												State: &dockerContainerType.State{
+													Status: "running",
+													Health: &dockerContainerType.Health{
+														Status: "healthy",
+													},
+												},
+											},
+											Config: &dockerContainerType.Config{},
+										}
+									}
+									w.Header().Set("Content-Type", "application/json")
+									w.WriteHeader(http.StatusOK)
+									json.NewEncoder(w).Encode(response)
+								},
+							),
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest(
+									"GET",
+									gomega.MatchRegexp(
+										fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, cid),
+									),
+								),
+								func(w http.ResponseWriter, _ *http.Request) {
+									callCount++
+									var response dockerContainerType.InspectResponse
+									if callCount <= 2 { // First two calls return starting
+										response = dockerContainerType.InspectResponse{
+											ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+												ID: cid,
+												State: &dockerContainerType.State{
+													Status: "running",
+													Health: &dockerContainerType.Health{
+														Status: "starting",
+													},
+												},
+											},
+											Config: &dockerContainerType.Config{},
+										}
+									} else { // Third call returns healthy
+										response = dockerContainerType.InspectResponse{
+											ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+												ID: cid,
+												State: &dockerContainerType.State{
+													Status: "running",
+													Health: &dockerContainerType.Health{
+														Status: "healthy",
+													},
+												},
+											},
+											Config: &dockerContainerType.Config{},
+										}
+									}
+									w.Header().Set("Content-Type", "application/json")
+									w.WriteHeader(http.StatusOK)
+									json.NewEncoder(w).Encode(response)
+								},
+							),
+						)
+						client := client{api: docker}
+						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
+						gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					})
+				})
+
+				ginkgo.When("container becomes unhealthy", func() {
+					ginkgo.It("should return an error", func() {
+						mockContainer := MockContainer()
+						cid := mockContainer.ContainerInfo().ID
+						// Mock inspect response with unhealthy status
+						mockServer.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest(
+									"GET",
+									gomega.MatchRegexp(
+										fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, cid),
+									),
+								),
+								ghttp.RespondWithJSONEncoded(
+									http.StatusOK,
+									dockerContainerType.InspectResponse{
+										ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+											ID: cid,
+											State: &dockerContainerType.State{
+												Status: "running",
+												Health: &dockerContainerType.Health{
+													Status: "unhealthy",
+												},
+											},
+										},
+										Config: &dockerContainerType.Config{},
+									},
+								),
+							),
+						)
+						client := client{api: docker}
+						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
+						gomega.Expect(err).To(gomega.HaveOccurred())
+						gomega.Expect(err.Error()).
+							To(gomega.ContainSubstring("health check failed"))
+					})
+				})
+
+				ginkgo.When("timeout is reached", func() {
+					ginkgo.It("should return a timeout error", func() {
+						mockContainer := MockContainer()
+						cid := mockContainer.ContainerInfo().ID
+						// Mock inspect response with starting status
+						mockServer.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest(
+									"GET",
+									gomega.MatchRegexp(
+										fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, cid),
+									),
+								),
+								ghttp.RespondWithJSONEncoded(
+									http.StatusOK,
+									dockerContainerType.InspectResponse{
+										ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+											ID: cid,
+											State: &dockerContainerType.State{
+												Status: "running",
+												Health: &dockerContainerType.Health{
+													Status: "starting",
+												},
+											},
+										},
+										Config: &dockerContainerType.Config{},
+									},
+								),
+							),
+						)
+						client := client{api: docker}
+						err := client.WaitForContainerHealthy(
+							types.ContainerID(cid),
+							100*time.Millisecond,
+						)
+						gomega.Expect(err).To(gomega.HaveOccurred())
+						gomega.Expect(err.Error()).To(gomega.ContainSubstring("timeout"))
+					})
 				})
 			})
 		})
