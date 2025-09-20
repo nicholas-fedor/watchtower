@@ -103,34 +103,33 @@ var _ = ginkgo.Describe("Update Handler", func() {
 			},
 		)
 
-		ginkgo.It("should return 429 Too Many Requests on lock contention", func() {
-			// Simulate lock contention by running a long update in a goroutine.
-			var wg sync.WaitGroup
-			wg.Add(1)
+		ginkgo.It("should queue concurrent requests and process them sequentially", func() {
+			// Use a custom lock to control concurrency.
 			customLock := make(chan bool, 1)
 			customLock <- true
-			handler = update.New(func(_ []string) { // Use _ for unused images parameter.
-				defer wg.Done()
-				time.Sleep(200 * time.Millisecond) // Hold lock during test.
+			called := 0
+			handler = update.New(func(_ []string) {
+				called++
+				time.Sleep(50 * time.Millisecond) // Short delay to simulate work.
 			}, customLock)
 
-			// Start a long-running update to hold the lock.
+			// Start first request in goroutine.
 			go func() {
 				req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
 				rec := httptest.NewRecorder()
 				handler.Handle(rec, req)
+				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusAccepted))
 			}()
 
-			// Wait briefly to ensure the lock is held.
-			time.Sleep(50 * time.Millisecond)
-
-			// Test concurrent request.
+			// Wait briefly, then start second request.
+			time.Sleep(10 * time.Millisecond)
 			handler.Handle(rec, req)
-			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusTooManyRequests))
+			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusAccepted))
 			gomega.Expect(rec.Body.String()).
-				To(gomega.ContainSubstring("Another update is in progress"))
+				To(gomega.ContainSubstring("Update enqueued and started"))
 
-			wg.Wait() // Ensure cleanup.
+			// Both should have been called sequentially.
+			gomega.Expect(called).To(gomega.Equal(2))
 		})
 
 		ginkgo.It("should handle concurrent requests correctly", func() {
@@ -138,7 +137,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 			calledCount := 0
 			mockUpdateFn = func(_ []string) { // Use _ for unused images parameter.
 				calledCount++
-				time.Sleep(100 * time.Millisecond) // Simulate work.
+				time.Sleep(10 * time.Millisecond) // Short delay to simulate work.
 			}
 			handler = update.New(mockUpdateFn, nil)
 
@@ -154,13 +153,14 @@ var _ = ginkgo.Describe("Update Handler", func() {
 						bytes.NewBufferString("test body"),
 					)
 					handler.Handle(localRec, localReq)
-					// Expect either 202 (processed) or 429 (contended).
-					gomega.Expect([]int{http.StatusAccepted, http.StatusTooManyRequests}).
-						To(gomega.ContainElement(localRec.Code))
+					// All should succeed with 202.
+					gomega.Expect(localRec.Code).To(gomega.Equal(http.StatusAccepted))
 				}()
 			}
 			wg.Wait()
-			gomega.Expect(calledCount).To(gomega.Equal(1)) // Only one update executes due to lock.
+			gomega.Expect(calledCount).
+				To(gomega.Equal(3))
+			// All updates execute sequentially due to lock.
 		})
 
 		ginkgo.It("should return 500 Internal Server Error on body read failure", func() {

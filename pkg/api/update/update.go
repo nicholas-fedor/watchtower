@@ -90,28 +90,18 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		logrus.Debug("No image query parameters provided")
 	}
 
-	// Attempt to acquire lock non-blocking to check for concurrent updates.
-	select {
-	case chanValue := <-handle.lock:
-		// Lock acquired, proceed with update.
-		defer func() { handle.lock <- chanValue }()
+	// Acquire lock, blocking if another update is in progress (requests will queue).
+	chanValue := <-handle.lock
 
-		if len(images) > 0 {
-			logrus.WithField("images", images).Info("Executing targeted update")
-		} else {
-			logrus.Info("Executing full update")
-		}
+	defer func() { handle.lock <- chanValue }()
 
-		handle.fn(images)
-		w.WriteHeader(http.StatusAccepted)
-		fmt.Fprintln(w, "Update enqueued and started")
-	default:
-		// Lock is held by another update, reject with 429.
-		logrus.Debug("Update request rejected due to concurrent operation")
-		http.Error(
-			w,
-			"Another update is in progress, please retry later",
-			http.StatusTooManyRequests,
-		)
+	if len(images) > 0 {
+		logrus.WithField("images", images).Info("Executing targeted update")
+	} else {
+		logrus.Info("Executing full update")
 	}
+
+	handle.fn(images)
+	w.WriteHeader(http.StatusAccepted)
+	fmt.Fprintln(w, "Update enqueued and started")
 }
