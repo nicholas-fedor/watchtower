@@ -726,7 +726,7 @@ func TestContainer_StopSignal(t *testing.T) {
 					},
 				},
 			},
-			want: "",
+			want: "SIGTERM",
 		},
 	}
 	for _, tt := range tests {

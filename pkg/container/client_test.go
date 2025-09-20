@@ -11,6 +11,7 @@ import (
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 
+	dockerTypes "github.com/docker/docker/api/types"
 	dockerBackendType "github.com/docker/docker/api/types/backend"
 	dockerContainerType "github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
@@ -325,13 +326,55 @@ var _ = ginkgo.Describe("the client", func() {
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "ex-exec-id"
 				cmd := "exec-cmd"
-				// Set up mock server handlers for exec creation, start, and inspection.
+				// Set up mock server handlers for GetContainer and exec operations.
 				mockServer.AppendHandlers(
-					// API.ContainerExecCreate
+					// Handler for ContainerInspect (GetContainer)
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp(
+								fmt.Sprintf(`^/v[0-9.]+/containers/%v/json$`, containerID),
+							),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerContainerType.InspectResponse{
+								ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+									ID:    string(containerID),
+									Name:  "/test-container",
+									Image: "test-image:latest",
+									State: &dockerContainerType.State{
+										Status: "running",
+									},
+									HostConfig: &dockerContainerType.HostConfig{},
+								},
+								Config: &dockerContainerType.Config{
+									Image:  "test-image:latest",
+									Labels: map[string]string{},
+								},
+							},
+						),
+					),
+					// Handler for ImageInspect
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp(`^/v[0-9.]+/images/test-image:latest/json$`),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerTypes.ImageInspect{
+								ID: "test-image-id",
+							},
+						),
+					),
+					// Handler for ContainerExecCreate
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest(
 							"POST",
-							gomega.HaveSuffix(fmt.Sprintf("containers/%v/exec", containerID)),
+							gomega.MatchRegexp(
+								fmt.Sprintf(`^/v[0-9.]+/containers/%v/exec$`, containerID),
+							),
 						),
 						ghttp.VerifyJSONRepresenting(dockerContainerType.ExecOptions{
 							User:   user,
@@ -342,17 +385,20 @@ var _ = ginkgo.Describe("the client", func() {
 								"-c",
 								cmd,
 							},
+							Env: []string{
+								`WT_CONTAINER={"name":"test-container","id":"ex-cont-id","image_name":"test-image:latest","stop_signal":"SIGTERM","labels":{}}`,
+							},
 						}),
 						ghttp.RespondWithJSONEncoded(
 							http.StatusOK,
 							dockerContainerType.CommitResponse{ID: execID},
 						),
 					),
-					// API.ContainerExecStart
+					// Handler for ContainerExecStart
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest(
 							"POST",
-							gomega.HaveSuffix(fmt.Sprintf("exec/%v/start", execID)),
+							gomega.MatchRegexp(fmt.Sprintf(`^/v[0-9.]+/exec/%v/start$`, execID)),
 						),
 						ghttp.VerifyJSONRepresenting(dockerContainerType.ExecStartOptions{
 							Detach: false,
@@ -360,11 +406,11 @@ var _ = ginkgo.Describe("the client", func() {
 						}),
 						ghttp.RespondWith(http.StatusOK, nil),
 					),
-					// API.ContainerExecInspect
+					// Handler for ContainerExecInspect
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest(
 							"GET",
-							gomega.HaveSuffix("exec/ex-exec-id/json"),
+							gomega.MatchRegexp(`^/v[0-9.]+/exec/ex-exec-id/json$`),
 						),
 						ghttp.RespondWithJSONEncoded(
 							http.StatusOK,
@@ -382,7 +428,7 @@ var _ = ginkgo.Describe("the client", func() {
 						),
 					),
 				)
-				// Execute command and verify log output includes container ID.
+				// Execute command and verify log output includes container id.
 				_, err := client.ExecuteCommand(containerID, cmd, 1)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Eventually(logbuf).Should(gbytes.Say(`container_id=ex-cont-id`))
