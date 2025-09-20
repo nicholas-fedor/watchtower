@@ -756,6 +756,11 @@ signal://[user:password@]host:port/source_phone/recipient1/recipient2
 - `source_phone`: Your Signal phone number with country code (e.g., +1234567890)
 - `recipient1, recipient2`: Phone numbers or group IDs to send to
 
+#### TLS Configuration
+
+- Use `signal://` for HTTPS (default, recommended)
+- Use `signal://...?disabletls=yes` for HTTP (insecure, for local testing only)
+
 #### Examples
 
 Send to a single phone number:
@@ -791,7 +796,7 @@ signal://localhost:8080/+1234567890/+0987654321?token=YOUR_API_TOKEN
 Using HTTP instead of HTTPS:
 
 ```
-signals://localhost:8080/+1234567890/+0987654321
+signal://localhost:8080/+1234567890/+0987654321?disabletls=yes
 ```
 
 ### Signal Attachments
