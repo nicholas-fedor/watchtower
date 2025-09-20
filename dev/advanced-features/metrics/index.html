@@ -1230,7 +1230,11 @@ a ticket in the repository issues.</p>
 <p>Metrics can be used to track how Watchtower behaves over time.</p>
 <p>To use this feature, you have to set an <a href="../../configuration/arguments/#http_api_token">API token</a> and <a href="../../configuration/arguments/#http_api_metrics">enable the metrics API</a>,
 as well as creating a port mapping for your container for port <code>8080</code>.</p>
-<p>The metrics API endpoint is <code>/v1/metrics</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You can enable both the metrics API and the update API simultaneously by using both <code>--http-api-metrics</code> and <code>--http-api-update</code> flags.</p>
+</div>
+<p>The metrics API endpoint is <code>/v1/metrics</code> and provides Prometheus-compatible metrics. This is separate from the <a href="../http-api/#http_api_update"><code>/v1/update</code></a> endpoint which triggers updates and returns JSON results.</p>
 <h2 id="available_metrics">Available Metrics<a class="headerlink" href="#available_metrics" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1305,7 +1309,7 @@ is preconfigured with a dashboard, which will look something like this:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 20, 2025 11:51:25 UTC"><span class="timeago" datetime="2025-09-20T11:51:25+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 20, 2025 11:51:25 UTC">2025-09-20</span>
   </span>
 
     

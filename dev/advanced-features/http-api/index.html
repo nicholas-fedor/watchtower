@@ -998,6 +998,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#response_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Response Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       Requirements
@@ -1310,6 +1319,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#response_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Response Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       Requirements
@@ -1453,18 +1471,50 @@
 <td style="text-align: center;"><a href="#http_api_update">Update</a></td>
 <td style="text-align: center;"><code>/v1/update</code></td>
 <td style="text-align: center;"><a href="#image_parameter_usage"><code>image</code></a></td>
-<td style="text-align: center;">Triggers an update of containers monitored by the Watchtower instance</td>
+<td style="text-align: center;">Triggers container updates and returns JSON results of the operation</td>
 </tr>
 <tr>
 <td style="text-align: center;"><a href="../metrics/">Metrics</a></td>
 <td style="text-align: center;"><code>/v1/metrics</code></td>
 <td style="text-align: center;"></td>
-<td style="text-align: center;">Provides container scan and update information that's typically only seen via logging</td>
+<td style="text-align: center;">Exposes Prometheus-compatible metrics for monitoring and alerting</td>
 </tr>
 </tbody>
 </table>
 <h3 id="http_api_update">HTTP API Update<a class="headerlink" href="#http_api_update" title="Permanent link">&para;</a></h3>
 <p>To enable this mode, use the <code>--http-api-update</code> CLI argument or the <code>WATCHTOWER_HTTP_API_UPDATE</code> environment variable.</p>
+<h4 id="response_format">Response Format<a class="headerlink" href="#response_format" title="Permanent link">&para;</a></h4>
+<p>The <code>/v1/update</code> endpoint returns a JSON response containing the results of the update operation:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">&quot;scanned&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;updated&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">&quot;failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">&quot;timing&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">&quot;duration_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1250</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">&quot;duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.25s&quot;</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-01-20T11:30:45Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="nt">&quot;api_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v1&quot;</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Summary Section:</strong></p>
+<ul>
+<li><code>scanned</code>: Number of containers that were scanned for updates</li>
+<li><code>updated</code>: Number of containers that were successfully updated</li>
+<li><code>failed</code>: Number of containers where the update failed</li>
+</ul>
+<p><strong>Timing Section:</strong></p>
+<ul>
+<li><code>duration_ms</code>: Execution time in milliseconds</li>
+<li><code>duration</code>: Human-readable execution time</li>
+</ul>
+<p><strong>Metadata:</strong></p>
+<ul>
+<li><code>timestamp</code>: UTC timestamp when the response was generated (RFC3339 format)</li>
+<li><code>api_version</code>: API version identifier</li>
+</ul>
 <h4 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h4>
 <h5 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h5>
 <p>Watchtower uses token-based, header authentication for the HTTP API.</p>
@@ -1478,41 +1528,45 @@ If port 8080 is used by another service, then it can be changed by using the <a 
 <p>Watchtower supports using the <code>image</code> URL query parameter to filter updates for only certain images.</p>
 <h5 id="no_image_filtering">No Image Filtering<a class="headerlink" href="#no_image_filtering" title="Permanent link">&para;</a></h5>
 <p>The following <code>curl</code> command would trigger an update of all container images monitored by Watchtower:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
 </code></pre></div>
 <h5 id="image_filtering_with_tags">Image Filtering with Tags<a class="headerlink" href="#image_filtering_with_tags" title="Permanent link">&para;</a></h5>
 <p>You can specify image tags to target containers running a specific version (e.g., <code>foo/bar:1.0</code>).</p>
 <p>For example, to update only containers using <code>foo/bar:1.0</code> and <code>foo/baz:latest</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar:1.0,foo/baz:latest
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar:1.0,foo/baz:latest
 </code></pre></div>
 <h5 id="image_filtering_without_tags">Image Filtering without Tags<a class="headerlink" href="#image_filtering_without_tags" title="Permanent link">&para;</a></h5>
 <p>If no tag is provided, Watchtower matches containers regardless of their tag.</p>
 <p>The following <code>curl</code> command would trigger an update for the images <code>foo/bar</code> and <code>foo/baz</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar,foo/baz
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar,foo/baz
 </code></pre></div>
 <h4 id="scheduled_updates">Scheduled Updates<a class="headerlink" href="#scheduled_updates" title="Permanent link">&para;</a></h4>
 <p>By default, enabling this mode prevents periodic polls (i.e. <a href="../../configuration/arguments/#schedule">scheduled</a> or <a href="../../configuration/arguments/#poll_interval">interval</a> polling).
 Use the <a href="../../configuration/arguments/#http_api_periodic_polls">HTTP API Periodic Polls</a> configuration option to allow both API-triggered and scheduled updates.</p>
 <h4 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h4>
-<div class="highlight"><span class="filename">Example Docker Compose Configuration</span><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">app-monitored-by-watchtower</span><span class="p">:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--http-api-update</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=mytoken</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080:8080</span>
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<div class="highlight"><span class="filename">Example Docker Compose Configuration</span><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">app-monitored-by-watchtower</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--http-api-update --http-api-metrics</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=mytoken</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080:8080</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Both <code>--http-api-update</code> and <code>--http-api-metrics</code> can be enabled simultaneously to provide both update triggering and monitoring capabilities.</p>
+</div>
 
 
 
@@ -1535,7 +1589,7 @@ Use the <a href="../../configuration/arguments/#http_api_periodic_polls">HTTP AP
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 20, 2025 11:51:25 UTC"><span class="timeago" datetime="2025-09-20T11:51:25+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 20, 2025 11:51:25 UTC">2025-09-20</span>
   </span>
 
     
