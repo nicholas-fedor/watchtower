@@ -11,9 +11,9 @@ import (
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 
-	dockerTypes "github.com/docker/docker/api/types"
 	dockerBackendType "github.com/docker/docker/api/types/backend"
 	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerImageType "github.com/docker/docker/api/types/image"
 	dockerClient "github.com/docker/docker/client"
 	gomegaTypes "github.com/onsi/gomega/types"
 
@@ -363,7 +363,7 @@ var _ = ginkgo.Describe("the client", func() {
 						),
 						ghttp.RespondWithJSONEncoded(
 							http.StatusOK,
-							dockerTypes.ImageInspect{
+							dockerImageType.InspectResponse{
 								ID: "test-image-id",
 							},
 						),
