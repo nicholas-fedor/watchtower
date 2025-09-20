@@ -165,6 +165,12 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Run once now and exit")
 
 	flags.BoolP(
+		"update-on-start",
+		"",
+		envBool("WATCHTOWER_UPDATE_ON_START"),
+		"Perform an update check on startup, then continue with periodic updates")
+
+	flags.BoolP(
 		"include-restarting",
 		"",
 		envBool("WATCHTOWER_INCLUDE_RESTARTING"),

@@ -372,7 +372,7 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 			}
 		}
 
-		if !strings.Contains(allDocs, "-"+flag.Shorthand) {
+		if flag.Shorthand != "" && !strings.Contains(allDocs, "-"+flag.Shorthand) {
 			t.Logf("Docs does not mention flag shorthand %q (%q)", flag.Shorthand, flag.Name)
 			t.Fail()
 		}
@@ -647,4 +647,55 @@ func TestDisableMemorySwappinessFlag(t *testing.T) {
 	disableMemorySwappiness, err := cmd.PersistentFlags().GetBool("disable-memory-swappiness")
 	require.NoError(t, err)
 	assert.True(t, disableMemorySwappiness, "disable-memory-swappiness flag should be true")
+}
+
+// TestUpdateOnStartFlag verifies that the --update-on-start flag is parsed correctly.
+func TestUpdateOnStartFlag(t *testing.T) {
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterSystemFlags(cmd)
+
+	err := cmd.ParseFlags([]string{"--update-on-start"})
+	require.NoError(t, err)
+
+	updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
+	require.NoError(t, err)
+	assert.True(t, updateOnStart, "--update-on-start flag should be true when set")
+}
+
+// TestUpdateOnStartEnvironmentVariable verifies that the WATCHTOWER_UPDATE_ON_START environment variable is parsed correctly.
+func TestUpdateOnStartEnvironmentVariable(t *testing.T) {
+	t.Setenv("WATCHTOWER_UPDATE_ON_START", "true")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterSystemFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
+	require.NoError(t, err)
+	assert.True(
+		t,
+		updateOnStart,
+		"WATCHTOWER_UPDATE_ON_START environment variable should set flag to true",
+	)
+}
+
+// TestUpdateOnStartDefault verifies that the --update-on-start flag defaults to false.
+func TestUpdateOnStartDefault(t *testing.T) {
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterSystemFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
+	require.NoError(t, err)
+	assert.False(t, updateOnStart, "--update-on-start flag should default to false")
 }
