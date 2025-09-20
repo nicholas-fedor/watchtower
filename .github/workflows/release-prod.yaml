@@ -21,9 +21,32 @@ jobs:
     permissions:
       contents: read # For code checkout
 
+  # Generate changelog for release
+  changelog:
+    # Runs after test
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # For repository checkout and git-cliff to access commit history
+    steps:
+      - name: Checkout
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose --latest --strip header
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Build binaries, images, SBOMs, and attestations
   build:
-    needs: test # Requires tests to pass
+    needs: [test, changelog] # Requires tests to pass and changelog to be generated
     uses: ./.github/workflows/build.yaml
     permissions:
       contents: write # For code checkout and publishing releases
@@ -55,7 +78,7 @@ jobs:
   # Update pkg.go.dev
   update-go-docs:
     # Runs after all jobs
-    needs: [test, build, manifest]
+    needs: [test, build, manifest, changelog]
     # Skips in dry-run
     if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:

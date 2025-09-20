@@ -5,6 +5,10 @@
   "packageRules": [
     {
       "matchManagers": ["gomod"],
+      "semanticCommitType": "chore"
+    },
+    {
+      "matchManagers": ["gomod"],
       "matchDepNames": ["go"],
       "matchDepTypes": ["golang"],
       "rangeStrategy": "bump",
