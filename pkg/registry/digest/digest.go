@@ -279,12 +279,20 @@ func fetchDigest(
 	}
 	defer resp.Body.Close()
 
-	// Handle 404 response for HEAD requests, assuming no update is needed.
+	// Handle 404 response for HEAD requests by returning empty digest to trigger GET fallback.
 	if method == http.MethodHead && resp.StatusCode == http.StatusNotFound {
 		logrus.WithFields(fields).WithField("status", resp.Status).
-			Debug("Registry returned 404 for HEAD request, assuming no update needed")
+			Debug("Registry returned 404 for HEAD request, falling back to GET")
 
-		return "", nil // Treat as no update available
+		return "", nil // Return empty to trigger GET fallback in CompareDigest
+	}
+
+	// Check for successful status code.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		logrus.WithFields(fields).WithField("status", resp.Status).
+			Debug("Registry returned non-success status")
+
+		return "", fmt.Errorf("%w: status %s", errInvalidRegistryResponse, resp.Status)
 	}
 
 	// Extract the digest based on the request method (HEAD from headers, GET from body).
@@ -349,7 +357,7 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 
 // extractGetDigest extracts the image digest from a GET response’s body.
 // It decodes the JSON manifest response to retrieve the digest field, normalizing it for consistency,
-// and handles decoding errors gracefully.
+// and handles decoding errors gracefully by falling back to header extraction.
 //
 // Parameters:
 //   - resp: The HTTP response from a GET request containing the manifest body.
@@ -361,7 +369,18 @@ func extractGetDigest(resp *http.Response) (string, error) {
 	var response manifestResponse
 	// Decode the JSON response body into the manifest structure.
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		logrus.WithError(err).Debug("Failed to extract digest from GET response")
+		logrus.WithError(err).
+			Warn("Failed to decode JSON from GET response, attempting header fallback")
+
+		// Fallback: Try to extract digest from Docker-Content-Digest header
+		if digest := resp.Header.Get(ContentDigestHeader); digest != "" {
+			normalizedDigest := helpers.NormalizeDigest(digest)
+			logrus.WithFields(logrus.Fields{
+				"digest": normalizedDigest,
+			}).Debug("Extracted digest from GET response header")
+
+			return normalizedDigest, nil
+		}
 
 		return "", fmt.Errorf("%w: %w", errDigestExtractionFailed, err)
 	}
