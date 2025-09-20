@@ -169,6 +169,20 @@ Environment Variable: WATCHTOWER_RUN_ONCE
     Enables debug output during execution, suitable for interactive use.
     Use with `--rm` to remove the Watchtower container after completion.
 
+### Update on Start
+
+Performs an update check on startup, then continues with periodic updates.
+
+```text
+            Argument: --update-on-start
+Environment Variable: WATCHTOWER_UPDATE_ON_START
+                Type: Boolean
+             Default: false
+```
+
+!!! Note
+    If used with `--run-once`, a warning is logged and `--run-once` takes precedence.
+
 ## Scheduling & Polling
 
 ### Schedule

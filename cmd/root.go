@@ -141,6 +141,8 @@ type RunConfig struct {
 	FilterDesc string
 	// RunOnce indicates whether to perform a single update and exit, set via the --run-once flag.
 	RunOnce bool
+	// UpdateOnStart enables an immediate update check on startup, then continues with periodic updates, set via the --update-on-start flag.
+	UpdateOnStart bool
 	// EnableUpdateAPI enables the HTTP update API endpoint, set via the --http-api-update flag.
 	EnableUpdateAPI bool
 	// EnableMetricsAPI enables the HTTP metrics API endpoint, set via the --http-api-metrics flag.
@@ -294,6 +296,7 @@ func run(c *cobra.Command, names []string) {
 
 	// Get flags controlling execution mode and HTTP API behavior.
 	runOnce, _ := c.PersistentFlags().GetBool("run-once")
+	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
 	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
 	enableMetricsAPI, _ := c.PersistentFlags().GetBool("http-api-metrics")
 	unblockHTTPAPI, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
@@ -331,6 +334,7 @@ func run(c *cobra.Command, names []string) {
 		Filter:           filter,
 		FilterDesc:       filterDesc,
 		RunOnce:          runOnce,
+		UpdateOnStart:    updateOnStart,
 		EnableUpdateAPI:  enableUpdateAPI,
 		EnableMetricsAPI: enableMetricsAPI,
 		UnblockHTTPAPI:   unblockHTTPAPI,
@@ -377,6 +381,13 @@ func runMain(cfg RunConfig) int {
 		return 1 // Exit immediately after logging
 	}
 
+	// Handle conflicts between --run-once and --update-on-start.
+	if cfg.RunOnce && cfg.UpdateOnStart {
+		logrus.Warn(
+			"--update-on-start is ignored when --run-once is specified; deferring to --run-once behavior",
+		)
+	}
+
 	// Handle one-time update mode, executing updates and registering metrics.
 	if cfg.RunOnce {
 		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
@@ -385,6 +396,13 @@ func runMain(cfg RunConfig) int {
 		notifier.Close()
 
 		return 0
+	}
+
+	// Handle immediate update on startup, then continue with periodic updates.
+	if cfg.UpdateOnStart {
+		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
+		metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
+		metrics.Default().RegisterScan(metric)
 	}
 
 	// Initialize a lock channel to prevent concurrent updates.
