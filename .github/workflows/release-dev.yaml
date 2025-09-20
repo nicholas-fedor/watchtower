@@ -46,10 +46,47 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }} # Docker Hub username
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }} # Docker Hub token
 
-  # Create multi-platform manifests
-  manifest:
+  # Generate and commit changelog
+  changelog:
     # Runs after build
     needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # For committing changelog
+    steps:
+      - name: Checkout
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit changelog
+        if: ${{ !fromJson(inputs.dry-run || 'false') }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update changelog"
+            git push
+          fi
+
+  # Create multi-platform manifests
+  manifest:
+    # Runs after build and changelog
+    needs: [build, changelog]
     # Skips in dry-run
     if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:

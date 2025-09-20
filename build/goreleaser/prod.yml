@@ -437,6 +437,14 @@ dockers:
       - "--label=org.opencontainers.image.source={{ .GitURL }}"
 
 ######################################################################################################
+# Changelog Configuration
+# https://goreleaser.com/customization/changelog
+######################################################################################################
+changelog:
+  # Disable GoReleaser's changelog generation since we use git-cliff
+  disable: true
+
+######################################################################################################
 # config the checksum filename
 # https://goreleaser.com/customization/checksum
 ######################################################################################################
