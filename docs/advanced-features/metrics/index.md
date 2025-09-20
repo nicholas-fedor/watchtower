@@ -9,7 +9,10 @@ Metrics can be used to track how Watchtower behaves over time.
 To use this feature, you have to set an [API token](../../configuration/arguments/index.md#http_api_token) and [enable the metrics API](../../configuration/arguments/index.md#http_api_metrics),
 as well as creating a port mapping for your container for port `8080`.
 
-The metrics API endpoint is `/v1/metrics`.
+!!! Note
+    You can enable both the metrics API and the update API simultaneously by using both `--http-api-metrics` and `--http-api-update` flags.
+
+The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible metrics. This is separate from the [`/v1/update`](../http-api/index.md#http_api_update) endpoint which triggers updates and returns JSON results.
 
 ## Available Metrics
 
