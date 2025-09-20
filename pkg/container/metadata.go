@@ -248,24 +248,37 @@ func (c Container) IsWatchtower() bool {
 	return isWatchtower
 }
 
-// StopSignal returns the custom stop signal from labels.
+// StopSignal returns the custom stop signal from labels or HostConfig.
 //
 // Returns:
-//   - string: Signal value or empty if unset.
+//   - string: Signal value, defaulting to "SIGTERM" if unset.
 func (c Container) StopSignal() string {
 	clog := logrus.WithField("container", c.Name())
-	signal := c.getLabelValueOrEmpty(signalLabel)
 
-	if signal == "" {
-		clog.WithField("label", signalLabel).Debug("Stop signal not set")
-	} else {
+	// Check label first
+	signal := c.getLabelValueOrEmpty(signalLabel)
+	if signal != "" {
 		clog.WithFields(logrus.Fields{
 			"label":  signalLabel,
 			"signal": signal,
-		}).Debug("Retrieved stop signal")
+		}).Debug("Retrieved stop signal from label")
+
+		return signal
 	}
 
-	return signal
+	// Check Config
+	if c.containerInfo != nil && c.containerInfo.Config != nil &&
+		c.containerInfo.Config.StopSignal != "" {
+		signal = c.containerInfo.Config.StopSignal
+		clog.WithField("signal", signal).Debug("Retrieved stop signal from Config")
+
+		return signal
+	}
+
+	// Default to SIGTERM
+	clog.Debug("Stop signal not set, using default SIGTERM")
+
+	return "SIGTERM"
 }
 
 // ContainsWatchtowerLabel checks if the container is Watchtower.

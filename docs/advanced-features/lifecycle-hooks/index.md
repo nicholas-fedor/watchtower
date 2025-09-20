@@ -52,6 +52,35 @@ the `docker run` command line:
     someimage --label=com.centurylinklabs.watchtower.lifecycle.post-check="/send-heartbeat.sh" \
     ```
 
+### Environment Variables
+
+Lifecycle hook commands have access to container metadata through the `WT_CONTAINER` environment variable. This variable contains a JSON object with information about the container being updated:
+
+```json
+{
+  "name": "my-container",
+  "id": "abc123def456",
+  "image_name": "nginx:latest",
+  "stop_signal": "SIGTERM",
+  "labels": {
+    "com.centurylinklabs.watchtower.lifecycle.pre-update": "/custom-stop.sh"
+  }
+}
+```
+
+This allows scripts to access container-specific information for custom logic, such as implementing vendor-specific stop procedures.
+
+#### Example: Custom stop command for Synology DSM
+
+```bash
+#!/bin/sh
+# Parse container name from WT_CONTAINER
+CONTAINER_NAME=$(echo $WT_CONTAINER | jq -r '.name')
+
+# Use Synology API to stop container properly
+synowebapi --exec api=SYNO.Docker.Container method="stop" name="$CONTAINER_NAME"
+```
+
 ### Timeouts
 
 The timeout for all lifecycle commands is 60 seconds. After that, a timeout will

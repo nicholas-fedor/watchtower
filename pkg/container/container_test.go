@@ -238,9 +238,9 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(container.StopSignal()).To(gomega.Equal("SIGKILL"))
 			})
 
-			ginkgo.It("returns empty string when signal is not set", func() {
+			ginkgo.It("returns SIGTERM when signal is not set", func() {
 				container = MockContainer(WithLabels(map[string]string{}))
-				gomega.Expect(container.StopSignal()).To(gomega.Equal(""))
+				gomega.Expect(container.StopSignal()).To(gomega.Equal("SIGTERM"))
 			})
 		})
 

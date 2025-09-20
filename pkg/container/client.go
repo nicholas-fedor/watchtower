@@ -3,6 +3,7 @@ package container
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -380,12 +381,29 @@ func (c client) ExecuteCommand(
 	ctx := context.Background()
 	clog := logrus.WithField("container_id", containerID)
 
-	// Set up exec configuration with command.
+	// Retrieve container to get its metadata.
+	container, err := c.GetContainer(containerID)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to retrieve container for metadata")
+
+		return false, fmt.Errorf("failed to get container: %w", err)
+	}
+
+	// Generate JSON metadata for the container.
+	metadataJSON, err := generateContainerMetadata(container)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to generate container metadata")
+
+		return false, err
+	}
+
+	// Set up exec configuration with command and metadata.
 	clog.WithField("command", command).Debug("Creating exec instance")
 	execConfig := dockerContainer.ExecOptions{
 		Tty:    true,
 		Detach: false,
 		Cmd:    []string{"sh", "-c", command},
+		Env:    []string{"WT_CONTAINER=" + metadataJSON},
 	}
 
 	// Create the exec instance.
@@ -427,6 +445,49 @@ func (c client) ExecuteCommand(
 	}).Debug("Executed command")
 
 	return skipUpdate, nil
+}
+
+// generateContainerMetadata creates a JSON-formatted string of container metadata.
+//
+// Parameters:
+//   - container: Container object to extract metadata from.
+//
+// Returns:
+//   - string: JSON string containing metadata (e.g., name, ID, image name, stop signal, labels).
+//   - error: Non-nil if JSON marshaling fails, nil otherwise.
+func generateContainerMetadata(container types.Container) (string, error) {
+	// Filter Watchtower-specific labels to reduce JSON size
+	labels := make(map[string]string)
+
+	if containerInfo := container.ContainerInfo(); containerInfo != nil &&
+		containerInfo.Config != nil {
+		for key, value := range containerInfo.Config.Labels {
+			if strings.HasPrefix(key, "com.centurylinklabs.watchtower.") {
+				labels[key] = value
+			}
+		}
+	}
+
+	metadata := struct {
+		Name       string            `json:"name"`
+		ID         string            `json:"id"`
+		ImageName  string            `json:"image_name"`
+		StopSignal string            `json:"stop_signal"`
+		Labels     map[string]string `json:"labels"`
+	}{
+		Name:       container.Name(),
+		ID:         string(container.ID()),
+		ImageName:  container.ImageName(),
+		StopSignal: container.StopSignal(),
+		Labels:     labels,
+	}
+
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal container metadata: %w", err)
+	}
+
+	return string(metadataJSON), nil
 }
 
 // captureExecOutput attaches to an exec instance and captures its output.
