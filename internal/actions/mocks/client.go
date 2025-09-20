@@ -22,14 +22,15 @@ type MockClient struct {
 // TestData holds configuration data for MockClient’s test behavior.
 // It defines container states, staleness, and mock operation results.
 type TestData struct {
-	TriedToRemoveImageCount int               // Number of times RemoveImageByID was called.
-	RenameContainerCount    int               // Number of times RenameContainer was called.
-	StopContainerCount      int               // Number of times StopContainer was called.
-	IsContainerStaleCount   int               // Number of times IsContainerStale was called.
-	NameOfContainerToKeep   string            // Name of the container to avoid stopping.
-	Containers              []types.Container // List of mock containers.
-	Staleness               map[string]bool   // Map of container names to staleness status.
-	IsContainerStaleError   error             // Error to return from IsContainerStale (for testing).
+	TriedToRemoveImageCount      int               // Number of times RemoveImageByID was called.
+	RenameContainerCount         int               // Number of times RenameContainer was called.
+	StopContainerCount           int               // Number of times StopContainer was called.
+	IsContainerStaleCount        int               // Number of times IsContainerStale was called.
+	WaitForContainerHealthyCount int               // Number of times WaitForContainerHealthy was called.
+	NameOfContainerToKeep        string            // Name of the container to avoid stopping.
+	Containers                   []types.Container // List of mock containers.
+	Staleness                    map[string]bool   // Map of container names to staleness status.
+	IsContainerStaleError        error             // Error to return from IsContainerStale (for testing).
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -162,4 +163,11 @@ func (client MockClient) IsContainerStale(
 // It simulates a warning condition for HEAD pull failures in tests.
 func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {
 	return true
+}
+
+// WaitForContainerHealthy simulates waiting for a container to become healthy.
+// It increments the count and returns nil to indicate success.
+func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Duration) error {
+	client.TestData.WaitForContainerHealthyCount++
+	return nil
 }

@@ -280,6 +280,7 @@ Environment Variable: WATCHTOWER_NO_RESTART
 
 Restarts containers one at a time to minimize downtime.
 This is ideal for zero-downtime deployments with lifecycle hooks.
+When containers have health checks configured, Watchtower waits for each container to become healthy before proceeding to the next one.
 
 ```text
             Argument: --rolling-restart
@@ -291,6 +292,8 @@ Environment Variable: WATCHTOWER_ROLLING_RESTART
 !!! Note
     When combined with `--cleanup`, image cleanup is deferred until all containers are updated, which may temporarily increase disk usage for large numbers of containers (>50).
     This is typically negligible for homelab setups but monitor disk space on resource-constrained hosts.
+
+    If a container fails to become healthy within 5 minutes, Watchtower logs a warning but continues with the next container to avoid blocking the entire update process.
 
 ### Cleanup Old Images
 

@@ -575,6 +575,63 @@ func (_c *MockClient_StopContainer_Call) RunAndReturn(run func(container types.C
 	return _c
 }
 
+// WaitForContainerHealthy provides a mock function for the type MockClient
+func (_mock *MockClient) WaitForContainerHealthy(containerID types.ContainerID, timeout time.Duration) error {
+	ret := _mock.Called(containerID, timeout)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitForContainerHealthy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(types.ContainerID, time.Duration) error); ok {
+		r0 = returnFunc(containerID, timeout)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_WaitForContainerHealthy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitForContainerHealthy'
+type MockClient_WaitForContainerHealthy_Call struct {
+	*mock.Call
+}
+
+// WaitForContainerHealthy is a helper method to define mock.On call
+//   - containerID types.ContainerID
+//   - timeout time.Duration
+func (_e *MockClient_Expecter) WaitForContainerHealthy(containerID interface{}, timeout interface{}) *MockClient_WaitForContainerHealthy_Call {
+	return &MockClient_WaitForContainerHealthy_Call{Call: _e.mock.On("WaitForContainerHealthy", containerID, timeout)}
+}
+
+func (_c *MockClient_WaitForContainerHealthy_Call) Run(run func(containerID types.ContainerID, timeout time.Duration)) *MockClient_WaitForContainerHealthy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.ContainerID
+		if args[0] != nil {
+			arg0 = args[0].(types.ContainerID)
+		}
+		var arg1 time.Duration
+		if args[1] != nil {
+			arg1 = args[1].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_WaitForContainerHealthy_Call) Return(err error) *MockClient_WaitForContainerHealthy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_WaitForContainerHealthy_Call) RunAndReturn(run func(containerID types.ContainerID, timeout time.Duration) error) *MockClient_WaitForContainerHealthy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WarnOnHeadPullFailed provides a mock function for the type MockClient
 func (_mock *MockClient) WarnOnHeadPullFailed(container types.Container) bool {
 	ret := _mock.Called(container)

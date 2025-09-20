@@ -336,6 +336,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
+				gomega.Expect(client.TestData.WaitForContainerHealthyCount).
+					To(gomega.Equal(3), "WaitForContainerHealthy should be called for each updated container")
 			})
 		})
 
