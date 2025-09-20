@@ -18,7 +18,7 @@ const (
 	// serverReadTimeout defines the maximum duration for reading the request, including headers.
 	serverReadTimeout = 10 * time.Second
 	// serverWriteTimeout defines the maximum duration for writing the response.
-	serverWriteTimeout = 10 * time.Second
+	serverWriteTimeout = 10 * time.Minute
 	// serverIdleTimeout defines the maximum duration for keeping idle connections alive.
 	serverIdleTimeout = 30 * time.Second
 	// serverMaxHeaderShift defines the bit shift for the maximum header size (1 MB).
