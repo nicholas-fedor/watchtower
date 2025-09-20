@@ -1297,6 +1297,81 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#signal_notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      Signal Notifications
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Signal Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setting_up_signal_api_server" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting up Signal API Server
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_signal_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Signal Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal_url_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Signal URL Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Signal URL Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal_attachments" class="md-nav__link">
+    <span class="md-ellipsis">
+      Signal Attachments
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2048,6 +2123,81 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#signal_notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      Signal Notifications
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Signal Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setting_up_signal_api_server" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting up Signal API Server
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_signal_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Signal Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal_url_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Signal URL Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Signal URL Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal_attachments" class="md-nav__link">
+    <span class="md-ellipsis">
+      Signal Attachments
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2145,7 +2295,7 @@ If no title is configured for the service, it will remove the title altogether.<
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: false
 </code></pre></div>
 <h2 id="email_notifications">Email Notifications<a class="headerlink" href="#email_notifications" title="Permanent link">&para;</a></h2>
-<p>Watchtower uses Shoutrrr's <a href="https://nicholas-fedor.github.io/shoutrrr/services/email/" rel="noopener noreferrer" target="_blank">smtp service</a> to send email notifications.</p>
+<p>Watchtower uses Shoutrrr's <a href="https://shoutrrr.nickfedor.com/services/email/" rel="noopener noreferrer" target="_blank">smtp service</a> to send email notifications.</p>
 <p>Either legacy email notification flags or Shoutrrr URLs can be used; however, directly using URLs is recommended for greater control and clarity, especially for configuring TLS settings (e.g., STARTTLS or Implicit TLS).</p>
 <p>To send notifications via e-mail, add <code>email</code> to the <code>--notifications</code> option or the <code>WATCHTOWER_NOTIFICATIONS</code> environment variable.</p>
 <p>Email notification flags (e.g., <code>WATCHTOWER_NOTIFICATION_EMAIL_SERVER</code>, <code>WATCHTOWER_NOTIFICATION_EMAIL_FROM</code>) are automatically converted to a Shoutrrr SMTP URL internally.</p>
@@ -2307,7 +2457,7 @@ If no title is configured for the service, it will remove the title altogether.<
 <li>
 <p><strong>Testing</strong>:</p>
 <ul>
-<li>Install Shoutrrr using one of the various <a href="https://nicholas-fedor.github.io/shoutrrr/installation/" rel="noopener noreferrer" target="_blank">installation methods</a>.</li>
+<li>Install Shoutrrr using one of the various <a href="https://shoutrrr.nickfedor.com/installation/" rel="noopener noreferrer" target="_blank">installation methods</a>.</li>
 <li>Test your URL with the Shoutrrr CLI:
   <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span>-u<span class="w"> </span>&lt;URL&gt;<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Test message&quot;</span>
 </code></pre></div></li>
@@ -2712,6 +2862,81 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>                Type: Boolean
 <a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>             Default: false
 </code></pre></div>
+<h2 id="signal_notifications">Signal Notifications<a class="headerlink" href="#signal_notifications" title="Permanent link">&para;</a></h2>
+<p>Watchtower uses Shoutrrr's <a href="https://shoutrrr.nickfedor.com/services/signal/" rel="noopener noreferrer" target="_blank">signal service</a> to send Signal notifications.</p>
+<p>Signal notifications require a Signal API server that can send messages on behalf of a registered Signal account. This is typically done using <a href="https://github.com/bbernhard/signal-cli-rest-api" rel="noopener noreferrer" target="_blank">signal-cli-rest-api</a> or <a href="https://github.com/codeshelldev/secured-signal-api" rel="noopener noreferrer" target="_blank">secured-signal-api</a>.</p>
+<h3 id="setting_up_signal_api_server">Setting up Signal API Server<a class="headerlink" href="#setting_up_signal_api_server" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Phone Number</strong>: A dedicated phone number registered with Signal</li>
+<li><strong>API Server</strong>: A server running signal-cli with REST API capabilities</li>
+<li><strong>Account Linking</strong>: Linking the server as a secondary device to your Signal account</li>
+<li><strong>Optional Security Layer</strong>: Authentication and endpoint restrictions via a proxy</li>
+</ol>
+<p>The server must be able to receive SMS verification codes during initial setup and maintain a persistent connection to Signal's servers.</p>
+<h3 id="example_signal_configuration">Example Signal Configuration<a class="headerlink" href="#example_signal_configuration" title="Permanent link">&para;</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="8:2"><input checked="checked" id="__tabbed_8_1" name="__tabbed_8" type="radio" /><input id="__tabbed_8_2" name="__tabbed_8" type="radio" /><div class="tabbed-labels"><label for="__tabbed_8_1">Docker CLI</label><label for="__tabbed_8_2">Docker Compose</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span>signal://localhost:8080/+1234567890/+0987654321<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a><span class="w">  </span>nickfedor/watchtower
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">signal://localhost:8080/+1234567890/+0987654321</span>
+<a id="__codelineno-49-6" name="__codelineno-49-6" href="#__codelineno-49-6"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-49-7" name="__codelineno-49-7" href="#__codelineno-49-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h3 id="signal_url_format">Signal URL Format<a class="headerlink" href="#signal_url_format" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>signal://[user:password@]host:port/source_phone/recipient1/recipient2
+</code></pre></div>
+<h4 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>host</code>: Signal API server hostname or IP address</li>
+<li><code>port</code>: Signal API server port (default: 8080)</li>
+<li><code>user</code>: Username for HTTP Basic Authentication (optional)</li>
+<li><code>password</code>: Password for HTTP Basic Authentication (optional)</li>
+<li><code>source_phone</code>: Your Signal phone number with country code (e.g., +1234567890)</li>
+<li><code>recipient1, recipient2</code>: Phone numbers or group IDs to send to</li>
+</ul>
+<h4 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h4>
+<p>Send to a single phone number:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>signal://localhost:8080/+1234567890/+0987654321
+</code></pre></div>
+<p>Send to multiple recipients:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>signal://localhost:8080/+1234567890/+0987654321/+1123456789/group.testgroup
+</code></pre></div>
+<p>Send to a group:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>signal://localhost:8080/+1234567890/group.abcdefghijklmnop=
+</code></pre></div>
+<p>With authentication:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>signal://user:password@localhost:8080/+1234567890/+0987654321
+</code></pre></div>
+<p>With API token (Bearer auth):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>signal://localhost:8080/+1234567890/+0987654321?token=YOUR_API_TOKEN
+</code></pre></div>
+<p>Using HTTP instead of HTTPS:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>signals://localhost:8080/+1234567890/+0987654321
+</code></pre></div>
+<h3 id="signal_attachments">Signal Attachments<a class="headerlink" href="#signal_attachments" title="Permanent link">&para;</a></h3>
+<p>The Signal service supports sending base64-encoded attachments:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span><span class="s2">&quot;signal://localhost:8080/+1234567890/+0987654321&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a><span class="w">  </span><span class="s2">&quot;Message with attachment&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a><span class="w">  </span>--attachments<span class="w"> </span><span class="s2">&quot;base64data1,base64data2&quot;</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Attachments must be provided as base64-encoded data. The API server handles MIME type detection and file handling.</p>
+</div>
 
 
 
@@ -2734,7 +2959,7 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 20, 2025 16:42:45 UTC"><span class="timeago" datetime="2025-09-20T16:42:45+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 20, 2025 16:42:45 UTC">2025-09-20</span>
   </span>
 
     
