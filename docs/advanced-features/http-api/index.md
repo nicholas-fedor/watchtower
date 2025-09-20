@@ -11,12 +11,48 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 |            **Name**            | **Endpoint**  |          **Parameters**           |                                    **Description**                                    |
 |:------------------------------:|:-------------:|:---------------------------------:|:-------------------------------------------------------------------------------------:|
-|   [Update](#http_api_update)   | `/v1/update`  | [`image`](#image_parameter_usage) |         Triggers an update of containers monitored by the Watchtower instance         |
-| [Metrics](../metrics/index.md) | `/v1/metrics` |                                   | Provides container scan and update information that's typically only seen via logging |
+|   [Update](#http_api_update)   | `/v1/update`  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation                 |
+| [Metrics](../metrics/index.md) | `/v1/metrics` |                                   | Exposes Prometheus-compatible metrics for monitoring and alerting                     |
 
 ### HTTP API Update
 
 To enable this mode, use the `--http-api-update` CLI argument or the `WATCHTOWER_HTTP_API_UPDATE` environment variable.
+
+#### Response Format
+
+The `/v1/update` endpoint returns a JSON response containing the results of the update operation:
+
+```json
+{
+  "summary": {
+    "scanned": 8,
+    "updated": 0,
+    "failed": 0
+  },
+  "timing": {
+    "duration_ms": 1250,
+    "duration": "1.25s"
+  },
+  "timestamp": "2025-01-20T11:30:45Z",
+  "api_version": "v1"
+}
+```
+
+**Summary Section:**
+
+- `scanned`: Number of containers that were scanned for updates
+- `updated`: Number of containers that were successfully updated
+- `failed`: Number of containers where the update failed
+
+**Timing Section:**
+
+- `duration_ms`: Execution time in milliseconds
+- `duration`: Human-readable execution time
+
+**Metadata:**
+
+- `timestamp`: UTC timestamp when the response was generated (RFC3339 format)
+- `api_version`: API version identifier
 
 #### Requirements
 
@@ -85,7 +121,7 @@ services:
     image: nickfedor/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --http-api-update
+    command: --http-api-update --http-api-metrics
     environment:
       - WATCHTOWER_HTTP_API_TOKEN=mytoken
     labels:
@@ -94,3 +130,6 @@ services:
       - 8080:8080
     restart: unless-stopped
 ```
+
+!!! Note
+    Both `--http-api-update` and `--http-api-metrics` can be enabled simultaneously to provide both update triggering and monitoring capabilities.

@@ -456,12 +456,14 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 
 	// Register the update API endpoint if enabled, linking it to the update handler.
 	if cfg.EnableUpdateAPI {
-		updateHandler := update.New(func(images []string) {
+		updateHandler := update.New(func(images []string) *metrics.Metric {
 			metric := runUpdatesWithNotifications(
 				filters.FilterByImage(images, cfg.Filter),
 				cleanup,
 			)
 			metrics.Default().RegisterScan(metric)
+
+			return metric
 		}, updateLock)
 		httpAPI.RegisterFunc(updateHandler.Path, updateHandler.Handle)
 
