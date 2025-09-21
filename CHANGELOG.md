@@ -10,135 +10,135 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add --update-on-start flag for immediate update check by @nicholas-fedorin [#672](https://github.com/nicholas-fedor/watchtower/pull/672)
-- Add health check waiting for rolling restarts by @nicholas-fedorin [#671](https://github.com/nicholas-fedor/watchtower/pull/671)
-- Add container metadata for lifecycle hooks by @nicholas-fedorin [#670](https://github.com/nicholas-fedor/watchtower/pull/670)
+- Add --update-on-start flag for immediate update check by @nicholas-fedor in [#672](https://github.com/nicholas-fedor/watchtower/pull/672)
+- Add health check waiting for rolling restarts by @nicholas-fedor in [#671](https://github.com/nicholas-fedor/watchtower/pull/671)
+- Add container metadata for lifecycle hooks by @nicholas-fedor in [#670](https://github.com/nicholas-fedor/watchtower/pull/670)
 
 ### Changed
 
-- Enhance HTTP API update endpoint with structured JSON response by @nicholas-fedorin [#673](https://github.com/nicholas-fedor/watchtower/pull/673)
+- Enhance HTTP API update endpoint with structured JSON response by @nicholas-fedor in [#673](https://github.com/nicholas-fedor/watchtower/pull/673)
 
 ### Chores
 
-- Update module github.com/nicholas-fedor/shoutrrr to v0.9.1 by @renovate[bot]in [#676](https://github.com/nicholas-fedor/watchtower/pull/676)
-- Update module github.com/nicholas-fedor/shoutrrr to v0.9.0 by @renovate[bot]in [#674](https://github.com/nicholas-fedor/watchtower/pull/674)
-- Update module github.com/spf13/viper to v1.21.0 by @renovate[bot]in [#650](https://github.com/nicholas-fedor/watchtower/pull/650)
-- Update module golang.org/x/text to v0.29.0 by @renovate[bot]in [#645](https://github.com/nicholas-fedor/watchtower/pull/645)
-- Update module github.com/prometheus/client_golang to v1.23.2 by @renovate[bot]in [#641](https://github.com/nicholas-fedor/watchtower/pull/641)
-- Update module github.com/onsi/ginkgo/v2 to v2.25.3 by @renovate[bot]in [#637](https://github.com/nicholas-fedor/watchtower/pull/637)
-- Update module github.com/prometheus/client_golang to v1.23.1 by @renovate[bot]in [#638](https://github.com/nicholas-fedor/watchtower/pull/638)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.9.1 by @renovate[bot] in [#676](https://github.com/nicholas-fedor/watchtower/pull/676)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.9.0 by @renovate[bot] in [#674](https://github.com/nicholas-fedor/watchtower/pull/674)
+- Update module github.com/spf13/viper to v1.21.0 by @renovate[bot] in [#650](https://github.com/nicholas-fedor/watchtower/pull/650)
+- Update module golang.org/x/text to v0.29.0 by @renovate[bot] in [#645](https://github.com/nicholas-fedor/watchtower/pull/645)
+- Update module github.com/prometheus/client_golang to v1.23.2 by @renovate[bot] in [#641](https://github.com/nicholas-fedor/watchtower/pull/641)
+- Update module github.com/onsi/ginkgo/v2 to v2.25.3 by @renovate[bot] in [#637](https://github.com/nicholas-fedor/watchtower/pull/637)
+- Update module github.com/prometheus/client_golang to v1.23.1 by @renovate[bot] in [#638](https://github.com/nicholas-fedor/watchtower/pull/638)
 
 ### Fixed
 
-- Improve digest fetching by falling back to GET when HEAD returns 404 by @nicholas-fedorin [#669](https://github.com/nicholas-fedor/watchtower/pull/669)
-- Resolve HTTP API failures on multiple simultaneous requests by @nicholas-fedorin [#668](https://github.com/nicholas-fedor/watchtower/pull/668)
-- Add HEAD to GET fallback for digest fetching by @nicholas-fedorin [#667](https://github.com/nicholas-fedor/watchtower/pull/667)
-- Enhance scope isolation and self-update safeguards by @nicholas-fedorin [#666](https://github.com/nicholas-fedor/watchtower/pull/666)
-- Prevent dereferencing an uninitialized notifier instance by @nicholas-fedorin [#644](https://github.com/nicholas-fedor/watchtower/pull/644)
+- Improve digest fetching by falling back to GET when HEAD returns 404 by @nicholas-fedor in [#669](https://github.com/nicholas-fedor/watchtower/pull/669)
+- Resolve HTTP API failures on multiple simultaneous requests by @nicholas-fedor in [#668](https://github.com/nicholas-fedor/watchtower/pull/668)
+- Add HEAD to GET fallback for digest fetching by @nicholas-fedor in [#667](https://github.com/nicholas-fedor/watchtower/pull/667)
+- Enhance scope isolation and self-update safeguards by @nicholas-fedor in [#666](https://github.com/nicholas-fedor/watchtower/pull/666)
+- Prevent dereferencing an uninitialized notifier instance by @nicholas-fedor in [#644](https://github.com/nicholas-fedor/watchtower/pull/644)
 
 ## [1.11.8] - 2025-09-04
 
 ### Changed
 
-- Overhaul documentation website by @nicholas-fedorin [#574](https://github.com/nicholas-fedor/watchtower/pull/574)
+- Overhaul documentation website by @nicholas-fedor in [#574](https://github.com/nicholas-fedor/watchtower/pull/574)
 
 ### Chores
 
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.18 by @renovate[bot]in [#621](https://github.com/nicholas-fedor/watchtower/pull/621)
-- Update module github.com/docker/docker to v28.4.0+incompatible by @renovate[bot]in [#619](https://github.com/nicholas-fedor/watchtower/pull/619)
-- Update module github.com/docker/cli to v28.4.0+incompatible by @renovate[bot]in [#618](https://github.com/nicholas-fedor/watchtower/pull/618)
-- Update dependency go to v1.25.1 by @renovate[bot]in [#616](https://github.com/nicholas-fedor/watchtower/pull/616)
-- Update Go dependencies by @nicholas-fedorin [#612](https://github.com/nicholas-fedor/watchtower/pull/612)
-- Update module github.com/spf13/pflag to v1.0.8 by @renovate[bot]in [#606](https://github.com/nicholas-fedor/watchtower/pull/606)
-- Update module github.com/onsi/ginkgo/v2 to v2.25.2 by @renovate[bot]in [#599](https://github.com/nicholas-fedor/watchtower/pull/599)
-- Update module github.com/stretchr/testify to v1.11.1 by @renovate[bot]in [#597](https://github.com/nicholas-fedor/watchtower/pull/597)
-- Update module github.com/onsi/gomega to v1.38.2 by @renovate[bot]in [#594](https://github.com/nicholas-fedor/watchtower/pull/594)
-- Update module github.com/stretchr/testify to v1.11.0 by @renovate[bot]in [#587](https://github.com/nicholas-fedor/watchtower/pull/587)
-- Update module github.com/onsi/gomega to v1.38.1 by @renovate[bot]in [#584](https://github.com/nicholas-fedor/watchtower/pull/584)
-- Update module github.com/onsi/ginkgo/v2 to v2.25.1 by @renovate[bot]in [#582](https://github.com/nicholas-fedor/watchtower/pull/582)
-- Update module github.com/onsi/ginkgo/v2 to v2.25.0 by @renovate[bot]in [#571](https://github.com/nicholas-fedor/watchtower/pull/571)
-- Update module github.com/onsi/ginkgo/v2 to v2.24.0 by @renovate[bot]in [#568](https://github.com/nicholas-fedor/watchtower/pull/568)
-- Update dependency go to v1.25.0 by @renovate[bot]in [#544](https://github.com/nicholas-fedor/watchtower/pull/544)
-- Update google.golang.org/genproto modules by @nicholas-fedorin [#529](https://github.com/nicholas-fedor/watchtower/pull/529)
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.17 by @renovate[bot]in [#526](https://github.com/nicholas-fedor/watchtower/pull/526)
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.16 by @renovate[bot]in [#524](https://github.com/nicholas-fedor/watchtower/pull/524)
-- Update module golang.org/x/text to v0.28.0 by @renovate[bot]in [#523](https://github.com/nicholas-fedor/watchtower/pull/523)
-- Update module github.com/docker/go-connections to v0.6.0 by @renovate[bot]in [#521](https://github.com/nicholas-fedor/watchtower/pull/521)
-- Update dependency go to v1.24.6 by @renovate[bot]in [#513](https://github.com/nicholas-fedor/watchtower/pull/513)
-- Update module github.com/prometheus/client_golang to v1.23.0 by @renovate[bot]in [#500](https://github.com/nicholas-fedor/watchtower/pull/500)
-- Update module github.com/docker/docker to v28.3.3+incompatible by @renovate[bot]in [#495](https://github.com/nicholas-fedor/watchtower/pull/495)
-- Update module github.com/docker/cli to v28.3.3+incompatible by @renovate[bot]in [#494](https://github.com/nicholas-fedor/watchtower/pull/494)
-- Update module github.com/onsi/gomega to v1.38.0 by @renovate[bot]in [#473](https://github.com/nicholas-fedor/watchtower/pull/473)
-- Update dependency go to v1.24.5 by @renovate[bot]in [#470](https://github.com/nicholas-fedor/watchtower/pull/470)
-- Update go dependencies by @nicholas-fedorin [#429](https://github.com/nicholas-fedor/watchtower/pull/429)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.18 by @renovate[bot] in [#621](https://github.com/nicholas-fedor/watchtower/pull/621)
+- Update module github.com/docker/docker to v28.4.0+incompatible by @renovate[bot] in [#619](https://github.com/nicholas-fedor/watchtower/pull/619)
+- Update module github.com/docker/cli to v28.4.0+incompatible by @renovate[bot] in [#618](https://github.com/nicholas-fedor/watchtower/pull/618)
+- Update dependency go to v1.25.1 by @renovate[bot] in [#616](https://github.com/nicholas-fedor/watchtower/pull/616)
+- Update Go dependencies by @nicholas-fedor in [#612](https://github.com/nicholas-fedor/watchtower/pull/612)
+- Update module github.com/spf13/pflag to v1.0.8 by @renovate[bot] in [#606](https://github.com/nicholas-fedor/watchtower/pull/606)
+- Update module github.com/onsi/ginkgo/v2 to v2.25.2 by @renovate[bot] in [#599](https://github.com/nicholas-fedor/watchtower/pull/599)
+- Update module github.com/stretchr/testify to v1.11.1 by @renovate[bot] in [#597](https://github.com/nicholas-fedor/watchtower/pull/597)
+- Update module github.com/onsi/gomega to v1.38.2 by @renovate[bot] in [#594](https://github.com/nicholas-fedor/watchtower/pull/594)
+- Update module github.com/stretchr/testify to v1.11.0 by @renovate[bot] in [#587](https://github.com/nicholas-fedor/watchtower/pull/587)
+- Update module github.com/onsi/gomega to v1.38.1 by @renovate[bot] in [#584](https://github.com/nicholas-fedor/watchtower/pull/584)
+- Update module github.com/onsi/ginkgo/v2 to v2.25.1 by @renovate[bot] in [#582](https://github.com/nicholas-fedor/watchtower/pull/582)
+- Update module github.com/onsi/ginkgo/v2 to v2.25.0 by @renovate[bot] in [#571](https://github.com/nicholas-fedor/watchtower/pull/571)
+- Update module github.com/onsi/ginkgo/v2 to v2.24.0 by @renovate[bot] in [#568](https://github.com/nicholas-fedor/watchtower/pull/568)
+- Update dependency go to v1.25.0 by @renovate[bot] in [#544](https://github.com/nicholas-fedor/watchtower/pull/544)
+- Update google.golang.org/genproto modules by @nicholas-fedor in [#529](https://github.com/nicholas-fedor/watchtower/pull/529)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.17 by @renovate[bot] in [#526](https://github.com/nicholas-fedor/watchtower/pull/526)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.16 by @renovate[bot] in [#524](https://github.com/nicholas-fedor/watchtower/pull/524)
+- Update module golang.org/x/text to v0.28.0 by @renovate[bot] in [#523](https://github.com/nicholas-fedor/watchtower/pull/523)
+- Update module github.com/docker/go-connections to v0.6.0 by @renovate[bot] in [#521](https://github.com/nicholas-fedor/watchtower/pull/521)
+- Update dependency go to v1.24.6 by @renovate[bot] in [#513](https://github.com/nicholas-fedor/watchtower/pull/513)
+- Update module github.com/prometheus/client_golang to v1.23.0 by @renovate[bot] in [#500](https://github.com/nicholas-fedor/watchtower/pull/500)
+- Update module github.com/docker/docker to v28.3.3+incompatible by @renovate[bot] in [#495](https://github.com/nicholas-fedor/watchtower/pull/495)
+- Update module github.com/docker/cli to v28.3.3+incompatible by @renovate[bot] in [#494](https://github.com/nicholas-fedor/watchtower/pull/494)
+- Update module github.com/onsi/gomega to v1.38.0 by @renovate[bot] in [#473](https://github.com/nicholas-fedor/watchtower/pull/473)
+- Update dependency go to v1.24.5 by @renovate[bot] in [#470](https://github.com/nicholas-fedor/watchtower/pull/470)
+- Update go dependencies by @nicholas-fedor in [#429](https://github.com/nicholas-fedor/watchtower/pull/429)
 
 ### Fixed
 
-- Enhance SMTP configuration with timeout constant and URL parameters by @nicholas-fedorin [#527](https://github.com/nicholas-fedor/watchtower/pull/527)
-- Streamline StopContainer implementation by @nicholas-fedorin [#504](https://github.com/nicholas-fedor/watchtower/pull/504)
+- Enhance SMTP configuration with timeout constant and URL parameters by @nicholas-fedor in [#527](https://github.com/nicholas-fedor/watchtower/pull/527)
+- Streamline StopContainer implementation by @nicholas-fedor in [#504](https://github.com/nicholas-fedor/watchtower/pull/504)
 
 ## [1.11.6] - 2025-07-16
 
 ### Chores
 
-- Update module github.com/spf13/pflag to v1.0.7 by @renovate[bot]in [#407](https://github.com/nicholas-fedor/watchtower/pull/407)
-- Update module golang.org/x/text to v0.27.0 by @renovate[bot]in [#384](https://github.com/nicholas-fedor/watchtower/pull/384)
-- Update module github.com/docker/docker to v28.3.2+incompatible by @renovate[bot]in [#383](https://github.com/nicholas-fedor/watchtower/pull/383)
-- Update module github.com/docker/cli to v28.3.2+incompatible by @renovate[bot]in [#379](https://github.com/nicholas-fedor/watchtower/pull/379)
-- Update module github.com/docker/cli to v28.3.1+incompatible by @renovate[bot]in [#370](https://github.com/nicholas-fedor/watchtower/pull/370)
-- Update module github.com/docker/docker to v28.3.1+incompatible by @renovate[bot]in [#371](https://github.com/nicholas-fedor/watchtower/pull/371)
+- Update module github.com/spf13/pflag to v1.0.7 by @renovate[bot] in [#407](https://github.com/nicholas-fedor/watchtower/pull/407)
+- Update module golang.org/x/text to v0.27.0 by @renovate[bot] in [#384](https://github.com/nicholas-fedor/watchtower/pull/384)
+- Update module github.com/docker/docker to v28.3.2+incompatible by @renovate[bot] in [#383](https://github.com/nicholas-fedor/watchtower/pull/383)
+- Update module github.com/docker/cli to v28.3.2+incompatible by @renovate[bot] in [#379](https://github.com/nicholas-fedor/watchtower/pull/379)
+- Update module github.com/docker/cli to v28.3.1+incompatible by @renovate[bot] in [#370](https://github.com/nicholas-fedor/watchtower/pull/370)
+- Update module github.com/docker/docker to v28.3.1+incompatible by @renovate[bot] in [#371](https://github.com/nicholas-fedor/watchtower/pull/371)
 
 ### Fixed
 
-- Restore proxy, DialContext, and redirect handling in NewAuthClient by @nicholas-fedorin [#403](https://github.com/nicholas-fedor/watchtower/pull/403)
+- Restore proxy, DialContext, and redirect handling in NewAuthClient by @nicholas-fedor in [#403](https://github.com/nicholas-fedor/watchtower/pull/403)
 
 ## [1.11.5] - 2025-07-01
 
 ### Changed
 
-- Enhance usage examples in doc.go by @nicholas-fedorin [#344](https://github.com/nicholas-fedor/watchtower/pull/344)
+- Enhance usage examples in doc.go by @nicholas-fedor in [#344](https://github.com/nicholas-fedor/watchtower/pull/344)
 
 ### Chores
 
-- Update module github.com/docker/cli to v28.3.0+incompatible by @renovate[bot]in [#356](https://github.com/nicholas-fedor/watchtower/pull/356)
-- Update module github.com/docker/docker to v28.3.0+incompatible by @renovate[bot]in [#357](https://github.com/nicholas-fedor/watchtower/pull/357)
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.15 by @renovate[bot]in [#349](https://github.com/nicholas-fedor/watchtower/pull/349)
-- Refactor `SliceSubtract` and update comment by @nicholas-fedorin [#343](https://github.com/nicholas-fedor/watchtower/pull/343)
-- Update github.com/google/pprof by @nicholas-fedorin [#327](https://github.com/nicholas-fedor/watchtower/pull/327)
+- Update module github.com/docker/cli to v28.3.0+incompatible by @renovate[bot] in [#356](https://github.com/nicholas-fedor/watchtower/pull/356)
+- Update module github.com/docker/docker to v28.3.0+incompatible by @renovate[bot] in [#357](https://github.com/nicholas-fedor/watchtower/pull/357)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.15 by @renovate[bot] in [#349](https://github.com/nicholas-fedor/watchtower/pull/349)
+- Refactor `SliceSubtract` and update comment by @nicholas-fedor in [#343](https://github.com/nicholas-fedor/watchtower/pull/343)
+- Update github.com/google/pprof by @nicholas-fedor in [#327](https://github.com/nicholas-fedor/watchtower/pull/327)
 
 ### Fixed
 
-- Handle unauthenticated registries and update linting by @nicholas-fedorin [#369](https://github.com/nicholas-fedor/watchtower/pull/369)
-- Fix registry redirect handling for image updates by @nicholas-fedorin [#359](https://github.com/nicholas-fedor/watchtower/pull/359)
-- Resolve update failures of containers with multiple networks by @nicholas-fedorin [#351](https://github.com/nicholas-fedor/watchtower/pull/351)
-- Ensure pinned container images are skipped during updates by @nicholas-fedorin [#347](https://github.com/nicholas-fedor/watchtower/pull/347)
-- Increase default timeout to 30s and demote timeout log to debug by @nicholas-fedorin [#325](https://github.com/nicholas-fedor/watchtower/pull/325)
-- Resolve premature image cleanup by @nicholas-fedorin [#321](https://github.com/nicholas-fedor/watchtower/pull/321)
-- Demote log messages to debug by @nicholas-fedorin [#315](https://github.com/nicholas-fedor/watchtower/pull/315)
+- Handle unauthenticated registries and update linting by @nicholas-fedor in [#369](https://github.com/nicholas-fedor/watchtower/pull/369)
+- Fix registry redirect handling for image updates by @nicholas-fedor in [#359](https://github.com/nicholas-fedor/watchtower/pull/359)
+- Resolve update failures of containers with multiple networks by @nicholas-fedor in [#351](https://github.com/nicholas-fedor/watchtower/pull/351)
+- Ensure pinned container images are skipped during updates by @nicholas-fedor in [#347](https://github.com/nicholas-fedor/watchtower/pull/347)
+- Increase default timeout to 30s and demote timeout log to debug by @nicholas-fedor in [#325](https://github.com/nicholas-fedor/watchtower/pull/325)
+- Resolve premature image cleanup by @nicholas-fedor in [#321](https://github.com/nicholas-fedor/watchtower/pull/321)
+- Demote log messages to debug by @nicholas-fedor in [#315](https://github.com/nicholas-fedor/watchtower/pull/315)
 
 ## [1.11.2] - 2025-06-10
 
 ### Fixed
 
-- Reduce MAC address warning to debug for non-running containers by @nicholas-fedorin [#314](https://github.com/nicholas-fedor/watchtower/pull/314)
-- Reintroduce option to skip tls verification by @nicholas-fedorin [#312](https://github.com/nicholas-fedor/watchtower/pull/312)
+- Reduce MAC address warning to debug for non-running containers by @nicholas-fedor in [#314](https://github.com/nicholas-fedor/watchtower/pull/314)
+- Reintroduce option to skip tls verification by @nicholas-fedor in [#312](https://github.com/nicholas-fedor/watchtower/pull/312)
 
 ## [1.11.0] - 2025-06-07
 
 ### Chores
 
-- Update module golang.org/x/text to v0.26.0 by @renovate[bot]in [#304](https://github.com/nicholas-fedor/watchtower/pull/304)
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.14 by @renovate[bot]in [#297](https://github.com/nicholas-fedor/watchtower/pull/297)
-- Update module github.com/docker/docker to v28.2.2+incompatible by @renovate[bot]in [#291](https://github.com/nicholas-fedor/watchtower/pull/291)
-- Update module github.com/docker/cli to v28.2.2+incompatible by @renovate[bot]in [#290](https://github.com/nicholas-fedor/watchtower/pull/290)
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.13 by @renovate[bot]in [#283](https://github.com/nicholas-fedor/watchtower/pull/283)
-- Update module github.com/docker/docker to v28.2.1+incompatible by @renovate[bot]in [#287](https://github.com/nicholas-fedor/watchtower/pull/287)
-- Update module github.com/docker/cli to v28.2.1+incompatible by @renovate[bot]in [#288](https://github.com/nicholas-fedor/watchtower/pull/288)
-- Update module github.com/docker/cli to v28.2.0+incompatible by @renovate[bot]in [#286](https://github.com/nicholas-fedor/watchtower/pull/286)
+- Update module golang.org/x/text to v0.26.0 by @renovate[bot] in [#304](https://github.com/nicholas-fedor/watchtower/pull/304)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.14 by @renovate[bot] in [#297](https://github.com/nicholas-fedor/watchtower/pull/297)
+- Update module github.com/docker/docker to v28.2.2+incompatible by @renovate[bot] in [#291](https://github.com/nicholas-fedor/watchtower/pull/291)
+- Update module github.com/docker/cli to v28.2.2+incompatible by @renovate[bot] in [#290](https://github.com/nicholas-fedor/watchtower/pull/290)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.13 by @renovate[bot] in [#283](https://github.com/nicholas-fedor/watchtower/pull/283)
+- Update module github.com/docker/docker to v28.2.1+incompatible by @renovate[bot] in [#287](https://github.com/nicholas-fedor/watchtower/pull/287)
+- Update module github.com/docker/cli to v28.2.1+incompatible by @renovate[bot] in [#288](https://github.com/nicholas-fedor/watchtower/pull/288)
+- Update module github.com/docker/cli to v28.2.0+incompatible by @renovate[bot] in [#286](https://github.com/nicholas-fedor/watchtower/pull/286)
 
 ### Fixed
 
-- Resolve DOCKER_API_VERSION 404 errors and enhance API handling by @nicholas-fedorin [#305](https://github.com/nicholas-fedor/watchtower/pull/305)
+- Resolve DOCKER_API_VERSION 404 errors and enhance API handling by @nicholas-fedor in [#305](https://github.com/nicholas-fedor/watchtower/pull/305)
 
 ## [1.10.0] - 2025-05-27
 
@@ -151,7 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Correct logging level of watchtower handling for shutdown signals and context cancellation by @nicholas-fedorin [#282](https://github.com/nicholas-fedor/watchtower/pull/282)
+- Correct logging level of watchtower handling for shutdown signals and context cancellation by @nicholas-fedor in [#282](https://github.com/nicholas-fedor/watchtower/pull/282)
 
 ## [1.7.1] - 2023-11-11
 
@@ -159,8 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add linking and output messages by @piksel
 - Add support for "none" scope by @piksel
-- Add unit test for volume subpath preservation by @nicholas-fedorin [#265](https://github.com/nicholas-fedor/watchtower/pull/265)
-- Add DisableMemorySwappiness flag for Podman compatibility by @nicholas-fedorin [#264](https://github.com/nicholas-fedor/watchtower/pull/264)
+- Add unit test for volume subpath preservation by @nicholas-fedor in [#265](https://github.com/nicholas-fedor/watchtower/pull/265)
+- Add DisableMemorySwappiness flag for Podman compatibility by @nicholas-fedor in [#264](https://github.com/nicholas-fedor/watchtower/pull/264)
 
 ### Chores
 
@@ -176,7 +176,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump golang.org/x/net from 0.15.0 to 0.16.0 by @dependabot[bot]
 - Bump github.com/onsi/gomega from 1.27.10 to 1.28.0 by @dependabot[bot]
 - Bump github.com/docker/distribution from 2.8.2+incompatible to 2.8.3+incompatible by @dependabot[bot]
-- Update codecov/codecov-action digest to b203f00 by @renovate[bot]in [#258](https://github.com/nicholas-fedor/watchtower/pull/258)
+- Update codecov/codecov-action digest to b203f00 by @renovate[bot] in [#258](https://github.com/nicholas-fedor/watchtower/pull/258)
 
 ### Fixed
 
@@ -197,99 +197,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
-- Update Go version and dependencies by @nicholas-fedorin [#251](https://github.com/nicholas-fedor/watchtower/pull/251)
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.9 by @renovate[bot]in [#248](https://github.com/nicholas-fedor/watchtower/pull/248)
-- Update module golang.org/x/text to v0.25.0 by @renovate[bot]in [#244](https://github.com/nicholas-fedor/watchtower/pull/244)
-- Update module github.com/docker/docker to v28.1.1+incompatible by @renovate[bot]in [#217](https://github.com/nicholas-fedor/watchtower/pull/217)
-- Update module github.com/docker/cli to v28.1.1+incompatible by @renovate[bot]in [#215](https://github.com/nicholas-fedor/watchtower/pull/215)
+- Update Go version and dependencies by @nicholas-fedor in [#251](https://github.com/nicholas-fedor/watchtower/pull/251)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.9 by @renovate[bot] in [#248](https://github.com/nicholas-fedor/watchtower/pull/248)
+- Update module golang.org/x/text to v0.25.0 by @renovate[bot] in [#244](https://github.com/nicholas-fedor/watchtower/pull/244)
+- Update module github.com/docker/docker to v28.1.1+incompatible by @renovate[bot] in [#217](https://github.com/nicholas-fedor/watchtower/pull/217)
+- Update module github.com/docker/cli to v28.1.1+incompatible by @renovate[bot] in [#215](https://github.com/nicholas-fedor/watchtower/pull/215)
 
 ### Fixed
 
-- Enhance host networking and alias handling for container recreation by @nicholas-fedorin [#237](https://github.com/nicholas-fedor/watchtower/pull/237)
+- Enhance host networking and alias handling for container recreation by @nicholas-fedor in [#237](https://github.com/nicholas-fedor/watchtower/pull/237)
 
 ## [1.9.0] - 2025-04-14
 
 ### Changed
 
-- Optional tag filter by @Foxitein [#205](https://github.com/nicholas-fedor/watchtower/pull/205)
-- Enhance default-legacy template with fields and debug logging by @nicholas-fedorin [#200](https://github.com/nicholas-fedor/watchtower/pull/200)
+- Optional tag filter by @Foxite in [#205](https://github.com/nicholas-fedor/watchtower/pull/205)
+- Enhance default-legacy template with fields and debug logging by @nicholas-fedor in [#200](https://github.com/nicholas-fedor/watchtower/pull/200)
 
 ### Chores
 
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.8 by @renovate[bot]in [#203](https://github.com/nicholas-fedor/watchtower/pull/203)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.8 by @renovate[bot] in [#203](https://github.com/nicholas-fedor/watchtower/pull/203)
 
 ## [1.8.8] - 2025-04-08
 
 ### Changed
 
-- Update shoutrrr to v0.8.7 by @nicholas-fedorin [#194](https://github.com/nicholas-fedor/watchtower/pull/194)
-- Change staleness check logging to debug by @nicholas-fedorin [#193](https://github.com/nicholas-fedor/watchtower/pull/193)
-- Enhance HEAD request compatibility with OCI indexes by @nicholas-fedorin [#185](https://github.com/nicholas-fedor/watchtower/pull/185)
-- Standardize comments by @nicholas-fedorin [#175](https://github.com/nicholas-fedor/watchtower/pull/175)
-- Standardize logrus logging by @nicholas-fedorin [#171](https://github.com/nicholas-fedor/watchtower/pull/171)
+- Update shoutrrr to v0.8.7 by @nicholas-fedor in [#194](https://github.com/nicholas-fedor/watchtower/pull/194)
+- Change staleness check logging to debug by @nicholas-fedor in [#193](https://github.com/nicholas-fedor/watchtower/pull/193)
+- Enhance HEAD request compatibility with OCI indexes by @nicholas-fedor in [#185](https://github.com/nicholas-fedor/watchtower/pull/185)
+- Standardize comments by @nicholas-fedor in [#175](https://github.com/nicholas-fedor/watchtower/pull/175)
+- Standardize logrus logging by @nicholas-fedor in [#171](https://github.com/nicholas-fedor/watchtower/pull/171)
 
 ### Chores
 
-- Update module github.com/prometheus/client_golang to v1.22.0 by @renovate[bot]in [#184](https://github.com/nicholas-fedor/watchtower/pull/184)
-- Update module github.com/onsi/ginkgo/v2 to v2.23.4 by @renovate[bot]in [#176](https://github.com/nicholas-fedor/watchtower/pull/176)
-- Update module golang.org/x/text to v0.24.0 by @renovate[bot]in [#174](https://github.com/nicholas-fedor/watchtower/pull/174)
+- Update module github.com/prometheus/client_golang to v1.22.0 by @renovate[bot] in [#184](https://github.com/nicholas-fedor/watchtower/pull/184)
+- Update module github.com/onsi/ginkgo/v2 to v2.23.4 by @renovate[bot] in [#176](https://github.com/nicholas-fedor/watchtower/pull/176)
+- Update module golang.org/x/text to v0.24.0 by @renovate[bot] in [#174](https://github.com/nicholas-fedor/watchtower/pull/174)
 
 ### Fixed
 
-- Exclude Aliases and DNSNames on default bridge network by @nicholas-fedorin [#163](https://github.com/nicholas-fedor/watchtower/pull/163)
+- Exclude Aliases and DNSNames on default bridge network by @nicholas-fedor in [#163](https://github.com/nicholas-fedor/watchtower/pull/163)
 
 ## [1.8.6] - 2025-03-31
 
 ### Added
 
-- Add debug logging by @nicholas-fedorin [#141](https://github.com/nicholas-fedor/watchtower/pull/141)
+- Add debug logging by @nicholas-fedor in [#141](https://github.com/nicholas-fedor/watchtower/pull/141)
 
 ### Changed
 
-- Improve pre-1.44 api support by @nicholas-fedorin [#152](https://github.com/nicholas-fedor/watchtower/pull/152)
-- Enhance network preservation and lifecycle management by @nicholas-fedorin [#128](https://github.com/nicholas-fedor/watchtower/pull/128)
-- Revert "fix(container): preserve static MAC address in StartContainer with te…" by @nicholas-fedorin [#124](https://github.com/nicholas-fedor/watchtower/pull/124)
+- Improve pre-1.44 api support by @nicholas-fedor in [#152](https://github.com/nicholas-fedor/watchtower/pull/152)
+- Enhance network preservation and lifecycle management by @nicholas-fedor in [#128](https://github.com/nicholas-fedor/watchtower/pull/128)
+- Revert "fix(container): preserve static MAC address in StartContainer with te…" by @nicholas-fedor in [#124](https://github.com/nicholas-fedor/watchtower/pull/124)
 
 ### Chores
 
-- Update go deps by @nicholas-fedorin [#154](https://github.com/nicholas-fedor/watchtower/pull/154)
-- Update module github.com/spf13/viper to v1.20.1 by @renovate[bot]in [#144](https://github.com/nicholas-fedor/watchtower/pull/144)
-- Update module github.com/docker/docker to v28.0.4+incompatible by @renovate[bot]in [#140](https://github.com/nicholas-fedor/watchtower/pull/140)
-- Update module github.com/docker/cli to v28.0.4+incompatible by @renovate[bot]in [#138](https://github.com/nicholas-fedor/watchtower/pull/138)
-- Update module github.com/docker/docker to v28.0.3+incompatible by @renovate[bot]in [#139](https://github.com/nicholas-fedor/watchtower/pull/139)
-- Update module github.com/onsi/gomega to v1.36.3 by @renovate[bot]in [#130](https://github.com/nicholas-fedor/watchtower/pull/130)
-- Update module github.com/onsi/ginkgo/v2 to v2.23.3 by @renovate[bot]in [#129](https://github.com/nicholas-fedor/watchtower/pull/129)
-- Update module github.com/onsi/ginkgo/v2 to v2.23.2 by @renovate[bot]in [#127](https://github.com/nicholas-fedor/watchtower/pull/127)
-- Update module github.com/docker/docker to v28.0.2+incompatible by @renovate[bot]in [#121](https://github.com/nicholas-fedor/watchtower/pull/121)
-- Update module github.com/onsi/ginkgo/v2 to v2.23.1 by @renovate[bot]in [#122](https://github.com/nicholas-fedor/watchtower/pull/122)
-- Update module github.com/docker/cli to v28.0.2+incompatible by @renovate[bot]in [#120](https://github.com/nicholas-fedor/watchtower/pull/120)
+- Update go deps by @nicholas-fedor in [#154](https://github.com/nicholas-fedor/watchtower/pull/154)
+- Update module github.com/spf13/viper to v1.20.1 by @renovate[bot] in [#144](https://github.com/nicholas-fedor/watchtower/pull/144)
+- Update module github.com/docker/docker to v28.0.4+incompatible by @renovate[bot] in [#140](https://github.com/nicholas-fedor/watchtower/pull/140)
+- Update module github.com/docker/cli to v28.0.4+incompatible by @renovate[bot] in [#138](https://github.com/nicholas-fedor/watchtower/pull/138)
+- Update module github.com/docker/docker to v28.0.3+incompatible by @renovate[bot] in [#139](https://github.com/nicholas-fedor/watchtower/pull/139)
+- Update module github.com/onsi/gomega to v1.36.3 by @renovate[bot] in [#130](https://github.com/nicholas-fedor/watchtower/pull/130)
+- Update module github.com/onsi/ginkgo/v2 to v2.23.3 by @renovate[bot] in [#129](https://github.com/nicholas-fedor/watchtower/pull/129)
+- Update module github.com/onsi/ginkgo/v2 to v2.23.2 by @renovate[bot] in [#127](https://github.com/nicholas-fedor/watchtower/pull/127)
+- Update module github.com/docker/docker to v28.0.2+incompatible by @renovate[bot] in [#121](https://github.com/nicholas-fedor/watchtower/pull/121)
+- Update module github.com/onsi/ginkgo/v2 to v2.23.1 by @renovate[bot] in [#122](https://github.com/nicholas-fedor/watchtower/pull/122)
+- Update module github.com/docker/cli to v28.0.2+incompatible by @renovate[bot] in [#120](https://github.com/nicholas-fedor/watchtower/pull/120)
 
 ### Fixed
 
-- Update test to reflect updated shoutrrr teams handling by @nicholas-fedorin [#155](https://github.com/nicholas-fedor/watchtower/pull/155)
-- Enhance RunHTTPServer shutdown handling by @nicholas-fedorin [#137](https://github.com/nicholas-fedor/watchtower/pull/137)
-- Preserve static MAC address in StartContainer with test coverage by @nicholas-fedorin [#123](https://github.com/nicholas-fedor/watchtower/pull/123)
+- Update test to reflect updated shoutrrr teams handling by @nicholas-fedor in [#155](https://github.com/nicholas-fedor/watchtower/pull/155)
+- Enhance RunHTTPServer shutdown handling by @nicholas-fedor in [#137](https://github.com/nicholas-fedor/watchtower/pull/137)
+- Preserve static MAC address in StartContainer with test coverage by @nicholas-fedor in [#123](https://github.com/nicholas-fedor/watchtower/pull/123)
 
 ## [1.8.5] - 2025-03-19
 
 ### Chores
 
-- Update module github.com/nicholas-fedor/shoutrrr to v0.8.5 by @renovate[bot]in [#118](https://github.com/nicholas-fedor/watchtower/pull/118)
-- Merge pull request #106 from nicholas-fedor/renovate/github.com-spf13-viper-1.x by @nicholas-fedorin [#106](https://github.com/nicholas-fedor/watchtower/pull/106)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.8.5 by @renovate[bot] in [#118](https://github.com/nicholas-fedor/watchtower/pull/118)
+- Merge pull request #106 from nicholas-fedor/renovate/github.com-spf13-viper-1.x by @nicholas-fedor in [#106](https://github.com/nicholas-fedor/watchtower/pull/106)
 - Update module github.com/spf13/viper to v1.20.0 by @renovate[bot]
 
 ## [1.8.4] - 2025-03-14
 
 ### Changed
 
-- Merge pull request #104 from nicholas-fedor/deps/package-updates by @nicholas-fedorin [#104](https://github.com/nicholas-fedor/watchtower/pull/104)
-- Merge pull request #93 from nicholas-fedor/renovate/golang.org-x-net-0.x by @nicholas-fedorin [#93](https://github.com/nicholas-fedor/watchtower/pull/93)
-- Merge pull request #92 from nicholas-fedor/renovate/github.com-onsi-ginkgo-v2-2.x by @nicholas-fedorin [#92](https://github.com/nicholas-fedor/watchtower/pull/92)
-- Merge pull request #94 from nicholas-fedor/renovate/golang.org-x-text-0.x by @nicholas-fedorin [#94](https://github.com/nicholas-fedor/watchtower/pull/94)
-- Merge pull request #89 from nicholas-fedor/renovate/go-1.x by @nicholas-fedorin [#89](https://github.com/nicholas-fedor/watchtower/pull/89)
-- Merge pull request #91 from nicholas-fedor/renovate/golang.org-x-net-0.x by @nicholas-fedorin [#91](https://github.com/nicholas-fedor/watchtower/pull/91)
-- Merge pull request #90 from nicholas-fedor/renovate/github.com-prometheus-client_golang-1.x by @nicholas-fedorin [#90](https://github.com/nicholas-fedor/watchtower/pull/90)
-- Merge pull request #86 from nicholas-fedor/renovate/github.com-nicholas-fedor-shoutrrr-0.x by @nicholas-fedorin [#86](https://github.com/nicholas-fedor/watchtower/pull/86)
+- Merge pull request #104 from nicholas-fedor/deps/package-updates by @nicholas-fedor in [#104](https://github.com/nicholas-fedor/watchtower/pull/104)
+- Merge pull request #93 from nicholas-fedor/renovate/golang.org-x-net-0.x by @nicholas-fedor in [#93](https://github.com/nicholas-fedor/watchtower/pull/93)
+- Merge pull request #92 from nicholas-fedor/renovate/github.com-onsi-ginkgo-v2-2.x by @nicholas-fedor in [#92](https://github.com/nicholas-fedor/watchtower/pull/92)
+- Merge pull request #94 from nicholas-fedor/renovate/golang.org-x-text-0.x by @nicholas-fedor in [#94](https://github.com/nicholas-fedor/watchtower/pull/94)
+- Merge pull request #89 from nicholas-fedor/renovate/go-1.x by @nicholas-fedor in [#89](https://github.com/nicholas-fedor/watchtower/pull/89)
+- Merge pull request #91 from nicholas-fedor/renovate/golang.org-x-net-0.x by @nicholas-fedor in [#91](https://github.com/nicholas-fedor/watchtower/pull/91)
+- Merge pull request #90 from nicholas-fedor/renovate/github.com-prometheus-client_golang-1.x by @nicholas-fedor in [#90](https://github.com/nicholas-fedor/watchtower/pull/90)
+- Merge pull request #86 from nicholas-fedor/renovate/github.com-nicholas-fedor-shoutrrr-0.x by @nicholas-fedor in [#86](https://github.com/nicholas-fedor/watchtower/pull/86)
 
 ### Chores
 
@@ -306,9 +306,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Merge pull request #85 from nicholas-fedor/switch-shoutrrr-from-containrrr-to-nicholas-fedor by @nicholas-fedorin [#85](https://github.com/nicholas-fedor/watchtower/pull/85)
-- Merge pull request #83 from nicholas-fedor/renovate/github.com-docker-cli-28.x by @nicholas-fedorin [#83](https://github.com/nicholas-fedor/watchtower/pull/83)
-- Merge pull request #84 from nicholas-fedor/renovate/github.com-docker-docker-28.x by @nicholas-fedorin [#84](https://github.com/nicholas-fedor/watchtower/pull/84)
+- Merge pull request #85 from nicholas-fedor/switch-shoutrrr-from-containrrr-to-nicholas-fedor by @nicholas-fedor in [#85](https://github.com/nicholas-fedor/watchtower/pull/85)
+- Merge pull request #83 from nicholas-fedor/renovate/github.com-docker-cli-28.x by @nicholas-fedor in [#83](https://github.com/nicholas-fedor/watchtower/pull/83)
+- Merge pull request #84 from nicholas-fedor/renovate/github.com-docker-docker-28.x by @nicholas-fedor in [#84](https://github.com/nicholas-fedor/watchtower/pull/84)
 
 ### Chores
 
@@ -323,13 +323,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Merge pull request #81 from nicholas-fedor/renovate/github.com-docker-docker-28.x by @nicholas-fedorin [#81](https://github.com/nicholas-fedor/watchtower/pull/81)
+- Merge pull request #81 from nicholas-fedor/renovate/github.com-docker-docker-28.x by @nicholas-fedor in [#81](https://github.com/nicholas-fedor/watchtower/pull/81)
 - Update deprecated method call by @nicholas-fedor
 - Refactor by @nicholas-fedor
-- Merge pull request #80 from nicholas-fedor/renovate/github.com-docker-cli-28.x by @nicholas-fedorin [#80](https://github.com/nicholas-fedor/watchtower/pull/80)
-- Merge pull request #79 from nicholas-fedor/renovate/github.com-prometheus-client_golang-1.x by @nicholas-fedorin [#79](https://github.com/nicholas-fedor/watchtower/pull/79)
-- Merge pull request #77 from nicholas-fedor/renovate/github.com-spf13-cobra-1.x by @nicholas-fedorin [#77](https://github.com/nicholas-fedor/watchtower/pull/77)
-- Merge pull request #74 from nicholas-fedor/73-failed-merge-pull-request-72-from-nicholas-fedorrenovategithubcom-spf13--44 by @nicholas-fedorin [#74](https://github.com/nicholas-fedor/watchtower/pull/74)
+- Merge pull request #80 from nicholas-fedor/renovate/github.com-docker-cli-28.x by @nicholas-fedor in [#80](https://github.com/nicholas-fedor/watchtower/pull/80)
+- Merge pull request #79 from nicholas-fedor/renovate/github.com-prometheus-client_golang-1.x by @nicholas-fedor in [#79](https://github.com/nicholas-fedor/watchtower/pull/79)
+- Merge pull request #77 from nicholas-fedor/renovate/github.com-spf13-cobra-1.x by @nicholas-fedor in [#77](https://github.com/nicholas-fedor/watchtower/pull/77)
+- Merge pull request #74 from nicholas-fedor/73-failed-merge-pull-request-72-from-nicholas-fedorrenovategithubcom-spf13--44 by @nicholas-fedor in [#74](https://github.com/nicholas-fedor/watchtower/pull/74)
 - Version updates by @nicholas-fedor
 
 ### Chores
@@ -343,8 +343,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Merge pull request #72 from nicholas-fedor/renovate/github.com-spf13-cobra-1.x by @nicholas-fedorin [#72](https://github.com/nicholas-fedor/watchtower/pull/72)
-- Merge pull request #70 from nicholas-fedor/renovate/cimg-go-1.x by @nicholas-fedorin [#70](https://github.com/nicholas-fedor/watchtower/pull/70)
+- Merge pull request #72 from nicholas-fedor/renovate/github.com-spf13-cobra-1.x by @nicholas-fedor in [#72](https://github.com/nicholas-fedor/watchtower/pull/72)
+- Merge pull request #70 from nicholas-fedor/renovate/cimg-go-1.x by @nicholas-fedor in [#70](https://github.com/nicholas-fedor/watchtower/pull/70)
 - Fix spelling by @nicholas-fedor
 - Replace dot imports with explicit package references by @nicholas-fedor
 - Replace dot imports with explicit package references by @nicholas-fedor
@@ -356,17 +356,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Chores
 
 - Update digest module github.com/spf13/cobra to v1.9.0 by @renovate[bot]
-- Merge pull request #67 from nicholas-fedor/dependabot/go_modules/golang.org/x/net-0.35.0 by @nicholas-fedorin [#67](https://github.com/nicholas-fedor/watchtower/pull/67)
+- Merge pull request #67 from nicholas-fedor/dependabot/go_modules/golang.org/x/net-0.35.0 by @nicholas-fedor in [#67](https://github.com/nicholas-fedor/watchtower/pull/67)
 - Bump golang.org/x/net from 0.34.0 to 0.35.0 by @dependabot[bot]
 
 ## [1.8.0] - 2025-02-08
 
 ### Changed
 
-- Merge pull request #65 from nicholas-fedor/64-watchtower-container-update-failure by @nicholas-fedorin [#65](https://github.com/nicholas-fedor/watchtower/pull/65)
+- Merge pull request #65 from nicholas-fedor/64-watchtower-container-update-failure by @nicholas-fedor in [#65](https://github.com/nicholas-fedor/watchtower/pull/65)
 - Re-enable test by @nicholas-fedor
 - Update minimum supported Docker API version by @nicholas-fedor
-- Merge pull request #60 from nicholas-fedor/renovate/golang.org-x-text-0.x by @nicholas-fedorin [#60](https://github.com/nicholas-fedor/watchtower/pull/60)
+- Merge pull request #60 from nicholas-fedor/renovate/golang.org-x-text-0.x by @nicholas-fedor in [#60](https://github.com/nicholas-fedor/watchtower/pull/60)
 
 ### Chores
 
@@ -376,7 +376,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Merge pull request #37 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedorin [#37](https://github.com/nicholas-fedor/watchtower/pull/37)
+- Merge pull request #37 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedor in [#37](https://github.com/nicholas-fedor/watchtower/pull/37)
 - Correct package dependencies by @nicholas-fedor
 - Migrate to Ginkgo v2 by @nicholas-fedor
 
@@ -388,11 +388,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
-- Merge pull request #44 from nicholas-fedor/renovate/github.com-spf13-pflag-1.x by @nicholas-fedorin [#44](https://github.com/nicholas-fedor/watchtower/pull/44)
+- Merge pull request #44 from nicholas-fedor/renovate/github.com-spf13-pflag-1.x by @nicholas-fedor in [#44](https://github.com/nicholas-fedor/watchtower/pull/44)
 - Update module github.com/spf13/pflag to v1.0.6 by @renovate[bot]
-- Merge pull request #42 from nicholas-fedor/renovate/github.com-docker-cli-27.x by @nicholas-fedorin [#42](https://github.com/nicholas-fedor/watchtower/pull/42)
+- Merge pull request #42 from nicholas-fedor/renovate/github.com-docker-cli-27.x by @nicholas-fedor in [#42](https://github.com/nicholas-fedor/watchtower/pull/42)
 - Update module github.com/docker/cli to v27.5.1+incompatible by @renovate[bot]
-- Merge pull request #43 from nicholas-fedor/renovate/github.com-docker-docker-27.x by @nicholas-fedorin [#43](https://github.com/nicholas-fedor/watchtower/pull/43)
+- Merge pull request #43 from nicholas-fedor/renovate/github.com-docker-docker-27.x by @nicholas-fedor in [#43](https://github.com/nicholas-fedor/watchtower/pull/43)
 - Update module github.com/docker/docker to v27.5.1+incompatible by @renovate[bot]
 
 ## [1.7.10] - 2025-01-20
@@ -403,19 +403,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Merge pull request #41 from nicholas-fedor/39-broken-pkggodev-versioning by @nicholas-fedorin [#41](https://github.com/nicholas-fedor/watchtower/pull/41)
+- Merge pull request #41 from nicholas-fedor/39-broken-pkggodev-versioning by @nicholas-fedor in [#41](https://github.com/nicholas-fedor/watchtower/pull/41)
 - Modify to indirect by @nicholas-fedor
 - Dependency updates by @nicholas-fedor
 
 ### Chores
 
-- Merge pull request #36 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedorin [#36](https://github.com/nicholas-fedor/watchtower/pull/36)
+- Merge pull request #36 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedor in [#36](https://github.com/nicholas-fedor/watchtower/pull/36)
 - Update module github.com/onsi/ginkgo to v2.22.2 by @renovate[bot]
-- Merge pull request #35 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedorin [#35](https://github.com/nicholas-fedor/watchtower/pull/35)
+- Merge pull request #35 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedor in [#35](https://github.com/nicholas-fedor/watchtower/pull/35)
 - Update module github.com/onsi/ginkgo to v2.22.2 by @renovate[bot]
-- Merge pull request #34 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedorin [#34](https://github.com/nicholas-fedor/watchtower/pull/34)
+- Merge pull request #34 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedor in [#34](https://github.com/nicholas-fedor/watchtower/pull/34)
 - Update module github.com/onsi/ginkgo to v2.22.2 by @renovate[bot]
-- Merge pull request #33 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedorin [#33](https://github.com/nicholas-fedor/watchtower/pull/33)
+- Merge pull request #33 from nicholas-fedor/renovate/github.com-onsi-ginkgo-2.x by @nicholas-fedor in [#33](https://github.com/nicholas-fedor/watchtower/pull/33)
 - Update module github.com/onsi/ginkgo to v2.22.2 by @renovate[bot]
 
 ## [1.7.2] - 2025-01-18
