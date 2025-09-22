@@ -5,6 +5,7 @@ package auth
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,12 +20,17 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ChallengeHeader is the HTTP Header containing challenge instructions.
 const ChallengeHeader = "WWW-Authenticate"
+
+// Domains for Docker Hub, the default registry.
+const (
+	DockerRegistryDomain = "docker.io"
+	DockerRegistryHost   = "index.docker.io"
+)
 
 // Constants for HTTP client configuration.
 // These values define timeouts and connection limits for registry requests.
@@ -65,6 +71,8 @@ var (
 	errFailedParseImageName = errors.New("failed to parse image name")
 	// errFailedDecodeResponse indicates a failure to decode the token response from the registry.
 	errFailedDecodeResponse = errors.New("failed to decode response")
+	// errFailedParseImageReference indicates a failure to parse an image reference into a normalized form.
+	errFailedParseImageReference = errors.New("failed to parse image reference")
 )
 
 // TLSVersionMap maps string names to TLS version constants.
@@ -672,6 +680,74 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 	return authURL, nil
 }
 
+// GetRegistryAddress extracts the registry address from an image reference.
+//
+// It returns the domain part of the reference, mapping Docker Hub’s default domain to its canonical host if needed.
+//
+// Parameters:
+//   - imageRef: Image reference string (e.g., "docker.io/library/alpine").
+//
+// Returns:
+//   - string: Registry address (e.g., "index.docker.io") if successful.
+//   - error: Non-nil if parsing fails, nil on success.
+func GetRegistryAddress(imageRef string) (string, error) {
+	// Parse the image reference into a normalized form for consistent domain extraction.
+	normalizedRef, err := reference.ParseNormalizedNamed(imageRef)
+	if err != nil {
+		logrus.WithError(err).
+			WithField("image_ref", imageRef).
+			Debug("Failed to parse image reference")
+
+		return "", fmt.Errorf("%w: %w", errFailedParseImageReference, err)
+	}
+
+	// Extract the domain from the normalized reference.
+	address := reference.Domain(normalizedRef)
+
+	// Map Docker Hub’s default domain to its canonical host for registry requests.
+	if address == DockerRegistryDomain {
+		logrus.WithFields(logrus.Fields{
+			"image_ref": imageRef,
+			"address":   address,
+		}).Debug("Mapped Docker Hub domain to canonical host")
+
+		address = DockerRegistryHost
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"image_ref": imageRef,
+		"address":   address,
+	}).Debug("Extracted registry address")
+
+	return address, nil
+}
+
+// TransformAuth converts a base64-encoded JSON object into a base64-encoded "username:password" string.
+// It decodes the input, extracts username and password from a RegistryCredentials struct, and re-encodes
+// them for use in HTTP Basic Authentication headers, ensuring compatibility with registry requirements.
+//
+// Parameters:
+//   - registryAuth: A base64-encoded string, typically a JSON object with username and password fields.
+//
+// Returns:
+//   - string: A base64-encoded "username:password" string if credentials are present, otherwise the original input.
+func TransformAuth(registryAuth string) string {
+	// Decode the base64 input, silently ignoring errors to handle malformed inputs gracefully.
+	b, _ := base64.StdEncoding.DecodeString(registryAuth)
+	credentials := &types.RegistryCredentials{}
+
+	// Unmarshal JSON into credentials struct, ignoring errors if malformed.
+	_ = json.Unmarshal(b, credentials) //nolint:musttag
+
+	// If both username and password are present, re-encode them as "username:password".
+	if credentials.Username != "" && credentials.Password != "" {
+		ba := fmt.Appendf(nil, "%s:%s", credentials.Username, credentials.Password)
+		registryAuth = base64.StdEncoding.EncodeToString(ba)
+	}
+
+	return registryAuth // Return original if no valid credentials.
+}
+
 // GetChallengeURL generates a challenge URL for accessing an image’s registry.
 //
 // Parameters:
@@ -681,7 +757,7 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 //   - url.URL: Generated challenge URL.
 func GetChallengeURL(imageRef reference.Named) url.URL {
 	// Extract registry host from the image reference.
-	host, _ := helpers.GetRegistryAddress(imageRef.Name())
+	host, _ := GetRegistryAddress(imageRef.Name())
 
 	scheme := "https"
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {

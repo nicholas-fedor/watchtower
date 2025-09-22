@@ -11,7 +11,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -116,7 +116,7 @@ func WarnOnAPIConsumption(container types.Container) bool {
 	}
 
 	// Extract the registry host from the reference.
-	containerHost, err := helpers.GetRegistryAddress(normalizedRef.Name())
+	containerHost, err := auth.GetRegistryAddress(normalizedRef.Name())
 	if err != nil {
 		logrus.WithError(err).
 			WithFields(fields).
@@ -126,7 +126,7 @@ func WarnOnAPIConsumption(container types.Container) bool {
 	}
 
 	// Check if the registry is known to support HEAD requests.
-	if containerHost == helpers.DockerRegistryHost || containerHost == "ghcr.io" {
+	if containerHost == auth.DockerRegistryHost || containerHost == "ghcr.io" {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"host": containerHost,
 		}).Debug("Registry supports HEAD requests, warning on API consumption")

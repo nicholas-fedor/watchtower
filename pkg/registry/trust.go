@@ -16,7 +16,7 @@ import (
 	dockerConfigCredentials "github.com/docker/cli/cli/config/credentials"
 	dockerConfigTypes "github.com/docker/cli/cli/config/types"
 
-	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 )
 
 // Errors for registry authentication operations.
@@ -127,7 +127,7 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 	}
 
 	// Get the registry server address from the image reference.
-	server, err := helpers.GetRegistryAddress(imageRef)
+	server, err := auth.GetRegistryAddress(imageRef)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get registry address")
 

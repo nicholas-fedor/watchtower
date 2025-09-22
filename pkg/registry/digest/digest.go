@@ -7,10 +7,10 @@ package digest
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,7 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
-	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -46,8 +45,6 @@ var (
 	errMissingImageInfo = errors.New("container image info missing")
 	// errInvalidRegistryResponse indicates the registry’s HEAD response lacks a digest or is malformed.
 	errInvalidRegistryResponse = errors.New("registry responded with invalid HEAD request")
-	// errDigestExtractionFailed indicates a failure to extract a digest from a GET response due to decoding issues.
-	errDigestExtractionFailed = errors.New("failed to extract digest from response")
 	// errFailedGetToken indicates a failure to obtain an authentication token from the registry.
 	errFailedGetToken = errors.New("failed to get token")
 	// errFailedBuildManifestURL indicates a failure to construct the manifest URL for the registry.
@@ -58,13 +55,33 @@ var (
 	errFailedExecuteRequest = errors.New("failed to execute request")
 )
 
-// manifestResponse represents the JSON structure of a registry manifest response from a GET request.
+// NormalizeDigest standardizes a digest string for consistent comparison.
 //
-// It is used to deserialize the digest field when fetching the full manifest body, providing a structured way
-// to access the image digest returned by the registry.
-type manifestResponse struct {
-	// Digest is the image digest from the registry, typically in the format "sha256:abc...".
-	Digest string `json:"digest"`
+// It trims common prefixes (e.g., "sha256:") to return the raw digest value.
+//
+// Parameters:
+//   - digest: Digest string (e.g., "sha256:abc123").
+//
+// Returns:
+//   - string: Normalized digest (e.g., "abc123").
+func NormalizeDigest(digest string) string {
+	// List of prefixes to strip from the digest.
+	prefixes := []string{"sha256:"}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(digest, prefix) {
+			// Trim the prefix to get the raw digest value.
+			normalized := strings.TrimPrefix(digest, prefix)
+			logrus.WithFields(logrus.Fields{
+				"original":   digest,
+				"normalized": normalized,
+			}).Debug("Normalized digest by trimming prefix")
+
+			return normalized
+		}
+	}
+
+	// Return unchanged if no prefix matches.
+	return digest
 }
 
 // CompareDigest checks whether a container’s current image digest matches the latest from its registry.
@@ -122,8 +139,8 @@ func CompareDigest(
 }
 
 // FetchDigest retrieves the digest of an image from its registry using a GET request.
-// Unlike CompareDigest, it fetches the full manifest body to extract the digest, which may be necessary when
-// HEAD requests are unsupported or additional metadata is required. The digest is normalized for consistency.
+// It fetches the manifest to ensure the digest header is present, which may be necessary when
+// HEAD requests are unsupported. The digest is extracted from the response headers and normalized for consistency.
 //
 // Parameters:
 //   - ctx: The context controlling the request’s lifecycle, enabling cancellation or timeouts.
@@ -132,7 +149,7 @@ func CompareDigest(
 //
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if successful.
-//   - error: An error if the request or decoding fails, nil if successful.
+//   - error: An error if the request fails or digest header is missing, nil if successful.
 func FetchDigest(ctx context.Context, container types.Container, authToken string) (string, error) {
 	return fetchDigest(ctx, container, authToken, http.MethodGet)
 }
@@ -160,7 +177,7 @@ func fetchDigest(
 	}
 
 	// Transform the provided auth string into a usable format for registry authentication.
-	registryAuth = TransformAuth(registryAuth)
+	registryAuth = auth.TransformAuth(registryAuth)
 
 	// Create an authentication client for registry requests.
 	client := auth.NewAuthClient()
@@ -279,15 +296,15 @@ func fetchDigest(
 	}
 	defer resp.Body.Close()
 
-	// Handle 404 response for HEAD requests by returning empty digest to trigger GET fallback.
-	if method == http.MethodHead && resp.StatusCode == http.StatusNotFound {
+	// Handle non-success responses for HEAD requests by returning empty digest to trigger GET fallback.
+	if method == http.MethodHead && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 		logrus.WithFields(fields).WithField("status", resp.Status).
-			Debug("Registry returned 404 for HEAD request, falling back to GET")
+			Debug("Registry returned non-success status for HEAD request, falling back to GET")
 
 		return "", nil // Return empty to trigger GET fallback in CompareDigest
 	}
 
-	// Check for successful status code.
+	// Check for successful status code (only for GET requests, since HEAD is handled above).
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		logrus.WithFields(fields).WithField("status", resp.Status).
 			Debug("Registry returned non-success status")
@@ -300,7 +317,7 @@ func fetchDigest(
 	if method == http.MethodHead {
 		digest, err = extractHeadDigest(resp)
 	} else {
-		digest, err = extractGetDigest(resp)
+		digest, err = ExtractGetDigest(resp)
 	}
 
 	if err != nil {
@@ -347,7 +364,7 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 	}
 
 	// Normalize the digest (e.g., strip "sha256:") for consistency.
-	normalizedDigest := helpers.NormalizeDigest(digest)
+	normalizedDigest := NormalizeDigest(digest)
 	logrus.WithFields(logrus.Fields{
 		"digest": normalizedDigest,
 	}).Debug("Extracted digest from HEAD response")
@@ -355,41 +372,111 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 	return normalizedDigest, nil
 }
 
-// extractGetDigest extracts the image digest from a GET response’s body.
-// It decodes the JSON manifest response to retrieve the digest field, normalizing it for consistency,
-// and handles decoding errors gracefully by falling back to header extraction.
+// ExtractGetDigest extracts the image digest from a GET response’s headers or body.
+//
+// It first tries to retrieve the digest from the "Docker-Content-Digest" header.
+// If the header is missing, it falls back to parsing the response body as a JSON
+// manifest or as a plain text digest for non-standard registries.
+// The digest is normalized for consistency.
 //
 // Parameters:
-//   - resp: The HTTP response from a GET request containing the manifest body.
+//   - resp: The HTTP response from a GET request containing headers and body.
 //
 // Returns:
-//   - string: The normalized digest (e.g., "abc..." without "sha256:") if successful.
-//   - error: An error if decoding fails or the digest is missing, nil if successful.
-func extractGetDigest(resp *http.Response) (string, error) {
-	var response manifestResponse
-	// Decode the JSON response body into the manifest structure.
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		logrus.WithError(err).
-			Warn("Failed to decode JSON from GET response, attempting header fallback")
+//   - string: The normalized digest (e.g., "abc..." without "sha256:") if present.
+//   - error: An error if the digest cannot be extracted, nil if successful.
+func ExtractGetDigest(resp *http.Response) (string, error) {
+	// First, try to retrieve the digest from the standard header.
+	digest := resp.Header.Get(ContentDigestHeader)
+	if digest != "" {
+		// Normalize the digest (e.g., strip "sha256:") for consistency.
+		normalizedDigest := NormalizeDigest(digest)
+		logrus.WithFields(logrus.Fields{
+			"digest": normalizedDigest,
+		}).Debug("Extracted digest from GET response header")
 
-		// Fallback: Try to extract digest from Docker-Content-Digest header
-		if digest := resp.Header.Get(ContentDigestHeader); digest != "" {
-			normalizedDigest := helpers.NormalizeDigest(digest)
+		return normalizedDigest, nil
+	}
+
+	// Fallback: Try to read the response body.
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"status": resp.Status,
+		}).Debug("Failed to read response body for digest extraction")
+
+		return "", fmt.Errorf(
+			"%w: failed to read response body: %w",
+			errInvalidRegistryResponse,
+			err,
+		)
+	}
+
+	bodyStr := strings.TrimSpace(string(bodyBytes))
+	if bodyStr == "" {
+		logrus.WithFields(logrus.Fields{
+			"status": resp.Status,
+		}).Debug("Response body is empty, no digest found")
+
+		return "", fmt.Errorf(
+			"%w: missing digest header and empty body",
+			errInvalidRegistryResponse,
+		)
+	}
+
+	// Try to parse as JSON manifest first (standard OCI/Docker format).
+	// Define a struct to hold the expected JSON structure with a digest field.
+	var (
+		manifest struct {
+			Digest string `json:"digest"`
+		}
+		jsonErr error
+	)
+	// Attempt to unmarshal the response body as JSON.
+	if jsonErr = json.Unmarshal(bodyBytes, &manifest); jsonErr == nil {
+		// JSON unmarshaling succeeded, check if digest field contains a value.
+		if manifest.Digest != "" {
+			// Successfully parsed JSON manifest with digest field populated.
+			normalizedDigest := NormalizeDigest(manifest.Digest)
 			logrus.WithFields(logrus.Fields{
 				"digest": normalizedDigest,
-			}).Debug("Extracted digest from GET response header")
+			}).Debug("Extracted digest from JSON manifest")
 
 			return normalizedDigest, nil
 		}
+		// JSON parsed successfully but digest field is empty or missing.
+		logrus.WithFields(logrus.Fields{
+			"status": resp.Status,
+			"body":   bodyStr,
+		}).Debug("JSON manifest parsed but digest field is empty")
 
-		return "", fmt.Errorf("%w: %w", errDigestExtractionFailed, err)
+		return "", fmt.Errorf("%w: empty digest in JSON manifest", errInvalidRegistryResponse)
+	}
+	// JSON parsing failed, log metadata for debugging (avoid exposing potentially sensitive content).
+	logrus.WithError(jsonErr).WithFields(logrus.Fields{
+		"status":       resp.Status,
+		"body_length":  len(bodyStr),
+		"content_type": resp.Header.Get("Content-Type"),
+	}).Debug("Failed to parse response body as JSON manifest")
+
+	// Final fallback: Try to parse as plain text digest for non-standard registries.
+	// Validate that the body looks like a digest (starts with sha256: prefix and has reasonable length).
+	if !strings.HasPrefix(bodyStr, "sha256:") || len(bodyStr) < 20 {
+		logrus.WithFields(logrus.Fields{
+			"status":       resp.Status,
+			"body_length":  len(bodyStr),
+			"content_type": resp.Header.Get("Content-Type"),
+			"body":         bodyStr,
+		}).Debug("Response body does not appear to be a valid digest")
+
+		return "", fmt.Errorf("%w: invalid digest format in body", errInvalidRegistryResponse)
 	}
 
-	// Normalize the extracted digest for consistent comparison.
-	normalizedDigest := helpers.NormalizeDigest(response.Digest)
+	// Normalize the digest from the plain text body.
+	normalizedDigest := NormalizeDigest(bodyStr)
 	logrus.WithFields(logrus.Fields{
 		"digest": normalizedDigest,
-	}).Debug("Extracted digest from GET response")
+	}).Debug("Extracted digest from plain text body")
 
 	return normalizedDigest, nil
 }
@@ -406,7 +493,7 @@ func extractGetDigest(resp *http.Response) (string, error) {
 //   - bool: True if any normalized local digest matches the normalized remote digest, false otherwise.
 func digestsMatch(localDigests []string, remoteDigest string) bool {
 	// Normalize the remote digest once for efficiency.
-	normalizedRemoteDigest := helpers.NormalizeDigest(remoteDigest)
+	normalizedRemoteDigest := NormalizeDigest(remoteDigest)
 
 	for _, digest := range localDigests {
 		// Split digest into repo and hash parts (e.g., "repo@sha256:abc").
@@ -416,7 +503,7 @@ func digestsMatch(localDigests []string, remoteDigest string) bool {
 		}
 
 		// Normalize the local digest’s hash part.
-		normalizedLocalDigest := helpers.NormalizeDigest(parts[1])
+		normalizedLocalDigest := NormalizeDigest(parts[1])
 		logrus.WithFields(logrus.Fields{
 			"local_digest":  normalizedLocalDigest,
 			"remote_digest": normalizedRemoteDigest,
@@ -431,30 +518,4 @@ func digestsMatch(localDigests []string, remoteDigest string) bool {
 	}
 
 	return false
-}
-
-// TransformAuth converts a base64-encoded JSON object into a base64-encoded "username:password" string.
-// It decodes the input, extracts username and password from a RegistryCredentials struct, and re-encodes
-// them for use in HTTP Basic Authentication headers, ensuring compatibility with registry requirements.
-//
-// Parameters:
-//   - registryAuth: A base64-encoded string, typically a JSON object with username and password fields.
-//
-// Returns:
-//   - string: A base64-encoded "username:password" string if credentials are present, otherwise the original input.
-func TransformAuth(registryAuth string) string {
-	// Decode the base64 input, silently ignoring errors to handle malformed inputs gracefully.
-	b, _ := base64.StdEncoding.DecodeString(registryAuth)
-	credentials := &types.RegistryCredentials{}
-
-	// Unmarshal JSON into credentials struct, ignoring errors if malformed.
-	_ = json.Unmarshal(b, credentials) //nolint:musttag
-
-	// If both username and password are present, re-encode them as "username:password".
-	if credentials.Username != "" && credentials.Password != "" {
-		ba := fmt.Appendf(nil, "%s:%s", credentials.Username, credentials.Password)
-		registryAuth = base64.StdEncoding.EncodeToString(ba)
-	}
-
-	return registryAuth // Return original if no valid credentials.
 }

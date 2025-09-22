@@ -131,3 +131,43 @@ func TestRandName(t *testing.T) {
 	anotherName := RandName()
 	assert.NotEqual(t, name, anotherName, "RandName should generate unique names")
 }
+
+// TestMinInt_FirstSmaller verifies that MinInt returns the smaller value when the first argument is smaller.
+func TestMinInt_FirstSmaller(t *testing.T) {
+	t.Parallel()
+
+	result := MinInt(3, 5)
+	assert.Equal(t, 3, result)
+}
+
+// TestMinInt_SecondSmaller verifies that MinInt returns the smaller value when the second argument is smaller.
+func TestMinInt_SecondSmaller(t *testing.T) {
+	t.Parallel()
+
+	result := MinInt(7, 2)
+	assert.Equal(t, 2, result)
+}
+
+// TestMinInt_Equal verifies that MinInt returns either value when both arguments are equal.
+func TestMinInt_Equal(t *testing.T) {
+	t.Parallel()
+
+	result := MinInt(4, 4)
+	assert.Equal(t, 4, result)
+}
+
+// TestMinInt_NegativeNumbers verifies that MinInt works correctly with negative numbers.
+func TestMinInt_NegativeNumbers(t *testing.T) {
+	t.Parallel()
+
+	result := MinInt(-1, -3)
+	assert.Equal(t, -3, result)
+}
+
+// TestMinInt_Zero verifies that MinInt works correctly with zero.
+func TestMinInt_Zero(t *testing.T) {
+	t.Parallel()
+
+	result := MinInt(0, 5)
+	assert.Equal(t, 0, result)
+}

@@ -47,6 +47,22 @@ func SliceSubtract(slice, subtractFrom []string) []string {
 	return result
 }
 
+// MinInt returns the smaller of two integers.
+//
+// Parameters:
+//   - a: First integer.
+//   - b: Second integer.
+//
+// Returns:
+//   - int: The smaller of the two integers.
+func MinInt(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
 // StringMapSubtract removes matching key-value pairs.
 //
 // Parameters:

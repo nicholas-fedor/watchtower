@@ -291,6 +291,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 //   - c: The cobra.Command instance being executed, providing access to parsed flags.
 //   - names: A slice of container names provided as positional arguments, used for filtering.
 func run(c *cobra.Command, names []string) {
+	// Attempt to derive the operational scope from the current container's scope label
+	// if not explicitly set. This ensures scope persistence during self-updates.
+	if err := deriveScopeFromContainer(client); err != nil {
+		logrus.WithError(err).Debug("Scope derivation failed, continuing with current scope")
+	}
+
 	// Build the filter and its description based on names, exclusions, and label settings.
 	filter, filterDesc := filters.BuildFilter(names, disableContainers, enableLabel, scope)
 
@@ -347,6 +353,54 @@ func run(c *cobra.Command, names []string) {
 		logrus.WithField("exit_code", exitCode).Debug("Exiting with non-zero status")
 		os.Exit(exitCode)
 	}
+}
+
+// deriveScopeFromContainer attempts to derive the operational scope from the current container's scope label.
+// This is crucial for self-update scenarios where a new Watchtower instance needs to inherit
+// the same scope as the instance being replaced to maintain proper isolation and prevent
+// cross-scope interference during the update process.
+//
+// Parameters:
+//   - client: Container client for Docker operations.
+//
+// Returns:
+//   - error: Non-nil if scope derivation fails, nil on success or if derivation is skipped.
+func deriveScopeFromContainer(client container.Client) error {
+	// Skip derivation if scope is already explicitly set via flags or environment.
+	if scope != "" {
+		return nil
+	}
+
+	// Retrieve the hostname environment variable, which typically contains
+	// the container ID when running inside Docker. This allows us to identify
+	// the current Watchtower container instance.
+	hostname := os.Getenv("HOSTNAME")
+	if hostname == "" {
+		// No hostname available, cannot derive scope.
+		return nil
+	}
+
+	// Attempt to retrieve the container object using the hostname as the container ID.
+	// This lookup is necessary to access the container's labels and metadata.
+	container, err := client.GetContainer(types.ContainerID(hostname))
+	if err != nil {
+		// Container lookup failed, but this is not a fatal error since
+		// scope derivation is a best-effort operation.
+		return fmt.Errorf("failed to retrieve current container for scope derivation: %w", err)
+	}
+
+	// Extract the scope label from the container. The Scope() method returns
+	// the scope value and a boolean indicating whether the label is present.
+	// Only set the scope if the label exists and contains a non-empty value.
+	if derivedScope, ok := container.Scope(); ok && derivedScope != "" {
+		scope = derivedScope
+		logrus.WithFields(logrus.Fields{
+			"derived_scope": scope,
+			"container_id":  hostname,
+		}).Debug("Derived operational scope from current container's scope label")
+	}
+
+	return nil
 }
 
 // runMain contains the core Watchtower logic after early exits are handled.
