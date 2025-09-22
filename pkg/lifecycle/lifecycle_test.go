@@ -82,10 +82,10 @@ func TestExecutePreChecks(t *testing.T) {
 					})),
 					mockContainer(),
 				}, nil)
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).
+				c.On("ExecuteCommand", mock.Anything, "pre-check", 1, 0, 0).
 					Return(true, nil)
 			},
-			expectedLogs:   5, // Listing, Found, Execute, Label not found, Skip
+			expectedLogs:   13, // Listing, Found, UID not found x2, UID not set x2, GID not found x2, GID not set x2, Execute, Label not found, Skip
 			expectedLogMsg: "Listing containers for pre-checks",
 		},
 		{
@@ -110,6 +110,8 @@ func TestExecutePreChecks(t *testing.T) {
 			ExecutePreChecks(client, types.UpdateParams{
 				Filter:         func(types.FilterableContainer) bool { return true },
 				LifecycleHooks: true,
+				LifecycleUID:   0,
+				LifecycleGID:   0,
 			})
 
 			assert.Len(t, hook.Entries, testClient.expectedLogs, "log entry count mismatch")
@@ -147,10 +149,10 @@ func TestExecutePostChecks(t *testing.T) {
 					})),
 					mockContainer(),
 				}, nil)
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).
+				c.On("ExecuteCommand", mock.Anything, "post-check", 1, 0, 0).
 					Return(true, nil)
 			},
-			expectedLogs:   5, // Listing, Found, Execute, Label not found, Skip
+			expectedLogs:   13, // Listing, Found, UID not found x2, UID not set x2, GID not found x2, GID not set x2, Execute, Label not found, Skip
 			expectedLogMsg: "Listing containers for post-checks",
 		},
 		{
@@ -175,6 +177,8 @@ func TestExecutePostChecks(t *testing.T) {
 			ExecutePostChecks(client, types.UpdateParams{
 				Filter:         func(types.FilterableContainer) bool { return true },
 				LifecycleHooks: true,
+				LifecycleUID:   0,
+				LifecycleGID:   0,
 			})
 
 			assert.Len(t, hook.Entries, testClient.expectedLogs)
@@ -205,16 +209,16 @@ func TestExecutePreCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 			})),
 			setupClient: func(c *mocks.MockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).
+				c.On("ExecuteCommand", mock.Anything, "pre-check", 1, 0, 0).
 					Return(true, nil)
 			},
-			expectedLogs:   1,
+			expectedLogs:   5, // UID not found, UID not set, GID not found, GID not set, Execute
 			expectedLogMsg: "Executing pre-check command",
 		},
 		{
 			name:           "no command",
 			container:      mockContainer(),
-			expectedLogs:   2, // "Label not found" + "Skipping"
+			expectedLogs:   6, // Command label not found, UID not found, UID not set, GID not found, GID not set, No command
 			expectedLogMsg: "No pre-check command supplied",
 		},
 		{
@@ -223,11 +227,25 @@ func TestExecutePreCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 			})),
 			setupClient: func(c *mocks.MockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-check", 1).
+				c.On("ExecuteCommand", mock.Anything, "pre-check", 1, 0, 0).
 					Return(false, errExecFailed)
 			},
-			expectedLogs:   2,
+			expectedLogs:   6, // UID not found, UID not set, GID not found, GID not set, Execute, Error
 			expectedLogMsg: "Pre-check command failed",
+		},
+		{
+			name: "container UID/GID override",
+			container: mockContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
+				"com.centurylinklabs.watchtower.lifecycle.uid":       "1000",
+				"com.centurylinklabs.watchtower.lifecycle.gid":       "1001",
+			})),
+			setupClient: func(c *mocks.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, "pre-check", 1, 1000, 1001).
+					Return(true, nil)
+			},
+			expectedLogs:   5, // UID found, UID set, GID found, GID set, Execute
+			expectedLogMsg: "Executing pre-check command",
 		},
 	}
 	for _, testClient := range tests {
@@ -243,7 +261,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 
 			hook.Reset()
 
-			ExecutePreCheckCommand(client, testClient.container)
+			ExecutePreCheckCommand(client, testClient.container, 0, 0)
 
 			assert.Len(t, hook.Entries, testClient.expectedLogs)
 
@@ -273,16 +291,16 @@ func TestExecutePostCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 			})),
 			setupClient: func(c *mocks.MockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).
+				c.On("ExecuteCommand", mock.Anything, "post-check", 1, 0, 0).
 					Return(true, nil)
 			},
-			expectedLogs:   1,
+			expectedLogs:   5, // UID not found, UID not set, GID not found, GID not set, Execute
 			expectedLogMsg: "Executing post-check command",
 		},
 		{
 			name:           "no command",
 			container:      mockContainer(),
-			expectedLogs:   2, // "Label not found" + "Skipping"
+			expectedLogs:   6, // Command label not found, UID not found, UID not set, GID not found, GID not set, No command
 			expectedLogMsg: "No post-check command supplied",
 		},
 		{
@@ -291,11 +309,25 @@ func TestExecutePostCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 			})),
 			setupClient: func(c *mocks.MockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "post-check", 1).
+				c.On("ExecuteCommand", mock.Anything, "post-check", 1, 0, 0).
 					Return(false, errExecFailed)
 			},
-			expectedLogs:   2,
+			expectedLogs:   6, // UID not found, UID not set, GID not found, GID not set, Execute, Error
 			expectedLogMsg: "Post-check command failed",
+		},
+		{
+			name: "container UID/GID override",
+			container: mockContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
+				"com.centurylinklabs.watchtower.lifecycle.uid":        "2000",
+				"com.centurylinklabs.watchtower.lifecycle.gid":        "2001",
+			})),
+			setupClient: func(c *mocks.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, "post-check", 1, 2000, 2001).
+					Return(true, nil)
+			},
+			expectedLogs:   5, // UID found, UID set, GID found, GID set, Execute
+			expectedLogMsg: "Executing post-check command",
 		},
 	}
 	for _, testClient := range tests {
@@ -311,7 +343,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 
 			hook.Reset()
 
-			ExecutePostCheckCommand(client, testClient.container)
+			ExecutePostCheckCommand(client, testClient.container, 0, 0)
 
 			assert.Len(t, hook.Entries, testClient.expectedLogs)
 
@@ -347,11 +379,11 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 				}),
 			),
 			setupClient: func(c *mocks.MockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-update", 2).
+				c.On("ExecuteCommand", mock.Anything, "pre-update", 2, 0, 0).
 					Return(true, nil)
 			},
 			expectedResult: true,
-			expectedLogs:   3,
+			expectedLogs:   7, // Timeout, UID not found, UID not set, GID not found, GID not set, Execute, Success
 			expectedLogMsg: "Pre-update command executed",
 		},
 		{
@@ -384,13 +416,32 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 				}),
 			),
 			setupClient: func(c *mocks.MockClient) {
-				c.On("ExecuteCommand", types.ContainerID("container_id"), "pre-update", 2).
+				c.On("ExecuteCommand", mock.Anything, "pre-update", 2, 0, 0).
 					Return(false, errExecFailed)
 			},
 			expectedResult: true,
 			expectedErr:    true,
-			expectedLogs:   3, // Timeout, Execute, Error
+			expectedLogs:   7, // Timeout, UID not found, UID not set, GID not found, GID not set, Execute, Error
 			expectedLogMsg: "Pre-update command failed",
+		},
+		{
+			name: "container UID/GID override",
+			container: mockContainer(
+				withContainerState(dockerContainer.State{Running: true}),
+				withLabels(map[string]string{
+					"com.centurylinklabs.watchtower.lifecycle.pre-update":         "pre-update",
+					"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "2",
+					"com.centurylinklabs.watchtower.lifecycle.uid":                "3000",
+					"com.centurylinklabs.watchtower.lifecycle.gid":                "3001",
+				}),
+			),
+			setupClient: func(c *mocks.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, "pre-update", 2, 3000, 3001).
+					Return(true, nil)
+			},
+			expectedResult: true,
+			expectedLogs:   7, // Timeout, UID found, UID set, GID found, GID set, Execute, Success
+			expectedLogMsg: "Pre-update command executed",
 		},
 	}
 	for _, tt := range tests {
@@ -424,7 +475,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 
 	hook.Reset()
 
-	result, err := ExecutePreUpdateCommand(client, tt.container)
+	result, err := ExecutePreUpdateCommand(client, tt.container, 0, 0)
 
 	assert.Equal(t, tt.expectedResult, result)
 
@@ -466,10 +517,10 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 					Return(mockContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
 					})), nil)
-				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).
+				c.On("ExecuteCommand", mock.Anything, "post-update", 1, 0, 0).
 					Return(true, nil)
 			},
-			expectedLogs:   4, // Retrieve, Label not found, Default timeout, Execute
+			expectedLogs:   8, // Retrieve, Timeout label not found, Default timeout, UID not found, UID not set, GID not found, GID not set, Execute
 			expectedLogMsg: "Executing post-update command",
 		},
 		{
@@ -478,7 +529,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			setupClient: func(c *mocks.MockClient) {
 				c.On("GetContainer", types.ContainerID("test")).Return(mockContainer(), nil)
 			},
-			expectedLogs:   5, // Retrieve, Timeout label not found, Default timeout, Command label not found, Skipping
+			expectedLogs:   9, // Retrieve, Timeout label not found, Default timeout, UID not found, UID not set, GID not found, GID not set, Command label not found, Skipping
 			expectedLogMsg: "No post-update command supplied",
 		},
 		{
@@ -498,11 +549,27 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 					Return(mockContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
 					})), nil)
-				c.On("ExecuteCommand", types.ContainerID("test"), "post-update", 1).
+				c.On("ExecuteCommand", mock.Anything, "post-update", 1, 0, 0).
 					Return(false, errExecFailed)
 			},
-			expectedLogs:   5, // Retrieve, Label not found, Default timeout, Execute, Error
+			expectedLogs:   9, // Retrieve, Timeout label not found, Default timeout, UID not found, UID not set, GID not found, GID not set, Execute, Error
 			expectedLogMsg: "Post-update command failed",
+		},
+		{
+			name:        "container UID/GID override",
+			containerID: "test",
+			setupClient: func(c *mocks.MockClient) {
+				c.On("GetContainer", types.ContainerID("test")).
+					Return(mockContainer(withLabels(map[string]string{
+						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
+						"com.centurylinklabs.watchtower.lifecycle.uid":         "4000",
+						"com.centurylinklabs.watchtower.lifecycle.gid":         "4001",
+					})), nil)
+				c.On("ExecuteCommand", mock.Anything, "post-update", 1, 4000, 4001).
+					Return(true, nil)
+			},
+			expectedLogs:   8, // Retrieve, Timeout label not found, Default timeout, UID found, UID set, GID found, GID set, Execute
+			expectedLogMsg: "Executing post-update command",
 		},
 	}
 	for _, testClient := range tests {
@@ -515,7 +582,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			testClient.setupClient(client)
 			hook.Reset()
 
-			ExecutePostUpdateCommand(client, testClient.containerID)
+			ExecutePostUpdateCommand(client, testClient.containerID, 0, 0)
 
 			assert.Len(t, hook.Entries, testClient.expectedLogs)
 

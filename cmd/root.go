@@ -119,6 +119,18 @@ var scope string
 // allowing container-specific configurations to override broader settings for flexibility.
 var labelPrecedence bool
 
+// lifecycleUID is the default UID to run lifecycle hooks as.
+//
+// It is set in preRun via the --lifecycle-uid flag or the WATCHTOWER_LIFECYCLE_UID environment variable,
+// providing a global default that can be overridden by container labels.
+var lifecycleUID int
+
+// lifecycleGID is the default GID to run lifecycle hooks as.
+//
+// It is set in preRun via the --lifecycle-gid flag or the WATCHTOWER_LIFECYCLE_GID environment variable,
+// providing a global default that can be overridden by container labels.
+var lifecycleGID int
+
 // rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 //
 // It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
@@ -235,6 +247,10 @@ func preRun(cmd *cobra.Command, _ []string) {
 	rollingRestart, _ = flagsSet.GetBool("rolling-restart")
 	scope, _ = flagsSet.GetString("scope")
 	labelPrecedence, _ = flagsSet.GetBool("label-take-precedence")
+
+	// Retrieve lifecycle UID and GID flags.
+	lifecycleUID, _ = flagsSet.GetInt("lifecycle-uid")
+	lifecycleGID, _ = flagsSet.GetInt("lifecycle-gid")
 
 	// Log the scope if specified, aiding debugging by confirming the operational boundary.
 	if scope != "" {
@@ -894,6 +910,8 @@ func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Met
 		RollingRestart:  rollingRestart,
 		LabelPrecedence: labelPrecedence,
 		NoPull:          noPull,
+		LifecycleUID:    lifecycleUID,
+		LifecycleGID:    lifecycleGID,
 	}
 
 	// Execute the update action, capturing results and image IDs for cleanup.

@@ -16,4 +16,6 @@ type UpdateParams struct {
 	RollingRestart   bool          // Use rolling restart if true.
 	LabelPrecedence  bool          // Prioritize labels if true.
 	PullFailureDelay time.Duration // Delay after failed self-update pull.
+	LifecycleUID     int           // Default UID for lifecycle hooks.
+	LifecycleGID     int           // Default GID for lifecycle hooks.
 }

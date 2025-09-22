@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -68,7 +69,14 @@ type Client interface {
 	// ExecuteCommand runs a command inside a container and returns whether to skip updates based on the result.
 	//
 	// The timeout specifies how long to wait for the command to complete.
-	ExecuteCommand(containerID types.ContainerID, command string, timeout int) (bool, error)
+	// UID and GID specify the user to run the command as, defaulting to container's configured user.
+	ExecuteCommand(
+		container types.Container,
+		command string,
+		timeout int,
+		uid int,
+		gid int,
+	) (bool, error)
 
 	// RemoveImageByID deletes an image from the Docker host by its ID.
 	//
@@ -381,28 +389,24 @@ func (c client) IsContainerStale(
 // ExecuteCommand runs a command inside a container and evaluates its result.
 //
 // Parameters:
-//   - containerID: ID of the container.
+//   - container: Container to execute command in.
 //   - command: Command to execute.
 //   - timeout: Minutes to wait before timeout (0 for no timeout).
+//   - uid: UID to run command as (-1 to use container default).
+//   - gid: GID to run command as (-1 to use container default).
 //
 // Returns:
 //   - bool: True if updates should be skipped, false otherwise.
 //   - error: Non-nil if execution fails, nil on success.
 func (c client) ExecuteCommand(
-	containerID types.ContainerID,
+	container types.Container,
 	command string,
 	timeout int,
+	uid int,
+	gid int,
 ) (bool, error) {
 	ctx := context.Background()
-	clog := logrus.WithField("container_id", containerID)
-
-	// Retrieve container to get its metadata.
-	container, err := c.GetContainer(containerID)
-	if err != nil {
-		clog.WithError(err).Debug("Failed to retrieve container for metadata")
-
-		return false, fmt.Errorf("failed to get container: %w", err)
-	}
+	clog := logrus.WithField("container_id", container.ID())
 
 	// Generate JSON metadata for the container.
 	metadataJSON, err := generateContainerMetadata(container)
@@ -412,6 +416,22 @@ func (c client) ExecuteCommand(
 		return false, err
 	}
 
+	// Set User if UID or GID are specified (non-zero).
+	var user string
+
+	switch {
+	case uid > 0 && gid > 0:
+		user = fmt.Sprintf("%d:%d", uid, gid)
+	case uid > 0:
+		user = strconv.Itoa(uid)
+	case gid > 0:
+		user = fmt.Sprintf(":%d", gid)
+	}
+
+	if user != "" {
+		clog.WithField("user", user).Debug("Setting exec user")
+	}
+
 	// Set up exec configuration with command and metadata.
 	clog.WithField("command", command).Debug("Creating exec instance")
 	execConfig := dockerContainer.ExecOptions{
@@ -419,10 +439,11 @@ func (c client) ExecuteCommand(
 		Detach: false,
 		Cmd:    []string{"sh", "-c", command},
 		Env:    []string{"WT_CONTAINER=" + metadataJSON},
+		User:   user,
 	}
 
 	// Create the exec instance.
-	exec, err := c.api.ContainerExecCreate(ctx, string(containerID), execConfig)
+	exec, err := c.api.ContainerExecCreate(ctx, string(container.ID()), execConfig)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to create exec instance")
 

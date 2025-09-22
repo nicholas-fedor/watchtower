@@ -554,7 +554,12 @@ func stopStaleContainer(
 
 	// Execute pre-update lifecycle hooks if enabled, checking for skip conditions.
 	if params.LifecycleHooks {
-		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(client, container)
+		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(
+			client,
+			container,
+			params.LifecycleUID,
+			params.LifecycleGID,
+		)
 		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Pre-update command execution failed")
 
@@ -718,7 +723,12 @@ func restartStaleContainer(
 		// Run post-update lifecycle hooks for restarting containers if enabled.
 		if container.ToRestart() && params.LifecycleHooks {
 			logrus.WithFields(fields).Debug("Executing post-update command")
-			lifecycle.ExecutePostUpdateCommand(client, newContainerID)
+			lifecycle.ExecutePostUpdateCommand(
+				client,
+				newContainerID,
+				params.LifecycleUID,
+				params.LifecycleGID,
+			)
 		}
 	}
 

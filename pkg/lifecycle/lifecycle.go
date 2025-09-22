@@ -25,6 +25,8 @@ var (
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
 func ExecutePreChecks(client container.Client, params types.UpdateParams) {
+	uid := params.LifecycleUID
+	gid := params.LifecycleGID
 	clog := logrus.WithField(
 		"filter",
 		fmt.Sprintf("%v", params.Filter),
@@ -42,7 +44,7 @@ func ExecutePreChecks(client container.Client, params types.UpdateParams) {
 	clog.WithField("count", len(containers)).Debug("Found containers for pre-checks")
 
 	for _, currentContainer := range containers {
-		ExecutePreCheckCommand(client, currentContainer)
+		ExecutePreCheckCommand(client, currentContainer, uid, gid)
 	}
 }
 
@@ -52,6 +54,8 @@ func ExecutePreChecks(client container.Client, params types.UpdateParams) {
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
 func ExecutePostChecks(client container.Client, params types.UpdateParams) {
+	uid := params.LifecycleUID
+	gid := params.LifecycleGID
 	clog := logrus.WithField("filter", fmt.Sprintf("%v", params.Filter))
 	clog.Debug("Listing containers for post-checks")
 
@@ -66,7 +70,7 @@ func ExecutePostChecks(client container.Client, params types.UpdateParams) {
 	clog.WithField("count", len(containers)).Debug("Found containers for post-checks")
 
 	for _, currentContainer := range containers {
-		ExecutePostCheckCommand(client, currentContainer)
+		ExecutePostCheckCommand(client, currentContainer, uid, gid)
 	}
 }
 
@@ -75,9 +79,22 @@ func ExecutePostChecks(client container.Client, params types.UpdateParams) {
 // Parameters:
 //   - client: Container client for execution.
 //   - container: Container to process.
-func ExecutePreCheckCommand(client container.Client, container types.Container) {
+//   - uid: Default UID to run command as.
+//   - gid: Default GID to run command as.
+func ExecutePreCheckCommand(client container.Client, container types.Container, uid int, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePreCheckCommand()
+
+	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
+	effectiveUID := uid
+	if containerUID, ok := container.GetLifecycleUID(); ok {
+		effectiveUID = containerUID
+	}
+
+	effectiveGID := gid
+	if containerGID, ok := container.GetLifecycleGID(); ok {
+		effectiveGID = containerGID
+	}
 
 	// Skip if no command is set.
 	if len(command) == 0 {
@@ -89,7 +106,7 @@ func ExecutePreCheckCommand(client container.Client, container types.Container) 
 	// Execute command with default timeout.
 	clog.WithField("command", command).Debug("Executing pre-check command")
 
-	_, err := client.ExecuteCommand(container.ID(), command, 1)
+	_, err := client.ExecuteCommand(container, command, 1, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Pre-check command failed")
 	}
@@ -100,9 +117,22 @@ func ExecutePreCheckCommand(client container.Client, container types.Container) 
 // Parameters:
 //   - client: Container client for execution.
 //   - container: Container to process.
-func ExecutePostCheckCommand(client container.Client, container types.Container) {
+//   - uid: Default UID to run command as.
+//   - gid: Default GID to run command as.
+func ExecutePostCheckCommand(client container.Client, container types.Container, uid int, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePostCheckCommand()
+
+	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
+	effectiveUID := uid
+	if containerUID, ok := container.GetLifecycleUID(); ok {
+		effectiveUID = containerUID
+	}
+
+	effectiveGID := gid
+	if containerGID, ok := container.GetLifecycleGID(); ok {
+		effectiveGID = containerGID
+	}
 
 	// Skip if no command is set.
 	if len(command) == 0 {
@@ -114,7 +144,7 @@ func ExecutePostCheckCommand(client container.Client, container types.Container)
 	// Execute command with default timeout.
 	clog.WithField("command", command).Debug("Executing post-check command")
 
-	_, err := client.ExecuteCommand(container.ID(), command, 1)
+	_, err := client.ExecuteCommand(container, command, 1, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Post-check command failed")
 	}
@@ -125,11 +155,18 @@ func ExecutePostCheckCommand(client container.Client, container types.Container)
 // Parameters:
 //   - client: Container client for execution.
 //   - container: Container to process.
+//   - uid: UID to run command as.
+//   - gid: GID to run command as.
 //
 // Returns:
 //   - bool: True if command ran, false if skipped.
 //   - error: Non-nil if execution fails, nil otherwise.
-func ExecutePreUpdateCommand(client container.Client, container types.Container) (bool, error) {
+func ExecutePreUpdateCommand(
+	client container.Client,
+	container types.Container,
+	uid int,
+	gid int,
+) (bool, error) {
 	timeout := container.PreUpdateTimeout()
 	command := container.GetLifecyclePreUpdateCommand()
 	clog := logrus.WithFields(logrus.Fields{
@@ -153,10 +190,21 @@ func ExecutePreUpdateCommand(client container.Client, container types.Container)
 		return false, nil
 	}
 
+	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
+	effectiveUID := uid
+	if containerUID, ok := container.GetLifecycleUID(); ok {
+		effectiveUID = containerUID
+	}
+
+	effectiveGID := gid
+	if containerGID, ok := container.GetLifecycleGID(); ok {
+		effectiveGID = containerGID
+	}
+
 	// Execute command with configured timeout.
 	clog.WithField("command", command).Debug("Executing pre-update command")
 
-	success, err := client.ExecuteCommand(container.ID(), command, timeout)
+	success, err := client.ExecuteCommand(container, command, timeout, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Pre-update command failed")
 
@@ -178,7 +226,14 @@ func ExecutePreUpdateCommand(client container.Client, container types.Container)
 // Parameters:
 //   - client: Container client for execution.
 //   - newContainerID: ID of the updated container.
-func ExecutePostUpdateCommand(client container.Client, newContainerID types.ContainerID) {
+//   - uid: UID to run command as.
+//   - gid: GID to run command as.
+func ExecutePostUpdateCommand(
+	client container.Client,
+	newContainerID types.ContainerID,
+	uid int,
+	gid int,
+) {
 	clog := logrus.WithField("container_id", newContainerID.ShortID())
 	clog.Debug("Retrieving container for post-update")
 
@@ -197,6 +252,17 @@ func ExecutePostUpdateCommand(client container.Client, newContainerID types.Cont
 	})
 	command := newContainer.GetLifecyclePostUpdateCommand()
 
+	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
+	effectiveUID := uid
+	if containerUID, ok := newContainer.GetLifecycleUID(); ok {
+		effectiveUID = containerUID
+	}
+
+	effectiveGID := gid
+	if containerGID, ok := newContainer.GetLifecycleGID(); ok {
+		effectiveGID = containerGID
+	}
+
 	// Skip if no command is set.
 	if len(command) == 0 {
 		clog.Debug("No post-update command supplied. Skipping")
@@ -207,7 +273,7 @@ func ExecutePostUpdateCommand(client container.Client, newContainerID types.Cont
 	// Execute command with configured timeout.
 	clog.WithField("command", command).Debug("Executing post-update command")
 
-	_, err = client.ExecuteCommand(newContainerID, command, timeout)
+	_, err = client.ExecuteCommand(newContainer, command, timeout, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).WithFields(logrus.Fields{
 			"container_id": newContainerID.ShortID(),

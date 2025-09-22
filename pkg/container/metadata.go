@@ -44,6 +44,10 @@ const (
 	preUpdateTimeoutLabel = "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout"
 	// postUpdateTimeoutLabel sets the timeout (in minutes) for the post-update command.
 	postUpdateTimeoutLabel = "com.centurylinklabs.watchtower.lifecycle.post-update-timeout"
+	// lifecycleUIDLabel specifies the UID to run lifecycle hooks as.
+	lifecycleUIDLabel = "com.centurylinklabs.watchtower.lifecycle.uid"
+	// lifecycleGIDLabel specifies the GID to run lifecycle hooks as.
+	lifecycleGIDLabel = "com.centurylinklabs.watchtower.lifecycle.gid"
 )
 
 // GetLifecyclePreCheckCommand returns the pre-check command from labels.
@@ -150,6 +154,86 @@ func (c Container) PostUpdateTimeout() int {
 	}).Debug("Retrieved post-update timeout")
 
 	return minutes
+}
+
+// getLifecycleID parses and validates a lifecycle ID (UID or GID) from labels.
+//
+// Parameters:
+//   - label: The label key to retrieve the value from.
+//   - idType: The type of ID ("UID" or "GID") for logging purposes.
+//
+// Returns:
+//   - int: ID value if set and valid.
+//   - bool: True if label is present and valid, false otherwise.
+func (c Container) getLifecycleID(label, idType string) (int, bool) {
+	clog := logrus.WithField("container", c.Name())
+	rawString, ok := c.getLabelValue(label)
+
+	if !ok {
+		clog.WithField("label", label).Debug(fmt.Sprintf("Lifecycle %s label not set", idType))
+
+		return 0, false
+	}
+
+	// Parse ID value.
+	parsedID, err := strconv.Atoi(rawString)
+	if err != nil {
+		clog.WithError(err).WithFields(logrus.Fields{
+			"label": label,
+			"value": rawString,
+		}).Warn(fmt.Sprintf("Invalid lifecycle %s value: not a valid integer", idType))
+
+		return 0, false
+	}
+
+	// Validate ID range (must be non-negative and within reasonable bounds).
+	if parsedID < 0 {
+		clog.WithFields(logrus.Fields{
+			"label": label,
+			"value": rawString,
+			idType:  parsedID,
+		}).Warn(fmt.Sprintf("Invalid lifecycle %s value: must be non-negative", idType))
+
+		return 0, false
+	}
+
+	// Check for unreasonably large ID values (greater than 2^31-1).
+	const maxReasonableID = 2147483647 // 2^31-1
+	if parsedID > maxReasonableID {
+		clog.WithFields(logrus.Fields{
+			"label": label,
+			"value": rawString,
+			idType:  parsedID,
+			"max":   maxReasonableID,
+		}).Warn(fmt.Sprintf("Invalid lifecycle %s value: exceeds maximum reasonable value", idType))
+
+		return 0, false
+	}
+
+	clog.WithFields(logrus.Fields{
+		"label": label,
+		idType:  parsedID,
+	}).Debug("Retrieved lifecycle " + idType)
+
+	return parsedID, true
+}
+
+// GetLifecycleUID returns the UID for lifecycle hooks from labels.
+//
+// Returns:
+//   - int: UID value if set and valid.
+//   - bool: True if label is present and valid, false otherwise.
+func (c Container) GetLifecycleUID() (int, bool) {
+	return c.getLifecycleID(lifecycleUIDLabel, "UID")
+}
+
+// GetLifecycleGID returns the GID for lifecycle hooks from labels.
+//
+// Returns:
+//   - int: GID value if set and valid.
+//   - bool: True if label is present and valid, false otherwise.
+func (c Container) GetLifecycleGID() (int, bool) {
+	return c.getLifecycleID(lifecycleGIDLabel, "GID")
 }
 
 // Enabled checks if Watchtower should manage the container.

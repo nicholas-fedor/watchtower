@@ -289,6 +289,20 @@ func (m mockContainer) IsRestarting() bool {
 	return false // Minimal stub, not used in these tests
 }
 
+// GetLifecycleUID returns the UID for lifecycle hooks. This method satisfies the
+// types.Container interface, returning 0 and false as a minimal stub since the auth
+// package does not use this data in these authentication-focused tests.
+func (m mockContainer) GetLifecycleUID() (int, bool) {
+	return 0, false // Minimal stub, not used in these tests
+}
+
+// GetLifecycleGID returns the GID for lifecycle hooks. This method satisfies the
+// types.Container interface, returning 0 and false as a minimal stub since the auth
+// package does not use this data in these authentication-focused tests.
+func (m mockContainer) GetLifecycleGID() (int, bool) {
+	return 0, false // Minimal stub, not used in these tests
+}
+
 // testAuthClient is a custom implementation of the AuthClient interface for testing.
 // It wraps an HTTP client with configurable TLS settings to bypass certificate
 // verification in test scenarios involving mock TLS servers.

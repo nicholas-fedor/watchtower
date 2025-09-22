@@ -605,6 +605,51 @@ var _ = ginkgo.Describe("the update action", func() {
 			})
 		})
 
+		ginkgo.When("lifecycle UID and GID are specified", func() {
+			ginkgo.It("should pass UID and GID to lifecycle hook execution", func() {
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							mocks.CreateMockContainerWithConfig(
+								"test-container-uid-gid",
+								"test-container-uid-gid",
+								"fake-image:latest",
+								true,
+								false,
+								time.Now(),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower.lifecycle.pre-update": "/PreUpdateReturn0.sh",
+									},
+									ExposedPorts: map[nat.Port]struct{}{},
+								}),
+						},
+					},
+					false,
+					false,
+				)
+				client.TestData.Staleness = map[string]bool{
+					"test-container-uid-gid": true,
+				}
+				report, cleanupImageIDs, err := actions.Update(
+					client,
+					types.UpdateParams{
+						Cleanup:        true,
+						LifecycleHooks: true,
+						LifecycleUID:   1000,
+						LifecycleGID:   1001,
+					},
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageIDs).
+					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(client.TestData.TriedToRemoveImageCount).
+					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
+			})
+		})
+
 		ginkgo.When("preupdate script returns 75", func() {
 			ginkgo.It("should not update those containers and collect no image IDs", func() {
 				client := mocks.CreateMockClient(

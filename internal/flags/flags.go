@@ -274,6 +274,20 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Label used for setting memory swappiness as nil when recreating the container, used for compatibility with podman",
 	)
 
+	flags.IntP(
+		"lifecycle-uid",
+		"",
+		envInt("WATCHTOWER_LIFECYCLE_UID"),
+		"Default UID to run lifecycle hooks as (can be overridden by container labels)",
+	)
+
+	flags.IntP(
+		"lifecycle-gid",
+		"",
+		envInt("WATCHTOWER_LIFECYCLE_GID"),
+		"Default GID to run lifecycle hooks as (can be overridden by container labels)",
+	)
+
 	flags.Bool(
 		"registry-tls-skip",
 		envBool("WATCHTOWER_REGISTRY_TLS_SKIP"),

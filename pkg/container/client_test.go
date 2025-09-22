@@ -681,8 +681,11 @@ var _ = ginkgo.Describe("the client", func() {
 						),
 					),
 				)
+				// Get the container first
+				container, err := client.GetContainer(containerID)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Execute command and verify log output includes container id.
-				_, err := client.ExecuteCommand(containerID, cmd, 1)
+				_, err = client.ExecuteCommand(container, cmd, 1, 0, 0)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Eventually(logbuf).Should(gbytes.Say(`container_id=ex-cont-id`))
 			})

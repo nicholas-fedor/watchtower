@@ -29,6 +29,8 @@ type Container interface {
 	GetLifecyclePostCheckCommand() string                  // Post-check command.
 	GetLifecyclePreUpdateCommand() string                  // Pre-update command.
 	GetLifecyclePostUpdateCommand() string                 // Post-update command.
+	GetLifecycleUID() (int, bool)                          // UID for lifecycle hooks, with presence.
+	GetLifecycleGID() (int, bool)                          // GID for lifecycle hooks, with presence.
 	VerifyConfiguration() error                            // Config validation.
 	SetStale(status bool)                                  // Set stale status.
 	IsStale() bool                                         // Stale status check.

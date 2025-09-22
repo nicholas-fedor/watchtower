@@ -121,7 +121,13 @@ var errCommandFailed = errors.New("command exited with non-zero code")
 // ExecuteCommand simulates executing a command in a container for testing lifecycle hooks.
 // It returns a SkipUpdate boolean indicating whether to skip the update and an error if the command fails.
 // The method uses predefined command behaviors to mimic real execution outcomes.
-func (client MockClient) ExecuteCommand(_ types.ContainerID, command string, _ int) (bool, error) {
+func (client MockClient) ExecuteCommand(
+	_ types.Container,
+	command string,
+	_ int,
+	_ int,
+	_ int,
+) (bool, error) {
 	switch command {
 	case "/PreUpdateReturn0.sh":
 		return false, nil // Command succeeds (exit 0), no skip.

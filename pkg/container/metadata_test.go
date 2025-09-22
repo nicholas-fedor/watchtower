@@ -996,6 +996,216 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 	}
 }
 
+func TestContainer_GetLifecycleUID(t *testing.T) {
+	tests := []struct {
+		name  string
+		c     Container
+		want  int
+		want1 bool
+	}{
+		{
+			name: "UIDSet",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleUIDLabel: "1000",
+						},
+					},
+				},
+			},
+			want:  1000,
+			want1: true,
+		},
+		{
+			name: "UIDNotSet",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+		{
+			name: "InvalidUID",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleUIDLabel: "invalid",
+						},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+		{
+			name: "NegativeUID",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleUIDLabel: "-1",
+						},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+		{
+			name: "TooLargeUID",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleUIDLabel: "3000000000",
+						},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := tt.c.GetLifecycleUID()
+			if got != tt.want {
+				t.Errorf("Container.GetLifecycleUID() got = %v, want %v", got, tt.want)
+			}
+
+			if got1 != tt.want1 {
+				t.Errorf("Container.GetLifecycleUID() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestContainer_GetLifecycleGID(t *testing.T) {
+	tests := []struct {
+		name  string
+		c     Container
+		want  int
+		want1 bool
+	}{
+		{
+			name: "GIDSet",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleGIDLabel: "1000",
+						},
+					},
+				},
+			},
+			want:  1000,
+			want1: true,
+		},
+		{
+			name: "GIDNotSet",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+		{
+			name: "InvalidGID",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleGIDLabel: "invalid",
+						},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+		{
+			name: "NegativeGID",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleGIDLabel: "-100",
+						},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+		{
+			name: "TooLargeGID",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							lifecycleGIDLabel: "5000000000",
+						},
+					},
+				},
+			},
+			want:  0,
+			want1: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := tt.c.GetLifecycleGID()
+			if got != tt.want {
+				t.Errorf("Container.GetLifecycleGID() got = %v, want %v", got, tt.want)
+			}
+
+			if got1 != tt.want1 {
+				t.Errorf("Container.GetLifecycleGID() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
 func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 	type args struct {
 		globalVal      bool
