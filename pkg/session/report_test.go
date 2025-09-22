@@ -337,6 +337,7 @@ func Test_report_All(t *testing.T) {
 				mock1 := mocks.NewMockContainerReport(t)
 				// No strict expectation; allow calls without failing if unmet
 				mock1.EXPECT().ID().Return(types.ContainerID("cont1")).Times(0)
+
 				mock2 := mocks.NewMockContainerReport(t)
 				mock2.EXPECT().ID().Return(types.ContainerID("cont2")).Times(0)
 

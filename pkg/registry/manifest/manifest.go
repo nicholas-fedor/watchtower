@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/nicholas-fedor/watchtower/pkg/registry/helpers"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -61,7 +61,7 @@ func BuildManifestURL(container types.Container) (string, error) {
 	}
 
 	// Extract the registry host and image components.
-	host, _ := helpers.GetRegistryAddress(normalizedTaggedRef.Name())
+	host, _ := auth.GetRegistryAddress(normalizedTaggedRef.Name())
 	img, tag := reference.Path(normalizedTaggedRef), normalizedTaggedRef.Tag()
 
 	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.

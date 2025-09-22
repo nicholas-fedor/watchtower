@@ -273,6 +273,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 				channel: func() chan *Metric {
 					ch := make(chan *Metric, 1)
 					ch <- &Metric{Scanned: 3, Updated: 2, Failed: 1}
+
 					close(ch)
 
 					return ch
@@ -292,6 +293,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 				channel: func() chan *Metric {
 					ch := make(chan *Metric, 1)
 					ch <- nil
+
 					close(ch)
 
 					return ch

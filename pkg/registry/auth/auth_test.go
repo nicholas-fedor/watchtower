@@ -7,6 +7,8 @@ package auth_test
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -1140,6 +1142,107 @@ var _ = ginkgo.Describe("the auth module", func() {
 			expected := url.URL{Host: "index.docker.io", Scheme: "https", Path: "/v2/"}
 			imageRef, _ := reference.ParseNormalizedNamed("docker.io/nickfedor/watchtower:latest")
 			gomega.Expect(auth.GetChallengeURL(imageRef)).To(gomega.Equal(expected))
+		})
+	})
+
+	ginkgo.Describe("GetRegistryAddress", func() {
+		ginkgo.It("should return error if passed empty string", func() {
+			_, err := auth.GetRegistryAddress("")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+		ginkgo.It("should return index.docker.io for image refs with no explicit registry", func() {
+			gomega.Expect(auth.GetRegistryAddress("watchtower")).To(gomega.Equal("index.docker.io"))
+			gomega.Expect(auth.GetRegistryAddress("nickfedor/watchtower")).
+				To(gomega.Equal("index.docker.io"))
+		})
+		ginkgo.It("should return index.docker.io for image refs with docker.io domain", func() {
+			gomega.Expect(auth.GetRegistryAddress("docker.io/watchtower")).
+				To(gomega.Equal("index.docker.io"))
+			gomega.Expect(auth.GetRegistryAddress("docker.io/nickfedor/watchtower")).
+				To(gomega.Equal("index.docker.io"))
+		})
+		ginkgo.It("should return the host if passed an image name containing a local host", func() {
+			gomega.Expect(auth.GetRegistryAddress("henk:80/watchtower")).To(gomega.Equal("henk:80"))
+			gomega.Expect(auth.GetRegistryAddress("localhost/watchtower")).
+				To(gomega.Equal("localhost"))
+		})
+		ginkgo.It(
+			"should return the server address if passed a fully qualified image name",
+			func() {
+				gomega.Expect(auth.GetRegistryAddress("github.com/nicholas-fedor/config")).
+					To(gomega.Equal("github.com"))
+			},
+		)
+	})
+
+	ginkgo.Describe("TransformAuth", func() {
+		ginkgo.It("should transform valid credentials into base64", func() {
+			creds := struct {
+				Username string `json:"username"`
+				Password string `json:"password"`
+			}{
+				Username: "testuser",
+				Password: "testpass",
+			}
+			jsonData, _ := json.Marshal(creds)
+			inputAuth := base64.StdEncoding.EncodeToString(jsonData)
+
+			result := auth.TransformAuth(inputAuth)
+			expected := base64.StdEncoding.EncodeToString([]byte("testuser:testpass"))
+			gomega.Expect(result).To(gomega.Equal(expected))
+		})
+
+		ginkgo.It("should return original input if decoding fails", func() {
+			inputAuth := "invalid-base64-string"
+			result := auth.TransformAuth(inputAuth)
+			gomega.Expect(result).To(gomega.Equal(inputAuth))
+		})
+
+		ginkgo.It("should handle empty credentials", func() {
+			creds := struct {
+				Username string `json:"username"`
+				Password string `json:"password"`
+			}{
+				Username: "",
+				Password: "",
+			}
+			jsonData, _ := json.Marshal(creds)
+			inputAuth := base64.StdEncoding.EncodeToString(jsonData)
+
+			result := auth.TransformAuth(inputAuth)
+			gomega.Expect(result).To(gomega.Equal(inputAuth))
+		})
+
+		ginkgo.It("should handle malformed JSON", func() {
+			inputAuth := base64.StdEncoding.EncodeToString([]byte("invalid json"))
+			result := auth.TransformAuth(inputAuth)
+			gomega.Expect(result).To(gomega.Equal(inputAuth))
+		})
+
+		ginkgo.It("should handle missing password field", func() {
+			creds := struct {
+				Username string `json:"username"`
+			}{
+				Username: "testuser",
+			}
+			jsonData, _ := json.Marshal(creds)
+			inputAuth := base64.StdEncoding.EncodeToString(jsonData)
+
+			result := auth.TransformAuth(inputAuth)
+			gomega.Expect(result).To(gomega.Equal(inputAuth))
+		})
+
+		ginkgo.It("should handle missing username field", func() {
+			creds := struct {
+				Password string `json:"password"`
+			}{
+				Password: "testpass",
+			}
+			jsonData, _ := json.Marshal(creds)
+			inputAuth := base64.StdEncoding.EncodeToString(jsonData)
+
+			result := auth.TransformAuth(inputAuth)
+			gomega.Expect(result).To(gomega.Equal(inputAuth))
 		})
 	})
 })

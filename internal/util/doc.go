@@ -6,6 +6,7 @@
 //   - SliceSubtract: Removes elements from string slices.
 //   - StringMapSubtract: Removes matching key-value pairs from string maps.
 //   - StructMapSubtract: Removes matching keys from struct maps.
+//   - MinInt: Returns the smaller of two integers.
 //   - RandName: Generates random 32-character container names.
 //   - GenerateRandomSHA256: Creates random 64-character SHA-256 hashes.
 //
