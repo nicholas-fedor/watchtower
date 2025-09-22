@@ -189,9 +189,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @nicholas-fedor made their first contribution in [#265](https://github.com/nicholas-fedor/watchtower/pull/265)
-
 - @renovate[bot] made their first contribution in [#258](https://github.com/nicholas-fedor/watchtower/pull/258)
-
 - @donuts-are-good made their first contribution
 
 ## [1.9.2] - 2025-05-08
@@ -514,15 +512,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @GridexX made their first contribution
-
 - @testwill made their first contribution
-
 - @Tentoe made their first contribution
-
 - @schizo99 made their first contribution
-
 - @Pwuts made their first contribution
-
 - @gilbsgilbs made their first contribution
 
 ## [1.5.3] - 2023-01-30
@@ -571,7 +564,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @SamKirsch10 made their first contribution
-
 - @nothub made their first contribution
 
 ## [1.5.1] - 2022-11-05
@@ -633,13 +625,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @matthewmcneely made their first contribution
-
 - @mateuszdrab made their first contribution
-
 - @jlaska made their first contribution
-
 - @Foxite made their first contribution
-
 - @lazou made their first contribution
 
 ## [1.4.0] - 2022-01-22
@@ -707,17 +695,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @jinnatar made their first contribution
-
 - @patricegautier made their first contribution
-
 - @MorrisLaw made their first contribution
-
 - @hypnoglow made their first contribution
-
 - @dhiemaz made their first contribution
-
 - @nightah made their first contribution
-
 - @DasSkelett made their first contribution
 
 ## [1.1.6] - 2021-01-10
@@ -816,15 +798,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @dhet made their first contribution
-
 - @osheroff made their first contribution
-
 - @CedricFinance made their first contribution
-
 - @m-sedl made their first contribution
-
 - @MichaelSp made their first contribution
-
 - @PssbleTrngle made their first contribution
 
 ## [1.0.2] - 2020-06-01
@@ -902,17 +879,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @tammert made their first contribution
-
 - @arnested made their first contribution
-
 - @bopoh24 made their first contribution
-
 - @Saicheg made their first contribution
-
 - @pagdot made their first contribution
-
 - @raymondelooff made their first contribution
-
 - @mindrunner made their first contribution
 
 ## [0.3.10] - 2019-12-26
@@ -959,15 +930,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Contributors
 
 - @jsclayton made their first contribution
-
 - @8ear made their first contribution
-
 - @foosel made their first contribution
-
 - @sixth made their first contribution
-
 - @kaloyan-raev made their first contribution
-
 - @lukapeschke made their first contribution
 
 ## [0.3.8] - 2019-07-02
