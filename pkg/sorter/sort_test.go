@@ -61,6 +61,8 @@ func (m *mockContainer) SetLinkedToRestarting(bool)                   {}
 func (m *mockContainer) IsLinkedToRestarting() bool                   { return false }
 func (m *mockContainer) PreUpdateTimeout() int                        { return 0 }
 func (m *mockContainer) PostUpdateTimeout() int                       { return 0 }
+func (m *mockContainer) GetLifecycleUID() (int, bool)                 { return 0, false }
+func (m *mockContainer) GetLifecycleGID() (int, bool)                 { return 0, false }
 
 func (m *mockContainer) GetCreateConfig() *dockerContainerTypes.Config {
 	return &dockerContainerTypes.Config{}

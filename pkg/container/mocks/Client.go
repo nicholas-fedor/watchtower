@@ -39,8 +39,8 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 }
 
 // ExecuteCommand provides a mock function for the type MockClient
-func (_mock *MockClient) ExecuteCommand(containerID types.ContainerID, command string, timeout int) (bool, error) {
-	ret := _mock.Called(containerID, command, timeout)
+func (_mock *MockClient) ExecuteCommand(container types.Container, command string, timeout int, uid int, gid int) (bool, error) {
+	ret := _mock.Called(container, command, timeout, uid, gid)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteCommand")
@@ -48,16 +48,16 @@ func (_mock *MockClient) ExecuteCommand(containerID types.ContainerID, command s
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(types.ContainerID, string, int) (bool, error)); ok {
-		return returnFunc(containerID, command, timeout)
+	if returnFunc, ok := ret.Get(0).(func(types.Container, string, int, int, int) (bool, error)); ok {
+		return returnFunc(container, command, timeout, uid, gid)
 	}
-	if returnFunc, ok := ret.Get(0).(func(types.ContainerID, string, int) bool); ok {
-		r0 = returnFunc(containerID, command, timeout)
+	if returnFunc, ok := ret.Get(0).(func(types.Container, string, int, int, int) bool); ok {
+		r0 = returnFunc(container, command, timeout, uid, gid)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(types.ContainerID, string, int) error); ok {
-		r1 = returnFunc(containerID, command, timeout)
+	if returnFunc, ok := ret.Get(1).(func(types.Container, string, int, int, int) error); ok {
+		r1 = returnFunc(container, command, timeout, uid, gid)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -70,18 +70,20 @@ type MockClient_ExecuteCommand_Call struct {
 }
 
 // ExecuteCommand is a helper method to define mock.On call
-//   - containerID types.ContainerID
+//   - container types.Container
 //   - command string
 //   - timeout int
-func (_e *MockClient_Expecter) ExecuteCommand(containerID interface{}, command interface{}, timeout interface{}) *MockClient_ExecuteCommand_Call {
-	return &MockClient_ExecuteCommand_Call{Call: _e.mock.On("ExecuteCommand", containerID, command, timeout)}
+//   - uid int
+//   - gid int
+func (_e *MockClient_Expecter) ExecuteCommand(container interface{}, command interface{}, timeout interface{}, uid interface{}, gid interface{}) *MockClient_ExecuteCommand_Call {
+	return &MockClient_ExecuteCommand_Call{Call: _e.mock.On("ExecuteCommand", container, command, timeout, uid, gid)}
 }
 
-func (_c *MockClient_ExecuteCommand_Call) Run(run func(containerID types.ContainerID, command string, timeout int)) *MockClient_ExecuteCommand_Call {
+func (_c *MockClient_ExecuteCommand_Call) Run(run func(container types.Container, command string, timeout int, uid int, gid int)) *MockClient_ExecuteCommand_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.ContainerID
+		var arg0 types.Container
 		if args[0] != nil {
-			arg0 = args[0].(types.ContainerID)
+			arg0 = args[0].(types.Container)
 		}
 		var arg1 string
 		if args[1] != nil {
@@ -91,10 +93,20 @@ func (_c *MockClient_ExecuteCommand_Call) Run(run func(containerID types.Contain
 		if args[2] != nil {
 			arg2 = args[2].(int)
 		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		var arg4 int
+		if args[4] != nil {
+			arg4 = args[4].(int)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -105,7 +117,7 @@ func (_c *MockClient_ExecuteCommand_Call) Return(b bool, err error) *MockClient_
 	return _c
 }
 
-func (_c *MockClient_ExecuteCommand_Call) RunAndReturn(run func(containerID types.ContainerID, command string, timeout int) (bool, error)) *MockClient_ExecuteCommand_Call {
+func (_c *MockClient_ExecuteCommand_Call) RunAndReturn(run func(container types.Container, command string, timeout int, uid int, gid int) (bool, error)) *MockClient_ExecuteCommand_Call {
 	_c.Call.Return(run)
 	return _c
 }

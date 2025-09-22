@@ -31,6 +31,46 @@ The commands are specified using docker container labels, the following are curr
 | Pre Update  | `com.centurylinklabs.watchtower.lifecycle.pre-update`  |
 | Post Update | `com.centurylinklabs.watchtower.lifecycle.post-update` |
 | Post Check  | `com.centurylinklabs.watchtower.lifecycle.post-check`  |
+| UID         | `com.centurylinklabs.watchtower.lifecycle.uid`         |
+| GID         | `com.centurylinklabs.watchtower.lifecycle.gid`         |
+
+### Specifying UID and GID for lifecycle hooks
+
+By default, lifecycle hook commands run as the container's configured user (typically `root` if no `USER` directive is set). You can override this by specifying UID and GID using container labels or global flags.
+
+!!! Note
+    UID and GID values must be valid non-negative integers between 0 and 2,147,483,647 (2^31-1). Invalid values will be logged as warnings and ignored, falling back to the container's default user.
+
+#### Container Labels
+
+Use the following labels to specify UID and GID per container:
+
+| Type | Docker Container Label                          |
+| ---- | ----------------------------------------------- |
+| UID  | `com.centurylinklabs.watchtower.lifecycle.uid`  |
+| GID  | `com.centurylinklabs.watchtower.lifecycle.gid`  |
+
+Example:
+
+```dockerfile
+LABEL com.centurylinklabs.watchtower.lifecycle.pre-update="/backup.sh"
+LABEL com.centurylinklabs.watchtower.lifecycle.uid="1000"
+LABEL com.centurylinklabs.watchtower.lifecycle.gid="1000"
+```
+
+#### Global Flags
+
+Use the following flags to set default UID and GID for all lifecycle hooks:
+
+- `--lifecycle-uid`: Default UID to run lifecycle hooks as
+- `--lifecycle-gid`: Default GID to run lifecycle hooks as
+
+Environment variables:
+
+- `WATCHTOWER_LIFECYCLE_UID`
+- `WATCHTOWER_LIFECYCLE_GID`
+
+Container labels take precedence over global flags.
 
 These labels can be declared as instructions in a Dockerfile (with some example .sh files) or be specified as part of
 the `docker run` command line:
@@ -41,6 +81,8 @@ the `docker run` command line:
     LABEL com.centurylinklabs.watchtower.lifecycle.pre-update="/dump-data.sh"
     LABEL com.centurylinklabs.watchtower.lifecycle.post-update="/restore-data.sh"
     LABEL com.centurylinklabs.watchtower.lifecycle.post-check="/send-heartbeat.sh"
+    LABEL com.centurylinklabs.watchtower.lifecycle.uid="1000"
+    LABEL com.centurylinklabs.watchtower.lifecycle.gid="1000"
     ```
 
 === "docker run"
@@ -49,7 +91,10 @@ the `docker run` command line:
     --label=com.centurylinklabs.watchtower.lifecycle.pre-check="/sync.sh" \
     --label=com.centurylinklabs.watchtower.lifecycle.pre-update="/dump-data.sh" \
     --label=com.centurylinklabs.watchtower.lifecycle.post-update="/restore-data.sh" \
-    someimage --label=com.centurylinklabs.watchtower.lifecycle.post-check="/send-heartbeat.sh" \
+    --label=com.centurylinklabs.watchtower.lifecycle.post-check="/send-heartbeat.sh" \
+    --label=com.centurylinklabs.watchtower.lifecycle.uid="1000" \
+    --label=com.centurylinklabs.watchtower.lifecycle.gid="1000" \
+    someimage
     ```
 
 ### Environment Variables

@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/flags"
 	containerMock "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	typeMock "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -363,4 +365,40 @@ func TestAwaitDockerClient(t *testing.T) {
 	// Should take at least 1 second but not more than 2 (to account for timing variations)
 	assert.GreaterOrEqual(t, elapsed, time.Second, "Should sleep for at least 1 second")
 	assert.Less(t, elapsed, 2*time.Second, "Should not sleep for more than 2 seconds")
+}
+
+func TestLifecycleFlags(t *testing.T) {
+	// Test that lifecycle UID and GID flags are properly read
+	originalLifecycleUID := lifecycleUID
+	originalLifecycleGID := lifecycleGID
+
+	defer func() {
+		lifecycleUID = originalLifecycleUID
+		lifecycleGID = originalLifecycleGID
+	}()
+
+	// Reset to defaults
+	lifecycleUID = 0
+	lifecycleGID = 0
+
+	// Test setting flags
+	cmd := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd)
+
+	err := cmd.ParseFlags([]string{"--lifecycle-uid", "1000", "--lifecycle-gid", "1001"})
+	require.NoError(t, err)
+
+	// Simulate preRun flag reading
+	uid, err := cmd.Flags().GetInt("lifecycle-uid")
+	require.NoError(t, err)
+
+	lifecycleUID = uid
+
+	gid, err := cmd.Flags().GetInt("lifecycle-gid")
+	require.NoError(t, err)
+
+	lifecycleGID = gid
+
+	assert.Equal(t, 1000, lifecycleUID, "lifecycleUID should be set to 1000")
+	assert.Equal(t, 1001, lifecycleGID, "lifecycleGID should be set to 1001")
 }
