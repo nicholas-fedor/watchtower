@@ -81,6 +81,7 @@ jobs:
           body: "Automated changelog update from CI"
           branch: chore/update-changelog
           delete-branch: true
+          sign-commits: true
 
   # Create multi-platform manifests
   manifest:
