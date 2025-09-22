@@ -1011,6 +1011,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#specifying_uid_and_gid_for_lifecycle_hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Specifying UID and GID for lifecycle hooks
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Specifying UID and GID for lifecycle hooks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#container_labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Container Labels
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global_flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      Global Flags
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#environment_variables" class="md-nav__link">
     <span class="md-ellipsis">
       Environment Variables
@@ -1249,6 +1282,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#specifying_uid_and_gid_for_lifecycle_hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Specifying UID and GID for lifecycle hooks
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Specifying UID and GID for lifecycle hooks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#container_labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Container Labels
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global_flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      Global Flags
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#environment_variables" class="md-nav__link">
     <span class="md-ellipsis">
       Environment Variables
@@ -1377,49 +1443,105 @@ executable.</p>
 <td>Post Check</td>
 <td><code>com.centurylinklabs.watchtower.lifecycle.post-check</code></td>
 </tr>
+<tr>
+<td>UID</td>
+<td><code>com.centurylinklabs.watchtower.lifecycle.uid</code></td>
+</tr>
+<tr>
+<td>GID</td>
+<td><code>com.centurylinklabs.watchtower.lifecycle.gid</code></td>
+</tr>
 </tbody>
 </table>
+<h3 id="specifying_uid_and_gid_for_lifecycle_hooks">Specifying UID and GID for lifecycle hooks<a class="headerlink" href="#specifying_uid_and_gid_for_lifecycle_hooks" title="Permanent link">&para;</a></h3>
+<p>By default, lifecycle hook commands run as the container's configured user (typically <code>root</code> if no <code>USER</code> directive is set). You can override this by specifying UID and GID using container labels or global flags.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>UID and GID values must be valid non-negative integers between 0 and 2,147,483,647 (2^31-1). Invalid values will be logged as warnings and ignored, falling back to the container's default user.</p>
+</div>
+<h4 id="container_labels">Container Labels<a class="headerlink" href="#container_labels" title="Permanent link">&para;</a></h4>
+<p>Use the following labels to specify UID and GID per container:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Docker Container Label</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UID</td>
+<td><code>com.centurylinklabs.watchtower.lifecycle.uid</code></td>
+</tr>
+<tr>
+<td>GID</td>
+<td><code>com.centurylinklabs.watchtower.lifecycle.gid</code></td>
+</tr>
+</tbody>
+</table>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.pre-update<span class="o">=</span><span class="s2">&quot;/backup.sh&quot;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.uid<span class="o">=</span><span class="s2">&quot;1000&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.gid<span class="o">=</span><span class="s2">&quot;1000&quot;</span>
+</code></pre></div>
+<h4 id="global_flags">Global Flags<a class="headerlink" href="#global_flags" title="Permanent link">&para;</a></h4>
+<p>Use the following flags to set default UID and GID for all lifecycle hooks:</p>
+<ul>
+<li><code>--lifecycle-uid</code>: Default UID to run lifecycle hooks as</li>
+<li><code>--lifecycle-gid</code>: Default GID to run lifecycle hooks as</li>
+</ul>
+<p>Environment variables:</p>
+<ul>
+<li><code>WATCHTOWER_LIFECYCLE_UID</code></li>
+<li><code>WATCHTOWER_LIFECYCLE_GID</code></li>
+</ul>
+<p>Container labels take precedence over global flags.</p>
 <p>These labels can be declared as instructions in a Dockerfile (with some example .sh files) or be specified as part of
 the <code>docker run</code> command line:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Dockerfile</label><label for="__tabbed_1_2">docker run</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.pre-check<span class="o">=</span><span class="s2">&quot;/sync.sh&quot;</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.pre-update<span class="o">=</span><span class="s2">&quot;/dump-data.sh&quot;</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.post-update<span class="o">=</span><span class="s2">&quot;/restore-data.sh&quot;</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.post-check<span class="o">=</span><span class="s2">&quot;/send-heartbeat.sh&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.pre-check<span class="o">=</span><span class="s2">&quot;/sync.sh&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.pre-update<span class="o">=</span><span class="s2">&quot;/dump-data.sh&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.post-update<span class="o">=</span><span class="s2">&quot;/restore-data.sh&quot;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.post-check<span class="o">=</span><span class="s2">&quot;/send-heartbeat.sh&quot;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.uid<span class="o">=</span><span class="s2">&quot;1000&quot;</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.lifecycle.gid<span class="o">=</span><span class="s2">&quot;1000&quot;</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.pre-check<span class="o">=</span><span class="s2">&quot;/sync.sh&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.pre-update<span class="o">=</span><span class="s2">&quot;/dump-data.sh&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.post-update<span class="o">=</span><span class="s2">&quot;/restore-data.sh&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>someimage<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.post-check<span class="o">=</span><span class="s2">&quot;/send-heartbeat.sh&quot;</span><span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.pre-check<span class="o">=</span><span class="s2">&quot;/sync.sh&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.pre-update<span class="o">=</span><span class="s2">&quot;/dump-data.sh&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.post-update<span class="o">=</span><span class="s2">&quot;/restore-data.sh&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.post-check<span class="o">=</span><span class="s2">&quot;/send-heartbeat.sh&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.uid<span class="o">=</span><span class="s2">&quot;1000&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>--label<span class="o">=</span>com.centurylinklabs.watchtower.lifecycle.gid<span class="o">=</span><span class="s2">&quot;1000&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>someimage
 </code></pre></div>
 </div>
 </div>
 </div>
 <h3 id="environment_variables">Environment Variables<a class="headerlink" href="#environment_variables" title="Permanent link">&para;</a></h3>
 <p>Lifecycle hook commands have access to container metadata through the <code>WT_CONTAINER</code> environment variable. This variable contains a JSON object with information about the container being updated:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my-container&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abc123def456&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">&quot;image_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;nginx:latest&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">&quot;stop_signal&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SIGTERM&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">&quot;labels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">&quot;com.centurylinklabs.watchtower.lifecycle.pre-update&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/custom-stop.sh&quot;</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my-container&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abc123def456&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">&quot;image_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;nginx:latest&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">&quot;stop_signal&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SIGTERM&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">&quot;labels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">&quot;com.centurylinklabs.watchtower.lifecycle.pre-update&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/custom-stop.sh&quot;</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
 </code></pre></div>
 <p>This allows scripts to access container-specific information for custom logic, such as implementing vendor-specific stop procedures.</p>
 <h4 id="example_custom_stop_command_for_synology_dsm">Example: Custom stop command for Synology DSM<a class="headerlink" href="#example_custom_stop_command_for_synology_dsm" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="ch">#!/bin/sh</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># Parse container name from WT_CONTAINER</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nv">CONTAINER_NAME</span><span class="o">=</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span><span class="nv">$WT_CONTAINER</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;.name&#39;</span><span class="k">)</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># Use Synology API to stop container properly</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>synowebapi<span class="w"> </span>--exec<span class="w"> </span><span class="nv">api</span><span class="o">=</span>SYNO.Docker.Container<span class="w"> </span><span class="nv">method</span><span class="o">=</span><span class="s2">&quot;stop&quot;</span><span class="w"> </span><span class="nv">name</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CONTAINER_NAME</span><span class="s2">&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="ch">#!/bin/sh</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># Parse container name from WT_CONTAINER</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">CONTAINER_NAME</span><span class="o">=</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span><span class="nv">$WT_CONTAINER</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;.name&#39;</span><span class="k">)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># Use Synology API to stop container properly</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>synowebapi<span class="w"> </span>--exec<span class="w"> </span><span class="nv">api</span><span class="o">=</span>SYNO.Docker.Container<span class="w"> </span><span class="nv">method</span><span class="o">=</span><span class="s2">&quot;stop&quot;</span><span class="w"> </span><span class="nv">name</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CONTAINER_NAME</span><span class="s2">&quot;</span>
 </code></pre></div>
 <h3 id="timeouts">Timeouts<a class="headerlink" href="#timeouts" title="Permanent link">&para;</a></h3>
 <p>The timeout for all lifecycle commands is 60 seconds. After that, a timeout will
@@ -1456,7 +1578,7 @@ log statement containing the exit code will be reported.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 20, 2025 09:59:49 UTC"><span class="timeago" datetime="2025-09-20T09:59:49+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 20, 2025 09:59:49 UTC">2025-09-20</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 22, 2025 20:45:37 UTC"><span class="timeago" datetime="2025-09-22T20:45:37+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 22, 2025 20:45:37 UTC">2025-09-22</span>
   </span>
 
     
