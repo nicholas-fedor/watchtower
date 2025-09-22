@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolve scope issues in self-updates and improve digest request handling by @nicholas-fedor in [#683](https://github.com/nicholas-fedor/watchtower/pull/683)
 - Improve digest fetching by falling back to GET when HEAD returns 404 by @nicholas-fedor in [#669](https://github.com/nicholas-fedor/watchtower/pull/669)
 - Resolve HTTP API failures on multiple simultaneous requests by @nicholas-fedor in [#668](https://github.com/nicholas-fedor/watchtower/pull/668)
 - Add HEAD to GET fallback for digest fetching by @nicholas-fedor in [#667](https://github.com/nicholas-fedor/watchtower/pull/667)
@@ -985,42 +986,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-[unreleased]: https://github.com/nicholas-fedor/watchtower/compare/v1.11.8...HEAD
-[1.11.8]: https://github.com/nicholas-fedor/watchtower/compare/v1.11.6...v1.11.8
-[1.11.6]: https://github.com/nicholas-fedor/watchtower/compare/v1.11.5...v1.11.6
-[1.11.5]: https://github.com/nicholas-fedor/watchtower/compare/v1.11.2...v1.11.5
-[1.11.2]: https://github.com/nicholas-fedor/watchtower/compare/v1.11.0...v1.11.2
-[1.11.0]: https://github.com/nicholas-fedor/watchtower/compare/v1.10.0...v1.11.0
-[1.10.0]: https://github.com/nicholas-fedor/watchtower/compare/v1.7.1...v1.10.0
-[1.7.1]: https://github.com/nicholas-fedor/watchtower/compare/v1.9.2...v1.7.1
-[1.9.2]: https://github.com/nicholas-fedor/watchtower/compare/v1.9.0...v1.9.2
-[1.9.0]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.8...v1.9.0
-[1.8.8]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.6...v1.8.8
-[1.8.6]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.5...v1.8.6
-[1.8.5]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.4...v1.8.5
-[1.8.4]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.3...v1.8.4
-[1.8.3]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.2...v1.8.3
-[1.8.2]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.1...v1.8.2
-[1.8.1]: https://github.com/nicholas-fedor/watchtower/compare/v1.8.0...v1.8.1
-[1.8.0]: https://github.com/nicholas-fedor/watchtower/compare/v1.7.12...v1.8.0
-[1.7.12]: https://github.com/nicholas-fedor/watchtower/compare/v1.7.11...v1.7.12
-[1.7.11]: https://github.com/nicholas-fedor/watchtower/compare/v1.7.10...v1.7.11
-[1.7.10]: https://github.com/nicholas-fedor/watchtower/compare/v1.7.2...v1.7.10
-[1.7.2]: https://github.com/nicholas-fedor/watchtower/compare/v1.6.0...v1.7.2
-[1.6.0]: https://github.com/nicholas-fedor/watchtower/compare/v1.5.3...v1.6.0
-[1.5.3]: https://github.com/nicholas-fedor/watchtower/compare/v1.5.2...v1.5.3
-[1.5.2]: https://github.com/nicholas-fedor/watchtower/compare/v1.5.1...v1.5.2
-[1.5.1]: https://github.com/nicholas-fedor/watchtower/compare/v1.4.0...v1.5.1
-[1.4.0]: https://github.com/nicholas-fedor/watchtower/compare/v1.1.6...v1.4.0
-[1.1.6]: https://github.com/nicholas-fedor/watchtower/compare/v1.1.5...v1.1.6
-[1.1.5]: https://github.com/nicholas-fedor/watchtower/compare/v1.1.3...v1.1.5
-[1.1.3]: https://github.com/nicholas-fedor/watchtower/compare/v1.1.2...v1.1.3
-[1.1.2]: https://github.com/nicholas-fedor/watchtower/compare/v1.1.1...v1.1.2
-[1.1.1]: https://github.com/nicholas-fedor/watchtower/compare/v1.0.3...v1.1.1
-[1.0.3]: https://github.com/nicholas-fedor/watchtower/compare/v1.0.2...v1.0.3
-[1.0.2]: https://github.com/nicholas-fedor/watchtower/compare/v1.0.1...v1.0.2
-[1.0.1]: https://github.com/nicholas-fedor/watchtower/compare/v0.3.10...v1.0.1
-[0.3.10]: https://github.com/nicholas-fedor/watchtower/compare/v0.3.8...v0.3.10
-[0.3.8]: https://github.com/nicholas-fedor/watchtower/compare/v0.3.7...v0.3.8
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.11.8...HEAD)
+- [1.11.8](https://github.com/nicholas-fedor/watchtower/compare/v1.11.6...v1.11.8)
+- [1.11.6](https://github.com/nicholas-fedor/watchtower/compare/v1.11.5...v1.11.6)
+- [1.11.5](https://github.com/nicholas-fedor/watchtower/compare/v1.11.2...v1.11.5)
+- [1.11.2](https://github.com/nicholas-fedor/watchtower/compare/v1.11.0...v1.11.2)
+- [1.11.0](https://github.com/nicholas-fedor/watchtower/compare/v1.10.0...v1.11.0)
+- [1.10.0](https://github.com/nicholas-fedor/watchtower/compare/v1.7.1...v1.10.0)
+- [1.7.1](https://github.com/nicholas-fedor/watchtower/compare/v1.9.2...v1.7.1)
+- [1.9.2](https://github.com/nicholas-fedor/watchtower/compare/v1.9.0...v1.9.2)
+- [1.9.0](https://github.com/nicholas-fedor/watchtower/compare/v1.8.8...v1.9.0)
+- [1.8.8](https://github.com/nicholas-fedor/watchtower/compare/v1.8.6...v1.8.8)
+- [1.8.6](https://github.com/nicholas-fedor/watchtower/compare/v1.8.5...v1.8.6)
+- [1.8.5](https://github.com/nicholas-fedor/watchtower/compare/v1.8.4...v1.8.5)
+- [1.8.4](https://github.com/nicholas-fedor/watchtower/compare/v1.8.3...v1.8.4)
+- [1.8.3](https://github.com/nicholas-fedor/watchtower/compare/v1.8.2...v1.8.3)
+- [1.8.2](https://github.com/nicholas-fedor/watchtower/compare/v1.8.1...v1.8.2)
+- [1.8.1](https://github.com/nicholas-fedor/watchtower/compare/v1.8.0...v1.8.1)
+- [1.8.0](https://github.com/nicholas-fedor/watchtower/compare/v1.7.12...v1.8.0)
+- [1.7.12](https://github.com/nicholas-fedor/watchtower/compare/v1.7.11...v1.7.12)
+- [1.7.11](https://github.com/nicholas-fedor/watchtower/compare/v1.7.10...v1.7.11)
+- [1.7.10](https://github.com/nicholas-fedor/watchtower/compare/v1.7.2...v1.7.10)
+- [1.7.2](https://github.com/nicholas-fedor/watchtower/compare/v1.6.0...v1.7.2)
+- [1.6.0](https://github.com/nicholas-fedor/watchtower/compare/v1.5.3...v1.6.0)
+- [1.5.3](https://github.com/nicholas-fedor/watchtower/compare/v1.5.2...v1.5.3)
+- [1.5.2](https://github.com/nicholas-fedor/watchtower/compare/v1.5.1...v1.5.2)
+- [1.5.1](https://github.com/nicholas-fedor/watchtower/compare/v1.4.0...v1.5.1)
+- [1.4.0](https://github.com/nicholas-fedor/watchtower/compare/v1.1.6...v1.4.0)
+- [1.1.6](https://github.com/nicholas-fedor/watchtower/compare/v1.1.5...v1.1.6)
+- [1.1.5](https://github.com/nicholas-fedor/watchtower/compare/v1.1.3...v1.1.5)
+- [1.1.3](https://github.com/nicholas-fedor/watchtower/compare/v1.1.2...v1.1.3)
+- [1.1.2](https://github.com/nicholas-fedor/watchtower/compare/v1.1.1...v1.1.2)
+- [1.1.1](https://github.com/nicholas-fedor/watchtower/compare/v1.0.3...v1.1.1)
+- [1.0.3](https://github.com/nicholas-fedor/watchtower/compare/v1.0.2...v1.0.3)
+- [1.0.2](https://github.com/nicholas-fedor/watchtower/compare/v1.0.1...v1.0.2)
+- [1.0.1](https://github.com/nicholas-fedor/watchtower/compare/v0.3.10...v1.0.1)
+- [0.3.10](https://github.com/nicholas-fedor/watchtower/compare/v0.3.8...v0.3.10)
+- [0.3.8](https://github.com/nicholas-fedor/watchtower/compare/v0.3.7...v0.3.8)
 
 <!-- generated by git-cliff -->
