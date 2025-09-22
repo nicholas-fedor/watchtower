@@ -70,18 +70,16 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Commit changelog
+      - name: Create Pull Request for changelog
         if: ${{ !fromJson(inputs.dry-run || 'false') }}
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add CHANGELOG.md
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update changelog"
-            git push
-          fi
+        uses: peter-evans/create-pull-request@915d841dae6a4f191bb78faf61a257411d7be4d2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: update changelog"
+          title: "docs: update changelog"
+          body: "Automated changelog update from CI"
+          branch: chore/update-changelog
+          delete-branch: true
 
   # Create multi-platform manifests
   manifest:
