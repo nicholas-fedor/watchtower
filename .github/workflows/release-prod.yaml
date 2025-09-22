@@ -55,6 +55,7 @@ jobs:
           body: "Automated changelog update for release ${{ github.ref_name }}"
           branch: chore/update-changelog-${{ github.ref_name }}
           delete-branch: true
+          sign-commits: true
 
   # Build binaries, images, SBOMs, and attestations
   build:
