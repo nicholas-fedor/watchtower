@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os/exec"
 	"time"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -70,13 +71,22 @@ func (r *LocalRegistry) URL() string {
 // PushImage pushes an image to the local registry.
 // This is useful for testing image operations in isolation.
 func (r *LocalRegistry) PushImage(ctx context.Context, imageName, tag string) error {
-	// Tag the image for the local registry
+	// First tag the image for the local registry
 	localImage := fmt.Sprintf("%s/%s:%s", r.url, imageName, tag)
+	tagCmd := exec.Command("docker", "tag", fmt.Sprintf("%s:%s", imageName, tag), localImage)
+	if output, err := tagCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to tag image for registry: %w, output: %s", err, string(output))
+	}
 
-	// Use docker CLI to tag and push (could be improved with Docker client)
-	log.Printf("Pushing image %s to local registry", localImage)
+	// Then push the image
+	pushCmd := exec.Command("docker", "push", localImage)
+	if output, err := pushCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to push image to registry: %w, output: %s", err, string(output))
+	}
 
-	return fmt.Errorf("PushImage not implemented - requires Docker client integration")
+	log.Printf("Successfully pushed image %s to local registry", localImage)
+
+	return nil
 }
 
 // PullImage pulls an image from the local registry.
@@ -84,7 +94,14 @@ func (r *LocalRegistry) PullImage(ctx context.Context, imageName, tag string) er
 	localImage := fmt.Sprintf("%s/%s:%s", r.url, imageName, tag)
 	log.Printf("Pulling image %s from local registry", localImage)
 
-	return fmt.Errorf("PullImage not implemented - requires Docker client integration")
+	pullCmd := exec.Command("docker", "pull", localImage)
+	if output, err := pullCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to pull image from registry: %w, output: %s", err, string(output))
+	}
+
+	log.Printf("Successfully pulled image %s from local registry", localImage)
+
+	return nil
 }
 
 // Cleanup stops and removes the registry container.

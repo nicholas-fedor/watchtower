@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -33,9 +34,10 @@ func NewE2EFramework(watchtowerImage string) (*E2EFramework, error) {
 	networkName := fmt.Sprintf("watchtower-e2e-%d", time.Now().Unix())
 
 	framework := &E2EFramework{
-		ctx:          ctx,
-		networkName:  networkName,
-		cleanupFuncs: []func() error{},
+		ctx:           ctx,
+		networkName:   networkName,
+		watchtowerImg: watchtowerImage,
+		cleanupFuncs:  []func() error{},
 	}
 
 	return framework, nil
@@ -90,11 +92,21 @@ func (f *E2EFramework) CreateContainer(
 
 // CreateWatchtowerContainer creates a Watchtower container with the specified configuration.
 func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.Container, error) {
+	// Check if Git monitoring is enabled - if so, don't wait for exit since it's not implemented yet
+	var waitStrategy wait.Strategy = wait.ForExit().WithExitTimeout(30 * time.Second)
+	for _, arg := range args {
+		if arg == "--enable-git-monitoring" {
+			// Git monitoring not implemented yet, so just wait for startup
+			waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(10 * time.Second)
+
+			break
+		}
+	}
+
 	req := testcontainers.ContainerRequest{
-		Image: f.watchtowerImg,
-		Cmd:   args,
-		WaitingFor: wait.ForLog("Watchtower is waiting for changes").
-			WithStartupTimeout(60 * time.Second),
+		Image:      f.watchtowerImg,
+		Cmd:        args,
+		WaitingFor: waitStrategy,
 		AutoRemove: true,
 		Networks:   []string{f.networkName},
 		Mounts: testcontainers.ContainerMounts{
@@ -164,6 +176,130 @@ func (f *E2EFramework) GetContainerLogs(container testcontainers.Container) (str
 	}
 
 	return string(logs), nil
+}
+
+// CreateLocalRegistry creates and starts a local Docker registry for testing.
+func (f *E2EFramework) CreateLocalRegistry() (*LocalRegistry, error) {
+	registry, err := NewLocalRegistry(f.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	f.registry = registry
+	f.addCleanupFunc(func() error {
+		return registry.Cleanup(f.ctx)
+	})
+
+	return registry, nil
+}
+
+// BuildAndPushImage builds a Docker image and pushes it to the specified registry.
+func (f *E2EFramework) BuildAndPushImage(dockerfile, tag, registryURL, version string) error {
+	// Build the image
+	buildCmd := exec.Command(
+		"docker",
+		"build",
+		"-t",
+		fmt.Sprintf("%s/%s:%s", registryURL, dockerfile, version),
+		".",
+	)
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to build image: %w, output: %s", err, string(output))
+	}
+
+	// Tag the image for registry
+	tagCmd := exec.Command(
+		"docker",
+		"tag",
+		fmt.Sprintf("%s/%s:%s", registryURL, dockerfile, version),
+		fmt.Sprintf("%s/%s:%s", registryURL, tag, version),
+	)
+	if output, err := tagCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to tag image: %w, output: %s", err, string(output))
+	}
+
+	// Push the image
+	pushCmd := exec.Command("docker", "push", fmt.Sprintf("%s/%s:%s", registryURL, tag, version))
+	if output, err := pushCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to push image: %w, output: %s", err, string(output))
+	}
+
+	return nil
+}
+
+// UpdateTestImage simulates updating an image by tagging an existing image with a new version.
+func (f *E2EFramework) UpdateTestImage(image, oldTag, newTag string) error {
+	// Tag the existing image with the new tag to simulate an update
+	tagCmd := exec.Command(
+		"docker",
+		"tag",
+		fmt.Sprintf("%s:%s", image, oldTag),
+		fmt.Sprintf("%s:%s", image, newTag),
+	)
+	if output, err := tagCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to tag image for update: %w, output: %s", err, string(output))
+	}
+
+	// If we have a registry, push the new tag
+	if f.registry != nil {
+		pushCmd := exec.Command("docker", "push", fmt.Sprintf("%s:%s", image, newTag))
+		if output, err := pushCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to push updated image: %w, output: %s", err, string(output))
+		}
+	}
+
+	return nil
+}
+
+// ConfigureInsecureRegistry configures Docker to allow insecure access to a registry.
+// This is commonly needed for local registries in testing.
+func (f *E2EFramework) ConfigureInsecureRegistry(registryURL string) error {
+	// Create daemon.json with insecure registry configuration
+	config := fmt.Sprintf(`{"insecure-registries": ["%s"]}`, registryURL)
+
+	// Write to /etc/docker/daemon.json (requires sudo)
+	writeCmd := exec.Command(
+		"sudo",
+		"sh",
+		"-c",
+		fmt.Sprintf(`echo '%s' > /etc/docker/daemon.json`, config),
+	)
+	if output, err := writeCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to write daemon.json: %w, output: %s", err, string(output))
+	}
+
+	// Restart Docker daemon
+	restartCmd := exec.Command("sudo", "systemctl", "restart", "docker")
+	if output, err := restartCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to restart Docker: %w, output: %s", err, string(output))
+	}
+
+	// Register cleanup to restore original daemon.json
+	f.addCleanupFunc(func() error {
+		// Remove the test daemon.json (system will use defaults)
+		removeCmd := exec.Command("sudo", "rm", "-f", "/etc/docker/daemon.json")
+		if output, err := removeCmd.CombinedOutput(); err != nil {
+			log.Printf(
+				"Warning: failed to remove test daemon.json: %v, output: %s",
+				err,
+				string(output),
+			)
+		}
+
+		// Restart Docker again
+		restartCmd := exec.Command("sudo", "systemctl", "restart", "docker")
+		if output, err := restartCmd.CombinedOutput(); err != nil {
+			log.Printf(
+				"Warning: failed to restart Docker after cleanup: %v, output: %s",
+				err,
+				string(output),
+			)
+		}
+
+		return nil
+	})
+
+	return nil
 }
 
 // LogTestInfo logs useful information about the current test environment.
