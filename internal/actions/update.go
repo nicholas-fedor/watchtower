@@ -26,9 +26,6 @@ const defaultPullFailureDelay = 5 * time.Minute
 // defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
 const defaultHealthCheckTimeout = 5 * time.Minute
 
-// defaultGitTimeout defines the default timeout for Git operations.
-const defaultGitTimeout = 30 * time.Second
-
 // Errors for update operations.
 var (
 	// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
@@ -62,6 +59,7 @@ var (
 // Containers with pinned images (referenced by digest) are skipped to preserve immutability.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - client: Container client for interacting with Docker API.
 //   - params: Update options specifying behavior like cleanup, restart, and filtering.
 //
@@ -70,6 +68,7 @@ var (
 //   - map[types.ImageID]bool: Set of image IDs to clean up after updates.
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(
+	ctx context.Context,
 	client container.Client,
 	params types.UpdateParams,
 ) (types.Report, map[types.ImageID]bool, error) {
@@ -154,7 +153,7 @@ func Update(
 
 		if isGitMonitored {
 			// Perform Git staleness checking
-			stale, err = checkGitStaleness(sourceContainer, params)
+			stale, err = checkGitStaleness(ctx, sourceContainer, params)
 			if err == nil && stale {
 				// For Git containers, we need to build a new image, so we don't have a "newest image" yet
 				newestImage = "" // Will be set after build
@@ -265,23 +264,23 @@ func Update(
 	if params.RollingRestart {
 		// Apply rolling restarts for updates and linked containers sequentially.
 		progress.UpdateFailed(
-			performRollingRestart(containersToUpdate, client, params, cleanupImageIDs),
+			performRollingRestart(ctx, containersToUpdate, client, params, cleanupImageIDs),
 		)
 		progress.UpdateFailed(
-			performRollingRestart(containersToRestart, client, params, cleanupImageIDs),
+			performRollingRestart(ctx, containersToRestart, client, params, cleanupImageIDs),
 		)
 	} else {
 		// Stop and restart containers in batches, respecting dependency order.
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToUpdate, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, cleanupImageIDs)
+		failedStart = restartContainersInSortedOrder(ctx, containersToUpdate, client, params, stoppedImages, cleanupImageIDs)
 		progress.UpdateFailed(failedStart)
 
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToRestart, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(containersToRestart, client, params, stoppedImages, cleanupImageIDs)
+		failedStart = restartContainersInSortedOrder(ctx, containersToRestart, client, params, stoppedImages, cleanupImageIDs)
 		progress.UpdateFailed(failedStart)
 	}
 
@@ -429,6 +428,7 @@ func isPinned(container types.Container, progress *session.Progress) (bool, erro
 // collecting image IDs for stale containers only to ensure proper cleanup.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - containers: List of containers to update or restart.
 //   - client: Container client for Docker operations.
 //   - params: Update options controlling restart behavior.
@@ -437,6 +437,7 @@ func isPinned(container types.Container, progress *session.Progress) (bool, erro
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
 func performRollingRestart(
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	params types.UpdateParams,
@@ -464,7 +465,7 @@ func performRollingRestart(
 		if err := stopStaleContainer(c, client, params); err != nil {
 			failed[c.ID()] = err
 		} else {
-			newContainerID, renamed, err := restartStaleContainer(c, client, params)
+			newContainerID, renamed, err := restartStaleContainer(ctx, c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -616,6 +617,7 @@ func stopStaleContainer(
 // renamed during a self-update, and tracking any restart failures.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - containers: List of containers to restart.
 //   - client: Container client for Docker operations.
 //   - params: Update options controlling restart behavior.
@@ -625,6 +627,7 @@ func stopStaleContainer(
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed restarts.
 func restartContainersInSortedOrder(
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	params types.UpdateParams,
@@ -649,7 +652,7 @@ func restartContainersInSortedOrder(
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
 		if stoppedImages[c.SafeImageID()] {
-			_, renamed, err := restartStaleContainer(c, client, params)
+			_, renamed, err := restartStaleContainer(ctx, c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -678,6 +681,7 @@ func restartContainersInSortedOrder(
 // if applicable, starts a new container, and runs post-update hooks, handling errors for each step.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Container to restart.
 //   - client: Container client for Docker operations.
 //   - params: Update options controlling restart and lifecycle hooks.
@@ -687,6 +691,7 @@ func restartContainersInSortedOrder(
 //   - bool: True if the container was renamed, false otherwise.
 //   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
+	ctx context.Context,
 	container types.Container,
 	client container.Client,
 	params types.UpdateParams,
@@ -701,7 +706,7 @@ func restartStaleContainer(
 
 	// Handle Git-monitored containers differently
 	if isGitMonitoredContainer(container) {
-		return restartGitContainer(container, client, params)
+		return restartGitContainer(ctx, container, client, params)
 	}
 
 	// Rename Watchtower containers only if restarts are enabled.
@@ -771,6 +776,7 @@ func restartStaleContainer(
 
 // restartGitContainer handles restarting a Git-monitored container by building a new image.
 func restartGitContainer(
+	ctx context.Context,
 	container types.Container,
 	client container.Client,
 	params types.UpdateParams,
@@ -797,10 +803,7 @@ func restartGitContainer(
 
 	authConfig := createGitAuthConfig(params)
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultGitTimeout)
-	defer cancel()
-
-	latestCommit, err := gitClient.GetLatestCommit(repoURL, branch, authConfig)
+	latestCommit, err := gitClient.GetLatestCommit(ctx, repoURL, branch, authConfig)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to get latest commit: %w", err)
 	}
@@ -921,6 +924,7 @@ func isGitMonitoredContainer(container types.Container) bool {
 
 // checkGitStaleness performs Git staleness checking for a container.
 func checkGitStaleness(
+	ctx context.Context,
 	container types.Container,
 	params types.UpdateParams,
 ) (bool, error) {
@@ -942,7 +946,7 @@ func checkGitStaleness(
 	authConfig := createGitAuthConfig(params)
 
 	// Get latest commit from remote repository
-	latestCommit, err := gitClient.GetLatestCommit(repoURL, branch, authConfig)
+	latestCommit, err := gitClient.GetLatestCommit(ctx, repoURL, branch, authConfig)
 	if err != nil {
 		return false, fmt.Errorf("failed to get latest commit: %w", err)
 	}

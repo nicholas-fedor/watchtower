@@ -59,13 +59,10 @@ func NewClientWithTimeout(timeout time.Duration) *DefaultClient {
 
 // GetLatestCommit retrieves the latest commit hash for a given reference.
 func (c *DefaultClient) GetLatestCommit(
+	ctx context.Context,
 	repoURL, ref string,
 	auth AuthConfig,
 ) (string, error) {
-	// Create context with timeout for the operation
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
-
 	// Try API approach first for supported providers
 	if hash, err := c.getLatestCommitAPI(ctx, repoURL, ref, auth); err == nil {
 		return hash, nil
@@ -176,7 +173,7 @@ func (c *DefaultClient) ValidateRepository(
 	repoURL string,
 	auth AuthConfig,
 ) error {
-	_, err := c.GetLatestCommit(repoURL, "HEAD", auth)
+	_, err := c.GetLatestCommit(ctx, repoURL, "HEAD", auth)
 
 	return err
 }

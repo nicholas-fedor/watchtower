@@ -841,10 +841,10 @@ func (c client) BuildImageFromGit(
 
 	// Extract the built image ID from the build output
 	// This is a simplified version - in practice, we'd need to parse the build output
-	ctx, cancel := context.WithTimeout(context.Background(), defaultImageBuildTimeout)
+	buildCtx, cancel := context.WithTimeout(ctx, defaultImageBuildTimeout)
 	defer cancel()
 
-	imageID, err := c.extractImageIDFromBuild(imageName)
+	imageID, err := c.extractImageIDFromBuild(buildCtx, imageName)
 	if err != nil {
 		logrus.WithFields(fields).WithError(err).Debug("Failed to extract built image ID")
 
@@ -880,16 +880,16 @@ func (c client) streamBuildOutput(reader io.ReadCloser) error {
 // extractImageIDFromBuild extracts the image ID from a successfully built image.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - imageName: Name of the built image.
 //
 // Returns:
 //   - types.ImageID: ID of the built image.
 //   - error: Non-nil if extraction fails, nil on success.
-func (c client) extractImageIDFromBuild(imageName string) (types.ImageID, error) {
-	// Create context with timeout for the inspection
-	ctx, cancel := context.WithTimeout(context.Background(), defaultImageBuildTimeout)
-	defer cancel()
-
+func (c client) extractImageIDFromBuild(
+	ctx context.Context,
+	imageName string,
+) (types.ImageID, error) {
 	// Inspect the built image to get its ID
 	inspect, err := c.api.ImageInspect(ctx, imageName)
 	if err != nil {

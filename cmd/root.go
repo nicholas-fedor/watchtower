@@ -462,7 +462,7 @@ func runMain(cfg RunConfig) int {
 	// Handle one-time update mode, executing updates and registering metrics.
 	if cfg.RunOnce {
 		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
-		metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
+		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, cleanup)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
 
@@ -472,7 +472,7 @@ func runMain(cfg RunConfig) int {
 	// Handle immediate update on startup, then continue with periodic updates.
 	if cfg.UpdateOnStart {
 		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
-		metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
+		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, cleanup)
 		metrics.Default().RegisterScan(metric)
 	}
 
@@ -529,6 +529,7 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	if cfg.EnableUpdateAPI {
 		updateHandler := update.New(func(images []string) *metrics.Metric {
 			metric := runUpdatesWithNotifications(
+				ctx,
 				filters.FilterByImage(images, cfg.Filter),
 				cleanup,
 			)
@@ -840,7 +841,7 @@ func runUpgradesOnSchedule(
 			select {
 			case v := <-lock:
 				defer func() { lock <- v }()
-				metric := runUpdatesWithNotifications(filter, cleanup)
+				metric := runUpdatesWithNotifications(ctx, filter, cleanup)
 				metrics.Default().RegisterScan(metric)
 			default:
 				metrics.Default().RegisterScan(nil)
@@ -887,12 +888,17 @@ func runUpgradesOnSchedule(
 // summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
 //
 // Parameters:
+//   - ctx: The context for controlling the update operation.
 //   - filter: The types.Filter determining which containers are targeted for updates.
 //   - cleanup: Boolean indicating whether to remove old images after updates.
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Metric {
+func runUpdatesWithNotifications(
+	ctx context.Context,
+	filter types.Filter,
+	cleanup bool,
+) *metrics.Metric {
 	// Start batching notifications to group update messages, if notifier is initialized
 	if notifier != nil {
 		notifier.StartNotification()
@@ -916,7 +922,7 @@ func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Met
 	}
 
 	// Execute the update action, capturing results and image IDs for cleanup.
-	result, cleanupImageIDs, err := actions.Update(client, updateParams)
+	result, cleanupImageIDs, err := actions.Update(ctx, client, updateParams)
 	if err != nil {
 		logrus.WithError(err).Error("Update execution failed")
 
