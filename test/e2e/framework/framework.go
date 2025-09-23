@@ -304,6 +304,25 @@ func (f *E2EFramework) ConfigureInsecureRegistry(registryURL string) error {
 	return nil
 }
 
+// BuildWatchtowerImage builds a local Watchtower image for testing.
+// This provides an alternative to the external wt.sh script with better integration.
+func (f *E2EFramework) BuildWatchtowerImage(imageName, tag string) error {
+	// Use docker build command for simplicity and reliability
+	cmd := exec.Command("docker", "build",
+		"-f", "build/docker/Dockerfile.self-local",
+		"-t", fmt.Sprintf("%s:%s", imageName, tag),
+		".")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to build watchtower image: %w\nOutput: %s", err, string(output))
+	}
+
+	log.Printf("Successfully built Watchtower image: %s:%s", imageName, tag)
+
+	return nil
+}
+
 // LogTestInfo logs useful information about the current test environment.
 func (f *E2EFramework) LogTestInfo() {
 	log.Printf("E2E Framework initialized:")
