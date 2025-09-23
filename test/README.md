@@ -39,6 +39,21 @@ test/
 
 ## Quick Start
 
+### Building Watchtower for Testing
+
+Before running E2E tests, build a local Watchtower image:
+
+```bash
+# Build default watchtower:test image
+./test/build-watchtower.sh
+
+# Build with custom name/tag
+./test/build-watchtower.sh --image my-watchtower --tag dev
+
+# Use environment variables
+WATCHTOWER_E2E_IMAGE=custom WATCHTOWER_E2E_TAG=latest ./test/build-watchtower.sh
+```
+
 ### Running E2E Tests
 
 ```bash
@@ -50,6 +65,11 @@ go test ./test/e2e/suites/ -run TestBasicSuite
 
 # Run with verbose output
 go test -v ./test/e2e/suites/
+
+# Run specific scenario tests
+go test ./test/e2e/scenarios/git/ -v      # Git monitoring tests
+go test ./test/e2e/scenarios/registry/ -v # Registry integration tests
+go test ./test/e2e/scenarios/lifecycle/ -v # Lifecycle hook tests
 ```
 
 ### Basic Test Example
@@ -338,20 +358,28 @@ For detailed implementation instructions, patterns, and examples, see [`E2E_IMPL
 
 ## Migration from Bash Scripts
 
-Existing bash scripts in the root directory should be gradually migrated to this framework:
+Legacy bash scripts have been migrated to the Go-based e2e testing framework:
 
-- `scripts/lifecycle-tests.sh` → `test/e2e/scenarios/lifecycle/`
-- `scripts/contnet-tests.sh` → `test/e2e/scenarios/networking/`
-- Custom local scripts → Appropriate scenario directories
+### ✅ **Completed Migrations**
 
-This provides better maintainability, reliability, and integration with the Go testing ecosystem.
+- `scripts/lifecycle-tests.sh` → `test/e2e/scenarios/lifecycle/hooks_test.go`
+- `scripts/contnet-tests.sh` → Framework supports networking test patterns
+- `Watchtower Testing/e2e_local-registry.sh` → `test/e2e/scenarios/registry/` tests
+- `Watchtower Testing/issue-501/e2e-test.sh` → Registry integration tests
 
-## Migration from Bash Scripts
+### 🔄 **Build Process Updates**
 
-Existing bash scripts in the root directory should be gradually migrated to this framework:
+- `Watchtower Testing/wt.sh` → `./test/build-watchtower.sh` (streamlined version)
+- New build script with better error handling and verification
+- Environment variable support for CI/CD integration
 
-- `scripts/lifecycle-tests.sh` → `test/e2e/scenarios/lifecycle/`
-- `scripts/contnet-tests.sh` → `test/e2e/scenarios/networking/`
-- Custom local scripts → Appropriate scenario directories
+### 📋 **Remaining Scripts**
 
-This provides better maintainability, reliability, and integration with the Go testing ecosystem.
+Some utility scripts remain for specific purposes:
+
+- `scripts/codecov.sh` - Code coverage reporting
+- `scripts/dependency-test.sh` - Dependency validation
+- `scripts/docker-util.sh` - Docker utility functions
+- `scripts/du-cli.sh` - CLI testing utilities
+
+The Go-based framework provides better maintainability, reliability, and integration with the Go testing ecosystem.
