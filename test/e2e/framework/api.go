@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"time"
@@ -201,7 +201,7 @@ func (f *E2EFramework) WaitForAPIReady(url, token string, timeout time.Duration)
 
 // MockAPIServer provides a mock HTTP API server for testing API clients.
 type MockAPIServer struct {
-	server    *http.Server
+	server    *httptest.Server
 	mu        sync.RWMutex
 	requests  []APIRequest
 	responses map[string]any
@@ -229,29 +229,15 @@ func NewMockAPIServer() *MockAPIServer {
 	mux.HandleFunc("/v1/metrics", mock.handleMetrics)
 	mux.HandleFunc("/v1/health", mock.handleHealth)
 
-	mock.server = &http.Server{
-		Addr:    ":0", // Let the system assign a port
-		Handler: mux,
-	}
-
-	// Start server in background
-	go func() {
-		if err := mock.server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Printf("Mock API server error: %v", err)
-		}
-	}()
-
-	// Give server time to start
-	time.Sleep(100 * time.Millisecond)
+	// Use httptest.Server which automatically assigns a port and provides the URL
+	mock.server = httptest.NewServer(mux)
 
 	return mock
 }
 
 // URL returns the mock server URL.
 func (m *MockAPIServer) URL() string {
-	// This is a simplified implementation
-	// In practice, you'd need to get the actual assigned port
-	return "http://localhost:8080"
+	return m.server.URL
 }
 
 // SetResponse sets a mock response for a specific endpoint.
@@ -340,5 +326,7 @@ func (m *MockAPIServer) captureRequest(r *http.Request, path string) {
 
 // Close shuts down the mock server.
 func (m *MockAPIServer) Close(ctx context.Context) error {
-	return m.server.Shutdown(ctx)
+	m.server.Close()
+
+	return nil
 }

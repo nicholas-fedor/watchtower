@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,10 +94,23 @@ func (f *E2EFramework) CreateContainer(
 // CreateWatchtowerContainer creates a Watchtower container with the specified configuration.
 func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.Container, error) {
 	// Check if Git monitoring is enabled - if so, don't wait for exit since it's not implemented yet
-	var waitStrategy wait.Strategy = wait.ForExit().WithExitTimeout(30 * time.Second)
+	var waitStrategy wait.Strategy = wait.ForLog("Running a one time update").WithStartupTimeout(30 * time.Second) // Wait for run-once start
 	for _, arg := range args {
 		if arg == "--enable-git-monitoring" {
 			// Git monitoring not implemented yet, so just wait for startup
+			waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(10 * time.Second)
+
+			break
+		}
+		if arg == "--help" {
+			// Help command exits immediately, wait for help output
+			waitStrategy = wait.ForLog("Watchtower automatically").
+				WithStartupTimeout(10 * time.Second)
+
+			break
+		}
+		// For notification flags, just wait for Watchtower to start
+		if strings.HasPrefix(arg, "--notification-") {
 			waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(10 * time.Second)
 
 			break
@@ -193,25 +207,13 @@ func (f *E2EFramework) CreateLocalRegistry() (*LocalRegistry, error) {
 	return registry, nil
 }
 
-// BuildAndPushImage builds a Docker image and pushes it to the specified registry.
-func (f *E2EFramework) BuildAndPushImage(dockerfile, tag, registryURL, version string) error {
-	// Build the image
-	buildCmd := exec.Command(
-		"docker",
-		"build",
-		"-t",
-		fmt.Sprintf("%s/%s:%s", registryURL, dockerfile, version),
-		".",
-	)
-	if output, err := buildCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to build image: %w, output: %s", err, string(output))
-	}
-
-	// Tag the image for registry
+// BuildAndPushImage tags an existing Docker image and pushes it to the specified registry.
+func (f *E2EFramework) BuildAndPushImage(sourceImage, tag, registryURL, version string) error {
+	// Tag the existing image for registry
 	tagCmd := exec.Command(
 		"docker",
 		"tag",
-		fmt.Sprintf("%s/%s:%s", registryURL, dockerfile, version),
+		sourceImage,
 		fmt.Sprintf("%s/%s:%s", registryURL, tag, version),
 	)
 	if output, err := tagCmd.CombinedOutput(); err != nil {
