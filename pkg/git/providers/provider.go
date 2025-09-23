@@ -2,8 +2,8 @@
 package providers
 
 import (
-	"slices"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -14,6 +14,13 @@ type BaseProvider struct {
 }
 
 // NewBaseProvider creates a new base provider.
+//
+// Parameters:
+//   - name: Provider name (e.g., "github", "gitlab").
+//   - hosts: List of supported hostnames.
+//
+// Returns:
+//   - BaseProvider: Configured base provider instance.
 func NewBaseProvider(name string, hosts []string) BaseProvider {
 	return BaseProvider{
 		name:  name,
@@ -22,16 +29,28 @@ func NewBaseProvider(name string, hosts []string) BaseProvider {
 }
 
 // Name returns the provider name.
+//
+// Returns:
+//   - string: Provider name (e.g., "github", "gitlab").
 func (p BaseProvider) Name() string {
 	return p.name
 }
 
 // Hosts returns the well-known hostnames for this provider.
+//
+// Returns:
+//   - []string: List of supported hostnames (e.g., ["github.com"]).
 func (p BaseProvider) Hosts() []string {
 	return p.hosts
 }
 
 // IsSupported checks if this provider can handle the given repository URL.
+//
+// Parameters:
+//   - repoURL: Repository URL to check.
+//
+// Returns:
+//   - bool: True if the provider supports this repository URL.
 func (p BaseProvider) IsSupported(repoURL string) bool {
 	return isHostSupported(repoURL, p.hosts)
 }
@@ -44,5 +63,6 @@ func isHostSupported(repoURL string, supportedHosts []string) bool {
 	}
 
 	host := strings.ToLower(u.Host)
+
 	return slices.Contains(supportedHosts, host)
 }
