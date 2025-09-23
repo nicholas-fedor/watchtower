@@ -745,10 +745,48 @@ Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
 Suppresses the info-level notification sent when Watchtower starts.
 
 ```text
-            Argument: --no-startup-message
+             Argument: --no-startup-message
 Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
-                Type: Boolean
-             Default: false
+                 Type: Boolean
+              Default: false
+```
+
+## Git Repository Monitoring
+
+### Enable Git Monitoring
+
+Enables Git repository monitoring for containers with Git labels. When enabled, Watchtower monitors Git repositories for new commits and rebuilds containers automatically.
+
+```text
+             Argument: --enable-git-monitoring
+Environment Variable: WATCHTOWER_GIT_ENABLE
+                 Type: Boolean
+              Default: false
+```
+
+!!! note
+    See [Git Repository Monitoring](../../advanced-features/git-monitoring/index.md) for detailed configuration and usage.
+
+### Git Authentication Token
+
+Sets a default authentication token for Git repository access. Can be overridden per container using labels.
+
+```text
+             Argument: --git-auth-token
+Environment Variable: WATCHTOWER_GIT_AUTH_TOKEN
+                 Type: String
+              Default: None
+```
+
+### Git Timeout
+
+Sets the timeout duration for Git operations (API calls, cloning, etc.).
+
+```text
+             Argument: --git-timeout
+Environment Variable: WATCHTOWER_GIT_TIMEOUT
+                 Type: Duration
+              Default: 30s
 ```
 
 ## Lifecycle & Health

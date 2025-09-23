@@ -171,6 +171,7 @@ nav:
       - Templates: notifications/templates/index.md
       - Template Preview: notifications/template-preview/index.md
   - Advanced Features:
+      - Git Repository Monitoring: advanced-features/git-monitoring/index.md
       - HTTP API: advanced-features/http-api/index.md
       - Lifecycle Hooks: advanced-features/lifecycle-hooks/index.md
       - Linked Containers: advanced-features/linked-containers/index.md

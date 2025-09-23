@@ -1183,4 +1183,57 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.BeNumerically(">=", 1*time.Millisecond), "Delay should have been applied")
 		})
 	})
+
+	ginkgo.When("handling Git-monitored containers", func() {
+		ginkgo.It(
+			"should process Git-monitored containers differently from regular containers",
+			func() {
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							mocks.CreateMockContainerWithConfig(
+								"git-container",
+								"/git-container",
+								"myapp:latest",
+								true,
+								false,
+								time.Now(),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower.git-repo":   "https://github.com/user/repo",
+										"com.centurylinklabs.watchtower.git-branch": "main",
+										"com.centurylinklabs.watchtower.git-commit": "abc123",
+									},
+								}),
+							mocks.CreateMockContainer(
+								"regular-container",
+								"/regular-container",
+								"nginx:latest",
+								time.Now()),
+						},
+					},
+					false,
+					false,
+				)
+
+				// Test that Git containers are processed (would require mocking Git client)
+				report, cleanupImageIDs, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true},
+				)
+
+				// The test verifies that the Update function can handle mixed container types
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Scanned()).
+					To(gomega.HaveLen(1))
+					// Only regular container scanned successfully
+				gomega.Expect(report.Skipped()).
+					To(gomega.HaveLen(1))
+					// Git container skipped due to repo access failure
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1)) // Regular container updated
+				gomega.Expect(cleanupImageIDs).To(gomega.HaveKey(types.ImageID("nginx:latest")))
+			},
+		)
+	})
 })

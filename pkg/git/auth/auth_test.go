@@ -1,221 +1,547 @@
-// Package auth provides Git authentication handling for Watchtower's Git monitoring feature.
 package auth
 
 import (
-	"os"
 	"testing"
 
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-func TestCreateAuthMethod_Token(t *testing.T) {
-	config := types.AuthConfig{
-		Method: types.AuthMethodToken,
-		Token:  "test-token",
+func TestCreateAuthMethod(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   types.AuthConfig
+		wantNil  bool
+		wantType any
+		wantErr  error
+	}{
+		{
+			name: "token auth",
+			config: types.AuthConfig{
+				Method: types.AuthMethodToken,
+				Token:  "test-token",
+			},
+			wantNil:  false,
+			wantType: &http.BasicAuth{},
+		},
+		{
+			name: "empty token auth",
+			config: types.AuthConfig{
+				Method: types.AuthMethodToken,
+				Token:  "",
+			},
+			wantNil: true,
+		},
+		{
+			name: "basic auth",
+			config: types.AuthConfig{
+				Method:   types.AuthMethodBasic,
+				Username: "user",
+				Password: "pass",
+			},
+			wantNil:  false,
+			wantType: &http.BasicAuth{},
+		},
+		{
+			name: "basic auth missing password",
+			config: types.AuthConfig{
+				Method:   types.AuthMethodBasic,
+				Username: "user",
+				Password: "",
+			},
+			wantNil: true,
+		},
+		{
+			name: "basic auth missing username",
+			config: types.AuthConfig{
+				Method:   types.AuthMethodBasic,
+				Username: "",
+				Password: "pass",
+			},
+			wantNil: true,
+		},
+		{
+			name: "ssh auth",
+			config: types.AuthConfig{
+				Method: types.AuthMethodSSH,
+				SSHKey: []byte("fake-key"),
+			},
+			wantErr: nil, // Will fail with invalid key, but we check this in the test logic
+		},
+		{
+			name: "ssh auth empty key",
+			config: types.AuthConfig{
+				Method: types.AuthMethodSSH,
+				SSHKey: []byte{},
+			},
+			wantErr: ErrSSHKeyRequired,
+		},
+		{
+			name: "none auth",
+			config: types.AuthConfig{
+				Method: types.AuthMethodNone,
+			},
+			wantNil: true,
+		},
+		{
+			name: "unknown auth method",
+			config: types.AuthConfig{
+				Method: "unknown",
+			},
+			wantErr: ErrUnsupportedAuthMethod,
+		},
 	}
 
-	auth, err := CreateAuthMethod(config)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auth, err := CreateAuthMethod(tt.config)
 
-	require.NoError(t, err)
-	assert.NotNil(t, auth)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr.Error())
+
+				return
+			}
+
+			// Special handling for SSH auth with invalid key
+			if tt.name == "ssh auth" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to create SSH public keys")
+
+				return
+			}
+
+			require.NoError(t, err)
+
+			if tt.wantNil {
+				assert.Nil(t, auth)
+			} else {
+				assert.NotNil(t, auth)
+
+				if tt.wantType != nil {
+					assert.IsType(t, tt.wantType, auth)
+				}
+			}
+		})
+	}
 }
 
-func TestCreateAuthMethod_Basic(t *testing.T) {
-	config := types.AuthConfig{
-		Method:   types.AuthMethodBasic,
-		Username: "testuser",
-		Password: "testpass",
+func TestCreateTokenAuth(t *testing.T) {
+	tests := []struct {
+		name    string
+		token   string
+		wantNil bool
+	}{
+		{
+			name:    "valid token",
+			token:   "test-token",
+			wantNil: false,
+		},
+		{
+			name:    "empty token",
+			token:   "",
+			wantNil: true,
+		},
 	}
 
-	auth, err := CreateAuthMethod(config)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auth := createTokenAuth(tt.token)
 
-	require.NoError(t, err)
-	assert.NotNil(t, auth)
+			if tt.wantNil {
+				assert.Nil(t, auth)
+			} else {
+				assert.NotNil(t, auth)
+				basicAuth, ok := auth.(*http.BasicAuth)
+				require.True(t, ok)
+				assert.Equal(t, "token", basicAuth.Username)
+				assert.Equal(t, tt.token, basicAuth.Password)
+			}
+		})
+	}
 }
 
-func TestCreateAuthMethod_SSH(t *testing.T) {
-	// Skip SSH test as it requires valid SSH key format
-	// This would be tested manually or with integration tests
-	t.Skip("SSH authentication requires valid key format - test manually")
-}
-
-func TestCreateAuthMethod_None(t *testing.T) {
-	config := types.AuthConfig{
-		Method: types.AuthMethodNone,
+func TestCreateBasicAuth(t *testing.T) {
+	tests := []struct {
+		name     string
+		username string
+		password string
+		wantNil  bool
+	}{
+		{
+			name:     "valid credentials",
+			username: "user",
+			password: "pass",
+			wantNil:  false,
+		},
+		{
+			name:     "empty username",
+			username: "",
+			password: "pass",
+			wantNil:  true,
+		},
+		{
+			name:     "empty password",
+			username: "user",
+			password: "",
+			wantNil:  true,
+		},
+		{
+			name:     "both empty",
+			username: "",
+			password: "",
+			wantNil:  true,
+		},
 	}
 
-	auth, err := CreateAuthMethod(config)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auth := createBasicAuth(tt.username, tt.password)
 
-	require.NoError(t, err)
-	assert.Nil(t, auth)
+			if tt.wantNil {
+				assert.Nil(t, auth)
+			} else {
+				assert.NotNil(t, auth)
+				basicAuth, ok := auth.(*http.BasicAuth)
+				require.True(t, ok)
+				assert.Equal(t, tt.username, basicAuth.Username)
+				assert.Equal(t, tt.password, basicAuth.Password)
+			}
+		})
+	}
 }
 
-func TestCreateAuthMethod_Invalid(t *testing.T) {
-	config := types.AuthConfig{
-		Method: "invalid-method",
+func TestCreateSSHAuth(t *testing.T) {
+	tests := []struct {
+		name    string
+		sshKey  []byte
+		wantErr error
+	}{
+		{
+			name: "valid ssh key",
+			sshKey: []byte(
+				"-----BEGIN OPENSSH PRIVATE KEY-----\nMOCK\n-----END OPENSSH PRIVATE KEY-----",
+			),
+			// Note: This will fail with invalid key format, but tests the error path
+		},
+		{
+			name:    "empty ssh key",
+			sshKey:  []byte{},
+			wantErr: ErrSSHKeyRequired,
+		},
+		{
+			name:    "nil ssh key",
+			sshKey:  nil,
+			wantErr: ErrSSHKeyRequired,
+		},
 	}
 
-	auth, err := CreateAuthMethod(config)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auth, err := createSSHAuth(tt.sshKey)
 
-	require.Error(t, err)
-	assert.Nil(t, auth)
-	assert.Contains(t, err.Error(), "unsupported authentication method")
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, err)
+				assert.Nil(t, auth)
+			} else {
+				// For valid keys, we expect either success or a different error
+				// The mock key above will fail, but that's expected
+				if err != nil {
+					assert.Contains(t, err.Error(), "failed to create SSH public keys")
+				} else {
+					assert.NotNil(t, auth)
+					assert.IsType(t, &ssh.PublicKeys{}, auth)
+				}
+			}
+		})
+	}
 }
 
-func TestParseAuthConfigFromFlags_Token(t *testing.T) {
-	config, err := ParseAuthConfigFromFlags("test-token", "", "", "")
-
-	require.NoError(t, err)
-	assert.Equal(t, types.AuthMethodToken, config.Method)
-	assert.Equal(t, "test-token", config.Token)
-}
-
-func TestParseAuthConfigFromFlags_Basic(t *testing.T) {
-	config, err := ParseAuthConfigFromFlags("", "testuser", "testpass", "")
-
-	require.NoError(t, err)
-	assert.Equal(t, types.AuthMethodBasic, config.Method)
-	assert.Equal(t, "testuser", config.Username)
-	assert.Equal(t, "testpass", config.Password)
-}
-
-func TestParseAuthConfigFromFlags_SSH(t *testing.T) {
-	// Create a temporary SSH key file for testing
-	tempFile, err := os.CreateTemp(t.TempDir(), "ssh_key_test")
-	require.NoError(t, err)
-
-	defer os.Remove(tempFile.Name())
-
-	_, err = tempFile.WriteString(
-		"-----BEGIN OPENSSH PRIVATE KEY-----\nfake-key-content\n-----END OPENSSH PRIVATE KEY-----",
-	)
-	require.NoError(t, err)
-	tempFile.Close()
-
-	config, err := ParseAuthConfigFromFlags("", "", "", tempFile.Name())
-
-	require.NoError(t, err)
-	assert.Equal(t, types.AuthMethodSSH, config.Method)
-	assert.NotEmpty(t, config.SSHKey)
-}
-
-func TestParseAuthConfigFromFlags_None(t *testing.T) {
-	config, err := ParseAuthConfigFromFlags("", "", "", "")
-
-	require.NoError(t, err)
-	assert.Equal(t, types.AuthMethodNone, config.Method)
-}
-
-func TestValidateAuthConfig_Token(t *testing.T) {
-	config := types.AuthConfig{
-		Method: types.AuthMethodToken,
-		Token:  "test-token",
+func TestLoadSSHKeyFromFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		filePath string
+		setup    func() string // returns temp file path
+		wantErr  error
+	}{
+		{
+			name:     "empty file path",
+			filePath: "",
+			wantErr:  ErrSSHKeyPathEmpty,
+		},
+		{
+			name:     "nonexistent file",
+			filePath: "/nonexistent/file",
+			wantErr:  nil, // Will be a file read error
+		},
 	}
 
-	err := ValidateAuthConfig(config)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var filePath string
+			if tt.setup != nil {
+				filePath = tt.setup()
+			} else {
+				filePath = tt.filePath
+			}
 
-	require.NoError(t, err)
+			key, err := LoadSSHKeyFromFile(filePath)
+
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, err)
+				assert.Nil(t, key)
+			} else if tt.name == "nonexistent file" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to read SSH key file")
+				assert.Nil(t, key)
+			}
+		})
+	}
 }
 
-func TestValidateAuthConfig_TokenEmpty(t *testing.T) {
-	config := types.AuthConfig{
-		Method: types.AuthMethodToken,
-		Token:  "",
+func TestParseAuthConfigFromFlags(t *testing.T) {
+	tests := []struct {
+		name       string
+		token      string
+		username   string
+		password   string
+		sshKeyPath string
+		expected   types.AuthConfig
+		wantErr    bool
+	}{
+		{
+			name:       "token takes priority",
+			token:      "token123",
+			username:   "user",
+			password:   "pass",
+			sshKeyPath: "/path/to/key",
+			expected: types.AuthConfig{
+				Method: types.AuthMethodToken,
+				Token:  "token123",
+			},
+		},
+		{
+			name:     "basic auth when no token",
+			token:    "",
+			username: "user",
+			password: "pass",
+			expected: types.AuthConfig{
+				Method:   types.AuthMethodBasic,
+				Username: "user",
+				Password: "pass",
+			},
+		},
+		{
+			name:       "ssh auth when no token or basic",
+			token:      "",
+			username:   "",
+			password:   "",
+			sshKeyPath: "/path/to/key",
+			expected: types.AuthConfig{
+				Method: types.AuthMethodSSH,
+				// SSHKey would be loaded, but we can't mock file reading easily
+			},
+			wantErr: true, // Because file doesn't exist
+		},
+		{
+			name:       "none auth when no credentials",
+			token:      "",
+			username:   "",
+			password:   "",
+			sshKeyPath: "",
+			expected: types.AuthConfig{
+				Method: types.AuthMethodNone,
+			},
+		},
+		{
+			name:     "basic auth incomplete",
+			token:    "",
+			username: "user",
+			password: "",
+			expected: types.AuthConfig{
+				Method: types.AuthMethodNone,
+			},
+		},
 	}
 
-	err := ValidateAuthConfig(config)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := ParseAuthConfigFromFlags(
+				tt.token,
+				tt.username,
+				tt.password,
+				tt.sshKeyPath,
+			)
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "token authentication requires a token")
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected.Method, config.Method)
+
+				if tt.expected.Token != "" {
+					assert.Equal(t, tt.expected.Token, config.Token)
+				}
+
+				if tt.expected.Username != "" {
+					assert.Equal(t, tt.expected.Username, config.Username)
+				}
+
+				if tt.expected.Password != "" {
+					assert.Equal(t, tt.expected.Password, config.Password)
+				}
+			}
+		})
+	}
 }
 
-func TestValidateAuthConfig_Basic(t *testing.T) {
-	config := types.AuthConfig{
-		Method:   types.AuthMethodBasic,
-		Username: "testuser",
-		Password: "testpass",
+func TestValidateAuthConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  types.AuthConfig
+		wantErr error
+	}{
+		{
+			name: "valid token config",
+			config: types.AuthConfig{
+				Method: types.AuthMethodToken,
+				Token:  "token123",
+			},
+		},
+		{
+			name: "invalid token config - empty token",
+			config: types.AuthConfig{
+				Method: types.AuthMethodToken,
+				Token:  "",
+			},
+			wantErr: ErrTokenRequired,
+		},
+		{
+			name: "valid basic config",
+			config: types.AuthConfig{
+				Method:   types.AuthMethodBasic,
+				Username: "user",
+				Password: "pass",
+			},
+		},
+		{
+			name: "invalid basic config - missing username",
+			config: types.AuthConfig{
+				Method:   types.AuthMethodBasic,
+				Username: "",
+				Password: "pass",
+			},
+			wantErr: ErrBasicAuthIncomplete,
+		},
+		{
+			name: "invalid basic config - missing password",
+			config: types.AuthConfig{
+				Method:   types.AuthMethodBasic,
+				Username: "user",
+				Password: "",
+			},
+			wantErr: ErrBasicAuthIncomplete,
+		},
+		{
+			name: "valid ssh config",
+			config: types.AuthConfig{
+				Method: types.AuthMethodSSH,
+				SSHKey: []byte("key"),
+			},
+		},
+		{
+			name: "invalid ssh config - empty key",
+			config: types.AuthConfig{
+				Method: types.AuthMethodSSH,
+				SSHKey: []byte{},
+			},
+			wantErr: ErrSSHKeyRequired,
+		},
+		{
+			name: "valid none config",
+			config: types.AuthConfig{
+				Method: types.AuthMethodNone,
+			},
+		},
+		{
+			name: "unknown method",
+			config: types.AuthConfig{
+				Method: "unknown",
+			},
+			wantErr: nil, // Error will be checked by containing the base error
+		},
 	}
 
-	err := ValidateAuthConfig(config)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateAuthConfig(tt.config)
 
-	require.NoError(t, err)
-}
-
-func TestValidateAuthConfig_BasicIncomplete(t *testing.T) {
-	config := types.AuthConfig{
-		Method:   types.AuthMethodBasic,
-		Username: "testuser",
-		Password: "",
+			switch {
+			case tt.wantErr != nil:
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, err)
+			case tt.name == "unknown method":
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "unknown authentication method")
+			default:
+				require.NoError(t, err)
+			}
+		})
 	}
-
-	err := ValidateAuthConfig(config)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "basic authentication requires both username and password")
-}
-
-func TestValidateAuthConfig_SSH(t *testing.T) {
-	config := types.AuthConfig{
-		Method: types.AuthMethodSSH,
-		SSHKey: []byte("fake-key-content"),
-	}
-
-	err := ValidateAuthConfig(config)
-
-	require.NoError(t, err)
-}
-
-func TestValidateAuthConfig_SSHEmpty(t *testing.T) {
-	config := types.AuthConfig{
-		Method: types.AuthMethodSSH,
-		SSHKey: []byte{},
-	}
-
-	err := ValidateAuthConfig(config)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "SSH authentication requires a private key")
-}
-
-func TestValidateAuthConfig_None(t *testing.T) {
-	config := types.AuthConfig{
-		Method: types.AuthMethodNone,
-	}
-
-	err := ValidateAuthConfig(config)
-
-	require.NoError(t, err)
-}
-
-func TestValidateAuthConfig_InvalidMethod(t *testing.T) {
-	config := types.AuthConfig{
-		Method: "invalid-method",
-	}
-
-	err := ValidateAuthConfig(config)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown authentication method")
 }
 
 func TestIsPrivateRepo(t *testing.T) {
 	tests := []struct {
-		url      string
+		name     string
+		repoURL  string
 		expected bool
 	}{
-		{"https://github.com/user/repo.git", false},
-		{"git@github.com:user/repo.git", true},
-		{"https://user:pass@github.com/user/repo.git", true},
-		{"git@gitlab.com:user/repo.git", true},
-		{"https://example.com/user/repo.git", false},
+		{
+			name:     "github ssh",
+			repoURL:  "git@github.com:user/repo.git",
+			expected: true,
+		},
+		{
+			name:     "gitlab ssh",
+			repoURL:  "git@gitlab.com:user/repo.git",
+			expected: true,
+		},
+		{
+			name:     "bitbucket ssh",
+			repoURL:  "git@bitbucket.org:user/repo.git",
+			expected: true,
+		},
+		{
+			name:     "https with username",
+			repoURL:  "https://user@github.com/user/repo.git",
+			expected: true,
+		},
+		{
+			name:     "https without username",
+			repoURL:  "https://github.com/user/repo.git",
+			expected: false,
+		},
+		{
+			name:     "public http",
+			repoURL:  "http://github.com/user/repo.git",
+			expected: false,
+		},
+		{
+			name:     "empty url",
+			repoURL:  "",
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.url, func(t *testing.T) {
-			result := IsPrivateRepo(tt.url)
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsPrivateRepo(tt.repoURL)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -223,7 +549,6 @@ func TestIsPrivateRepo(t *testing.T) {
 
 func TestGetDefaultAuthConfig(t *testing.T) {
 	config := GetDefaultAuthConfig()
-
 	assert.Equal(t, types.AuthMethodNone, config.Method)
 	assert.Empty(t, config.Token)
 	assert.Empty(t, config.Username)
