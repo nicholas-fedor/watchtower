@@ -12,7 +12,7 @@ This directory contains scripts used to build the WebAssembly (WASM) components 
 These scripts build the `tplprev.wasm` WebAssembly binary and `wasm_exec.js` runtime that power the interactive template preview feature on the documentation site. The scripts:
 
 1. Copy or download `wasm_exec.js` from the Go installation or GitHub
-2. Build the WASM binary from `tools/tplprev/main_wasm.go`
+2. Build the WASM binary from `build/tplprev/main_wasm.go`
 3. Output files to `docs/assets/` for inclusion in the documentation site
 
 ## Usage

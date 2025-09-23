@@ -31,7 +31,7 @@ else {
 Write-Output "Building tplprev.wasm..."
 $env:GOARCH = "wasm"
 $env:GOOS = "js"
-go build -o ./docs/assets/tplprev.wasm ./tools/tplprev
+go build -o ./docs/assets/tplprev.wasm ./build/tplprev
 
 # Verify output
 Write-Output "Files in ./docs/assets:"

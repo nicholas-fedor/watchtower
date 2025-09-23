@@ -32,7 +32,7 @@ fi
 
 # Build WASM binary
 echo "Building tplprev.wasm..."
-GOARCH=wasm GOOS=js go build -o ./docs/assets/tplprev.wasm ./tools/tplprev
+GOARCH=wasm GOOS=js go build -o ./docs/assets/tplprev.wasm ./build/tplprev
 
 # Verify output
 echo "Files in ./docs/assets:"
