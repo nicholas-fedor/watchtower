@@ -37,13 +37,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Set executable permissions for script
-        run: chmod +x ./scripts/build-tplprev.sh
+        run: chmod +x ./build/docs/build-tplprev.sh
 
       - name: Build tplprev
         run: |
           go mod download
           go clean -cache  # Clear build cache
-          ./scripts/build-tplprev.sh
+          ./build/docs/build-tplprev.sh
 
       - name: Setup python
         uses: actions/setup-python@4267e283df95c05d9f16ece6624106f44613b489
