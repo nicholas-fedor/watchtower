@@ -2,6 +2,7 @@
 package mocks
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -176,4 +177,16 @@ func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {
 func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Duration) error {
 	client.TestData.WaitForContainerHealthyCount++
 	return nil
+}
+
+// BuildImageFromGit simulates building an image from a Git repository.
+// It provides a mock implementation for testing Git-based image building.
+func (client MockClient) BuildImageFromGit(
+	ctx context.Context,
+	repoURL string,
+	commitHash string,
+	imageName string,
+	auth map[string]string,
+) (types.ImageID, error) {
+	return "", nil
 }

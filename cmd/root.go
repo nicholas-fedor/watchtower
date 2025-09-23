@@ -197,6 +197,7 @@ func init() {
 	flags.RegisterDockerFlags(rootCmd)
 	flags.RegisterSystemFlags(rootCmd)
 	flags.RegisterNotificationFlags(rootCmd)
+	flags.RegisterGitFlags(rootCmd)
 }
 
 // Execute runs the root command and manages any errors encountered during its execution.

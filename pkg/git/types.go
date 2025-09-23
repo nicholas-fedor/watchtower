@@ -4,6 +4,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -45,8 +46,8 @@ type AuthConfig struct {
 	SSHKey   []byte     // For SSH key auth
 }
 
-// GitClient defines the interface for Git operations.
-type GitClient interface {
+// Client defines the interface for Git operations.
+type Client interface {
 	// GetLatestCommit retrieves the latest commit hash for a given reference
 	GetLatestCommit(ctx context.Context, repoURL, ref string, auth AuthConfig) (string, error)
 
@@ -76,15 +77,15 @@ type RepositoryInfo struct {
 	Tags          []string // Available tags
 }
 
-// GitError represents Git-specific errors.
-type GitError struct {
+// Error represents Git-specific errors.
+type Error struct {
 	Op     string // Operation that failed
 	URL    string // Repository URL
 	Reason string // Human-readable reason
 	Cause  error  // Underlying error
 }
 
-func (e GitError) Error() string {
+func (e Error) Error() string {
 	if e.Cause != nil {
 		return fmt.Sprintf("git %s failed for %s: %s: %v", e.Op, e.URL, e.Reason, e.Cause)
 	}
@@ -92,13 +93,14 @@ func (e GitError) Error() string {
 	return fmt.Sprintf("git %s failed for %s: %s", e.Op, e.URL, e.Reason)
 }
 
-func (e GitError) Unwrap() error {
+func (e Error) Unwrap() error {
 	return e.Cause
 }
 
 // IsAuthError checks if an error is authentication-related.
 func IsAuthError(err error) bool {
-	if gitErr, ok := err.(GitError); ok {
+	var gitErr Error
+	if errors.As(err, &gitErr) {
 		return gitErr.Reason == "authentication failed" ||
 			gitErr.Reason == "repository not found" ||
 			gitErr.Reason == "access denied"
@@ -109,7 +111,8 @@ func IsAuthError(err error) bool {
 
 // IsNetworkError checks if an error is network-related.
 func IsNetworkError(err error) bool {
-	if gitErr, ok := err.(GitError); ok {
+	var gitErr Error
+	if errors.As(err, &gitErr) {
 		return gitErr.Reason == "network error" ||
 			gitErr.Reason == "timeout"
 	}

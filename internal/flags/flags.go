@@ -485,6 +485,38 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"Write notification logs to stdout instead of logging (to stderr)")
 }
 
+// RegisterGitFlags adds Git monitoring flags to the root command.
+//
+// Parameters:
+//   - rootCmd: Root Cobra command.
+func RegisterGitFlags(rootCmd *cobra.Command) {
+	flags := rootCmd.PersistentFlags()
+
+	flags.BoolP(
+		"enable-git-monitoring",
+		"",
+		envBool("WATCHTOWER_GIT_ENABLE"),
+		"Enable Git repository monitoring for container updates")
+
+	flags.StringP(
+		"git-auth-token",
+		"",
+		envString("WATCHTOWER_GIT_AUTH_TOKEN"),
+		"Authentication token for Git repository access (GitHub/GitLab token)")
+
+	flags.StringP(
+		"git-default-branch",
+		"",
+		envString("WATCHTOWER_GIT_DEFAULT_BRANCH"),
+		"Default branch to monitor for Git repositories (default: main)")
+
+	flags.StringP(
+		"git-update-policy",
+		"",
+		envString("WATCHTOWER_GIT_UPDATE_POLICY"),
+		"Git update policy: patch, minor, major, or all (default: minor)")
+}
+
 // envString fetches a string from an environment variable.
 //
 // Parameters:

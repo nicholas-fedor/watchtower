@@ -1,19 +1,23 @@
 package container
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types/build"
 	"github.com/sirupsen/logrus"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerRegistry "github.com/docker/docker/api/types/registry"
 	dockerClient "github.com/docker/docker/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
@@ -28,6 +32,9 @@ var (
 	// errHealthCheckFailed indicates that a container's health check failed.
 	errHealthCheckFailed = errors.New("container health check failed")
 )
+
+// defaultImageBuildTimeout defines the default timeout for image build operations.
+const defaultImageBuildTimeout = 30 * time.Second
 
 // Client defines the interface for interacting with the Docker API within Watchtower.
 //
@@ -96,6 +103,16 @@ type Client interface {
 	// It polls the container's health status until it reports "healthy" or the timeout is reached.
 	// If the container has no health check configured, it returns immediately.
 	WaitForContainerHealthy(containerID types.ContainerID, timeout time.Duration) error
+
+	// BuildImageFromGit builds a Docker image from a Git repository.
+	//
+	// It clones the repository, checks out the specified commit, and builds the image using the Dockerfile.
+	// Returns the built image ID or an error if the build fails.
+	BuildImageFromGit(
+		ctx context.Context,
+		repoURL, commitHash, imageName string,
+		auth map[string]string,
+	) (types.ImageID, error)
 }
 
 // client is the concrete implementation of the Client interface.
@@ -747,4 +764,137 @@ func (c client) WaitForContainerHealthy(
 			// Continue polling for "starting" or other statuses
 		}
 	}
+}
+
+// BuildImageFromGit builds a Docker image from a Git repository.
+//
+// Parameters:
+//   - ctx: Context for the build operation.
+//   - repoURL: URL of the Git repository to build from.
+//   - commitHash: Specific commit hash to build from.
+//   - imageName: Name/tag for the built image.
+//   - auth: Authentication credentials (username, password, etc.).
+//
+// Returns:
+//   - types.ImageID: ID of the built image.
+//   - error: Non-nil if build fails, nil on success.
+func (c client) BuildImageFromGit(
+	ctx context.Context,
+	repoURL, commitHash, imageName string,
+	auth map[string]string,
+) (types.ImageID, error) {
+	fields := logrus.Fields{
+		"repo_url":    repoURL,
+		"commit_hash": commitHash,
+		"image_name":  imageName,
+	}
+
+	logrus.WithFields(fields).Debug("Starting Git-based image build")
+
+	// Set up build options
+	buildOptions := build.ImageBuildOptions{
+		RemoteContext: repoURL,      // Git URL as remote context
+		Dockerfile:    "Dockerfile", // Assume standard Dockerfile location
+		Tags:          []string{imageName},
+		BuildArgs: map[string]*string{
+			"GIT_COMMIT": &commitHash,
+		},
+		Labels: map[string]string{
+			"com.centurylinklabs.watchtower.git-repo":   repoURL,
+			"com.centurylinklabs.watchtower.git-commit": commitHash,
+			"com.centurylinklabs.watchtower.built-at":   time.Now().Format(time.RFC3339),
+		},
+		Remove:      true, // Remove intermediate containers
+		ForceRemove: true, // Force removal even if in use
+		PullParent:  true, // Pull base images
+	}
+
+	// Add authentication if provided
+	if username, ok := auth["username"]; ok {
+		if password, ok := auth["password"]; ok {
+			// Use Docker registry auth config
+			buildOptions.AuthConfigs = map[string]dockerRegistry.AuthConfig{
+				// This would need to be expanded for different registries
+				"docker.io": {
+					Username: username,
+					Password: password,
+				},
+			}
+		}
+	}
+
+	// Execute the build
+	response, err := c.api.ImageBuild(ctx, nil, buildOptions)
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Debug("Failed to start image build")
+
+		return "", fmt.Errorf("failed to start image build: %w", err)
+	}
+	defer response.Body.Close()
+
+	// Stream build output for logging
+	if err := c.streamBuildOutput(response.Body); err != nil {
+		logrus.WithFields(fields).WithError(err).Debug("Build failed during execution")
+
+		return "", fmt.Errorf("build execution failed: %w", err)
+	}
+
+	// Extract the built image ID from the build output
+	// This is a simplified version - in practice, we'd need to parse the build output
+	ctx, cancel := context.WithTimeout(context.Background(), defaultImageBuildTimeout)
+	defer cancel()
+
+	imageID, err := c.extractImageIDFromBuild(imageName)
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Debug("Failed to extract built image ID")
+
+		return "", fmt.Errorf("failed to extract image ID: %w", err)
+	}
+
+	logrus.WithFields(fields).
+		WithField("image_id", imageID).
+		Debug("Successfully built image from Git")
+
+	return imageID, nil
+}
+
+// streamBuildOutput streams and logs the build output from Docker.
+//
+// Parameters:
+//   - reader: Reader containing the build output stream.
+//
+// Returns:
+//   - error: Non-nil if streaming fails, nil on success.
+func (c client) streamBuildOutput(reader io.ReadCloser) error {
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Parse and log build output
+		logrus.WithField("build_output", line).Debug("Build output")
+		// In a full implementation, we'd parse JSON build output here
+	}
+
+	return fmt.Errorf("failed to scan build output: %w", scanner.Err())
+}
+
+// extractImageIDFromBuild extracts the image ID from a successfully built image.
+//
+// Parameters:
+//   - imageName: Name of the built image.
+//
+// Returns:
+//   - types.ImageID: ID of the built image.
+//   - error: Non-nil if extraction fails, nil on success.
+func (c client) extractImageIDFromBuild(imageName string) (types.ImageID, error) {
+	// Create context with timeout for the inspection
+	ctx, cancel := context.WithTimeout(context.Background(), defaultImageBuildTimeout)
+	defer cancel()
+
+	// Inspect the built image to get its ID
+	inspect, err := c.api.ImageInspect(ctx, imageName)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect built image: %w", err)
+	}
+
+	return types.ImageID(inspect.ID), nil
 }

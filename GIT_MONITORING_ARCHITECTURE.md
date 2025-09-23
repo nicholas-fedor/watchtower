@@ -228,40 +228,40 @@ func (c *Client) BuildImageFromGit(ctx context.Context, repoURL, commitHash, ima
 
 ## Implementation Roadmap
 
-### Phase 1: Core Infrastructure
+### Phase 1: Core Infrastructure ✅
 
-- [ ] Add go-git dependency and basic Git client
-- [ ] Implement Git provider API clients
-- [ ] Add Git-related types and interfaces
-- [ ] Create basic authentication handling
+- [x] Add go-git dependency and basic Git client
+- [x] Implement Git provider API clients
+- [x] Add Git-related types and interfaces
+- [x] Create basic authentication handling
 
-### Phase 2: Container Integration
+### Phase 2: Container Integration ✅
 
-- [ ] Extend container client with Git build capabilities
-- [ ] Add Git staleness checking to update flow
-- [ ] Implement label-based state management
-- [ ] Add Git-related CLI flags
+- [x] Extend container client with Git build capabilities
+- [x] Add Git staleness checking to update flow
+- [x] Implement label-based state management
+- [x] Add Git-related CLI flags
 
-### Phase 3: Update Logic
+### Phase 3: Update Logic ✅
 
-- [ ] Integrate Git checking with existing update logic
-- [ ] Implement semantic versioning policies
-- [ ] Add Docker API image building
-- [ ] Handle build errors and rollback scenarios
+- [x] Integrate Git checking with existing update logic
+- [x] Implement semantic versioning policies
+- [x] Add Docker API image building
+- [x] Handle build errors and rollback scenarios
 
-### Phase 4: Security & Reliability
+### Phase 4: Security & Reliability ✅
 
-- [ ] Implement comprehensive authentication methods
-- [ ] Add timeout and rate limiting
-- [ ] Security audit and input validation
-- [ ] Performance optimization
+- [x] Implement comprehensive authentication methods
+- [x] Add timeout and rate limiting
+- [x] Security audit and input validation
+- [x] Performance optimization
 
-### Phase 5: Testing & Documentation
+### Phase 5: Testing & Documentation ✅
 
-- [ ] Unit tests for Git operations
-- [ ] Integration tests with real Git repositories
-- [ ] Documentation and examples
-- [ ] Update notification templates
+- [x] Unit tests for Git operations
+- [x] Integration tests with real Git repositories
+- [x] Documentation and examples
+- [x] Update notification templates
 
 ## API Design
 

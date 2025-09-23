@@ -2,6 +2,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +10,18 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+)
+
+// Predefined error variables for consistent error handling.
+var (
+	ErrUnsupportedAuthMethod = errors.New("unsupported authentication method")
+	ErrSSHKeyPathEmpty       = errors.New("SSH key file path is empty")
+	ErrTokenRequired         = errors.New("token authentication requires a token")
+	ErrBasicAuthIncomplete   = errors.New(
+		"basic authentication requires both username and password",
+	)
+	ErrSSHKeyRequired    = errors.New("SSH authentication requires a private key")
+	ErrUnknownAuthMethod = errors.New("unknown authentication method")
 )
 
 // CreateAuthMethod creates a go-git authentication method from AuthConfig.
@@ -19,11 +32,13 @@ func CreateAuthMethod(config AuthConfig) (transport.AuthMethod, error) {
 	case AuthMethodBasic:
 		return createBasicAuth(config.Username, config.Password), nil
 	case AuthMethodSSH:
-		return createSSHAuth(config.SSHKey)
+		auth, err := createSSHAuth(config.SSHKey)
+
+		return auth, err
 	case AuthMethodNone:
-		return nil, nil
+		return nil, nil //nolint:nilnil // No authentication needed is valid
 	default:
-		return nil, fmt.Errorf("unsupported auth method: %s", config.Method)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedAuthMethod, config.Method)
 	}
 }
 
@@ -54,7 +69,7 @@ func createBasicAuth(username, password string) transport.AuthMethod {
 // createSSHAuth creates SSH key authentication.
 func createSSHAuth(sshKey []byte) (transport.AuthMethod, error) {
 	if len(sshKey) == 0 {
-		return nil, nil
+		return nil, ErrSSHKeyRequired
 	}
 
 	publicKeys, err := ssh.NewPublicKeys("git", sshKey, "")
@@ -68,7 +83,7 @@ func createSSHAuth(sshKey []byte) (transport.AuthMethod, error) {
 // LoadSSHKeyFromFile loads an SSH private key from a file.
 func LoadSSHKeyFromFile(filePath string) ([]byte, error) {
 	if filePath == "" {
-		return nil, fmt.Errorf("SSH key file path is empty")
+		return nil, ErrSSHKeyPathEmpty
 	}
 
 	keyData, err := os.ReadFile(filePath)
@@ -94,10 +109,12 @@ func ParseAuthConfigFromFlags(token, username, password, sshKeyPath string) (Aut
 		config.Password = password
 	case sshKeyPath != "":
 		config.Method = AuthMethodSSH
+
 		sshKey, err := LoadSSHKeyFromFile(sshKeyPath)
 		if err != nil {
 			return config, fmt.Errorf("failed to load SSH key: %w", err)
 		}
+
 		config.SSHKey = sshKey
 	default:
 		config.Method = AuthMethodNone
@@ -111,20 +128,20 @@ func ValidateAuthConfig(config AuthConfig) error {
 	switch config.Method {
 	case AuthMethodToken:
 		if config.Token == "" {
-			return fmt.Errorf("token authentication requires a token")
+			return ErrTokenRequired
 		}
 	case AuthMethodBasic:
 		if config.Username == "" || config.Password == "" {
-			return fmt.Errorf("basic authentication requires both username and password")
+			return ErrBasicAuthIncomplete
 		}
 	case AuthMethodSSH:
 		if len(config.SSHKey) == 0 {
-			return fmt.Errorf("SSH authentication requires a private key")
+			return ErrSSHKeyRequired
 		}
 	case AuthMethodNone:
 		// No validation needed for no auth
 	default:
-		return fmt.Errorf("unknown authentication method: %s", config.Method)
+		return fmt.Errorf("%w: %s", ErrUnknownAuthMethod, config.Method)
 	}
 
 	return nil

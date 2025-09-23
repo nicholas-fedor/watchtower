@@ -4,6 +4,7 @@ package git
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,19 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
+// Predefined error variables for consistent error handling.
+var (
+	ErrUnsupportedProvider  = errors.New("unsupported Git provider")
+	ErrInvalidRepoURLFormat = errors.New("invalid GitHub repository URL format")
+	ErrMinPathParts         = errors.New("URL path must have at least 2 parts")
+)
+
+// Minimum number of path parts required for a valid repository URL.
+const minPathParts = 2
+
+// Default timeout for HTTP requests.
+const defaultHTTPTimeout = 30 * time.Second
+
 // DefaultClient implements the GitClient interface.
 type DefaultClient struct {
 	httpClient *http.Client
@@ -27,9 +41,9 @@ type DefaultClient struct {
 func NewClient() *DefaultClient {
 	return &DefaultClient{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second, // Default timeout
+			Timeout: defaultHTTPTimeout,
 		},
-		timeout: 30 * time.Second,
+		timeout: defaultHTTPTimeout,
 	}
 }
 
@@ -45,10 +59,13 @@ func NewClientWithTimeout(timeout time.Duration) *DefaultClient {
 
 // GetLatestCommit retrieves the latest commit hash for a given reference.
 func (c *DefaultClient) GetLatestCommit(
-	ctx context.Context,
 	repoURL, ref string,
 	auth AuthConfig,
 ) (string, error) {
+	// Create context with timeout for the operation
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+
 	// Try API approach first for supported providers
 	if hash, err := c.getLatestCommitAPI(ctx, repoURL, ref, auth); err == nil {
 		return hash, nil
@@ -75,7 +92,7 @@ func (c *DefaultClient) getLatestCommitAPI(
 	case "gitlab":
 		return c.getGitLabLatestCommit(ctx, repoURL, ref, auth)
 	default:
-		return "", fmt.Errorf("API not supported for provider: %s", provider)
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedProvider, provider)
 	}
 }
 
@@ -87,7 +104,7 @@ func (c *DefaultClient) getLatestCommitGoGit(
 ) (string, error) {
 	authMethod, err := CreateAuthMethod(auth)
 	if err != nil {
-		return "", GitError{
+		return "", Error{
 			Op:     "auth",
 			URL:    repoURL,
 			Reason: "authentication setup failed",
@@ -106,7 +123,7 @@ func (c *DefaultClient) getLatestCommitGoGit(
 		Auth: authMethod,
 	})
 	if err != nil {
-		return "", GitError{
+		return "", Error{
 			Op:     "list",
 			URL:    repoURL,
 			Reason: "failed to list remote references",
@@ -123,7 +140,9 @@ func (c *DefaultClient) getLatestCommitGoGit(
 
 	// If not found as branch, try as tag
 	found := false
+
 	var commitHash plumbing.Hash
+
 	for _, reference := range refs {
 		if reference.Name() == targetRef {
 			commitHash = reference.Hash()
@@ -141,7 +160,7 @@ func (c *DefaultClient) getLatestCommitGoGit(
 	}
 
 	if !found {
-		return "", GitError{
+		return "", Error{
 			Op:     "resolve",
 			URL:    repoURL,
 			Reason: fmt.Sprintf("reference '%s' not found", ref),
@@ -157,9 +176,55 @@ func (c *DefaultClient) ValidateRepository(
 	repoURL string,
 	auth AuthConfig,
 ) error {
-	_, err := c.GetLatestCommit(ctx, repoURL, "HEAD", auth)
+	_, err := c.GetLatestCommit(repoURL, "HEAD", auth)
 
 	return err
+}
+
+// listRefs retrieves references from a Git repository and filters them by type.
+// It uses Git protocol to list remote references without cloning the repository.
+func (c *DefaultClient) listRefs(
+	ctx context.Context,
+	repoURL string,
+	auth AuthConfig,
+	filterFunc func(plumbing.ReferenceName) bool,
+) ([]string, error) {
+	authMethod, err := CreateAuthMethod(auth)
+	if err != nil {
+		return nil, Error{
+			Op:     "auth",
+			URL:    repoURL,
+			Reason: "authentication setup failed",
+			Cause:  err,
+		}
+	}
+
+	remote := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{repoURL},
+	})
+
+	refs, err := remote.ListContext(ctx, &git.ListOptions{
+		Auth: authMethod,
+	})
+	if err != nil {
+		return nil, Error{
+			Op:     "list",
+			URL:    repoURL,
+			Reason: "failed to list references",
+			Cause:  err,
+		}
+	}
+
+	var result []string
+
+	for _, ref := range refs {
+		if filterFunc(ref.Name()) {
+			result = append(result, ref.Name().Short())
+		}
+	}
+
+	return result, nil
 }
 
 // ListBranches returns available branches for a repository.
@@ -168,41 +233,9 @@ func (c *DefaultClient) ListBranches(
 	repoURL string,
 	auth AuthConfig,
 ) ([]string, error) {
-	authMethod, err := CreateAuthMethod(auth)
-	if err != nil {
-		return nil, GitError{
-			Op:     "auth",
-			URL:    repoURL,
-			Reason: "authentication setup failed",
-			Cause:  err,
-		}
-	}
-
-	remote := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
-		Name: "origin",
-		URLs: []string{repoURL},
+	return c.listRefs(ctx, repoURL, auth, func(name plumbing.ReferenceName) bool {
+		return name.IsBranch()
 	})
-
-	refs, err := remote.ListContext(ctx, &git.ListOptions{
-		Auth: authMethod,
-	})
-	if err != nil {
-		return nil, GitError{
-			Op:     "list",
-			URL:    repoURL,
-			Reason: "failed to list branches",
-			Cause:  err,
-		}
-	}
-
-	var branches []string
-	for _, ref := range refs {
-		if ref.Name().IsBranch() {
-			branches = append(branches, ref.Name().Short())
-		}
-	}
-
-	return branches, nil
 }
 
 // ListTags returns available tags for a repository.
@@ -211,36 +244,9 @@ func (c *DefaultClient) ListTags(
 	repoURL string,
 	auth AuthConfig,
 ) ([]string, error) {
-	authMethod, err := CreateAuthMethod(auth)
-	if err != nil {
-		return nil, GitError{
-			Op:     "auth",
-			URL:    repoURL,
-			Reason: "authentication setup failed",
-			Cause:  err,
-		}
-	}
-
-	remote := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
-		Name: "origin",
-		URLs: []string{repoURL},
+	return c.listRefs(ctx, repoURL, auth, func(name plumbing.ReferenceName) bool {
+		return name.IsTag()
 	})
-
-	refs, err := remote.ListContext(ctx, &git.ListOptions{
-		Auth: authMethod,
-	})
-	if err != nil {
-		return nil, GitError{Op: "list", URL: repoURL, Reason: "failed to list tags", Cause: err}
-	}
-
-	var tags []string
-	for _, ref := range refs {
-		if ref.Name().IsTag() {
-			tags = append(tags, ref.Name().Short())
-		}
-	}
-
-	return tags, nil
 }
 
 // detectProvider identifies the Git provider from a repository URL.
@@ -259,7 +265,7 @@ func detectProvider(repoURL string) (string, error) {
 	case strings.Contains(host, "bitbucket.org"):
 		return "bitbucket", nil
 	default:
-		return "", fmt.Errorf("unsupported Git provider: %s", host)
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedProvider, host)
 	}
 }
 
@@ -288,7 +294,7 @@ func (c *DefaultClient) getGitHubLatestCommit(
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
 	// Add authentication if provided
@@ -303,29 +309,31 @@ func (c *DefaultClient) getGitHubLatestCommit(
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", GitError{Op: "api", URL: repoURL, Reason: "network error", Cause: err}
+		return "", Error{Op: "api", URL: repoURL, Reason: "network error", Cause: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return "", GitError{Op: "api", URL: repoURL, Reason: "repository or reference not found"}
+		return "", Error{Op: "api", URL: repoURL, Reason: "repository or reference not found"}
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		var errorResp gitHubErrorResponse
-		json.Unmarshal(body, &errorResp)
 
-		return "", GitError{
+		var errorResp gitHubErrorResponse
+
+		_ = json.Unmarshal(body, &errorResp) // Ignore error for fallback parsing
+
+		return "", Error{
 			Op:     "api",
 			URL:    repoURL,
-			Reason: fmt.Sprintf("API error: %s", errorResp.Message),
+			Reason: "API error: " + errorResp.Message,
 		}
 	}
 
 	var commitResp gitHubCommitResponse
 	if err := json.NewDecoder(resp.Body).Decode(&commitResp); err != nil {
-		return "", GitError{
+		return "", Error{
 			Op:     "api",
 			URL:    repoURL,
 			Reason: "failed to parse API response",
@@ -337,15 +345,15 @@ func (c *DefaultClient) getGitHubLatestCommit(
 }
 
 // parseGitHubRepoURL extracts owner and repo from GitHub URL.
-func parseGitHubRepoURL(repoURL string) (owner, repo string, err error) {
-	u, err := url.Parse(repoURL)
+func parseGitHubRepoURL(repoURL string) (string, string, error) {
+	parsedURL, err := url.Parse(repoURL)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to parse repository URL: %w", err)
 	}
 
-	pathParts := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(pathParts) < 2 {
-		return "", "", fmt.Errorf("invalid GitHub repository URL format")
+	pathParts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+	if len(pathParts) < minPathParts {
+		return "", "", fmt.Errorf("%w: %s", ErrMinPathParts, parsedURL.Path)
 	}
 
 	return pathParts[0], strings.TrimSuffix(pathParts[1], ".git"), nil
@@ -376,39 +384,39 @@ func (c *DefaultClient) getGitLabLatestCommit(
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
 	// Add authentication if provided
 	if auth.Method == AuthMethodToken && auth.Token != "" {
-		req.Header.Set("PRIVATE-TOKEN", auth.Token)
+		req.Header.Set("Private-Token", auth.Token)
 	}
 
 	req.Header.Set("User-Agent", "Watchtower-Git-Monitor")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", GitError{Op: "api", URL: repoURL, Reason: "network error", Cause: err}
+		return "", Error{Op: "api", URL: repoURL, Reason: "network error", Cause: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return "", GitError{Op: "api", URL: repoURL, Reason: "repository or reference not found"}
+		return "", Error{Op: "api", URL: repoURL, Reason: "repository or reference not found"}
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 
-		return "", GitError{
+		return "", Error{
 			Op:     "api",
 			URL:    repoURL,
-			Reason: fmt.Sprintf("API error: %s", string(body)),
+			Reason: "API error: " + string(body),
 		}
 	}
 
 	var commitResp gitLabCommitResponse
 	if err := json.NewDecoder(resp.Body).Decode(&commitResp); err != nil {
-		return "", GitError{
+		return "", Error{
 			Op:     "api",
 			URL:    repoURL,
 			Reason: "failed to parse API response",
@@ -420,10 +428,10 @@ func (c *DefaultClient) getGitLabLatestCommit(
 }
 
 // parseGitLabRepoURL extracts project path from GitLab URL.
-func parseGitLabRepoURL(repoURL string) (project string, err error) {
+func parseGitLabRepoURL(repoURL string) (string, error) {
 	u, err := url.Parse(repoURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse repository URL: %w", err)
 	}
 
 	path := strings.Trim(u.Path, "/")
