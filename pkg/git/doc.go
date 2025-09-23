@@ -1,8 +1,10 @@
 // Package git provides Git repository monitoring capabilities for Watchtower.
 //
-// This package enables Watchtower to monitor Git repositories for new commits,
-// supporting both Git provider APIs (for performance) and go-git (for universal compatibility).
-// It handles authentication, commit resolution, and repository validation.
+// This package is organized into subpackages for different Git operations:
+//
+//   - client: Main Git client for repository operations, commit resolution, and validation
+//   - auth: Authentication handling for various Git providers and methods
+//   - providers: Provider-specific implementations for GitHub, GitLab, and generic Git support
 //
 // Key Features:
 //   - Hybrid API/go-git approach for optimal performance and compatibility
@@ -13,14 +15,18 @@
 //
 // Usage:
 //
-//	import "github.com/nicholas-fedor/watchtower/pkg/git"
+//	import (
+//		"github.com/nicholas-fedor/watchtower/pkg/git/client"
+//		"github.com/nicholas-fedor/watchtower/pkg/git/auth"
+//	)
 //
-//	client := git.NewClient()
-//	commit, err := client.GetLatestCommit(ctx, "https://github.com/user/repo.git", "main", authConfig)
+//	gitClient := client.NewClient()
+//	authConfig := auth.GetDefaultAuthConfig()
+//	commit, err := gitClient.GetLatestCommit(ctx, "https://github.com/user/repo.git", "main", authConfig)
 //
 // Authentication:
 //
-// The package supports various authentication methods:
+// The auth subpackage supports various authentication methods:
 //   - Token authentication (GitHub/GitLab personal access tokens)
 //   - SSH key authentication
 //   - Basic username/password authentication

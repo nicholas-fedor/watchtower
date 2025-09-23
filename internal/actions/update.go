@@ -13,7 +13,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/git"
+	gitAuth "github.com/nicholas-fedor/watchtower/pkg/git/auth"
+	gitClient "github.com/nicholas-fedor/watchtower/pkg/git/client"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
@@ -799,11 +800,11 @@ func restartGitContainer(
 	}
 
 	// Get latest commit hash
-	gitClient := git.NewClient()
+	gitClientInstance := gitClient.NewClient()
 
 	authConfig := createGitAuthConfig(params)
 
-	latestCommit, err := gitClient.GetLatestCommit(ctx, repoURL, branch, authConfig)
+	latestCommit, err := gitClientInstance.GetLatestCommit(ctx, repoURL, branch, authConfig)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to get latest commit: %w", err)
 	}
@@ -940,7 +941,7 @@ func checkGitStaleness(
 	}
 
 	// Create Git client
-	gitClient := git.NewClient()
+	gitClient := gitClient.NewClient()
 
 	// Create authentication config from environment/flags
 	authConfig := createGitAuthConfig(params)
@@ -993,8 +994,16 @@ func gitInfoFromContainer(container types.Container) (string, string, string) {
 }
 
 // createGitAuthConfig creates Git authentication config from Watchtower parameters.
-func createGitAuthConfig(_ types.UpdateParams) git.AuthConfig {
+func createGitAuthConfig(_ types.UpdateParams) types.AuthConfig {
 	// For now, use environment variables or flags that would be added to UpdateParams
 	// This is a placeholder - actual implementation would depend on how auth is configured
-	return git.GetDefaultAuthConfig()
+	defaultConfig := gitAuth.GetDefaultAuthConfig()
+
+	return types.AuthConfig{
+		Method:   defaultConfig.Method,
+		Token:    defaultConfig.Token,
+		Username: defaultConfig.Username,
+		Password: defaultConfig.Password,
+		SSHKey:   defaultConfig.SSHKey,
+	}
 }

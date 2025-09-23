@@ -1,5 +1,5 @@
-// Package git provides Git repository operations for Watchtower's Git monitoring feature.
-package git
+// Package auth provides Git authentication handling for Watchtower's Git monitoring feature.
+package auth
 
 import (
 	"errors"
@@ -10,6 +10,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Predefined error variables for consistent error handling.
@@ -25,17 +27,17 @@ var (
 )
 
 // CreateAuthMethod creates a go-git authentication method from AuthConfig.
-func CreateAuthMethod(config AuthConfig) (transport.AuthMethod, error) {
+func CreateAuthMethod(config types.AuthConfig) (transport.AuthMethod, error) {
 	switch config.Method {
-	case AuthMethodToken:
+	case types.AuthMethodToken:
 		return createTokenAuth(config.Token), nil
-	case AuthMethodBasic:
+	case types.AuthMethodBasic:
 		return createBasicAuth(config.Username, config.Password), nil
-	case AuthMethodSSH:
+	case types.AuthMethodSSH:
 		auth, err := createSSHAuth(config.SSHKey)
 
 		return auth, err
-	case AuthMethodNone:
+	case types.AuthMethodNone:
 		return nil, nil //nolint:nilnil // No authentication needed is valid
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedAuthMethod, config.Method)
@@ -95,20 +97,22 @@ func LoadSSHKeyFromFile(filePath string) ([]byte, error) {
 }
 
 // ParseAuthConfigFromFlags creates AuthConfig from command-line flags.
-func ParseAuthConfigFromFlags(token, username, password, sshKeyPath string) (AuthConfig, error) {
-	config := AuthConfig{}
+func ParseAuthConfigFromFlags(
+	token, username, password, sshKeyPath string,
+) (types.AuthConfig, error) {
+	config := types.AuthConfig{}
 
 	// Determine auth method based on provided credentials
 	switch {
 	case token != "":
-		config.Method = AuthMethodToken
+		config.Method = types.AuthMethodToken
 		config.Token = token
 	case username != "" && password != "":
-		config.Method = AuthMethodBasic
+		config.Method = types.AuthMethodBasic
 		config.Username = username
 		config.Password = password
 	case sshKeyPath != "":
-		config.Method = AuthMethodSSH
+		config.Method = types.AuthMethodSSH
 
 		sshKey, err := LoadSSHKeyFromFile(sshKeyPath)
 		if err != nil {
@@ -117,28 +121,28 @@ func ParseAuthConfigFromFlags(token, username, password, sshKeyPath string) (Aut
 
 		config.SSHKey = sshKey
 	default:
-		config.Method = AuthMethodNone
+		config.Method = types.AuthMethodNone
 	}
 
 	return config, nil
 }
 
 // ValidateAuthConfig checks if the authentication configuration is valid.
-func ValidateAuthConfig(config AuthConfig) error {
+func ValidateAuthConfig(config types.AuthConfig) error {
 	switch config.Method {
-	case AuthMethodToken:
+	case types.AuthMethodToken:
 		if config.Token == "" {
 			return ErrTokenRequired
 		}
-	case AuthMethodBasic:
+	case types.AuthMethodBasic:
 		if config.Username == "" || config.Password == "" {
 			return ErrBasicAuthIncomplete
 		}
-	case AuthMethodSSH:
+	case types.AuthMethodSSH:
 		if len(config.SSHKey) == 0 {
 			return ErrSSHKeyRequired
 		}
-	case AuthMethodNone:
+	case types.AuthMethodNone:
 		// No validation needed for no auth
 	default:
 		return fmt.Errorf("%w: %s", ErrUnknownAuthMethod, config.Method)
@@ -172,8 +176,8 @@ func IsPrivateRepo(repoURL string) bool {
 }
 
 // GetDefaultAuthConfig returns a default authentication configuration.
-func GetDefaultAuthConfig() AuthConfig {
-	return AuthConfig{
-		Method: AuthMethodNone,
+func GetDefaultAuthConfig() types.AuthConfig {
+	return types.AuthConfig{
+		Method: types.AuthMethodNone,
 	}
 }

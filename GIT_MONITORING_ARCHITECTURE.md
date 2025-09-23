@@ -61,12 +61,20 @@ This document outlines the architectural design for adding Git repository monito
 
 ### Core Components
 
-#### `pkg/git/` (New Package)
+#### `pkg/git/` (Package Structure)
 
-- `client.go` - Git operations coordinator (API + go-git fallback)
-- `auth.go` - Authentication handling (HTTP tokens, SSH keys)
-- `types.go` - Git-specific data structures (Repo, Commit, Policy)
-- `mocks/` - Test mocks for Git operations
+- `client/` - Git operations coordinator (API + go-git fallback)
+  - `client.go` - Main Git client implementation
+  - `client_test.go` - Unit tests for Git client
+- `auth/` - Authentication handling (HTTP tokens, SSH keys)
+  - `auth.go` - Authentication method implementations
+  - `auth_test.go` - Unit tests for authentication
+- `providers/` - Provider-specific implementations
+  - `github/client.go` - GitHub API client
+  - `gitlab/client.go` - GitLab API client
+  - `generic/client.go` - Universal go-git fallback
+  - `provider.go` - Base provider interface
+- `doc.go` - Package documentation
 
 #### `pkg/container/` (Extended)
 
@@ -262,6 +270,14 @@ func (c *Client) BuildImageFromGit(ctx context.Context, repoURL, commitHash, ima
 - [x] Integration tests with real Git repositories
 - [x] Documentation and examples
 - [x] Update notification templates
+
+### Phase 6: Code Organization ✅
+
+- [x] Subdirectory migration completed
+- [x] Package declarations updated for proper subpackage structure
+- [x] Cross-package imports established
+- [x] Linting issues resolved
+- [x] Documentation updated to reflect new structure
 
 ## API Design
 

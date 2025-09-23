@@ -1,6 +1,5 @@
-// Package git provides Git repository operations for Watchtower's Git monitoring feature.
-// It supports both Git provider APIs (for performance) and go-git (for universal compatibility).
-package git
+// Package types provides shared types for Git operations in Watchtower.
+package types
 
 import (
 	"context"
@@ -23,27 +22,30 @@ const (
 	PolicyNone UpdatePolicy = "none"
 )
 
-// AuthMethod defines the authentication method for Git operations.
+// AuthMethod represents different authentication methods for Git operations.
 type AuthMethod string
 
 const (
-	// AuthMethodToken uses HTTP token authentication.
-	AuthMethodToken AuthMethod = "token"
-	// AuthMethodSSH uses SSH key authentication.
-	AuthMethodSSH AuthMethod = "ssh"
-	// AuthMethodBasic uses username/password authentication.
-	AuthMethodBasic AuthMethod = "basic"
-	// AuthMethodNone uses no authentication (public repos only).
+	// AuthMethodNone indicates no authentication.
 	AuthMethodNone AuthMethod = "none"
+
+	// AuthMethodToken indicates token-based authentication (GitHub/GitLab tokens).
+	AuthMethodToken AuthMethod = "token"
+
+	// AuthMethodBasic indicates username/password authentication.
+	AuthMethodBasic AuthMethod = "basic"
+
+	// AuthMethodSSH indicates SSH key authentication.
+	AuthMethodSSH AuthMethod = "ssh"
 )
 
-// AuthConfig contains authentication configuration for Git operations.
+// AuthConfig holds authentication configuration for Git operations.
 type AuthConfig struct {
-	Method   AuthMethod // Authentication method
-	Token    string     // For token-based auth
-	Username string     // For basic auth
-	Password string     // For basic auth
-	SSHKey   []byte     // For SSH key auth
+	Method   AuthMethod
+	Token    string
+	Username string
+	Password string
+	SSHKey   []byte
 }
 
 // Client defines the interface for Git operations.
@@ -77,7 +79,7 @@ type RepositoryInfo struct {
 	Tags          []string // Available tags
 }
 
-// Error represents Git-specific errors.
+// Error represents a Git operation error with structured information.
 type Error struct {
 	Op     string // Operation that failed
 	URL    string // Repository URL
@@ -87,10 +89,10 @@ type Error struct {
 
 func (e Error) Error() string {
 	if e.Cause != nil {
-		return fmt.Sprintf("git %s failed for %s: %s: %v", e.Op, e.URL, e.Reason, e.Cause)
+		return fmt.Sprintf("git %s %s: %s: %v", e.Op, e.URL, e.Reason, e.Cause)
 	}
 
-	return fmt.Sprintf("git %s failed for %s: %s", e.Op, e.URL, e.Reason)
+	return fmt.Sprintf("git %s %s: %s", e.Op, e.URL, e.Reason)
 }
 
 func (e Error) Unwrap() error {
@@ -118,4 +120,19 @@ func IsNetworkError(err error) bool {
 	}
 
 	return false
+}
+
+// Provider defines the interface for Git provider API clients.
+type Provider interface {
+	// Name returns the provider name (e.g., "github", "gitlab").
+	Name() string
+
+	// Hosts returns the well-known hostnames for this provider.
+	Hosts() []string
+
+	// GetLatestCommit retrieves the latest commit hash using provider-specific API.
+	GetLatestCommit(ctx context.Context, repoURL, ref string, auth AuthConfig) (string, error)
+
+	// IsSupported checks if this provider can handle the given repository URL.
+	IsSupported(repoURL string) bool
 }
