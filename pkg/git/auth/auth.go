@@ -72,7 +72,9 @@ func CreateAuthMethod(config types.AuthConfig) (transport.AuthMethod, error) {
 	case types.AuthMethodNone:
 		logrus.Debug("Using no authentication")
 
-		return nil, nil //nolint:nilnil // No authentication needed is valid
+		var zero transport.AuthMethod
+
+		return zero, nil // No authentication needed is valid
 	default:
 		logrus.WithField("method", config.Method).Debug("Unsupported authentication method")
 

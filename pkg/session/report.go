@@ -162,14 +162,24 @@ func categorizeContainer(report *report, update *ContainerStatus) {
 	}
 
 	// Handle explicit states.
-	//nolint:exhaustive // Other states handled above.
 	switch update.state {
+	case UnknownState:
+		update.state = StaleState
+		report.stale = append(report.stale, update)
 	case UpdatedState:
 		report.updated = append(report.updated, update)
 	case FailedState:
 		report.failed = append(report.failed, update)
+	case SkippedState:
+		// Skipped is handled above, but add for exhaustiveness
+		report.skipped = append(report.skipped, update)
+	case ScannedState:
+		update.state = StaleState
+		report.stale = append(report.stale, update)
 	case StaleState:
 		report.stale = append(report.stale, update)
+	case FreshState:
+		report.fresh = append(report.fresh, update)
 	default:
 		update.state = StaleState
 		report.stale = append(report.stale, update)

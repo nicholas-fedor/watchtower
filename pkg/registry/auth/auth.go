@@ -737,7 +737,7 @@ func TransformAuth(registryAuth string) string {
 	credentials := &types.RegistryCredentials{}
 
 	// Unmarshal JSON into credentials struct, ignoring errors if malformed.
-	_ = json.Unmarshal(b, credentials) //nolint:musttag
+	_ = json.Unmarshal(b, credentials)
 
 	// If both username and password are present, re-encode them as "username:password".
 	if credentials.Username != "" && credentials.Password != "" {

@@ -60,8 +60,6 @@ const (
 //
 // It implements the types.Container interface, storing state and metadata
 // for container operations such as updates and lifecycle hooks.
-//
-//nolint:recvcheck // Intentional mix: value receivers for reads, pointer receivers for writes
 type Container struct {
 	LinkedToRestarting bool                                 // Indicates if linked to a restarting container
 	Stale              bool                                 // Marks the container as having an outdated image
@@ -101,7 +99,7 @@ func NewContainer(
 //
 // Returns:
 //   - bool: True if linked, false otherwise.
-func (c Container) IsLinkedToRestarting() bool {
+func (c *Container) IsLinkedToRestarting() bool {
 	return c.LinkedToRestarting
 }
 
@@ -117,7 +115,7 @@ func (c *Container) SetLinkedToRestarting(value bool) {
 //
 // Returns:
 //   - bool: True if stale, false otherwise.
-func (c Container) IsStale() bool {
+func (c *Container) IsStale() bool {
 	return c.Stale
 }
 
@@ -133,7 +131,7 @@ func (c *Container) SetStale(value bool) {
 //
 // Returns:
 //   - bool: True if stale or linked to restarting, false otherwise.
-func (c Container) ToRestart() bool {
+func (c *Container) ToRestart() bool {
 	return c.Stale || c.LinkedToRestarting
 }
 
@@ -141,7 +139,7 @@ func (c Container) ToRestart() bool {
 //
 // Returns:
 //   - *dockerContainerType.InspectResponse: Container metadata.
-func (c Container) ContainerInfo() *dockerContainerType.InspectResponse {
+func (c *Container) ContainerInfo() *dockerContainerType.InspectResponse {
 	return c.containerInfo
 }
 
@@ -149,7 +147,7 @@ func (c Container) ContainerInfo() *dockerContainerType.InspectResponse {
 //
 // Returns:
 //   - types.ContainerID: Container ID.
-func (c Container) ID() types.ContainerID {
+func (c *Container) ID() types.ContainerID {
 	return types.ContainerID(c.containerInfo.ID)
 }
 
@@ -157,7 +155,7 @@ func (c Container) ID() types.ContainerID {
 //
 // Returns:
 //   - bool: True if running, false otherwise.
-func (c Container) IsRunning() bool {
+func (c *Container) IsRunning() bool {
 	if c.containerInfo == nil || c.containerInfo.State == nil {
 		return false
 	}
@@ -169,7 +167,7 @@ func (c Container) IsRunning() bool {
 //
 // Returns:
 //   - bool: True if restarting, false otherwise.
-func (c Container) IsRestarting() bool {
+func (c *Container) IsRestarting() bool {
 	return c.containerInfo.State.Restarting
 }
 
@@ -177,15 +175,15 @@ func (c Container) IsRestarting() bool {
 //
 // Returns:
 //   - string: Container name.
-func (c Container) Name() string {
+func (c *Container) Name() string {
 	return strings.TrimPrefix(c.containerInfo.Name, "/")
 }
 
-// ImageID returns the ID of the container’s image.
+// ImageID returns the ID of the container's image.
 //
 // Returns:
 //   - types.ImageID: Image ID (panics if imageInfo is nil).
-func (c Container) ImageID() types.ImageID {
+func (c *Container) ImageID() types.ImageID {
 	return types.ImageID(c.imageInfo.ID)
 }
 
@@ -193,7 +191,7 @@ func (c Container) ImageID() types.ImageID {
 //
 // Returns:
 //   - types.ImageID: Image ID or empty string if imageInfo is nil.
-func (c Container) SafeImageID() types.ImageID {
+func (c *Container) SafeImageID() types.ImageID {
 	if c.imageInfo == nil {
 		return ""
 	}
@@ -201,13 +199,13 @@ func (c Container) SafeImageID() types.ImageID {
 	return types.ImageID(c.imageInfo.ID)
 }
 
-// ImageName returns the name of the container’s image.
+// ImageName returns the name of the container's image.
 //
 // It uses the Zodiac label if present, otherwise Config.Image, appending ":latest" if untagged.
 //
 // Returns:
 //   - string: Image name (e.g., "alpine:latest").
-func (c Container) ImageName() string {
+func (c *Container) ImageName() string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Prefer Zodiac label for image name.
@@ -233,7 +231,7 @@ func (c Container) ImageName() string {
 //
 // Returns:
 //   - bool: True if imageInfo is non-nil, false otherwise.
-func (c Container) HasImageInfo() bool {
+func (c *Container) HasImageInfo() bool {
 	return c.imageInfo != nil
 }
 
@@ -241,7 +239,7 @@ func (c Container) HasImageInfo() bool {
 //
 // Returns:
 //   - *dockerImageType.InspectResponse: Image metadata or nil if unavailable.
-func (c Container) ImageInfo() *dockerImageType.InspectResponse {
+func (c *Container) ImageInfo() *dockerImageType.InspectResponse {
 	return c.imageInfo
 }
 
@@ -251,7 +249,7 @@ func (c Container) ImageInfo() *dockerImageType.InspectResponse {
 //
 // Returns:
 //   - *dockerContainerType.Config: Configuration for container creation.
-func (c Container) GetCreateConfig() *dockerContainerType.Config {
+func (c *Container) GetCreateConfig() *dockerContainerType.Config {
 	clog := logrus.WithField("container", c.Name())
 	config := c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
@@ -335,7 +333,7 @@ func (c Container) GetCreateConfig() *dockerContainerType.Config {
 //
 // Returns:
 //   - *dockerContainerType.HostConfig: Host configuration for container creation.
-func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
+func (c *Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 	clog := logrus.WithField("container", c.Name())
 
 	hostConfig := c.containerInfo.HostConfig
@@ -358,11 +356,11 @@ func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 	return hostConfig
 }
 
-// VerifyConfiguration validates the container’s metadata for recreation.
+// VerifyConfiguration validates the container's metadata for recreation.
 //
 // Returns:
 //   - error: Non-nil if metadata is missing or invalid, nil on success.
-func (c Container) VerifyConfiguration() error {
+func (c *Container) VerifyConfiguration() error {
 	// Check for nil image info.
 	if c.imageInfo == nil {
 		logrus.WithField("container", "<unknown>").Debug("No image info available")
@@ -404,7 +402,7 @@ func (c Container) VerifyConfiguration() error {
 //
 // Returns:
 //   - []string: List of linked container names.
-func (c Container) Links() []string {
+func (c *Container) Links() []string {
 	clog := logrus.WithField("container", c.Name())
 
 	var links []string

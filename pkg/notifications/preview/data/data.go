@@ -41,9 +41,8 @@ var (
 func New() *PreviewData {
 	// Initialize random number generator with a fixed seed for consistent previews
 	// Note: Using math/rand intentionally for deterministic output (not cryptographically secure)
-	//nolint:gosec
 	return &PreviewData{
-		rand:           rand.New(rand.NewSource(1)),
+		rand:           rand.New(rand.NewSource(1)),       // #nosec G404
 		lastTime:       time.Now().Add(-30 * time.Minute), // Start timestamps 30 minutes ago
 		report:         &report{},                         // Initialize empty report
 		containerCount: 0,                                 // Start container count at 0
@@ -69,15 +68,21 @@ func (p *PreviewData) AddFromState(state State) {
 	var err error
 
 	// Handle state-specific logic for errors
-	// Switch statement avoids exhaustive check to reduce verbosity
-	//nolint:exhaustive
 	switch state {
+	case ScannedState:
+		// No error for scanned state
+	case UpdatedState:
+		// No error for updated state
 	case FailedState:
 		// Simulate a failure with a realistic error message
 		err = fmt.Errorf("%w: %s", errExecutionFailed, p.randomEntry(errorMessages))
 	case SkippedState:
 		// Simulate a skip with a realistic skip reason
 		err = fmt.Errorf("%w: %s", errSkipped, p.randomEntry(skippedMessages))
+	case StaleState:
+		// No error for stale state
+	case FreshState:
+		// No error for fresh state
 	}
 
 	// Create a container status with the generated data

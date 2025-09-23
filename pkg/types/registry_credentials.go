@@ -2,6 +2,6 @@ package types
 
 // RegistryCredentials holds basic auth credentials.
 type RegistryCredentials struct {
-	Username string // Registry username.
-	Password string // Registry token or password.
+	Username string `json:"username"` // Registry username.
+	Password string `json:"password"` // Registry token or password.
 }
