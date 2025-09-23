@@ -132,7 +132,7 @@ func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.
 		}
 		// For HTTP API flags, wait for API server start
 		if strings.HasPrefix(arg, "--http-api") {
-			waitStrategy = wait.ForLog("Starting HTTP API server").
+			waitStrategy = wait.ForLog("HTTP API server started successfully").
 				WithStartupTimeout(helpCommandTimeout)
 			exposeAPI = true
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -68,8 +67,8 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		"path":   r.URL.Path,
 	}).Info("Received HTTP API update request")
 
-	// Log request body to stdout for debugging.
-	_, err := io.Copy(os.Stdout, r.Body)
+	// Read request body
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to read request body")
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
@@ -77,21 +76,25 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract images from query parameters.
-	var images []string
+	logrus.WithField("body", string(body)).Debug("Request body content")
 
-	imageQueries, found := r.URL.Query()["image"]
-	if found {
-		for _, image := range imageQueries {
-			images = append(images, strings.Split(image, ",")...)
-		}
-
-		logrus.WithField("images", images).Debug("Extracted images from query parameters")
-	} else {
-		images = nil
-
-		logrus.Debug("No image query parameters provided")
+	// Parse JSON body for images
+	var requestBody struct {
+		Images []string `json:"images"`
 	}
+	if err := json.Unmarshal(body, &requestBody); err != nil {
+		logrus.WithError(err).Debug("Failed to parse JSON request body")
+		// Fallback to query parameters for backward compatibility
+		imageQueries, found := r.URL.Query()["image"]
+		if found {
+			for _, image := range imageQueries {
+				requestBody.Images = append(requestBody.Images, strings.Split(image, ",")...)
+			}
+		}
+	}
+
+	images := requestBody.Images
+	logrus.WithField("images", images).Debug("Parsed images from request")
 
 	// Acquire lock, blocking if another update is in progress (requests will queue).
 	chanValue := <-handle.lock

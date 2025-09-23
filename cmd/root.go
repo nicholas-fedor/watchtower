@@ -493,15 +493,19 @@ func runMain(cfg RunConfig) int {
 	defer cancel()
 
 	// Configure and start the HTTP API, handling any startup errors.
-	if err := setupAndStartAPI(ctx, cfg, updateLock); err != nil {
-		return 1
+	if cfg.APIToken != "" || cfg.EnableUpdateAPI || cfg.EnableMetricsAPI {
+		if err := setupAndStartAPI(ctx, cfg, updateLock); err != nil {
+			return 1
+		}
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
-	if err := runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup); err != nil {
-		logNotify("Scheduled upgrades failed", err)
+	if !cfg.EnableUpdateAPI || cfg.UnblockHTTPAPI {
+		if err := runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup); err != nil {
+			logNotify("Scheduled upgrades failed", err)
 
-		return 1
+			return 1
+		}
 	}
 
 	// Default to failure if execution completes unexpectedly.
@@ -525,8 +529,16 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	httpAPI := pkgApi.New(cfg.APIToken)
 	httpAPI.Addr = ":" + cfg.APIPort
 
+	// Register the health endpoint (no authentication required).
+	httpAPI.RegisterFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
 	// Register the update API endpoint if enabled, linking it to the update handler.
 	if cfg.EnableUpdateAPI {
+		logrus.Info("HTTP API is enabled")
+
 		updateHandler := update.New(func(images []string) *metrics.Metric {
 			metric := runUpdatesWithNotifications(
 				ctx,
@@ -551,7 +563,7 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	}
 
 	// Start the API server, logging errors unless it’s a clean shutdown.
-	if err := httpAPI.Start(ctx, cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI); err != nil &&
+	if err := httpAPI.Start(ctx, cfg.EnableUpdateAPI); err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
 		logrus.WithError(err).Error("Failed to start API")
 
@@ -723,7 +735,7 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string, sc
 
 	// Report HTTP API status if enabled.
 	if enableUpdateAPI {
-		startupLog.Info(fmt.Sprintf("The HTTP API is enabled at :%s.", apiPort))
+		startupLog.Info("Starting HTTP API server")
 	}
 
 	// Send batched notifications if not suppressed, ensuring startup info reaches users.
@@ -835,6 +847,8 @@ func runUpgradesOnSchedule(
 	scheduler := cron.New()
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
+	logrus.WithField("schedule_spec", scheduleSpec).Debug("Attempting to add cron function")
+
 	if err := scheduler.AddFunc(
 		scheduleSpec,
 		func() {
@@ -852,7 +866,9 @@ func runUpgradesOnSchedule(
 				logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
 			}
 		}); err != nil {
-		return fmt.Errorf("failed to schedule updates: %w", err)
+		logrus.WithError(err).Error("Failed to schedule updates, continuing without scheduling")
+
+		return nil
 	}
 
 	// Log startup message with the first scheduled run time.

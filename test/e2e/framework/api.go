@@ -252,7 +252,7 @@ func NewMockAPIServer() *MockAPIServer {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/update", mock.handleUpdate)
 	mux.HandleFunc("/v1/metrics", mock.handleMetrics)
-	mux.HandleFunc("/v1/health", mock.handleHealth)
+	mux.HandleFunc("/health", mock.handleHealth)
 
 	// Use httptest.Server which automatically assigns a port and provides the URL
 	mock.server = httptest.NewServer(mux)

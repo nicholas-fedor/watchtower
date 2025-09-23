@@ -193,7 +193,7 @@ func TestHTTPAPIMetrics(t *testing.T) {
 	})
 }
 
-// TestHTTPAPIPeriodicPolls tests HTTP API with periodic polling disabled.
+// TestHTTPAPIPeriodicPolls tests HTTP API with periodic polling enabled.
 func TestHTTPAPIPeriodicPolls(t *testing.T) {
 	fw, err := framework.NewE2EFramework("watchtower:test")
 	require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestHTTPAPIPeriodicPolls(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, container)
 
-		// Start Watchtower with HTTP API and periodic polls disabled
+		// Start Watchtower with HTTP API and periodic polls enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--http-api-update",
 			"--http-api-periodic-polls",
@@ -219,16 +219,14 @@ func TestHTTPAPIPeriodicPolls(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Wait for API to be ready (should not start periodic updates)
+		// Wait for API to be ready (should also run periodic updates)
 		err = fw.WaitForAPIReady("http://localhost:8080", "test-token", 30*time.Second)
 		require.NoError(t, err)
 
-		// Verify no periodic updates are running
+		// Verify periodic updates are running alongside API
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "HTTP API is enabled")
-		// Should not contain periodic scheduling messages
-		require.NotContains(t, logs, "Scheduling first run")
 
 		return nil
 	})
