@@ -12,6 +12,10 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+const (
+	registryTimeout = 60 * time.Second
+)
+
 // LocalRegistry manages a local Docker registry for testing.
 // It provides isolation for testing image operations without affecting external registries.
 type LocalRegistry struct {
@@ -25,7 +29,7 @@ func NewLocalRegistry(ctx context.Context) (*LocalRegistry, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        "registry:2",
 		ExposedPorts: []string{"5000/tcp"},
-		WaitingFor:   wait.ForListeningPort("5000/tcp").WithStartupTimeout(60 * time.Second),
+		WaitingFor:   wait.ForListeningPort("5000/tcp").WithStartupTimeout(registryTimeout),
 		AutoRemove:   true,
 	}
 
@@ -39,14 +43,14 @@ func NewLocalRegistry(ctx context.Context) (*LocalRegistry, error) {
 
 	host, err := container.Host(ctx)
 	if err != nil {
-		container.Terminate(ctx) // cleanup on error
+		_ = container.Terminate(ctx) // cleanup on error
 
 		return nil, fmt.Errorf("failed to get registry host: %w", err)
 	}
 
 	port, err := container.MappedPort(ctx, "5000")
 	if err != nil {
-		container.Terminate(ctx) // cleanup on error
+		_ = container.Terminate(ctx) // cleanup on error
 
 		return nil, fmt.Errorf("failed to get registry port: %w", err)
 	}
@@ -73,13 +77,30 @@ func (r *LocalRegistry) URL() string {
 func (r *LocalRegistry) PushImage(ctx context.Context, imageName, tag string) error {
 	// First tag the image for the local registry
 	localImage := fmt.Sprintf("%s/%s:%s", r.url, imageName, tag)
-	tagCmd := exec.Command("docker", "tag", fmt.Sprintf("%s:%s", imageName, tag), localImage)
+
+	imageRef := fmt.Sprintf("%s:%s", imageName, tag) // #nosec G204 - controlled test input
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	tagCmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"tag",
+		imageRef,
+		localImage,
+	)
 	if output, err := tagCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to tag image for registry: %w, output: %s", err, string(output))
 	}
 
 	// Then push the image
-	pushCmd := exec.Command("docker", "push", localImage)
+	pushCmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"push",
+		localImage,
+	)
 	if output, err := pushCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to push image to registry: %w, output: %s", err, string(output))
 	}
@@ -94,7 +115,15 @@ func (r *LocalRegistry) PullImage(ctx context.Context, imageName, tag string) er
 	localImage := fmt.Sprintf("%s/%s:%s", r.url, imageName, tag)
 	log.Printf("Pulling image %s from local registry", localImage)
 
-	pullCmd := exec.Command("docker", "pull", localImage)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pullCmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"pull",
+		localImage,
+	)
 	if output, err := pullCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to pull image from registry: %w, output: %s", err, string(output))
 	}
@@ -106,7 +135,12 @@ func (r *LocalRegistry) PullImage(ctx context.Context, imageName, tag string) er
 
 // Cleanup stops and removes the registry container.
 func (r *LocalRegistry) Cleanup(ctx context.Context) error {
-	timeout := 30 * time.Second
+	timeout := containerStopTimeout
 
-	return r.container.Stop(ctx, &timeout)
+	err := r.container.Stop(ctx, &timeout)
+	if err != nil {
+		return fmt.Errorf("failed to stop registry container: %w", err)
+	}
+
+	return nil
 }

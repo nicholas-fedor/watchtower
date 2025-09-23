@@ -4,6 +4,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -12,14 +13,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+const (
+	containerStopTimeout     = 30 * time.Second
+	watchtowerStartupTimeout = 30 * time.Second
+	helpCommandTimeout       = 10 * time.Second
+	gitServerTimeout         = 60 * time.Second
+	logTimeout               = 10 * time.Second
 )
 
 // E2EFramework manages the lifecycle of end-to-end tests for Watchtower.
 // It provides utilities for creating isolated test environments with proper cleanup.
 type E2EFramework struct {
-	ctx           context.Context
 	networkName   string
 	registry      *LocalRegistry
 	watchtowerImg string
@@ -29,13 +39,10 @@ type E2EFramework struct {
 // NewE2EFramework creates a new end-to-end testing framework.
 // It initializes Docker client, creates an isolated network, and sets up cleanup.
 func NewE2EFramework(watchtowerImage string) (*E2EFramework, error) {
-	ctx := context.Background()
-
 	// Create isolated network for testing
 	networkName := fmt.Sprintf("watchtower-e2e-%d", time.Now().Unix())
 
 	framework := &E2EFramework{
-		ctx:           ctx,
 		networkName:   networkName,
 		watchtowerImg: watchtowerImage,
 		cleanupFuncs:  []func() error{},
@@ -53,6 +60,7 @@ func (f *E2EFramework) addCleanupFunc(cleanup func() error) {
 // It should be called in test cleanup functions or defer statements.
 func (f *E2EFramework) Cleanup() error {
 	var errs []error
+
 	for _, cleanup := range f.cleanupFuncs {
 		if err := cleanup(); err != nil {
 			errs = append(errs, err)
@@ -60,7 +68,7 @@ func (f *E2EFramework) Cleanup() error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("cleanup errors: %v", errs)
+		return fmt.Errorf("cleanup errors: %w", errors.Join(errs...))
 	}
 
 	return nil
@@ -73,19 +81,22 @@ func (f *E2EFramework) CreateContainer(
 ) (testcontainers.Container, error) {
 	req.Networks = []string{f.networkName}
 
-	container, err := testcontainers.GenericContainer(f.ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	container, err := testcontainers.GenericContainer(
+		context.Background(),
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: req,
+			Started:          true,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
 
 	// Register container cleanup
 	f.addCleanupFunc(func() error {
-		timeout := 30 * time.Second
+		timeout := containerStopTimeout
 
-		return container.Stop(f.ctx, &timeout)
+		return container.Stop(context.Background(), &timeout)
 	})
 
 	return container, nil
@@ -94,24 +105,36 @@ func (f *E2EFramework) CreateContainer(
 // CreateWatchtowerContainer creates a Watchtower container with the specified configuration.
 func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.Container, error) {
 	// Check if Git monitoring is enabled - if so, don't wait for exit since it's not implemented yet
-	var waitStrategy wait.Strategy = wait.ForLog("Running a one time update").WithStartupTimeout(30 * time.Second) // Wait for run-once start
+	var waitStrategy wait.Strategy = wait.ForLog("Running a one time update").WithStartupTimeout(watchtowerStartupTimeout) // Wait for run-once start
+
+	var exposeAPI bool
+
 	for _, arg := range args {
 		if arg == "--enable-git-monitoring" {
 			// Git monitoring not implemented yet, so just wait for startup
-			waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(10 * time.Second)
+			waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(helpCommandTimeout)
 
 			break
 		}
+
 		if arg == "--help" {
 			// Help command exits immediately, wait for help output
 			waitStrategy = wait.ForLog("Watchtower automatically").
-				WithStartupTimeout(10 * time.Second)
+				WithStartupTimeout(logTimeout)
 
 			break
 		}
 		// For notification flags, just wait for Watchtower to start
 		if strings.HasPrefix(arg, "--notification-") {
-			waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(10 * time.Second)
+			waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(helpCommandTimeout)
+
+			break
+		}
+		// For HTTP API flags, wait for API server start
+		if strings.HasPrefix(arg, "--http-api") {
+			waitStrategy = wait.ForLog("Starting HTTP API server").
+				WithStartupTimeout(helpCommandTimeout)
+			exposeAPI = true
 
 			break
 		}
@@ -123,29 +146,40 @@ func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.
 		WaitingFor: waitStrategy,
 		AutoRemove: true,
 		Networks:   []string{f.networkName},
-		Mounts: testcontainers.ContainerMounts{
-			{
-				Source: testcontainers.DockerBindMountSource{
-					HostPath: "/var/run/docker.sock",
-				},
-				Target: "/var/run/docker.sock",
-			},
+		HostConfigModifier: func(hostConfig *container.HostConfig) {
+			hostConfig.Binds = []string{"/var/run/docker.sock:/var/run/docker.sock"}
 		},
 	}
 
-	container, err := testcontainers.GenericContainer(f.ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	if exposeAPI {
+		req.ExposedPorts = []string{"8080/tcp"}
+		originalModifier := req.HostConfigModifier
+		req.HostConfigModifier = func(hostConfig *container.HostConfig) {
+			originalModifier(hostConfig)
+			hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
+				"8080/tcp": {{HostIP: "0.0.0.0", HostPort: "8080"}},
+			}
+		}
+	}
+
+	container, err := testcontainers.GenericContainer(
+		context.Background(),
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: req,
+			Started:          true,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Watchtower container: %w", err)
 	}
 
 	// Register container cleanup
 	f.addCleanupFunc(func() error {
-		timeout := 30 * time.Second
+		timeout := containerStopTimeout
 
-		return container.Stop(f.ctx, &timeout)
+		_ = container.Stop(context.Background(), &timeout)
+
+		return nil
 	})
 
 	return container, nil
@@ -173,20 +207,27 @@ func (f *E2EFramework) WaitForLog(
 	logMessage string,
 	timeout time.Duration,
 ) error {
-	return wait.ForLog(logMessage).WithStartupTimeout(timeout).WaitUntilReady(f.ctx, container)
+	err := wait.ForLog(logMessage).
+		WithStartupTimeout(timeout).
+		WaitUntilReady(context.Background(), container)
+	if err != nil {
+		return fmt.Errorf("failed to wait for log: %w", err)
+	}
+
+	return nil
 }
 
 // GetContainerLogs retrieves logs from a container for debugging.
 func (f *E2EFramework) GetContainerLogs(container testcontainers.Container) (string, error) {
-	reader, err := container.Logs(f.ctx)
+	reader, err := container.Logs(context.Background())
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get container logs: %w", err)
 	}
 	defer reader.Close()
 
 	logs, err := io.ReadAll(reader)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read container logs: %w", err)
 	}
 
 	return string(logs), nil
@@ -194,14 +235,14 @@ func (f *E2EFramework) GetContainerLogs(container testcontainers.Container) (str
 
 // CreateLocalRegistry creates and starts a local Docker registry for testing.
 func (f *E2EFramework) CreateLocalRegistry() (*LocalRegistry, error) {
-	registry, err := NewLocalRegistry(f.ctx)
+	registry, err := NewLocalRegistry(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
 	f.registry = registry
 	f.addCleanupFunc(func() error {
-		return registry.Cleanup(f.ctx)
+		return registry.Cleanup(context.Background())
 	})
 
 	return registry, nil
@@ -210,18 +251,27 @@ func (f *E2EFramework) CreateLocalRegistry() (*LocalRegistry, error) {
 // BuildAndPushImage tags an existing Docker image and pushes it to the specified registry.
 func (f *E2EFramework) BuildAndPushImage(sourceImage, tag, registryURL, version string) error {
 	// Tag the existing image for registry
-	tagCmd := exec.Command(
-		"docker",
-		"tag",
-		sourceImage,
-		fmt.Sprintf("%s/%s:%s", registryURL, tag, version),
-	)
+	targetImage := fmt.Sprintf(
+		"%s/%s:%s",
+		registryURL,
+		tag,
+		version,
+	) // #nosec G204 - controlled test input
+
+	tagCmd := exec.CommandContext(context.Background(), "docker", "tag", sourceImage, targetImage)
 	if output, err := tagCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to tag image: %w, output: %s", err, string(output))
 	}
 
 	// Push the image
-	pushCmd := exec.Command("docker", "push", fmt.Sprintf("%s/%s:%s", registryURL, tag, version))
+	pushImage := fmt.Sprintf(
+		"%s/%s:%s",
+		registryURL,
+		tag,
+		version,
+	) // #nosec G204 - controlled test input
+
+	pushCmd := exec.CommandContext(context.Background(), "docker", "push", pushImage)
 	if output, err := pushCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to push image: %w, output: %s", err, string(output))
 	}
@@ -232,19 +282,19 @@ func (f *E2EFramework) BuildAndPushImage(sourceImage, tag, registryURL, version 
 // UpdateTestImage simulates updating an image by tagging an existing image with a new version.
 func (f *E2EFramework) UpdateTestImage(image, oldTag, newTag string) error {
 	// Tag the existing image with the new tag to simulate an update
-	tagCmd := exec.Command(
-		"docker",
-		"tag",
-		fmt.Sprintf("%s:%s", image, oldTag),
-		fmt.Sprintf("%s:%s", image, newTag),
-	)
+	sourceTag := fmt.Sprintf("%s:%s", image, oldTag) // #nosec G204 - controlled test input
+	targetTag := fmt.Sprintf("%s:%s", image, newTag) // #nosec G204 - controlled test input
+
+	tagCmd := exec.CommandContext(context.Background(), "docker", "tag", sourceTag, targetTag)
 	if output, err := tagCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to tag image for update: %w, output: %s", err, string(output))
 	}
 
 	// If we have a registry, push the new tag
 	if f.registry != nil {
-		pushCmd := exec.Command("docker", "push", fmt.Sprintf("%s:%s", image, newTag))
+		pushTag := fmt.Sprintf("%s:%s", image, newTag) // #nosec G204 - controlled test input
+
+		pushCmd := exec.CommandContext(context.Background(), "docker", "push", pushTag)
 		if output, err := pushCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to push updated image: %w, output: %s", err, string(output))
 		}
@@ -260,18 +310,24 @@ func (f *E2EFramework) ConfigureInsecureRegistry(registryURL string) error {
 	config := fmt.Sprintf(`{"insecure-registries": ["%s"]}`, registryURL)
 
 	// Write to /etc/docker/daemon.json (requires sudo)
-	writeCmd := exec.Command(
-		"sudo",
-		"sh",
-		"-c",
-		fmt.Sprintf(`echo '%s' > /etc/docker/daemon.json`, config),
-	)
+	writeScript := fmt.Sprintf(
+		`echo '%s' > /etc/docker/daemon.json`,
+		config,
+	) // #nosec G204 - controlled test input
+
+	writeCmd := exec.CommandContext(context.Background(), "sudo", "sh", "-c", writeScript)
 	if output, err := writeCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to write daemon.json: %w, output: %s", err, string(output))
 	}
 
 	// Restart Docker daemon
-	restartCmd := exec.Command("sudo", "systemctl", "restart", "docker")
+	restartCmd := exec.CommandContext(
+		context.Background(),
+		"sudo",
+		"systemctl",
+		"restart",
+		"docker",
+	)
 	if output, err := restartCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to restart Docker: %w, output: %s", err, string(output))
 	}
@@ -279,7 +335,13 @@ func (f *E2EFramework) ConfigureInsecureRegistry(registryURL string) error {
 	// Register cleanup to restore original daemon.json
 	f.addCleanupFunc(func() error {
 		// Remove the test daemon.json (system will use defaults)
-		removeCmd := exec.Command("sudo", "rm", "-f", "/etc/docker/daemon.json")
+		removeCmd := exec.CommandContext(
+			context.Background(),
+			"sudo",
+			"rm",
+			"-f",
+			"/etc/docker/daemon.json",
+		)
 		if output, err := removeCmd.CombinedOutput(); err != nil {
 			log.Printf(
 				"Warning: failed to remove test daemon.json: %v, output: %s",
@@ -289,7 +351,13 @@ func (f *E2EFramework) ConfigureInsecureRegistry(registryURL string) error {
 		}
 
 		// Restart Docker again
-		restartCmd := exec.Command("sudo", "systemctl", "restart", "docker")
+		restartCmd := exec.CommandContext(
+			context.Background(),
+			"sudo",
+			"systemctl",
+			"restart",
+			"docker",
+		)
 		if output, err := restartCmd.CombinedOutput(); err != nil {
 			log.Printf(
 				"Warning: failed to restart Docker after cleanup: %v, output: %s",
@@ -308,17 +376,29 @@ func (f *E2EFramework) ConfigureInsecureRegistry(registryURL string) error {
 // This provides an alternative to the external wt.sh script with better integration.
 func (f *E2EFramework) BuildWatchtowerImage(imageName, tag string) error {
 	// Use docker build command for simplicity and reliability
-	cmd := exec.Command("docker", "build",
+	imageTag := fmt.Sprintf("%s:%s", imageName, tag) // #nosec G204 - controlled test input
+
+	log.Printf(
+		"Building Docker image %s using Dockerfile build/docker/Dockerfile.self-local",
+		imageTag,
+	)
+	log.Printf("Context: current directory")
+
+	cmd := exec.CommandContext(context.Background(), "docker", "build",
 		"-f", "build/docker/Dockerfile.self-local",
-		"-t", fmt.Sprintf("%s:%s", imageName, tag),
+		"-t", imageTag,
 		".")
+
+	log.Printf("Executing: docker build -f build/docker/Dockerfile.self-local -t %s .", imageTag)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to build watchtower image: %w\nOutput: %s", err, string(output))
+		log.Printf("Build failed with output:\n%s", string(output))
+
+		return fmt.Errorf("failed to build watchtower image: %w", err)
 	}
 
-	log.Printf("Successfully built Watchtower image: %s:%s", imageName, tag)
+	log.Printf("Successfully built Watchtower image: %s", imageTag)
 
 	return nil
 }
@@ -328,6 +408,7 @@ func (f *E2EFramework) LogTestInfo() {
 	log.Printf("E2E Framework initialized:")
 	log.Printf("  - Network: %s", f.networkName)
 	log.Printf("  - Watchtower Image: %s", f.watchtowerImg)
+
 	if f.registry != nil {
 		log.Printf("  - Registry: %s", f.registry.URL())
 	}

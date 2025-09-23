@@ -14,7 +14,7 @@ The e2e testing framework is built on [Testcontainers for Go](https://golang.tes
 
 ## Directory Structure
 
-```
+```text
 test/
 ├── README.md                    # This file
 └── e2e/                        # End-to-end tests
@@ -41,17 +41,16 @@ test/
 
 ### Building Watchtower for Testing
 
-Before running E2E tests, build a local Watchtower image:
+Before running E2E tests, build a local Watchtower image using the Go orchestrator:
 
 ```bash
 # Build default watchtower:test image
-./test/build-watchtower.sh
+go run test/e2e/main.go build
 
-# Build with custom name/tag
-./test/build-watchtower.sh --image my-watchtower --tag dev
-
-# Use environment variables
-WATCHTOWER_E2E_IMAGE=custom WATCHTOWER_E2E_TAG=latest ./test/build-watchtower.sh
+# The orchestrator provides additional commands:
+go run test/e2e/main.go test     # Run tests only
+go run test/e2e/main.go run      # Build and run tests
+go run test/e2e/main.go cleanup  # Clean up Docker resources
 ```
 
 ### Running E2E Tests
@@ -369,9 +368,10 @@ Legacy bash scripts have been migrated to the Go-based e2e testing framework:
 
 ### 🔄 **Build Process Updates**
 
-- `Watchtower Testing/wt.sh` → `./test/build-watchtower.sh` (streamlined version)
-- New build script with better error handling and verification
-- Environment variable support for CI/CD integration
+- `Watchtower Testing/wt.sh` → `test/e2e/main.go build` (Go-based orchestrator)
+- Integrated build process with test execution and cleanup
+- Enhanced logging and error handling
+- Comprehensive Docker resource management
 
 ### 📋 **Remaining Scripts**
 

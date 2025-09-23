@@ -19,6 +19,7 @@ func TestSlackNotifications(t *testing.T) {
 		// Start mock Slack server
 		mockSlack, err := fw.StartMockNotificationService("slack")
 		require.NoError(t, err)
+
 		slackServer := mockSlack.(*framework.SlackMockServer)
 
 		// Create a test container
@@ -56,6 +57,7 @@ func TestEmailNotifications(t *testing.T) {
 		// Start mock email server
 		mockEmail, err := fw.StartMockNotificationService("email")
 		require.NoError(t, err)
+
 		emailServer := mockEmail.(*framework.EmailMockServer)
 
 		// Create a test container
@@ -95,6 +97,7 @@ func TestGotifyNotifications(t *testing.T) {
 		// Start mock Gotify server
 		mockGotify, err := fw.StartMockNotificationService("gotify")
 		require.NoError(t, err)
+
 		gotifyServer := mockGotify.(*framework.GotifyMockServer)
 
 		// Create a test container
@@ -132,10 +135,12 @@ func TestMultipleNotifications(t *testing.T) {
 		// Start multiple mock servers
 		mockSlack, err := fw.StartMockNotificationService("slack")
 		require.NoError(t, err)
+
 		slackServer := mockSlack.(*framework.SlackMockServer)
 
 		mockEmail, err := fw.StartMockNotificationService("email")
 		require.NoError(t, err)
+
 		emailServer := mockEmail.(*framework.EmailMockServer)
 
 		// Create a test container
@@ -178,6 +183,7 @@ func TestNotificationContentValidation(t *testing.T) {
 		// Start mock Slack server
 		mockSlack, err := fw.StartMockNotificationService("slack")
 		require.NoError(t, err)
+
 		slackServer := mockSlack.(*framework.SlackMockServer)
 
 		// Create a test container with a specific name
@@ -249,6 +255,7 @@ func TestNotificationLevels(t *testing.T) {
 		// Start mock Slack server
 		mockSlack, err := fw.StartMockNotificationService("slack")
 		require.NoError(t, err)
+
 		slackServer := mockSlack.(*framework.SlackMockServer)
 
 		// Create a test container

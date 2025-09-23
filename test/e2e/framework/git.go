@@ -3,8 +3,10 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -13,6 +15,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+var errUnsupportedURLScheme = errors.New("only file:// URLs supported for mock commits")
 
 // MockGitServer manages a mock Git server for testing Git monitoring functionality.
 type MockGitServer struct {
@@ -31,7 +35,7 @@ func NewMockGitServer(ctx context.Context, repoName string) (*MockGitServer, err
 			"git daemon --reuseaddr --base-path=/git --export-all --enable=receive-pack --listen=0.0.0.0 --port=9418",
 		},
 		ExposedPorts: []string{"9418/tcp"},
-		WaitingFor:   wait.ForListeningPort("9418/tcp").WithStartupTimeout(60 * time.Second),
+		WaitingFor:   wait.ForListeningPort("9418/tcp").WithStartupTimeout(gitServerTimeout),
 		AutoRemove:   true,
 		Files: []testcontainers.ContainerFile{
 			{
@@ -51,19 +55,24 @@ func NewMockGitServer(ctx context.Context, repoName string) (*MockGitServer, err
 
 	host, err := container.Host(ctx)
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 
 		return nil, fmt.Errorf("failed to get Git server host: %w", err)
 	}
 
 	port, err := container.MappedPort(ctx, "9418")
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 
 		return nil, fmt.Errorf("failed to get Git server port: %w", err)
 	}
 
-	url := fmt.Sprintf("git://%s:%s/%s.git", host, port.Port(), repoName)
+	gitURL := fmt.Sprintf(
+		"git://%s/%s.git",
+		net.JoinHostPort(host, port.Port()),
+		repoName,
+	) // #nosec G204 - controlled test input
+	url := gitURL
 	repoPath := fmt.Sprintf("/git/%s.git", repoName)
 
 	server := &MockGitServer{
@@ -85,29 +94,49 @@ func (s *MockGitServer) URL() string {
 // SetupMockRepo initializes a mock Git repository with the specified branch and commit.
 func (s *MockGitServer) SetupMockRepo(ctx context.Context, branch, initialCommit string) error {
 	// Create initial repository structure
-	setupCmd := exec.Command("docker", "exec", s.container.GetContainerID(),
-		"sh", "-c", fmt.Sprintf(`
+	setupScript := fmt.Sprintf(`
 			mkdir -p %s &&
 			cd %s &&
 			git init --bare &&
 			git config --global user.email "test@example.com" &&
 			git config --global user.name "Test User"
-		`, s.repoPath, s.repoPath))
+		`, s.repoPath, s.repoPath) // #nosec G204 - controlled test input
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	setupCmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"exec",
+		s.container.GetContainerID(),
+		"sh",
+		"-c",
+		setupScript,
+	) // #nosec G204 - controlled test input
 
 	if output, err := setupCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to setup mock repo: %w, output: %s", err, string(output))
 	}
 
 	// Create a working directory and push initial commit
-	workCmd := exec.Command("docker", "exec", s.container.GetContainerID(),
-		"sh", "-c", fmt.Sprintf(`
+	workScript := fmt.Sprintf(`
 			mkdir -p /tmp/work && cd /tmp/work &&
 			git clone %s . &&
 			echo "Initial commit" > README.md &&
 			git add README.md &&
 			git commit -m "%s" &&
 			git push origin %s
-		`, s.url, initialCommit, branch))
+		`, s.url, initialCommit, branch) // #nosec G204 - controlled test input
+	workCmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"exec",
+		s.container.GetContainerID(),
+		"sh",
+		"-c",
+		workScript,
+	) // #nosec G204 - controlled test input
 
 	if output, err := workCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create initial commit: %w, output: %s", err, string(output))
@@ -119,14 +148,26 @@ func (s *MockGitServer) SetupMockRepo(ctx context.Context, branch, initialCommit
 // SimulateGitCommit creates a new commit in the mock repository.
 func (s *MockGitServer) SimulateGitCommit(ctx context.Context, commitMessage string) error {
 	// Create a new commit by modifying a file and pushing
-	commitCmd := exec.Command("docker", "exec", s.container.GetContainerID(),
-		"sh", "-c", fmt.Sprintf(`
+	commitScript := fmt.Sprintf(`
 			cd /tmp/work &&
 			echo "%s - $(date)" >> changes.txt &&
 			git add changes.txt &&
 			git commit -m "%s" &&
 			git push origin main
-		`, commitMessage, commitMessage))
+		`, commitMessage, commitMessage) // #nosec G204 - controlled test input
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	commitCmd := exec.CommandContext(
+		ctx,
+		"docker",
+		"exec",
+		s.container.GetContainerID(),
+		"sh",
+		"-c",
+		commitScript,
+	) // #nosec G204 - controlled test input
 
 	if output, err := commitCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to simulate Git commit: %w, output: %s", err, string(output))
@@ -137,9 +178,14 @@ func (s *MockGitServer) SimulateGitCommit(ctx context.Context, commitMessage str
 
 // Cleanup stops and removes the Git server container.
 func (s *MockGitServer) Cleanup(ctx context.Context) error {
-	timeout := 30 * time.Second
+	timeout := containerStopTimeout
 
-	return s.container.Stop(ctx, &timeout)
+	err := s.container.Stop(ctx, &timeout)
+	if err != nil {
+		return fmt.Errorf("failed to stop Git server container: %w", err)
+	}
+
+	return nil
 }
 
 // SetupMockGitRepo creates a mock Git repository for testing.
@@ -150,7 +196,7 @@ func (f *E2EFramework) SetupMockGitRepo(name, branch, initialCommit string) (str
 	repoPath := filepath.Join(tempDir, name+".git")
 
 	// Initialize bare repository
-	initCmd := exec.Command("git", "init", "--bare", repoPath)
+	initCmd := exec.CommandContext(context.Background(), "git", "init", "--bare", repoPath)
 	if err := initCmd.Run(); err != nil {
 		log.Printf("Failed to init mock repo: %v", err)
 
@@ -159,7 +205,8 @@ func (f *E2EFramework) SetupMockGitRepo(name, branch, initialCommit string) (str
 
 	// Create a working copy and make initial commit
 	workDir := strings.TrimSuffix(repoPath, ".git")
-	cloneCmd := exec.Command("git", "clone", repoPath, workDir)
+
+	cloneCmd := exec.CommandContext(context.Background(), "git", "clone", repoPath, workDir)
 	if err := cloneCmd.Run(); err != nil {
 		log.Printf("Failed to clone mock repo: %v", err)
 
@@ -167,33 +214,67 @@ func (f *E2EFramework) SetupMockGitRepo(name, branch, initialCommit string) (str
 	}
 
 	// Configure git user
-	configCmd1 := exec.Command("git", "-C", workDir, "config", "user.email", "test@example.com")
-	configCmd2 := exec.Command("git", "-C", workDir, "config", "user.name", "Test User")
-	configCmd1.Run()
-	configCmd2.Run()
+	configCmd1 := exec.CommandContext(
+		context.Background(),
+		"git",
+		"-C",
+		workDir,
+		"config",
+		"user.email",
+		"test@example.com",
+	)
+	configCmd2 := exec.CommandContext(
+		context.Background(),
+		"git",
+		"-C",
+		workDir,
+		"config",
+		"user.name",
+		"Test User",
+	)
+
+	_ = configCmd1.Run()
+	_ = configCmd2.Run()
 
 	// Create initial file and commit
-	fileCmd := exec.Command(
-		"sh",
-		"-c",
-		fmt.Sprintf(`echo "%s" > %s/README.md`, initialCommit, workDir),
+	fileScript := fmt.Sprintf(
+		`echo "%s" > %s/README.md`,
+		initialCommit,
+		workDir,
+	) // #nosec G204 - controlled test input
+	fileCmd := exec.CommandContext(context.Background(), "sh", "-c", fileScript)
+	_ = fileCmd.Run()
+
+	addCmd := exec.CommandContext(context.Background(), "git", "-C", workDir, "add", "README.md")
+	_ = addCmd.Run()
+
+	commitCmd := exec.CommandContext(
+		context.Background(),
+		"git",
+		"-C",
+		workDir,
+		"commit",
+		"-m",
+		initialCommit,
 	)
-	fileCmd.Run()
+	_ = commitCmd.Run()
 
-	addCmd := exec.Command("git", "-C", workDir, "add", "README.md")
-	addCmd.Run()
-
-	commitCmd := exec.Command("git", "-C", workDir, "commit", "-m", initialCommit)
-	commitCmd.Run()
-
-	pushCmd := exec.Command("git", "-C", workDir, "push", "origin", branch)
-	pushCmd.Run()
+	pushCmd := exec.CommandContext(
+		context.Background(),
+		"git",
+		"-C",
+		workDir,
+		"push",
+		"origin",
+		branch,
+	) // #nosec G204 - controlled test input
+	_ = pushCmd.Run()
 
 	// Return file:// URL for local access
-	repoURL := fmt.Sprintf("file://%s", repoPath)
+	repoURL := "file://" + repoPath
 
 	cleanup := func() error {
-		return exec.Command("rm", "-rf", tempDir).Run()
+		return exec.CommandContext(context.Background(), "rm", "-rf", tempDir).Run()
 	}
 
 	f.addCleanupFunc(cleanup)
@@ -205,34 +286,52 @@ func (f *E2EFramework) SetupMockGitRepo(name, branch, initialCommit string) (str
 func (f *E2EFramework) SimulateGitCommit(repoURL, commitMessage string) error {
 	// Extract repo path from file:// URL
 	if !strings.HasPrefix(repoURL, "file://") {
-		return fmt.Errorf("only file:// URLs supported for mock commits")
+		return errUnsupportedURLScheme
 	}
 
 	repoPath := strings.TrimPrefix(repoURL, "file://")
 	workDir := strings.TrimSuffix(repoPath, ".git")
 
 	// Create a new file/modify existing one
-	fileCmd := exec.Command(
-		"sh",
-		"-c",
-		fmt.Sprintf(`echo "%s - $(date)" >> %s/changes.txt`, commitMessage, workDir),
-	)
+	fileScript := fmt.Sprintf(
+		`echo "%s - $(date)" >> %s/changes.txt`,
+		commitMessage,
+		workDir,
+	) // #nosec G204 - controlled test input
+
+	fileCmd := exec.CommandContext(context.Background(), "sh", "-c", fileScript)
 	if output, err := fileCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create test file: %w, output: %s", err, string(output))
 	}
 
 	// Add, commit, and push
-	addCmd := exec.Command("git", "-C", workDir, "add", "changes.txt")
+	addCmd := exec.CommandContext(context.Background(), "git", "-C", workDir, "add", "changes.txt")
 	if output, err := addCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to add file: %w, output: %s", err, string(output))
 	}
 
-	commitCmd := exec.Command("git", "-C", workDir, "commit", "-m", commitMessage)
+	commitCmd := exec.CommandContext(
+		context.Background(),
+		"git",
+		"-C",
+		workDir,
+		"commit",
+		"-m",
+		commitMessage,
+	)
 	if output, err := commitCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to commit: %w, output: %s", err, string(output))
 	}
 
-	pushCmd := exec.Command("git", "-C", workDir, "push", "origin", "main")
+	pushCmd := exec.CommandContext(
+		context.Background(),
+		"git",
+		"-C",
+		workDir,
+		"push",
+		"origin",
+		"main",
+	)
 	if output, err := pushCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to push: %w, output: %s", err, string(output))
 	}

@@ -271,16 +271,19 @@ func TestHTTPAPIMockServer(t *testing.T) {
 
 		// Check that update request contained the images
 		updateFound := false
+
 		for _, req := range requests {
 			if req.Path == "/v1/update" && req.Method == http.MethodPost {
 				require.Contains(t, req.Body, "nginx")
 				require.Contains(t, req.Body, "redis")
 				require.Contains(t, req.Headers, "Authorization")
+
 				updateFound = true
 
 				break
 			}
 		}
+
 		require.True(t, updateFound, "Update request not found in captured requests")
 
 		return nil

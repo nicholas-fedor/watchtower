@@ -2,6 +2,7 @@
 package framework
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,6 +10,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+)
+
+const (
+	notificationDelay = 100 * time.Millisecond
+)
+
+var (
+	errNotificationTimeout = errors.New("notification containing text not received within timeout")
+	errUnsupportedService  = errors.New("unsupported notification service type")
 )
 
 // MockNotificationServer manages a mock notification service for testing.
@@ -36,7 +46,7 @@ func NewMockNotificationServer() *MockNotificationServer {
 	mock.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mock.handleRequest(r)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "ok"}`))
+		_, _ = w.Write([]byte(`{"status": "ok"}`))
 	}))
 
 	return mock
@@ -50,8 +60,9 @@ func (m *MockNotificationServer) URL() string {
 // handleRequest captures notification requests.
 func (m *MockNotificationServer) handleRequest(r *http.Request) {
 	body := ""
+
 	if r.Body != nil {
-		buf := make([]byte, 1024)
+		buf := make([]byte, bufferSize)
 		n, _ := r.Body.Read(buf)
 		body = string(buf[:n])
 	}
@@ -105,10 +116,11 @@ func (m *MockNotificationServer) WaitForNotification(text string, timeout time.D
 				return nil
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+
+		time.Sleep(notificationDelay)
 	}
 
-	return fmt.Errorf("notification containing '%s' not received within %v", text, timeout)
+	return fmt.Errorf("%w: '%s' within %v", errNotificationTimeout, text, timeout)
 }
 
 // Close shuts down the mock server.
@@ -168,7 +180,7 @@ func NewEmailMockServer() *EmailMockServer {
 	mock.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mock.handleEmailRequest(r)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "sent"}`))
+		_, _ = w.Write([]byte(`{"status": "sent"}`))
 	})
 
 	return mock
@@ -184,7 +196,7 @@ func (e *EmailMockServer) handleEmailRequest(r *http.Request) {
 
 	// Extract email details from request
 	if r.Method == http.MethodPost {
-		r.ParseForm()
+		_ = r.ParseForm()
 		email.To = r.FormValue("to")
 		email.Subject = r.FormValue("subject")
 		email.Body = r.FormValue("body")
@@ -234,7 +246,7 @@ func NewGotifyMockServer() *GotifyMockServer {
 	mock.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mock.handleGotifyRequest(r)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id": 1}`))
+		_, _ = w.Write([]byte(`{"id": 1}`))
 	})
 
 	return mock
@@ -247,11 +259,12 @@ func (g *GotifyMockServer) handleGotifyRequest(r *http.Request) {
 	}
 
 	if r.Method == http.MethodPost {
-		r.ParseForm()
+		_ = r.ParseForm()
 		message.Title = r.FormValue("title")
+
 		message.Message = r.FormValue("message")
 		if priority := r.FormValue("priority"); priority != "" {
-			fmt.Sscanf(priority, "%d", &message.Priority)
+			_, _ = fmt.Sscanf(priority, "%d", &message.Priority)
 		}
 	}
 
@@ -280,6 +293,7 @@ func (f *E2EFramework) StartMockNotificationService(serviceType string) (any, er
 	switch strings.ToLower(serviceType) {
 	case "slack":
 		mock := NewSlackMockServer()
+
 		f.addCleanupFunc(func() error {
 			mock.Close()
 
@@ -290,6 +304,7 @@ func (f *E2EFramework) StartMockNotificationService(serviceType string) (any, er
 
 	case "email", "smtp":
 		mock := NewEmailMockServer()
+
 		f.addCleanupFunc(func() error {
 			mock.Close()
 
@@ -300,6 +315,7 @@ func (f *E2EFramework) StartMockNotificationService(serviceType string) (any, er
 
 	case "gotify":
 		mock := NewGotifyMockServer()
+
 		f.addCleanupFunc(func() error {
 			mock.Close()
 
@@ -309,7 +325,7 @@ func (f *E2EFramework) StartMockNotificationService(serviceType string) (any, er
 		return mock, nil
 
 	default:
-		return nil, fmt.Errorf("unsupported notification service type: %s", serviceType)
+		return nil, fmt.Errorf("%w: %s", errUnsupportedService, serviceType)
 	}
 }
 
@@ -327,7 +343,7 @@ func (f *E2EFramework) WaitForNotification(
 	case *GotifyMockServer:
 		return service.WaitForNotification(text, timeout)
 	default:
-		return fmt.Errorf("unsupported mock service type")
+		return errUnsupportedService
 	}
 }
 
@@ -349,9 +365,11 @@ func (f *E2EFramework) BuildNotificationArgs(
 		if from := config["EMAIL_FROM"]; from != "" {
 			args = append(args, "--notification-email-from", from)
 		}
+
 		if to := config["EMAIL_TO"]; to != "" {
 			args = append(args, "--notification-email-to", to)
 		}
+
 		if server := config["EMAIL_SERVER"]; server != "" {
 			args = append(args, "--notification-email-server", server)
 		}

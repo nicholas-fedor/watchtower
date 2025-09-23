@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,21 @@ import (
 	"strings"
 	"sync"
 	"time"
+)
+
+const (
+	defaultHTTPTimeout     = 30 * time.Second
+	apiHealthCheckInterval = 500 * time.Millisecond
+	mockScannedCount       = 5
+	mockUpdatedCount       = 3
+	mockFailedCount        = 0
+	bufferSize             = 1024
+)
+
+var (
+	errAPIUpdateFailed  = errors.New("API update failed")
+	errAPIMetricsFailed = errors.New("API metrics request failed")
+	errAPINotReady      = errors.New("API not ready")
 )
 
 // APIClient provides utilities for testing Watchtower's HTTP API.
@@ -27,7 +43,7 @@ func NewAPIClient(baseURL, token string) *APIClient {
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		token:   token,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: defaultHTTPTimeout,
 		},
 	}
 }
@@ -52,7 +68,7 @@ func (c *APIClient) GetMetrics() (*http.Response, error) {
 
 // GetHealth checks the health endpoint.
 func (c *APIClient) GetHealth() (*http.Response, error) {
-	url := c.baseURL + "/v1/health"
+	url := c.baseURL + "/health"
 
 	return c.sendRequest("GET", url, nil)
 }
@@ -60,15 +76,17 @@ func (c *APIClient) GetHealth() (*http.Response, error) {
 // sendRequest sends an HTTP request with proper authentication.
 func (c *APIClient) sendRequest(method, url string, body any) (*http.Response, error) {
 	var bodyReader io.Reader
+
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
+
 		bodyReader = bytes.NewReader(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, bodyReader)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -152,7 +170,12 @@ func (f *E2EFramework) TriggerAPIUpdate(token string, images []string) error {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 
-		return fmt.Errorf("API update failed with status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf(
+			"%w with status %d: %s",
+			errAPIUpdateFailed,
+			resp.StatusCode,
+			string(body),
+		)
 	}
 
 	return nil
@@ -169,7 +192,7 @@ func (f *E2EFramework) GetAPIMetrics(token string) (map[string]any, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API metrics request failed with status %d", resp.StatusCode)
+		return nil, fmt.Errorf("%w with status %d", errAPIMetricsFailed, resp.StatusCode)
 	}
 
 	var metrics map[string]any
@@ -189,14 +212,16 @@ func (f *E2EFramework) WaitForAPIReady(url, token string, timeout time.Duration)
 		resp, err := client.GetHealth()
 		if err == nil {
 			resp.Body.Close()
+
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
 		}
-		time.Sleep(500 * time.Millisecond)
+
+		time.Sleep(apiHealthCheckInterval)
 	}
 
-	return fmt.Errorf("API not ready within %v", timeout)
+	return fmt.Errorf("%w within %v", errAPINotReady, timeout)
 }
 
 // MockAPIServer provides a mock HTTP API server for testing API clients.
@@ -268,7 +293,12 @@ func (m *MockAPIServer) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+
+		return
+	}
 }
 
 // handleMetrics handles mock metrics requests.
@@ -276,13 +306,18 @@ func (m *MockAPIServer) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	m.captureRequest(r, "/v1/metrics")
 
 	response := map[string]any{
-		"scanned": 5,
-		"updated": 3,
-		"failed":  0,
+		"scanned": mockScannedCount,
+		"updated": mockUpdatedCount,
+		"failed":  mockFailedCount,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+
+		return
+	}
 }
 
 // handleHealth handles mock health requests.
@@ -294,14 +329,20 @@ func (m *MockAPIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+
+		return
+	}
 }
 
 // captureRequest captures an API request.
 func (m *MockAPIServer) captureRequest(r *http.Request, path string) {
 	body := ""
+
 	if r.Body != nil {
-		buf := make([]byte, 1024)
+		buf := make([]byte, bufferSize)
 		n, _ := r.Body.Read(buf)
 		body = string(buf[:n])
 	}
@@ -325,7 +366,7 @@ func (m *MockAPIServer) captureRequest(r *http.Request, path string) {
 }
 
 // Close shuts down the mock server.
-func (m *MockAPIServer) Close(ctx context.Context) error {
+func (m *MockAPIServer) Close(_ context.Context) error {
 	m.server.Close()
 
 	return nil
