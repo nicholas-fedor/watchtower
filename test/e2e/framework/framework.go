@@ -105,7 +105,7 @@ func (f *E2EFramework) CreateContainer(
 // CreateWatchtowerContainer creates a Watchtower container with the specified configuration.
 func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.Container, error) {
 	// Check if Git monitoring is enabled - if so, don't wait for exit since it's not implemented yet
-	var waitStrategy wait.Strategy = wait.ForLog("Running a one time update").WithStartupTimeout(watchtowerStartupTimeout) // Wait for run-once start
+	var waitStrategy wait.Strategy
 
 	var exposeAPI bool
 
@@ -118,6 +118,26 @@ func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.
 
 			break
 		}
+	}
+	runOnce := false
+	for _, arg := range args {
+		if arg == "--run-once" {
+			runOnce = true
+
+			break
+		}
+	}
+
+	// Set default wait strategy
+	if runOnce {
+		if noStartupMessage {
+			waitStrategy = wait.ForLog("Performing pre-update sanity checks").
+				WithStartupTimeout(watchtowerStartupTimeout)
+		} else {
+			waitStrategy = wait.ForLog("Running a one time update").WithStartupTimeout(watchtowerStartupTimeout)
+		}
+	} else {
+		waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(helpCommandTimeout)
 	}
 
 	for _, arg := range args {
@@ -155,13 +175,6 @@ func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.
 
 			break
 		}
-	}
-
-	// Adjust wait strategy for run-once if startup messages are suppressed
-	if noStartupMessage &&
-		waitStrategy == wait.ForLog("Running a one time update").
-			WithStartupTimeout(watchtowerStartupTimeout) {
-		waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(helpCommandTimeout)
 	}
 
 	req := testcontainers.ContainerRequest{

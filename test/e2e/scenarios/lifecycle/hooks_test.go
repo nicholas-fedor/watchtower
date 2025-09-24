@@ -40,7 +40,7 @@ func TestLifecycleHooksBasic(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Performing pre-update sanity checks", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it time to process containers
@@ -50,7 +50,7 @@ func TestLifecycleHooksBasic(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
+		require.Contains(t, logs, "Performing pre-update sanity checks")
 
 		return nil
 	})
@@ -84,14 +84,14 @@ func TestLifecycleHooksPreUpdateOnly(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Performing pre-update sanity checks", 30*time.Second)
 		require.NoError(t, err)
 
 		// Verify Watchtower processed containers
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
+		require.Contains(t, logs, "Performing pre-update sanity checks")
 
 		return nil
 	})
@@ -125,14 +125,14 @@ func TestLifecycleHooksPostUpdateOnly(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Performing pre-update sanity checks", 30*time.Second)
 		require.NoError(t, err)
 
 		// Verify Watchtower processed containers
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
+		require.Contains(t, logs, "Performing pre-update sanity checks")
 
 		return nil
 	})
@@ -167,14 +167,14 @@ func TestLifecycleHooksFailureHandling(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Performing pre-update sanity checks", 30*time.Second)
 		require.NoError(t, err)
 
 		// Verify Watchtower processed containers
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
+		require.Contains(t, logs, "Performing pre-update sanity checks")
 
 		return nil
 	})
@@ -208,14 +208,14 @@ func TestLifecycleHooksDisabled(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Performing pre-update sanity checks", 30*time.Second)
 		require.NoError(t, err)
 
 		// Verify Watchtower processed containers normally
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
+		require.Contains(t, logs, "Performing pre-update sanity checks")
 
 		return nil
 	})
@@ -250,14 +250,14 @@ func TestLifecycleHooksComplexCommands(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Performing pre-update sanity checks", 30*time.Second)
 		require.NoError(t, err)
 
 		// Verify Watchtower processed containers with complex hook configurations
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
+		require.Contains(t, logs, "Performing pre-update sanity checks")
 
 		return nil
 	})
