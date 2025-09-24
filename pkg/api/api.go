@@ -1,3 +1,4 @@
+// Package api provides the HTTP API server implementation for Watchtower.
 package api
 
 import (
@@ -10,6 +11,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
+
+// readHeaderTimeout is the timeout for reading request headers.
+const readHeaderTimeout = 10 * time.Second
+
+// shutdownTimeout is the timeout for graceful server shutdown.
+const shutdownTimeout = 5 * time.Second
 
 // API represents the HTTP API server for Watchtower.
 type API struct {
@@ -57,8 +64,9 @@ func (a *API) Start(ctx context.Context, blocking bool) error {
 	}
 
 	a.server = &http.Server{
-		Addr:    a.Addr,
-		Handler: a.authMiddleware(a.mux),
+		Addr:              a.Addr,
+		Handler:           a.authMiddleware(a.mux),
+		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
 	if blocking {
@@ -74,10 +82,14 @@ func (a *API) Start(ctx context.Context, blocking bool) error {
 		case err := <-errChan:
 			return err
 		case <-ctx.Done():
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 			defer cancel()
 
-			return a.server.Shutdown(shutdownCtx)
+			if err := a.server.Shutdown(shutdownCtx); err != nil {
+				return fmt.Errorf("server shutdown failed: %w", err)
+			}
+
+			return nil
 		}
 	}
 
@@ -93,10 +105,12 @@ func (a *API) Start(ctx context.Context, blocking bool) error {
 	go func() {
 		<-ctx.Done()
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 		defer cancel()
 
-		a.server.Shutdown(shutdownCtx)
+		if err := a.server.Shutdown(shutdownCtx); err != nil {
+			logrus.WithError(err).Error("Failed to shutdown server")
+		}
 	}()
 
 	return nil
@@ -135,7 +149,7 @@ func (a *API) authMiddleware(next http.Handler) http.Handler {
 // HTTPServer interface for RunHTTPServer.
 type HTTPServer interface {
 	ListenAndServe() error
-	Shutdown(context.Context) error
+	Shutdown(ctx context.Context) error
 }
 
 // RunHTTPServer starts the HTTP server and handles graceful shutdown.
@@ -150,7 +164,7 @@ func RunHTTPServer(ctx context.Context, server HTTPServer) error {
 	case err := <-errChan:
 		return err
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 		defer cancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {

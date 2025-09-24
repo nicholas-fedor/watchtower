@@ -109,6 +109,17 @@ func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.
 
 	var exposeAPI bool
 
+	noStartupMessage := false
+
+	// Check if startup messages are suppressed
+	for _, arg := range args {
+		if arg == "--no-startup-message" {
+			noStartupMessage = true
+
+			break
+		}
+	}
+
 	for _, arg := range args {
 		if arg == "--enable-git-monitoring" {
 			// Git monitoring not implemented yet, so just wait for startup
@@ -132,12 +143,25 @@ func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.
 		}
 		// For HTTP API flags, wait for API server start
 		if strings.HasPrefix(arg, "--http-api") {
-			waitStrategy = wait.ForLog("HTTP API server started successfully").
-				WithStartupTimeout(helpCommandTimeout)
+			if noStartupMessage {
+				waitStrategy = wait.ForLog("HTTP API is enabled").
+					WithStartupTimeout(helpCommandTimeout)
+			} else {
+				waitStrategy = wait.ForLog("HTTP API server started successfully").
+					WithStartupTimeout(helpCommandTimeout)
+			}
+
 			exposeAPI = true
 
 			break
 		}
+	}
+
+	// Adjust wait strategy for run-once if startup messages are suppressed
+	if noStartupMessage &&
+		waitStrategy == wait.ForLog("Running a one time update").
+			WithStartupTimeout(watchtowerStartupTimeout) {
+		waitStrategy = wait.ForLog("Watchtower").WithStartupTimeout(helpCommandTimeout)
 	}
 
 	req := testcontainers.ContainerRequest{

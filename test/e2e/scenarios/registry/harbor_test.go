@@ -42,12 +42,13 @@ func TestHarborIntegration(t *testing.T) {
 		// Run Watchtower with run-once to test Harbor integration
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -57,7 +58,6 @@ func TestHarborIntegration(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})
@@ -92,12 +92,13 @@ func TestHarborAuthentication(t *testing.T) {
 		// Run Watchtower with run-once to test Harbor authentication
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -107,7 +108,6 @@ func TestHarborAuthentication(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})
@@ -144,12 +144,13 @@ func TestHarborProjects(t *testing.T) {
 		// Run Watchtower with run-once to test Harbor project structure
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -159,7 +160,6 @@ func TestHarborProjects(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})

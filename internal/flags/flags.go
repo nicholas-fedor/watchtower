@@ -201,6 +201,12 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Restart containers one at a time")
 
 	flags.BoolP(
+		"no-self-update",
+		"",
+		envBool("WATCHTOWER_NO_SELF_UPDATE"),
+		"Disable self-update of the Watchtower container")
+
+	flags.BoolP(
 		"http-api-update",
 		"",
 		envBool("WATCHTOWER_HTTP_API_UPDATE"),
@@ -668,8 +674,9 @@ func EnvConfig(cmd *cobra.Command) error {
 //   - bool: Cleanup setting.
 //   - bool: No-restart setting.
 //   - bool: Monitor-only setting.
+//   - bool: No-self-update setting.
 //   - time.Duration: Stop timeout.
-func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
+func ReadFlags(cmd *cobra.Command) (bool, bool, bool, bool, time.Duration) {
 	flags := cmd.PersistentFlags()
 
 	// Fetch flags, fatal on error.
@@ -694,6 +701,13 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 			Fatal("Failed to get monitor-only flag")
 	}
 
+	noSelfUpdate, err := flags.GetBool("no-self-update")
+	if err != nil {
+		logrus.WithField("flag", "no-self-update").
+			WithError(err).
+			Fatal("Failed to get no-self-update flag")
+	}
+
 	timeout, err := flags.GetDuration("stop-timeout")
 	if err != nil {
 		logrus.WithField("flag", "stop-timeout").
@@ -702,13 +716,14 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"cleanup":      cleanup,
-		"no_restart":   noRestart,
-		"monitor_only": monitorOnly,
-		"timeout":      timeout,
+		"cleanup":        cleanup,
+		"no_restart":     noRestart,
+		"monitor_only":   monitorOnly,
+		"no_self_update": noSelfUpdate,
+		"timeout":        timeout,
 	}).Debug("Retrieved operational flags")
 
-	return cleanup, noRestart, monitorOnly, timeout
+	return cleanup, noRestart, monitorOnly, noSelfUpdate, timeout
 }
 
 // setEnvOptStr sets an environment variable if needed.

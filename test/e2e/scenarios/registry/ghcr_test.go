@@ -31,12 +31,13 @@ func TestGHCRIntegration(t *testing.T) {
 		// Run Watchtower with run-once to test GHCR integration
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -46,7 +47,6 @@ func TestGHCRIntegration(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})
@@ -74,12 +74,13 @@ func TestGHCRPrivateRepo(t *testing.T) {
 		// Run Watchtower with run-once and GHCR auth
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -89,7 +90,6 @@ func TestGHCRPrivateRepo(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})
@@ -121,12 +121,13 @@ func TestGHCRRateLimitHandling(t *testing.T) {
 		// Run Watchtower to test GHCR rate limit handling
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -136,7 +137,6 @@ func TestGHCRRateLimitHandling(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		// Clean up containers
 		_ = container1

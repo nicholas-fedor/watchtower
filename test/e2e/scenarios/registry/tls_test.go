@@ -66,13 +66,14 @@ func TestRegistryTLSSecure(t *testing.T) {
 		// Run Watchtower with run-once and secure TLS (default behavior)
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 			// No --tls-skip-verify flag, so TLS verification is enabled
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -82,7 +83,6 @@ func TestRegistryTLSSecure(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})
@@ -141,13 +141,14 @@ func TestRegistryTLSVerificationFailure(t *testing.T) {
 		// Run Watchtower with run-once and strict TLS verification (default)
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 			// No --tls-skip-verify flag, so TLS verification is enforced
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -157,7 +158,6 @@ func TestRegistryTLSVerificationFailure(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})

@@ -35,6 +35,7 @@ func TestGitMonitoringPolicyPatch(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)
@@ -73,6 +74,7 @@ func TestGitMonitoringPolicyMinor(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)
@@ -111,6 +113,7 @@ func TestGitMonitoringPolicyMajor(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)
@@ -149,6 +152,7 @@ func TestGitMonitoringPolicyNone(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)
@@ -187,6 +191,7 @@ func TestGitMonitoringPolicyInvalid(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)

@@ -1,3 +1,4 @@
+// Package main provides the entry point for the e2e test suite.
 package main
 
 import (
@@ -11,6 +12,8 @@ import (
 )
 
 const minArgs = 2
+
+// main runs the e2e test suite based on command line arguments.
 
 func main() {
 	if len(os.Args) < minArgs {
@@ -34,6 +37,7 @@ func main() {
 		log.Printf("Unknown command: %s", command)
 		printUsage()
 		os.Exit(1)
+		// printUsage displays the help message for the e2e test suite.
 	}
 }
 
@@ -42,6 +46,7 @@ func printUsage() {
 	log.Println("Commands:")
 	log.Println("  build   - Build the local Watchtower Docker image")
 	log.Println("  test    - Run the e2e test suite")
+	// buildImage builds the local Watchtower Docker image.
 	log.Println("  run     - Build image and run tests")
 	log.Println("  cleanup - Clean up local environment")
 }
@@ -78,6 +83,7 @@ func buildImage() {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("Image verification failed: %v\nOutput: %s", err, string(output))
+		// runTests executes the e2e test suite using go test.
 	}
 
 	log.Println("✅ Image verification passed")
@@ -92,6 +98,7 @@ func runTests() {
 
 	err := cmd.Run()
 	if err != nil {
+		// cleanup performs cleanup of local Docker environment.
 		log.Fatalf("Tests failed: %v", err)
 	}
 

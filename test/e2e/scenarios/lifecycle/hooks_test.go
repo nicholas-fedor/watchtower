@@ -32,8 +32,10 @@ func TestLifecycleHooksBasic(t *testing.T) {
 		// Run Watchtower with lifecycle hooks enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 			"--enable-lifecycle-hooks",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -74,8 +76,10 @@ func TestLifecycleHooksPreUpdateOnly(t *testing.T) {
 		// Run Watchtower with lifecycle hooks enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 			"--enable-lifecycle-hooks",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -113,8 +117,10 @@ func TestLifecycleHooksPostUpdateOnly(t *testing.T) {
 		// Run Watchtower with lifecycle hooks enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 			"--enable-lifecycle-hooks",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -153,8 +159,10 @@ func TestLifecycleHooksFailureHandling(t *testing.T) {
 		// Run Watchtower with lifecycle hooks enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 			"--enable-lifecycle-hooks",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -192,7 +200,9 @@ func TestLifecycleHooksDisabled(t *testing.T) {
 		// Run Watchtower WITHOUT lifecycle hooks enabled (default behavior)
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
+			"--debug",
 			// Note: --enable-lifecycle-hooks is NOT specified
 		})
 		require.NoError(t, err)
@@ -232,8 +242,10 @@ func TestLifecycleHooksComplexCommands(t *testing.T) {
 		// Run Watchtower with lifecycle hooks enabled
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message",
 			"--enable-lifecycle-hooks",
+			"--debug",
 		})
 		require.NoError(t, err)
 

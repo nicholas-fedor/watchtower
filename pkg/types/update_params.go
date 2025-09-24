@@ -18,4 +18,5 @@ type UpdateParams struct {
 	PullFailureDelay time.Duration // Delay after failed self-update pull.
 	LifecycleUID     int           // Default UID for lifecycle hooks.
 	LifecycleGID     int           // Default GID for lifecycle hooks.
+	NoSelfUpdate     bool          // Skip self-update of Watchtower if true.
 }

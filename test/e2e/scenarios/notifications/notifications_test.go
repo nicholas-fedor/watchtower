@@ -156,6 +156,7 @@ func TestMultipleNotifications(t *testing.T) {
 		// Run Watchtower with multiple notifications configured
 		args := []string{
 			"--run-once",
+			"--no-self-update",
 			"--notification-slack",
 			"--notification-slack-hook-url", slackServer.URL(),
 			"--notification-email",
@@ -232,6 +233,7 @@ func TestNotificationFailureHandling(t *testing.T) {
 		// Run Watchtower with invalid notification URL (should still start)
 		args := []string{
 			"--run-once",
+			"--no-self-update",
 			"--notification-slack",
 			"--notification-slack-hook-url", "http://invalid-url-that-does-not-exist.com/webhook",
 		}

@@ -35,7 +35,8 @@ func TestHTTPAPIBasic(t *testing.T) {
 			"--http-api-metrics",
 			"--http-api-token=test-token",
 			"--http-api-port=8080",
-			"--no-startup-message",
+			"--no-self-update",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -86,6 +87,8 @@ func TestHTTPAPIUpdateTrigger(t *testing.T) {
 			"--http-api-token=test-token",
 			"--http-api-port=8080",
 			"--no-startup-message",
+			"--no-self-update",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -118,6 +121,8 @@ func TestHTTPAPIAuthentication(t *testing.T) {
 			"--http-api-token=secret-token",
 			"--http-api-port=8080",
 			"--no-startup-message",
+			"--no-self-update",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -172,6 +177,8 @@ func TestHTTPAPIMetrics(t *testing.T) {
 			"--http-api-token=test-token",
 			"--http-api-port=8080",
 			"--no-startup-message",
+			"--no-self-update",
+			"--debug",
 		})
 		require.NoError(t, err)
 
@@ -216,6 +223,8 @@ func TestHTTPAPIPeriodicPolls(t *testing.T) {
 			"--http-api-token=test-token",
 			"--http-api-port=8080",
 			"--no-startup-message",
+			"--no-self-update",
+			"--debug",
 		})
 		require.NoError(t, err)
 

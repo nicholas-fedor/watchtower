@@ -352,7 +352,7 @@ func (f *E2EFramework) BuildNotificationArgs(
 	serviceType string,
 	config map[string]string,
 ) []string {
-	args := []string{"--run-once"}
+	args := []string{"--run-once", "--no-self-update"}
 
 	switch strings.ToLower(serviceType) {
 	case "slack":

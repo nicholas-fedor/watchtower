@@ -17,6 +17,7 @@ import (
 	typeMock "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+// TestDeriveScopeFromContainer tests the deriveScopeFromContainer function with various scenarios.
 func TestDeriveScopeFromContainer(t *testing.T) {
 	// Save original scope value to restore later
 	originalScope := scope
@@ -130,6 +131,8 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 	}
 }
 
+// TestDeriveScopeFromContainer_Logging tests logging behavior in deriveScopeFromContainer.
+
 func TestDeriveScopeFromContainer_Logging(t *testing.T) {
 	// Save original scope value to restore later
 	originalScope := scope
@@ -208,6 +211,7 @@ func (h *testLogHook) Fire(entry *logrus.Entry) error {
 }
 
 func (h *testLogHook) Levels() []logrus.Level {
+	// TestFormatDuration tests the formatDuration function with various time durations.
 	return []logrus.Level{logrus.DebugLevel}
 }
 
@@ -258,6 +262,7 @@ func TestFormatDuration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatDuration(tt.duration)
 			assert.Equal(t, tt.expected, result)
+			// TestFormatTimeUnit tests the formatTimeUnit function with different values and options.
 		})
 	}
 }
@@ -312,6 +317,7 @@ func TestFormatTimeUnit(t *testing.T) {
 				singular string
 				plural   string
 			}{tt.value, tt.singular, tt.plural}, tt.forceInclude)
+			// TestFilterEmpty tests the filterEmpty function with various string slices.
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -347,6 +353,7 @@ func TestFilterEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// TestAwaitDockerClient tests that awaitDockerClient sleeps for the expected duration.
 			result := filterEmpty(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -360,6 +367,7 @@ func TestAwaitDockerClient(t *testing.T) {
 
 	awaitDockerClient()
 
+	// TestLifecycleFlags tests reading lifecycle UID and GID flags.
 	elapsed := time.Since(start)
 
 	// Should take at least 1 second but not more than 2 (to account for timing variations)

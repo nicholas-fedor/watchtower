@@ -124,6 +124,14 @@ func Update(
 		}
 		clog := logrus.WithFields(fields)
 
+		// Skip Watchtower containers if self-update is disabled.
+		if params.NoSelfUpdate && sourceContainer.IsWatchtower() {
+			clog.Debug("Skipping Watchtower container due to no-self-update flag")
+			progress.AddScanned(sourceContainer, sourceContainer.SafeImageID())
+
+			continue
+		}
+
 		// Check if the container uses a pinned (digest-based) image to skip updates.
 		isPinned, err := isPinned(sourceContainer, progress)
 		if err != nil {

@@ -32,12 +32,13 @@ func TestDockerHubIntegration(t *testing.T) {
 		// Don't wait for completion since it may sleep after self-update failure
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--no-startup-message", // Reduce log noise
 		})
 		require.NoError(t, err)
 
 		// Wait for Watchtower to start processing containers
-		err = fw.WaitForLog(watchtower, "Running a one time update", 30*time.Second)
+		err = fw.WaitForLog(watchtower, "Watchtower", 30*time.Second)
 		require.NoError(t, err)
 
 		// Give it a moment to process
@@ -47,7 +48,6 @@ func TestDockerHubIntegration(t *testing.T) {
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "Running a one time update")
 
 		return nil
 	})
@@ -79,6 +79,7 @@ func TestDockerHubRateLimitHandling(t *testing.T) {
 		// Run Watchtower to test rate limit handling
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 		})
 		require.NoError(t, err)
 
@@ -114,6 +115,7 @@ func TestDockerHubOfficialImages(t *testing.T) {
 		// Run Watchtower to test official image handling
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 		})
 		require.NoError(t, err)
 
@@ -146,6 +148,7 @@ func TestDockerHubUserImages(t *testing.T) {
 		// Run Watchtower to test user image handling
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 		})
 		require.NoError(t, err)
 

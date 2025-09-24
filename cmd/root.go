@@ -131,6 +131,12 @@ var lifecycleUID int
 // providing a global default that can be overridden by container labels.
 var lifecycleGID int
 
+// noSelfUpdate is a boolean flag that disables self-update of the Watchtower container.
+//
+// It is set in preRun via the --no-self-update flag or the WATCHTOWER_NO_SELF_UPDATE environment variable,
+// preventing Watchtower from attempting to update its own container image.
+var noSelfUpdate bool
+
 // rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 //
 // It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
@@ -234,7 +240,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Get secrets from files (e.g., for notifications) and read core operational flags.
 	flags.GetSecretsFromFiles(cmd)
-	cleanup, noRestart, monitorOnly, timeout = flags.ReadFlags(cmd)
+	cleanup, noRestart, monitorOnly, noSelfUpdate, timeout = flags.ReadFlags(cmd)
 
 	// Validate the timeout value to ensure it’s non-negative, preventing invalid stop durations.
 	if timeout < 0 {
@@ -501,11 +507,7 @@ func runMain(cfg RunConfig) int {
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
 	if !cfg.EnableUpdateAPI || cfg.UnblockHTTPAPI {
-		if err := runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup); err != nil {
-			logNotify("Scheduled upgrades failed", err)
-
-			return 1
-		}
+		runUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup)
 	}
 
 	// Default to failure if execution completes unexpectedly.
@@ -530,9 +532,9 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	httpAPI.Addr = ":" + cfg.APIPort
 
 	// Register the health endpoint (no authentication required).
-	httpAPI.RegisterFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	httpAPI.RegisterFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Register the update API endpoint if enabled, linking it to the update handler.
@@ -558,6 +560,10 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 
 	// Register the metrics API endpoint if enabled, providing access to update metrics.
 	if cfg.EnableMetricsAPI {
+		if !cfg.EnableUpdateAPI {
+			logrus.Info("HTTP API is enabled")
+		}
+
 		metricsHandler := metricsAPI.New()
 		httpAPI.RegisterHandler(metricsHandler.Path, metricsHandler.Handle)
 	}
@@ -711,9 +717,13 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string, sc
 	noStartupMessage, _ := c.PersistentFlags().GetBool("no-startup-message")
 	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
 
-	apiPort, _ := c.PersistentFlags().GetString("http-api-port")
-	if apiPort == "" {
-		apiPort = "8080" // Default port if not specified via --http-api-port.
+	// If startup messages are suppressed, log minimal info and just send notifications if needed.
+	if noStartupMessage {
+		logrus.Info("Watchtower ", meta.Version, " using Docker API v", client.GetVersion())
+		notifier.StartNotification()
+		notifier.SendNotification(nil)
+
+		return
 	}
 
 	// Configure the logger based on whether startup messages should be suppressed.
@@ -826,9 +836,6 @@ func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 //   - filtering: A string describing the filter, used in startup messaging.
 //   - lock: A channel ensuring only one update runs at a time, or nil to create a new one.
 //   - cleanup: Boolean indicating whether to remove old images after updates.
-//
-// Returns:
-//   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
 func runUpgradesOnSchedule(
 	ctx context.Context,
 	c *cobra.Command,
@@ -836,7 +843,7 @@ func runUpgradesOnSchedule(
 	filtering string,
 	lock chan bool,
 	cleanup bool,
-) error {
+) {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
 		lock = make(chan bool, 1)
@@ -867,8 +874,6 @@ func runUpgradesOnSchedule(
 			}
 		}); err != nil {
 		logrus.WithError(err).Error("Failed to schedule updates, continuing without scheduling")
-
-		return nil
 	}
 
 	// Log startup message with the first scheduled run time.
@@ -894,8 +899,6 @@ func runUpgradesOnSchedule(
 	logrus.Debug("Waiting for running update to be finished...")
 	<-lock
 	logrus.Debug("Scheduler stopped and update completed.")
-
-	return nil
 }
 
 // runUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -935,6 +938,7 @@ func runUpdatesWithNotifications(
 		NoPull:          noPull,
 		LifecycleUID:    lifecycleUID,
 		LifecycleGID:    lifecycleGID,
+		NoSelfUpdate:    noSelfUpdate,
 	}
 
 	// Execute the update action, capturing results and image IDs for cleanup.

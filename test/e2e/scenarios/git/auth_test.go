@@ -35,6 +35,7 @@ func TestGitMonitoringAuthToken(t *testing.T) {
 		// Run Watchtower with Git monitoring and token auth
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 			"--git-auth-token=ghp_test_token_12345",
 		})
@@ -74,6 +75,7 @@ func TestGitMonitoringAuthSSH(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled (SSH auth not implemented yet)
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)
@@ -113,6 +115,7 @@ func TestGitMonitoringAuthBasic(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled (basic auth not implemented yet)
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)
@@ -151,6 +154,7 @@ func TestGitMonitoringAuthUsername(t *testing.T) {
 		// Run Watchtower with Git monitoring enabled (username auth not implemented yet)
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 		})
 		require.NoError(t, err)
@@ -189,6 +193,7 @@ func TestGitMonitoringAuthInvalid(t *testing.T) {
 		// Run Watchtower with Git monitoring and invalid auth
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--run-once",
+			"--no-self-update",
 			"--enable-git-monitoring",
 			"--git-auth-token=", // Empty token
 		})
