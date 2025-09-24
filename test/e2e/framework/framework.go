@@ -131,7 +131,7 @@ func (f *E2EFramework) CreateWatchtowerContainer(args []string) (testcontainers.
 	// Set default wait strategy
 	if runOnce {
 		if noStartupMessage {
-			waitStrategy = wait.ForLog("Performing pre-update sanity checks").
+			waitStrategy = wait.ForLog("Update session completed").
 				WithStartupTimeout(watchtowerStartupTimeout)
 		} else {
 			waitStrategy = wait.ForLog("Running a one time update").WithStartupTimeout(watchtowerStartupTimeout)

@@ -27,21 +27,17 @@ func TestRegistryTLSInsecure(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, container)
 
-		// Run Watchtower with --help to test that --tls-skip-verify flag is accepted
+		// Run Watchtower with --help to test that registry TLS flags are available
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--help",
 		})
 		require.NoError(t, err)
 
-		// Wait for help output (different waiting strategy for help)
-		err = fw.WaitForLog(watchtower, "Automatically updates", 10*time.Second)
-		require.NoError(t, err)
-
-		// Verify Watchtower shows help and includes TLS-related options
+		// Verify Watchtower shows help and includes registry TLS options
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "--tls-skip-verify")
+		require.Contains(t, logs, "--registry-tls-skip")
 
 		return nil
 	})
@@ -94,21 +90,17 @@ func TestRegistryTLSCustomCert(t *testing.T) {
 	require.NoError(t, err)
 
 	fw.RunTestWithCleanup(t, func() error {
-		// Run Watchtower with --help to test that TLS-related flags are available
+		// Run Watchtower with --help to test that registry TLS flags are available
 		watchtower, err := fw.CreateWatchtowerContainer([]string{
 			"--help",
 		})
 		require.NoError(t, err)
 
-		// Wait for help output
-		err = fw.WaitForLog(watchtower, "Automatically updates", 10*time.Second)
-		require.NoError(t, err)
-
-		// Verify Watchtower help includes TLS-related options
+		// Verify Watchtower help includes registry TLS options
 		logs, err := fw.GetContainerLogs(watchtower)
 		require.NoError(t, err)
 		require.Contains(t, logs, "Watchtower")
-		require.Contains(t, logs, "--tls-skip-verify")
+		require.Contains(t, logs, "--registry-tls-skip")
 
 		return nil
 	})

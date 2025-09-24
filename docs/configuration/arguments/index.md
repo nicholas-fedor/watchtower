@@ -360,6 +360,17 @@ Environment Variable: WATCHTOWER_MONITOR_ONLY
 
     See [Label Precedence](#label_precedence).
 
+### Disable Self-Update
+
+Disables self-update of the Watchtower container.
+
+```text
+            Argument: --no-self-update
+Environment Variable: WATCHTOWER_NO_SELF_UPDATE
+                Type: Boolean
+             Default: false
+```
+
 ### Disable Image Pulling
 
 Prevents pulling new images from registries, monitoring only local image cache changes.
