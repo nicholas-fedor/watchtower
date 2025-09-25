@@ -27,14 +27,19 @@ type API struct {
 	registered bool
 }
 
-// New creates a new API instance with the given authentication token.
-func New(token string) *API {
-	mux := http.NewServeMux()
-
-	return &API{
+// New is a factory function creating a new API instance.
+func New(token, addr string) *API {
+	api := &API{
 		token: token,
-		mux:   mux,
+		Addr:  addr,
+		mux:   http.NewServeMux(),
 	}
+	logrus.WithFields(logrus.Fields{
+		"addr":  api.Addr,
+		"token": token,
+	}).Debug("Initialized new API instance")
+
+	return api
 }
 
 // RegisterFunc registers an HTTP handler function for the given path.

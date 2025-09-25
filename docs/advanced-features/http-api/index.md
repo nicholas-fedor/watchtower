@@ -64,12 +64,34 @@ This should be set using the [HTTP API Token](../../configuration/arguments/inde
 
 All requests to the `/v1/update` endpoint will require a `Token` field in the request header with the predefined HTTP API token value.
 
-##### Port Configuration
+##### Address and Port Configuration
 
-Watchtower defaults to using port 8080.
-If port 8080 is used by another service, then it can be changed by using the [HTTP API Port](../../configuration/arguments/index.md#http_api_port) configuration option.
+Watchtower defaults to listening on all interfaces on port 8080.
+The port can be changed using the [HTTP API Port](../../configuration/arguments/index.md#http_api_port) configuration option.
+To bind to a specific host, use the [HTTP API Host](../../configuration/arguments/index.md#http_api_host) configuration option.
+The host must be a valid IP address (IPv4 or IPv6).
 
 Alternatively, if Watchtower is being run via a Docker container, then the `host:container` port mapping can be updated accordingly (e.g. `8080:8080` -> `9000:8080`).
+
+###### Examples
+
+- Listen on all interfaces on port 8080 (default):
+
+  ```bash
+  --http-api-port=8080
+  ```
+
+- Listen on localhost only on port 8080:
+
+  ```bash
+  --http-api-host=127.0.0.1 --http-api-port=8080
+  ```
+
+- Listen on a specific IP and port:
+
+  ```bash
+  --http-api-host=192.168.1.100 --http-api-port=9090
+  ```
 
 #### Image Parameter Usage
 

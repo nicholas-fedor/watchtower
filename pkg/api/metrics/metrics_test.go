@@ -44,7 +44,7 @@ func getWithToken(handler http.Handler) map[string]int {
 }
 
 var _ = ginkgo.Describe("the metrics API", func() {
-	httpAPI := api.New(token)
+	httpAPI := api.New(token, ":8080")
 	m := metricsAPI.New()
 
 	handleReq := httpAPI.RequireToken(m.Handle)

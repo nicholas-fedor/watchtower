@@ -218,6 +218,13 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Runs Watchtower with the Prometheus metrics API enabled")
 
 	flags.StringP(
+		"http-api-host",
+		"",
+		envString("WATCHTOWER_HTTP_API_HOST"),
+		"Host to bind the HTTP API to (default: empty, binds to all interfaces; allows empty or valid IP address)",
+	)
+
+	flags.StringP(
 		"http-api-port",
 		"",
 		envString("WATCHTOWER_HTTP_API_PORT"),
@@ -596,6 +603,7 @@ func SetDefaults() {
 	viper.SetDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
 	viper.SetDefault("WATCHTOWER_POLL_INTERVAL", defaultPollIntervalSeconds)
 	viper.SetDefault("WATCHTOWER_TIMEOUT", time.Second*defaultStopTimeoutSeconds)
+	viper.SetDefault("WATCHTOWER_HTTP_API_HOST", "")
 	viper.SetDefault("WATCHTOWER_HTTP_API_PORT", "8080")
 	viper.SetDefault("WATCHTOWER_NOTIFICATIONS", []string{})
 	viper.SetDefault("WATCHTOWER_NOTIFICATIONS_LEVEL", "info")

@@ -678,6 +678,23 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
 !!! Note
     See [Metrics](../../advanced-features/metrics/index.md) for details.
 
+### HTTP API Host
+
+Sets the host to bind the HTTP API to.
+
+```text
+            Argument: --http-api-host
+Environment Variable: WATCHTOWER_HTTP_API_HOST
+                Type: String
+             Default: empty (binds to all interfaces)
+```
+
+!!! Note
+     If not specified, Watchtower listens on all interfaces on the port specified by `--http-api-port`.
+     Use this option to bind to a specific host, such as `127.0.0.1` for localhost only.
+     The host must be a valid IP address (IPv4 or IPv6).
+     The port is set separately with `--http-api-port`.
+
 ### HTTP API Port
 
 Sets the listening port for the HTTP API.
