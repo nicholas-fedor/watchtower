@@ -52,10 +52,10 @@ type API struct {
 }
 
 // New is a factory function creating a new API instance.
-func New(token string) *API {
+func New(token, addr string) *API {
 	api := &API{
 		Token:       token,
-		Addr:        ":8080", // Default here, overridden in run()
+		Addr:        addr,
 		hasHandlers: false,
 		mux:         http.NewServeMux(),
 	}

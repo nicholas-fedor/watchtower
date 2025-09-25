@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -401,4 +402,43 @@ func TestLifecycleFlags(t *testing.T) {
 
 	assert.Equal(t, 1000, lifecycleUID, "lifecycleUID should be set to 1000")
 	assert.Equal(t, 1001, lifecycleGID, "lifecycleGID should be set to 1001")
+}
+
+func TestGetAPIAddr(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		port     string
+		expected string
+	}{
+		{
+			name:     "empty host",
+			host:     "",
+			port:     "8080",
+			expected: ":8080",
+		},
+		{
+			name:     "IPv4 host",
+			host:     "127.0.0.1",
+			port:     "8080",
+			expected: "127.0.0.1:8080",
+		},
+		{
+			name:     "IPv6 host",
+			host:     "::1",
+			port:     "8080",
+			expected: "[::1]:8080",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getAPIAddr(tt.host, tt.port)
+			assert.Equal(t, tt.expected, result)
+
+			// Verify the formatted address is a valid TCP address
+			_, err := net.ResolveTCPAddr("tcp", result)
+			assert.NoError(t, err, "formatted address should be a valid TCP address")
+		})
+	}
 }
