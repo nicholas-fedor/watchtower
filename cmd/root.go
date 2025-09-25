@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -163,6 +164,8 @@ type RunConfig struct {
 	UnblockHTTPAPI bool
 	// APIToken is the authentication token for HTTP API access, set via the --http-api-token flag.
 	APIToken string
+	// APIHost is the host to bind the HTTP API to, set via the --http-api-host flag (defaults to empty string).
+	APIHost string
 	// APIPort is the port for the HTTP API server, set via the --http-api-port flag (defaults to "8080").
 	APIPort string
 }
@@ -325,8 +328,21 @@ func run(c *cobra.Command, names []string) {
 	apiToken, _ := c.PersistentFlags().GetString("http-api-token")
 	healthCheck, _ := c.PersistentFlags().GetBool("health-check")
 
-	// Get the HTTP API port, falling back to "8080" if not specified.
+	// Get the HTTP API host and port, falling back to "8080" for port if not specified.
 	flagsSet := c.PersistentFlags()
+
+	apiHost, err := flagsSet.GetString("http-api-host")
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to get http-api-host flag")
+	}
+
+	// Validate APIHost: allow empty or valid IP
+	if apiHost != "" && net.ParseIP(apiHost) == nil {
+		logrus.Fatalf(
+			"invalid http-api-host '%s': must be empty or a valid IP address (IPv4 or IPv6)",
+			apiHost,
+		)
+	}
 
 	apiPort, err := flagsSet.GetString("http-api-port")
 	if err != nil {
@@ -361,6 +377,7 @@ func run(c *cobra.Command, names []string) {
 		EnableMetricsAPI: enableMetricsAPI,
 		UnblockHTTPAPI:   unblockHTTPAPI,
 		APIToken:         apiToken,
+		APIHost:          apiHost,
 		APIPort:          apiPort,
 	}
 
@@ -520,9 +537,11 @@ func runMain(cfg RunConfig) int {
 // Returns:
 //   - error: An error if the API fails to start (excluding clean shutdown), nil otherwise.
 func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) error {
-	// Initialize the HTTP API with the configured authentication token and port.
-	httpAPI := pkgApi.New(cfg.APIToken)
-	httpAPI.Addr = ":" + cfg.APIPort
+	// Get the formatted HTTP api address string.
+	address := getAPIAddr(cfg.APIHost, cfg.APIPort)
+
+	// Initialize the HTTP API with the configured authentication token and address.
+	httpAPI := pkgApi.New(cfg.APIToken, address)
 
 	// Register the update API endpoint if enabled, linking it to the update handler.
 	if cfg.EnableUpdateAPI {
@@ -557,6 +576,16 @@ func setupAndStartAPI(ctx context.Context, cfg RunConfig, updateLock chan bool) 
 	}
 
 	return nil
+}
+
+// getAPIAddr formats the API address string based on host and port.
+func getAPIAddr(host, port string) string {
+	address := host + ":" + port
+	if host != "" && strings.Contains(host, ":") && net.ParseIP(host) != nil {
+		address = "[" + host + "]:" + port
+	}
+
+	return address
 }
 
 // logNotify logs an error message and ensures notifications are sent before returning control.
@@ -697,9 +726,17 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string, sc
 	noStartupMessage, _ := c.PersistentFlags().GetBool("no-startup-message")
 	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
 
+	apiListenAddr, _ := c.PersistentFlags().GetString("http-api-host")
+
 	apiPort, _ := c.PersistentFlags().GetString("http-api-port")
 	if apiPort == "" {
-		apiPort = "8080" // Default port if not specified via --http-api-port.
+		apiPort = "8080"
+	}
+
+	if apiListenAddr == "" {
+		apiListenAddr = ":" + apiPort
+	} else {
+		apiListenAddr = apiListenAddr + ":" + apiPort
 	}
 
 	// Configure the logger based on whether startup messages should be suppressed.
@@ -721,7 +758,7 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string, sc
 
 	// Report HTTP API status if enabled.
 	if enableUpdateAPI {
-		startupLog.Info(fmt.Sprintf("The HTTP API is enabled at :%s.", apiPort))
+		startupLog.Info(fmt.Sprintf("The HTTP API is enabled at %s.", apiListenAddr))
 	}
 
 	// Send batched notifications if not suppressed, ensuring startup info reaches users.

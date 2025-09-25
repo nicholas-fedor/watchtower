@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("API", func() {
 		var apiInstance *api.API
 
 		ginkgo.BeforeEach(func() {
-			apiInstance = api.New(testToken)
+			apiInstance = api.New(testToken, ":8080")
 		})
 
 		ginkgo.It("should return 401 Unauthorized when token is not provided", func() {
@@ -86,7 +86,7 @@ var _ = ginkgo.Describe("API", func() {
 		})
 
 		ginkgo.It("should skip starting the server when no handlers are registered", func() {
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			err := apiInstance.Start(context.Background(), true)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(logBuffer.String, 100*time.Millisecond).
@@ -94,7 +94,7 @@ var _ = ginkgo.Describe("API", func() {
 		})
 
 		ginkgo.It("should fail with a fatal log when token is empty", func() {
-			emptyTokenAPI := api.New("")
+			emptyTokenAPI := api.New("", ":8080")
 			emptyTokenAPI.RegisterFunc("/test", http.HandlerFunc(testHandler))
 			var logOutput string
 			logrus.SetOutput(&testLogWriter{
@@ -124,7 +124,7 @@ var _ = ginkgo.Describe("API", func() {
 			port := tcpAddr.Port
 			listener.Close()
 
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 			apiInstance.RegisterFunc("/test-sync", http.HandlerFunc(testHandler))
 
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("API", func() {
 			port := tcpAddr.Port
 			listener.Close()
 
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 			apiInstance.RegisterFunc("/test-async", http.HandlerFunc(testHandler))
 
@@ -248,7 +248,7 @@ var _ = ginkgo.Describe("API", func() {
 		})
 
 		ginkgo.It("should start server asynchronously and log error on failure", func() {
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			apiInstance.Addr = "127.0.0.1:invalid" // Invalid address to force failure
 			apiInstance.RegisterFunc("/test-fail", http.HandlerFunc(testHandler))
 
@@ -284,7 +284,7 @@ var _ = ginkgo.Describe("API", func() {
 			go func() { _ = testServer.Serve(listener) }()
 			defer testServer.Close()
 
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 			apiInstance.RegisterFunc("/test-error", http.HandlerFunc(testHandler))
 
@@ -315,7 +315,7 @@ var _ = ginkgo.Describe("API", func() {
 			port := tcpAddr.Port
 			listener.Close()
 
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 			apiInstance.RegisterFunc("/test-shutdown", http.HandlerFunc(testHandler))
 
@@ -349,7 +349,7 @@ var _ = ginkgo.Describe("API", func() {
 		})
 
 		ginkgo.It("should return error on shutdown failure", func() {
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			apiInstance.Addr = "127.0.0.1:0"
 			apiInstance.RegisterFunc("/test-shutdown-fail", http.HandlerFunc(testHandler))
 
@@ -392,7 +392,7 @@ var _ = ginkgo.Describe("API", func() {
 			port := tcpAddr.Port
 			listener.Close()
 
-			apiInstance := api.New(testToken)
+			apiInstance := api.New(testToken, ":8080")
 			apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 			// Use RegisterHandler with a custom handler
 			apiInstance.RegisterHandler("/test-handler", http.HandlerFunc(testHandler))
