@@ -43,13 +43,13 @@ jobs:
         env:
           OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHANGELOG_PAT }}
 
       - name: Create Pull Request for changelog
         if: ${{ !fromJson(inputs.dry-run || 'false') }}
         uses: peter-evans/create-pull-request@9ec683ee07f9121fdf529b923931dd78d977a5c9
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.CHANGELOG_PAT }}
           commit-message: "docs: update changelog for ${{ github.ref_name }}"
           title: "docs: update changelog for ${{ github.ref_name }}"
           body: "Automated changelog update for release ${{ github.ref_name }}"
