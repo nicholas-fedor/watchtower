@@ -59,7 +59,6 @@ jobs:
         uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate changelog
         uses: orhun/git-cliff-action@98c93442bb05a455a77bee982867857ae748eeea # v4
@@ -69,13 +68,13 @@ jobs:
         env:
           OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHANGELOG_PAT }}
 
       - name: Create Pull Request for changelog
         if: ${{ !fromJson(inputs.dry-run || 'false') }}
         uses: peter-evans/create-pull-request@9ec683ee07f9121fdf529b923931dd78d977a5c9
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.CHANGELOG_PAT }}
           commit-message: "docs: update changelog"
           title: "docs: update changelog"
           body: "Automated changelog update from CI"
