@@ -89,7 +89,6 @@ jobs:
           body: "Automated changelog update for ${{ github.ref_name }}"
           branch: docs/update-changelog-${{ github.ref_name }}
           delete-branch: true
-          sign-commits: true
 
   # Create multi-platform manifests
   manifest:
