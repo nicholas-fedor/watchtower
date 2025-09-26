@@ -103,6 +103,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					Filter:           filters.WatchtowerContainersFilter,
 					PullFailureDelay: 1 * time.Millisecond, // Test-specific very short delay
 					CPUCopyMode:      "auto",
+					NoSelfUpdate:     false,
 				},
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -141,10 +142,11 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 			params := types.UpdateParams{
-				Cleanup:     true,
-				NoRestart:   true,
-				Filter:      filters.WatchtowerContainersFilter,
-				CPUCopyMode: "auto",
+				Cleanup:      true,
+				NoRestart:    true,
+				Filter:       filters.WatchtowerContainersFilter,
+				CPUCopyMode:  "auto",
+				NoSelfUpdate: false,
 			}
 			report, cleanupImageIDs, err := actions.Update(context.Background(), client, params)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -257,7 +259,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto", NoSelfUpdate: false},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
@@ -291,7 +293,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto", NoSelfUpdate: false},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(4))
@@ -312,7 +314,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto", NoSelfUpdate: false},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -335,7 +337,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
+					types.UpdateParams{
+						Cleanup:        true,
+						RollingRestart: true,
+						CPUCopyMode:    "auto",
+						NoSelfUpdate:   false,
+					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
@@ -356,7 +363,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto", NoSelfUpdate: false},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -406,7 +413,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto", NoSelfUpdate: false},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -445,7 +452,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true, MonitorOnly: true, CPUCopyMode: "auto"},
+					types.UpdateParams{
+						Cleanup:      true,
+						MonitorOnly:  true,
+						CPUCopyMode:  "auto",
+						NoSelfUpdate: false,
+					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
@@ -487,6 +499,7 @@ var _ = ginkgo.Describe("the update action", func() {
 							MonitorOnly:     true,
 							LabelPrecedence: true,
 							CPUCopyMode:     "auto",
+							NoSelfUpdate:    false,
 						},
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -532,6 +545,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								MonitorOnly:     true,
 								LabelPrecedence: true,
 								CPUCopyMode:     "auto",
+								NoSelfUpdate:    false,
 							},
 						)
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -567,6 +581,7 @@ var _ = ginkgo.Describe("the update action", func() {
 							MonitorOnly:     true,
 							LabelPrecedence: true,
 							CPUCopyMode:     "auto",
+							NoSelfUpdate:    false,
 						},
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -614,6 +629,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
+						NoSelfUpdate:   false,
 					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -659,6 +675,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleUID:   1000,
 						LifecycleGID:   1001,
 						CPUCopyMode:    "auto",
+						NoSelfUpdate:   false,
 					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -705,6 +722,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
+						NoSelfUpdate:   false,
 					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -749,6 +767,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
+						NoSelfUpdate:   false,
 					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -840,6 +859,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
+						NoSelfUpdate:   false,
 					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -886,6 +906,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
+						NoSelfUpdate:   false,
 					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -906,9 +927,10 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.BeforeEach(func() {
 			params = types.UpdateParams{
-				Cleanup:     true,
-				Filter:      filters.NoFilter,
-				CPUCopyMode: "auto",
+				Cleanup:      true,
+				Filter:       filters.NoFilter,
+				CPUCopyMode:  "auto",
+				NoSelfUpdate: false,
 			}
 		})
 
@@ -1181,6 +1203,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					Filter:           filters.WatchtowerContainersFilter,
 					PullFailureDelay: 1 * time.Millisecond, // Test-specific very short delay
 					CPUCopyMode:      "auto",
+					NoSelfUpdate:     false,
 				},
 			)
 			elapsedTime := time.Since(startTime)
@@ -1233,7 +1256,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageIDs, err := actions.Update(
 					context.Background(),
 					client,
-					types.UpdateParams{Cleanup: true},
+					types.UpdateParams{Cleanup: true, NoSelfUpdate: false},
 				)
 
 				// The test verifies that the Update function can handle mixed container types
