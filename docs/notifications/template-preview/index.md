@@ -35,28 +35,27 @@ hide:
   </div>
 
   <!-- Textarea for user to edit the notification template, with default Go template content for report and logs -->
-  <textarea name="template" rows="20">{{- with .Report -}}
-    {{- if ( or .Updated .Failed ) -}}
-{{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-      {{- range .Updated}}
+  <textarea name="template" rows="20">{{- if .Report -}}
+ {{- with .Report -}}
+   {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+   {{- if ( or .Updated .Failed ) -}}
+     {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
-      {{- end -}}
-      {{- range .Fresh}}
+     {{- end -}}
+     {{- range .Fresh}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
-      {{- end -}}
-      {{- range .Skipped}}
+     {{- end -}}
+     {{- range .Skipped}}
 - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-      {{- end -}}
-      {{- range .Failed}}
+     {{- end -}}
+     {{- range .Failed}}
 - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-        {{- end -}}
-    {{- end -}}
-  {{- end -}}
-  {{- if (and .Entries .Report) }}
-
-Logs:
-  {{ end -}}
-  {{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}</textarea>
+     {{- end -}}
+   {{- end -}}
+ {{- end -}}
+{{- else -}}
+ {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
+{{- end -}}</textarea>
 
 <!-- Closing div for template-wrapper -->
 </div>
