@@ -953,6 +953,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#split_by_container" class="md-nav__link">
+    <span class="md-ellipsis">
+      Split by Container
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Split by Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage_example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1788,6 +1812,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#split_by_container" class="md-nav__link">
+    <span class="md-ellipsis">
+      Split by Container
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Split by Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage_example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2312,6 +2360,28 @@ If no title is configured for the service, it will remove the title altogether.<
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                Type: Boolean
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: false
 </code></pre></div>
+<h3 id="split_by_container">Split by Container<a class="headerlink" href="#split_by_container" title="Permanent link">&para;</a></h3>
+<p>Send separate notifications for each updated container instead of grouping them.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>            Argument: --notification-split-by-container
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                Type: Boolean
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             Default: false
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When disabled (default), notifications are grouped for all updated containers in a single session.
+When enabled, a separate notification is sent for each container update.</p>
+</div>
+<h4 id="usage_example">Usage Example<a class="headerlink" href="#usage_example" title="Permanent link">&para;</a></h4>
+<p>To enable separate notifications per container:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>slack<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="o">=</span><span class="s2">&quot;https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>nickfedor/watchtower
+</code></pre></div>
 <h2 id="email_notifications">Email Notifications<a class="headerlink" href="#email_notifications" title="Permanent link">&para;</a></h2>
 <p>Watchtower uses Shoutrrr's <a href="https://shoutrrr.nickfedor.com/services/email/" rel="noopener noreferrer" target="_blank">smtp service</a> to send email notifications.</p>
 <p>Either legacy email notification flags or Shoutrrr URLs can be used; however, directly using URLs is recommended for greater control and clarity, especially for configuring TLS settings (e.g., STARTTLS or Implicit TLS).</p>
@@ -2343,7 +2413,7 @@ If no title is configured for the service, it will remove the title altogether.<
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>smtp://${USER}:${PASSWORD}@smtp.gmail.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>smtp://${USER}:${PASSWORD}@smtp.gmail.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2373,7 +2443,7 @@ If no title is configured for the service, it will remove the title altogether.<
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>smtp://${USER}:${PASSWORD}@email-smtp.us-east-1.amazonaws.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>smtp://${USER}:${PASSWORD}@email-smtp.us-east-1.amazonaws.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -2399,7 +2469,7 @@ If no title is configured for the service, it will remove the title altogether.<
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>smtp://${USER}:${PASSWORD}@smtp.office365.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>smtp://${USER}:${PASSWORD}@smtp.office365.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -2425,7 +2495,7 @@ If no title is configured for the service, it will remove the title altogether.<
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>smtp://${USER}:${PASSWORD}@smtp.example.com:465/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ImplicitTLS&amp;usestarttls=no&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>smtp://${USER}:${PASSWORD}@smtp.example.com:465/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ImplicitTLS&amp;usestarttls=no&amp;timeout=30s
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -2451,7 +2521,7 @@ If no title is configured for the service, it will remove the title altogether.<
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>smtp://${USER}:${PASSWORD}@smtp.example.com:25/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=None&amp;usestarttls=no&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>smtp://${USER}:${PASSWORD}@smtp.example.com:25/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=None&amp;usestarttls=no&amp;timeout=30s
 </code></pre></div>
 </div>
 </div>
@@ -2477,7 +2547,7 @@ If no title is configured for the service, it will remove the title altogether.<
 <ul>
 <li>Install Shoutrrr using one of the various <a href="https://shoutrrr.nickfedor.com/installation/" rel="noopener noreferrer" target="_blank">installation methods</a>.</li>
 <li>Test your URL with the Shoutrrr CLI:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span>-u<span class="w"> </span>&lt;URL&gt;<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Test message&quot;</span>
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span>-u<span class="w"> </span>&lt;URL&gt;<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Test message&quot;</span>
 </code></pre></div></li>
 </ul>
 </li>
@@ -2493,29 +2563,29 @@ If no title is configured for the service, it will remove the title altogether.<
 <div class="tabbed-set tabbed-alternate" data-tabs="2:4"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><input id="__tabbed_2_4" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker CLI</label><label for="__tabbed_2_2">Docker CLI (SMTP Relay)</label><label for="__tabbed_2_3">Docker Compose</label><label for="__tabbed_2_4">Docker Compose (SMTP Relay)</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>smtp.example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="o">=</span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>user<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span>secret<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>smtp.example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="o">=</span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>user<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>relay.example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>relay.example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2524,33 +2594,33 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp.example.com</span>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">587</span>
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user</span>
-<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
-<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp.example.com</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">587</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">relay.example.com</span>
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">relay.example.com</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2565,45 +2635,45 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <h3 id="legacy_notification_flags">Legacy Notification Flags<a class="headerlink" href="#legacy_notification_flags" title="Permanent link">&para;</a></h3>
 <h4 id="email_from">Email From<a class="headerlink" href="#email_from" title="Permanent link">&para;</a></h4>
 <p>The e-mail address from which notifications will be sent.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>            Argument: --notification-email-from
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_FROM
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>                Type: String
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>             Default: None
-</code></pre></div>
-<h4 id="email_to">Email To<a class="headerlink" href="#email_to" title="Permanent link">&para;</a></h4>
-<p>The e-mail address to which notifications will be sent.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>            Argument: --notification-email-to
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_TO
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>                Type: String
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>             Default: None
-</code></pre></div>
-<h4 id="email_server">Email Server<a class="headerlink" href="#email_server" title="Permanent link">&para;</a></h4>
-<p>The SMTP server (IP or FQDN) to send notifications through.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>            Argument: --notification-email-server
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>            Argument: --notification-email-from
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_FROM
 <a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>                Type: String
 <a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>             Default: None
 </code></pre></div>
-<h4 id="email_server_tls_skip_verify">Email Server TLS Skip Verify<a class="headerlink" href="#email_server_tls_skip_verify" title="Permanent link">&para;</a></h4>
-<p>Skip verification of the server certificate when using TLS.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>            Argument: --notification-email-server-tls-skip-verify
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>                Type: Boolean
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>             Default: false
+<h4 id="email_to">Email To<a class="headerlink" href="#email_to" title="Permanent link">&para;</a></h4>
+<p>The e-mail address to which notifications will be sent.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>            Argument: --notification-email-to
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_TO
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>                Type: String
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>             Default: None
 </code></pre></div>
-<h4 id="email_server_user">Email Server User<a class="headerlink" href="#email_server_user" title="Permanent link">&para;</a></h4>
-<p>The username for the SMTP server if it requires authentication.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>            Argument: --notification-email-server-user
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER
+<h4 id="email_server">Email Server<a class="headerlink" href="#email_server" title="Permanent link">&para;</a></h4>
+<p>The SMTP server (IP or FQDN) to send notifications through.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>            Argument: --notification-email-server
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER
 <a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>                Type: String
 <a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>             Default: None
 </code></pre></div>
+<h4 id="email_server_tls_skip_verify">Email Server TLS Skip Verify<a class="headerlink" href="#email_server_tls_skip_verify" title="Permanent link">&para;</a></h4>
+<p>Skip verification of the server certificate when using TLS.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>            Argument: --notification-email-server-tls-skip-verify
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>                Type: Boolean
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>             Default: false
+</code></pre></div>
+<h4 id="email_server_user">Email Server User<a class="headerlink" href="#email_server_user" title="Permanent link">&para;</a></h4>
+<p>The username for the SMTP server if it requires authentication.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>            Argument: --notification-email-server-user
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>                Type: String
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>             Default: None
+</code></pre></div>
 <h4 id="email_server_password">Email Server Password<a class="headerlink" href="#email_server_password" title="Permanent link">&para;</a></h4>
 <p>The password for the SMTP server if it requires authentication.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>            Argument: --notification-email-server-password
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>                Type: String
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>            Argument: --notification-email-server-password
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>                Type: String
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2611,62 +2681,62 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </div>
 <h4 id="email_subject_tag">Email Subject Tag<a class="headerlink" href="#email_subject_tag" title="Permanent link">&para;</a></h4>
 <p>Subject prefix tag for notifications via mail.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>            Argument: --notification-email-subjecttag
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>                Type: String
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>             Default: &quot;&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>            Argument: --notification-email-subjecttag
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>                Type: String
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>             Default: &quot;&quot;
 </code></pre></div>
 <h4 id="email_server_port">Email Server Port<a class="headerlink" href="#email_server_port" title="Permanent link">&para;</a></h4>
 <p>The port the SMTP server listens on.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>            Argument: --notification-email-server-port
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>                Type: Integer
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>             Default: 25
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>            Argument: --notification-email-server-port
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>                Type: Integer
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>             Default: 25
 </code></pre></div>
 <h4 id="email_delay">Email Delay<a class="headerlink" href="#email_delay" title="Permanent link">&para;</a></h4>
 <p>The delay (in seconds) between sending notifications if multiple containers are updated at once.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>            Argument: --notification-email-delay
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_DELAY
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>                Type: Integer
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>            Argument: --notification-email-delay
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_DELAY
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>                Type: Integer
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>             Default: None
 </code></pre></div>
 <h3 id="transitioning_from_legacy_email_notifications_to_shoutrrr">Transitioning from Legacy Email Notifications to Shoutrrr<a class="headerlink" href="#transitioning_from_legacy_email_notifications_to_shoutrrr" title="Permanent link">&para;</a></h3>
 <p>Watchtower includes a <code>watchtower notify-upgrade</code> command to convert legacy flags to a Shoutrrr URL.</p>
 <p>The output is written to a temporary file, which you can copy using:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>&lt;CONTAINER&gt;:&lt;FILE_PATH&gt;<span class="w"> </span>./watchtower-notifications.env
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>&lt;CONTAINER&gt;:&lt;FILE_PATH&gt;<span class="w"> </span>./watchtower-notifications.env
 </code></pre></div>
 <h4 id="example_walkthrough">Example Walkthrough<a class="headerlink" href="#example_walkthrough" title="Permanent link">&para;</a></h4>
 <p>Example Legacy Configuration:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Docker CLI</label><label for="__tabbed_3_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>smtp.example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="o">=</span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>user@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span>secret<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>smtp.example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="o">=</span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>user@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
-<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp.example.com</span>
-<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">587</span>
-<a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user@example.com</span>
-<a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
-<a id="__codelineno-29-10" name="__codelineno-29-10" href="#__codelineno-29-10"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
-<a id="__codelineno-29-11" name="__codelineno-29-11" href="#__codelineno-29-11"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
-<a id="__codelineno-29-12" name="__codelineno-29-12" href="#__codelineno-29-12"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-29-13" name="__codelineno-29-13" href="#__codelineno-29-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp.example.com</span>
+<a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">587</span>
+<a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user@example.com</span>
+<a id="__codelineno-31-9" name="__codelineno-31-9" href="#__codelineno-31-9"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
+<a id="__codelineno-31-10" name="__codelineno-31-10" href="#__codelineno-31-10"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
+<a id="__codelineno-31-11" name="__codelineno-31-11" href="#__codelineno-31-11"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
+<a id="__codelineno-31-12" name="__codelineno-31-12" href="#__codelineno-31-12"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-31-13" name="__codelineno-31-13" href="#__codelineno-31-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 </div>
 </div>
@@ -2674,10 +2744,10 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <ol>
 <li>
 <p>Run the following CLI command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>watchtower<span class="w"> </span>watchtower<span class="w"> </span>notify-upgrade
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>watchtower<span class="w"> </span>watchtower<span class="w"> </span>notify-upgrade
 </code></pre></div>
 <p>Converted Shoutrrr URL:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes
 </code></pre></div>
 </li>
 <li>
@@ -2687,27 +2757,27 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Docker CLI</label><label for="__tabbed_4_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>shoutrrr<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span>smtp://user@example.com:secret@smtp.example.com:587/?fromaddress<span class="o">=</span>sender@example.com<span class="p">&amp;</span><span class="nv">toaddresses</span><span class="o">=</span>recipient@example.com<span class="p">&amp;</span><span class="nv">encryption</span><span class="o">=</span>ExplicitTLS<span class="p">&amp;</span><span class="nv">usestarttls</span><span class="o">=</span>yes<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG</span><span class="o">=</span>Watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>shoutrrr<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span>smtp://user@example.com:secret@smtp.example.com:587/?fromaddress<span class="o">=</span>sender@example.com<span class="p">&amp;</span><span class="nv">toaddresses</span><span class="o">=</span>recipient@example.com<span class="p">&amp;</span><span class="nv">encryption</span><span class="o">=</span>ExplicitTLS<span class="p">&amp;</span><span class="nv">usestarttls</span><span class="o">=</span>yes<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG</span><span class="o">=</span>Watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shoutrrr</span>
-<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes</span>
-<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10&quot;</span>
-<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Watchtower</span>
-<a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shoutrrr</span>
+<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes</span>
+<a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10&quot;</span>
+<a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Watchtower</span>
+<a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 </div>
 </div>
@@ -2722,27 +2792,27 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <div class="tabbed-set tabbed-alternate" data-tabs="5:2"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Docker CLI</label><label for="__tabbed_5_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>slack<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="o">=</span><span class="s2">&quot;https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER</span><span class="o">=</span>watchtower-server-1<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_CHANNEL</span><span class="o">=</span><span class="c1">#my-custom-channel \</span>
-<a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>slack<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="o">=</span><span class="s2">&quot;https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER</span><span class="o">=</span>watchtower-server-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_CHANNEL</span><span class="o">=</span><span class="c1">#my-custom-channel \</span>
+<a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
-<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy&quot;</span>
-<a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">watchtower-server-1</span>
-<a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_CHANNEL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#my-custom-channel&quot;</span>
-<a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
+<a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy&quot;</span>
+<a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">watchtower-server-1</span>
+<a id="__codelineno-37-8" name="__codelineno-37-8" href="#__codelineno-37-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_CHANNEL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#my-custom-channel&quot;</span>
+<a id="__codelineno-37-9" name="__codelineno-37-9" href="#__codelineno-37-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-37-10" name="__codelineno-37-10" href="#__codelineno-37-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 </div>
 </div>
@@ -2752,10 +2822,10 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <p>Watchtower supports the following Slack-related options:</p>
 <h4 id="slack_hook_url">Slack Hook URL<a class="headerlink" href="#slack_hook_url" title="Permanent link">&para;</a></h4>
 <p>The Slack webhook URL for notifications.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>            Argument: --notification-slack-hook-url
-<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
-<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>                Type: String
-<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>            Argument: --notification-slack-hook-url
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>                Type: String
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2763,41 +2833,41 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </div>
 <h4 id="slack_identifier">Slack Identifier<a class="headerlink" href="#slack_identifier" title="Permanent link">&para;</a></h4>
 <p>Custom name under which messages are sent.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>            Argument: --notification-slack-identifier
-<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER
-<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>                Type: String
-<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a>             Default: watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>            Argument: --notification-slack-identifier
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>                Type: String
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a>             Default: watchtower
 </code></pre></div>
 <h4 id="slack_channel">Slack Channel<a class="headerlink" href="#slack_channel" title="Permanent link">&para;</a></h4>
 <p>A string which overrides the webhook's default channel (optional).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>            Argument: --notification-slack-channel
-<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
-<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>                Type: String
-<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>            Argument: --notification-slack-channel
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>                Type: String
+<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a>             Default: None
 </code></pre></div>
 <h2 id="microsoft_teams_notifications">Microsoft Teams Notifications<a class="headerlink" href="#microsoft_teams_notifications" title="Permanent link">&para;</a></h2>
 <div class="tabbed-set tabbed-alternate" data-tabs="6:2"><input checked="checked" id="__tabbed_6_1" name="__tabbed_6" type="radio" /><input id="__tabbed_6_2" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="__tabbed_6_1">Docker CLI</label><label for="__tabbed_6_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>msteams<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL</span><span class="o">=</span><span class="s2">&quot;https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>msteams<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL</span><span class="o">=</span><span class="s2">&quot;https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">msteams</span>
-<a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz&quot;</span>
-<a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-40-8" name="__codelineno-40-8" href="#__codelineno-40-8"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-40-9" name="__codelineno-40-9" href="#__codelineno-40-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">msteams</span>
+<a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz&quot;</span>
+<a id="__codelineno-42-7" name="__codelineno-42-7" href="#__codelineno-42-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-42-8" name="__codelineno-42-8" href="#__codelineno-42-8"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-42-9" name="__codelineno-42-9" href="#__codelineno-42-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 </div>
 </div>
@@ -2807,10 +2877,10 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <p>Watchtower supports the following Microsoft Teams-related options:</p>
 <h4 id="msteams_hook_url">MSTeams Hook URL<a class="headerlink" href="#msteams_hook_url" title="Permanent link">&para;</a></h4>
 <p>The Microsoft Teams webhook URL for notifications.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>            Argument: --notification-msteams-hook
-<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
-<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>                Type: String
-<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>            Argument: --notification-msteams-hook
+<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
+<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>                Type: String
+<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2818,36 +2888,36 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </div>
 <h4 id="msteams_use_log_data">MSTeams Use Log Data<a class="headerlink" href="#msteams_use_log_data" title="Permanent link">&para;</a></h4>
 <p>Enable sending keys/values filled by <code>log.WithField</code> or <code>log.WithFields</code> as Microsoft Teams message facts.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>            Argument: --notification-msteams-data
-<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA
-<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>                Type: Boolean
-<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>            Argument: --notification-msteams-data
+<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA
+<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>                Type: Boolean
+<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>             Default: false
 </code></pre></div>
 <h2 id="gotify_notifications">Gotify Notifications<a class="headerlink" href="#gotify_notifications" title="Permanent link">&para;</a></h2>
 <div class="tabbed-set tabbed-alternate" data-tabs="7:2"><input checked="checked" id="__tabbed_7_1" name="__tabbed_7" type="radio" /><input id="__tabbed_7_2" name="__tabbed_7" type="radio" /><div class="tabbed-labels"><label for="__tabbed_7_1">Docker CLI</label><label for="__tabbed_7_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>gotify<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="o">=</span><span class="s2">&quot;https://my.gotify.tld/&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="o">=</span><span class="s2">&quot;SuperSecretToken&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>gotify<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="o">=</span><span class="s2">&quot;https://my.gotify.tld/&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="o">=</span><span class="s2">&quot;SuperSecretToken&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-45-8" name="__codelineno-45-8" href="#__codelineno-45-8"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gotify</span>
-<a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://my.gotify.tld/&quot;</span>
-<a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SuperSecretToken&quot;</span>
-<a id="__codelineno-44-8" name="__codelineno-44-8" href="#__codelineno-44-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-44-9" name="__codelineno-44-9" href="#__codelineno-44-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-44-10" name="__codelineno-44-10" href="#__codelineno-44-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gotify</span>
+<a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://my.gotify.tld/&quot;</span>
+<a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SuperSecretToken&quot;</span>
+<a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-46-10" name="__codelineno-46-10" href="#__codelineno-46-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 </div>
 </div>
@@ -2857,17 +2927,17 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <p>Watchtower supports the following Gotify-related options:</p>
 <h4 id="gotify_url">Gotify URL<a class="headerlink" href="#gotify_url" title="Permanent link">&para;</a></h4>
 <p>The URL of the Gotify instance.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>            Argument: --notification-gotify-url
-<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_URL
-<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a>                Type: String
-<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>            Argument: --notification-gotify-url
+<a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_URL
+<a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>                Type: String
+<a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>             Default: None
 </code></pre></div>
 <h4 id="gotify_token">Gotify Token<a class="headerlink" href="#gotify_token" title="Permanent link">&para;</a></h4>
 <p>The app token for the Gotify instance.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>            Argument: --notification-gotify-token
-<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
-<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>                Type: String
-<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>            Argument: --notification-gotify-token
+<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
+<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>                Type: String
+<a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2875,10 +2945,10 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </div>
 <h4 id="gotify_tls_skip_verify">Gotify TLS Skip Verify<a class="headerlink" href="#gotify_tls_skip_verify" title="Permanent link">&para;</a></h4>
 <p>Skip verification of the server certificate when using TLS.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>            Argument: --notification-gotify-tls-skip-verify
-<a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY
-<a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>                Type: Boolean
-<a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>            Argument: --notification-gotify-tls-skip-verify
+<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY
+<a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>                Type: Boolean
+<a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>             Default: false
 </code></pre></div>
 <h2 id="signal_notifications">Signal Notifications<a class="headerlink" href="#signal_notifications" title="Permanent link">&para;</a></h2>
 <p>Watchtower uses Shoutrrr's <a href="https://shoutrrr.nickfedor.com/services/signal/" rel="noopener noreferrer" target="_blank">signal service</a> to send Signal notifications.</p>
@@ -2895,27 +2965,27 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <div class="tabbed-set tabbed-alternate" data-tabs="8:2"><input checked="checked" id="__tabbed_8_1" name="__tabbed_8" type="radio" /><input id="__tabbed_8_2" name="__tabbed_8" type="radio" /><div class="tabbed-labels"><label for="__tabbed_8_1">Docker CLI</label><label for="__tabbed_8_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span>signal://localhost:8080/+1234567890/+0987654321<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a><span class="w">  </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span>signal://localhost:8080/+1234567890/+0987654321<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">signal://localhost:8080/+1234567890/+0987654321</span>
-<a id="__codelineno-49-6" name="__codelineno-49-6" href="#__codelineno-49-6"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-49-7" name="__codelineno-49-7" href="#__codelineno-49-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
+<a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">signal://localhost:8080/+1234567890/+0987654321</span>
+<a id="__codelineno-51-6" name="__codelineno-51-6" href="#__codelineno-51-6"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-51-7" name="__codelineno-51-7" href="#__codelineno-51-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
 </div>
 </div>
 </div>
 <h3 id="signal_url_format">Signal URL Format<a class="headerlink" href="#signal_url_format" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>signal://[user:password@]host:port/source_phone/recipient1/recipient2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>signal://[user:password@]host:port/source_phone/recipient1/recipient2
 </code></pre></div>
 <h4 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h4>
 <ul>
@@ -2933,28 +3003,28 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </ul>
 <h4 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h4>
 <p>Send to a single phone number:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>signal://localhost:8080/+1234567890/+0987654321
+<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>signal://localhost:8080/+1234567890/+0987654321
 </code></pre></div>
 <p>Send to multiple recipients:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>signal://localhost:8080/+1234567890/+0987654321/+1123456789/group.testgroup
+<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>signal://localhost:8080/+1234567890/+0987654321/+1123456789/group.testgroup
 </code></pre></div>
 <p>Send to a group:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>signal://localhost:8080/+1234567890/group.abcdefghijklmnop=
+<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>signal://localhost:8080/+1234567890/group.abcdefghijklmnop=
 </code></pre></div>
 <p>With authentication:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>signal://user:password@localhost:8080/+1234567890/+0987654321
+<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>signal://user:password@localhost:8080/+1234567890/+0987654321
 </code></pre></div>
 <p>With API token (Bearer auth):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>signal://localhost:8080/+1234567890/+0987654321?token=YOUR_API_TOKEN
+<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>signal://localhost:8080/+1234567890/+0987654321?token=YOUR_API_TOKEN
 </code></pre></div>
 <p>Using HTTP instead of HTTPS:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>signal://localhost:8080/+1234567890/+0987654321?disabletls=yes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>signal://localhost:8080/+1234567890/+0987654321?disabletls=yes
 </code></pre></div>
 <h3 id="signal_attachments">Signal Attachments<a class="headerlink" href="#signal_attachments" title="Permanent link">&para;</a></h3>
 <p>The Signal service supports sending base64-encoded attachments:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span><span class="s2">&quot;signal://localhost:8080/+1234567890/+0987654321&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a><span class="w">  </span><span class="s2">&quot;Message with attachment&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a><span class="w">  </span>--attachments<span class="w"> </span><span class="s2">&quot;base64data1,base64data2&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span><span class="s2">&quot;signal://localhost:8080/+1234567890/+0987654321&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a><span class="w">  </span><span class="s2">&quot;Message with attachment&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a><span class="w">  </span>--attachments<span class="w"> </span><span class="s2">&quot;base64data1,base64data2&quot;</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2982,7 +3052,7 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 20, 2025 23:29:37 UTC"><span class="timeago" datetime="2025-09-20T23:29:37+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 20, 2025 23:29:37 UTC">2025-09-20</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 26, 2025 16:49:17 UTC"><span class="timeago" datetime="2025-09-26T16:49:17+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 26, 2025 16:49:17 UTC">2025-09-26</span>
   </span>
 
     
