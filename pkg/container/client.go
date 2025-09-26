@@ -101,6 +101,11 @@ type Client interface {
 	// It polls the container's health status until it reports "healthy" or the timeout is reached.
 	// If the container has no health check configured, it returns immediately.
 	WaitForContainerHealthy(containerID types.ContainerID, timeout time.Duration) error
+
+	// ListAllContainers retrieves a list of all containers from the Docker host, regardless of status.
+	//
+	// Returns all containers without filtering by status or other criteria.
+	ListAllContainers() ([]types.Container, error)
 }
 
 // client is the concrete implementation of the Client interface.
@@ -342,6 +347,53 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 	logrus.WithFields(fields).WithField("new_id", newID).Debug("Started new container")
 
 	return newID, nil
+}
+
+// ListAllContainers retrieves a list of all containers from the Docker host, regardless of status.
+//
+// Returns:
+//   - []types.Container: List of all containers.
+//   - error: Non-nil if listing fails, nil on success.
+func (c client) ListAllContainers() ([]types.Container, error) {
+	ctx := context.Background()
+	clog := logrus.WithField("list_all", true)
+
+	clog.Debug("Retrieving all container list")
+
+	// Fetch containers with no status filter
+	containers, err := c.api.ContainerList(ctx, dockerContainer.ListOptions{})
+	if err != nil {
+		if strings.Contains(err.Error(), "page not found") {
+			clog.WithFields(logrus.Fields{
+				"error":       err,
+				"endpoint":    "/containers/json",
+				"api_version": strings.Trim(c.api.ClientVersion(), "\""),
+				"docker_host": os.Getenv("DOCKER_HOST"),
+			}).Warn("Docker API returned 404 for container list; treating as empty list")
+
+			return []types.Container{}, nil
+		}
+
+		clog.WithError(err).Debug("Failed to list all containers")
+
+		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
+	}
+
+	// Convert to types.Container
+	hostContainers := []types.Container{}
+
+	for _, runningContainer := range containers {
+		container, err := GetSourceContainer(c.api, types.ContainerID(runningContainer.ID))
+		if err != nil {
+			return nil, err
+		}
+
+		hostContainers = append(hostContainers, container)
+	}
+
+	clog.WithField("count", len(hostContainers)).Debug("Listed all containers")
+
+	return hostContainers, nil
 }
 
 // RenameContainer renames an existing container to a new name.
