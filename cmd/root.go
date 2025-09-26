@@ -254,6 +254,8 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Get the cron schedule specification from flags or environment variables.
 	scheduleSpec, _ = flagsSet.GetString("schedule")
+	logrus.WithField("scheduleSpec", scheduleSpec).
+		Debug("Retrieved cron schedule specification from flags")
 
 	// Get secrets from files (e.g., for notifications) and read core operational flags.
 	flags.GetSecretsFromFiles(cmd)
@@ -846,7 +848,7 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string, sc
 	if scope != "" {
 		startupLog.WithField("scope", scope).Info("Only checking containers in scope")
 	} else {
-		startupLog.Info(filtering)
+		startupLog.Debug(filtering)
 	}
 
 	// Log scheduling or run mode information based on configuration.
@@ -918,18 +920,44 @@ func logNotifierInfo(log *logrus.Entry, notifierNames []string) {
 //   - c: The cobra.Command instance, providing access to flags like --run-once.
 //   - sched: The time.Time of the first scheduled run, or zero if no schedule is set.
 func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
-	if !sched.IsZero() {
+	switch {
+	case !sched.IsZero(): // scheduled runs
 		until := formatDuration(time.Until(sched))
 		log.Info("Scheduling first run: " + sched.Format("2006-01-02 15:04:05 -0700 MST"))
 		log.Info("Note that the first check will be performed in " + until)
 
-		return
-	}
+	case func() bool { // one-time updates
+		v, _ := c.PersistentFlags().GetBool("run-once")
 
-	if runOnce, _ := c.PersistentFlags().GetBool("run-once"); runOnce {
+		return v
+	}():
 		log.Info("Running a one time update.")
-	} else {
-		log.Info("Periodic runs are not enabled.")
+
+	case func() bool { // update on start
+		v, _ := c.PersistentFlags().GetBool("update-on-start")
+
+		return v
+	}():
+		log.Info("Running update on start, then scheduling periodic updates.")
+
+	case func() bool { // HTTP API without periodic polling
+		a, _ := c.PersistentFlags().GetBool("http-api-update")
+		b, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
+
+		return a && !b
+	}():
+		log.Info("Updates via HTTP API enabled. Periodic updates are not enabled.")
+
+	case func() bool { // HTTP API with periodic polling
+		a, _ := c.PersistentFlags().GetBool("http-api-update")
+		b, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
+
+		return a && b
+	}():
+		log.Info("Updates via HTTP API enabled. Periodic updates are also enabled.")
+
+	default: // default periodic
+		log.Info("Periodic updates are enabled with default schedule.")
 	}
 }
 

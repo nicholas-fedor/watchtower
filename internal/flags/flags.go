@@ -972,12 +972,17 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 	// Update schedule to match interval or default if needed.
 	if intervalChanged || !scheduleChanged {
 		interval, _ := flags.GetInt("interval")
-		if err := flags.Set("schedule", fmt.Sprintf("@every %ds", interval)); err != nil {
+
+		scheduleValue := fmt.Sprintf("@every %ds", interval)
+		if err := flags.Set("schedule", scheduleValue); err != nil {
 			logrus.WithError(err).
 				WithField("interval", interval).
 				Debug("Failed to set schedule from interval")
 		} else {
-			logrus.WithField("interval", interval).Debug("Set schedule from interval")
+			logrus.WithFields(logrus.Fields{
+				"interval": interval,
+				"schedule": scheduleValue,
+			}).Debug("Set default schedule from interval")
 		}
 	}
 
