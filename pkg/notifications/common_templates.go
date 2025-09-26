@@ -23,8 +23,8 @@ var commonTemplates = map[string]string{
 	`default`: `
 {{- if .Report -}}
   {{- with .Report -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
     {{- if ( or .Updated .Failed ) -}}
-{{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
       {{- end -}}

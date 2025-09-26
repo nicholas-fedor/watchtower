@@ -59,9 +59,16 @@ jobs:
         uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate changelog
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+
+      - name: Generate Changelog
         uses: orhun/git-cliff-action@98c93442bb05a455a77bee982867857ae748eeea # v4
         with:
           config: cliff.toml
@@ -69,19 +76,19 @@ jobs:
         env:
           OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHANGELOG_PAT }}
 
-      - name: Create Pull Request for changelog
+      - name: Create Pull Request for Changelog
         if: ${{ !fromJson(inputs.dry-run || 'false') }}
         uses: peter-evans/create-pull-request@9ec683ee07f9121fdf529b923931dd78d977a5c9
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "docs: update changelog"
-          title: "docs: update changelog"
-          body: "Automated changelog update from CI"
-          branch: chore/update-changelog
+          token: ${{ secrets.CHANGELOG_PAT }}
+          committer: Nick Fedor <nick@nickfedor.com>
+          title: "docs(changelog): update changelog for ${{ github.ref_name }}"
+          commit-message: "docs(changelog): update changelog for ${{ github.ref_name }}"
+          body: "Automated changelog update for ${{ github.ref_name }}"
+          branch: docs/update-changelog-${{ github.ref_name }}
           delete-branch: true
-          sign-commits: true
 
   # Create multi-platform manifests
   manifest:

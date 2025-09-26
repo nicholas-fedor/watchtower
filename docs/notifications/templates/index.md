@@ -95,8 +95,8 @@ When `--notification-report` is set, the template processes a `notifications.Dat
 ```go title="Default Report Template"
 {{- if .Report -}}
   {{- with .Report -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
     {{- if ( or .Updated .Failed ) -}}
-{{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
       {{- end -}}
@@ -133,6 +133,7 @@ Logs:
     {{- if .Report -}}
       {{- with .Report -}}
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+    {{- if ( or .Updated .Failed ) -}}
           {{- range .Updated}}
     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
           {{- end -}}
@@ -145,6 +146,7 @@ Logs:
           {{- range .Failed}}
     - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
           {{- end -}}
+    {{- end -}}
       {{- end -}}
     {{- if .Entries -}}
 
@@ -172,6 +174,7 @@ Logs:
             {{- if .Report -}}
               {{- with .Report -}}
             {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+            {{- if ( or .Updated .Failed ) -}}
                 {{- range .Updated}}
             - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
                 {{- end -}}
@@ -184,6 +187,7 @@ Logs:
                 {{- range .Failed}}
             - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
                 {{- end -}}
+            {{- end -}}
               {{- end -}}
             {{- if .Entries -}}
 

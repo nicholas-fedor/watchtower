@@ -138,6 +138,12 @@ var lifecycleGID int
 // preventing Watchtower from attempting to update its own container image.
 var noSelfUpdate bool
 
+// cpuCopyMode specifies how CPU settings are handled when recreating containers.
+//
+// It is set during preRun via the --cpu-copy-mode flag or the WATCHTOWER_CPU_COPY_MODE environment variable,
+// controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
+var cpuCopyMode string
+
 // rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 //
 // It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
@@ -281,6 +287,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 	removeVolumes, _ := flagsSet.GetBool("remove-volumes")
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
 	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
+	cpuCopyMode, _ = flagsSet.GetString("cpu-copy-mode")
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
 	if monitorOnly && noPull {
@@ -297,6 +304,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 		RemoveVolumes:           removeVolumes,
 		IncludeRestarting:       includeRestarting,
 		DisableMemorySwappiness: disableMemorySwappiness,
+		CPUCopyMode:             cpuCopyMode,
 		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
 	})
 
@@ -972,6 +980,7 @@ func runUpdatesWithNotifications(
 		LifecycleUID:    lifecycleUID,
 		LifecycleGID:    lifecycleGID,
 		NoSelfUpdate:    noSelfUpdate,
+		CPUCopyMode:     cpuCopyMode,
 	}
 
 	// Execute the update action, capturing results and image IDs for cleanup.

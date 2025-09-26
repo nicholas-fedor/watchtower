@@ -981,6 +981,174 @@ var _ = ginkgo.Describe("Container", func() {
 			gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
 				"Disabled memory swappiness for Podman compatibility"))
 		})
+		ginkgo.Describe("CPU Copy Mode Configuration", func() {
+			var (
+				logOutput         *bytes.Buffer
+				mockContainer     *Container
+				defaultNanoCPUs   int64 = 1000000000 // 1 CPU
+				defaultCPUShares  int64 = 1024
+				defaultCPUQuota   int64 = 100000
+				defaultCPUPeriod  int64 = 100000
+				defaultCpusetCpus       = "0-1"
+				defaultCpusetMems       = "0"
+				containerName           = "test-container"
+				containerID             = "test-container-id"
+			)
+
+			// WithCPUSettings configures the container's CPU settings.
+			WithCPUSettings := func(nanoCPUs int64, cpuShares int64, cpuQuota int64, cpuPeriod int64, cpusetCpus string, cpusetMems string) MockContainerUpdate {
+				return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+					if c.HostConfig == nil {
+						c.HostConfig = &dockerContainerType.HostConfig{}
+					}
+					c.HostConfig.NanoCPUs = nanoCPUs
+					c.HostConfig.CPUShares = cpuShares
+					c.HostConfig.CPUQuota = cpuQuota
+					c.HostConfig.CPUPeriod = cpuPeriod
+					c.HostConfig.CpusetCpus = cpusetCpus
+					c.HostConfig.CpusetMems = cpusetMems
+				}
+			}
+
+			ginkgo.BeforeEach(func() {
+				logOutput = &bytes.Buffer{}
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.DebugLevel)
+				mockContainer = MockContainer(
+					WithCPUSettings(
+						defaultNanoCPUs,
+						defaultCPUShares,
+						defaultCPUQuota,
+						defaultCPUPeriod,
+						defaultCpusetCpus,
+						defaultCpusetMems,
+					),
+				)
+				inspectResponse := dockerContainerType.InspectResponse{
+					ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+						ID:         containerID,
+						Name:       "/" + containerName,
+						HostConfig: mockContainer.GetCreateHostConfig(),
+						State:      &dockerContainerType.State{Running: true},
+					},
+					Config: &dockerContainerType.Config{},
+				}
+				mockContainer.containerInfo = &inspectResponse
+			})
+
+			ginkgo.It("strips all CPU settings when mode is 'none'", func() {
+				clog := logrus.WithFields(logrus.Fields{
+					"container": mockContainer.Name(),
+					"id":        mockContainer.ID().ShortID(),
+				})
+				hostConfig := mockContainer.GetCreateHostConfig()
+
+				handleCPUSettings(hostConfig, "none", false, clog)
+				gomega.Expect(hostConfig.NanoCPUs).
+					To(gomega.Equal(int64(0)), "NanoCPUs should be 0 when mode is 'none'")
+				gomega.Expect(hostConfig.CPUShares).
+					To(gomega.Equal(int64(0)), "CPUShares should be 0 when mode is 'none'")
+				gomega.Expect(hostConfig.CPUQuota).
+					To(gomega.Equal(int64(0)), "CPUQuota should be 0 when mode is 'none'")
+				gomega.Expect(hostConfig.CPUPeriod).
+					To(gomega.Equal(int64(0)), "CPUPeriod should be 0 when mode is 'none'")
+				gomega.Expect(hostConfig.CpusetCpus).
+					To(gomega.Equal(""), "CpusetCpus should be empty when mode is 'none'")
+				gomega.Expect(hostConfig.CpusetMems).
+					To(gomega.Equal(""), "CpusetMems should be empty when mode is 'none'")
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Stripped all CPU settings"))
+			})
+
+			ginkgo.It("preserves all CPU settings when mode is 'full'", func() {
+				clog := logrus.WithFields(logrus.Fields{
+					"container": mockContainer.Name(),
+					"id":        mockContainer.ID().ShortID(),
+				})
+				hostConfig := mockContainer.GetCreateHostConfig()
+
+				handleCPUSettings(hostConfig, "full", false, clog)
+				gomega.Expect(hostConfig.NanoCPUs).
+					To(gomega.Equal(defaultNanoCPUs), "NanoCPUs should remain unchanged when mode is 'full'")
+				gomega.Expect(hostConfig.CPUShares).
+					To(gomega.Equal(defaultCPUShares), "CPUShares should remain unchanged when mode is 'full'")
+				gomega.Expect(hostConfig.CPUQuota).
+					To(gomega.Equal(defaultCPUQuota), "CPUQuota should remain unchanged when mode is 'full'")
+				gomega.Expect(hostConfig.CPUPeriod).
+					To(gomega.Equal(defaultCPUPeriod), "CPUPeriod should remain unchanged when mode is 'full'")
+				gomega.Expect(hostConfig.CpusetCpus).
+					To(gomega.Equal(defaultCpusetCpus), "CpusetCpus should remain unchanged when mode is 'full'")
+				gomega.Expect(hostConfig.CpusetMems).
+					To(gomega.Equal(defaultCpusetMems), "CpusetMems should remain unchanged when mode is 'full'")
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Copied all CPU settings unchanged"))
+			})
+
+			ginkgo.It("filters NanoCPUs when mode is 'auto' and isPodman is true", func() {
+				clog := logrus.WithFields(logrus.Fields{
+					"container": mockContainer.Name(),
+					"id":        mockContainer.ID().ShortID(),
+				})
+				hostConfig := mockContainer.GetCreateHostConfig()
+
+				handleCPUSettings(hostConfig, "auto", true, clog)
+				gomega.Expect(hostConfig.NanoCPUs).
+					To(gomega.Equal(int64(0)), "NanoCPUs should be 0 when mode is 'auto' and isPodman is true")
+				gomega.Expect(hostConfig.CPUShares).
+					To(gomega.Equal(defaultCPUShares), "CPUShares should remain unchanged")
+				gomega.Expect(hostConfig.CPUQuota).
+					To(gomega.Equal(defaultCPUQuota), "CPUQuota should remain unchanged")
+				gomega.Expect(hostConfig.CPUPeriod).
+					To(gomega.Equal(defaultCPUPeriod), "CPUPeriod should remain unchanged")
+				gomega.Expect(hostConfig.CpusetCpus).
+					To(gomega.Equal(defaultCpusetCpus), "CpusetCpus should remain unchanged")
+				gomega.Expect(hostConfig.CpusetMems).
+					To(gomega.Equal(defaultCpusetMems), "CpusetMems should remain unchanged")
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Detected Podman, filtered NanoCPUs for compatibility"))
+			})
+
+			ginkgo.It(
+				"preserves all CPU settings when mode is 'auto' and isPodman is false",
+				func() {
+					clog := logrus.WithFields(logrus.Fields{
+						"container": mockContainer.Name(),
+						"id":        mockContainer.ID().ShortID(),
+					})
+					hostConfig := mockContainer.GetCreateHostConfig()
+
+					handleCPUSettings(hostConfig, "auto", false, clog)
+					gomega.Expect(hostConfig.NanoCPUs).
+						To(gomega.Equal(defaultNanoCPUs), "NanoCPUs should remain unchanged when mode is 'auto' and isPodman is false")
+					gomega.Expect(hostConfig.CPUShares).
+						To(gomega.Equal(defaultCPUShares), "CPUShares should remain unchanged")
+					gomega.Expect(hostConfig.CPUQuota).
+						To(gomega.Equal(defaultCPUQuota), "CPUQuota should remain unchanged")
+					gomega.Expect(hostConfig.CPUPeriod).
+						To(gomega.Equal(defaultCPUPeriod), "CPUPeriod should remain unchanged")
+					gomega.Expect(hostConfig.CpusetCpus).
+						To(gomega.Equal(defaultCpusetCpus), "CpusetCpus should remain unchanged")
+					gomega.Expect(hostConfig.CpusetMems).
+						To(gomega.Equal(defaultCpusetMems), "CpusetMems should remain unchanged")
+					gomega.Expect(logOutput.String()).
+						To(gomega.ContainSubstring("Detected Docker, copied all CPU settings"))
+				},
+			)
+
+			ginkgo.It("defaults to 'full' mode for unknown CPU copy mode", func() {
+				clog := logrus.WithFields(logrus.Fields{
+					"container": mockContainer.Name(),
+					"id":        mockContainer.ID().ShortID(),
+				})
+				hostConfig := mockContainer.GetCreateHostConfig()
+
+				handleCPUSettings(hostConfig, "unknown", false, clog)
+				gomega.Expect(hostConfig.NanoCPUs).
+					To(gomega.Equal(defaultNanoCPUs), "NanoCPUs should remain unchanged for unknown mode")
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Unknown CPU copy mode, defaulting to full"))
+			})
+		})
 	})
 
 	ginkgo.Describe("Host Config Creation", func() {
@@ -1057,6 +1225,8 @@ var _ = ginkgo.Describe("Container", func() {
 				"1.44",
 				flags.DockerAPIMinVersion,
 				true,
+				"auto",
+				false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
@@ -1073,6 +1243,8 @@ var _ = ginkgo.Describe("Container", func() {
 				"1.44",
 				flags.DockerAPIMinVersion,
 				false,
+				"auto",
+				false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
@@ -1088,6 +1260,8 @@ var _ = ginkgo.Describe("Container", func() {
 				true,
 				"1.44",
 				flags.DockerAPIMinVersion,
+				false,
+				"auto",
 				false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -1109,6 +1283,8 @@ var _ = ginkgo.Describe("Container", func() {
 				"1.44",
 				flags.DockerAPIMinVersion,
 				false,
+				"auto",
+				false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -1125,6 +1301,8 @@ var _ = ginkgo.Describe("Container", func() {
 				true,
 				"1.44",
 				flags.DockerAPIMinVersion,
+				false,
+				"auto",
 				false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -1147,6 +1325,8 @@ var _ = ginkgo.Describe("Container", func() {
 				"1.44",
 				flags.DockerAPIMinVersion,
 				false,
+				"auto",
+				false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
@@ -1167,6 +1347,8 @@ var _ = ginkgo.Describe("Container", func() {
 				"1.44",
 				flags.DockerAPIMinVersion,
 				false,
+				"auto",
+				false,
 			)
 			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -1183,6 +1365,8 @@ var _ = ginkgo.Describe("Container", func() {
 				true,
 				"1.44",
 				flags.DockerAPIMinVersion,
+				false,
+				"auto",
 				false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -1204,6 +1388,8 @@ var _ = ginkgo.Describe("Container", func() {
 				true,
 				"1.23",
 				flags.DockerAPIMinVersion,
+				false,
+				"auto",
 				false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -1237,6 +1423,8 @@ var _ = ginkgo.Describe("Container", func() {
 				true,
 				"1.23",
 				flags.DockerAPIMinVersion,
+				false,
+				"auto",
 				false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())

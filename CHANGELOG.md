@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add --cpu-copy-mode flag for Podman CPU compatibility by @nicholas-fedor in [#712](https://github.com/nicholas-fedor/watchtower/pull/712)
 - Add UID and GID support for lifecycle hooks scripts by @nicholas-fedor in [#690](https://github.com/nicholas-fedor/watchtower/pull/690)
 - Add --update-on-start flag for immediate update check by @nicholas-fedor in [#672](https://github.com/nicholas-fedor/watchtower/pull/672)
 - Add health check waiting for rolling restarts by @nicholas-fedor in [#671](https://github.com/nicholas-fedor/watchtower/pull/671)
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Add HTTP API host configuration support by @nicholas-fedor in [#697](https://github.com/nicholas-fedor/watchtower/pull/697)
 - Enhance HTTP API update endpoint with structured JSON response by @nicholas-fedor in [#673](https://github.com/nicholas-fedor/watchtower/pull/673)
 
 ### Chores
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Send report notifications in monitor-only mode by @nicholas-fedor in [#709](https://github.com/nicholas-fedor/watchtower/pull/709)
 - Resolve scope issues in self-updates and improve digest request handling by @nicholas-fedor in [#683](https://github.com/nicholas-fedor/watchtower/pull/683)
 - Improve digest fetching by falling back to GET when HEAD returns 404 by @nicholas-fedor in [#669](https://github.com/nicholas-fedor/watchtower/pull/669)
 - Resolve HTTP API failures on multiple simultaneous requests by @nicholas-fedor in [#668](https://github.com/nicholas-fedor/watchtower/pull/668)
