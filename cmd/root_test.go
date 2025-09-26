@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -12,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	containerMock "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -56,7 +57,13 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "container lookup fails - should return error",
 			initialScope: "",
 			hostname:     "test-container",
-			mockSetup: func(client *containerMock.MockClient, _ *typeMock.MockContainer) {
+			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().ListAllContainers().
+					Return([]types.Container{container}, nil)
+				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{Hostname: "test-container"},
+				})
+				container.EXPECT().ID().Return(types.ContainerID("test-container"))
 				client.EXPECT().GetContainer(types.ContainerID("test-container")).
 					Return(nil, errors.New("container not found"))
 			},
@@ -69,6 +76,12 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "test-container",
 			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().ListAllContainers().
+					Return([]types.Container{container}, nil)
+				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{Hostname: "test-container"},
+				})
+				container.EXPECT().ID().Return(types.ContainerID("test-container"))
 				client.EXPECT().GetContainer(types.ContainerID("test-container")).
 					Return(container, nil)
 				container.EXPECT().Scope().Return("", false)
@@ -82,6 +95,12 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "test-container",
 			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().ListAllContainers().
+					Return([]types.Container{container}, nil)
+				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{Hostname: "test-container"},
+				})
+				container.EXPECT().ID().Return(types.ContainerID("test-container"))
 				client.EXPECT().GetContainer(types.ContainerID("test-container")).
 					Return(container, nil)
 				container.EXPECT().Scope().Return("", true)
@@ -95,6 +114,12 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "test-container",
 			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().ListAllContainers().
+					Return([]types.Container{container}, nil)
+				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{Hostname: "test-container"},
+				})
+				container.EXPECT().ID().Return(types.ContainerID("test-container"))
 				client.EXPECT().GetContainer(types.ContainerID("test-container")).
 					Return(container, nil)
 				container.EXPECT().Scope().Return("production", true)
@@ -108,6 +133,12 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "my_app.container-123",
 			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().ListAllContainers().
+					Return([]types.Container{container}, nil)
+				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{Hostname: "my_app.container-123"},
+				})
+				container.EXPECT().ID().Return(types.ContainerID("my_app.container-123"))
 				client.EXPECT().GetContainer(types.ContainerID("my_app.container-123")).
 					Return(container, nil)
 				container.EXPECT().Scope().Return("staging", true)
@@ -121,6 +152,12 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "watchtower_watchtower_1",
 			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().ListAllContainers().
+					Return([]types.Container{container}, nil)
+				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{Hostname: "watchtower_watchtower_1"},
+				})
+				container.EXPECT().ID().Return(types.ContainerID("watchtower_watchtower_1"))
 				client.EXPECT().GetContainer(types.ContainerID("watchtower_watchtower_1")).
 					Return(container, nil)
 				container.EXPECT().Scope().Return("project-watchtower", true)
@@ -133,7 +170,13 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "custom hostname lookup fails - should return error",
 			initialScope: "",
 			hostname:     "nonexistent-container",
-			mockSetup: func(client *containerMock.MockClient, _ *typeMock.MockContainer) {
+			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().ListAllContainers().
+					Return([]types.Container{container}, nil)
+				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{Hostname: "nonexistent-container"},
+				})
+				container.EXPECT().ID().Return(types.ContainerID("nonexistent-container"))
 				client.EXPECT().GetContainer(types.ContainerID("nonexistent-container")).
 					Return(nil, errors.New("container not found"))
 			},
@@ -205,6 +248,11 @@ func TestDeriveScopeFromContainer_Logging(t *testing.T) {
 	mockContainer := typeMock.NewMockContainer(t)
 
 	// Set up successful derivation
+	mockClient.On("ListAllContainers").Return([]types.Container{mockContainer}, nil)
+	mockContainer.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+		Config: &dockerContainer.Config{Hostname: "test-container"},
+	})
+	mockContainer.On("ID").Return(types.ContainerID("test-container"))
 	mockClient.On("GetContainer", types.ContainerID("test-container")).Return(mockContainer, nil)
 	mockContainer.On("Scope").Return("derived-scope", true)
 
@@ -452,103 +500,6 @@ func TestLifecycleFlags(t *testing.T) {
 
 	assert.Equal(t, 1000, lifecycleUID, "lifecycleUID should be set to 1000")
 	assert.Equal(t, 1001, lifecycleGID, "lifecycleGID should be set to 1001")
-}
-
-func TestGetContainerID(t *testing.T) {
-	tests := []struct {
-		name        string
-		cgroupFile  string
-		hostname    string
-		expected    string
-		expectError bool
-	}{
-		{
-			name: "successful cgroup parsing",
-			cgroupFile: `11:name=systemd:/docker/abc123def456
-12:pids:/docker/abc123def456
-`,
-			hostname:    "test-container",
-			expected:    "abc123def456",
-			expectError: false,
-		},
-		{
-			name: "cgroup without docker",
-			cgroupFile: `11:name=systemd:/
-12:pids:/
-`,
-			hostname:    "fallback-hostname",
-			expected:    "fallback-hostname",
-			expectError: false,
-		},
-		{
-			name:        "no cgroup file and no hostname",
-			cgroupFile:  "",
-			hostname:    "",
-			expected:    "",
-			expectError: true,
-		},
-		{
-			name: "cgroup file exists but no docker line",
-			cgroupFile: `11:name=systemd:/user.slice/user-1000.slice
-12:pids:/user.slice/user-1000.slice
-`,
-			hostname:    "custom-hostname",
-			expected:    "custom-hostname",
-			expectError: false,
-		},
-		{
-			name: "multiple docker entries, uses first",
-			cgroupFile: `11:name=systemd:/docker/abc123def456/docker/def789ghi012
-12:pids:/docker/abc123def456/docker/def789ghi012
-`,
-			hostname:    "ignored",
-			expected:    "abc123def456",
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set up environment
-			t.Setenv("HOSTNAME", tt.hostname)
-
-			var tempFileName string
-
-			if tt.cgroupFile != "" {
-				// Create a temporary file to simulate /proc/self/cgroup
-				tempFile, err := os.CreateTemp(t.TempDir(), "cgroup")
-				require.NoError(t, err)
-
-				tempFileName = tempFile.Name()
-				defer os.Remove(tempFileName)
-
-				_, err = tempFile.WriteString(tt.cgroupFile)
-				require.NoError(t, err)
-				tempFile.Close()
-			}
-
-			// Use the testable version with mocked opener
-			result, err := getContainerIDWithOpener(func(name string) (*os.File, error) {
-				if name == "/proc/self/cgroup" {
-					if tt.cgroupFile != "" {
-						return os.Open(tempFileName)
-					}
-
-					return nil, os.ErrNotExist
-				}
-
-				return os.Open(name)
-			})
-
-			if tt.expectError {
-				require.Error(t, err)
-				assert.Equal(t, ErrContainerIDNotFound, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
-			}
-		})
-	}
 }
 
 func TestGetAPIAddr(t *testing.T) {
