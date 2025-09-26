@@ -6,6 +6,7 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -34,6 +35,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+var ErrContainerIDNotFound = errors.New(
+	"container ID not found in /proc/self/cgroup and HOSTNAME is not set",
+)
+
+// osOpen is a variable to allow mocking os.Open in tests.
+var osOpen = os.Open
 
 // client is the Docker client instance used to interact with container operations in Watchtower.
 //
@@ -396,6 +404,67 @@ func run(c *cobra.Command, names []string) {
 	}
 }
 
+// getContainerID retrieves the actual container ID from /proc/self/cgroup.
+// This is necessary because HOSTNAME may contain a custom hostname set in Docker Compose,
+// not the container ID. The container ID is extracted from the cgroup path.
+// If cgroup parsing fails, it falls back to the HOSTNAME environment variable for compatibility.
+//
+// Returns:
+//   - string: The container ID if found.
+//   - error: Non-nil if the container ID cannot be retrieved.
+func getContainerID() (string, error) {
+	return getContainerIDWithOpener(osOpen)
+}
+
+// getContainerIDWithOpener retrieves the actual container ID from /proc/self/cgroup using a provided file opener.
+// This is necessary because HOSTNAME may contain a custom hostname set in Docker Compose,
+// not the container ID. The container ID is extracted from the cgroup path.
+// If cgroup parsing fails, it falls back to the HOSTNAME environment variable for compatibility.
+// This function allows testing by injecting a file opener.
+//
+// Parameters:
+//   - opener: A function to open files, allowing injection for testing purposes.
+//
+// Returns:
+//   - string: The container ID if found.
+//   - error: Non-nil if the container ID cannot be retrieved.
+func getContainerIDWithOpener(opener func(string) (*os.File, error)) (string, error) {
+	// First, try to get container ID from /proc/self/cgroup
+	file, err := opener("/proc/self/cgroup")
+	if err == nil {
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.Contains(line, "/docker/") {
+				parts := strings.Split(line, "/docker/")
+				if len(parts) > 1 {
+					id := strings.Split(parts[1], "/")[0]
+
+					return id, nil
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			// Log but continue to fallback
+			logrus.WithError(err).Debug("Error reading /proc/self/cgroup")
+		}
+	} else {
+		// Log but continue to fallback
+		logrus.WithError(err).Debug("Failed to open /proc/self/cgroup")
+	}
+
+	// Fallback to HOSTNAME environment variable
+	hostname := os.Getenv("HOSTNAME")
+	if hostname == "" {
+		return "", ErrContainerIDNotFound
+	}
+
+	return hostname, nil
+}
+
 // deriveScopeFromContainer attempts to derive the operational scope from the current container's scope label.
 // This is crucial for self-update scenarios where a new Watchtower instance needs to inherit
 // the same scope as the instance being replaced to maintain proper isolation and prevent
@@ -405,25 +474,24 @@ func run(c *cobra.Command, names []string) {
 //   - client: Container client for Docker operations.
 //
 // Returns:
-//   - error: Non-nil if scope derivation fails, nil on success or if derivation is skipped.
+//   - error: Non-nil if container ID retrieval or scope derivation fails, nil on success or if derivation is skipped.
 func deriveScopeFromContainer(client container.Client) error {
 	// Skip derivation if scope is already explicitly set via flags or environment.
 	if scope != "" {
 		return nil
 	}
 
-	// Retrieve the hostname environment variable, which typically contains
-	// the container ID when running inside Docker. This allows us to identify
-	// the current Watchtower container instance.
-	hostname := os.Getenv("HOSTNAME")
-	if hostname == "" {
-		// No hostname available, cannot derive scope.
-		return nil
+	// Retrieve the actual container ID from /proc/self/cgroup, as HOSTNAME may contain
+	// a custom hostname set in Docker Compose rather than the container ID.
+	containerID, err := getContainerID()
+	if err != nil {
+		// Container ID retrieval failed, return the error for proper handling.
+		return err
 	}
 
-	// Attempt to retrieve the container object using the hostname as the container ID.
+	// Attempt to retrieve the container object using the retrieved container ID.
 	// This lookup is necessary to access the container's labels and metadata.
-	container, err := client.GetContainer(types.ContainerID(hostname))
+	container, err := client.GetContainer(types.ContainerID(containerID))
 	if err != nil {
 		// Container lookup failed, but this is not a fatal error since
 		// scope derivation is a best-effort operation.
@@ -437,7 +505,7 @@ func deriveScopeFromContainer(client container.Client) error {
 		scope = derivedScope
 		logrus.WithFields(logrus.Fields{
 			"derived_scope": scope,
-			"container_id":  hostname,
+			"container_id":  containerID,
 		}).Debug("Derived operational scope from current container's scope label")
 	}
 

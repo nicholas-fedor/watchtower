@@ -106,7 +106,7 @@ func StartTargetContainer(
 		hostConfig,
 		createNetworkConfig,
 		nil,
-		sourceContainer.Name(),
+		"",
 	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to create new container")
@@ -116,6 +116,19 @@ func StartTargetContainer(
 
 	createdContainerID := types.ContainerID(createdContainer.ID)
 	clog.WithField("new_id", createdContainerID.ShortID()).Debug("Created container successfully")
+
+	// Rename the container to the correct name to avoid conflicts during self-update
+	clog.Debug("Renaming container to correct name")
+
+	if err := api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name()); err != nil {
+		clog.WithError(err).Debug("Failed to rename container")
+		// Clean up the created container to avoid orphaned resources
+		if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainerType.RemoveOptions{Force: true}); rmErr != nil {
+			clog.WithError(rmErr).Warn("Failed to clean up container after rename error")
+		}
+
+		return "", fmt.Errorf("%w: %w", errRenameContainerFailed, err)
+	}
 
 	// Attach additional networks for legacy API if needed.
 	if versions.LessThan(clientVersion, "1.44") && len(networkConfig.EndpointsConfig) > 1 {
