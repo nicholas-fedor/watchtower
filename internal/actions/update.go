@@ -817,8 +817,20 @@ func restartGitContainer(
 		return "", false, fmt.Errorf("failed to get latest commit: %w", err)
 	}
 
+	// Parse the image reference to get the base name without tag
+	ref, err := reference.ParseNormalizedNamed(container.ImageName())
+	if err != nil {
+		return "", false, fmt.Errorf(
+			"failed to parse image name %s: %w",
+			container.ImageName(),
+			err,
+		)
+	}
+
+	baseName := reference.Path(ref)
+
 	// Generate unique image name for the build
-	imageName := fmt.Sprintf("%s:git-%s", container.ImageName(), latestCommit[:8])
+	imageName := fmt.Sprintf("%s:git-%s", baseName, latestCommit[:8])
 
 	// Build new image from Git repository
 	builtImageID, err := client.BuildImageFromGit(
