@@ -644,6 +644,61 @@ func (_c *MockClient_WaitForContainerHealthy_Call) RunAndReturn(run func(contain
 	return _c
 }
 
+// GetInfo provides a mock function for the type MockClient
+func (_mock *MockClient) GetInfo() (map[string]any, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInfo")
+	}
+
+	var r0 map[string]any
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (map[string]any, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() map[string]any); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]any)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_GetInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInfo'
+type MockClient_GetInfo_Call struct {
+	*mock.Call
+}
+
+// GetInfo is a helper method to define mock.On call
+func (_e *MockClient_Expecter) GetInfo() *MockClient_GetInfo_Call {
+	return &MockClient_GetInfo_Call{Call: _e.mock.On("GetInfo")}
+}
+
+func (_c *MockClient_GetInfo_Call) Run(run func()) *MockClient_GetInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClient_GetInfo_Call) Return(info map[string]any, err error) *MockClient_GetInfo_Call {
+	_c.Call.Return(info, err)
+	return _c
+}
+
+func (_c *MockClient_GetInfo_Call) RunAndReturn(run func() (map[string]any, error)) *MockClient_GetInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WarnOnHeadPullFailed provides a mock function for the type MockClient
 func (_mock *MockClient) WarnOnHeadPullFailed(container types.Container) bool {
 	ret := _mock.Called(container)

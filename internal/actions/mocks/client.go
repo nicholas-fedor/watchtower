@@ -177,3 +177,13 @@ func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Dur
 	client.TestData.WaitForContainerHealthyCount++
 	return nil
 }
+
+// GetInfo returns mock system information for testing.
+// It provides a basic map with mock Docker/Podman info.
+func (client MockClient) GetInfo() (map[string]any, error) {
+	return map[string]any{
+		"Name":          "docker",
+		"ServerVersion": "1.50",
+		"OSType":        "linux",
+	}, nil
+}

@@ -28,6 +28,8 @@ import (
 //   - clientVersion: Docker API version used by the client.
 //   - minSupportedVersion: Minimum Docker API version required for full network features.
 //   - disableMemorySwappiness: If true, disables memory swappiness for Podman compatibility.
+//   - cpuCopyMode: CPU copy mode for container recreation, used for compatibility with Podman.
+//   - isPodman: If true, indicates Podman is being used for CPU compatibility.
 //
 // Returns:
 //   - types.ContainerID: ID of the new container.
@@ -40,6 +42,8 @@ func StartTargetContainer(
 	clientVersion string,
 	minSupportedVersion string,
 	disableMemorySwappiness bool,
+	cpuCopyMode string,
+	isPodman bool,
 ) (types.ContainerID, error) {
 	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
@@ -57,6 +61,9 @@ func StartTargetContainer(
 
 		clog.Debug("Disabled memory swappiness for Podman compatibility")
 	}
+
+	// Handle CPU settings based on copy mode.
+	handleCPUSettings(hostConfig, cpuCopyMode, isPodman, clog)
 
 	// Log network details for debugging, including MAC address validation.
 	isHostNetwork := sourceContainer.ContainerInfo().HostConfig.NetworkMode.IsHost()
@@ -232,4 +239,42 @@ func RenameTargetContainer(
 	clog.Debug("Renamed container successfully")
 
 	return nil
+}
+
+// handleCPUSettings applies CPU configuration based on the specified copy mode.
+//
+// It handles Podman compatibility by filtering NanoCpus when necessary.
+// Modes: "auto" (detect Podman and filter), "full" (copy all), "none" (strip all).
+func handleCPUSettings(
+	hostConfig *dockerContainerType.HostConfig,
+	cpuCopyMode string,
+	isPodman bool,
+	clog *logrus.Entry,
+) {
+	switch cpuCopyMode {
+	case "none":
+		// Strip all CPU limits
+		hostConfig.NanoCPUs = 0
+		hostConfig.CPUShares = 0
+		hostConfig.CPUQuota = 0
+		hostConfig.CPUPeriod = 0
+		hostConfig.CpusetCpus = ""
+		hostConfig.CpusetMems = ""
+
+		clog.Debug("Stripped all CPU settings")
+	case "full":
+		// Copy all CPU settings unchanged (default behavior)
+		clog.Debug("Copied all CPU settings unchanged")
+	case "auto":
+		// Use isPodman flag to filter NanoCpus if Podman
+		if isPodman {
+			hostConfig.NanoCPUs = 0
+
+			clog.Debug("Detected Podman, filtered NanoCPUs for compatibility")
+		} else {
+			clog.Debug("Detected Docker, copied all CPU settings")
+		}
+	default:
+		clog.WithField("mode", cpuCopyMode).Debug("Unknown CPU copy mode, defaulting to full")
+	}
 }
