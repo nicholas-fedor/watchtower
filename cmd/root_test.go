@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -25,28 +26,31 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 	defer func() { scope = originalScope }()
 
 	tests := []struct {
-		name          string
-		initialScope  string
-		hostname      string
-		mockSetup     func(*containerMock.MockClient, *typeMock.MockContainer)
-		expectedScope string
-		expectedError bool
+		name              string
+		initialScope      string
+		hostname          string
+		mockSetup         func(*containerMock.MockClient, *typeMock.MockContainer)
+		expectedScope     string
+		expectedError     bool
+		expectedErrorType error
 	}{
 		{
-			name:          "scope already set - should return nil without derivation",
-			initialScope:  "preset",
-			hostname:      "test-container",
-			mockSetup:     func(*containerMock.MockClient, *typeMock.MockContainer) {},
-			expectedScope: "preset",
-			expectedError: false,
+			name:              "scope already set - should return nil without derivation",
+			initialScope:      "preset",
+			hostname:          "test-container",
+			mockSetup:         func(*containerMock.MockClient, *typeMock.MockContainer) {},
+			expectedScope:     "preset",
+			expectedError:     false,
+			expectedErrorType: nil,
 		},
 		{
-			name:          "no hostname - should return nil",
-			initialScope:  "",
-			hostname:      "",
-			mockSetup:     func(*containerMock.MockClient, *typeMock.MockContainer) {},
-			expectedScope: "",
-			expectedError: false,
+			name:              "no hostname - should return error",
+			initialScope:      "",
+			hostname:          "",
+			mockSetup:         func(*containerMock.MockClient, *typeMock.MockContainer) {},
+			expectedScope:     "",
+			expectedError:     true,
+			expectedErrorType: ErrContainerIDNotFound,
 		},
 		{
 			name:         "container lookup fails - should return error",
@@ -56,8 +60,9 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 				client.EXPECT().GetContainer(types.ContainerID("test-container")).
 					Return(nil, errors.New("container not found"))
 			},
-			expectedScope: "",
-			expectedError: true,
+			expectedScope:     "",
+			expectedError:     true,
+			expectedErrorType: nil, // Not checking specific error type for this case
 		},
 		{
 			name:         "container has no scope label - should return nil",
@@ -68,8 +73,9 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 					Return(container, nil)
 				container.EXPECT().Scope().Return("", false)
 			},
-			expectedScope: "",
-			expectedError: false,
+			expectedScope:     "",
+			expectedError:     false,
+			expectedErrorType: nil,
 		},
 		{
 			name:         "container has empty scope label - should return nil",
@@ -80,8 +86,9 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 					Return(container, nil)
 				container.EXPECT().Scope().Return("", true)
 			},
-			expectedScope: "",
-			expectedError: false,
+			expectedScope:     "",
+			expectedError:     false,
+			expectedErrorType: nil,
 		},
 		{
 			name:         "container has valid scope label - should set scope and return nil",
@@ -92,8 +99,47 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 					Return(container, nil)
 				container.EXPECT().Scope().Return("production", true)
 			},
-			expectedScope: "production",
-			expectedError: false,
+			expectedScope:     "production",
+			expectedError:     false,
+			expectedErrorType: nil,
+		},
+		{
+			name:         "custom hostname with special characters - should work",
+			initialScope: "",
+			hostname:     "my_app.container-123",
+			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().GetContainer(types.ContainerID("my_app.container-123")).
+					Return(container, nil)
+				container.EXPECT().Scope().Return("staging", true)
+			},
+			expectedScope:     "staging",
+			expectedError:     false,
+			expectedErrorType: nil,
+		},
+		{
+			name:         "custom hostname from Docker Compose - should derive scope",
+			initialScope: "",
+			hostname:     "watchtower_watchtower_1",
+			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+				client.EXPECT().GetContainer(types.ContainerID("watchtower_watchtower_1")).
+					Return(container, nil)
+				container.EXPECT().Scope().Return("project-watchtower", true)
+			},
+			expectedScope:     "project-watchtower",
+			expectedError:     false,
+			expectedErrorType: nil,
+		},
+		{
+			name:         "custom hostname lookup fails - should return error",
+			initialScope: "",
+			hostname:     "nonexistent-container",
+			mockSetup: func(client *containerMock.MockClient, _ *typeMock.MockContainer) {
+				client.EXPECT().GetContainer(types.ContainerID("nonexistent-container")).
+					Return(nil, errors.New("container not found"))
+			},
+			expectedScope:     "",
+			expectedError:     true,
+			expectedErrorType: nil,
 		},
 	}
 
@@ -118,6 +164,10 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			// Assert results
 			if tt.expectedError {
 				require.Error(t, err)
+
+				if tt.expectedErrorType != nil {
+					require.ErrorIs(t, err, tt.expectedErrorType)
+				}
 			} else {
 				require.NoError(t, err)
 			}
@@ -402,6 +452,103 @@ func TestLifecycleFlags(t *testing.T) {
 
 	assert.Equal(t, 1000, lifecycleUID, "lifecycleUID should be set to 1000")
 	assert.Equal(t, 1001, lifecycleGID, "lifecycleGID should be set to 1001")
+}
+
+func TestGetContainerID(t *testing.T) {
+	tests := []struct {
+		name        string
+		cgroupFile  string
+		hostname    string
+		expected    string
+		expectError bool
+	}{
+		{
+			name: "successful cgroup parsing",
+			cgroupFile: `11:name=systemd:/docker/abc123def456
+12:pids:/docker/abc123def456
+`,
+			hostname:    "test-container",
+			expected:    "abc123def456",
+			expectError: false,
+		},
+		{
+			name: "cgroup without docker",
+			cgroupFile: `11:name=systemd:/
+12:pids:/
+`,
+			hostname:    "fallback-hostname",
+			expected:    "fallback-hostname",
+			expectError: false,
+		},
+		{
+			name:        "no cgroup file and no hostname",
+			cgroupFile:  "",
+			hostname:    "",
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name: "cgroup file exists but no docker line",
+			cgroupFile: `11:name=systemd:/user.slice/user-1000.slice
+12:pids:/user.slice/user-1000.slice
+`,
+			hostname:    "custom-hostname",
+			expected:    "custom-hostname",
+			expectError: false,
+		},
+		{
+			name: "multiple docker entries, uses first",
+			cgroupFile: `11:name=systemd:/docker/abc123def456/docker/def789ghi012
+12:pids:/docker/abc123def456/docker/def789ghi012
+`,
+			hostname:    "ignored",
+			expected:    "abc123def456",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up environment
+			t.Setenv("HOSTNAME", tt.hostname)
+
+			var tempFileName string
+
+			if tt.cgroupFile != "" {
+				// Create a temporary file to simulate /proc/self/cgroup
+				tempFile, err := os.CreateTemp(t.TempDir(), "cgroup")
+				require.NoError(t, err)
+
+				tempFileName = tempFile.Name()
+				defer os.Remove(tempFileName)
+
+				_, err = tempFile.WriteString(tt.cgroupFile)
+				require.NoError(t, err)
+				tempFile.Close()
+			}
+
+			// Use the testable version with mocked opener
+			result, err := getContainerIDWithOpener(func(name string) (*os.File, error) {
+				if name == "/proc/self/cgroup" {
+					if tt.cgroupFile != "" {
+						return os.Open(tempFileName)
+					}
+
+					return nil, os.ErrNotExist
+				}
+
+				return os.Open(name)
+			})
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Equal(t, ErrContainerIDNotFound, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
 }
 
 func TestGetAPIAddr(t *testing.T) {
