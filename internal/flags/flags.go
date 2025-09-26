@@ -281,6 +281,13 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Label used for setting memory swappiness as nil when recreating the container, used for compatibility with podman",
 	)
 
+	flags.StringP(
+		"cpu-copy-mode",
+		"",
+		envString("WATCHTOWER_CPU_COPY_MODE"),
+		"CPU copy mode for container recreation, used for compatibility with Podman. Options: auto, full, none",
+	)
+
 	flags.IntP(
 		"lifecycle-uid",
 		"",
@@ -575,6 +582,7 @@ func SetDefaults() {
 	viper.SetDefault("WATCHTOWER_LOG_LEVEL", "info")
 	viper.SetDefault("WATCHTOWER_LOG_FORMAT", "auto")
 	viper.SetDefault("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS", false)
+	viper.SetDefault("WATCHTOWER_CPU_COPY_MODE", "auto")
 	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS1.2")
 }

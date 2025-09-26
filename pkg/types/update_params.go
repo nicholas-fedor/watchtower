@@ -18,4 +18,5 @@ type UpdateParams struct {
 	PullFailureDelay time.Duration // Delay after failed self-update pull.
 	LifecycleUID     int           // Default UID for lifecycle hooks.
 	LifecycleGID     int           // Default GID for lifecycle hooks.
+	CPUCopyMode      string        // CPU copy mode for container recreation.
 }
