@@ -758,11 +758,26 @@ Configures the notification service URL.
 Can reference a file for sensitive values.
 
 ```text
-            Argument: --notification-url
+             Argument: --notification-url
 Environment Variable: WATCHTOWER_NOTIFICATION_URL
-                Type: String
-             Default: None
+                 Type: String
+              Default: None
 ```
+
+### Notification Split by Container
+
+Send separate notifications for each updated container instead of grouping them.
+
+```text
+            Argument: --notification-split-by-container
+Environment Variable: WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER
+                Type: Boolean
+             Default: false
+```
+
+!!! Note
+    When disabled (default), notifications are grouped for all updated containers in a single session.
+    When enabled, a separate notification is sent for each container update.
 
 ### Notification Email Server Password
 

@@ -118,6 +118,35 @@ Environment Variable: WATCHTOWER_NOTIFICATION_LOG_STDOUT
              Default: false
 ```
 
+### Split by Container
+
+Send separate notifications for each updated container instead of grouping them.
+
+```text
+            Argument: --notification-split-by-container
+Environment Variable: WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER
+                Type: Boolean
+             Default: false
+```
+
+!!! Note
+    When disabled (default), notifications are grouped for all updated containers in a single session.
+    When enabled, a separate notification is sent for each container update.
+
+#### Usage Example
+
+To enable separate notifications per container:
+
+```bash
+docker run -d \
+  --name watchtower \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e WATCHTOWER_NOTIFICATIONS=slack \
+  -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy" \
+  -e WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER=true \
+  nickfedor/watchtower
+```
+
 ## Email Notifications
 
 Watchtower uses Shoutrrr's [smtp service](https://shoutrrr.nickfedor.com/services/email/){target="_blank" rel="noopener noreferrer"} to send email notifications.

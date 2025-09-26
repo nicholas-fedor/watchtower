@@ -39,6 +39,51 @@ var ErrContainerIDNotFound = errors.New(
 	"container ID not found in /proc/self/cgroup and HOSTNAME is not set",
 )
 
+// singleContainerReport implements types.Report for individual container notifications.
+type singleContainerReport struct {
+	updated []types.ContainerReport
+	scanned []types.ContainerReport
+	failed  []types.ContainerReport
+	skipped []types.ContainerReport
+	stale   []types.ContainerReport
+	fresh   []types.ContainerReport
+}
+
+// Scanned returns scanned containers.
+func (r *singleContainerReport) Scanned() []types.ContainerReport { return r.scanned }
+
+// Updated returns updated containers (only one for split notifications).
+func (r *singleContainerReport) Updated() []types.ContainerReport { return r.updated }
+
+// Failed returns failed containers.
+func (r *singleContainerReport) Failed() []types.ContainerReport { return r.failed }
+
+// Skipped returns skipped containers.
+func (r *singleContainerReport) Skipped() []types.ContainerReport { return r.skipped }
+
+// Stale returns stale containers.
+func (r *singleContainerReport) Stale() []types.ContainerReport { return r.stale }
+
+// Fresh returns fresh containers.
+func (r *singleContainerReport) Fresh() []types.ContainerReport { return r.fresh }
+
+// All returns all containers (prioritized by state).
+func (r *singleContainerReport) All() []types.ContainerReport {
+	all := make(
+		[]types.ContainerReport,
+		0,
+		len(r.updated)+len(r.failed)+len(r.skipped)+len(r.stale)+len(r.fresh)+len(r.scanned),
+	)
+	all = append(all, r.updated...)
+	all = append(all, r.failed...)
+	all = append(all, r.skipped...)
+	all = append(all, r.stale...)
+	all = append(all, r.fresh...)
+	all = append(all, r.scanned...)
+
+	return all
+}
+
 // client is the Docker client instance used to interact with container operations in Watchtower.
 //
 // It provides an interface for listing, stopping, starting, and managing containers, initialized during
@@ -135,6 +180,12 @@ var lifecycleUID int
 // It is set in preRun via the --lifecycle-gid flag or the WATCHTOWER_LIFECYCLE_GID environment variable,
 // providing a global default that can be overridden by container labels.
 var lifecycleGID int
+
+// notificationSplitByContainer is a boolean flag enabling separate notifications for each updated container.
+//
+// It is set in preRun via the --notification-split-by-container flag or the WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER environment variable,
+// allowing users to receive individual notifications instead of grouped ones.
+var notificationSplitByContainer bool
 
 // cpuCopyMode specifies how CPU settings are handled when recreating containers.
 //
@@ -266,6 +317,9 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Retrieve lifecycle UID and GID flags.
 	lifecycleUID, _ = flagsSet.GetInt("lifecycle-uid")
 	lifecycleGID, _ = flagsSet.GetInt("lifecycle-gid")
+
+	// Retrieve notification split flag.
+	notificationSplitByContainer, _ = flagsSet.GetBool("notification-split-by-container")
 
 	// Log the scope if specified, aiding debugging by confirming the operational boundary.
 	if scope != "" {
@@ -1047,7 +1101,24 @@ func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Met
 
 	// Send the batched notification with update results, if notifier and result are initialized
 	if notifier != nil && result != nil {
-		notifier.SendNotification(result)
+		if notificationSplitByContainer && len(result.Updated()) > 0 {
+			// Send separate notifications for each updated container
+			for _, updatedContainer := range result.Updated() {
+				// Create a minimal report with only this container
+				singleContainerReport := &singleContainerReport{
+					updated: []types.ContainerReport{updatedContainer},
+					scanned: result.Scanned(), // Include all scanned for context
+					failed:  result.Failed(),  // Include all failed for context
+					skipped: result.Skipped(), // Include all skipped for context
+					stale:   result.Stale(),   // Include all stale for context
+					fresh:   result.Fresh(),   // Include all fresh for context
+				}
+				notifier.SendNotification(singleContainerReport)
+			}
+		} else {
+			// Send grouped notification as before
+			notifier.SendNotification(result)
+		}
 	}
 
 	// Generate and log a metric summarizing the update session.

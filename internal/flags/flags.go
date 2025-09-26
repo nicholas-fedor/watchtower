@@ -497,6 +497,12 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"notification-log-stdout",
 		envBool("WATCHTOWER_NOTIFICATION_LOG_STDOUT"),
 		"Write notification logs to stdout instead of logging (to stderr)")
+
+	flags.BoolP(
+		"notification-split-by-container",
+		"",
+		envBool("WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER"),
+		"Send separate notifications for each updated container instead of grouping them")
 }
 
 // envString fetches a string from an environment variable.
