@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Address container identification issue by @nicholas-fedor in [#718](https://github.com/nicholas-fedor/watchtower/pull/718)
 - Improve logging clarity and accuracy for scheduling modes by @nicholas-fedor in [#716](https://github.com/nicholas-fedor/watchtower/pull/716)
 - Improve Container ID Retrieval for Self-Update by @nicholas-fedor in [#714](https://github.com/nicholas-fedor/watchtower/pull/714)
 - Send report notifications in monitor-only mode by @nicholas-fedor in [#709](https://github.com/nicholas-fedor/watchtower/pull/709)
