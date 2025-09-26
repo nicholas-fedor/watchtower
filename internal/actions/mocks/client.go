@@ -69,7 +69,7 @@ func (client MockClient) ListContainers(filter types.Filter) ([]types.Container,
 
 // ListAllContainers returns all containers from TestData without filtering.
 func (client MockClient) ListAllContainers() ([]types.Container, error) {
-	   return client.TestData.Containers, nil
+	return client.TestData.Containers, nil
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.
