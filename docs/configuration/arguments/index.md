@@ -30,14 +30,14 @@ This command triggers an update attempt for "nginx" and "redis" containers, disp
 
 Certain flags support referencing a file, using its contents as the value, to securely handle sensitive data like passwords or tokens, avoiding exposure in configuration files or command lines.
 
-| Flag                            | Environment Variable                             |
-|---------------------------------|-------------------------------------------------|
-| `--notification-url`            | `WATCHTOWER_NOTIFICATION_URL`                   |
+| Flag                                   | Environment Variable                            |
+|----------------------------------------|-------------------------------------------------|
+| `--http-api-token`                     | `WATCHTOWER_HTTP_API_TOKEN`                     |
 | `--notification-email-server-password` | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD` |
-| `--notification-slack-hook-url` | `WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL`        |
-| `--notification-msteams-hook`   | `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK`          |
-| `--notification-gotify-token`   | `WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN`          |
-| `--http-api-token`              | `WATCHTOWER_HTTP_API_TOKEN`                     |
+| `--notification-gotify-token`          | `WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN`          |
+| `--notification-msteams-hook`          | `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK`          |
+| `--notification-slack-hook-url`        | `WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL`        |
+| `--notification-url`                   | `WATCHTOWER_NOTIFICATION_URL`                   |
 
 ### Example Docker Compose Usage
 
@@ -171,7 +171,8 @@ Environment Variable: WATCHTOWER_RUN_ONCE
 
 ### Update on Start
 
-Performs an update check on startup, then continues with periodic updates.
+Performs an update check on startup.
+If a schedule is configured (via --schedule or --interval), then Watchtower continues with periodic updates.
 
 ```text
             Argument: --update-on-start
