@@ -1130,6 +1130,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cpu_copy_mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      CPU Copy Mode
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CPU Copy Mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage_examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Examples
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2211,6 +2235,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cpu_copy_mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      CPU Copy Mode
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CPU Copy Mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage_examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Examples
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2924,13 +2972,55 @@ Include it in the URL (e.g., <code>http://user:pass@proxy.example.com:3128</code
 <a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>                Type: Boolean
 <a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a>             Default: false
 </code></pre></div>
+<h3 id="cpu_copy_mode">CPU Copy Mode<a class="headerlink" href="#cpu_copy_mode" title="Permanent link">&para;</a></h3>
+<p>Controls how CPU settings are copied when recreating containers, addressing Podman compatibility issues with CPU limits.
+Podman handles NanoCPUs differently than Docker, which can cause container recreation failures.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>            Argument: --cpu-copy-mode
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>Environment Variable: WATCHTOWER_CPU_COPY_MODE
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>                Type: String
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>     Possible Values: auto, full, none
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>             Default: auto
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul>
+<li><strong>auto</strong>: Automatically detects if running on Podman and filters NanoCPUs for compatibility. On Docker, copies all CPU settings.</li>
+<li><strong>full</strong>: Copies all CPU settings unchanged (original behavior).</li>
+<li><strong>none</strong>: Strips all CPU limits to avoid compatibility issues.</li>
+</ul>
+</div>
+<p>Use <code>auto</code> in mixed Docker/Podman environments.
+Use <code>full</code> if running only on Docker and want to preserve all CPU limits.
+Use <code>none</code> if CPU limits are causing issues and you prefer no limits on recreated containers.</p>
+<h4 id="usage_examples">Usage Examples<a class="headerlink" href="#usage_examples" title="Permanent link">&para;</a></h4>
+<p>Run Watchtower with automatic CPU compatibility:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a><span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a><span class="w">    </span>--cpu-copy-mode<span class="w"> </span>auto
+</code></pre></div>
+<p>Force full CPU copying (Docker-only environments):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a><span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a><span class="w">    </span>--cpu-copy-mode<span class="w"> </span>full
+</code></pre></div>
+<p>Strip all CPU limits:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="w">    </span>--cpu-copy-mode<span class="w"> </span>none
+</code></pre></div>
 <h2 id="http_api_metrics">HTTP API &amp; Metrics<a class="headerlink" href="#http_api_metrics" title="Permanent link">&para;</a></h2>
 <h3 id="http_api_mode">HTTP API Mode<a class="headerlink" href="#http_api_mode" title="Permanent link">&para;</a></h3>
 <p>Runs Watchtower in HTTP API mode, allowing updates only via HTTP requests, with support for tag-specific filtering (e.g., <code>image=foo/bar:1.0</code>).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>            Argument: --http-api-update
-<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>Environment Variable: WATCHTOWER_HTTP_API_UPDATE
-<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>                Type: Boolean
-<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>            Argument: --http-api-update
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>Environment Variable: WATCHTOWER_HTTP_API_UPDATE
+<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a>                Type: Boolean
+<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2939,17 +3029,17 @@ Include it in the URL (e.g., <code>http://user:pass@proxy.example.com:3128</code
 <h3 id="http_api_token">HTTP API Token<a class="headerlink" href="#http_api_token" title="Permanent link">&para;</a></h3>
 <p>Sets an authentication token for HTTP API requests.
 Can reference a file for security.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>            Argument: --http-api-token
-<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>Environment Variable: WATCHTOWER_HTTP_API_TOKEN
-<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>                Type: String
-<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>            Argument: --http-api-token
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>Environment Variable: WATCHTOWER_HTTP_API_TOKEN
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>                Type: String
+<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>             Default: None
 </code></pre></div>
 <h3 id="http_api_metrics_1">HTTP API Metrics<a class="headerlink" href="#http_api_metrics_1" title="Permanent link">&para;</a></h3>
 <p>Enables a Prometheus metrics endpoint via HTTP.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>            Argument: --http-api-metrics
-<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>Environment Variable: WATCHTOWER_HTTP_API_METRICS
-<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>                Type: Boolean
-<a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>            Argument: --http-api-metrics
+<a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>Environment Variable: WATCHTOWER_HTTP_API_METRICS
+<a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>                Type: Boolean
+<a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2957,10 +3047,10 @@ Can reference a file for security.</p>
 </div>
 <h3 id="http_api_host">HTTP API Host<a class="headerlink" href="#http_api_host" title="Permanent link">&para;</a></h3>
 <p>Sets the host to bind the HTTP API to.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>            Argument: --http-api-host
-<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>Environment Variable: WATCHTOWER_HTTP_API_HOST
-<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>                Type: String
-<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>             Default: empty (binds to all interfaces)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>            Argument: --http-api-host
+<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>Environment Variable: WATCHTOWER_HTTP_API_HOST
+<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>                Type: String
+<a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>             Default: empty (binds to all interfaces)
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2971,73 +3061,73 @@ Can reference a file for security.</p>
 </div>
 <h3 id="http_api_port">HTTP API Port<a class="headerlink" href="#http_api_port" title="Permanent link">&para;</a></h3>
 <p>Sets the listening port for the HTTP API.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>            Argument: --http-api-port
-<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>Environment Variable: WATCHTOWER_HTTP_API_PORT
-<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a>                Type: String
-<a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a>             Default: 8080
+<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>            Argument: --http-api-port
+<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>Environment Variable: WATCHTOWER_HTTP_API_PORT
+<a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>                Type: String
+<a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>             Default: 8080
 </code></pre></div>
 <h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
 <h3 id="notification_url">Notification URL<a class="headerlink" href="#notification_url" title="Permanent link">&para;</a></h3>
 <p>Configures the notification service URL.
 Can reference a file for sensitive values.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>            Argument: --notification-url
-<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_URL
-<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>                Type: String
-<a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>            Argument: --notification-url
+<a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_URL
+<a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>                Type: String
+<a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>             Default: None
 </code></pre></div>
 <h3 id="notification_email_server_password">Notification Email Server Password<a class="headerlink" href="#notification_email_server_password" title="Permanent link">&para;</a></h3>
 <p>Sets the password for the email notification server.
 Can reference a file for security.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>            Argument: --notification-email-server-password
-<a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
-<a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>                Type: String
-<a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>            Argument: --notification-email-server-password
+<a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
+<a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>                Type: String
+<a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>             Default: None
 </code></pre></div>
 <h3 id="notification_slack_hook_url">Notification Slack Hook URL<a class="headerlink" href="#notification_slack_hook_url" title="Permanent link">&para;</a></h3>
 <p>Sets the Slack webhook URL for notifications.
 Can reference a file for security.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>            Argument: --notification-slack-hook-url
-<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
-<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>                Type: String
-<a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>            Argument: --notification-slack-hook-url
+<a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
+<a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>                Type: String
+<a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>             Default: None
 </code></pre></div>
 <h3 id="notification_microsoft_teams_hook">Notification Microsoft Teams Hook<a class="headerlink" href="#notification_microsoft_teams_hook" title="Permanent link">&para;</a></h3>
 <p>Sets the Microsoft Teams webhook URL for notifications.
 Can reference a file for security.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>            Argument: --notification-msteams-hook
-<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK
-<a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>                Type: String
-<a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>            Argument: --notification-msteams-hook
+<a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK
+<a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a>                Type: String
+<a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>             Default: None
 </code></pre></div>
 <h3 id="notification_gotify_token">Notification Gotify Token<a class="headerlink" href="#notification_gotify_token" title="Permanent link">&para;</a></h3>
 <p>Sets the Gotify token for notifications.
 Can reference a file for security.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>            Argument: --notification-gotify-token
-<a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
-<a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>                Type: String
-<a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>            Argument: --notification-gotify-token
+<a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
+<a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>                Type: String
+<a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>             Default: None
 </code></pre></div>
 <h3 id="disable_startup_message">Disable Startup Message<a class="headerlink" href="#disable_startup_message" title="Permanent link">&para;</a></h3>
 <p>Suppresses the info-level notification sent when Watchtower starts.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>            Argument: --no-startup-message
-<a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
-<a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>                Type: Boolean
-<a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>            Argument: --no-startup-message
+<a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
+<a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>                Type: Boolean
+<a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a>             Default: false
 </code></pre></div>
 <h2 id="lifecycle_health">Lifecycle &amp; Health<a class="headerlink" href="#lifecycle_health" title="Permanent link">&para;</a></h2>
 <h3 id="container_stop_timeout">Container Stop Timeout<a class="headerlink" href="#container_stop_timeout" title="Permanent link">&para;</a></h3>
 <p>Sets the timeout (e.g., <code>30s</code>) before forcibly stopping a container during updates.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>            Argument: --stop-timeout
-<a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>Environment Variable: WATCHTOWER_TIMEOUT
-<a id="__codelineno-52-3" name="__codelineno-52-3" href="#__codelineno-52-3"></a>                Type: Duration
-<a id="__codelineno-52-4" name="__codelineno-52-4" href="#__codelineno-52-4"></a>              Default: 30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>            Argument: --stop-timeout
+<a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>Environment Variable: WATCHTOWER_TIMEOUT
+<a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>                Type: Duration
+<a id="__codelineno-56-4" name="__codelineno-56-4" href="#__codelineno-56-4"></a>              Default: 30s
 </code></pre></div>
 <h3 id="lifecycle_uid">Lifecycle UID<a class="headerlink" href="#lifecycle_uid" title="Permanent link">&para;</a></h3>
 <p>Sets the default user ID to run lifecycle hooks as when no container-specific UID is specified.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>            Argument: --lifecycle-uid
-<a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_UID
-<a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a>                Type: Integer
-<a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>              Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>            Argument: --lifecycle-uid
+<a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_UID
+<a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>                Type: Integer
+<a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>              Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3046,10 +3136,10 @@ Can reference a file for security.</p>
 </div>
 <h3 id="lifecycle_gid">Lifecycle GID<a class="headerlink" href="#lifecycle_gid" title="Permanent link">&para;</a></h3>
 <p>Sets the default group ID to run lifecycle hooks as when no container-specific GID is specified.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>            Argument: --lifecycle-gid
-<a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_GID
-<a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a>                Type: Integer
-<a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a>              Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>            Argument: --lifecycle-gid
+<a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_GID
+<a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>                Type: Integer
+<a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>              Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3058,10 +3148,10 @@ Can reference a file for security.</p>
 </div>
 <h3 id="health_check">Health Check<a class="headerlink" href="#health_check" title="Permanent link">&para;</a></h3>
 <p>Returns a success exit code for Docker <code>HEALTHCHECK</code>, verifying another process is running in the container.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>            Argument: --health-check
-<a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>Environment Variable: None
-<a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>                Type: N/A
-<a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a>             Default: N/A
+<div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>            Argument: --health-check
+<a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a>Environment Variable: None
+<a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a>                Type: N/A
+<a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a>             Default: N/A
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3071,18 +3161,18 @@ Do not use on the main command line.</p>
 <h2 id="output_compatibility">Output &amp; Compatibility<a class="headerlink" href="#output_compatibility" title="Permanent link">&para;</a></h2>
 <h3 id="programmatic_output_porcelain">Programmatic Output (Porcelain)<a class="headerlink" href="#programmatic_output_porcelain" title="Permanent link">&para;</a></h3>
 <p>Outputs session results in a machine-readable format (version specified by <code>VERSION</code>).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>            Argument: --porcelain, -P
-<a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>Environment Variable: WATCHTOWER_PORCELAIN
-<a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>     Possible Values: v1
-<a id="__codelineno-56-4" name="__codelineno-56-4" href="#__codelineno-56-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>            Argument: --porcelain, -P
+<a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>Environment Variable: WATCHTOWER_PORCELAIN
+<a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a>     Possible Values: v1
+<a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Equivalent to:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>--notification-url logger://
-<a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>--notification-log-stdout
-<a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>--notification-report
-<a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>--notification-template porcelain.VERSION.summary-no-log
+<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>--notification-url logger://
+<a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>--notification-log-stdout
+<a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>--notification-report
+<a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a>--notification-template porcelain.VERSION.summary-no-log
 </code></pre></div></p>
 </div>
 
@@ -3107,7 +3197,7 @@ Do not use on the main command line.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 25, 2025 12:03:15 UTC"><span class="timeago" datetime="2025-09-25T12:03:15+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 25, 2025 12:03:15 UTC">2025-09-25</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 26, 2025 05:23:12 UTC"><span class="timeago" datetime="2025-09-26T05:23:12+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 26, 2025 05:23:12 UTC">2025-09-26</span>
   </span>
 
     
