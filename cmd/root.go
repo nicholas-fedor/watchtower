@@ -6,7 +6,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -40,8 +39,50 @@ var ErrContainerIDNotFound = errors.New(
 	"container ID not found in /proc/self/cgroup and HOSTNAME is not set",
 )
 
-// osOpen is a variable to allow mocking os.Open in tests.
-var osOpen = os.Open
+// singleContainerReport implements types.Report for individual container notifications.
+type singleContainerReport struct {
+	updated []types.ContainerReport
+	scanned []types.ContainerReport
+	failed  []types.ContainerReport
+	skipped []types.ContainerReport
+	stale   []types.ContainerReport
+	fresh   []types.ContainerReport
+}
+
+// Scanned returns scanned containers.
+func (r *singleContainerReport) Scanned() []types.ContainerReport { return r.scanned }
+
+// Updated returns updated containers (only one for split notifications).
+func (r *singleContainerReport) Updated() []types.ContainerReport { return r.updated }
+
+// Failed returns failed containers.
+func (r *singleContainerReport) Failed() []types.ContainerReport { return r.failed }
+
+// Skipped returns skipped containers.
+func (r *singleContainerReport) Skipped() []types.ContainerReport { return r.skipped }
+
+// Stale returns stale containers.
+func (r *singleContainerReport) Stale() []types.ContainerReport { return r.stale }
+
+// Fresh returns fresh containers.
+func (r *singleContainerReport) Fresh() []types.ContainerReport { return r.fresh }
+
+// All returns all containers (prioritized by state).
+func (r *singleContainerReport) All() []types.ContainerReport {
+	all := make(
+		[]types.ContainerReport,
+		0,
+		len(r.updated)+len(r.failed)+len(r.skipped)+len(r.stale)+len(r.fresh)+len(r.scanned),
+	)
+	all = append(all, r.updated...)
+	all = append(all, r.failed...)
+	all = append(all, r.skipped...)
+	all = append(all, r.stale...)
+	all = append(all, r.fresh...)
+	all = append(all, r.scanned...)
+
+	return all
+}
 
 // client is the Docker client instance used to interact with container operations in Watchtower.
 //
@@ -145,6 +186,12 @@ var lifecycleGID int
 // It is set in preRun via the --no-self-update flag or the WATCHTOWER_NO_SELF_UPDATE environment variable,
 // preventing Watchtower from attempting to update its own container image.
 var noSelfUpdate bool
+
+// notificationSplitByContainer is a boolean flag enabling separate notifications for each updated container.
+//
+// It is set in preRun via the --notification-split-by-container flag or the WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER environment variable,
+// allowing users to receive individual notifications instead of grouped ones.
+var notificationSplitByContainer bool
 
 // cpuCopyMode specifies how CPU settings are handled when recreating containers.
 //
@@ -277,6 +324,9 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Retrieve lifecycle UID and GID flags.
 	lifecycleUID, _ = flagsSet.GetInt("lifecycle-uid")
 	lifecycleGID, _ = flagsSet.GetInt("lifecycle-gid")
+
+	// Retrieve notification split flag.
+	notificationSplitByContainer, _ = flagsSet.GetBool("notification-split-by-container")
 
 	// Log the scope if specified, aiding debugging by confirming the operational boundary.
 	if scope != "" {
@@ -413,65 +463,30 @@ func run(c *cobra.Command, names []string) {
 	}
 }
 
-// getContainerID retrieves the actual container ID from /proc/self/cgroup.
-// This is necessary because HOSTNAME may contain a custom hostname set in Docker Compose,
-// not the container ID. The container ID is extracted from the cgroup path.
-// If cgroup parsing fails, it falls back to the HOSTNAME environment variable for compatibility.
+// getContainerID retrieves the actual container ID using Docker API by matching the HOSTNAME
+// environment variable with container.Config.Hostname.
 //
 // Returns:
-//   - string: The container ID if found.
+//   - types.ContainerID: The container ID if found.
 //   - error: Non-nil if the container ID cannot be retrieved.
-func getContainerID() (string, error) {
-	return getContainerIDWithOpener(osOpen)
-}
-
-// getContainerIDWithOpener retrieves the actual container ID from /proc/self/cgroup using a provided file opener.
-// This is necessary because HOSTNAME may contain a custom hostname set in Docker Compose,
-// not the container ID. The container ID is extracted from the cgroup path.
-// If cgroup parsing fails, it falls back to the HOSTNAME environment variable for compatibility.
-// This function allows testing by injecting a file opener.
-//
-// Parameters:
-//   - opener: A function to open files, allowing injection for testing purposes.
-//
-// Returns:
-//   - string: The container ID if found.
-//   - error: Non-nil if the container ID cannot be retrieved.
-func getContainerIDWithOpener(opener func(string) (*os.File, error)) (string, error) {
-	// First, try to get container ID from /proc/self/cgroup
-	file, err := opener("/proc/self/cgroup")
-	if err == nil {
-		defer file.Close()
-
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.Contains(line, "/docker/") {
-				parts := strings.Split(line, "/docker/")
-				if len(parts) > 1 {
-					id := strings.Split(parts[1], "/")[0]
-
-					return id, nil
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			// Log but continue to fallback
-			logrus.WithError(err).Debug("Error reading /proc/self/cgroup")
-		}
-	} else {
-		// Log but continue to fallback
-		logrus.WithError(err).Debug("Failed to open /proc/self/cgroup")
-	}
-
-	// Fallback to HOSTNAME environment variable
+func getContainerID(client container.Client) (types.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
 		return "", ErrContainerIDNotFound
 	}
 
-	return hostname, nil
+	containers, err := client.ListAllContainers()
+	if err != nil {
+		return "", fmt.Errorf("failed to list all containers: %w", err)
+	}
+
+	for _, container := range containers {
+		if container.ContainerInfo().Config.Hostname == hostname {
+			return container.ID(), nil
+		}
+	}
+
+	return "", ErrContainerIDNotFound
 }
 
 // deriveScopeFromContainer attempts to derive the operational scope from the current container's scope label.
@@ -490,9 +505,8 @@ func deriveScopeFromContainer(client container.Client) error {
 		return nil
 	}
 
-	// Retrieve the actual container ID from /proc/self/cgroup, as HOSTNAME may contain
-	// a custom hostname set in Docker Compose rather than the container ID.
-	containerID, err := getContainerID()
+	// Retrieve the actual container ID using Docker API by matching HOSTNAME.
+	containerID, err := getContainerID(client)
 	if err != nil {
 		// Container ID retrieval failed, return the error for proper handling.
 		return err
@@ -500,7 +514,7 @@ func deriveScopeFromContainer(client container.Client) error {
 
 	// Attempt to retrieve the container object using the retrieved container ID.
 	// This lookup is necessary to access the container's labels and metadata.
-	container, err := client.GetContainer(types.ContainerID(containerID))
+	container, err := client.GetContainer(containerID)
 	if err != nil {
 		// Container lookup failed, but this is not a fatal error since
 		// scope derivation is a best-effort operation.
@@ -1111,7 +1125,24 @@ func runUpdatesWithNotifications(
 
 	// Send the batched notification with update results, if notifier and result are initialized
 	if notifier != nil && result != nil {
-		notifier.SendNotification(result)
+		if notificationSplitByContainer && len(result.Updated()) > 0 {
+			// Send separate notifications for each updated container
+			for _, updatedContainer := range result.Updated() {
+				// Create a minimal report with only this container
+				singleContainerReport := &singleContainerReport{
+					updated: []types.ContainerReport{updatedContainer},
+					scanned: result.Scanned(), // Include all scanned for context
+					failed:  result.Failed(),  // Include all failed for context
+					skipped: result.Skipped(), // Include all skipped for context
+					stale:   result.Stale(),   // Include all stale for context
+					fresh:   result.Fresh(),   // Include all fresh for context
+				}
+				notifier.SendNotification(singleContainerReport)
+			}
+		} else {
+			// Send grouped notification as before
+			notifier.SendNotification(result)
+		}
 	}
 
 	// Generate and log a metric summarizing the update session.

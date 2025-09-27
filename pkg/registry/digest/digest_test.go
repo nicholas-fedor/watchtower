@@ -47,6 +47,8 @@ func FuzzExtractGetDigest(f *testing.F) {
 			Header:     http.Header{},
 			Body:       io.NopCloser(bytes.NewReader(body)),
 		}
+
+		resp.Header.Set("Content-Type", "application/json")
 		defer resp.Body.Close()
 
 		// Call ExtractGetDigest; we don't care about the result, just that it doesn't panic
@@ -1860,6 +1862,7 @@ var _ = ginkgo.Describe("Digests", func() {
 					logrus.Debug(
 						"Handled GET /v2/test/image/manifests/latest with valid JSON manifest",
 					)
+					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					fmt.Fprintf(w, `{"digest": "%s"}`, mockDigestHash)
 				},
@@ -1921,6 +1924,7 @@ var _ = ginkgo.Describe("Digests", func() {
 					logrus.Debug(
 						"Handled GET /v2/test/image/manifests/latest with JSON manifest with empty digest",
 					)
+					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					w.Write([]byte(`{"digest": ""}`))
 				},
@@ -1983,6 +1987,7 @@ var _ = ginkgo.Describe("Digests", func() {
 					logrus.Debug(
 						"Handled GET /v2/test/image/manifests/latest with JSON manifest without digest field",
 					)
+					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					w.Write([]byte(`{"other_field": "value"}`))
 				},
@@ -2318,6 +2323,259 @@ var _ = ginkgo.Describe("Digests", func() {
 			_, err := digest.FetchDigest(ctx, mockContainerInvalidURL, registryAuth)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to build manifest URL"))
+		})
+
+		ginkgo.It("should handle plain text 404 responses (non-JSON body)", func() {
+			defer ginkgo.GinkgoRecover()
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug(
+						"Handled GET /v2/test/image/manifests/latest with plain text 404 body",
+					)
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte("404 Not Found")) // Plain text non-JSON body
+				},
+			)
+
+			client := newTestAuthClient()
+			ctx := context.Background()
+			registryAuth := auth.TransformAuth("token")
+			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set(
+				"Accept",
+				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+			)
+			req.Header.Set("User-Agent", digest.UserAgent)
+
+			resp, err := client.Do(req)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			defer resp.Body.Close()
+
+			_, err = digest.ExtractGetDigest(resp)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("invalid digest format in body"))
+		})
+
+		ginkgo.It("should handle OCI image index responses with proper Content-Type", func() {
+			defer ginkgo.GinkgoRecover()
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/test/image/manifests/latest with OCI image index")
+					w.Header().Set("Content-Type", "application/vnd.oci.image.index.v1+json")
+					w.WriteHeader(http.StatusOK)
+					w.Write(
+						[]byte(
+							`{"digest": "sha256:ociindexdigest123456789012345678901234567890123456789012345678901234567890"}`,
+						),
+					)
+				},
+			)
+
+			client := newTestAuthClient()
+			ctx := context.Background()
+			registryAuth := auth.TransformAuth("token")
+			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set(
+				"Accept",
+				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+			)
+			req.Header.Set("User-Agent", digest.UserAgent)
+
+			resp, err := client.Do(req)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			defer resp.Body.Close()
+
+			result, err := digest.ExtractGetDigest(resp)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(result).
+				To(gomega.Equal("ociindexdigest123456789012345678901234567890123456789012345678901234567890"))
+		})
+
+		ginkgo.It("should handle invalid Content-Type headers", func() {
+			defer ginkgo.GinkgoRecover()
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug(
+						"Handled GET /v2/test/image/manifests/latest with invalid Content-Type",
+					)
+					w.Header().Set("Content-Type", "text/plain") // Invalid Content-Type for JSON
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"digest": "sha256:invalidcontenttypedigest"}`))
+				},
+			)
+
+			client := newTestAuthClient()
+			ctx := context.Background()
+			registryAuth := auth.TransformAuth("token")
+			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set(
+				"Accept",
+				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+			)
+			req.Header.Set("User-Agent", digest.UserAgent)
+
+			resp, err := client.Do(req)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			defer resp.Body.Close()
+
+			_, err = digest.ExtractGetDigest(resp)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("unsupported content type for JSON parsing"))
+		})
+
+		ginkgo.It("should handle missing or malformed Content-Type headers", func() {
+			defer ginkgo.GinkgoRecover()
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug(
+						"Handled GET /v2/test/image/manifests/latest with missing Content-Type",
+					)
+					// No Content-Type header set
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"digest": "sha256:missingcontenttypedigest"}`))
+				},
+			)
+
+			client := newTestAuthClient()
+			ctx := context.Background()
+			registryAuth := auth.TransformAuth("token")
+			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set(
+				"Accept",
+				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+			)
+			req.Header.Set("User-Agent", digest.UserAgent)
+
+			resp, err := client.Do(req)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			defer resp.Body.Close()
+
+			_, err = digest.ExtractGetDigest(resp)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("unsupported content type for JSON parsing"))
 		})
 	})
 })
