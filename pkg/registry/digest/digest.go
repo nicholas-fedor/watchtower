@@ -377,6 +377,8 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 // It first tries to retrieve the digest from the "Docker-Content-Digest" header.
 // If the header is missing, it falls back to parsing the response body as a JSON
 // manifest or as a plain text digest for non-standard registries.
+// When attempting JSON parsing, the Content-Type header must contain "application/json",
+// "application/vnd.oci", or "application/vnd.docker".
 // The digest is normalized for consistency.
 //
 // Parameters:
@@ -424,40 +426,52 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 		)
 	}
 
-	// Try to parse as JSON manifest first (standard OCI/Docker format).
-	// Define a struct to hold the expected JSON structure with a digest field.
-	var (
-		manifest struct {
+	// Check if the response body starts with JSON indicators ('{' or '[') before attempting JSON unmarshaling.
+	if strings.HasPrefix(bodyStr, "{") || strings.HasPrefix(bodyStr, "[") {
+		// Check Content-Type for JSON parsing.
+		contentType := resp.Header.Get("Content-Type")
+		if !strings.Contains(contentType, "application/json") &&
+			!strings.Contains(contentType, "application/vnd.oci") &&
+			!strings.Contains(contentType, "application/vnd.docker") {
+			return "", fmt.Errorf(
+				"%w: unsupported content type for JSON parsing: %s",
+				errInvalidRegistryResponse,
+				contentType,
+			)
+		}
+		// Try to parse as JSON manifest first (standard OCI/Docker format).
+		// Define a struct to hold the expected JSON structure with a digest field.
+		var manifest struct {
 			Digest string `json:"digest"`
 		}
-		jsonErr error
-	)
-	// Attempt to unmarshal the response body as JSON.
-	if jsonErr = json.Unmarshal(bodyBytes, &manifest); jsonErr == nil {
-		// JSON unmarshaling succeeded, check if digest field contains a value.
-		if manifest.Digest != "" {
-			// Successfully parsed JSON manifest with digest field populated.
-			normalizedDigest := NormalizeDigest(manifest.Digest)
+		// Attempt to unmarshal the response body as JSON.
+		var jsonErr error
+		if jsonErr = json.Unmarshal(bodyBytes, &manifest); jsonErr == nil {
+			// JSON unmarshaling succeeded, check if digest field contains a value.
+			if manifest.Digest != "" {
+				// Successfully parsed JSON manifest with digest field populated.
+				normalizedDigest := NormalizeDigest(manifest.Digest)
+				logrus.WithFields(logrus.Fields{
+					"digest": normalizedDigest,
+				}).Debug("Extracted digest from JSON manifest")
+
+				return normalizedDigest, nil
+			}
+			// JSON parsed successfully but digest field is empty or missing.
 			logrus.WithFields(logrus.Fields{
-				"digest": normalizedDigest,
-			}).Debug("Extracted digest from JSON manifest")
+				"status": resp.Status,
+				"body":   bodyStr,
+			}).Debug("JSON manifest parsed but digest field is empty")
 
-			return normalizedDigest, nil
+			return "", fmt.Errorf("%w: empty digest in JSON manifest", errInvalidRegistryResponse)
 		}
-		// JSON parsed successfully but digest field is empty or missing.
-		logrus.WithFields(logrus.Fields{
-			"status": resp.Status,
-			"body":   bodyStr,
-		}).Debug("JSON manifest parsed but digest field is empty")
-
-		return "", fmt.Errorf("%w: empty digest in JSON manifest", errInvalidRegistryResponse)
+		// JSON parsing failed, log metadata for debugging (avoid exposing potentially sensitive content).
+		logrus.WithError(jsonErr).WithFields(logrus.Fields{
+			"status":       resp.Status,
+			"body_length":  len(bodyStr),
+			"content_type": resp.Header.Get("Content-Type"),
+		}).Debug("Failed to parse response body as JSON manifest")
 	}
-	// JSON parsing failed, log metadata for debugging (avoid exposing potentially sensitive content).
-	logrus.WithError(jsonErr).WithFields(logrus.Fields{
-		"status":       resp.Status,
-		"body_length":  len(bodyStr),
-		"content_type": resp.Header.Get("Content-Type"),
-	}).Debug("Failed to parse response body as JSON manifest")
 
 	// Final fallback: Try to parse as plain text digest for non-standard registries.
 	// Validate that the body looks like a digest (starts with sha256: prefix and has reasonable length).

@@ -234,14 +234,14 @@ func (c imageClient) shouldSkipPull(
 
 	switch {
 	case err != nil:
-		// HEAD request failed; log based on warning strategy and proceed with pull.
+		// Digest retrieval failed; log based on warning strategy and proceed with pull.
 		headLevel := logrus.DebugLevel
 		if warn {
 			headLevel = logrus.WarnLevel
 		}
 
 		clog.WithError(err).
-			Log(headLevel, "HEAD request failed, falling back to full pull")
+			Log(headLevel, "Digest retrieval failed, falling back to full pull")
 
 		return false
 	case match:
