@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nicholas-fedor/shoutrrr/pkg/services/smtp"
+	"github.com/nicholas-fedor/shoutrrr/pkg/services/email/smtp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 

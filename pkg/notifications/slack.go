@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nicholas-fedor/shoutrrr/pkg/services/discord"
-	"github.com/nicholas-fedor/shoutrrr/pkg/services/slack"
+	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/discord"
+	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/slack"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
