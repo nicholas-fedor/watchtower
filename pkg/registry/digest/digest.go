@@ -277,10 +277,10 @@ func fetchDigest(
 		req.Header.Set("Authorization", token)
 	}
 
-	// Set Accept header to support both OCI image indexes and Docker V2 manifests.
+	// Set Accept header for Docker Distribution API manifest requests, supporting both v1 and v2.
 	req.Header.Set(
 		"Accept",
-		"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+		"application/vnd.docker.distribution.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 	)
 	req.Header.Set("User-Agent", UserAgent)
 

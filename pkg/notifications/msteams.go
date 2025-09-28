@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/nicholas-fedor/shoutrrr/pkg/services/teams"
+	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/teams"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
