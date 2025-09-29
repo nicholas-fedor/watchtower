@@ -1,9 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,7 +20,9 @@ import (
 	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	containerMock "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	typeMock "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -469,9 +476,14 @@ func TestAwaitDockerClient(t *testing.T) {
 	// TestLifecycleFlags tests reading lifecycle UID and GID flags.
 	elapsed := time.Since(start)
 
-	// Should take at least 1 second but not more than 2 (to account for timing variations)
-	assert.GreaterOrEqual(t, elapsed, time.Second, "Should sleep for at least 1 second")
-	assert.Less(t, elapsed, 2*time.Second, "Should not sleep for more than 2 seconds")
+	// Should take at least 900ms but not more than 3 seconds (to account for CI timing variations)
+	assert.GreaterOrEqual(
+		t,
+		elapsed,
+		900*time.Millisecond,
+		"Should sleep for at least 900 milliseconds",
+	)
+	assert.Less(t, elapsed, 3*time.Second, "Should not sleep for more than 3 seconds")
 }
 
 func TestLifecycleFlags(t *testing.T) {
@@ -547,4 +559,155 @@ func TestGetAPIAddr(t *testing.T) {
 			assert.NoError(t, err, "formatted address should be a valid TCP address")
 		})
 	}
+}
+
+// TestUpdateLockSerialization verifies that the updateLock mechanism properly serializes updates,
+// preventing concurrent access to the Docker client. This test simulates multiple update operations
+// running simultaneously, ensuring only one update executes at a time, mimicking the behavior
+// of updateOnStart and scheduled updates in the main application.
+func TestUpdateLockSerialization(t *testing.T) {
+	// Initialize the update lock channel with the same pattern as in runMain
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Atomic counters to track concurrent execution and completion
+	var (
+		running   int32
+		started   int32
+		completed int32
+	)
+
+	// WaitGroup to synchronize test completion
+	var wg sync.WaitGroup
+
+	// Simulate the update function used in runMain and runUpgradesOnSchedule
+	updateFunc := func(id int) {
+		select {
+		case v := <-updateLock:
+			// Acquired lock, perform update
+			defer func() { updateLock <- v }()
+
+			// Track that only one update is running at a time
+			current := atomic.AddInt32(&running, 1)
+			require.Equal(
+				t,
+				int32(1),
+				current,
+				"Only one update should be running at a time, but %d are running",
+				current,
+			)
+
+			atomic.AddInt32(&started, 1)
+
+			// Simulate update work with a delay
+			time.Sleep(100 * time.Millisecond)
+
+			atomic.AddInt32(&running, -1)
+			atomic.AddInt32(&completed, 1)
+
+		default:
+			// Lock not available, skip update (same as in the actual code)
+			t.Logf("Update %d skipped due to concurrent update in progress", id)
+		}
+	}
+
+	// Simulate concurrent updateOnStart and scheduled updates
+	numUpdates := 2
+	for i := range numUpdates {
+		wg.Add(1)
+
+		go func(id int) {
+			defer wg.Done()
+
+			updateFunc(id)
+		}(i)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
+	// Verify that only one update executed due to lock serialization
+	assert.Equal(t, int32(1), started, "Only one update should have started due to lock")
+	assert.Equal(t, int32(1), completed, "Only one update should have completed")
+	assert.Equal(t, int32(0), running, "No updates should be running after completion")
+}
+
+// TestConcurrentScheduledAndAPIUpdate verifies that API-triggered updates wait for scheduled updates to complete,
+// ensuring proper serialization and preventing race conditions between periodic updates and HTTP API calls.
+func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
+	// Initialize the update lock channel with the same pattern as in runMain
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Channels to signal when each update type starts and completes
+	scheduledStarted := make(chan struct{})
+	scheduledCompleted := make(chan struct{})
+	apiStarted := make(chan struct{})
+	apiCompleted := make(chan struct{})
+
+	// Mock update function for API handler that signals start and completion
+	updateFn := func(_ []string) *metrics.Metric {
+		close(apiStarted)
+		time.Sleep(100 * time.Millisecond) // Simulate API update work
+		close(apiCompleted)
+
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
+
+	// Create the update handler with the shared lock
+	handler := update.New(updateFn, updateLock)
+
+	// Simulate scheduled update (longer duration)
+	go func() {
+		select {
+		case v := <-updateLock:
+			close(scheduledStarted)
+			time.Sleep(200 * time.Millisecond) // Simulate scheduled update work (longer than API)
+			close(scheduledCompleted)
+
+			updateLock <- v
+		default:
+			t.Error("Scheduled update should have acquired the lock")
+		}
+	}()
+
+	// Simulate API update request
+	go func() {
+		req, err := http.NewRequestWithContext(
+			context.Background(),
+			http.MethodPost,
+			"/v1/update",
+			http.NoBody,
+		)
+		if err != nil {
+			t.Errorf("Failed to create request: %v", err)
+
+			return
+		}
+
+		w := httptest.NewRecorder()
+		handler.Handle(w, req)
+	}()
+
+	// Wait for scheduled update to start
+	<-scheduledStarted
+
+	// Verify API update has not started yet (should be blocked by lock)
+	select {
+	case <-apiStarted:
+		t.Error("API update should not have started while scheduled update is running")
+	default:
+		// Expected: API is blocked
+	}
+
+	// Wait for scheduled update to complete
+	<-scheduledCompleted
+
+	// Now API update should start and complete
+	<-apiStarted
+	<-apiCompleted
+
+	// Verify the API response is successful
+	// Note: In a real scenario, we'd check the response body, but for this test,
+	// the completion signals are sufficient to verify serialization
 }

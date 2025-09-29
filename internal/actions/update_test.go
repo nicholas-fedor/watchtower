@@ -101,7 +101,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				types.UpdateParams{
 					Cleanup:          true,
 					Filter:           filters.WatchtowerContainersFilter,
-					PullFailureDelay: 1 * time.Millisecond, // Test-specific very short delay
+					PullFailureDelay: 10 * time.Millisecond, // Test-specific short delay
 					CPUCopyMode:      "auto",
 					NoSelfUpdate:     false,
 				},
@@ -1201,7 +1201,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				types.UpdateParams{
 					Cleanup:          true,
 					Filter:           filters.WatchtowerContainersFilter,
-					PullFailureDelay: 1 * time.Millisecond, // Test-specific very short delay
+					PullFailureDelay: 10 * time.Millisecond, // Test-specific very short delay
 					CPUCopyMode:      "auto",
 					NoSelfUpdate:     false,
 				},
@@ -1214,9 +1214,9 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(cleanupImageIDs).
 				To(gomega.BeEmpty(), "No cleanup should occur on pull failure")
 
-			// Verify that the delay was applied (using test-specific very short delay from PullFailureDelay)
+			// Verify that the delay was applied (using test-specific short delay from PullFailureDelay)
 			gomega.Expect(elapsedTime).
-				To(gomega.BeNumerically(">=", 1*time.Millisecond), "Delay should have been applied")
+				To(gomega.BeNumerically(">=", 10*time.Millisecond), "Delay should have been applied")
 		})
 	})
 

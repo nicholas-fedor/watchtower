@@ -574,6 +574,10 @@ func runMain(cfg RunConfig) int {
 		)
 	}
 
+	// Initialize a lock channel to prevent concurrent updates.
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
 	// Handle one-time update mode, executing updates and registering metrics.
 	if cfg.RunOnce {
 		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
@@ -586,14 +590,16 @@ func runMain(cfg RunConfig) int {
 
 	// Handle immediate update on startup, then continue with periodic updates.
 	if cfg.UpdateOnStart {
-		writeStartupMessage(cfg.Command, time.Time{}, cfg.FilterDesc, scope)
-		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, cleanup)
-		metrics.Default().RegisterScan(metric)
-	}
+		select {
+		case v := <-updateLock:
+			defer func() { updateLock <- v }()
 
-	// Initialize a lock channel to prevent concurrent updates.
-	updateLock := make(chan bool, 1)
-	updateLock <- true
+			metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, cleanup)
+			metrics.Default().RegisterScan(metric)
+		default:
+			logrus.Debug("Skipped update on start as another update is already running.")
+		}
+	}
 
 	// Check for and resolve conflicts with multiple Watchtower instances.
 	cleanupImageIDs := make(map[types.ImageID]bool)
