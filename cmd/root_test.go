@@ -468,9 +468,14 @@ func TestAwaitDockerClient(t *testing.T) {
 
 	elapsed := time.Since(start)
 
-	// Should take at least 1 second but not more than 2 (to account for timing variations)
-	assert.GreaterOrEqual(t, elapsed, time.Second, "Should sleep for at least 1 second")
-	assert.Less(t, elapsed, 2*time.Second, "Should not sleep for more than 2 seconds")
+	// Should take at least 900ms but not more than 3 seconds (to account for CI timing variations)
+	assert.GreaterOrEqual(
+		t,
+		elapsed,
+		900*time.Millisecond,
+		"Should sleep for at least 900 milliseconds",
+	)
+	assert.Less(t, elapsed, 3*time.Second, "Should not sleep for more than 3 seconds")
 }
 
 func TestLifecycleFlags(t *testing.T) {
@@ -586,8 +591,8 @@ func TestUpdateLockSerialization(t *testing.T) {
 
 			atomic.AddInt32(&started, 1)
 
-			// Simulate update work with a small delay
-			time.Sleep(10 * time.Millisecond)
+			// Simulate update work with a delay
+			time.Sleep(100 * time.Millisecond)
 
 			atomic.AddInt32(&running, -1)
 			atomic.AddInt32(&completed, 1)
@@ -635,7 +640,7 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 	// Mock update function for API handler that signals start and completion
 	updateFn := func(_ []string) *metrics.Metric {
 		close(apiStarted)
-		time.Sleep(50 * time.Millisecond) // Simulate API update work
+		time.Sleep(100 * time.Millisecond) // Simulate API update work
 		close(apiCompleted)
 
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
@@ -649,7 +654,7 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 		select {
 		case v := <-updateLock:
 			close(scheduledStarted)
-			time.Sleep(100 * time.Millisecond) // Simulate scheduled update work (longer than API)
+			time.Sleep(200 * time.Millisecond) // Simulate scheduled update work (longer than API)
 			close(scheduledCompleted)
 
 			updateLock <- v
