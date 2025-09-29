@@ -44,7 +44,7 @@ func jsTplPrev(this js.Value, args []js.Value) any {
 	var levels []data.LogLevel
 
 	if levelsArg.Type() == js.TypeString {
-		levels = data.LevelsFromString(statesArg.String())
+		levels = data.LevelsFromString(levelsArg.String())
 	} else {
 		for i := 0; i < levelsArg.Length(); i++ {
 			level := data.LogLevel(levelsArg.Index(i).String())

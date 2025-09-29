@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - 1.25.1
+          - 1.25.x
         platform:
           - macos-latest
           - windows-latest
@@ -37,7 +37,7 @@ jobs:
 
       - name: Run tests
         run: |
-          go test -v -coverprofile coverage.out -covermode atomic ./...
+          go test -race -p 1 -coverprofile=coverage.out ./...
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
