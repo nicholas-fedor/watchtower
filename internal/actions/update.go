@@ -833,9 +833,15 @@ func restartGitContainer(
 	imageName := fmt.Sprintf("%s:git-%s", baseName, latestCommit[:8])
 
 	// Build new image from Git repository
+	// Append branch to repoURL for Docker to check out the correct branch
+	buildContext := repoURL
+	if branch != "" {
+		buildContext = repoURL + "#" + branch
+	}
+
 	builtImageID, err := client.BuildImageFromGit(
 		ctx,
-		repoURL,
+		buildContext,
 		latestCommit,
 		imageName,
 		map[string]string{
