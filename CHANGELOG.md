@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Integrate --update-on-start with normal update cycle by @nicholas-fedor in [#740](https://github.com/nicholas-fedor/watchtower/pull/740)
 - Improve CI test reliability across platforms by @nicholas-fedor in [#732](https://github.com/nicholas-fedor/watchtower/pull/732)
 - Prevent concurrent Docker client access causing crashes by @nicholas-fedor in [#731](https://github.com/nicholas-fedor/watchtower/pull/731)
 - Resolve Docker Distribution API manifest HEAD request issues by @nicholas-fedor in [#728](https://github.com/nicholas-fedor/watchtower/pull/728)
