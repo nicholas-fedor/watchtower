@@ -581,19 +581,6 @@ func runMain(cfg RunConfig) int {
 		return 0
 	}
 
-	// Handle immediate update on startup, then continue with periodic updates.
-	if cfg.UpdateOnStart {
-		select {
-		case v := <-updateLock:
-			defer func() { updateLock <- v }()
-
-			metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
-			metrics.Default().RegisterScan(metric)
-		default:
-			logrus.Debug("Skipped update on start as another update is already running.")
-		}
-	}
-
 	// Check for and resolve conflicts with multiple Watchtower instances.
 	cleanupImageIDs := make(map[types.ImageID]bool)
 	if err := actions.CheckForMultipleWatchtowerInstances(client, cleanup, scope, cleanupImageIDs); err != nil {
@@ -839,10 +826,21 @@ func writeStartupMessage(c *cobra.Command, sched time.Time, filtering string, sc
 
 	// Configure the logger based on whether startup messages should be suppressed.
 	startupLog := setupStartupLogger(noStartupMessage)
-	startupLog.Info("Watchtower ", meta.Version, " using Docker API v", client.GetVersion())
+
+	var version string
+	if client != nil {
+		version = client.GetVersion()
+	}
+
+	startupLog.Info("Watchtower ", meta.Version, " using Docker API v", version)
 
 	// Log details about configured notifiers or lack thereof.
-	logNotifierInfo(startupLog, notifier.GetNames())
+	var notifierNames []string
+	if notifier != nil {
+		notifierNames = notifier.GetNames()
+	}
+
+	logNotifierInfo(startupLog, notifierNames)
 
 	// Log filtering information, using structured logging for scope when set
 	if scope != "" {
@@ -889,7 +887,9 @@ func setupStartupLogger(noStartupMessage bool) *logrus.Entry {
 
 	log := logrus.NewEntry(logrus.StandardLogger())
 
-	notifier.StartNotification()
+	if notifier != nil {
+		notifier.StartNotification()
+	}
 
 	return log
 }
@@ -965,6 +965,7 @@ func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 //
 // It sets up a cron scheduler, runs updates at specified intervals, and ensures graceful shutdown on interrupt
 // signals (SIGINT, SIGTERM) or context cancellation, handling concurrency with a lock channel.
+// If update-on-start is enabled, it triggers the first update immediately before starting the scheduler.
 //
 // Parameters:
 //   - ctx: The context controlling the scheduler’s lifecycle, enabling shutdown on cancellation.
@@ -993,29 +994,47 @@ func runUpgradesOnSchedule(
 	// Create a new cron scheduler for managing periodic updates.
 	scheduler := cron.New()
 
+	// Define the update function to be used both for scheduled runs and immediate execution.
+	updateFunc := func() {
+		select {
+		case v := <-lock:
+			defer func() { lock <- v }()
+
+			metric := runUpdatesWithNotifications(filter, cleanup)
+			metrics.Default().RegisterScan(metric)
+		default:
+			metrics.Default().RegisterScan(nil)
+			logrus.Debug("Skipped another update already running.")
+		}
+
+		nextRuns := scheduler.Entries()
+		if len(nextRuns) > 0 {
+			logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
+		}
+	}
+
 	// Add the update function to the cron schedule, handling concurrency and metrics.
-	if err := scheduler.AddFunc(
-		scheduleSpec,
-		func() {
-			select {
-			case v := <-lock:
-				defer func() { lock <- v }()
-				metric := runUpdatesWithNotifications(filter, cleanup)
-				metrics.Default().RegisterScan(metric)
-			default:
-				metrics.Default().RegisterScan(nil)
-				logrus.Debug("Skipped another update already running.")
-			}
-			nextRuns := scheduler.Entries()
-			if len(nextRuns) > 0 {
-				logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
-			}
-		}); err != nil {
-		return fmt.Errorf("failed to schedule updates: %w", err)
+	if scheduleSpec != "" {
+		if err := scheduler.AddFunc(
+			scheduleSpec,
+			updateFunc); err != nil {
+			return fmt.Errorf("failed to schedule updates: %w", err)
+		}
 	}
 
 	// Log startup message with the first scheduled run time.
-	writeStartupMessage(c, scheduler.Entries()[0].Schedule.Next(time.Now()), filtering, scope)
+	var nextRun time.Time
+	if len(scheduler.Entries()) > 0 {
+		nextRun = scheduler.Entries()[0].Schedule.Next(time.Now())
+	}
+
+	writeStartupMessage(c, nextRun, filtering, scope)
+
+	// Check if update-on-start is enabled and trigger immediate update if so.
+	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
+	if updateOnStart {
+		updateFunc()
+	}
 
 	// Start the scheduler to begin periodic execution.
 	scheduler.Start()
@@ -1035,7 +1054,11 @@ func runUpgradesOnSchedule(
 	// Stop the scheduler and wait for any running update to complete.
 	scheduler.Stop()
 	logrus.Debug("Waiting for running update to be finished...")
-	<-lock
+
+	if len(lock) > 0 {
+		<-lock
+	}
+
 	logrus.Debug("Scheduler stopped and update completed.")
 
 	return nil
@@ -1052,10 +1075,12 @@ func runUpgradesOnSchedule(
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-func runUpdatesWithNotifications(filter types.Filter, cleanup bool) *metrics.Metric {
+var runUpdatesWithNotifications = func(filter types.Filter, cleanup bool) *metrics.Metric {
 	// Start batching notifications to group update messages, if notifier is initialized
 	if notifier != nil {
-		notifier.StartNotification()
+		if notifier != nil {
+			notifier.StartNotification()
+		}
 	} else {
 		logrus.Warn("Notifier is nil, skipping notification batching")
 	}
