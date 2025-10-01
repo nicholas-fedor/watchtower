@@ -27,7 +27,8 @@ import (
 	typeMock "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
-// TestDeriveScopeFromContainer tests the deriveScopeFromContainer function with various scenarios.
+const testFilterDesc = "test filter"
+
 func TestDeriveScopeFromContainer(t *testing.T) {
 	// Save original scope value to restore later
 	originalScope := scope
@@ -710,4 +711,322 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 	// Verify the API response is successful
 	// Note: In a real scenario, we'd check the response body, but for this test,
 	// the completion signals are sufficient to verify serialization
+}
+
+// TestUpdateOnStartTriggersImmediateUpdate verifies that the --update-on-start flag
+// triggers an immediate update before scheduling periodic updates.
+func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
+	// Create a command with update-on-start flag enabled
+	cmd := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd)
+	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+	require.NoError(t, err)
+
+	// Track if update function was called
+	updateCalled := make(chan bool, 1)
+	updateCallCount := int32(0)
+
+	// Mock the update function to signal when called
+	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool) *metrics.Metric {
+		atomic.AddInt32(&updateCallCount, 1)
+
+		select {
+		case updateCalled <- true:
+		default:
+		}
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+
+	// Create a context that will cancel quickly to avoid running the scheduler
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	// Create update lock
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Call runUpgradesOnSchedule with a filter that matches no containers
+	filter := func(_ types.FilterableContainer) bool { return false }
+	filterDesc := testFilterDesc
+
+	// The function should trigger immediate update and then start scheduler
+	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+
+	// Should not return an error (context cancellation is expected)
+	require.NoError(t, err)
+
+	// Verify that update was called immediately
+	select {
+	case <-updateCalled:
+		// Expected: update was called
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Update function was not called immediately with --update-on-start")
+	}
+
+	// Verify only one update call occurred (the immediate one)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&updateCallCount))
+}
+
+// TestUpdateOnStartIntegratesWithCronScheduling verifies that update-on-start
+// works with cron scheduling without causing duplicate updates.
+func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
+	// Create a command with update-on-start flag enabled and a schedule
+	cmd := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd)
+	err := cmd.ParseFlags(
+		[]string{"--update-on-start", "--schedule", "@every 1h", "--no-startup-message"},
+	)
+	require.NoError(t, err)
+
+	// Save original scheduleSpec and restore after test
+	originalScheduleSpec := scheduleSpec
+
+	defer func() { scheduleSpec = originalScheduleSpec }()
+
+	scheduleSpec = "@every 1h" // Set the schedule spec that was parsed
+
+	// Track update calls
+	updateCallCount := int32(0)
+	updateCalls := make(chan time.Time, 10)
+
+	// Mock the update function
+	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool) *metrics.Metric {
+		callTime := time.Now()
+
+		atomic.AddInt32(&updateCallCount, 1)
+
+		select {
+		case updateCalls <- callTime:
+		default:
+		}
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+
+	// Create a context that allows some time for scheduler to start but not run updates
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	// Create update lock
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Call runUpgradesOnSchedule
+	filter := func(_ types.FilterableContainer) bool { return false }
+	filterDesc := testFilterDesc
+
+	startTime := time.Now()
+	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+
+	// Should not return an error (context cancellation is expected)
+	require.NoError(t, err)
+
+	// Wait a bit for any scheduled calls
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify that at least one update was called (the immediate one)
+	callCount := atomic.LoadInt32(&updateCallCount)
+	assert.GreaterOrEqual(t, callCount, int32(1), "At least one update should have been called")
+
+	// Verify that the first call happened immediately (within 10ms of start)
+	select {
+	case callTime := <-updateCalls:
+		timeSinceStart := callTime.Sub(startTime)
+		assert.Less(
+			t,
+			timeSinceStart,
+			10*time.Millisecond,
+			"First update should happen immediately",
+		)
+	default:
+		t.Error("No update calls were recorded")
+	}
+
+	// Verify no duplicate immediate calls occurred
+	assert.LessOrEqual(
+		t,
+		callCount,
+		int32(2),
+		"Should not have more than 2 update calls in short test period",
+	)
+}
+
+// TestUpdateOnStartLockingBehavior verifies that update-on-start respects the update lock
+// and doesn't run concurrent updates.
+func TestUpdateOnStartLockingBehavior(t *testing.T) {
+	// Create a command with update-on-start flag enabled
+	cmd := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd)
+	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+	require.NoError(t, err)
+
+	// Create update lock that's initially unavailable (simulating another update in progress)
+	updateLock := make(chan bool, 1)
+	// Don't put anything in the lock initially
+
+	// Track if update function was called
+	updateCalled := make(chan bool, 1)
+
+	// Mock the update function
+	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool) *metrics.Metric {
+		select {
+		case updateCalled <- true:
+		default:
+		}
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+
+	// Create a short context
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	// Call runUpgradesOnSchedule
+	filter := func(_ types.FilterableContainer) bool { return false }
+	filterDesc := testFilterDesc
+
+	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+
+	// Should not return an error
+	require.NoError(t, err)
+
+	// Verify that update was NOT called because lock was unavailable
+	select {
+	case <-updateCalled:
+		t.Error("Update should not have been called when lock is unavailable")
+	case <-time.After(10 * time.Millisecond):
+		// Expected: no update call
+	}
+}
+
+// TestUpdateOnStartSelfUpdateScenario verifies that update-on-start works correctly
+// in self-update scenarios where Watchtower updates itself.
+func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
+	// Create a command with update-on-start flag enabled
+	cmd := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd)
+	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+	require.NoError(t, err)
+
+	// Track update calls
+	updateCalled := make(chan bool, 1)
+
+	// Mock the update function
+	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool) *metrics.Metric {
+		select {
+		case updateCalled <- true:
+		default:
+		}
+
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
+
+	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+
+	// Create a short context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	// Create update lock
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Call runUpgradesOnSchedule with a filter that includes containers
+	filter := func(_ types.FilterableContainer) bool { return true }
+	filterDesc := testFilterDesc
+
+	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+
+	// Should not return an error
+	require.NoError(t, err)
+
+	// Verify that update was called for self-update scenario
+	select {
+	case <-updateCalled:
+		// Expected: update was called
+	case <-time.After(50 * time.Millisecond):
+		t.Error("Update function was not called in self-update scenario")
+	}
+}
+
+// TestUpdateOnStartMultiInstanceScenario verifies that multiple Watchtower instances
+// with update-on-start don't conflict with each other.
+func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
+	// This test simulates two Watchtower instances both with --update-on-start
+	// They should not conflict due to proper locking
+
+	// Create commands with update-on-start flag enabled
+	cmd1 := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd1)
+	err := cmd1.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+	require.NoError(t, err)
+
+	cmd2 := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd2)
+	err = cmd2.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+	require.NoError(t, err)
+
+	// Shared update lock (simulating shared resource)
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Track update calls from both instances
+	updateCallCount := int32(0)
+	instance1Called := make(chan bool, 1)
+	instance2Called := make(chan bool, 1)
+
+	// Mock the update function
+	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool) *metrics.Metric {
+		atomic.AddInt32(&updateCallCount, 1)
+		time.Sleep(50 * time.Millisecond) // Simulate update work
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+
+	// Start both instances concurrently
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		filter := func(_ types.FilterableContainer) bool { return false }
+		filterDesc := "instance1"
+
+		err := runUpgradesOnSchedule(ctx, cmd1, filter, filterDesc, updateLock, false)
+		assert.NoError(t, err)
+		close(instance1Called)
+	}()
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		filter := func(_ types.FilterableContainer) bool { return false }
+		filterDesc := "instance2"
+
+		err := runUpgradesOnSchedule(ctx, cmd2, filter, filterDesc, updateLock, false)
+		assert.NoError(t, err)
+		close(instance2Called)
+	}()
+
+	// Wait for both instances to complete
+	<-instance1Called
+	<-instance2Called
+
+	// Verify that only one update occurred due to locking (one instance gets the lock first)
+	callCount := atomic.LoadInt32(&updateCallCount)
+	assert.Equal(t, int32(1), callCount, "Only one update should occur due to lock serialization")
 }

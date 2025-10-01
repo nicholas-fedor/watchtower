@@ -80,7 +80,7 @@ jobs:
 
       - name: Create Pull Request for Changelog
         if: ${{ !fromJson(inputs.dry-run || 'false') }}
-        uses: peter-evans/create-pull-request@9ec683ee07f9121fdf529b923931dd78d977a5c9
+        uses: peter-evans/create-pull-request@d3e081a03ae8d69301ed924bae10d70ea4af94d9
         with:
           token: ${{ secrets.CHANGELOG_PAT }}
           committer: Nick Fedor <nick@nickfedor.com>
