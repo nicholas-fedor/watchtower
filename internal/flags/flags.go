@@ -541,6 +541,24 @@ func RegisterGitFlags(rootCmd *cobra.Command) {
 		"",
 		envString("WATCHTOWER_GIT_UPDATE_POLICY"),
 		"Git update policy: patch, minor, major, or all (default: minor)")
+
+	flags.StringP(
+		"git-username",
+		"",
+		envString("WATCHTOWER_GIT_USERNAME"),
+		"Git username for basic authentication")
+
+	flags.StringP(
+		"git-password",
+		"",
+		envString("WATCHTOWER_GIT_PASSWORD"),
+		"Git password for basic authentication")
+
+	flags.StringP(
+		"git-ssh-key-path",
+		"",
+		envString("WATCHTOWER_GIT_SSH_KEY_PATH"),
+		"Path to SSH private key file for Git authentication")
 }
 
 // envString fetches a string from an environment variable.

@@ -199,6 +199,30 @@ var notificationSplitByContainer bool
 // controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
 var cpuCopyMode string
 
+// gitAuthToken holds the Git authentication token for private repository access.
+//
+// It is set during preRun via the --git-auth-token flag or the WATCHTOWER_GIT_AUTH_TOKEN environment variable,
+// enabling authentication for GitHub/GitLab repositories during container updates.
+var gitAuthToken string
+
+// gitUsername holds the Git username for basic authentication.
+//
+// It is set during preRun via the --git-username flag or the WATCHTOWER_GIT_USERNAME environment variable,
+// used for username/password authentication with Git repositories.
+var gitUsername string
+
+// gitPassword holds the Git password for basic authentication.
+//
+// It is set during preRun via the --git-password flag or the WATCHTOWER_GIT_PASSWORD environment variable,
+// used for username/password authentication with Git repositories.
+var gitPassword string
+
+// gitSSHKeyPath holds the path to the SSH private key file for Git authentication.
+//
+// It is set during preRun via the --git-ssh-key-path flag or the WATCHTOWER_GIT_SSH_KEY_PATH environment variable,
+// enabling SSH key-based authentication for Git repositories.
+var gitSSHKeyPath string
+
 // rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 //
 // It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
@@ -348,6 +372,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
 	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
 	cpuCopyMode, _ = flagsSet.GetString("cpu-copy-mode")
+
+	// Retrieve Git authentication flags.
+	gitAuthToken, _ = flagsSet.GetString("git-auth-token")
+	gitUsername, _ = flagsSet.GetString("git-username")
+	gitPassword, _ = flagsSet.GetString("git-password")
+	gitSSHKeyPath, _ = flagsSet.GetString("git-ssh-key-path")
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
 	if monitorOnly && noPull {
@@ -1120,6 +1150,10 @@ var runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter,
 		LifecycleGID:    lifecycleGID,
 		NoSelfUpdate:    noSelfUpdate,
 		CPUCopyMode:     cpuCopyMode,
+		GitAuthToken:    gitAuthToken,
+		GitUsername:     gitUsername,
+		GitPassword:     gitPassword,
+		GitSSHKeyPath:   gitSSHKeyPath,
 	}
 
 	// Execute the update action, capturing results and image IDs for cleanup.

@@ -810,7 +810,7 @@ func restartGitContainer(
 	// Get latest commit hash
 	gitClientInstance := gitClient.NewClient()
 
-	authConfig := createGitAuthConfig(params)
+	authConfig := CreateGitAuthConfig(params)
 
 	latestCommit, err := gitClientInstance.GetLatestCommit(ctx, repoURL, branch, authConfig)
 	if err != nil {
@@ -832,7 +832,7 @@ func restartGitContainer(
 	// Generate unique image name for the build
 	imageName := fmt.Sprintf("%s:git-%s", baseName, latestCommit[:8])
 
-	// Build new image from Git repository
+	// Build new image using Docker's native Git support with branch specification
 	// Append branch to repoURL for Docker to check out the correct branch
 	buildContext := repoURL
 	if branch != "" {
@@ -841,7 +841,7 @@ func restartGitContainer(
 
 	builtImageID, err := client.BuildImageFromGit(
 		ctx,
-		buildContext,
+		buildContext, // Use Docker's #branch syntax for remote Git URL
 		latestCommit,
 		imageName,
 		map[string]string{
@@ -854,6 +854,8 @@ func restartGitContainer(
 
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"built_image": builtImageID,
+		"repo_url":    repoURL,
+		"branch":      branch,
 		"commit":      latestCommit,
 	}).Debug("Successfully built new image from Git")
 
@@ -970,7 +972,7 @@ func checkGitStaleness(
 	gitClient := gitClient.NewClient()
 
 	// Create authentication config from environment/flags
-	authConfig := createGitAuthConfig(params)
+	authConfig := CreateGitAuthConfig(params)
 
 	// Get latest commit from remote repository
 	latestCommit, err := gitClient.GetLatestCommit(ctx, repoURL, branch, authConfig)
@@ -1020,16 +1022,21 @@ func gitInfoFromContainer(container types.Container) (string, string, string) {
 }
 
 // createGitAuthConfig creates Git authentication config from Watchtower parameters.
-func createGitAuthConfig(_ types.UpdateParams) types.AuthConfig {
-	// For now, use environment variables or flags that would be added to UpdateParams
-	// This is a placeholder - actual implementation would depend on how auth is configured
-	defaultConfig := gitAuth.GetDefaultAuthConfig()
+func CreateGitAuthConfig(params types.UpdateParams) types.AuthConfig {
+	authConfig, err := gitAuth.ParseAuthConfigFromFlags(
+		params.GitAuthToken,
+		params.GitUsername,
+		params.GitPassword,
+		params.GitSSHKeyPath,
+	)
+	if err != nil {
+		logrus.WithError(err).
+			Warn("Failed to parse Git authentication configuration, falling back to no authentication")
 
-	return types.AuthConfig{
-		Method:   defaultConfig.Method,
-		Token:    defaultConfig.Token,
-		Username: defaultConfig.Username,
-		Password: defaultConfig.Password,
-		SSHKey:   defaultConfig.SSHKey,
+		return types.AuthConfig{
+			Method: types.AuthMethodNone,
+		}
 	}
+
+	return authConfig
 }

@@ -995,7 +995,14 @@ func (c client) streamBuildOutput(reader io.ReadCloser) error {
 		// In a full implementation, we'd parse JSON build output here
 	}
 
-	return fmt.Errorf("failed to scan build output: %w", scanner.Err())
+	scanErr := scanner.Err()
+	logrus.WithField("scanner_error", scanErr).Debug("Build output scanning completed")
+
+	if scanErr != nil {
+		return fmt.Errorf("failed to scan build output: %w", scanErr)
+	}
+
+	return nil
 }
 
 // extractImageIDFromBuild extracts the image ID from a successfully built image.

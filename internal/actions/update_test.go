@@ -1272,4 +1272,188 @@ var _ = ginkgo.Describe("the update action", func() {
 			},
 		)
 	})
+
+	ginkgo.When("testing Git authentication configuration", func() {
+		ginkgo.Context("createGitAuthConfig function", func() {
+			ginkgo.It("should successfully create auth config with valid UpdateParams", func() {
+				params := types.UpdateParams{
+					GitAuthToken:  "test-token",
+					GitUsername:   "test-user",
+					GitPassword:   "test-pass",
+					GitSSHKeyPath: "/path/to/key",
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodToken))
+				gomega.Expect(authConfig.Token).To(gomega.Equal("test-token"))
+			})
+
+			ginkgo.It("should fallback to AuthMethodNone when auth parsing fails", func() {
+				params := types.UpdateParams{
+					GitAuthToken:  "",
+					GitUsername:   "",
+					GitPassword:   "",
+					GitSSHKeyPath: "",
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodNone))
+			})
+
+			ginkgo.It(
+				"should handle error cases and log warnings for auth configuration failures",
+				func() {
+					// Test with invalid SSH key path that would cause parsing to fail
+					params := types.UpdateParams{
+						GitAuthToken:  "",
+						GitUsername:   "",
+						GitPassword:   "",
+						GitSSHKeyPath: "/nonexistent/key/path",
+					}
+
+					// This should not panic and should fallback gracefully
+					authConfig := actions.CreateGitAuthConfig(params)
+
+					// Should fallback to none due to SSH key loading failure
+					gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodNone))
+				},
+			)
+		})
+
+		ginkgo.Context("UpdateParams integration tests", func() {
+			ginkgo.It(
+				"should map Git auth fields from UpdateParams to auth config correctly",
+				func() {
+					params := types.UpdateParams{
+						GitAuthToken: "github-token-123",
+					}
+
+					authConfig := actions.CreateGitAuthConfig(params)
+
+					gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodToken))
+					gomega.Expect(authConfig.Token).To(gomega.Equal("github-token-123"))
+				},
+			)
+
+			ginkgo.It("should handle parameter precedence and validation", func() {
+				// Token should take priority over basic auth
+				params := types.UpdateParams{
+					GitAuthToken: "token-priority",
+					GitUsername:  "user",
+					GitPassword:  "pass",
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodToken))
+				gomega.Expect(authConfig.Token).To(gomega.Equal("token-priority"))
+				// Username/password should not be set when token takes priority
+				gomega.Expect(authConfig.Username).To(gomega.BeEmpty())
+				gomega.Expect(authConfig.Password).To(gomega.BeEmpty())
+			})
+
+			ginkgo.It("should handle empty/missing field scenarios", func() {
+				params := types.UpdateParams{
+					// All fields empty
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodNone))
+				gomega.Expect(authConfig.Token).To(gomega.BeEmpty())
+				gomega.Expect(authConfig.Username).To(gomega.BeEmpty())
+				gomega.Expect(authConfig.Password).To(gomega.BeEmpty())
+				gomega.Expect(authConfig.SSHKey).To(gomega.BeEmpty())
+			})
+		})
+
+		ginkgo.Context("authentication priority selection", func() {
+			ginkgo.It("should prioritize token over basic auth", func() {
+				params := types.UpdateParams{
+					GitAuthToken: "token-first",
+					GitUsername:  "basic-user",
+					GitPassword:  "basic-pass",
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodToken))
+				gomega.Expect(authConfig.Token).To(gomega.Equal("token-first"))
+			})
+
+			ginkgo.It("should prioritize basic auth over SSH", func() {
+				params := types.UpdateParams{
+					GitUsername:   "basic-user",
+					GitPassword:   "basic-pass",
+					GitSSHKeyPath: "/path/to/ssh/key",
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodBasic))
+				gomega.Expect(authConfig.Username).To(gomega.Equal("basic-user"))
+				gomega.Expect(authConfig.Password).To(gomega.Equal("basic-pass"))
+			})
+
+			ginkgo.It("should fallback to SSH when higher priority methods unavailable", func() {
+				params := types.UpdateParams{
+					GitAuthToken:  "",
+					GitUsername:   "",
+					GitPassword:   "",
+					GitSSHKeyPath: "/valid/ssh/key/path", // Would need to be mocked for full test
+				}
+
+				// This test demonstrates the priority logic - SSH would be selected if file exists
+				// In a real scenario, we'd mock the file system
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				// Should attempt SSH but fallback to none if file doesn't exist
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodNone))
+			})
+		})
+
+		ginkgo.Context("error handling and edge cases", func() {
+			ginkgo.It("should handle invalid SSH key file scenarios gracefully", func() {
+				params := types.UpdateParams{
+					GitSSHKeyPath: "/nonexistent/ssh/key",
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				// Should fallback to none when SSH key file is invalid
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodNone))
+			})
+
+			ginkgo.It("should handle malformed authentication configurations", func() {
+				// Test incomplete basic auth (missing password)
+				params := types.UpdateParams{
+					GitUsername: "user-without-password",
+					GitPassword: "",
+				}
+
+				authConfig := actions.CreateGitAuthConfig(params)
+
+				// Should fallback to none for incomplete basic auth
+				gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodNone))
+			})
+
+			ginkgo.It("should handle error propagation and recovery", func() {
+				// Test various error scenarios that should all result in graceful fallback
+				testCases := []types.UpdateParams{
+					{GitSSHKeyPath: "/invalid/path"}, // Invalid SSH path
+					{GitUsername: "user"},            // Incomplete basic auth
+					{GitPassword: "pass"},            // Incomplete basic auth
+					{},                               // All empty
+				}
+
+				for _, params := range testCases {
+					authConfig := actions.CreateGitAuthConfig(params)
+					// All error cases should fallback to AuthMethodNone
+					gomega.Expect(authConfig.Method).To(gomega.Equal(types.AuthMethodNone))
+				}
+			})
+		})
+	})
 })

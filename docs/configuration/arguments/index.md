@@ -843,10 +843,10 @@ Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
 Suppresses the info-level notification sent when Watchtower starts.
 
 ```text
-             Argument: --no-startup-message
+            Argument: --no-startup-message
 Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
-                 Type: Boolean
-              Default: false
+                Type: Boolean
+             Default: false
 ```
 
 ## Git Repository Monitoring
@@ -856,10 +856,10 @@ Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
 Enables Git repository monitoring for containers with Git labels. When enabled, Watchtower monitors Git repositories for new commits and rebuilds containers automatically.
 
 ```text
-             Argument: --enable-git-monitoring
+            Argument: --enable-git-monitoring
 Environment Variable: WATCHTOWER_GIT_ENABLE
-                 Type: Boolean
-              Default: false
+                Type: Boolean
+             Default: false
 ```
 
 !!! note
@@ -870,10 +870,43 @@ Environment Variable: WATCHTOWER_GIT_ENABLE
 Sets a default authentication token for Git repository access. Can be overridden per container using labels.
 
 ```text
-             Argument: --git-auth-token
+            Argument: --git-auth-token
 Environment Variable: WATCHTOWER_GIT_AUTH_TOKEN
-                 Type: String
-              Default: None
+                Type: String
+             Default: None
+```
+
+### Git Username
+
+Sets the username for Git repository authentication.
+
+```text
+            Argument: --git-username
+Environment Variable: WATCHTOWER_GIT_USERNAME
+                Type: String
+             Default: None
+```
+
+### Git Password
+
+Sets the password or token for Git repository authentication.
+
+```text
+            Argument: --git-password
+Environment Variable: WATCHTOWER_GIT_PASSWORD
+                Type: String
+             Default: None
+```
+
+### Git SSH Key Path
+
+Sets the path to the SSH private key file for Git repository authentication.
+
+```text
+            Argument: --git-ssh-key-path
+Environment Variable: WATCHTOWER_GIT_SSH_KEY_PATH
+                Type: String
+             Default: None
 ```
 
 ### Git Timeout
@@ -881,10 +914,10 @@ Environment Variable: WATCHTOWER_GIT_AUTH_TOKEN
 Sets the timeout duration for Git operations (API calls, cloning, etc.).
 
 ```text
-             Argument: --git-timeout
+            Argument: --git-timeout
 Environment Variable: WATCHTOWER_GIT_TIMEOUT
-                 Type: Duration
-              Default: 30s
+                Type: Duration
+             Default: 30s
 ```
 
 ## Lifecycle & Health
@@ -897,7 +930,7 @@ Sets the timeout (e.g., `30s`) before forcibly stopping a container during updat
             Argument: --stop-timeout
 Environment Variable: WATCHTOWER_TIMEOUT
                 Type: Duration
-              Default: 30s
+             Default: 30s
 ```
 
 ### Lifecycle UID
@@ -908,7 +941,7 @@ Sets the default user ID to run lifecycle hooks as when no container-specific UI
             Argument: --lifecycle-uid
 Environment Variable: WATCHTOWER_LIFECYCLE_UID
                 Type: Integer
-              Default: None
+             Default: None
 ```
 
 !!! Note
@@ -924,7 +957,7 @@ Sets the default group ID to run lifecycle hooks as when no container-specific G
             Argument: --lifecycle-gid
 Environment Variable: WATCHTOWER_LIFECYCLE_GID
                 Type: Integer
-              Default: None
+             Default: None
 ```
 
 !!! Note

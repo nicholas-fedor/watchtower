@@ -131,15 +131,7 @@ services:
       - WATCHTOWER_GIT_PASSWORD=github_pat_xxxxxxxxxx
 ```
 
-Or per-container:
-
-```yaml
-services:
-  app:
-    labels:
-      - "com.centurylinklabs.watchtower.git-repo=https://github.com/user/private-repo.git"
-      - "com.centurylinklabs.watchtower.git-auth-token=github_pat_xxxxxxxxxx"
-```
+Alternatively, these environment variables can be replaced with the --git-username and --git-password command-line flags.
 
 #### SSH Keys
 
@@ -205,6 +197,68 @@ docker run -d \
     - **Organization Access**: Better access to private organization repositories
     - **Token Rotation**: Easier to rotate client credentials than personal tokens
     - **Audit Trail**: Better tracking of API usage
+
+## Authentication Priority
+
+Authentication is configured globally via command-line flags and environment variables. When multiple global authentication methods are configured, Watchtower uses a priority system to determine which method to use for Git operations. This ensures predictable behavior and prevents conflicts when different authentication methods are available.
+
+### Priority Order
+
+Authentication methods are prioritized as follows (highest to lowest):
+
+1. **Token Authentication** (Personal access tokens, OAuth app credentials)
+2. **Basic Authentication** (Username/password)
+3. **SSH Key Authentication**
+4. **No Authentication** (Public repositories only)
+
+### Multiple Methods Behavior
+
+- Only the **highest priority** authentication method that is configured and valid will be used
+- Lower priority methods are ignored when a higher priority method is available
+- If the highest priority method fails (e.g., invalid token), Watchtower will not fall back to lower priority methods
+
+### User Guidance
+
+To avoid confusion and ensure reliable authentication:
+
+- **Configure only one authentication method** globally
+- **Use token authentication** when possible, as it provides the best security and rate limit benefits
+- **Test authentication** before deploying to production
+- **Monitor logs** for authentication-related messages
+
+!!! warning "Authentication Conflicts"
+    Configuring multiple methods may lead to unexpected behavior. Always verify which method is being used in the logs.
+
+### Auth Prioritization Examples
+
+#### Single Method (Recommended)
+
+```yaml
+services:
+  watchtower:
+    environment:
+      - WATCHTOWER_GIT_ENABLE=true
+      - WATCHTOWER_GIT_USERNAME=token
+      - WATCHTOWER_GIT_PASSWORD=github_pat_xxxxxxxxxx
+```
+
+Only token authentication is used.
+
+#### Multiple Methods Configured (Token Takes Priority)
+
+```yaml
+services:
+  watchtower:
+    volumes:
+      - /path/to/ssh/key:/root/.ssh/id_rsa:ro
+    environment:
+      - WATCHTOWER_GIT_ENABLE=true
+      - WATCHTOWER_GIT_USERNAME=token
+      - WATCHTOWER_GIT_PASSWORD=github_pat_xxxxxxxxxx
+      - WATCHTOWER_GIT_SSH_KEY_PATH=/root/.ssh/id_rsa
+```
+
+Token authentication is used; SSH key is ignored.
 
 ## Update Policies
 
@@ -379,7 +433,3 @@ time="2024-01-01T12:00:00Z" level=info msg="Built new image from Git: app:latest
 - **Authentication**: Personal tokens, OAuth apps, SSH keys, basic auth
 - **Docker**: Requires Docker API access for image building
 - **Networks**: HTTPS-only for security (SSH for Git access)
-
----
-
-Git monitoring provides a powerful way to implement continuous deployment directly from your Git repositories. Combined with Watchtower's existing image monitoring, you get comprehensive container update automation.
