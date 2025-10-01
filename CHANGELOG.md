@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update genproto dependencies by @nicholas-fedor in [#742](https://github.com/nicholas-fedor/watchtower/pull/742)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.10.0 by @renovate[bot] in [#727](https://github.com/nicholas-fedor/watchtower/pull/727)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.9.1 by @renovate[bot] in [#676](https://github.com/nicholas-fedor/watchtower/pull/676)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.9.0 by @renovate[bot] in [#674](https://github.com/nicholas-fedor/watchtower/pull/674)
