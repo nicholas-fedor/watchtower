@@ -165,7 +165,7 @@ func cleanupExcessWatchtowers(
 
 	// Get the newest container’s image ID (kept running).
 	newestContainer := containers[len(containers)-1]
-	newestImageID := newestContainer.ImageID()
+	newestImageID := newestContainer.SafeImageID()
 	logrus.WithFields(logrus.Fields{
 		"newest_container": newestContainer.Name(),
 		"newest_image_id":  newestImageID,
@@ -185,8 +185,8 @@ func cleanupExcessWatchtowers(
 
 		logrus.WithField("container", c.Name()).Debug("Stopped Watchtower instance")
 		// Skip cleanup if the image is used by the newest container.
-		if cleanup && c.ImageID() != newestImageID {
-			cleanupImageIDs[c.ImageID()] = true
+		if cleanup && c.SafeImageID() != newestImageID {
+			cleanupImageIDs[c.SafeImageID()] = true
 		}
 	}
 

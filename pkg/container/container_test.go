@@ -265,6 +265,27 @@ var _ = ginkgo.Describe("Container", func() {
 			})
 		})
 
+		ginkgo.Context("fetching image ID", func() {
+			ginkgo.It("returns image ID when imageInfo is available", func() {
+				imageID := container.ImageID()
+				gomega.Expect(imageID).To(gomega.Equal(types.ImageID("image_id")))
+			})
+
+			ginkgo.It("returns empty string for ImageID when imageInfo is nil", func() {
+				container = MockContainer(WithPortBindings())
+				container.imageInfo = nil
+				imageID := container.ImageID()
+				gomega.Expect(imageID).To(gomega.Equal(types.ImageID("")))
+			})
+
+			ginkgo.It("returns empty string for SafeImageID when imageInfo is nil", func() {
+				container = MockContainer(WithPortBindings())
+				container.imageInfo = nil
+				imageID := container.SafeImageID()
+				gomega.Expect(imageID).To(gomega.Equal(types.ImageID("")))
+			})
+		})
+
 		ginkgo.Context("fetching container links", func() {
 			ginkgo.When("depends-on label is present", func() {
 				ginkgo.It("returns single dependent container", func() {
