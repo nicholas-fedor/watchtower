@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -43,10 +44,12 @@ type router interface {
 // shoutrrrTypeNotifier manages Shoutrrr notifications.
 //
 // It handles queuing, templating, and sending with delay.
+// Uses mutex for thread-safe access to entries.
 type shoutrrrTypeNotifier struct {
 	Urls           []string              // Notification service URLs.
 	Router         router                // Router for sending messages.
 	entries        []*logrus.Entry       // Queued log entries.
+	entriesMutex   sync.RWMutex          // Mutex for thread-safe access to entries.
 	logLevel       logrus.Level          // Minimum log level for notifications.
 	template       *template.Template    // Template for message formatting.
 	messages       chan string           // Channel for message queuing.
@@ -266,9 +269,13 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 //
 // It resets the entries slice if nil.
 func (n *shoutrrrTypeNotifier) StartNotification() {
+	n.entriesMutex.Lock()
+
 	if n.entries == nil {
 		n.entries = make([]*logrus.Entry, 0, initialEntriesCapacity)
 	}
+
+	n.entriesMutex.Unlock()
 }
 
 // SendNotification sends queued messages with a report.
@@ -278,8 +285,11 @@ func (n *shoutrrrTypeNotifier) StartNotification() {
 //
 // It clears the queue after sending.
 func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
-	n.sendEntries(n.entries, report)
+	n.entriesMutex.Lock()
+	entries := n.entries
 	n.entries = nil
+	n.entriesMutex.Unlock()
+	n.sendEntries(entries, report)
 }
 
 // Close stops queuing and waits for sends to complete.
@@ -313,11 +323,15 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 		return nil // Skip non-notify entries.
 	}
 
+	n.entriesMutex.Lock()
+
 	if n.entries != nil {
 		n.entries = append(n.entries, entry) // Queue if batching.
 	} else {
 		n.sendEntries([]*logrus.Entry{entry}, nil) // Send immediately if not batching.
 	}
+
+	n.entriesMutex.Unlock()
 
 	return nil
 }
