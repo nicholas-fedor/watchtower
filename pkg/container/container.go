@@ -184,8 +184,12 @@ func (c Container) Name() string {
 // ImageID returns the ID of the container’s image.
 //
 // Returns:
-//   - types.ImageID: Image ID (panics if imageInfo is nil).
+//   - types.ImageID: Image ID or empty string if imageInfo is nil.
 func (c Container) ImageID() types.ImageID {
+	if c.imageInfo == nil {
+		return ""
+	}
+
 	return types.ImageID(c.imageInfo.ID)
 }
 
