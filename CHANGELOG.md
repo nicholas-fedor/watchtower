@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ensure Watchtower updates itself last to fix notification split issue by @nicholas-fedor in [#756](https://github.com/nicholas-fedor/watchtower/pull/756)
 - Correct shutdown lock waiting logic and prevent test timeouts by @nicholas-fedor in [#753](https://github.com/nicholas-fedor/watchtower/pull/753)
 - Resolve data race in shoutrrr notifications by @nicholas-fedor in [#746](https://github.com/nicholas-fedor/watchtower/pull/746)
 - Prevent nil pointer dereference in container cleanup by @nicholas-fedor in [#745](https://github.com/nicholas-fedor/watchtower/pull/745)
