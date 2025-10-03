@@ -33,6 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
         with:
+          ref: 'main'
           fetch-depth: 0
 
       - name: Import GPG key
