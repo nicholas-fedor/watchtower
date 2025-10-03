@@ -48,7 +48,7 @@ jobs:
         uses: orhun/git-cliff-action@98c93442bb05a455a77bee982867857ae748eeea # v4
         with:
           config: cliff.toml
-          args: --verbose --latest --strip header
+          args: --verbose
         env:
           OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
@@ -65,7 +65,6 @@ jobs:
           body: "Automated changelog update for release ${{ github.ref_name }}"
           branch: docs/update-changelog-${{ github.ref_name }}
           delete-branch: true
-          sign-commits: true
 
   # Build binaries, images, SBOMs, and attestations
   build:
