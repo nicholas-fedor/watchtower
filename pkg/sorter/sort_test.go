@@ -17,9 +17,10 @@ import (
 
 // mockContainer implements types.Container for testing sorting.
 type mockContainer struct {
-	name    string
-	created string
-	links   []string
+	name         string
+	created      string
+	links        []string
+	isWatchtower bool
 }
 
 func (m *mockContainer) ContainerInfo() *dockerContainerTypes.InspectResponse {
@@ -45,7 +46,7 @@ func (m *mockContainer) Enabled() (bool, bool)                        { return t
 func (m *mockContainer) IsMonitorOnly(types.UpdateParams) bool        { return false }
 func (m *mockContainer) Scope() (string, bool)                        { return "", false }
 func (m *mockContainer) ToRestart() bool                              { return false }
-func (m *mockContainer) IsWatchtower() bool                           { return false }
+func (m *mockContainer) IsWatchtower() bool                           { return m.isWatchtower }
 func (m *mockContainer) StopSignal() string                           { return "SIGTERM" }
 func (m *mockContainer) HasImageInfo() bool                           { return false }
 func (m *mockContainer) ImageInfo() *dockerImageTypes.InspectResponse { return nil }
@@ -170,6 +171,38 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				sorted, err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(sorted).To(gomega.BeEmpty())
+			})
+
+			ginkgo.It("places Watchtower containers last", func() {
+				containers := []types.Container{
+					&mockContainer{name: "watchtower", isWatchtower: true},
+					&mockContainer{name: "c1", links: []string{"c2"}},
+					&mockContainer{name: "c2", links: nil},
+				}
+				sorted, err := sorter.SortByDependencies(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(sorted).To(gomega.HaveLen(3))
+				gomega.Expect(sorted[0].Name()).To(gomega.Equal("c2"))         // No links
+				gomega.Expect(sorted[1].Name()).To(gomega.Equal("c1"))         // Depends on c2
+				gomega.Expect(sorted[2].Name()).To(gomega.Equal("watchtower")) // Watchtower last
+			})
+
+			ginkgo.It("places multiple Watchtower containers last", func() {
+				containers := []types.Container{
+					&mockContainer{name: "watchtower1", isWatchtower: true},
+					&mockContainer{name: "c1", links: []string{"c2"}},
+					&mockContainer{name: "watchtower2", isWatchtower: true},
+					&mockContainer{name: "c2", links: nil},
+				}
+				sorted, err := sorter.SortByDependencies(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(sorted).To(gomega.HaveLen(4))
+				gomega.Expect(sorted[0].Name()).To(gomega.Equal("c2")) // No links
+				gomega.Expect(sorted[1].Name()).To(gomega.Equal("c1")) // Depends on c2
+				// Watchtower containers at the end (order may vary)
+				watchtowerNames := []string{sorted[2].Name(), sorted[3].Name()}
+				gomega.Expect(watchtowerNames).To(gomega.ContainElement("watchtower1"))
+				gomega.Expect(watchtowerNames).To(gomega.ContainElement("watchtower2"))
 			})
 		})
 	})

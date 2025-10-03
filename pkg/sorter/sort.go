@@ -74,20 +74,48 @@ func (c ByCreated) Less(i, indexJ int) bool {
 func SortByDependencies(containers []types.Container) ([]types.Container, error) {
 	logrus.WithField("container_count", len(containers)).Debug("Starting dependency sort")
 
+	// Separate Watchtower containers from non-Watchtower containers
+	var (
+		nonWatchtowerContainers []types.Container
+		watchtowerContainers    []types.Container
+	)
+
+	for _, container := range containers {
+		if container.IsWatchtower() {
+			watchtowerContainers = append(watchtowerContainers, container)
+		} else {
+			nonWatchtowerContainers = append(nonWatchtowerContainers, container)
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"non_watchtower_count": len(nonWatchtowerContainers),
+		"watchtower_count":     len(watchtowerContainers),
+	}).Debug("Separated containers by Watchtower status")
+
+	// Sort non-Watchtower containers by dependencies
 	sorter := dependencySorter{
 		unvisited: nil, // Containers yet to be visited
 		marked:    nil, // Marks visited containers for cycle detection
 		sorted:    nil, // Sorted result
 	}
 
-	sorted, err := sorter.Sort(containers)
+	sortedNonWatchtower, err := sorter.Sort(nonWatchtowerContainers)
 	if err != nil {
-		logrus.WithError(err).Debug("Dependency sort failed")
-	} else {
-		logrus.WithField("sorted_count", len(sorted)).Debug("Completed dependency sort")
+		logrus.WithError(err).Debug("Dependency sort failed for non-Watchtower containers")
+
+		return nil, err
 	}
 
-	return sorted, err
+	// Append Watchtower containers at the end
+	sorted := make([]types.Container, 0, len(sortedNonWatchtower)+len(watchtowerContainers))
+	sorted = append(sorted, sortedNonWatchtower...)
+	sorted = append(sorted, watchtowerContainers...)
+
+	logrus.WithField("sorted_count", len(sorted)).
+		Debug("Completed dependency sort with Watchtower containers last")
+
+	return sorted, nil
 }
 
 // dependencySorter handles topological sorting by dependencies.
