@@ -220,7 +220,7 @@ func fetchDigest(
 		Debug("Extracted original host from manifest URL")
 
 	// Obtain an authentication token and challenge host for the registry.
-	token, challengeHost, err := auth.GetToken(ctx, container, registryAuth, client)
+	token, challengeHost, redirected, err := auth.GetToken(ctx, container, registryAuth, client)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
 
@@ -233,16 +233,16 @@ func fetchDigest(
 	} else {
 		logrus.WithFields(fields).
 			WithField("challenge_host", challengeHost).
-			Debug("Received challenge host from GetToken")
+			WithField("redirected", redirected).
+			Debug("Received challenge host and redirect flag from GetToken")
 	}
 
-	// If the challenge response indicates a different host (e.g., due to a proxy redirect),
-	// reconstruct the manifest URL using the challenge host.
-	if challengeHost != "" && challengeHost != originalHost {
+	// If the challenge request was redirected, update the manifest URL host using the challenge host.
+	if redirected && challengeHost != "" {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"original_host":  originalHost,
 			"challenge_host": challengeHost,
-		}).Debug("Detected registry redirect, updating manifest URL host")
+		}).Debug("Challenge request was redirected, updating manifest URL host")
 
 		parsedURL.Host = challengeHost
 		manifestURL = parsedURL.String()
@@ -253,7 +253,8 @@ func fetchDigest(
 		logrus.WithFields(fields).
 			WithField("challenge_host", challengeHost).
 			WithField("original_host", originalHost).
-			Debug("No manifest URL update needed; challenge host empty or same as original")
+			WithField("redirected", redirected).
+			Debug("No manifest URL update needed; not redirected or challenge host empty")
 	}
 
 	logrus.WithFields(fields).WithFields(logrus.Fields{

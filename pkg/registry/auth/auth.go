@@ -229,11 +229,13 @@ func extractChallengeHost(realm string, fields logrus.Fields) string {
 //   - container: Container with image info.
 //   - registryAuth: Base64-encoded auth string.
 //   - client: Client for HTTP requests.
+//   - redirected: True if the challenge request was redirected.
 //   - fields: Logging fields for context.
 //
 // Returns:
 //   - string: Bearer token header (e.g., "Bearer ...").
 //   - string: Challenge host (e.g., "ghcr.io").
+//   - bool: Redirect flag (passed through).
 //   - error: Non-nil if processing fails, nil on success.
 func handleBearerAuth(
 	ctx context.Context,
@@ -241,8 +243,9 @@ func handleBearerAuth(
 	container types.Container,
 	registryAuth string,
 	client Client,
+	redirected bool,
 	fields logrus.Fields,
-) (string, string, error) {
+) (string, string, bool, error) {
 	logrus.WithFields(fields).Debug("Entering Bearer auth path")
 
 	var challengeHost string
@@ -276,7 +279,7 @@ func handleBearerAuth(
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to parse image name")
 
-		return "", "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
+		return "", "", redirected, fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
 	token, err := GetBearerHeader(
@@ -289,13 +292,16 @@ func handleBearerAuth(
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get bearer token")
 
-		return "", "", fmt.Errorf("%w: %w", errFailedDecodeResponse, err)
+		return "", "", redirected, fmt.Errorf("%w: %w", errFailedDecodeResponse, err)
 	}
 
 	if token == "" {
 		logrus.WithFields(fields).Debug("Empty bearer token received")
 
-		return "", "", fmt.Errorf("%w: empty token in response", errFailedDecodeResponse)
+		return "", "", redirected, fmt.Errorf(
+			"%w: empty token in response",
+			errFailedDecodeResponse,
+		)
 	}
 
 	logrus.WithFields(fields).
@@ -303,7 +309,7 @@ func handleBearerAuth(
 		WithField("challenge_host", challengeHost).
 		Debug("Returning Bearer token and challenge host")
 
-	return token, challengeHost, nil
+	return token, challengeHost, redirected, nil
 }
 
 // GetToken fetches a token and the challenge host for the registry hosting the provided image.
@@ -317,13 +323,14 @@ func handleBearerAuth(
 // Returns:
 //   - string: Authentication token (e.g., "Basic ..." or "Bearer ...").
 //   - string: Challenge host (e.g., "ghcr.io"), empty if not applicable.
+//   - bool: True if the challenge request was redirected, false otherwise.
 //   - error: Non-nil if operation fails, nil on success.
 func GetToken(
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 	client Client,
-) (string, string, error) {
+) (string, string, bool, error) {
 	fields := logrus.Fields{
 		"image": container.ImageName(),
 	}
@@ -333,7 +340,7 @@ func GetToken(
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to parse image name")
 
-		return "", "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
+		return "", "", false, fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
 	// Generate the challenge URL.
@@ -347,7 +354,7 @@ func GetToken(
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to create challenge request")
 
-		return "", "", fmt.Errorf("%w: %w", errFailedCreateChallengeRequest, err)
+		return "", "", false, fmt.Errorf("%w: %w", errFailedCreateChallengeRequest, err)
 	}
 
 	res, err := client.Do(req)
@@ -357,9 +364,12 @@ func GetToken(
 			WithField("url", challengeURL.String()).
 			Debug("Failed to execute challenge request")
 
-		return "", "", fmt.Errorf("%w: %w", errFailedExecuteChallengeRequest, err)
+		return "", "", false, fmt.Errorf("%w: %w", errFailedExecuteChallengeRequest, err)
 	}
 	defer res.Body.Close()
+
+	// Detect if the request was redirected.
+	redirected := res.Request.URL.Host != challengeURL.Host
 
 	// Handle 200 OK response (no auth required).
 	if res.StatusCode == http.StatusOK {
@@ -367,7 +377,7 @@ func GetToken(
 			WithField("url", challengeURL.String()).
 			Debug("No authentication required (200 OK)")
 
-		return "", "", nil
+		return "", "", redirected, nil
 	}
 
 	// Extract the challenge header.
@@ -383,7 +393,7 @@ func GetToken(
 			WithField("url", challengeURL.String()).
 			Debug("Empty WWW-Authenticate header; assuming no authentication required")
 
-		return "", "", nil
+		return "", "", redirected, nil
 	}
 
 	// Normalize challenge for comparison.
@@ -395,17 +405,25 @@ func GetToken(
 		if registryAuth == "" {
 			logrus.WithFields(fields).Debug("No credentials provided for Basic auth")
 
-			return "", "", fmt.Errorf("%w: basic auth required", errNoCredentials)
+			return "", "", redirected, fmt.Errorf("%w: basic auth required", errNoCredentials)
 		}
 
 		logrus.WithFields(fields).Debug("Using Basic auth")
 
-		return "Basic " + registryAuth, "", nil
+		return "Basic " + registryAuth, "", redirected, nil
 	}
 
 	// Handle Bearer auth.
 	if strings.HasPrefix(challenge, "bearer") {
-		return handleBearerAuth(ctx, wwwAuthHeader, container, registryAuth, client, fields)
+		return handleBearerAuth(
+			ctx,
+			wwwAuthHeader,
+			container,
+			registryAuth,
+			client,
+			redirected,
+			fields,
+		)
 	}
 
 	// Handle unknown challenge types.
@@ -413,7 +431,7 @@ func GetToken(
 		WithField("challenge", challenge).
 		Error("Unsupported challenge type from registry")
 
-	return "", "", fmt.Errorf("%w: %s", errUnsupportedChallenge, challenge)
+	return "", "", redirected, fmt.Errorf("%w: %s", errUnsupportedChallenge, challenge)
 }
 
 // processChallenge parses the WWW-Authenticate header to extract authentication details.
