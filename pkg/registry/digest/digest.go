@@ -237,26 +237,6 @@ func fetchDigest(
 			Debug("Received challenge host and redirect flag from GetToken")
 	}
 
-	// If the challenge request was redirected, update the manifest URL host using the challenge host.
-	if redirected && challengeHost != "" {
-		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"original_host":  originalHost,
-			"challenge_host": challengeHost,
-		}).Debug("Challenge request was redirected, updating manifest URL host")
-
-		parsedURL.Host = challengeHost
-		manifestURL = parsedURL.String()
-		logrus.WithFields(fields).
-			WithField("updated_url", manifestURL).
-			Debug("Reconstructed manifest URL")
-	} else {
-		logrus.WithFields(fields).
-			WithField("challenge_host", challengeHost).
-			WithField("original_host", originalHost).
-			WithField("redirected", redirected).
-			Debug("No manifest URL update needed; not redirected or challenge host empty")
-	}
-
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"method": method,
 		"url":    manifestURL,
@@ -285,7 +265,7 @@ func fetchDigest(
 	)
 	req.Header.Set("User-Agent", UserAgent)
 
-	// Execute the request using the provided authentication client.
+	// Execute the initial request using the provided authentication client.
 	resp, err := client.Do(req)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
@@ -296,6 +276,68 @@ func fetchDigest(
 		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
 	}
 	defer resp.Body.Close()
+
+	// Check if the manifest request was redirected.
+	manifestRedirected := req.URL.Host != originalHost
+	if manifestRedirected {
+		// Update manifest URL to the redirected host.
+		parsedURL.Host = req.URL.Host
+		manifestURL = parsedURL.String()
+		logrus.WithFields(fields).WithFields(logrus.Fields{
+			"original_host": originalHost,
+			"new_host":      req.URL.Host,
+			"updated_url":   manifestURL,
+		}).Debug("Manifest request was redirected, updated URL")
+	} else if redirected && challengeHost != "" {
+		// Manifest didn't redirect, but auth did, update to challenge host and retry.
+		parsedURL.Host = challengeHost
+		manifestURL = parsedURL.String()
+		logrus.WithFields(fields).WithFields(logrus.Fields{
+			"original_host":  originalHost,
+			"challenge_host": challengeHost,
+			"updated_url":    manifestURL,
+		}).Debug("Using challenge host since manifest didn't redirect, retrying")
+
+		// Retry the request with updated URL.
+		req, err = http.NewRequestWithContext(ctx, method, manifestURL, nil)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
+				"method": method,
+				"url":    manifestURL,
+			}).Debug("Failed to create retry request")
+
+			return "", fmt.Errorf("%w: %w", errFailedCreateRequest, err)
+		}
+
+		// Set headers again for the retry request.
+		if token != "" {
+			req.Header.Set("Authorization", token)
+		}
+
+		req.Header.Set(
+			"Accept",
+			"application/vnd.docker.distribution.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+		)
+		req.Header.Set("User-Agent", UserAgent)
+
+		resp, err = client.Do(req)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
+				"method": method,
+				"url":    manifestURL,
+			}).Debug("Failed to execute retry request")
+
+			return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
+		}
+		defer resp.Body.Close()
+	} else {
+		logrus.WithFields(fields).
+			WithField("challenge_host", challengeHost).
+			WithField("original_host", originalHost).
+			WithField("redirected", redirected).
+			WithField("manifest_redirected", manifestRedirected).
+			Debug("No manifest URL update needed")
+	}
 
 	// Handle non-success responses for HEAD requests by returning empty digest to trigger GET fallback.
 	if method == http.MethodHead && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
