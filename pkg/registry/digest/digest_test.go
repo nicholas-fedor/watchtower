@@ -31,6 +31,19 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+const (
+	httpScheme  = "http"
+	httpsScheme = "https"
+)
+
+func getScheme() string {
+	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		return httpScheme
+	}
+
+	return httpsScheme
+}
+
 // FuzzExtractGetDigest fuzzes the body parsing in ExtractGetDigest to test for crashes or unexpected behavior with malformed inputs.
 func FuzzExtractGetDigest(f *testing.F) {
 	// Seed with known good and bad inputs
@@ -251,7 +264,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerEmptyDigests, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerEmptyDigests)
+			url, err := manifest.BuildManifestURL(mockContainerEmptyDigests, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -319,7 +332,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -458,7 +471,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -520,7 +533,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -593,7 +606,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithInvalidDigest)
+			url, err := manifest.BuildManifestURL(mockContainerWithInvalidDigest, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -889,7 +902,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -955,7 +968,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -1023,7 +1036,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -1090,7 +1103,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -1286,7 +1299,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1352,7 +1365,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1416,7 +1429,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1547,7 +1560,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1611,7 +1624,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1674,7 +1687,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1735,7 +1748,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1797,7 +1810,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1902,7 +1915,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1966,7 +1979,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2031,7 +2044,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2095,7 +2108,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2159,7 +2172,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2230,10 +2243,18 @@ var _ = ginkgo.Describe("Digests", func() {
 				w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
 				w.WriteHeader(http.StatusFound)
 			})
+			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodHead {
+					w.WriteHeader(http.StatusNotFound)
+				} else {
+					w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+					w.WriteHeader(http.StatusOK)
+				}
+			})
 			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request on redirect server")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, redirectAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`, getScheme(), redirectAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -2251,7 +2272,8 @@ var _ = ginkgo.Describe("Digests", func() {
 						w.Header().Set(
 							"WWW-Authenticate",
 							fmt.Sprintf(
-								`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								getScheme(),
 								redirectAddr,
 							),
 						)
@@ -2266,7 +2288,8 @@ var _ = ginkgo.Describe("Digests", func() {
 			registryAuth := auth.TransformAuth("token")
 			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
+			gomega.Expect(result).
+				To(gomega.Equal("d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"))
 		})
 		ginkgo.It("should conditionally update manifest URL host only when redirected", func() {
 			defer ginkgo.GinkgoRecover()
@@ -2295,10 +2318,18 @@ var _ = ginkgo.Describe("Digests", func() {
 				w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
 				w.WriteHeader(http.StatusFound)
 			})
+			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodHead {
+					w.WriteHeader(http.StatusNotFound)
+				} else {
+					w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+					w.WriteHeader(http.StatusOK)
+				}
+			})
 			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request on redirect server")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, redirectAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`, getScheme(), redirectAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -2320,7 +2351,8 @@ var _ = ginkgo.Describe("Digests", func() {
 			registryAuth := auth.TransformAuth("token")
 			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
+			gomega.Expect(result).
+				To(gomega.Equal("d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"))
 		})
 
 		ginkgo.It("should not update manifest URL host when not redirected", func() {
@@ -2505,7 +2537,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				url, err := manifest.BuildManifestURL(mockContainerWithServer)
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2579,7 +2611,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				url, err := manifest.BuildManifestURL(mockContainerWithServer)
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2651,7 +2683,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				url, err := manifest.BuildManifestURL(mockContainerWithServer)
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2721,7 +2753,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				url, err := manifest.BuildManifestURL(mockContainerWithServer)
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

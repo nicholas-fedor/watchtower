@@ -10,7 +10,6 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -27,15 +26,16 @@ var (
 // BuildManifestURL constructs a URL for accessing a container’s image manifest from its registry.
 //
 // It parses the image name into a normalized reference, extracts the registry host, and builds a URL with path and tag,
-// using the appropriate scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
+// using the provided scheme.
 //
 // Parameters:
 //   - container: Container with image info for URL construction.
+//   - scheme: The scheme to use for the URL (e.g., "https" or "http").
 //
 // Returns:
 //   - string: Manifest URL (e.g., "https://index.docker.io/v2/library/alpine/manifests/latest") if successful.
 //   - error: Non-nil if parsing or tagging fails, nil on success.
-func BuildManifestURL(container types.Container) (string, error) {
+func BuildManifestURL(container types.Container, scheme string) (string, error) {
 	// Set up logging fields for consistent tracking.
 	fields := logrus.Fields{
 		"container": container.Name(),
@@ -64,14 +64,7 @@ func BuildManifestURL(container types.Container) (string, error) {
 	host, _ := auth.GetRegistryAddress(normalizedTaggedRef.Name())
 	img, tag := reference.Path(normalizedTaggedRef), normalizedTaggedRef.Tag()
 
-	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
-	scheme := "https"
-	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
-		scheme = "http"
-
-		logrus.WithField("host", host).
-			Debug("Using HTTP scheme due to WATCHTOWER_REGISTRY_TLS_SKIP")
-	}
+	// Use the provided scheme.
 
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"host":       host,
