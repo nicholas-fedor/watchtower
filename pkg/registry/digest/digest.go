@@ -199,7 +199,23 @@ func buildManifestURL(
 
 	originalHost := parsedURL.Host
 
-	// Special handling for lscr.io: use ghcr.io as the manifest host
+	// Special handling for lscr.io registry redirects:
+	// lscr.io (LinuxServer.io) images are hosted on GitHub Container Registry (ghcr.io)
+	// but the registry redirects manifest requests from lscr.io to ghcr.io.
+	// However, the authentication challenge comes from ghcr.io, and when we try to
+	// make manifest requests to lscr.io, we get 401 Unauthorized followed by 404 Not Found
+	// because lscr.io doesn't actually host the manifests - it's just a redirect endpoint.
+	//
+	// To fix this, we intercept lscr.io URLs and change the host to ghcr.io for manifest requests,
+	// while still using lscr.io for the initial authentication challenge to get the correct tokens.
+	// This ensures HEAD requests succeed with 200 OK and we can extract digests without
+	// falling back to expensive full image pulls.
+	//
+	// The authentication flow works as follows:
+	// 1. Initial challenge request to lscr.io/v2/ gets redirected to ghcr.io
+	// 2. Authentication tokens are obtained from ghcr.io using the redirected challenge
+	// 3. Manifest requests are made directly to ghcr.io (not lscr.io) to avoid 401/404 errors
+	// 4. Digest extraction succeeds from the 200 OK response
 	if parsedURL.Host == "lscr.io" {
 		parsedURL.Host = "ghcr.io"
 		manifestURL = parsedURL.String()

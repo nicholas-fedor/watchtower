@@ -657,7 +657,20 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 			WithField("image", imageRef.Name()).
 			Debug("Failed to get registry address")
 	}
-	// Override realm for lscr.io registry to ensure correct authentication.
+
+	// Special handling for lscr.io registry authentication:
+	// lscr.io (LinuxServer.io) images are hosted on GitHub Container Registry (ghcr.io),
+	// but the authentication challenge from lscr.io redirects to ghcr.io. When we receive
+	// the WWW-Authenticate header from ghcr.io, it contains the ghcr.io realm URL.
+	// However, for lscr.io images, we need to ensure the realm points to ghcr.io's token endpoint
+	// to get the correct authentication tokens. This prevents authentication failures
+	// that would occur if we tried to use lscr.io's non-existent token endpoint.
+	//
+	// Without this override, lscr.io authentication would fail because:
+	// 1. Challenge request to lscr.io/v2/ redirects to ghcr.io/v2/
+	// 2. ghcr.io returns WWW-Authenticate header with ghcr.io realm
+	// 3. But sometimes the realm might not be correctly set, causing token requests to fail
+	// 4. This ensures we always use the correct ghcr.io token endpoint for lscr.io images
 	if registryAddress == LSCRRegistry {
 		values["realm"] = "https://ghcr.io/token"
 	}
