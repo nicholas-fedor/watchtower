@@ -399,7 +399,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", originalTLSSkip)
 
 		// Execute GetToken and verify the result.
-		token, _, err := auth.GetToken(context.Background(), containerInstance, creds, client)
+		token, _, _, err := auth.GetToken(context.Background(), containerInstance, creds, client)
 		if expectedErr != "" {
 			gomega.Expect(err).
 				To(gomega.HaveOccurred(), fmt.Sprintf("Expected an error for challenge '%s'", challengeHeader))
@@ -462,7 +462,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
 				client := auth.NewAuthClient()
-				token, _, err := auth.GetToken(
+				token, _, _, err := auth.GetToken(
 					context.Background(),
 					mockContainerInstance,
 					creds,
@@ -514,7 +514,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 
 			client := auth.NewAuthClient()
-			token, _, err := auth.GetToken(
+			token, _, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"user:pass",
@@ -562,7 +562,12 @@ var _ = ginkgo.Describe("the auth module", func() {
 				}
 
 				// Execute GetToken and verify the result.
-				token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+				token, _, _, err := auth.GetToken(
+					context.Background(),
+					containerInstance,
+					"",
+					client,
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(token).To(gomega.Equal(""))
 			},
@@ -597,7 +602,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			client := auth.NewAuthClient()
 
 			// Execute GetToken and verify the expected failure.
-			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("http: server gave HTTP response to HTTPS client"))
@@ -639,7 +644,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify the result.
-			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
@@ -680,7 +685,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify the result.
-			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
@@ -723,7 +728,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 
 			// Execute GetToken and verify the result.
-			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
 		})
@@ -757,7 +762,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			client := auth.NewAuthClient()
 
 			// Execute GetToken and verify the expected failure.
-			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("failed to execute challenge request"))
@@ -809,7 +814,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
-			token, challengeHost, err := auth.GetToken(
+			token, challengeHost, redirected, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -818,6 +823,124 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
 			gomega.Expect(challengeHost).To(gomega.Equal(redirectAddr))
+			gomega.Expect(redirected).To(gomega.BeFalse()) // No HTTP redirect occurred
+		})
+		// Test case: Verifies that GetToken returns redirect=false when the challenge request is not redirected.
+		ginkgo.It("should return redirect=false when challenge request is not redirected", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverAddr + "/test/image:latest",
+			}
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request - no redirect")
+				w.Header().Set(
+					"WWW-Authenticate",
+					fmt.Sprintf(
+						`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+						serverAddr,
+					),
+				)
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			token, challengeHost, redirected, err := auth.GetToken(
+				context.Background(),
+				containerInstance,
+				"",
+				client,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
+			gomega.Expect(challengeHost).To(gomega.Equal(serverAddr))
+			gomega.Expect(redirected).To(gomega.BeFalse())
+		})
+
+		// Test case: Verifies that GetToken returns redirect=true when the challenge request is redirected.
+		ginkgo.It("should return redirect=true when challenge request is redirected", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			redirectMux := http.NewServeMux()
+			redirectServer := httptest.NewTLSServer(redirectMux)
+			defer redirectServer.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			redirectAddr := redirectServer.Listener.Addr().String()
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverAddr + "/test/image:latest",
+			}
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request - redirecting")
+				// Redirect to the redirect server's /v2/
+				redirectURL := fmt.Sprintf("https://%s/v2/", redirectAddr)
+				w.Header().Set("Location", redirectURL)
+				w.WriteHeader(http.StatusFound)
+			})
+			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request on redirect server")
+				w.Header().Set(
+					"WWW-Authenticate",
+					fmt.Sprintf(
+						`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+						redirectAddr,
+					),
+				)
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			token, challengeHost, redirected, err := auth.GetToken(
+				context.Background(),
+				containerInstance,
+				"",
+				client,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
+			gomega.Expect(challengeHost).To(gomega.Equal(redirectAddr))
+			gomega.Expect(redirected).To(gomega.BeTrue()) // HTTP redirect occurred
 		})
 
 		// Test case: Ensures GetToken fails with an error when the HTTP client exceeds
@@ -882,7 +1005,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify failure due to too many redirects
-			token, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 			gomega.Expect(err).
 				To(gomega.HaveOccurred(), "Expected error due to exceeding redirect limit")
 			gomega.Expect(err.Error()).
@@ -1257,6 +1380,123 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			result := auth.TransformAuth(inputAuth)
 			gomega.Expect(result).To(gomega.Equal(inputAuth))
+		})
+		// Test case: Verifies that GetToken returns redirect=false when the challenge request is not redirected.
+		ginkgo.It("should return redirect=false when challenge request is not redirected", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverAddr + "/test/image:latest",
+			}
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request - no redirect")
+				w.Header().Set(
+					"WWW-Authenticate",
+					fmt.Sprintf(
+						`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+						serverAddr,
+					),
+				)
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			token, challengeHost, redirected, err := auth.GetToken(
+				context.Background(),
+				containerInstance,
+				"",
+				client,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
+			gomega.Expect(challengeHost).To(gomega.Equal(serverAddr))
+			gomega.Expect(redirected).To(gomega.BeFalse())
+		})
+
+		// Test case: Verifies that GetToken returns redirect=true when the challenge request is redirected.
+		ginkgo.It("should return redirect=true when challenge request is redirected", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewTLSServer(mux)
+			defer server.Close()
+
+			redirectMux := http.NewServeMux()
+			redirectServer := httptest.NewTLSServer(redirectMux)
+			defer redirectServer.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			redirectAddr := redirectServer.Listener.Addr().String()
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: serverAddr + "/test/image:latest",
+			}
+
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request - redirecting")
+				// Redirect to the redirect server's /v2/
+				redirectURL := fmt.Sprintf("https://%s/v2/", redirectAddr)
+				w.Header().Set("Location", redirectURL)
+				w.WriteHeader(http.StatusFound)
+			})
+			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request on redirect server")
+				w.Header().Set(
+					"WWW-Authenticate",
+					fmt.Sprintf(
+						`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+						redirectAddr,
+					),
+				)
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			token, challengeHost, redirected, err := auth.GetToken(
+				context.Background(),
+				containerInstance,
+				"",
+				client,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
+			gomega.Expect(challengeHost).To(gomega.Equal(redirectAddr))
+			gomega.Expect(redirected).To(gomega.BeTrue()) // HTTP redirect occurred
 		})
 	})
 })

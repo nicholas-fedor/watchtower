@@ -136,5 +136,11 @@ func buildMockContainerManifestURL(imageRef string) (string, error) {
 		imageInfo,
 	)
 
-	return manifest.BuildManifestURL(mock)
+	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
+	scheme := "https"
+	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		scheme = "http"
+	}
+
+	return manifest.BuildManifestURL(mock, scheme)
 }

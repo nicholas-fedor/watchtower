@@ -1013,6 +1013,32 @@ func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	}
 }
 
+// waitForRunningUpdate waits for any currently running update to complete before proceeding with shutdown.
+// It checks the lock channel status and blocks with a timeout if an update is in progress.
+// Parameters:
+//   - ctx: The context for cancellation, allowing early shutdown on context timeout.
+//   - lock: The channel used to synchronize updates, ensuring only one runs at a time.
+func waitForRunningUpdate(ctx context.Context, lock chan bool) {
+	const updateWaitTimeout = 30 * time.Second
+
+	logrus.Debug("Checking lock status before shutdown.")
+
+	if len(lock) == 0 {
+		select {
+		case <-lock:
+			logrus.Debug("Lock acquired, update finished.")
+		case <-time.After(updateWaitTimeout):
+			logrus.Warn("Timeout waiting for running update to finish, proceeding with shutdown.")
+		case <-ctx.Done():
+			logrus.Debug("Context cancelled, proceeding with shutdown.")
+		}
+	} else {
+		logrus.Debug("No update running, lock available.")
+	}
+
+	logrus.Debug("Lock check completed.")
+}
+
 // runUpgradesOnSchedule schedules and executes periodic container updates according to the cron specification.
 //
 // It sets up a cron scheduler, runs updates at specified intervals, and ensures graceful shutdown on interrupt
@@ -1104,9 +1130,7 @@ func runUpgradesOnSchedule(
 	scheduler.Stop()
 	logrus.Debug("Waiting for running update to be finished...")
 
-	if len(lock) > 0 {
-		<-lock
-	}
+	waitForRunningUpdate(ctx, lock)
 
 	logrus.Debug("Scheduler stopped and update completed.")
 

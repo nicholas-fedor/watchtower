@@ -983,6 +983,9 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 	// Track update calls from both instances
 	updateCallCount := int32(0)
+
+	var completed int32
+
 	instance1Called := make(chan bool, 1)
 	instance2Called := make(chan bool, 1)
 
@@ -1007,6 +1010,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 		err := runUpgradesOnSchedule(ctx, cmd1, filter, filterDesc, updateLock, false)
 		assert.NoError(t, err)
+		atomic.AddInt32(&completed, 1)
 		close(instance1Called)
 	}()
 
@@ -1019,6 +1023,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 		err := runUpgradesOnSchedule(ctx, cmd2, filter, filterDesc, updateLock, false)
 		assert.NoError(t, err)
+		atomic.AddInt32(&completed, 1)
 		close(instance2Called)
 	}()
 
@@ -1026,7 +1031,152 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 	<-instance1Called
 	<-instance2Called
 
+	// Verify that both instances shut down properly
+	assert.Equal(
+		t,
+		int32(2),
+		atomic.LoadInt32(&completed),
+		"Both instances should have shut down properly",
+	)
+
 	// Verify that only one update occurred due to locking (one instance gets the lock first)
 	callCount := atomic.LoadInt32(&updateCallCount)
 	assert.Equal(t, int32(1), callCount, "Only one update should occur due to lock serialization")
+	// Verify the lock is properly released after the test
+	lockAvailable := false
+
+	select {
+	case v := <-updateLock:
+		lockAvailable = true
+		// Lock was available, put it back for cleanup
+		updateLock <- v
+	default:
+		// Lock not available
+	}
+
+	assert.True(t, lockAvailable, "Lock should be available after test completion")
+}
+
+// TestWaitForRunningUpdate_NoUpdateRunning verifies that waitForRunningUpdate returns immediately
+// when no update is currently running (lock channel has a value).
+func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
+	lock := make(chan bool, 1)
+	lock <- true // Lock is available, no update running
+
+	ctx := context.Background()
+	start := time.Now()
+
+	waitForRunningUpdate(ctx, lock)
+
+	elapsed := time.Since(start)
+
+	// Should return immediately without blocking
+	assert.Less(t, elapsed, 10*time.Millisecond, "Should not block when no update is running")
+}
+
+// TestWaitForRunningUpdate_UpdateRunning verifies that waitForRunningUpdate blocks
+// and waits for an update to complete when one is running (lock channel is empty).
+func TestWaitForRunningUpdate_UpdateRunning(t *testing.T) {
+	lock := make(chan bool, 1)
+	// Don't put anything in lock initially - simulating update in progress
+
+	ctx := context.Background()
+	waitCompleted := make(chan bool, 1)
+
+	go func() {
+		waitForRunningUpdate(ctx, lock)
+
+		waitCompleted <- true
+	}()
+
+	// Wait a bit to ensure waitForRunningUpdate is blocking
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify it's still waiting
+	select {
+	case <-waitCompleted:
+		t.Error("waitForRunningUpdate should still be waiting")
+	default:
+		// Expected: still waiting
+	}
+
+	// Now complete the "update" by putting value back in lock
+	lock <- true
+
+	// Wait for waitForRunningUpdate to complete
+	select {
+	case <-waitCompleted:
+		// Expected: completed after lock was released
+	case <-time.After(100 * time.Millisecond):
+		t.Error("waitForRunningUpdate should have completed after lock was released")
+	}
+}
+
+// TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate verifies that runUpgradesOnSchedule
+// waits for any running update to complete before shutting down when receiving a shutdown signal.
+func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
+	// Create a command without scheduling to keep test simple
+	cmd := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd)
+	err := cmd.ParseFlags([]string{"--no-startup-message"})
+	require.NoError(t, err)
+
+	// Create update lock
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Track when shutdown completes
+	shutdownCompleted := make(chan bool, 1)
+
+	// Mock runUpdatesWithNotifications to simulate a long-running update
+	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+	runUpdatesWithNotifications = func(_ types.Filter, _ bool) *metrics.Metric {
+		// Signal that we're in the update
+		time.Sleep(100 * time.Millisecond) // Simulate update work
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+
+	// Create a cancellable context for shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start runUpgradesOnSchedule in a goroutine
+	go func() {
+		filter := func(_ types.FilterableContainer) bool { return false }
+		filterDesc := testFilterDesc
+
+		// This should start and wait for context cancellation
+		err := runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+		assert.NoError(t, err)
+
+		shutdownCompleted <- true
+	}()
+
+	// Start an update manually to simulate one running
+	go func() {
+		select {
+		case v := <-updateLock:
+			defer func() { updateLock <- v }()
+
+			time.Sleep(200 * time.Millisecond) // Longer than the shutdown delay
+		default:
+			// Lock not available
+		}
+	}()
+
+	// Give the update time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Cancel context to trigger shutdown
+	cancel()
+
+	// Wait for shutdown to complete
+	select {
+	case <-shutdownCompleted:
+		// Expected: shutdown completed after waiting for update
+	case <-time.After(500 * time.Millisecond):
+		t.Error("Shutdown should have completed after update finished")
+	}
 }

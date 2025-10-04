@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.0] - 2025-10-03
 
 ### Added
 
@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v28.5.0+incompatible by @renovate[bot] in [#750](https://github.com/nicholas-fedor/watchtower/pull/750)
+- Update module github.com/docker/docker to v28.5.0+incompatible by @renovate[bot] in [#751](https://github.com/nicholas-fedor/watchtower/pull/751)
+- Update module github.com/onsi/ginkgo/v2 to v2.26.0 by @renovate[bot] in [#749](https://github.com/nicholas-fedor/watchtower/pull/749)
+- Update genproto dependencies by @nicholas-fedor in [#742](https://github.com/nicholas-fedor/watchtower/pull/742)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.10.0 by @renovate[bot] in [#727](https://github.com/nicholas-fedor/watchtower/pull/727)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.9.1 by @renovate[bot] in [#676](https://github.com/nicholas-fedor/watchtower/pull/676)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.9.0 by @renovate[bot] in [#674](https://github.com/nicholas-fedor/watchtower/pull/674)
@@ -35,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ensure Watchtower updates itself last to fix notification split issue by @nicholas-fedor in [#756](https://github.com/nicholas-fedor/watchtower/pull/756)
+- Correct shutdown lock waiting logic and prevent test timeouts by @nicholas-fedor in [#753](https://github.com/nicholas-fedor/watchtower/pull/753)
+- Resolve data race in shoutrrr notifications by @nicholas-fedor in [#746](https://github.com/nicholas-fedor/watchtower/pull/746)
+- Prevent nil pointer dereference in container cleanup by @nicholas-fedor in [#745](https://github.com/nicholas-fedor/watchtower/pull/745)
+- Integrate --update-on-start with normal update cycle by @nicholas-fedor in [#740](https://github.com/nicholas-fedor/watchtower/pull/740)
+- Improve CI test reliability across platforms by @nicholas-fedor in [#732](https://github.com/nicholas-fedor/watchtower/pull/732)
+- Prevent concurrent Docker client access causing crashes by @nicholas-fedor in [#731](https://github.com/nicholas-fedor/watchtower/pull/731)
+- Resolve Docker Distribution API manifest HEAD request issues by @nicholas-fedor in [#728](https://github.com/nicholas-fedor/watchtower/pull/728)
 - Improve self-update handling with robust digest parsing by @nicholas-fedor in [#724](https://github.com/nicholas-fedor/watchtower/pull/724)
 - Address container identification issue by @nicholas-fedor in [#718](https://github.com/nicholas-fedor/watchtower/pull/718)
 - Improve logging clarity and accuracy for scheduling modes by @nicholas-fedor in [#716](https://github.com/nicholas-fedor/watchtower/pull/716)
@@ -153,6 +165,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.10.0] - 2025-05-27
 
+### Chores
+
+- Bump github.com/prometheus/client_golang from 1.17.0 to 1.18.0 by @dependabot[bot]
+- Bump github.com/spf13/viper from 1.18.1 to 1.18.2 by @dependabot[bot]
+- Bump github.com/spf13/viper from 1.17.0 to 1.18.1 by @dependabot[bot]
+- Bump go/stdlib to v1.20.x by @piksel
+
+### Fixed
+
+- Correct logging level of watchtower handling for shutdown signals and context cancellation by @nicholas-fedor in [#282](https://github.com/nicholas-fedor/watchtower/pull/282)
+
+## [1.7.1] - 2023-11-11
+
 ### Added
 
 - Add linking and output messages by @piksel
@@ -162,10 +187,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
-- Bump github.com/prometheus/client_golang from 1.17.0 to 1.18.0 by @dependabot[bot]
-- Bump github.com/spf13/viper from 1.18.1 to 1.18.2 by @dependabot[bot]
-- Bump github.com/spf13/viper from 1.17.0 to 1.18.1 by @dependabot[bot]
-- Bump go/stdlib to v1.20.x by @piksel
 - Bump github.com/spf13/cobra from 1.7.0 to 1.8.0 by @dependabot[bot]
 - Bump golang.org/x/text from 0.13.0 to 0.14.0 by @dependabot[bot]
 - Bump github.com/docker/cli from 24.0.6+incompatible to 24.0.7+incompatible by @dependabot[bot]
@@ -182,7 +203,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Correct logging level of watchtower handling for shutdown signals and context cancellation by @nicholas-fedor in [#282](https://github.com/nicholas-fedor/watchtower/pull/282)
 - Instance cleanup without scope by @piksel
 - Set nopull param from args by @piksel
 - Handle missing healthcheck keys in config by @piksel
@@ -190,6 +210,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Contributors
 
+- @nicholas-fedor made their first contribution in [#265](https://github.com/nicholas-fedor/watchtower/pull/265)
+- @renovate[bot] made their first contribution in [#258](https://github.com/nicholas-fedor/watchtower/pull/258)
 - @donuts-are-good made their first contribution
 
 ## [1.9.2] - 2025-05-08
@@ -419,6 +441,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.2] - 2025-01-18
 
+### Changed
+
+- Dependency update by @nicholas-fedor
+- Consolidated all post-fork updates including dependency bumps and workflow changes by @dependabot[bot]
+- Add a flag/env to explicitly exclude containers by name by @rdamazio
+
+### New Contributors
+
+- @nicholas-fedor made their first contribution
+
+## [1.6.0] - 2023-10-02
+
 ### Added
 
 - Add template preview by @piksel
@@ -426,151 +460,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a label take precedence argument by @jebabin
 - Support container network mode by @schizo99
 - Add no-pull label for containers by @gilbsgilbs
-- Add json template by @piksel
-- Add oci image index support by @piksel
-- Add porcelain output by @piksel
-- Support secrets for notification_url by @jlaska
-- Add general notification delay by @lazou
-- Add title field to template data by @piksel
-- Support delayed sending by @piksel
-- Add context fields to lifecycle events by @piksel
-- Add WATCHTOWER_INCLUDE_RESTARTING env for include-restarting flag by @ilike2burnthing
-- Add defered closer calls for the http clients by @simskij
-- Add http head based digest comparison to avoid dockerhub rate limits by @simskij
-- Adds scopeUID config to enable multiple instances of Watchtower by @victorcmoura
-- Add string functions for lowercase, uppercase and capitalize to shoutrrr templates by @PssbleTrngle
-- Adds the option to skip TLS verification for a Gotify instance by @tammert
-- Add template support for shoutrrr notifications by @arnested
-- Added --trace flag and new log.Trace() lines for sensitive information by @tammert
-- Add ability to overrider depending containers with special label by @Saicheg
-- Add shoutrrr.go by @mbrandau
-- Add shoutrrr by @mbrandau
-- Add timeout override for pre-update lifecycle hook by @simskij
-- Add --no-startup-message flag
-- #387 fix: add comments to pass linting by @simskij
-- Add support for multiple email recipients by @simskij
-- Added Mail Subject Tag to email.go by @simskij
-- Add --revive-stopped flag to start stopped containers after an update by @zoispag
-- Add pre/post update check lifecycle hooks
-- Add optional email delay by @simskij
-- Add docker api version parameter by @kaloyan-raev
-- Add support for Gotify notifications by @lukapeschke
 
 ### Changed
 
-- Dependency update by @nicholas-fedor
-- Consolidated all post-fork updates including dependency bumps and workflow changes by @dependabot[bot]
-- Add a flag/env to explicitly exclude containers by name by @rdamazio
 - Allow logging output to use JSON formatter by @GridexX
 - Update shoutrrr to v0.8 by @piksel
 - Enabled loading http-api-token from file by @piksel
 - Log removed/untagged images by @piksel
 - Merge pull request #1548 from containrrr/dependabot/go_modules/github.com/onsi/gomega-1.26.0 by @dependabot[bot]
-- Set default email client host by @piksel
-- Update shoutrrr to v0.7 by @piksel
-- Ignore removal error due to non-existing containers by @nothub
-- Preparations for soft deprecation of legacy notification args by @piksel
-- Allow log level to be set to any level by @matthewmcneely
-- Regex container name filtering by @mateuszdrab
-- Update shoutrrr to v0.6.1 by @piksel
-- Update shoutrrr to v0.6.1 by @piksel
-- Optional query parameter to update only containers of a specified image by @Foxite
-- Bump shoutrrr to v0.5.3 by @piksel
-- Bump vulnerable packages by @simskij
-- Bump version of vulnerable dependencies by @piksel
-- Improve HTTP API logging, honor no-startup-message by @jinnatar
-- Post update time out by @patricegautier
-- Improve session result logging by @piksel
-- Use a more specific error type for no container info by @MorrisLaw
-- Update dependencies (sane go.mod) by @piksel
-- Update to v0.5 by @piksel
-- Session report collection and report templates by @piksel
-- Pre-update lifecycle hook
-- Allow hostname override for notifiers by @nightah
-- - feat: custom user agent by @piksel
-- Allow running periodic updates with enabled HTTP API by @DasSkelett
-- Check container config before update by @piksel
-- Feat/head failure toggle by @simskij
-- Update shoutrrr to v0.4.4 by @piksel
-- Make head pull failure warning toggleable by @piksel
-- Move token logs to trace by @simskij
-- Use short image/container IDs in logs by @piksel
-- Include additional info in startup by @piksel
-- Update Shoutrrr to v0.4 by @piksel
-- Fix notifications and old instance cleanup by @piksel
-- Prometheus support by @simskij
-- Cherrypick notification changes from #450 by @simskij
-- Log based on registry known-support - reduce noise on notifications by @tkalus
-- Revert "feat(config): swap viper and cobra for config " by @simskij
-- Clean up scope builder and remove fmt print by @simskij
-- Make sure all different ref formats are supported by @simskij
-- Swap viper and cobra for config by @piksel
-- Move secret value "credentials" to trace log by @piksel
-- Actually fix it by @simskij
-- Allow watchtower to update rebooting containers
-- Monitor-only for individual containers by @dhet
-- Disabling color through environment variables by @bugficks
-- Rolling restart by @osheroff
-- Skip updating containers where no local image info can be retrieved by @piksel
-- Make sure all shoutrrr notifications are sent by @CedricFinance
-- Warning if `WATCHTOWER_NO_PULL` and`WATCHTOWER_MONITOR_ONLY` are used simultaneously. by @m-sedl
-- Lifecycle logs as Debug instead of Info by @MichaelSp
-- Allows flags containing sensitive stuff to be passed as files by @tammert
-- Image of running container no longer needed locally by @tammert
-- Update shoutrrr to get latest and updated services by @arnested
-- Comment out test that is incompatible with CircleCI by @simskij
-- Bump minimum API version to 1.25 by @simskij
-- Increases stopContainer timeout to 10min by @bopoh24
-- Increases stopContainer timeout from 60 seconds to 10min by @victorcmoura
-- Watchtower HTTP API based updates by @victorcmoura
-- Merge branch 'master' into all-contributors/add-mbrandau by @simskij
-- Merge pull request #470 from mbrandau/add-shoutrrr by @simskij
-- Update shoutrrr by @mbrandau
-- Reuse router by @mbrandau
-- Use CreateSender instead of calling Send multiple times by @mbrandau
-- Adjust flags by @mbrandau
-- Merge pull request #480 from containrrr/feature/367 by @simskij
-- Feature/367 fix: skip container if pre-update command fails by @simskij
-- Merge pull request #477 from mbrandau/no-startup-message by @simskij
-- Merge pull request #465 from lukwil/feature/443 by @simskij
-- Fix according to remarks
-- Merge pull request #455 from pagdot/patch-1 by @simskij
-- Return on error after http.Post to gotify instance by @pagdot
-- Merge pull request #418 from jsclayton/fix/retain-cmd by @simskij
-- Merge branch 'master' into fix/retain-cmd by @simskij
-- Merge pull request #448 from raymondelooff/bugfix/188 by @simskij
-- Unset Hostname when NetworkMode is container by @raymondelooff
-- Tidy up mod and sum files by @simskij
-- Extract code from the container package by @simskij
-- #387 fix: switch to image id map and add additional tests by @simskij
-- Merge pull request #436 from containrrr/feature/multiple-email-recipients by @simskij
-- Merge pull request #393 from mindrunner/master by @simskij
-- Merge branch 'master' into master by @simskij
-- Proper set implementation by @mindrunner
-- Do not delete same image twice when cleaning up by @mindrunner
-- Merge pull request #423 from zoispag/feature/413-change-initial-log-from-debug-to-info by @simskij
-- #413 Change initial logging message from debug to info by @zoispag
-- Sync by @zoispag
-- Merge branch 'master' into all-contributors/add-zoispag by @simskij
-- Don’t delete cmd when runtime entrypoint is different by @jsclayton
-- Update flags.go by @8ear
-- Update flags.go by @8ear
-- Update email.go by @8ear
-- Update email.go by @8ear
-- Update email.go by @8ear
-- Update email.go by @8ear
-- Fix a small typo by @foosel
-- Update check.go by @sixth
-- Feat/lifecycle hooks by @simskij
-- Split out more code into separate files by @simskij
-- Move actions into internal by @simskij
-- Move actions into pkg by @simskij
-- Move container into pkg by @simskij
-- Extract types and pkgs to new files by @simskij
-- Re-apply based on new go flags package by @zoispag
-- Switch urfave to cobra by @simskij
-- Exclude markdown files from coverage analysis by @simskij
-- Setup a working pipeline by @simskij
 
 ### Chores
 
@@ -619,6 +516,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump github.com/docker/docker from 23.0.2+incompatible to 23.0.3+incompatible by @dependabot[bot]
 - Bump docker/docker from 20.10.23+inc to 23.0.2+inc by @dependabot[bot]
 - Bump github.com/onsi/gomega from 1.25.0 to 1.26.0 by @dependabot[bot]
+
+### Fixed
+
+- Only remove container id network aliases by @piksel
+- Check flag/docs consistency by @piksel
+- Received typo by @testwill
+- Ensure temp files are cleaned up by @piksel
+- Correctly set the delay from options by @Tentoe
+- Empty out the aliases on recreation by @simskij
+- Always use container interface by @piksel
+- Image name parsing behavior by @Pwuts
+- Remove logging of credentials by @piksel
+- Ignore empty challenge fields by @piksel
+- Always add missing slashes to link names by @piksel
+
+### New Contributors
+
+- @GridexX made their first contribution
+- @testwill made their first contribution
+- @Tentoe made their first contribution
+- @schizo99 made their first contribution
+- @Pwuts made their first contribution
+- @gilbsgilbs made their first contribution
+
+## [1.5.3] - 2023-01-30
+
+### Changed
+
+- Set default email client host by @piksel
+
+## [1.5.2] - 2023-01-29
+
+### Added
+
+- Add json template by @piksel
+- Add oci image index support by @piksel
+
+### Changed
+
+- Update shoutrrr to v0.7 by @piksel
+- Ignore removal error due to non-existing containers by @nothub
+
+### Chores
+
 - Bump github.com/docker/cli from 20.10.22+incompatible to 20.10.23+incompatible by @dependabot[bot]
 - Bump github.com/spf13/viper from 1.14.0 to 1.15.0 by @dependabot[bot]
 - Bump github.com/docker/docker from 20.10.22+incompatible to 20.10.23+incompatible by @dependabot[bot]
@@ -636,6 +577,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump github.com/spf13/cobra from 1.6.0 to 1.6.1 by @dependabot[bot]
 - Bump github.com/prometheus/client_golang from 1.13.0 to 1.14.0 by @dependabot[bot]
 - Bump github.com/onsi/gomega from 1.23.0 to 1.24.0 by @dependabot[bot]
+
+### Fixed
+
+- Update metrics from sessions started via API by @SamKirsch10
+- Refactor/simplify container mock builders by @piksel
+
+### New Contributors
+
+- @SamKirsch10 made their first contribution
+- @nothub made their first contribution
+
+## [1.5.1] - 2022-11-05
+
+### Added
+
+- Add porcelain output by @piksel
+- Support secrets for notification_url by @jlaska
+- Add general notification delay by @lazou
+
+### Changed
+
+- Preparations for soft deprecation of legacy notification args by @piksel
+- Allow log level to be set to any level by @matthewmcneely
+- Regex container name filtering by @mateuszdrab
+- Update shoutrrr to v0.6.1 by @piksel
+- Update shoutrrr to v0.6.1 by @piksel
+- Optional query parameter to update only containers of a specified image by @Foxite
+- Bump shoutrrr to v0.5.3 by @piksel
+
+### Chores
+
 - Bump github.com/docker/cli from 20.10.19+incompatible to 20.10.21+incompatible by @dependabot[bot]
 - Bump github.com/docker/docker from 20.10.19+incompatible to 20.10.21+incompatible by @dependabot[bot]
 - Bump github.com/onsi/gomega from 1.22.1 to 1.23.0 by @dependabot[bot]
@@ -661,23 +633,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump github.com/spf13/cobra from 1.4.0 to 1.5.0 by @dependabot[bot]
 - Bump github.com/onsi/ginkgo from 1.14.2 to 1.16.5 by @dependabot[bot]
 - Bump github.com/docker/distribution from 2.7.1+incompatible to 2.8.0+incompatible by @dependabot[bot]
-- Bump shoutrrr and containrd by @piksel
 
 ### Fixed
 
-- Only remove container id network aliases by @piksel
-- Check flag/docs consistency by @piksel
-- Received typo by @testwill
-- Ensure temp files are cleaned up by @piksel
-- Correctly set the delay from options by @Tentoe
-- Empty out the aliases on recreation by @simskij
-- Always use container interface by @piksel
-- Image name parsing behavior by @Pwuts
-- Remove logging of credentials by @piksel
-- Ignore empty challenge fields by @piksel
-- Always add missing slashes to link names by @piksel
-- Update metrics from sessions started via API by @SamKirsch10
-- Refactor/simplify container mock builders by @piksel
 - Explicitly accept non-commands as root args by @piksel
 - Detect schedule set from env by @piksel
 - Include icon in slack legacy url by @Choromanski
@@ -685,6 +643,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Testing for flag files on windows by @piksel
 - Title customization by @piksel
 - Correctly handle non-stale restarts by @piksel
+
+### New Contributors
+
+- @matthewmcneely made their first contribution
+- @mateuszdrab made their first contribution
+- @jlaska made their first contribution
+- @Foxite made their first contribution
+- @lazou made their first contribution
+
+## [1.4.0] - 2022-01-22
+
+### Added
+
+- Add title field to template data by @piksel
+- Support delayed sending by @piksel
+- Add context fields to lifecycle events by @piksel
+
+### Changed
+
+- Bump vulnerable packages by @simskij
+- Bump version of vulnerable dependencies by @piksel
+- Improve HTTP API logging, honor no-startup-message by @jinnatar
+- Post update time out by @patricegautier
+- Improve session result logging by @piksel
+- Use a more specific error type for no container info by @MorrisLaw
+- Update dependencies (sane go.mod) by @piksel
+- Update to v0.5 by @piksel
+- Session report collection and report templates by @piksel
+- Pre-update lifecycle hook
+- Allow hostname override for notifiers by @nightah
+- * feat: custom user agent by @piksel
+- Allow running periodic updates with enabled HTTP API by @DasSkelett
+- Check container config before update by @piksel
+- Feat/head failure toggle by @simskij
+- Update shoutrrr to v0.4.4 by @piksel
+- Make head pull failure warning toggleable by @piksel
+- Move token logs to trace by @simskij
+- Use short image/container IDs in logs by @piksel
+- Include additional info in startup by @piksel
+- Update Shoutrrr to v0.4 by @piksel
+
+### Chores
+
+- Bump shoutrrr and containrd by @piksel
+
+### Fixed
+
 - Move invalid token to log field by @piksel
 - Add missing portmap when needed by @piksel
 - Linked/depends-on container restarting by @piksel
@@ -704,50 +709,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Don't panic on unconfigured notifier by @piksel
 - Disallow log level 'trace' by @zoispag
 - Set log level to debug for message about API token by @zoispag
-- Fix manifest tag index in manifest.go by @piksel
-- Fix linting issues by @simskij
-- Fix cleanup for rolling updates by @piksel
-- Fix typo by @rg9400
-- Fix default interval to be the intended value by @piksel
-- Fix erroneous poll interval change by @simskij
-- Return nil imageinfo when retrieve fails by @piksel
-- Fix fmt and vetting issues by @simskij
-- Make shoutrrr init failure a fatal error by @piksel
-- Display errors on init failure by @piksel
-- Always use configured delay for notifications by @piksel
-- Fix linting and formatting by @simskij
-- Fix some errors and clean up
-- Improve logging by @simskij
-- Update mock client for tests by @simskij
-- Fix #472 by @mbrandau
-- Fix some var ref errors by @simskij
-- Switch exit code for run once to 0 by @simskij
-- Resolve merge issues by @simskij
-- Remove linting issues by @simskij
-- Remove unnecessary cronSet check by @simskij
-- Fix port typing issue introduced in 998e805 by @simskij
-- Fix linter errors by @simskij
 
 ### Removed
 
 - Remove unused cross package dependency on mock api server by @piksel
-- Removed all potential debug password prints, both plaintext and encoded by @tammert
 
 ### New Contributors
 
-- @nicholas-fedor made their first contribution
-- @GridexX made their first contribution
-- @testwill made their first contribution
-- @Tentoe made their first contribution
-- @schizo99 made their first contribution
-- @Pwuts made their first contribution
-- @gilbsgilbs made their first contribution
-- @SamKirsch10 made their first contribution
-- @matthewmcneely made their first contribution
-- @mateuszdrab made their first contribution
-- @jlaska made their first contribution
-- @Foxite made their first contribution
-- @lazou made their first contribution
 - @jinnatar made their first contribution
 - @patricegautier made their first contribution
 - @MorrisLaw made their first contribution
@@ -755,21 +723,234 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - @dhiemaz made their first contribution
 - @nightah made their first contribution
 - @DasSkelett made their first contribution
+
+## [1.1.6] - 2021-01-10
+
+### Added
+
+- Add WATCHTOWER_INCLUDE_RESTARTING env for include-restarting flag by @ilike2burnthing
+
+### Changed
+
+- Fix notifications and old instance cleanup by @piksel
+- Prometheus support by @simskij
+- Cherrypick notification changes from #450 by @simskij
+
+### New Contributors
+
 - @ilike2burnthing made their first contribution
+
+## [1.1.5] - 2021-01-02
+
+### Changed
+
+- Log based on registry known-support - reduce noise on notifications by @tkalus
+
+### Fixed
+
+- Fix manifest tag index in manifest.go by @piksel
+
+### New Contributors
+
 - @tkalus made their first contribution
+
+## [1.1.3] - 2020-12-21
+
+### Changed
+
+- Revert "feat(config): swap viper and cobra for config " by @simskij
+
+## [1.1.2] - 2020-12-21
+
+### Changed
+
+- Clean up scope builder and remove fmt print by @simskij
+
+## [1.1.1] - 2020-12-21
+
+### Added
+
+- Add defered closer calls for the http clients by @simskij
+- Add http head based digest comparison to avoid dockerhub rate limits by @simskij
+
+### Changed
+
+- Make sure all different ref formats are supported by @simskij
+- Swap viper and cobra for config by @piksel
+- Move secret value "credentials" to trace log by @piksel
+- Actually fix it by @simskij
+- Allow watchtower to update rebooting containers
+
+### Fixed
+
+- Fix linting issues by @simskij
+- Fix cleanup for rolling updates by @piksel
+- Fix typo by @rg9400
+- Fix default interval to be the intended value by @piksel
+- Fix erroneous poll interval change by @simskij
+- Return nil imageinfo when retrieve fails by @piksel
+
+### New Contributors
+
 - @rg9400 made their first contribution
+
+## [1.0.3] - 2020-10-03
+
+### Added
+
+- Adds scopeUID config to enable multiple instances of Watchtower by @victorcmoura
+- Add string functions for lowercase, uppercase and capitalize to shoutrrr templates by @PssbleTrngle
+
+### Changed
+
+- Monitor-only for individual containers by @dhet
+- Disabling color through environment variables by @bugficks
+- Rolling restart by @osheroff
+- Skip updating containers where no local image info can be retrieved by @piksel
+- Make sure all shoutrrr notifications are sent by @CedricFinance
+- Warning if `WATCHTOWER_NO_PULL` and` WATCHTOWER_MONITOR_ONLY` are used simultaneously. by @m-sedl
+- Lifecycle logs as Debug instead of Info by @MichaelSp
+- Allows flags containing sensitive stuff to be passed as files by @tammert
+- Image of running container no longer needed locally by @tammert
+
+### Fixed
+
+- Fix fmt and vetting issues by @simskij
+
+### New Contributors
+
 - @dhet made their first contribution
 - @osheroff made their first contribution
 - @CedricFinance made their first contribution
 - @m-sedl made their first contribution
 - @MichaelSp made their first contribution
 - @PssbleTrngle made their first contribution
+
+## [1.0.2] - 2020-06-01
+
+### Changed
+
+- Update shoutrrr to get latest and updated services by @arnested
+
+### Fixed
+
+- Make shoutrrr init failure a fatal error by @piksel
+
+## [1.0.1] - 2020-05-29
+
+### Added
+
+- Adds the option to skip TLS verification for a Gotify instance by @tammert
+- Add template support for shoutrrr notifications by @arnested
+- Added --trace flag and new log.Trace() lines for sensitive information by @tammert
+- Add ability to overrider depending containers with special label by @Saicheg
+- Add shoutrrr.go by @mbrandau
+- Add shoutrrr by @mbrandau
+- Add timeout override for pre-update lifecycle hook by @simskij
+- Add --no-startup-message flag
+- #387 fix: add comments to pass linting by @simskij
+- Add support for multiple email recipients by @simskij
+
+### Changed
+
+- Comment out test that is incompatible with CircleCI by @simskij
+- Bump minimum API version to 1.25 by @simskij
+- Increases stopContainer timeout to 10min by @bopoh24
+- Increases stopContainer timeout from 60 seconds to 10min by @victorcmoura
+- Watchtower HTTP API based updates by @victorcmoura
+- Merge branch 'master' into all-contributors/add-mbrandau by @simskij
+- Merge pull request #470 from mbrandau/add-shoutrrr by @simskij
+- Update shoutrrr by @mbrandau
+- Reuse router by @mbrandau
+- Use CreateSender instead of calling Send multiple times by @mbrandau
+- Adjust flags by @mbrandau
+- Merge pull request #480 from containrrr/feature/367 by @simskij
+- Feature/367 fix: skip container if pre-update command fails by @simskij
+- Merge pull request #477 from mbrandau/no-startup-message by @simskij
+- Merge pull request #465 from lukwil/feature/443 by @simskij
+- Fix according to remarks
+- Merge pull request #455 from pagdot/patch-1 by @simskij
+- Return on error after http.Post to gotify instance by @pagdot
+- Merge pull request #418 from jsclayton/fix/retain-cmd by @simskij
+- Merge branch 'master' into fix/retain-cmd by @simskij
+- Merge pull request #448 from raymondelooff/bugfix/188 by @simskij
+- Unset Hostname when NetworkMode is container by @raymondelooff
+- Tidy up mod and sum files by @simskij
+- Extract code from the container package by @simskij
+- #387 fix: switch to image id map and add additional tests by @simskij
+- Merge pull request #436 from containrrr/feature/multiple-email-recipients by @simskij
+- Merge pull request #393 from mindrunner/master by @simskij
+- Merge branch 'master' into master by @simskij
+- Proper set implementation by @mindrunner
+- Do not delete same image twice when cleaning up by @mindrunner
+
+### Fixed
+
+- Display errors on init failure by @piksel
+- Always use configured delay for notifications by @piksel
+- Fix linting and formatting by @simskij
+- Fix some errors and clean up
+- Improve logging by @simskij
+- Update mock client for tests by @simskij
+- Fix #472 by @mbrandau
+
+### Removed
+
+- Removed all potential debug password prints, both plaintext and encoded by @tammert
+
+### New Contributors
+
+- @tammert made their first contribution
 - @arnested made their first contribution
 - @bopoh24 made their first contribution
 - @Saicheg made their first contribution
 - @pagdot made their first contribution
 - @raymondelooff made their first contribution
 - @mindrunner made their first contribution
+
+## [0.3.10] - 2019-12-26
+
+### Added
+
+- Added Mail Subject Tag to email.go by @simskij
+- Add --revive-stopped flag to start stopped containers after an update by @zoispag
+- Add pre/post update check lifecycle hooks
+- Add optional email delay by @simskij
+- Add docker api version parameter by @kaloyan-raev
+- Add support for Gotify notifications by @lukapeschke
+
+### Changed
+
+- Merge pull request #423 from zoispag/feature/413-change-initial-log-from-debug-to-info by @simskij
+- #413 Change initial logging message from debug to info by @zoispag
+- Sync by @zoispag
+- Merge branch 'master' into all-contributors/add-zoispag by @simskij
+- Don’t delete cmd when runtime entrypoint is different by @jsclayton
+- Update flags.go by @8ear
+- Update flags.go by @8ear
+- Update email.go by @8ear
+- Update email.go by @8ear
+- Update email.go by @8ear
+- Update email.go by @8ear
+- Fix a small typo by @foosel
+- Update check.go by @sixth
+- Feat/lifecycle hooks by @simskij
+- Split out more code into separate files by @simskij
+- Move actions into internal by @simskij
+- Move actions into pkg by @simskij
+- Move container into pkg by @simskij
+- Extract types and pkgs to new files by @simskij
+- Re-apply based on new go flags package by @zoispag
+
+### Fixed
+
+- Fix some var ref errors by @simskij
+- Switch exit code for run once to 0 by @simskij
+- Resolve merge issues by @simskij
+- Remove linting issues by @simskij
+
+### New Contributors
+
 - @jsclayton made their first contribution
 - @8ear made their first contribution
 - @foosel made their first contribution
@@ -777,15 +958,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - @kaloyan-raev made their first contribution
 - @lukapeschke made their first contribution
 
+## [0.3.8] - 2019-07-02
+
+### Changed
+
+- Switch urfave to cobra by @simskij
+- Exclude markdown files from coverage analysis by @simskij
+- Setup a working pipeline by @simskij
+
+### Fixed
+
+- Remove unnecessary cronSet check by @simskij
+- Fix port typing issue introduced in 998e805 by @simskij
+- Fix linter errors by @simskij
+
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.11.8...HEAD)
+- [1.12.0](https://github.com/nicholas-fedor/watchtower/compare/v1.11.8...v1.12.0)
 - [1.11.8](https://github.com/nicholas-fedor/watchtower/compare/v1.11.6...v1.11.8)
 - [1.11.6](https://github.com/nicholas-fedor/watchtower/compare/v1.11.5...v1.11.6)
 - [1.11.5](https://github.com/nicholas-fedor/watchtower/compare/v1.11.2...v1.11.5)
 - [1.11.2](https://github.com/nicholas-fedor/watchtower/compare/v1.11.0...v1.11.2)
 - [1.11.0](https://github.com/nicholas-fedor/watchtower/compare/v1.10.0...v1.11.0)
-- [1.10.0](https://github.com/nicholas-fedor/watchtower/compare/v1.9.2...v1.10.0)
+- [1.10.0](https://github.com/nicholas-fedor/watchtower/compare/v1.7.1...v1.10.0)
+- [1.7.1](https://github.com/nicholas-fedor/watchtower/compare/v1.9.2...v1.7.1)
 - [1.9.2](https://github.com/nicholas-fedor/watchtower/compare/v1.9.0...v1.9.2)
 - [1.9.0](https://github.com/nicholas-fedor/watchtower/compare/v1.8.8...v1.9.0)
 - [1.8.8](https://github.com/nicholas-fedor/watchtower/compare/v1.8.6...v1.8.8)
@@ -799,5 +995,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [1.7.12](https://github.com/nicholas-fedor/watchtower/compare/v1.7.11...v1.7.12)
 - [1.7.11](https://github.com/nicholas-fedor/watchtower/compare/v1.7.10...v1.7.11)
 - [1.7.10](https://github.com/nicholas-fedor/watchtower/compare/v1.7.2...v1.7.10)
+- [1.7.2](https://github.com/nicholas-fedor/watchtower/compare/v1.6.0...v1.7.2)
+- [1.6.0](https://github.com/nicholas-fedor/watchtower/compare/v1.5.3...v1.6.0)
+- [1.5.3](https://github.com/nicholas-fedor/watchtower/compare/v1.5.2...v1.5.3)
+- [1.5.2](https://github.com/nicholas-fedor/watchtower/compare/v1.5.1...v1.5.2)
+- [1.5.1](https://github.com/nicholas-fedor/watchtower/compare/v1.4.0...v1.5.1)
+- [1.4.0](https://github.com/nicholas-fedor/watchtower/compare/v1.1.6...v1.4.0)
+- [1.1.6](https://github.com/nicholas-fedor/watchtower/compare/v1.1.5...v1.1.6)
+- [1.1.5](https://github.com/nicholas-fedor/watchtower/compare/v1.1.3...v1.1.5)
+- [1.1.3](https://github.com/nicholas-fedor/watchtower/compare/v1.1.2...v1.1.3)
+- [1.1.2](https://github.com/nicholas-fedor/watchtower/compare/v1.1.1...v1.1.2)
+- [1.1.1](https://github.com/nicholas-fedor/watchtower/compare/v1.0.3...v1.1.1)
+- [1.0.3](https://github.com/nicholas-fedor/watchtower/compare/v1.0.2...v1.0.3)
+- [1.0.2](https://github.com/nicholas-fedor/watchtower/compare/v1.0.1...v1.0.2)
+- [1.0.1](https://github.com/nicholas-fedor/watchtower/compare/v0.3.10...v1.0.1)
+- [0.3.10](https://github.com/nicholas-fedor/watchtower/compare/v0.3.8...v0.3.10)
+- [0.3.8](https://github.com/nicholas-fedor/watchtower/compare/v0.3.7...v0.3.8)
 
 <!-- generated by git-cliff -->

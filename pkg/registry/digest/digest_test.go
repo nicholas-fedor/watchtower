@@ -31,6 +31,19 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+const (
+	httpScheme  = "http"
+	httpsScheme = "https"
+)
+
+func getScheme() string {
+	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		return httpScheme
+	}
+
+	return httpsScheme
+}
+
 // FuzzExtractGetDigest fuzzes the body parsing in ExtractGetDigest to test for crashes or unexpected behavior with malformed inputs.
 func FuzzExtractGetDigest(f *testing.F) {
 	// Seed with known good and bad inputs
@@ -248,10 +261,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerEmptyDigests, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerEmptyDigests, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerEmptyDigests)
+			url, err := manifest.BuildManifestURL(mockContainerEmptyDigests, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -316,10 +329,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -356,7 +369,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			_, _, err := auth.GetToken(ctx, mockContainerUnreachable, registryAuth, client)
+			_, _, _, err := auth.GetToken(ctx, mockContainerUnreachable, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("failed to execute challenge request"))
@@ -387,7 +400,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			_, _, err := auth.GetToken(ctx, mockContainerInvalidImage, registryAuth, client)
+			_, _, _, err := auth.GetToken(ctx, mockContainerInvalidImage, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
 		})
@@ -407,7 +420,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			_, _, err := auth.GetToken(ctx, mockContainerInvalidURL, registryAuth, client)
+			_, _, _, err := auth.GetToken(ctx, mockContainerInvalidURL, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
 		})
@@ -455,10 +468,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -517,10 +530,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -585,7 +598,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(
+			token, _, _, err := auth.GetToken(
 				ctx,
 				mockContainerWithInvalidDigest,
 				registryAuth,
@@ -593,7 +606,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithInvalidDigest)
+			url, err := manifest.BuildManifestURL(mockContainerWithInvalidDigest, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -652,7 +665,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			registryAuth := auth.TransformAuth("token")
-			_, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			_, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("challenge header did not include all values needed to construct an auth url"))
@@ -664,7 +677,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
-		ginkgo.It("should fall back to GET when HEAD returns 404", func() {
+		ginkgo.It("should not fall back to GET when HEAD returns 404", func() {
 			defer ginkgo.GinkgoRecover()
 			mux := http.NewServeMux()
 			server := httptest.NewServer(mux)
@@ -708,10 +721,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			registryAuth := auth.TransformAuth("token")
 
-			// Test that CompareDigest falls back to GET and succeeds
+			// Test that CompareDigest does not fall back to GET for 404 and returns error
 			matches, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(matches).To(gomega.BeTrue())
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("should return error when both HEAD and GET fail", func() {
@@ -886,10 +899,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -952,10 +965,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -1020,10 +1033,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -1087,10 +1100,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
@@ -1229,20 +1242,28 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.BeforeEach(func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			mux = http.NewServeMux()
-			server = httptest.NewTLSServer(mux)
+			server = httptest.NewServer(mux)
 			logrus.WithField("server_addr", server.Listener.Addr().String()).
 				Debug("Starting test server")
 		})
 
 		ginkgo.AfterEach(func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			logrus.Debug("Closing test server")
 			server.Close()
 		})
 
 		ginkgo.It("should fetch a digest successfully", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			scheme := "https"
+			if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+				scheme = "http"
+			}
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1256,7 +1277,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`, scheme, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1275,10 +1296,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1302,6 +1323,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should return an error if GET request fails after token", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1315,7 +1338,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1339,10 +1362,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1362,6 +1385,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should return an error if TLS handshake times out", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1374,8 +1399,12 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
+				scheme := "https"
+				if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+					scheme = "http"
+				}
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`, scheme, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1397,10 +1426,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer cancel()
 
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1437,7 +1466,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			_, _, err := auth.GetToken(ctx, mockContainerUnreachable, registryAuth, client)
+			_, _, _, err := auth.GetToken(ctx, mockContainerUnreachable, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.MatchRegexp("no such host|server misbehaving"))
 		})
@@ -1457,7 +1486,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			_, _, err := auth.GetToken(ctx, mockContainerInvalidImage, registryAuth, client)
+			_, _, _, err := auth.GetToken(ctx, mockContainerInvalidImage, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
 		})
@@ -1477,7 +1506,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1488,13 +1517,15 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			_, _, err := auth.GetToken(ctx, mockContainerInvalidURL, registryAuth, client)
+			_, _, _, err := auth.GetToken(ctx, mockContainerInvalidURL, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
 		})
 
 		ginkgo.It("should return an error if response decoding fails", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1508,7 +1539,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1526,10 +1557,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1554,6 +1585,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should fall back to header when JSON decoding fails", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1567,7 +1600,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1588,10 +1621,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1615,6 +1648,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should parse JSON manifest for digest extraction", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1628,7 +1663,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1649,10 +1684,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1676,6 +1711,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should handle empty body error", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1689,7 +1726,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1708,10 +1745,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1736,6 +1773,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should handle malformed JSON manifest", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1749,7 +1788,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1768,10 +1807,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1836,6 +1875,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should parse valid JSON manifest with digest field", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1849,7 +1890,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1871,10 +1912,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1898,6 +1939,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should handle JSON manifest with empty digest field", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1911,7 +1954,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1933,10 +1976,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -1961,6 +2004,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should handle JSON manifest without digest field", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -1974,7 +2019,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -1996,10 +2041,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2024,6 +2069,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should handle invalid plain text digest format", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -2037,7 +2084,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -2058,10 +2105,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2086,6 +2133,8 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should handle short plain text digest", func() {
 			defer ginkgo.GinkgoRecover()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -2099,7 +2148,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request")
 				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -2120,10 +2169,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			client := newTestAuthClient()
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
+			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
+			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -2178,9 +2227,8 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer redirectServer.Close()
 
 			serverAddr := server.Listener.Addr().String()
-			redirectAddr := redirectServer.Listener.Addr().
-				String()
-				// Use actual redirect server address
+			redirectAddr := redirectServer.Listener.Addr().String()
+			// Use actual redirect server address
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
 				mockID,
@@ -2191,14 +2239,25 @@ var _ = ginkgo.Describe("Digests", func() {
 			)
 
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/ request")
-				w.Header().Set(
-					"WWW-Authenticate",
-					fmt.Sprintf(
-						`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`,
-						redirectAddr,
-					),
-				)
+				logrus.Debug("Handled GET /v2/ request - redirecting")
+				w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
+				w.WriteHeader(http.StatusFound)
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodHead {
+						w.WriteHeader(http.StatusNotFound)
+					} else {
+						w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+						w.WriteHeader(http.StatusOK)
+					}
+				},
+			)
+			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request on redirect server")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`, getScheme(), redirectAddr))
 				w.WriteHeader(http.StatusUnauthorized)
 			})
 			redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
@@ -2216,7 +2275,8 @@ var _ = ginkgo.Describe("Digests", func() {
 						w.Header().Set(
 							"WWW-Authenticate",
 							fmt.Sprintf(
-								`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`,
+								getScheme(),
 								redirectAddr,
 							),
 						)
@@ -2231,32 +2291,21 @@ var _ = ginkgo.Describe("Digests", func() {
 			registryAuth := auth.TransformAuth("token")
 			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
+			gomega.Expect(result).
+				To(gomega.Equal("d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"))
 		})
-	})
-
-	ginkgo.When("testing fetchDigest function directly", func() {
-		var server *httptest.Server
-		var mux *http.ServeMux
-
-		ginkgo.BeforeEach(func() {
+		ginkgo.It("should conditionally update manifest URL host only when redirected", func() {
 			defer ginkgo.GinkgoRecover()
-			mux = http.NewServeMux()
-			server = httptest.NewTLSServer(mux)
-		})
+			mux := http.NewServeMux()
+			server := httptest.NewServer(mux)
+			defer server.Close()
 
-		ginkgo.AfterEach(func() {
-			defer ginkgo.GinkgoRecover()
-			server.Close()
-		})
+			redirectMux := http.NewServeMux()
+			redirectServer := httptest.NewServer(redirectMux)
+			defer redirectServer.Close()
 
-		ginkgo.It("should handle no authentication required", func() {
-			defer ginkgo.GinkgoRecover()
-			// Use HTTP server for this test since we set TLS_SKIP
-			httpServer := httptest.NewServer(mux)
-			defer httpServer.Close()
-
-			serverAddr := httpServer.Listener.Addr().String()
+			serverAddr := server.Listener.Addr().String()
+			redirectAddr := redirectServer.Listener.Addr().String()
 			mockImageRef := serverAddr + "/test/image:latest"
 			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
 				mockID,
@@ -2266,14 +2315,37 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
+			// Test case 1: redirected=true, should update host
 			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/ request - no auth required")
-				w.WriteHeader(http.StatusOK)
+				logrus.Debug("Handled GET /v2/ request - redirecting")
+				w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
+				w.WriteHeader(http.StatusFound)
 			})
 			mux.HandleFunc(
 				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodHead {
+						w.WriteHeader(http.StatusNotFound)
+					} else {
+						w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+						w.WriteHeader(http.StatusOK)
+					}
+				},
+			)
+			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request on redirect server")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s://%s/token",service="test-service",scope="repository:test/image:pull"`, getScheme(), redirectAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			redirectMux.HandleFunc(
+				"/v2/test/image/manifests/latest",
 				func(w http.ResponseWriter, _ *http.Request) {
-					logrus.Debug("Handled GET /v2/test/image/manifests/latest - no auth")
+					logrus.Debug("Handled manifest request on redirect server")
 					w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
 					w.WriteHeader(http.StatusOK)
 				},
@@ -2282,300 +2354,507 @@ var _ = ginkgo.Describe("Digests", func() {
 			ctx := context.Background()
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
-			registryAuth := auth.TransformAuth("")
+			registryAuth := auth.TransformAuth("token")
+			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(result).
+				To(gomega.Equal("d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"))
+		})
+
+		ginkgo.It("should not update manifest URL host when not redirected", func() {
+			defer ginkgo.GinkgoRecover()
+			mux := http.NewServeMux()
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			serverAddr := server.Listener.Addr().String()
+			mockImageRef := serverAddr + "/test/image:latest"
+			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				mockImageRef,
+				mockCreated,
+				mockDigest,
+			)
+
+			// Test case 2: redirected=false, should not update host
+			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /v2/ request - no redirect")
+				w.Header().
+					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+				logrus.Debug("Handled GET /token request")
+				w.Write([]byte(`{"token": "mock-token"}`))
+			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled manifest request on original server")
+					w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+					w.WriteHeader(http.StatusOK)
+				},
+			)
+
+			ctx := context.Background()
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			registryAuth := auth.TransformAuth("token")
 			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
 		})
 
-		ginkgo.It("should handle manifest URL with no host", func() {
-			defer ginkgo.GinkgoRecover()
-			// Create a mock container that would result in a URL with no host
-			// This is tricky to test directly, so we'll test the error path by mocking
-			mockContainerInvalid := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				"invalid-url", // This should cause manifest.BuildManifestURL to fail or return URL without host
-				mockCreated,
-				mockDigest,
-			)
+		ginkgo.When("testing fetchDigest function directly", func() {
+			var server *httptest.Server
+			var mux *http.ServeMux
 
-			ctx := context.Background()
-			registryAuth := auth.TransformAuth("token")
-			_, err := digest.FetchDigest(ctx, mockContainerInvalid, registryAuth)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).
-				To(gomega.ContainSubstring("registry responded with invalid HEAD request"))
-		})
-
-		ginkgo.It("should handle URL parsing failure", func() {
-			defer ginkgo.GinkgoRecover()
-			mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				"http://invalid url with spaces/test/image:latest", // Invalid URL
-				mockCreated,
-				mockDigest,
-			)
-
-			ctx := context.Background()
-			registryAuth := auth.TransformAuth("token")
-			_, err := digest.FetchDigest(ctx, mockContainerInvalidURL, registryAuth)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to build manifest URL"))
-		})
-
-		ginkgo.It("should handle plain text 404 responses (non-JSON body)", func() {
-			defer ginkgo.GinkgoRecover()
-			serverAddr := server.Listener.Addr().String()
-			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				mockImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/ request")
-				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
-				w.WriteHeader(http.StatusUnauthorized)
+			ginkgo.BeforeEach(func() {
+				defer ginkgo.GinkgoRecover()
+				mux = http.NewServeMux()
+				server = httptest.NewServer(mux)
 			})
-			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /token request")
-				w.Write([]byte(`{"token": "mock-token"}`))
+
+			ginkgo.AfterEach(func() {
+				defer ginkgo.GinkgoRecover()
+				server.Close()
 			})
-			mux.HandleFunc(
-				"/v2/test/image/manifests/latest",
-				func(w http.ResponseWriter, _ *http.Request) {
-					logrus.Debug(
-						"Handled GET /v2/test/image/manifests/latest with plain text 404 body",
-					)
+
+			ginkgo.It("should handle no authentication required", func() {
+				defer ginkgo.GinkgoRecover()
+				// Use HTTP server for this test since we set TLS_SKIP
+				httpServer := httptest.NewServer(mux)
+				defer httpServer.Close()
+
+				serverAddr := httpServer.Listener.Addr().String()
+				mockImageRef := serverAddr + "/test/image:latest"
+				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+					mockID,
+					mockName,
+					mockImageRef,
+					mockCreated,
+					mockDigest,
+				)
+
+				mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/ request - no auth required")
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte("404 Not Found")) // Plain text non-JSON body
+				})
+				mux.HandleFunc(
+					"/v2/test/image/manifests/latest",
+					func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug("Handled GET /v2/test/image/manifests/latest - no auth")
+						w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+						w.WriteHeader(http.StatusOK)
+					},
+				)
+
+				ctx := context.Background()
+				viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+				registryAuth := auth.TransformAuth("")
+				result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
+			})
+
+			ginkgo.It("should handle invalid image reference", func() {
+				defer ginkgo.GinkgoRecover()
+				// Create a mock container with invalid image reference
+				// This should cause manifest.BuildManifestURL to fail
+				mockContainerInvalid := mocks.CreateMockContainerWithDigest(
+					mockID,
+					mockName,
+					"example.com/test/image:", // Missing tag, invalid format
+					mockCreated,
+					mockDigest,
+				)
+
+				ctx := context.Background()
+				registryAuth := auth.TransformAuth("token")
+				_, err := digest.FetchDigest(ctx, mockContainerInvalid, registryAuth)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).
+					To(gomega.ContainSubstring("failed to parse image name"))
+			})
+
+			ginkgo.It("should handle URL parsing failure", func() {
+				defer ginkgo.GinkgoRecover()
+				mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
+					mockID,
+					mockName,
+					"http://invalid url with spaces/test/image:latest", // Invalid URL
+					mockCreated,
+					mockDigest,
+				)
+
+				ctx := context.Background()
+				registryAuth := auth.TransformAuth("token")
+				_, err := digest.FetchDigest(ctx, mockContainerInvalidURL, registryAuth)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).
+					To(gomega.ContainSubstring("failed to build manifest URL"))
+			})
+
+			ginkgo.It("should handle plain text 404 responses (non-JSON body)", func() {
+				defer ginkgo.GinkgoRecover()
+				viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+				serverAddr := server.Listener.Addr().String()
+				mockImageRef := serverAddr + "/test/image:latest"
+				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+					mockID,
+					mockName,
+					mockImageRef,
+					mockCreated,
+					mockDigest,
+				)
+
+				mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/ request")
+					w.Header().
+						Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					w.WriteHeader(http.StatusUnauthorized)
+				})
+				mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /token request")
+					w.Write([]byte(`{"token": "mock-token"}`))
+				})
+				mux.HandleFunc(
+					"/v2/test/image/manifests/latest",
+					func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug(
+							"Handled GET /v2/test/image/manifests/latest with plain text 404 body",
+						)
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte("404 Not Found")) // Plain text non-JSON body
+					},
+				)
+
+				client := newTestAuthClient()
+				ctx := context.Background()
+				registryAuth := auth.TransformAuth("token")
+				token, _, _, err := auth.GetToken(
+					ctx,
+					mockContainerWithServer,
+					registryAuth,
+					client,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set(
+					"Accept",
+					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+				)
+				req.Header.Set("User-Agent", digest.UserAgent)
+
+				resp, err := client.Do(req)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				defer resp.Body.Close()
+
+				_, err = digest.ExtractGetDigest(resp)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).
+					To(gomega.ContainSubstring("invalid digest format in body"))
+			})
+
+			ginkgo.It("should handle OCI image index responses with proper Content-Type", func() {
+				defer ginkgo.GinkgoRecover()
+				viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+				serverAddr := server.Listener.Addr().String()
+				mockImageRef := serverAddr + "/test/image:latest"
+				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+					mockID,
+					mockName,
+					mockImageRef,
+					mockCreated,
+					mockDigest,
+				)
+
+				mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/ request")
+					w.Header().
+						Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					w.WriteHeader(http.StatusUnauthorized)
+				})
+				mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /token request")
+					w.Write([]byte(`{"token": "mock-token"}`))
+				})
+				mux.HandleFunc(
+					"/v2/test/image/manifests/latest",
+					func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug(
+							"Handled GET /v2/test/image/manifests/latest with OCI image index",
+						)
+						w.Header().Set("Content-Type", "application/vnd.oci.image.index.v1+json")
+						w.WriteHeader(http.StatusOK)
+						w.Write(
+							[]byte(
+								`{"digest": "sha256:ociindexdigest123456789012345678901234567890123456789012345678901234567890"}`,
+							),
+						)
+					},
+				)
+
+				client := newTestAuthClient()
+				ctx := context.Background()
+				registryAuth := auth.TransformAuth("token")
+				token, _, _, err := auth.GetToken(
+					ctx,
+					mockContainerWithServer,
+					registryAuth,
+					client,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set(
+					"Accept",
+					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+				)
+				req.Header.Set("User-Agent", digest.UserAgent)
+
+				resp, err := client.Do(req)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				defer resp.Body.Close()
+
+				result, err := digest.ExtractGetDigest(resp)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(result).
+					To(gomega.Equal("ociindexdigest123456789012345678901234567890123456789012345678901234567890"))
+			})
+
+			ginkgo.It("should handle invalid Content-Type headers", func() {
+				defer ginkgo.GinkgoRecover()
+				viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+				serverAddr := server.Listener.Addr().String()
+				mockImageRef := serverAddr + "/test/image:latest"
+				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+					mockID,
+					mockName,
+					mockImageRef,
+					mockCreated,
+					mockDigest,
+				)
+
+				mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/ request")
+					w.Header().
+						Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					w.WriteHeader(http.StatusUnauthorized)
+				})
+				mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /token request")
+					w.Write([]byte(`{"token": "mock-token"}`))
+				})
+				mux.HandleFunc(
+					"/v2/test/image/manifests/latest",
+					func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug(
+							"Handled GET /v2/test/image/manifests/latest with invalid Content-Type",
+						)
+						w.Header().
+							Set("Content-Type", "text/plain")
+							// Invalid Content-Type for JSON
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"digest": "sha256:invalidcontenttypedigest"}`))
+					},
+				)
+
+				client := newTestAuthClient()
+				ctx := context.Background()
+				registryAuth := auth.TransformAuth("token")
+				token, _, _, err := auth.GetToken(
+					ctx,
+					mockContainerWithServer,
+					registryAuth,
+					client,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set(
+					"Accept",
+					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+				)
+				req.Header.Set("User-Agent", digest.UserAgent)
+
+				resp, err := client.Do(req)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				defer resp.Body.Close()
+
+				_, err = digest.ExtractGetDigest(resp)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).
+					To(gomega.ContainSubstring("unsupported content type for JSON parsing"))
+			})
+
+			ginkgo.It("should handle missing or malformed Content-Type headers", func() {
+				defer ginkgo.GinkgoRecover()
+				viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+				serverAddr := server.Listener.Addr().String()
+				mockImageRef := serverAddr + "/test/image:latest"
+				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+					mockID,
+					mockName,
+					mockImageRef,
+					mockCreated,
+					mockDigest,
+				)
+
+				mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /v2/ request")
+					w.Header().
+						Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
+					w.WriteHeader(http.StatusUnauthorized)
+				})
+				mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+					logrus.Debug("Handled GET /token request")
+					w.Write([]byte(`{"token": "mock-token"}`))
+				})
+				mux.HandleFunc(
+					"/v2/test/image/manifests/latest",
+					func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug(
+							"Handled GET /v2/test/image/manifests/latest with missing Content-Type",
+						)
+						// No Content-Type header set
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"digest": "sha256:missingcontenttypedigest"}`))
+					},
+				)
+
+				client := newTestAuthClient()
+				ctx := context.Background()
+				registryAuth := auth.TransformAuth("token")
+				token, _, _, err := auth.GetToken(
+					ctx,
+					mockContainerWithServer,
+					registryAuth,
+					client,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set(
+					"Accept",
+					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+				)
+				req.Header.Set("User-Agent", digest.UserAgent)
+
+				resp, err := client.Do(req)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				defer resp.Body.Close()
+
+				_, err = digest.ExtractGetDigest(resp)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).
+					To(gomega.ContainSubstring("unsupported content type for JSON parsing"))
+			})
+
+			ginkgo.It(
+				"should successfully use HEAD requests for lscr.io images when redirected",
+				func() {
+					defer ginkgo.GinkgoRecover()
+					mux := http.NewServeMux()
+					server := httptest.NewServer(mux)
+					defer server.Close()
+
+					redirectMux := http.NewServeMux()
+					redirectServer := httptest.NewServer(redirectMux)
+					defer redirectServer.Close()
+
+					serverAddr := server.Listener.Addr().String()
+					redirectAddr := redirectServer.Listener.Addr().String()
+					// Use lscr.io image name to trigger special handling
+					mockImageRef := serverAddr + "/lscr.io/test/image:latest"
+					mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+						mockID,
+						mockName,
+						mockImageRef,
+						mockCreated,
+						mockDigest,
+					)
+
+					mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug("Handled GET /v2/ request - redirecting lscr.io")
+						w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
+						w.WriteHeader(http.StatusFound)
+					})
+					mux.HandleFunc(
+						"/v2/lscr.io/test/image/manifests/latest",
+						func(w http.ResponseWriter, r *http.Request) {
+							if r.Method == http.MethodHead {
+								w.WriteHeader(http.StatusNotFound)
+							} else {
+								w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+								w.WriteHeader(http.StatusOK)
+							}
+						},
+					)
+					redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug("Handled GET /v2/ request on redirect server for lscr.io")
+						w.Header().
+							Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:lscr.io/test/image:pull"`, redirectAddr))
+						w.WriteHeader(http.StatusUnauthorized)
+					})
+					redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug("Handled GET /token request for lscr.io")
+						w.Write([]byte(`{"token": "mock-token"}`))
+					})
+					redirectMux.HandleFunc(
+						"/v2/lscr.io/test/image/manifests/latest",
+						func(w http.ResponseWriter, r *http.Request) {
+							logrus.Debug("Handled manifest request for lscr.io")
+							if r.Method == http.MethodHead {
+								// Simulate successful HEAD request for lscr.io
+								w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+								w.WriteHeader(http.StatusOK)
+							} else {
+								w.WriteHeader(http.StatusInternalServerError)
+							}
+						},
+					)
+
+					ctx := context.Background()
+					viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+					defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+					registryAuth := auth.TransformAuth("token")
+					result, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(result).To(gomega.BeTrue())
 				},
 			)
-
-			client := newTestAuthClient()
-			ctx := context.Background()
-			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set(
-				"Accept",
-				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-			)
-			req.Header.Set("User-Agent", digest.UserAgent)
-
-			resp, err := client.Do(req)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			defer resp.Body.Close()
-
-			_, err = digest.ExtractGetDigest(resp)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).
-				To(gomega.ContainSubstring("invalid digest format in body"))
-		})
-
-		ginkgo.It("should handle OCI image index responses with proper Content-Type", func() {
-			defer ginkgo.GinkgoRecover()
-			serverAddr := server.Listener.Addr().String()
-			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				mockImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/ request")
-				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
-				w.WriteHeader(http.StatusUnauthorized)
-			})
-			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /token request")
-				w.Write([]byte(`{"token": "mock-token"}`))
-			})
-			mux.HandleFunc(
-				"/v2/test/image/manifests/latest",
-				func(w http.ResponseWriter, _ *http.Request) {
-					logrus.Debug("Handled GET /v2/test/image/manifests/latest with OCI image index")
-					w.Header().Set("Content-Type", "application/vnd.oci.image.index.v1+json")
-					w.WriteHeader(http.StatusOK)
-					w.Write(
-						[]byte(
-							`{"digest": "sha256:ociindexdigest123456789012345678901234567890123456789012345678901234567890"}`,
-						),
-					)
-				},
-			)
-
-			client := newTestAuthClient()
-			ctx := context.Background()
-			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set(
-				"Accept",
-				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-			)
-			req.Header.Set("User-Agent", digest.UserAgent)
-
-			resp, err := client.Do(req)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			defer resp.Body.Close()
-
-			result, err := digest.ExtractGetDigest(resp)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(result).
-				To(gomega.Equal("ociindexdigest123456789012345678901234567890123456789012345678901234567890"))
-		})
-
-		ginkgo.It("should handle invalid Content-Type headers", func() {
-			defer ginkgo.GinkgoRecover()
-			serverAddr := server.Listener.Addr().String()
-			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				mockImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/ request")
-				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
-				w.WriteHeader(http.StatusUnauthorized)
-			})
-			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /token request")
-				w.Write([]byte(`{"token": "mock-token"}`))
-			})
-			mux.HandleFunc(
-				"/v2/test/image/manifests/latest",
-				func(w http.ResponseWriter, _ *http.Request) {
-					logrus.Debug(
-						"Handled GET /v2/test/image/manifests/latest with invalid Content-Type",
-					)
-					w.Header().Set("Content-Type", "text/plain") // Invalid Content-Type for JSON
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"digest": "sha256:invalidcontenttypedigest"}`))
-				},
-			)
-
-			client := newTestAuthClient()
-			ctx := context.Background()
-			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set(
-				"Accept",
-				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-			)
-			req.Header.Set("User-Agent", digest.UserAgent)
-
-			resp, err := client.Do(req)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			defer resp.Body.Close()
-
-			_, err = digest.ExtractGetDigest(resp)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).
-				To(gomega.ContainSubstring("unsupported content type for JSON parsing"))
-		})
-
-		ginkgo.It("should handle missing or malformed Content-Type headers", func() {
-			defer ginkgo.GinkgoRecover()
-			serverAddr := server.Listener.Addr().String()
-			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
-				mockID,
-				mockName,
-				mockImageRef,
-				mockCreated,
-				mockDigest,
-			)
-
-			mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /v2/ request")
-				w.Header().
-					Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`, serverAddr))
-				w.WriteHeader(http.StatusUnauthorized)
-			})
-			mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
-				logrus.Debug("Handled GET /token request")
-				w.Write([]byte(`{"token": "mock-token"}`))
-			})
-			mux.HandleFunc(
-				"/v2/test/image/manifests/latest",
-				func(w http.ResponseWriter, _ *http.Request) {
-					logrus.Debug(
-						"Handled GET /v2/test/image/manifests/latest with missing Content-Type",
-					)
-					// No Content-Type header set
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"digest": "sha256:missingcontenttypedigest"}`))
-				},
-			)
-
-			client := newTestAuthClient()
-			ctx := context.Background()
-			registryAuth := auth.TransformAuth("token")
-			token, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			url, err := manifest.BuildManifestURL(mockContainerWithServer)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set(
-				"Accept",
-				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-			)
-			req.Header.Set("User-Agent", digest.UserAgent)
-
-			resp, err := client.Do(req)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			defer resp.Body.Close()
-
-			_, err = digest.ExtractGetDigest(resp)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).
-				To(gomega.ContainSubstring("unsupported content type for JSON parsing"))
 		})
 	})
 })
