@@ -677,7 +677,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
-		ginkgo.It("should fall back to GET when HEAD returns 404", func() {
+		ginkgo.It("should not fall back to GET when HEAD returns 404", func() {
 			defer ginkgo.GinkgoRecover()
 			mux := http.NewServeMux()
 			server := httptest.NewServer(mux)
@@ -721,10 +721,10 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			registryAuth := auth.TransformAuth("token")
 
-			// Test that CompareDigest falls back to GET and succeeds
+			// Test that CompareDigest does not fall back to GET for 404 and returns error
 			matches, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(matches).To(gomega.BeTrue())
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(matches).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("should return error when both HEAD and GET fail", func() {
@@ -2459,14 +2459,14 @@ var _ = ginkgo.Describe("Digests", func() {
 				gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
 			})
 
-			ginkgo.It("should handle manifest URL with no host", func() {
+			ginkgo.It("should handle invalid image reference", func() {
 				defer ginkgo.GinkgoRecover()
-				// Create a mock container that would result in a URL with no host
-				// This is tricky to test directly, so we'll test the error path by mocking
+				// Create a mock container with invalid image reference
+				// This should cause manifest.BuildManifestURL to fail
 				mockContainerInvalid := mocks.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
-					"invalid-url", // This should cause manifest.BuildManifestURL to fail or return URL without host
+					"example.com/test/image:", // Missing tag, invalid format
 					mockCreated,
 					mockDigest,
 				)
@@ -2476,7 +2476,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				_, err := digest.FetchDigest(ctx, mockContainerInvalid, registryAuth)
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err.Error()).
-					To(gomega.ContainSubstring("registry responded with invalid HEAD request"))
+					To(gomega.ContainSubstring("failed to parse image name"))
 			})
 
 			ginkgo.It("should handle URL parsing failure", func() {
@@ -2781,6 +2781,80 @@ var _ = ginkgo.Describe("Digests", func() {
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("unsupported content type for JSON parsing"))
 			})
+
+			ginkgo.It(
+				"should successfully use HEAD requests for lscr.io images when redirected",
+				func() {
+					defer ginkgo.GinkgoRecover()
+					mux := http.NewServeMux()
+					server := httptest.NewServer(mux)
+					defer server.Close()
+
+					redirectMux := http.NewServeMux()
+					redirectServer := httptest.NewServer(redirectMux)
+					defer redirectServer.Close()
+
+					serverAddr := server.Listener.Addr().String()
+					redirectAddr := redirectServer.Listener.Addr().String()
+					// Use lscr.io image name to trigger special handling
+					mockImageRef := serverAddr + "/lscr.io/test/image:latest"
+					mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+						mockID,
+						mockName,
+						mockImageRef,
+						mockCreated,
+						mockDigest,
+					)
+
+					mux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug("Handled GET /v2/ request - redirecting lscr.io")
+						w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
+						w.WriteHeader(http.StatusFound)
+					})
+					mux.HandleFunc(
+						"/v2/lscr.io/test/image/manifests/latest",
+						func(w http.ResponseWriter, r *http.Request) {
+							if r.Method == http.MethodHead {
+								w.WriteHeader(http.StatusNotFound)
+							} else {
+								w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+								w.WriteHeader(http.StatusOK)
+							}
+						},
+					)
+					redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug("Handled GET /v2/ request on redirect server for lscr.io")
+						w.Header().
+							Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="repository:lscr.io/test/image:pull"`, redirectAddr))
+						w.WriteHeader(http.StatusUnauthorized)
+					})
+					redirectMux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+						logrus.Debug("Handled GET /token request for lscr.io")
+						w.Write([]byte(`{"token": "mock-token"}`))
+					})
+					redirectMux.HandleFunc(
+						"/v2/lscr.io/test/image/manifests/latest",
+						func(w http.ResponseWriter, r *http.Request) {
+							logrus.Debug("Handled manifest request for lscr.io")
+							if r.Method == http.MethodHead {
+								// Simulate successful HEAD request for lscr.io
+								w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+								w.WriteHeader(http.StatusOK)
+							} else {
+								w.WriteHeader(http.StatusInternalServerError)
+							}
+						},
+					)
+
+					ctx := context.Background()
+					viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+					defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+					registryAuth := auth.TransformAuth("token")
+					result, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(result).To(gomega.BeTrue())
+				},
+			)
 		})
 	})
 })

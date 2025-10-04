@@ -30,6 +30,7 @@ const ChallengeHeader = "WWW-Authenticate"
 const (
 	DockerRegistryDomain = "docker.io"
 	DockerRegistryHost   = "index.docker.io"
+	LSCRRegistry         = "lscr.io"
 )
 
 // Constants for HTTP client configuration.
@@ -649,10 +650,23 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 		}
 	}
 
+	// Get registry address for special handling.
+	registryAddress, err := GetRegistryAddress(imageRef.Name())
+	if err != nil {
+		logrus.WithError(err).
+			WithField("image", imageRef.Name()).
+			Debug("Failed to get registry address")
+	}
+	// Override realm for lscr.io registry to ensure correct authentication.
+	if registryAddress == LSCRRegistry {
+		values["realm"] = "https://ghcr.io/token"
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"image":   imageRef.Name(),
 		"realm":   values["realm"],
 		"service": values["service"],
+		"scope":   values["scope"],
 	}).Debug("Parsed challenge header")
 
 	// Validate required fields.
@@ -766,7 +780,7 @@ func TransformAuth(registryAuth string) string {
 	return registryAuth // Return original if no valid credentials.
 }
 
-// GetChallengeURL generates a challenge URL for accessing an image’s registry.
+// GetChallengeURL generates a challenge URL for accessing an image's registry.
 //
 // Parameters:
 //   - imageRef: Normalized image reference.
@@ -776,6 +790,12 @@ func TransformAuth(registryAuth string) string {
 func GetChallengeURL(imageRef reference.Named) url.URL {
 	// Extract registry host from the image reference.
 	host, _ := GetRegistryAddress(imageRef.Name())
+
+	// Special handling for lscr.io registry: use ghcr.io for challenge URL
+	// to get the correct WWW-Authenticate header with proper scope.
+	if host == "lscr.io" {
+		host = "ghcr.io"
+	}
 
 	scheme := "https"
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
