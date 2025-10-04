@@ -2243,14 +2243,17 @@ var _ = ginkgo.Describe("Digests", func() {
 				w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
 				w.WriteHeader(http.StatusFound)
 			})
-			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, r *http.Request) {
-				if r.Method == http.MethodHead {
-					w.WriteHeader(http.StatusNotFound)
-				} else {
-					w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
-					w.WriteHeader(http.StatusOK)
-				}
-			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodHead {
+						w.WriteHeader(http.StatusNotFound)
+					} else {
+						w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+						w.WriteHeader(http.StatusOK)
+					}
+				},
+			)
 			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request on redirect server")
 				w.Header().
@@ -2318,14 +2321,17 @@ var _ = ginkgo.Describe("Digests", func() {
 				w.Header().Set("Location", fmt.Sprintf("http://%s/v2/", redirectAddr))
 				w.WriteHeader(http.StatusFound)
 			})
-			mux.HandleFunc("/v2/test/image/manifests/latest", func(w http.ResponseWriter, r *http.Request) {
-				if r.Method == http.MethodHead {
-					w.WriteHeader(http.StatusNotFound)
-				} else {
-					w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
-					w.WriteHeader(http.StatusOK)
-				}
-			})
+			mux.HandleFunc(
+				"/v2/test/image/manifests/latest",
+				func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodHead {
+						w.WriteHeader(http.StatusNotFound)
+					} else {
+						w.Header().Set(digest.ContentDigestHeader, mockDigestHash)
+						w.WriteHeader(http.StatusOK)
+					}
+				},
+			)
 			redirectMux.HandleFunc("/v2/", func(w http.ResponseWriter, _ *http.Request) {
 				logrus.Debug("Handled GET /v2/ request on redirect server")
 				w.Header().

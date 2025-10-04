@@ -263,13 +263,13 @@ func handleManifestResponse(
 	parsedURL *url.URL,
 ) (string, string, bool, error) {
 	fields := logrus.Fields{
-		"method":        method,
-		"status_code":   resp.StatusCode,
-		"status":        resp.Status,
-		"original_host": originalHost,
+		"method":         method,
+		"status_code":    resp.StatusCode,
+		"status":         resp.Status,
+		"original_host":  originalHost,
 		"challenge_host": challengeHost,
-		"redirected":    redirected,
-		"request_host":  resp.Request.URL.Host,
+		"redirected":     redirected,
+		"request_host":   resp.Request.URL.Host,
 	}
 
 	logrus.WithFields(fields).Debug("Handling manifest response")
@@ -278,31 +278,47 @@ func handleManifestResponse(
 
 	// Handle non-success responses for HEAD requests by returning empty digest to trigger GET fallback.
 	// If the initial manifest request failed with 404 or 401 and there's a different challenge host, retry on challenge host.
-	retryCondition := resp.StatusCode == http.StatusNotFound && challengeHost != "" && resp.Request.URL.Host != challengeHost
-	logrus.WithFields(fields).WithField("retry_condition_met", retryCondition).Debug("Checking retry condition")
+	retryCondition := resp.StatusCode == http.StatusNotFound && challengeHost != "" &&
+		resp.Request.URL.Host != challengeHost
+	logrus.WithFields(fields).
+		WithField("retry_condition_met", retryCondition).
+		Debug("Checking retry condition")
 
 	if retryCondition {
 		parsedURL.Host = challengeHost
 		manifestURL = parsedURL.String()
-		logrus.WithFields(fields).WithField("updated_manifest_url", manifestURL).Debug("Retry condition met, updating manifest URL host")
+		logrus.WithFields(fields).
+			WithField("updated_manifest_url", manifestURL).
+			Debug("Retry condition met, updating manifest URL host")
 
 		return "", manifestURL, true, nil
 	}
 
-	headFallbackCondition := method == http.MethodHead && (resp.StatusCode < 200 || resp.StatusCode >= 300)
-	logrus.WithFields(fields).WithField("head_fallback_condition", headFallbackCondition).Debug("Checking HEAD fallback condition")
+	headFallbackCondition := method == http.MethodHead &&
+		(resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices)
+	logrus.WithFields(fields).
+		WithField("head_fallback_condition", headFallbackCondition).
+		Debug("Checking HEAD fallback condition")
 
 	if headFallbackCondition {
-		logrus.WithFields(fields).Debug("HEAD request failed, returning empty digest to trigger GET fallback")
+		logrus.WithFields(fields).
+			Debug("HEAD request failed, returning empty digest to trigger GET fallback")
+
 		return "", "", false, nil // Return empty to trigger GET fallback in CompareDigest
 	}
 
 	// Check for successful status code (only for GET requests, since HEAD is handled above).
-	successCondition := resp.StatusCode >= 200 && resp.StatusCode < 300
-	logrus.WithFields(fields).WithField("success_condition", successCondition).Debug("Checking success status condition")
+	successCondition := resp.StatusCode >= http.StatusOK &&
+		resp.StatusCode < http.StatusMultipleChoices
+	logrus.WithFields(fields).
+		WithField("success_condition", successCondition).
+		Debug("Checking success status condition")
 
 	if !successCondition {
-		logrus.WithFields(fields).WithField("error", "invalid status code").Debug("Response status not successful")
+		logrus.WithFields(fields).
+			WithField("error", "invalid status code").
+			Debug("Response status not successful")
+
 		return "", "", false, fmt.Errorf("%w: status %s", errInvalidRegistryResponse, resp.Status)
 	}
 
@@ -322,10 +338,13 @@ func handleManifestResponse(
 
 	if err != nil {
 		logrus.WithFields(fields).WithError(err).Debug("Failed to extract digest")
+
 		return "", "", false, err
 	}
 
-	logrus.WithFields(fields).WithField("extracted_digest", digest).Debug("Successfully extracted digest")
+	logrus.WithFields(fields).
+		WithField("extracted_digest", digest).
+		Debug("Successfully extracted digest")
 
 	return digest, "", false, nil
 }
