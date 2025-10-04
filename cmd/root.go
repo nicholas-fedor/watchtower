@@ -923,8 +923,8 @@ func logScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	switch {
 	case !sched.IsZero(): // scheduled runs
 		until := formatDuration(time.Until(sched))
-		log.Info("Scheduling first run: " + sched.Format("2006-01-02 15:04:05 -0700 MST"))
-		log.Info("Note that the first check will be performed in " + until)
+		log.Info("Scheduling next run: " + sched.Format("2006-01-02 15:04:05 -0700 MST"))
+		log.Info("Note that the next check will be performed in " + until)
 
 	case func() bool { // one-time updates
 		v, _ := c.PersistentFlags().GetBool("run-once")
@@ -1059,6 +1059,7 @@ func runUpgradesOnSchedule(
 	// Check if update-on-start is enabled and trigger immediate update if so.
 	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
 	if updateOnStart {
+		logrus.Info("Update on startup enabled - performing immediate check")
 		updateFunc()
 	}
 
