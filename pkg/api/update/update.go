@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -68,8 +67,8 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		"path":   r.URL.Path,
 	}).Info("Received HTTP API update request")
 
-	// Log request body to stdout for debugging.
-	_, err := io.Copy(os.Stdout, r.Body)
+	// Discard request body to prevent I/O blocking in tests and CI environments.
+	_, err := io.Copy(io.Discard, r.Body)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to read request body")
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
