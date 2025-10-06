@@ -1,5 +1,7 @@
 package types
 
+import "github.com/sirupsen/logrus"
+
 // Notifier defines the common interface for notification services.
 type Notifier interface {
 	StartNotification()                 // Begin queuing messages.
@@ -8,4 +10,9 @@ type Notifier interface {
 	GetNames() []string                 // Service names.
 	GetURLs() []string                  // Service URLs.
 	Close()                             // Stop and flush notifications.
+	GetEntries() []*logrus.Entry        // Get queued log entries.
+	SendFilteredEntries(
+		entries []*logrus.Entry,
+		report Report,
+	) // Send filtered entries with report.
 }

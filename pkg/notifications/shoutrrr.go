@@ -287,7 +287,6 @@ func (n *shoutrrrTypeNotifier) StartNotification() {
 func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	n.entriesMutex.Lock()
 	entries := n.entries
-	n.entries = nil
 	n.entriesMutex.Unlock()
 	n.sendEntries(entries, report)
 }
@@ -301,6 +300,29 @@ func (n *shoutrrrTypeNotifier) Close() {
 	LocalLog.Debug("Waiting for the notification goroutine to finish")
 
 	<-n.done
+}
+
+// GetEntries returns a copy of the queued log entries.
+//
+// Returns:
+//   - []*logrus.Entry: Copy of queued entries.
+func (n *shoutrrrTypeNotifier) GetEntries() []*logrus.Entry {
+	n.entriesMutex.RLock()
+	defer n.entriesMutex.RUnlock()
+
+	entries := make([]*logrus.Entry, len(n.entries))
+	copy(entries, n.entries)
+
+	return entries
+}
+
+// SendFilteredEntries sends filtered log entries with an optional report.
+//
+// Parameters:
+//   - entries: Log entries to send.
+//   - report: Optional scan report.
+func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, report types.Report) {
+	n.sendEntries(entries, report)
 }
 
 // Levels returns log levels that trigger notifications.

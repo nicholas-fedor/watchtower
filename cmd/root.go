@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -35,19 +36,304 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-var ErrContainerIDNotFound = errors.New(
-	"container ID not found in /proc/self/cgroup and HOSTNAME is not set",
+var (
+	ErrContainerIDNotFound = errors.New(
+		"container ID not found in /proc/self/cgroup and HOSTNAME is not set",
+	)
+
+	// client is the Docker client instance used to interact with container operations in Watchtower.
+	//
+	// It provides an interface for listing, stopping, starting, and managing containers, initialized during
+	// the preRun phase with options derived from command-line flags and environment variables such as
+	// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
+	client container.Client
+
+	// scheduleSpec holds the cron-formatted schedule string that dictates when periodic container updates occur.
+	//
+	// It is populated during preRun from the --schedule flag or the WATCHTOWER_SCHEDULE environment variable,
+	// supporting formats like "@every 1h" or standard cron syntax (e.g., "0 0 * * * *") for flexible scheduling.
+	scheduleSpec string
+
+	// cleanup is a boolean flag determining whether to remove old images after a container update.
+	//
+	// It is set during preRun via the --cleanup flag or the WATCHTOWER_CLEANUP environment variable,
+	// enabling disk space management by deleting outdated images post-update.
+	cleanup bool
+
+	// noRestart is a boolean flag that prevents containers from being restarted after an update.
+	//
+	// It is configured in preRun via the --no-restart flag or the WATCHTOWER_NO_RESTART environment variable,
+	// useful when users prefer manual restart control or want to minimize downtime during updates.
+	noRestart bool
+
+	// noPull is a boolean flag that skips pulling new images from the registry during updates.
+	//
+	// It is enabled in preRun via the --no-pull flag or the WATCHTOWER_NO_PULL environment variable,
+	// allowing updates to proceed using only locally cached images, potentially reducing network usage.
+	noPull bool
+
+	// monitorOnly is a boolean flag enabling a mode where Watchtower monitors containers without updating them.
+	//
+	// It is set in preRun via the --monitor-only flag or the WATCHTOWER_MONITOR_ONLY environment variable,
+	// ideal for observing image staleness without triggering automatic updates.
+	monitorOnly bool
+
+	// enableLabel is a boolean flag restricting updates to containers with the "com.centurylinklabs.watchtower.enable" label set to true.
+	//
+	// It is configured in preRun via the --label-enable flag or the WATCHTOWER_LABEL_ENABLE environment variable,
+	// providing granular control over which containers are targeted for updates.
+	enableLabel bool
+
+	// disableContainers is a slice of container names explicitly excluded from updates.
+	//
+	// It is populated in preRun from the --disable-containers flag or the WATCHTOWER_DISABLE_CONTAINERS environment variable,
+	// allowing users to blacklist specific containers from Watchtower's operations.
+	disableContainers []string
+
+	// notifier is the notification system instance responsible for sending update status messages to configured channels.
+	//
+	// It is initialized in preRun with notification types specified via flags (e.g., --notifications), supporting
+	// multiple methods like email, Slack, or MSTeams to inform users about update successes, failures, or skips.
+	notifier types.Notifier
+
+	// timeout specifies the maximum duration allowed for container stop operations during updates.
+	//
+	// It defaults to a value defined in the flags package and can be overridden in preRun via the --timeout flag or
+	// WATCHTOWER_TIMEOUT environment variable, ensuring containers are stopped gracefully within a specified time limit.
+	timeout time.Duration
+
+	// lifecycleHooks is a boolean flag enabling the execution of pre- and post-update lifecycle hook commands.
+	//
+	// It is set in preRun via the --enable-lifecycle-hooks flag or the WATCHTOWER_LIFECYCLE_HOOKS environment variable,
+	// allowing custom scripts to run at specific update stages for additional validation or actions.
+	lifecycleHooks bool
+
+	// rollingRestart is a boolean flag enabling rolling restarts, updating containers sequentially rather than all at once.
+	//
+	// It is configured in preRun via the --rolling-restart flag or the WATCHTOWER_ROLLING_RESTART environment variable,
+	// reducing downtime by restarting containers one-by-one during updates.
+	rollingRestart bool
+
+	// scope defines a specific operational scope for Watchtower, limiting updates to containers matching this scope.
+	//
+	// It is set in preRun via the --scope flag or the WATCHTOWER_SCOPE environment variable, useful for isolating
+	// Watchtower's actions to a subset of containers (e.g., a project or environment).
+	scope string
+
+	// labelPrecedence is a boolean flag giving container label settings priority over global command-line flags.
+	//
+	// It is enabled in preRun via the --label-take-precedence flag or the WATCHTOWER_LABEL_PRECEDENCE environment variable,
+	// allowing container-specific configurations to override broader settings for flexibility.
+	labelPrecedence bool
+
+	// lifecycleUID is the default UID to run lifecycle hooks as.
+	//
+	// It is set in preRun via the --lifecycle-uid flag or the WATCHTOWER_LIFECYCLE_UID environment variable,
+	// providing a global default that can be overridden by container labels.
+	lifecycleUID int
+
+	// lifecycleGID is the default GID to run lifecycle hooks as.
+	//
+	// It is set in preRun via the --lifecycle-gid flag or the WATCHTOWER_LIFECYCLE_GID environment variable,
+	// providing a global default that can be overridden by container labels.
+	lifecycleGID int
+
+	// notificationSplitByContainer is a boolean flag enabling separate notifications for each updated container.
+	//
+	// It is set in preRun via the --notification-split-by-container flag or the WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER environment variable,
+	// allowing users to receive individual notifications instead of grouped ones.
+	notificationSplitByContainer bool
+
+	// notificationReport is a boolean flag enabling report-based notifications.
+	//
+	// It is set in preRun via the --notification-report flag or the WATCHTOWER_NOTIFICATION_REPORT environment variable,
+	// controlling whether notifications include session reports or just log entries.
+	notificationReport bool
+
+	// cpuCopyMode specifies how CPU settings are handled when recreating containers.
+	//
+	// It is set during preRun via the --cpu-copy-mode flag or the WATCHTOWER_CPU_COPY_MODE environment variable,
+	// controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
+	cpuCopyMode string
+
+	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
+	//
+	// It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
+	// to manage setup and execution, initialized with default behavior and configured via flags during runtime.
+	rootCmd = NewRootCommand()
+
+	// runUpdatesWithNotifications performs container updates and sends notifications about the results.
+	//
+	// It executes the update action with configured parameters, batches notifications, and returns a metric
+	// summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
+	//
+	// Parameters:
+	//   - filter: The types.Filter determining which containers are targeted for updates.
+	//   - cleanup: Boolean indicating whether to remove old images after updates.
+	//
+	// Returns:
+	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
+	runUpdatesWithNotifications = func(filter types.Filter, cleanup bool) *metrics.Metric {
+		// Start batching notifications to group update messages, if notifier is initialized
+		if notifier != nil {
+			if notifier != nil {
+				notifier.StartNotification()
+			}
+		} else {
+			logrus.Warn("Notifier is nil, skipping notification batching")
+		}
+
+		// Configure update parameters based on global flags and settings.
+		updateParams := types.UpdateParams{
+			Filter:          filter,
+			Cleanup:         cleanup,
+			NoRestart:       noRestart,
+			Timeout:         timeout,
+			MonitorOnly:     monitorOnly,
+			LifecycleHooks:  lifecycleHooks,
+			RollingRestart:  rollingRestart,
+			LabelPrecedence: labelPrecedence,
+			NoPull:          noPull,
+			LifecycleUID:    lifecycleUID,
+			LifecycleGID:    lifecycleGID,
+			CPUCopyMode:     cpuCopyMode,
+		}
+
+		// Execute the update action, capturing results and image IDs for cleanup.
+		result, cleanupImageIDs, err := actions.Update(client, updateParams)
+		if err != nil {
+			logrus.WithError(err).Error("Update execution failed")
+
+			return &metrics.Metric{
+				Scanned: 0,
+				Updated: 0,
+				Failed:  0,
+			}
+		}
+
+		// Perform deferred image cleanup if enabled.
+		if cleanup {
+			actions.CleanupImages(client, cleanupImageIDs)
+		}
+
+		// Log update report for debugging.
+		updatedNames := make([]string, 0, len(result.Updated()))
+		for _, r := range result.Updated() {
+			updatedNames = append(updatedNames, r.Name())
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"scanned":       len(result.Scanned()),
+			"updated":       len(result.Updated()),
+			"failed":        len(result.Failed()),
+			"updated_names": updatedNames,
+		}).Debug("Report before notification")
+
+		// Send the batched notification with update results, if notifier and result are initialized
+		if notifier != nil && result != nil {
+			if notificationSplitByContainer {
+				if notificationReport && len(result.Updated()) > 0 {
+					// Send separate notifications for each updated container in report mode
+					for _, updatedContainer := range result.Updated() {
+						// Create a minimal report with only this container
+						singleContainerReport := &singleContainerReport{
+							updated: []types.ContainerReport{updatedContainer},
+							scanned: []types.ContainerReport{
+								updatedContainer,
+							}, // Include all scanned for context
+							failed:  result.Failed(),  // Include all failed for context
+							skipped: result.Skipped(), // Include all skipped for context
+							stale:   result.Stale(),   // Include all stale for context
+							fresh:   result.Fresh(),   // Include all fresh for context
+						}
+						notifier.StartNotification()
+						notifier.SendNotification(singleContainerReport)
+					}
+				} else if !notificationReport {
+					// Send separate notifications for each container with "Found new image" in log mode
+					entries := notifier.GetEntries()
+					containerNames := make(map[string]bool)
+					for _, entry := range entries {
+						if strings.Contains(entry.Message, "Found new image") {
+							if containerName, ok := entry.Data["container"].(string); ok {
+								containerNames[containerName] = true
+							}
+						}
+					}
+					for containerName := range containerNames {
+						filteredEntries := make([]*logrus.Entry, 0)
+						for _, entry := range entries {
+							if cn, ok := entry.Data["container"].(string); ok && cn == containerName {
+								filteredEntries = append(filteredEntries, entry)
+							}
+						}
+						notifier.SendFilteredEntries(filteredEntries, nil)
+					}
+				}
+			} else {
+				// Send grouped notification as before
+				notifier.SendNotification(result)
+			}
+		}
+
+		// Generate and log a metric summarizing the update session.
+		metricResults := metrics.NewMetric(result)
+		notifications.LocalLog.WithFields(logrus.Fields{
+			"scanned": metricResults.Scanned,
+			"updated": metricResults.Updated,
+			"failed":  metricResults.Failed,
+		}).Info("Update session completed")
+
+		return metricResults
+	}
 )
 
-// singleContainerReport implements types.Report for individual container notifications.
-type singleContainerReport struct {
-	updated []types.ContainerReport
-	scanned []types.ContainerReport
-	failed  []types.ContainerReport
-	skipped []types.ContainerReport
-	stale   []types.ContainerReport
-	fresh   []types.ContainerReport
-}
+type (
+	// singleContainerReport implements types.Report for individual container notifications.
+	singleContainerReport struct {
+		updated []types.ContainerReport
+		scanned []types.ContainerReport
+		failed  []types.ContainerReport
+		skipped []types.ContainerReport
+		stale   []types.ContainerReport
+		fresh   []types.ContainerReport
+	}
+
+	// sortableContainers implements sort.Interface for reports.
+	sortableContainers []types.ContainerReport
+
+	// RunConfig encapsulates the configuration parameters for the runMain function.
+	//
+	// It aggregates command-line flags and derived settings into a single structure, providing a cohesive way
+	// to pass configuration data through the CLI execution flow, ensuring all necessary parameters are accessible
+	// for update operations, API setup, and scheduling.
+	RunConfig struct {
+		// Command is the cobra.Command instance representing the executed command, providing access to parsed flags.
+		Command *cobra.Command
+		// Names is a slice of container names explicitly provided as positional arguments, used for filtering.
+		Names []string
+		// Filter is the types.Filter function determining which containers are processed during updates.
+		Filter types.Filter
+		// FilterDesc is a human-readable description of the applied filter, used in logging and notifications.
+		FilterDesc string
+		// RunOnce indicates whether to perform a single update and exit, set via the --run-once flag.
+		RunOnce bool
+		// UpdateOnStart enables an immediate update check on startup, then continues with periodic updates, set via the --update-on-start flag.
+		UpdateOnStart bool
+		// EnableUpdateAPI enables the HTTP update API endpoint, set via the --http-api-update flag.
+		EnableUpdateAPI bool
+		// EnableMetricsAPI enables the HTTP metrics API endpoint, set via the --http-api-metrics flag.
+		EnableMetricsAPI bool
+		// UnblockHTTPAPI allows periodic polling alongside the HTTP API, set via the --http-api-periodic-polls flag.
+		UnblockHTTPAPI bool
+		// APIToken is the authentication token for HTTP API access, set via the --http-api-token flag.
+		APIToken string
+		// APIHost is the host to bind the HTTP API to, set via the --http-api-host flag (defaults to empty string).
+		APIHost string
+		// APIPort is the port for the HTTP API server, set via the --http-api-port flag (defaults to "8080").
+		APIPort string
+	}
+)
 
 // Scanned returns scanned containers.
 func (r *singleContainerReport) Scanned() []types.ContainerReport { return r.scanned }
@@ -67,168 +353,77 @@ func (r *singleContainerReport) Stale() []types.ContainerReport { return r.stale
 // Fresh returns fresh containers.
 func (r *singleContainerReport) Fresh() []types.ContainerReport { return r.fresh }
 
-// All returns all containers (prioritized by state).
+// All returns deduplicated containers, prioritized by state.
+//
+// Returns:
+//   - []types.ContainerReport: Sorted, unique list.
 func (r *singleContainerReport) All() []types.ContainerReport {
-	all := make(
-		[]types.ContainerReport,
-		0,
-		len(r.updated)+len(r.failed)+len(r.skipped)+len(r.stale)+len(r.fresh)+len(r.scanned),
+	// Calculate total capacity for all containers.
+	allLen := len(
+		r.scanned,
+	) + len(
+		r.updated,
+	) + len(
+		r.failed,
+	) + len(
+		r.skipped,
+	) + len(
+		r.stale,
+	) + len(
+		r.fresh,
 	)
-	all = append(all, r.updated...)
-	all = append(all, r.failed...)
-	all = append(all, r.skipped...)
-	all = append(all, r.stale...)
-	all = append(all, r.fresh...)
-	all = append(all, r.scanned...)
+	all := make([]types.ContainerReport, 0, allLen)
+	presentIDs := map[types.ContainerID][]string{}
+
+	// Append unique containers in priority order.
+	appendUnique := func(reports []types.ContainerReport) {
+		for _, report := range reports {
+			if _, found := presentIDs[report.ID()]; found {
+				continue
+			}
+
+			all = append(all, report)
+			presentIDs[report.ID()] = nil
+		}
+	}
+
+	appendUnique(r.updated)
+	appendUnique(r.failed)
+	appendUnique(r.skipped)
+	appendUnique(r.stale)
+	appendUnique(r.fresh)
+	appendUnique(r.scanned)
+
+	sort.Sort(sortableContainers(all))
 
 	return all
 }
 
-// client is the Docker client instance used to interact with container operations in Watchtower.
+// Len returns the slice length.
 //
-// It provides an interface for listing, stopping, starting, and managing containers, initialized during
-// the preRun phase with options derived from command-line flags and environment variables such as
-// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
-var client container.Client
+// Returns:
+//   - int: Number of reports.
+func (s sortableContainers) Len() int {
+	return len(s)
+}
 
-// scheduleSpec holds the cron-formatted schedule string that dictates when periodic container updates occur.
+// Less compares container IDs.
 //
-// It is populated during preRun from the --schedule flag or the WATCHTOWER_SCHEDULE environment variable,
-// supporting formats like "@every 1h" or standard cron syntax (e.g., "0 0 * * * *") for flexible scheduling.
-var scheduleSpec string
+// Parameters:
+//   - i, j: Indices to compare.
+//
+// Returns:
+//   - bool: True if i's ID is less than j's.
+func (s sortableContainers) Less(i, j int) bool {
+	return s[i].ID() < s[j].ID()
+}
 
-// cleanup is a boolean flag determining whether to remove old images after a container update.
+// Swap exchanges two reports.
 //
-// It is set during preRun via the --cleanup flag or the WATCHTOWER_CLEANUP environment variable,
-// enabling disk space management by deleting outdated images post-update.
-var cleanup bool
-
-// noRestart is a boolean flag that prevents containers from being restarted after an update.
-//
-// It is configured in preRun via the --no-restart flag or the WATCHTOWER_NO_RESTART environment variable,
-// useful when users prefer manual restart control or want to minimize downtime during updates.
-var noRestart bool
-
-// noPull is a boolean flag that skips pulling new images from the registry during updates.
-//
-// It is enabled in preRun via the --no-pull flag or the WATCHTOWER_NO_PULL environment variable,
-// allowing updates to proceed using only locally cached images, potentially reducing network usage.
-var noPull bool
-
-// monitorOnly is a boolean flag enabling a mode where Watchtower monitors containers without updating them.
-//
-// It is set in preRun via the --monitor-only flag or the WATCHTOWER_MONITOR_ONLY environment variable,
-// ideal for observing image staleness without triggering automatic updates.
-var monitorOnly bool
-
-// enableLabel is a boolean flag restricting updates to containers with the "com.centurylinklabs.watchtower.enable" label set to true.
-//
-// It is configured in preRun via the --label-enable flag or the WATCHTOWER_LABEL_ENABLE environment variable,
-// providing granular control over which containers are targeted for updates.
-var enableLabel bool
-
-// disableContainers is a slice of container names explicitly excluded from updates.
-//
-// It is populated in preRun from the --disable-containers flag or the WATCHTOWER_DISABLE_CONTAINERS environment variable,
-// allowing users to blacklist specific containers from Watchtower’s operations.
-var disableContainers []string
-
-// notifier is the notification system instance responsible for sending update status messages to configured channels.
-//
-// It is initialized in preRun with notification types specified via flags (e.g., --notifications), supporting
-// multiple methods like email, Slack, or MSTeams to inform users about update successes, failures, or skips.
-var notifier types.Notifier
-
-// timeout specifies the maximum duration allowed for container stop operations during updates.
-//
-// It defaults to a value defined in the flags package and can be overridden in preRun via the --timeout flag or
-// WATCHTOWER_TIMEOUT environment variable, ensuring containers are stopped gracefully within a specified time limit.
-var timeout time.Duration
-
-// lifecycleHooks is a boolean flag enabling the execution of pre- and post-update lifecycle hook commands.
-//
-// It is set in preRun via the --enable-lifecycle-hooks flag or the WATCHTOWER_LIFECYCLE_HOOKS environment variable,
-// allowing custom scripts to run at specific update stages for additional validation or actions.
-var lifecycleHooks bool
-
-// rollingRestart is a boolean flag enabling rolling restarts, updating containers sequentially rather than all at once.
-//
-// It is configured in preRun via the --rolling-restart flag or the WATCHTOWER_ROLLING_RESTART environment variable,
-// reducing downtime by restarting containers one-by-one during updates.
-var rollingRestart bool
-
-// scope defines a specific operational scope for Watchtower, limiting updates to containers matching this scope.
-//
-// It is set in preRun via the --scope flag or the WATCHTOWER_SCOPE environment variable, useful for isolating
-// Watchtower’s actions to a subset of containers (e.g., a project or environment).
-var scope string
-
-// labelPrecedence is a boolean flag giving container label settings priority over global command-line flags.
-//
-// It is enabled in preRun via the --label-take-precedence flag or the WATCHTOWER_LABEL_PRECEDENCE environment variable,
-// allowing container-specific configurations to override broader settings for flexibility.
-var labelPrecedence bool
-
-// lifecycleUID is the default UID to run lifecycle hooks as.
-//
-// It is set in preRun via the --lifecycle-uid flag or the WATCHTOWER_LIFECYCLE_UID environment variable,
-// providing a global default that can be overridden by container labels.
-var lifecycleUID int
-
-// lifecycleGID is the default GID to run lifecycle hooks as.
-//
-// It is set in preRun via the --lifecycle-gid flag or the WATCHTOWER_LIFECYCLE_GID environment variable,
-// providing a global default that can be overridden by container labels.
-var lifecycleGID int
-
-// notificationSplitByContainer is a boolean flag enabling separate notifications for each updated container.
-//
-// It is set in preRun via the --notification-split-by-container flag or the WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER environment variable,
-// allowing users to receive individual notifications instead of grouped ones.
-var notificationSplitByContainer bool
-
-// cpuCopyMode specifies how CPU settings are handled when recreating containers.
-//
-// It is set during preRun via the --cpu-copy-mode flag or the WATCHTOWER_CPU_COPY_MODE environment variable,
-// controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
-var cpuCopyMode string
-
-// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
-//
-// It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
-// to manage setup and execution, initialized with default behavior and configured via flags during runtime.
-var rootCmd = NewRootCommand()
-
-// RunConfig encapsulates the configuration parameters for the runMain function.
-//
-// It aggregates command-line flags and derived settings into a single structure, providing a cohesive way
-// to pass configuration data through the CLI execution flow, ensuring all necessary parameters are accessible
-// for update operations, API setup, and scheduling.
-type RunConfig struct {
-	// Command is the cobra.Command instance representing the executed command, providing access to parsed flags.
-	Command *cobra.Command
-	// Names is a slice of container names explicitly provided as positional arguments, used for filtering.
-	Names []string
-	// Filter is the types.Filter function determining which containers are processed during updates.
-	Filter types.Filter
-	// FilterDesc is a human-readable description of the applied filter, used in logging and notifications.
-	FilterDesc string
-	// RunOnce indicates whether to perform a single update and exit, set via the --run-once flag.
-	RunOnce bool
-	// UpdateOnStart enables an immediate update check on startup, then continues with periodic updates, set via the --update-on-start flag.
-	UpdateOnStart bool
-	// EnableUpdateAPI enables the HTTP update API endpoint, set via the --http-api-update flag.
-	EnableUpdateAPI bool
-	// EnableMetricsAPI enables the HTTP metrics API endpoint, set via the --http-api-metrics flag.
-	EnableMetricsAPI bool
-	// UnblockHTTPAPI allows periodic polling alongside the HTTP API, set via the --http-api-periodic-polls flag.
-	UnblockHTTPAPI bool
-	// APIToken is the authentication token for HTTP API access, set via the --http-api-token flag.
-	APIToken string
-	// APIHost is the host to bind the HTTP API to, set via the --http-api-host flag (defaults to empty string).
-	APIHost string
-	// APIPort is the port for the HTTP API server, set via the --http-api-port flag (defaults to "8080").
-	APIPort string
+// Parameters:
+//   - i, j: Indices to swap.
+func (s sortableContainers) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
 
 // NewRootCommand creates and configures the root command for the Watchtower CLI.
@@ -320,6 +515,9 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Retrieve notification split flag.
 	notificationSplitByContainer, _ = flagsSet.GetBool("notification-split-by-container")
+
+	// Retrieve notification report flag.
+	notificationReport, _ = flagsSet.GetBool("notification-report")
 
 	// Log the scope if specified, aiding debugging by confirming the operational boundary.
 	if scope != "" {
@@ -1087,104 +1285,4 @@ func runUpgradesOnSchedule(
 	logrus.Debug("Scheduler stopped and update completed.")
 
 	return nil
-}
-
-// runUpdatesWithNotifications performs container updates and sends notifications about the results.
-//
-// It executes the update action with configured parameters, batches notifications, and returns a metric
-// summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
-//
-// Parameters:
-//   - filter: The types.Filter determining which containers are targeted for updates.
-//   - cleanup: Boolean indicating whether to remove old images after updates.
-//
-// Returns:
-//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-var runUpdatesWithNotifications = func(filter types.Filter, cleanup bool) *metrics.Metric {
-	// Start batching notifications to group update messages, if notifier is initialized
-	if notifier != nil {
-		if notifier != nil {
-			notifier.StartNotification()
-		}
-	} else {
-		logrus.Warn("Notifier is nil, skipping notification batching")
-	}
-
-	// Configure update parameters based on global flags and settings.
-	updateParams := types.UpdateParams{
-		Filter:          filter,
-		Cleanup:         cleanup,
-		NoRestart:       noRestart,
-		Timeout:         timeout,
-		MonitorOnly:     monitorOnly,
-		LifecycleHooks:  lifecycleHooks,
-		RollingRestart:  rollingRestart,
-		LabelPrecedence: labelPrecedence,
-		NoPull:          noPull,
-		LifecycleUID:    lifecycleUID,
-		LifecycleGID:    lifecycleGID,
-		CPUCopyMode:     cpuCopyMode,
-	}
-
-	// Execute the update action, capturing results and image IDs for cleanup.
-	result, cleanupImageIDs, err := actions.Update(client, updateParams)
-	if err != nil {
-		logrus.WithError(err).Error("Update execution failed")
-
-		return &metrics.Metric{
-			Scanned: 0,
-			Updated: 0,
-			Failed:  0,
-		}
-	}
-
-	// Perform deferred image cleanup if enabled.
-	if cleanup {
-		actions.CleanupImages(client, cleanupImageIDs)
-	}
-
-	// Log update report for debugging.
-	updatedNames := make([]string, 0, len(result.Updated()))
-	for _, r := range result.Updated() {
-		updatedNames = append(updatedNames, r.Name())
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"scanned":       len(result.Scanned()),
-		"updated":       len(result.Updated()),
-		"failed":        len(result.Failed()),
-		"updated_names": updatedNames,
-	}).Debug("Report before notification")
-
-	// Send the batched notification with update results, if notifier and result are initialized
-	if notifier != nil && result != nil {
-		if notificationSplitByContainer && len(result.Updated()) > 0 {
-			// Send separate notifications for each updated container
-			for _, updatedContainer := range result.Updated() {
-				// Create a minimal report with only this container
-				singleContainerReport := &singleContainerReport{
-					updated: []types.ContainerReport{updatedContainer},
-					scanned: result.Scanned(), // Include all scanned for context
-					failed:  result.Failed(),  // Include all failed for context
-					skipped: result.Skipped(), // Include all skipped for context
-					stale:   result.Stale(),   // Include all stale for context
-					fresh:   result.Fresh(),   // Include all fresh for context
-				}
-				notifier.SendNotification(singleContainerReport)
-			}
-		} else {
-			// Send grouped notification as before
-			notifier.SendNotification(result)
-		}
-	}
-
-	// Generate and log a metric summarizing the update session.
-	metricResults := metrics.NewMetric(result)
-	notifications.LocalLog.WithFields(logrus.Fields{
-		"scanned": metricResults.Scanned,
-		"updated": metricResults.Updated,
-		"failed":  metricResults.Failed,
-	}).Info("Update session completed")
-
-	return metricResults
 }
