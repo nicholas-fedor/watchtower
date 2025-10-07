@@ -6,6 +6,7 @@ package mocks
 
 import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/sirupsen/logrus"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -102,6 +103,52 @@ func (_c *MockNotifier_Close_Call) RunAndReturn(run func()) *MockNotifier_Close_
 	return _c
 }
 
+// GetEntries provides a mock function for the type MockNotifier
+func (_mock *MockNotifier) GetEntries() []*logrus.Entry {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEntries")
+	}
+
+	var r0 []*logrus.Entry
+	if returnFunc, ok := ret.Get(0).(func() []*logrus.Entry); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*logrus.Entry)
+		}
+	}
+	return r0
+}
+
+// MockNotifier_GetEntries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEntries'
+type MockNotifier_GetEntries_Call struct {
+	*mock.Call
+}
+
+// GetEntries is a helper method to define mock.On call
+func (_e *MockNotifier_Expecter) GetEntries() *MockNotifier_GetEntries_Call {
+	return &MockNotifier_GetEntries_Call{Call: _e.mock.On("GetEntries")}
+}
+
+func (_c *MockNotifier_GetEntries_Call) Run(run func()) *MockNotifier_GetEntries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockNotifier_GetEntries_Call) Return(entrys []*logrus.Entry) *MockNotifier_GetEntries_Call {
+	_c.Call.Return(entrys)
+	return _c
+}
+
+func (_c *MockNotifier_GetEntries_Call) RunAndReturn(run func() []*logrus.Entry) *MockNotifier_GetEntries_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetNames provides a mock function for the type MockNotifier
 func (_mock *MockNotifier) GetNames() []string {
 	ret := _mock.Called()
@@ -191,6 +238,52 @@ func (_c *MockNotifier_GetURLs_Call) Return(strings []string) *MockNotifier_GetU
 
 func (_c *MockNotifier_GetURLs_Call) RunAndReturn(run func() []string) *MockNotifier_GetURLs_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// SendFilteredEntries provides a mock function for the type MockNotifier
+func (_mock *MockNotifier) SendFilteredEntries(entries []*logrus.Entry, report types.Report) {
+	_mock.Called(entries, report)
+	return
+}
+
+// MockNotifier_SendFilteredEntries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendFilteredEntries'
+type MockNotifier_SendFilteredEntries_Call struct {
+	*mock.Call
+}
+
+// SendFilteredEntries is a helper method to define mock.On call
+//   - entries []*logrus.Entry
+//   - report types.Report
+func (_e *MockNotifier_Expecter) SendFilteredEntries(entries interface{}, report interface{}) *MockNotifier_SendFilteredEntries_Call {
+	return &MockNotifier_SendFilteredEntries_Call{Call: _e.mock.On("SendFilteredEntries", entries, report)}
+}
+
+func (_c *MockNotifier_SendFilteredEntries_Call) Run(run func(entries []*logrus.Entry, report types.Report)) *MockNotifier_SendFilteredEntries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 []*logrus.Entry
+		if args[0] != nil {
+			arg0 = args[0].([]*logrus.Entry)
+		}
+		var arg1 types.Report
+		if args[1] != nil {
+			arg1 = args[1].(types.Report)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNotifier_SendFilteredEntries_Call) Return() *MockNotifier_SendFilteredEntries_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockNotifier_SendFilteredEntries_Call) RunAndReturn(run func(entries []*logrus.Entry, report types.Report)) *MockNotifier_SendFilteredEntries_Call {
+	_c.Run(run)
 	return _c
 }
 
