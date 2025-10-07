@@ -49,15 +49,23 @@ type API struct {
 	Addr        string // Set dynamically from flags
 	hasHandlers bool
 	mux         *http.ServeMux // Custom mux to avoid global collisions
+	server      HTTPServer     // Optional injected server for testing
 }
 
 // New is a factory function creating a new API instance.
-func New(token, addr string) *API {
+// The server parameter is optional and allows dependency injection for testing.
+func New(token, addr string, server ...HTTPServer) *API {
+	var injectedServer HTTPServer
+	if len(server) > 0 {
+		injectedServer = server[0]
+	}
+
 	api := &API{
 		Token:       token,
 		Addr:        addr,
 		hasHandlers: false,
 		mux:         http.NewServeMux(),
+		server:      injectedServer,
 	}
 	logrus.WithFields(logrus.Fields{
 		"addr":  api.Addr,
@@ -114,17 +122,24 @@ func (api *API) Start(ctx context.Context, block bool) error {
 		logrus.WithField("addr", api.Addr).Fatal("API token is empty or unset")
 	}
 
-	server := &http.Server{
-		Addr:              api.Addr,
-		Handler:           api.mux,
-		ReadTimeout:       serverReadTimeout,
-		WriteTimeout:      serverWriteTimeout,
-		IdleTimeout:       serverIdleTimeout,
-		ReadHeaderTimeout: serverReadTimeout,
-		MaxHeaderBytes:    1 << serverMaxHeaderShift,
-		TLSConfig:         nil,
-		TLSNextProto:      make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
-		BaseContext:       func(_ net.Listener) context.Context { return ctx },
+	var server HTTPServer
+	if api.server != nil {
+		// Use injected server for testing
+		server = api.server
+	} else {
+		// Create real server for production
+		server = &http.Server{
+			Addr:              api.Addr,
+			Handler:           api.mux,
+			ReadTimeout:       serverReadTimeout,
+			WriteTimeout:      serverWriteTimeout,
+			IdleTimeout:       serverIdleTimeout,
+			ReadHeaderTimeout: serverReadTimeout,
+			MaxHeaderBytes:    1 << serverMaxHeaderShift,
+			TLSConfig:         nil,
+			TLSNextProto:      make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+			BaseContext:       func(_ net.Listener) context.Context { return ctx },
+		}
 	}
 
 	logrus.WithField("addr", api.Addr).Info("Starting HTTP API server")
