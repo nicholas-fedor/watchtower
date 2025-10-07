@@ -55,6 +55,11 @@ func WriteStartupMessage(
 		apiListenAddr = apiListenAddr + ":" + apiPort
 	}
 
+	// If startup messages are suppressed, skip all logging
+	if noStartupMessage {
+		return
+	}
+
 	// Configure the logger based on whether startup messages should be suppressed.
 	startupLog := SetupStartupLogger(noStartupMessage, notifier)
 
@@ -89,7 +94,7 @@ func WriteStartupMessage(
 	}
 
 	// Send batched notifications if not suppressed, ensuring startup info reaches users.
-	if !noStartupMessage {
+	if !noStartupMessage && notifier != nil {
 		notifier.SendNotification(nil)
 	}
 
