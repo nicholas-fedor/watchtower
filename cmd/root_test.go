@@ -629,6 +629,12 @@ func TestUpdateLockSerialization(t *testing.T) {
 // TestConcurrentScheduledAndAPIUpdate verifies that API-triggered updates wait for scheduled updates to complete,
 // ensuring proper serialization and preventing race conditions between periodic updates and HTTP API calls.
 func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
+	// Enable debug logging to see lock acquisition logs
+	originalLevel := logrus.GetLevel()
+
+	logrus.SetLevel(logrus.DebugLevel)
+	defer logrus.SetLevel(originalLevel)
+
 	// Initialize the update lock channel with the same pattern as in runMain
 	updateLock := make(chan bool, 1)
 	updateLock <- true
@@ -653,11 +659,15 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 
 	// Simulate scheduled update (longer duration)
 	go func() {
+		t.Log("Scheduled: trying to acquire lock")
+
 		select {
 		case v := <-updateLock:
+			t.Log("Scheduled: acquired lock")
 			close(scheduledStarted)
 			time.Sleep(200 * time.Millisecond) // Simulate scheduled update work (longer than API)
 			close(scheduledCompleted)
+			t.Log("Scheduled: releasing lock")
 
 			updateLock <- v
 		default:
@@ -665,8 +675,13 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 		}
 	}()
 
+	// Wait for scheduled update to start
+	<-scheduledStarted
+
 	// Simulate API update request
 	go func() {
+		t.Log("API: creating request")
+
 		req, err := http.NewRequestWithContext(
 			context.Background(),
 			http.MethodPost,
@@ -680,11 +695,11 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		handler.Handle(w, req)
-	}()
 
-	// Wait for scheduled update to start
-	<-scheduledStarted
+		t.Log("API: calling handler.Handle")
+		handler.Handle(w, req)
+		t.Log("API: handler.Handle completed")
+	}()
 
 	// Verify API update has not started yet (should be blocked by lock)
 	select {
