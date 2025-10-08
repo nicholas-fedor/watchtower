@@ -51,6 +51,8 @@ var (
 	errStartContainerFailed = errors.New("failed to start container")
 	// errParseImageReference indicates a failure to parse a container’s image reference.
 	errParseImageReference = errors.New("failed to parse image reference")
+	// errNoContainerInfo indicates that container info is not available.
+	errNoContainerInfo = errors.New("container info not available")
 )
 
 // Update scans and updates containers based on parameters.
@@ -859,13 +861,21 @@ func restartGitContainer(
 		"commit":      latestCommit,
 	}).Debug("Successfully built new image from Git")
 
-	// Update container to use the newly built image
-	// Note: In a real implementation, this would require modifying the container's
-	// configuration to point to the new image. For now, we'll assume the container
-	// will be recreated with the updated image through docker-compose or similar.
+	// Update the container's configuration to use the newly built image
+	// We need to modify the container's Config.Image to point to the new image
+	// before calling StartContainer, which will create a new container with this image
+	if containerInfo := container.ContainerInfo(); containerInfo != nil && containerInfo.Config != nil {
+		// Update the image reference in the container configuration
+		containerInfo.Config.Image = imageName
+		logrus.WithFields(fields).
+			WithField("old_image", container.ImageName()).
+			WithField("new_image", imageName).
+			Debug("Updated container configuration with new image")
+	} else {
+		return "", false, errNoContainerInfo
+	}
 
-	// For this implementation, we'll use the existing StartContainer method
-	// but in practice, the container's image reference would need to be updated
+	// Now start the container with the updated configuration
 	newContainerID, err := client.StartContainer(container)
 	if err != nil {
 		logrus.WithFields(fields).WithError(err).Debug("Failed to start container with new image")
