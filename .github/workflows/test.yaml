@@ -29,6 +29,7 @@ jobs:
         uses: actions/setup-go@c0137caad775660c0844396c52da96e560aba63d
         with:
           go-version: ${{ matrix.go-version }}
+          check-latest: true
           cache: true
           cache-dependency-path: "**/go.sum"
 
