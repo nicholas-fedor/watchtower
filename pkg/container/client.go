@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
@@ -127,6 +128,7 @@ type ClientOptions struct {
 	DisableMemorySwappiness bool
 	CPUCopyMode             string
 	WarnOnHeadFailed        WarningStrategy
+	Fs                      afero.Fs
 }
 
 // NewClient initializes a new Client instance for Docker API interactions.
@@ -148,6 +150,10 @@ func NewClient(opts ClientOptions) Client {
 	)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to initialize Docker client")
+	}
+	// Set default filesystem if not provided
+	if opts.Fs == nil {
+		opts.Fs = afero.NewOsFs()
 	}
 
 	// Apply forced API version if set and valid.
@@ -303,26 +309,15 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		// When CPUCopyMode is set to "auto", automatically detect the container runtime (Podman vs Docker)
 		// to determine the appropriate CPU copying behavior. This prevents resource allocation issues
 		// that could occur if Docker-specific logic is applied to Podman or vice versa.
-		info, err := c.GetInfo()
+		var err error
+
+		isPodman, err = c.detectPodman()
 		if err != nil {
-			// If system info retrieval fails, fall back to assuming Docker behavior.
+			// If detection fails, fall back to Docker behavior.
 			// This conservative approach ensures compatibility in environments where runtime detection
-			// is not possible, defaulting to the more common Docker runtime assumptions.
+			// is not possible, defaulting to the Docker runtime.
 			logrus.WithError(err).
-				Debug("Failed to get system info for Podman detection, assuming Docker")
-		} else {
-			// Detection works by examining the system info returned by the Docker API client.
-			// Podman identifies itself in two ways:
-			// 1. The "Name" field equals "podman"
-			// 2. The "ServerVersion" field contains "podman" (case-insensitive)
-			// This dual-check ensures reliable detection across different Podman versions and configurations.
-			if name, exists := info["Name"]; exists && name == "podman" {
-				isPodman = true
-			} else if serverVersion, exists := info["ServerVersion"]; exists {
-				if sv, ok := serverVersion.(string); ok && strings.Contains(strings.ToLower(sv), "podman") {
-					isPodman = true
-				}
-			}
+				Debug("Failed to detect container runtime, falling back to Docker")
 		}
 	}
 
@@ -806,6 +801,59 @@ func (c client) GetInfo() (map[string]any, error) {
 	}
 
 	return infoMap, nil
+}
+
+// detectPodman determines if the container runtime is Podman using multiple detection methods.
+//
+// Returns:
+//   - bool: True if Podman is detected, false otherwise.
+//   - error: Non-nil if detection fails, nil on success.
+func (c client) detectPodman() (bool, error) {
+	// Check for Podman marker file
+	if _, err := c.Fs.Stat("/run/.containerenv"); err == nil {
+		logrus.Debug("Detected Podman via marker file /run/.containerenv")
+
+		return true, nil
+	}
+
+	// Check for Docker marker file (ensure we're not in Docker)
+	if _, err := c.Fs.Stat("/.dockerenv"); err == nil {
+		logrus.Debug("Detected Docker via marker file /.dockerenv")
+
+		return false, nil
+	}
+
+	// Check CONTAINER environment variable
+	if container := os.Getenv("CONTAINER"); container == "podman" || container == "oci" {
+		logrus.Debug("Detected Podman via CONTAINER environment variable")
+
+		return true, nil
+	}
+
+	// Fallback to API-based detection
+	info, err := c.GetInfo()
+	if err != nil {
+		logrus.WithError(err).
+			Debug("Failed to get system info for Podman detection, assuming Docker")
+
+		return false, err
+	}
+
+	if name, exists := info["Name"]; exists && name == "podman" {
+		logrus.Debug("Detected Podman via API Name field")
+
+		return true, nil
+	} else if serverVersion, exists := info["ServerVersion"]; exists {
+		if sv, ok := serverVersion.(string); ok && strings.Contains(strings.ToLower(sv), "podman") {
+			logrus.Debug("Detected Podman via API ServerVersion field")
+
+			return true, nil
+		}
+	}
+
+	logrus.Debug("No Podman detection criteria met, assuming Docker")
+
+	return false, nil
 }
 
 // WaitForContainerHealthy waits for a container to become healthy or times out.
