@@ -646,6 +646,8 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 	apiCompleted := make(chan struct{})
 
 	// Mock update function for API handler that signals start and completion
+	// Mutex to protect concurrent t.Log calls from race conditions
+	var logMu sync.Mutex
 	updateFn := func(_ []string) *metrics.Metric {
 		close(apiStarted)
 		time.Sleep(100 * time.Millisecond) // Simulate API update work
@@ -659,7 +661,9 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 
 	// Simulate scheduled update (longer duration)
 	go func() {
+		logMu.Lock()
 		t.Log("Scheduled: trying to acquire lock")
+		logMu.Unlock()
 
 		select {
 		case v := <-updateLock:
