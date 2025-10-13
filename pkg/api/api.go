@@ -3,8 +3,10 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -20,19 +22,27 @@ const shutdownTimeout = 5 * time.Second
 
 // API represents the HTTP API server for Watchtower.
 type API struct {
-	Addr       string
-	token      string
-	mux        *http.ServeMux
-	server     *http.Server
-	registered bool
+	Token       string
+	Addr        string // Set dynamically from flags
+	hasHandlers bool
+	mux         *http.ServeMux // Custom mux to avoid global collisions
+	server      HTTPServer     // Optional injected server for testing
 }
 
 // New is a factory function creating a new API instance.
-func New(token, addr string) *API {
+// The server parameter is optional and allows dependency injection for testing.
+func New(token, addr string, server ...HTTPServer) *API {
+	var injectedServer HTTPServer
+	if len(server) > 0 {
+		injectedServer = server[0]
+	}
+
 	api := &API{
-		token: token,
-		Addr:  addr,
-		mux:   http.NewServeMux(),
+		Token:       token,
+		Addr:        addr,
+		hasHandlers: false,
+		mux:         http.NewServeMux(),
+		server:      injectedServer,
 	}
 	logrus.WithFields(logrus.Fields{
 		"addr":  api.Addr,
@@ -68,34 +78,30 @@ func (a *API) Start(ctx context.Context, blocking bool) error {
 		logrus.Fatal("API token is empty or unset")
 	}
 
-	a.server = &http.Server{
-		Addr:              a.Addr,
-		Handler:           a.authMiddleware(a.mux),
-		ReadHeaderTimeout: readHeaderTimeout,
+	var server HTTPServer
+	if api.server != nil {
+		// Use injected server for testing
+		server = api.server
+	} else {
+		// Create real server for production
+		server = &http.Server{
+			Addr:              api.Addr,
+			Handler:           api.mux,
+			ReadTimeout:       serverReadTimeout,
+			WriteTimeout:      serverWriteTimeout,
+			IdleTimeout:       serverIdleTimeout,
+			ReadHeaderTimeout: serverReadTimeout,
+			MaxHeaderBytes:    1 << serverMaxHeaderShift,
+			TLSConfig:         nil,
+			TLSNextProto:      make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+			BaseContext:       func(_ net.Listener) context.Context { return ctx },
+		}
 	}
 
-	if blocking {
-		errChan := make(chan error, 1)
+	logrus.WithField("addr", api.Addr).Info("Starting HTTP API server")
 
-		go func() {
-			errChan <- a.server.ListenAndServe()
-		}()
-
-		logrus.Info("HTTP API server started successfully")
-
-		select {
-		case err := <-errChan:
-			return err
-		case <-ctx.Done():
-			shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
-			defer cancel()
-
-			if err := a.server.Shutdown(shutdownCtx); err != nil {
-				return fmt.Errorf("server shutdown failed: %w", err)
-			}
-
-			return nil
-		}
+	if block {
+		return RunHTTPServer(ctx, server)
 	}
 
 	go func() {

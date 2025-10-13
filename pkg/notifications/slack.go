@@ -132,3 +132,20 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	return urlStr, nil
 }
+
+// GetEntries returns nil for legacy notifiers.
+//
+// Returns:
+//   - []*logrus.Entry: Always nil.
+func (s *slackTypeNotifier) GetEntries() []*logrus.Entry {
+	return nil
+}
+
+// SendFilteredEntries does nothing for legacy notifiers.
+//
+// Parameters:
+//   - entries: Ignored.
+//   - report: Ignored.
+func (s *slackTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
+	// Legacy notifiers do not support filtered entries.
+}

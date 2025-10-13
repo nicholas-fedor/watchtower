@@ -155,3 +155,20 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	return urlStr, nil
 }
+
+// GetEntries returns nil for legacy notifiers.
+//
+// Returns:
+//   - []*logrus.Entry: Always nil.
+func (n *gotifyTypeNotifier) GetEntries() []*logrus.Entry {
+	return nil
+}
+
+// SendFilteredEntries does nothing for legacy notifiers.
+//
+// Parameters:
+//   - entries: Ignored.
+//   - report: Ignored.
+func (n *gotifyTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
+	// Legacy notifiers do not support filtered entries.
+}

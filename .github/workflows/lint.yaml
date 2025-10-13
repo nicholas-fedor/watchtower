@@ -22,13 +22,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@c0137caad775660c0844396c52da96e560aba63d
         with:
+          check-latest: true
           go-version: ${{ env.GO_VERSION }}
 
       - name: Install dependencies
         run: go mod download
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@7409966d8b436f844cc71daeb79a8b62c9827c0c
+        uses: golangci/golangci-lint-action@1d64cc17c98f6243ff9c45fc39cc6911222133e3
         with:
           args: --timeout=5m
 

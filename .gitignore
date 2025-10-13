@@ -199,3 +199,5 @@ test-reports/
 
 # All-contributors
 .all-contributors/
+/Logs
+TODO.md

@@ -93,9 +93,17 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Acquire lock, blocking if another update is in progress (requests will queue).
+	logrus.Debug("Handler: trying to acquire lock")
+
 	chanValue := <-handle.lock
 
-	defer func() { handle.lock <- chanValue }()
+	logrus.Debug("Handler: acquired lock")
+
+	defer func() {
+		logrus.Debug("Handler: releasing lock")
+
+		handle.lock <- chanValue
+	}()
 
 	if len(images) > 0 {
 		logrus.WithField("images", images).Info("Executing targeted update")
@@ -104,9 +112,13 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute update and get results
+	logrus.Debug("Handler: executing update function")
+
 	startTime := time.Now()
 	metric := handle.fn(images)
 	duration := time.Since(startTime)
+
+	logrus.Debug("Handler: update function completed")
 
 	// Set content type to JSON
 	w.Header().Set("Content-Type", "application/json")

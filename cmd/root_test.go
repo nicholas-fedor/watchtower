@@ -19,7 +19,11 @@ import (
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	containerMock "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
@@ -367,7 +371,7 @@ func TestFormatDuration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatDuration(tt.duration)
+			result := util.FormatDuration(tt.duration)
 			assert.Equal(t, tt.expected, result)
 			// TestFormatTimeUnit tests the formatTimeUnit function with different values and options.
 		})
@@ -419,12 +423,7 @@ func TestFormatTimeUnit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatTimeUnit(struct {
-				value    int64
-				singular string
-				plural   string
-			}{tt.value, tt.singular, tt.plural}, tt.forceInclude)
-			// TestFilterEmpty tests the filterEmpty function with various string slices.
+			result := util.FormatTimeUnit(tt.value, tt.singular, tt.plural, tt.forceInclude)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -460,13 +459,13 @@ func TestFilterEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TestAwaitDockerClient tests that awaitDockerClient sleeps for the expected duration.
-			result := filterEmpty(tt.input)
+			result := util.FilterEmpty(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
+// TestAwaitDockerClient tests that awaitDockerClient sleeps for the expected duration.
 func TestAwaitDockerClient(t *testing.T) {
 	// This function just sleeps for 1 second, so we test that it doesn't panic
 	// and completes within a reasonable time
@@ -552,7 +551,7 @@ func TestGetAPIAddr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getAPIAddr(tt.host, tt.port)
+			result := api.GetAPIAddr(tt.host, tt.port)
 			assert.Equal(t, tt.expected, result)
 
 			// Verify the formatted address is a valid TCP address
@@ -636,6 +635,12 @@ func TestUpdateLockSerialization(t *testing.T) {
 // TestConcurrentScheduledAndAPIUpdate verifies that API-triggered updates wait for scheduled updates to complete,
 // ensuring proper serialization and preventing race conditions between periodic updates and HTTP API calls.
 func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
+	// Enable debug logging to see lock acquisition logs
+	originalLevel := logrus.GetLevel()
+
+	logrus.SetLevel(logrus.DebugLevel)
+	defer logrus.SetLevel(originalLevel)
+
 	// Initialize the update lock channel with the same pattern as in runMain
 	updateLock := make(chan bool, 1)
 	updateLock <- true
@@ -647,6 +652,8 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 	apiCompleted := make(chan struct{})
 
 	// Mock update function for API handler that signals start and completion
+	// Mutex to protect concurrent t.Log calls from race conditions
+	var logMu sync.Mutex
 	updateFn := func(_ []string) *metrics.Metric {
 		close(apiStarted)
 		time.Sleep(100 * time.Millisecond) // Simulate API update work
@@ -660,11 +667,17 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 
 	// Simulate scheduled update (longer duration)
 	go func() {
+		logMu.Lock()
+		t.Log("Scheduled: trying to acquire lock")
+		logMu.Unlock()
+
 		select {
 		case v := <-updateLock:
+			t.Log("Scheduled: acquired lock")
 			close(scheduledStarted)
 			time.Sleep(200 * time.Millisecond) // Simulate scheduled update work (longer than API)
 			close(scheduledCompleted)
+			t.Log("Scheduled: releasing lock")
 
 			updateLock <- v
 		default:
@@ -672,8 +685,13 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 		}
 	}()
 
+	// Wait for scheduled update to start
+	<-scheduledStarted
+
 	// Simulate API update request
 	go func() {
+		t.Log("API: creating request")
+
 		req, err := http.NewRequestWithContext(
 			context.Background(),
 			http.MethodPost,
@@ -687,11 +705,11 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		handler.Handle(w, req)
-	}()
 
-	// Wait for scheduled update to start
-	<-scheduledStarted
+		t.Log("API: calling handler.Handle")
+		handler.Handle(w, req)
+		t.Log("API: handler.Handle completed")
+	}()
 
 	// Verify API update has not started yet (should be blocked by lock)
 	select {
@@ -754,7 +772,21 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 	filterDesc := testFilterDesc
 
 	// The function should trigger immediate update and then start scheduler
-	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+	err = scheduling.RunUpgradesOnSchedule(
+		ctx,
+		cmd,
+		filter,
+		filterDesc,
+		updateLock,
+		false,
+		"",
+		logging.WriteStartupMessage,
+		runUpdatesWithNotifications,
+		nil,
+		"",
+		nil,
+		"",
+	)
 
 	// Should not return an error (context cancellation is expected)
 	require.NoError(t, err)
@@ -823,7 +855,21 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 	filterDesc := testFilterDesc
 
 	startTime := time.Now()
-	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+	err = scheduling.RunUpgradesOnSchedule(
+		ctx,
+		cmd,
+		filter,
+		filterDesc,
+		updateLock,
+		false,
+		"",
+		logging.WriteStartupMessage,
+		runUpdatesWithNotifications,
+		nil,
+		"",
+		nil,
+		"",
+	)
 
 	// Should not return an error (context cancellation is expected)
 	require.NoError(t, err)
@@ -895,7 +941,21 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 	filter := func(_ types.FilterableContainer) bool { return false }
 	filterDesc := testFilterDesc
 
-	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+	err = scheduling.RunUpgradesOnSchedule(
+		ctx,
+		cmd,
+		filter,
+		filterDesc,
+		updateLock,
+		false,
+		"",
+		logging.WriteStartupMessage,
+		runUpdatesWithNotifications,
+		nil,
+		"",
+		nil,
+		"",
+	)
 
 	// Should not return an error
 	require.NoError(t, err)
@@ -946,7 +1006,21 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 	filter := func(_ types.FilterableContainer) bool { return true }
 	filterDesc := testFilterDesc
 
-	err = runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+	err = scheduling.RunUpgradesOnSchedule(
+		ctx,
+		cmd,
+		filter,
+		filterDesc,
+		updateLock,
+		false,
+		"",
+		logging.WriteStartupMessage,
+		runUpdatesWithNotifications,
+		nil,
+		"",
+		nil,
+		"",
+	)
 
 	// Should not return an error
 	require.NoError(t, err)
@@ -1008,7 +1082,21 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		filter := func(_ types.FilterableContainer) bool { return false }
 		filterDesc := "instance1"
 
-		err := runUpgradesOnSchedule(ctx, cmd1, filter, filterDesc, updateLock, false)
+		err := scheduling.RunUpgradesOnSchedule(
+			ctx,
+			cmd1,
+			filter,
+			filterDesc,
+			updateLock,
+			false,
+			"",
+			logging.WriteStartupMessage,
+			runUpdatesWithNotifications,
+			nil,
+			"",
+			nil,
+			"",
+		)
 		assert.NoError(t, err)
 		atomic.AddInt32(&completed, 1)
 		close(instance1Called)
@@ -1021,7 +1109,21 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		filter := func(_ types.FilterableContainer) bool { return false }
 		filterDesc := "instance2"
 
-		err := runUpgradesOnSchedule(ctx, cmd2, filter, filterDesc, updateLock, false)
+		err := scheduling.RunUpgradesOnSchedule(
+			ctx,
+			cmd2,
+			filter,
+			filterDesc,
+			updateLock,
+			false,
+			"",
+			logging.WriteStartupMessage,
+			runUpdatesWithNotifications,
+			nil,
+			"",
+			nil,
+			"",
+		)
 		assert.NoError(t, err)
 		atomic.AddInt32(&completed, 1)
 		close(instance2Called)
@@ -1066,7 +1168,7 @@ func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 	ctx := context.Background()
 	start := time.Now()
 
-	waitForRunningUpdate(ctx, lock)
+	scheduling.WaitForRunningUpdate(ctx, lock)
 
 	elapsed := time.Since(start)
 
@@ -1084,7 +1186,7 @@ func TestWaitForRunningUpdate_UpdateRunning(t *testing.T) {
 	waitCompleted := make(chan bool, 1)
 
 	go func() {
-		waitForRunningUpdate(ctx, lock)
+		scheduling.WaitForRunningUpdate(ctx, lock)
 
 		waitCompleted <- true
 	}()
@@ -1148,7 +1250,21 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 		filterDesc := testFilterDesc
 
 		// This should start and wait for context cancellation
-		err := runUpgradesOnSchedule(ctx, cmd, filter, filterDesc, updateLock, false)
+		err := scheduling.RunUpgradesOnSchedule(
+			ctx,
+			cmd,
+			filter,
+			filterDesc,
+			updateLock,
+			false,
+			"",
+			logging.WriteStartupMessage,
+			runUpdatesWithNotifications,
+			nil,
+			"",
+			nil,
+			"",
+		)
 		assert.NoError(t, err)
 
 		shutdownCompleted <- true

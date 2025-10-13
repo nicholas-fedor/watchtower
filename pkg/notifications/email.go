@@ -170,3 +170,20 @@ func (e *emailTypeNotifier) GetDelay() time.Duration {
 
 	return e.delay
 }
+
+// GetEntries returns nil for legacy notifiers.
+//
+// Returns:
+//   - []*logrus.Entry: Always nil.
+func (e *emailTypeNotifier) GetEntries() []*logrus.Entry {
+	return nil
+}
+
+// SendFilteredEntries does nothing for legacy notifiers.
+//
+// Parameters:
+//   - entries: Ignored.
+//   - report: Ignored.
+func (e *emailTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
+	// Legacy notifiers do not support filtered entries.
+}
