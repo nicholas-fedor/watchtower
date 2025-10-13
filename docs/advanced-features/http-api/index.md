@@ -62,7 +62,7 @@ Watchtower uses token-based, header authentication for the HTTP API.
 
 This should be set using the [HTTP API Token](../../configuration/arguments/index.md#http_api_token) configuration option.
 
-All requests to the `/v1/update` endpoint will require a `Token` field in the request header with the predefined HTTP API token value.
+All requests to the `/v1/update` endpoint will require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
 
 ##### Address and Port Configuration
 
