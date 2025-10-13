@@ -1130,7 +1130,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 	// Mock runUpdatesWithNotifications to simulate a long-running update
 	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications = func(ctx context.Context, _ types.Filter, _ bool) *metrics.Metric {
 		// Signal that we're in the update
 		time.Sleep(100 * time.Millisecond) // Simulate update work
 
