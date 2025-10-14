@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -72,7 +73,7 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Execute the update action, capturing results and image IDs for cleanup.
-	result, cleanupImageIDs, err := Update(client, updateParams)
+	result, cleanupImageIDs, err := Update(context.Background(), client, updateParams)
 	if err != nil {
 		logrus.WithError(err).Error("Update execution failed")
 
