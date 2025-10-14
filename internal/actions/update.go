@@ -822,48 +822,6 @@ func restartStaleContainer(
 	return newContainerID, renamed, nil
 }
 
-<<<<<<< Updated upstream
-=======
-// restartOldContainer attempts to restart a previously stopped container.
-//
-// This is used as a rollback mechanism when a new container fails to start or become healthy.
-// With the updated architecture, the old container is stopped but NOT removed, so it can be
-// restarted reliably.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - containerID: ID of the stopped container to restart.
-//   - client: Container client for Docker operations.
-//   - params: Update options controlling restart behavior.
-//
-// Returns:
-//   - error: Non-nil if restart fails, nil on success.
-func restartOldContainer(
-	ctx context.Context,
-	containerID types.ContainerID,
-	client container.Client,
-	params types.UpdateParams,
-) error {
-	// Get the stopped container
-	oldContainer, err := client.GetContainer(containerID)
-	if err != nil {
-		return fmt.Errorf("failed to get old container: %w", err)
-	}
-
-	// Start the existing stopped container
-	err = client.StartExistingContainer(containerID)
-	if err != nil {
-		return fmt.Errorf("failed to start old container: %w", err)
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"container": oldContainer.Name(),
-		"image":     oldContainer.ImageName(),
-	}).Info("Successfully restarted old container after update failure")
-
-	return nil
-}
-
 // restartGitContainerWithRollback handles restarting a Git-monitored container by building a new image.
 // If the new container fails to start or become healthy, it rolls back to the old container.
 func restartGitContainerWithRollback(
@@ -878,6 +836,7 @@ func restartGitContainerWithRollback(
 	}
 
 	oldContainerID := container.ID()
+	renamed := false
 
 	logrus.WithFields(fields).Debug("Restarting Git-monitored container")
 
@@ -897,6 +856,25 @@ func restartGitContainerWithRollback(
 	}
 
 	logrus.WithFields(fields).WithField("dockerfile", dockerfilePath).Debug("Using Dockerfile path for Git build")
+
+	// Rename Watchtower containers to avoid name conflicts when creating the new container
+	if container.IsWatchtower() && !params.NoRestart {
+		newName := util.RandName()
+		if err := client.RenameContainer(container, newName); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"container": container.Name(),
+				"new_name":  newName,
+			}).Warn("Failed to rename Git-monitored Watchtower container")
+
+			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
+		}
+
+		logrus.WithFields(fields).
+			WithField("new_name", newName).
+			Debug("Renamed Git-monitored Watchtower container")
+
+		renamed = true
+	}
 
 	// Get latest commit hash
 	gitClientInstance := gitClient.NewClient()
@@ -969,23 +947,25 @@ func restartGitContainerWithRollback(
 	// Now start the container with the updated configuration
 	newContainerID, err := client.StartContainer(container)
 	if err != nil {
-		logrus.WithFields(fields).WithError(err).Warn("Failed to start new Git container, attempting to restart old container")
+		logrus.WithFields(fields).WithError(err).Warn("Failed to start new Git container")
 
-		// Attempt to restart the old container
-		if rollbackErr := restartOldContainer(ctx, oldContainerID, client, params); rollbackErr != nil {
-			logrus.WithFields(fields).
-				WithError(rollbackErr).
-				Error("Failed to rollback to old container")
-			return "", false, fmt.Errorf("%w: %w (rollback also failed: %v)", errStartContainerFailed, err, rollbackErr)
+		// Clean up renamed Watchtower container on failure
+		if renamed && container.IsWatchtower() {
+			logrus.WithFields(fields).Debug("Cleaning up failed renamed Watchtower container")
+
+			if cleanupErr := client.StopContainer(container, params.Timeout); cleanupErr != nil {
+				logrus.WithError(cleanupErr).
+					WithFields(fields).
+					Debug("Failed to remove failed renamed Watchtower container")
+			}
 		}
 
-		logrus.WithFields(fields).Info("Successfully rolled back to old container")
-		return "", false, fmt.Errorf("%w: %w", errStartContainerFailed, err)
+		return "", renamed, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
 
 	// Wait for the new container to become healthy if it has a health check
 	if waitErr := client.WaitForContainerHealthy(newContainerID, defaultHealthCheckTimeout); waitErr != nil {
-		logrus.WithFields(fields).WithError(waitErr).Warn("New Git container failed health check, attempting to rollback to old container")
+		logrus.WithFields(fields).WithError(waitErr).Warn("New Git container failed health check")
 
 		// Stop the unhealthy new container
 		if newContainer, getErr := client.GetContainer(newContainerID); getErr == nil {
@@ -996,21 +976,12 @@ func restartGitContainerWithRollback(
 			}
 		}
 
-		// Attempt to restart the old container
-		if rollbackErr := restartOldContainer(ctx, oldContainerID, client, params); rollbackErr != nil {
-			logrus.WithFields(fields).
-				WithError(rollbackErr).
-				Error("Failed to rollback to old container after health check failure")
-			return "", false, fmt.Errorf("container failed health check: %w (rollback also failed: %v)", waitErr, rollbackErr)
-		}
-
-		logrus.WithFields(fields).Info("Successfully rolled back to old container after health check failure")
-		return "", false, fmt.Errorf("container failed health check: %w", waitErr)
+		return "", renamed, fmt.Errorf("container failed health check: %w", waitErr)
 	}
 
 	// New container is healthy, now it's safe to remove the old container
 	if oldContainer, getErr := client.GetContainer(oldContainerID); getErr == nil {
-		if removeErr := client.RemoveContainer(oldContainer); removeErr != nil {
+		if removeErr := client.StopContainer(oldContainer, params.Timeout); removeErr != nil {
 			logrus.WithFields(fields).
 				WithError(removeErr).
 				Warn("Failed to remove old container after successful Git update")
@@ -1020,6 +991,7 @@ func restartGitContainerWithRollback(
 		}
 	}
 
+	// Run post-update lifecycle hooks
 	// Run post-update lifecycle hooks
 	if container.ToRestart() && params.LifecycleHooks {
 		logrus.WithFields(fields).Debug("Executing post-update command")
@@ -1035,10 +1007,9 @@ func restartGitContainerWithRollback(
 		WithField("new_container_id", newContainerID).
 		Info("Successfully restarted Git-monitored container")
 
-	return newContainerID, false, nil
+	return newContainerID, renamed, nil
 }
 
->>>>>>> Stashed changes
 // restartGitContainer handles restarting a Git-monitored container by building a new image.
 func restartGitContainer(
 	ctx context.Context,
