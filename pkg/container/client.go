@@ -118,6 +118,7 @@ type Client interface {
 		ctx context.Context,
 		repoURL, commitHash, imageName string,
 		auth map[string]string,
+		dockerfilePath string,
 	) (types.ImageID, error)
 
 	// ListAllContainers retrieves a list of all containers from the Docker host, regardless of status.
@@ -951,6 +952,7 @@ func (c client) BuildImageFromGit(
 	ctx context.Context,
 	repoURL, commitHash, imageName string,
 	auth map[string]string,
+	dockerfilePath string,
 ) (types.ImageID, error) {
 	fields := logrus.Fields{
 		"repo_url":    repoURL,
@@ -958,12 +960,17 @@ func (c client) BuildImageFromGit(
 		"image_name":  imageName,
 	}
 
-	logrus.WithFields(fields).Debug("Starting Git-based image build")
+	// Default to "Dockerfile" if no custom path specified
+	if dockerfilePath == "" {
+		dockerfilePath = "Dockerfile"
+	}
+
+	logrus.WithFields(fields).WithField("dockerfile", dockerfilePath).Debug("Starting Git-based image build")
 
 	// Set up build options
 	buildOptions := build.ImageBuildOptions{
-		RemoteContext: repoURL,      // Git URL as remote context
-		Dockerfile:    "Dockerfile", // Assume standard Dockerfile location
+		RemoteContext: repoURL,          // Git URL as remote context
+		Dockerfile:    dockerfilePath,   // Use custom or default Dockerfile location
 		Tags:          []string{imageName},
 		BuildArgs: map[string]*string{
 			"GIT_COMMIT": &commitHash,
