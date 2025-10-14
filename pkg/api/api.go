@@ -20,6 +20,18 @@ const readHeaderTimeout = 10 * time.Second
 // shutdownTimeout is the timeout for graceful server shutdown.
 const shutdownTimeout = 5 * time.Second
 
+// serverReadTimeout is the timeout for reading the entire request.
+const serverReadTimeout = 30 * time.Second
+
+// serverWriteTimeout is the timeout for writing the response.
+const serverWriteTimeout = 30 * time.Second
+
+// serverIdleTimeout is the maximum time to wait for the next request.
+const serverIdleTimeout = 120 * time.Second
+
+// serverMaxHeaderShift is the bit shift for max header bytes (1 << 20 = 1MB).
+const serverMaxHeaderShift = 20
+
 // API represents the HTTP API server for Watchtower.
 type API struct {
 	Token       string
@@ -55,38 +67,38 @@ func New(token, addr string, server ...HTTPServer) *API {
 // RegisterFunc registers an HTTP handler function for the given path.
 func (a *API) RegisterFunc(path string, handler func(http.ResponseWriter, *http.Request)) {
 	a.mux.HandleFunc(path, handler)
-	a.registered = true
+	a.hasHandlers = true
 }
 
 // RegisterHandler registers an HTTP handler for the given path.
 func (a *API) RegisterHandler(path string, handler http.Handler) {
 	a.mux.Handle(path, handler)
-	a.registered = true
+	a.hasHandlers = true
 }
 
 // Start starts the HTTP API server.
 // If blocking is true, it runs in the foreground and blocks until shutdown.
 // If blocking is false, it runs in the background.
 func (a *API) Start(ctx context.Context, blocking bool) error {
-	if !a.registered {
+	if !a.hasHandlers {
 		logrus.Info("No handlers registered, skipping API start")
 
 		return nil
 	}
 
-	if a.token == "" {
+	if a.Token == "" {
 		logrus.Fatal("API token is empty or unset")
 	}
 
 	var server HTTPServer
-	if api.server != nil {
+	if a.server != nil {
 		// Use injected server for testing
-		server = api.server
+		server = a.server
 	} else {
 		// Create real server for production
 		server = &http.Server{
-			Addr:              api.Addr,
-			Handler:           api.mux,
+			Addr:              a.Addr,
+			Handler:           a.mux,
 			ReadTimeout:       serverReadTimeout,
 			WriteTimeout:      serverWriteTimeout,
 			IdleTimeout:       serverIdleTimeout,
@@ -98,14 +110,14 @@ func (a *API) Start(ctx context.Context, blocking bool) error {
 		}
 	}
 
-	logrus.WithField("addr", api.Addr).Info("Starting HTTP API server")
+	logrus.WithField("addr", a.Addr).Info("Starting HTTP API server")
 
-	if block {
+	if blocking {
 		return RunHTTPServer(ctx, server)
 	}
 
 	go func() {
-		err := a.server.ListenAndServe()
+		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logrus.Error("HTTP server failed: ", err)
 		}
@@ -119,7 +131,7 @@ func (a *API) Start(ctx context.Context, blocking bool) error {
 		shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 		defer cancel()
 
-		if err := a.server.Shutdown(shutdownCtx); err != nil {
+		if err := server.Shutdown(shutdownCtx); err != nil {
 			logrus.WithError(err).Error("Failed to shutdown server")
 		}
 	}()
@@ -132,7 +144,7 @@ func (a *API) RequireToken(handler func(http.ResponseWriter, *http.Request)) htt
 	return func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if auth == "" || !strings.HasPrefix(auth, "Bearer ") ||
-			strings.TrimPrefix(auth, "Bearer ") != a.token {
+			strings.TrimPrefix(auth, "Bearer ") != a.Token {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 
 			return
@@ -147,7 +159,7 @@ func (a *API) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if auth == "" || !strings.HasPrefix(auth, "Bearer ") ||
-			strings.TrimPrefix(auth, "Bearer ") != a.token {
+			strings.TrimPrefix(auth, "Bearer ") != a.Token {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 
 			return
