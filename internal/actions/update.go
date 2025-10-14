@@ -313,8 +313,45 @@ func Update(
 		time.Sleep(delay)
 	}
 
+	// Generate the final report summarizing the session.
+	report := progress.Report()
+
+	// Log update session results at info level.
+	logUpdateSessionResults(report)
+
 	// Return the final report summarizing the session and the cleanup image IDs.
-	return progress.Report(), cleanupImageIDs, nil
+	return report, cleanupImageIDs, nil
+}
+
+// logUpdateSessionResults logs the update session results at the info level.
+//
+// This function logs two concise lines summarizing which containers were successfully
+// updated and which containers failed to update. It only logs if there are containers
+// in each category to avoid polluting logs with empty results.
+//
+// Parameters:
+//   - report: Session report containing updated and failed containers.
+func logUpdateSessionResults(report types.Report) {
+	updated := report.Updated()
+	failed := report.Failed()
+
+	// Log successful updates if any.
+	if len(updated) > 0 {
+		names := make([]string, len(updated))
+		for i, c := range updated {
+			names[i] = c.Name()
+		}
+		logrus.WithField("containers", names).Info("Successful Updates")
+	}
+
+	// Log failed updates if any.
+	if len(failed) > 0 {
+		names := make([]string, len(failed))
+		for i, c := range failed {
+			names[i] = c.Name()
+		}
+		logrus.WithField("containers", names).Info("Failed Updates")
+	}
 }
 
 // isInvalidImageName checks if an image name is invalid.
