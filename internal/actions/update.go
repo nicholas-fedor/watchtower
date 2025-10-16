@@ -1051,7 +1051,12 @@ func restartGitContainer(
 	logrus.WithFields(fields).Debug("Restarting Git-monitored container")
 
 	// Stop and rename Watchtower containers to avoid name conflicts when creating the new container
+	var oldContainerName string
+	var needsRollback bool
 	if container.IsWatchtower() && !params.NoRestart {
+		needsRollback = true
+		oldContainerName = container.Name()
+		
 		// Save the running state before stopping so we can restore it later
 		// This ensures the new container will be started even though we stopped the old one
 		wasRunning := container.IsRunning()
@@ -1073,6 +1078,16 @@ func restartGitContainer(
 				"new_name":  newName,
 			}).Warn("Failed to rename Git-monitored Watchtower container")
 
+			// Try to restart the old container since we failed to rename
+			if wasRunning {
+				if startErr := client.StartExistingContainer(container.ID()); startErr != nil {
+					logrus.WithError(startErr).WithFields(fields).
+						Error("Failed to restart old Watchtower container after rename failure")
+				} else {
+					logrus.WithFields(fields).Info("Restarted old Watchtower container after rename failure")
+				}
+			}
+
 			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
 		}
 
@@ -1085,6 +1100,29 @@ func restartGitContainer(
 			container.ContainerInfo().State.Running = true
 			logrus.WithFields(fields).Debug("Restored running state for Watchtower container restart")
 		}
+		
+		// Set up deferred rollback in case anything fails below
+		defer func() {
+			if needsRollback && wasRunning {
+				logrus.WithFields(fields).Warn("Update failed, attempting to rollback by restarting old container")
+				
+				// Rename the old container back to original name if needed
+				if oldContainerName != "" && container.Name() != oldContainerName {
+					if renameErr := client.RenameContainer(container, oldContainerName); renameErr != nil {
+						logrus.WithError(renameErr).WithFields(fields).
+							Error("Failed to rename old container back during rollback")
+					}
+				}
+				
+				// Start the old container
+				if startErr := client.StartExistingContainer(container.ID()); startErr != nil {
+					logrus.WithError(startErr).WithFields(fields).
+						Error("CRITICAL: Failed to restart old Watchtower container during rollback - manual intervention required")
+				} else {
+					logrus.WithFields(fields).Info("Successfully rolled back to old Watchtower container")
+				}
+			}
+		}()
 	}
 
 	// Extract Git information including custom Dockerfile path
@@ -1177,6 +1215,9 @@ func restartGitContainer(
 
 		return "", false, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
+
+	// Successfully started new container, disable rollback
+	needsRollback = false
 
 	// Run post-update lifecycle hooks
 	if container.ToRestart() && params.LifecycleHooks {
