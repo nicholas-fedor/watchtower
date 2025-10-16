@@ -1119,44 +1119,24 @@ func restartGitContainer(
 		"dockerfile":  dockerfilePath,
 	}).Debug("Successfully built new image from Git")
 
-	// For Watchtower self-updates: Now that we have successfully built the new image,
-	// stop and rename the old container to free up the name
+	// For Watchtower self-updates: Rename the running container to free up the name
+	// We do NOT stop the container first - let it keep running until the new one starts
 	if container.IsWatchtower() && !params.NoRestart {
 		wasRunning := container.IsRunning()
 		
-		// Stop the old Watchtower container
-		if err := client.StopContainerOnly(container, params.Timeout); err != nil {
-			logrus.WithError(err).WithFields(fields).
-				Warn("Failed to stop Git-monitored Watchtower container after successful build")
-			return "", false, fmt.Errorf("%w: %w", errStopContainerFailed, err)
-		}
-
-		logrus.WithFields(fields).Debug("Stopped old Watchtower container after successful build")
-
-		// Rename the stopped container to free up the original name
+		// Rename the running container to free up the original name
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"container": container.Name(),
 				"new_name":  newName,
 			}).Warn("Failed to rename Git-monitored Watchtower container")
-
-			// Try to restart the old container since we failed to rename
-			if wasRunning {
-				if startErr := client.StartExistingContainer(container.ID()); startErr != nil {
-					logrus.WithError(startErr).WithFields(fields).
-						Error("Failed to restart old Watchtower container after rename failure")
-				} else {
-					logrus.WithFields(fields).Info("Restarted old Watchtower container after rename failure")
-				}
-			}
-
 			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
 		}
 
 		logrus.WithFields(fields).
 			WithField("new_name", newName).
-			Debug("Renamed stopped Git-monitored Watchtower container")
+			Debug("Renamed running Git-monitored Watchtower container (will continue until new one starts)")
 		
 		// Restore the running state in the container's metadata so StartContainer knows to start it
 		if wasRunning && container.ContainerInfo() != nil && container.ContainerInfo().State != nil {
