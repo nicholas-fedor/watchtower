@@ -1052,6 +1052,10 @@ func restartGitContainer(
 
 	// Stop and rename Watchtower containers to avoid name conflicts when creating the new container
 	if container.IsWatchtower() && !params.NoRestart {
+		// Save the running state before stopping so we can restore it later
+		// This ensures the new container will be started even though we stopped the old one
+		wasRunning := container.IsRunning()
+		
 		// First stop the container before renaming to avoid any issues
 		if err := client.StopContainerOnly(container, params.Timeout); err != nil {
 			logrus.WithError(err).WithFields(fields).
@@ -1075,6 +1079,12 @@ func restartGitContainer(
 		logrus.WithFields(fields).
 			WithField("new_name", newName).
 			Debug("Renamed stopped Git-monitored Watchtower container")
+		
+		// Restore the running state in the container's metadata so StartContainer knows to start it
+		if wasRunning && container.ContainerInfo() != nil && container.ContainerInfo().State != nil {
+			container.ContainerInfo().State.Running = true
+			logrus.WithFields(fields).Debug("Restored running state for Watchtower container restart")
+		}
 	}
 
 	// Extract Git information including custom Dockerfile path
