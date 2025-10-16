@@ -1050,81 +1050,6 @@ func restartGitContainer(
 
 	logrus.WithFields(fields).Debug("Restarting Git-monitored container")
 
-	// Stop and rename Watchtower containers to avoid name conflicts when creating the new container
-	var oldContainerName string
-	var needsRollback bool
-	if container.IsWatchtower() && !params.NoRestart {
-		needsRollback = true
-		oldContainerName = container.Name()
-		
-		// Save the running state before stopping so we can restore it later
-		// This ensures the new container will be started even though we stopped the old one
-		wasRunning := container.IsRunning()
-		
-		// First stop the container before renaming to avoid any issues
-		if err := client.StopContainerOnly(container, params.Timeout); err != nil {
-			logrus.WithError(err).WithFields(fields).
-				Warn("Failed to stop Git-monitored Watchtower container")
-			return "", false, fmt.Errorf("%w: %w", errStopContainerFailed, err)
-		}
-
-		logrus.WithFields(fields).Debug("Stopped Git-monitored Watchtower container")
-
-		// Now rename the stopped container to free up the original name
-		newName := util.RandName()
-		if err := client.RenameContainer(container, newName); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"container": container.Name(),
-				"new_name":  newName,
-			}).Warn("Failed to rename Git-monitored Watchtower container")
-
-			// Try to restart the old container since we failed to rename
-			if wasRunning {
-				if startErr := client.StartExistingContainer(container.ID()); startErr != nil {
-					logrus.WithError(startErr).WithFields(fields).
-						Error("Failed to restart old Watchtower container after rename failure")
-				} else {
-					logrus.WithFields(fields).Info("Restarted old Watchtower container after rename failure")
-				}
-			}
-
-			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
-		}
-
-		logrus.WithFields(fields).
-			WithField("new_name", newName).
-			Debug("Renamed stopped Git-monitored Watchtower container")
-		
-		// Restore the running state in the container's metadata so StartContainer knows to start it
-		if wasRunning && container.ContainerInfo() != nil && container.ContainerInfo().State != nil {
-			container.ContainerInfo().State.Running = true
-			logrus.WithFields(fields).Debug("Restored running state for Watchtower container restart")
-		}
-		
-		// Set up deferred rollback in case anything fails below
-		defer func() {
-			if needsRollback && wasRunning {
-				logrus.WithFields(fields).Warn("Update failed, attempting to rollback by restarting old container")
-				
-				// Rename the old container back to original name if needed
-				if oldContainerName != "" && container.Name() != oldContainerName {
-					if renameErr := client.RenameContainer(container, oldContainerName); renameErr != nil {
-						logrus.WithError(renameErr).WithFields(fields).
-							Error("Failed to rename old container back during rollback")
-					}
-				}
-				
-				// Start the old container
-				if startErr := client.StartExistingContainer(container.ID()); startErr != nil {
-					logrus.WithError(startErr).WithFields(fields).
-						Error("CRITICAL: Failed to restart old Watchtower container during rollback - manual intervention required")
-				} else {
-					logrus.WithFields(fields).Info("Successfully rolled back to old Watchtower container")
-				}
-			}
-		}()
-	}
-
 	// Extract Git information including custom Dockerfile path
 	repoURL, branch, _, dockerfilePath := gitInfoFromContainer(container)
 	if repoURL == "" {
@@ -1194,6 +1119,52 @@ func restartGitContainer(
 		"dockerfile":  dockerfilePath,
 	}).Debug("Successfully built new image from Git")
 
+	// For Watchtower self-updates: Now that we have successfully built the new image,
+	// stop and rename the old container to free up the name
+	if container.IsWatchtower() && !params.NoRestart {
+		wasRunning := container.IsRunning()
+		
+		// Stop the old Watchtower container
+		if err := client.StopContainerOnly(container, params.Timeout); err != nil {
+			logrus.WithError(err).WithFields(fields).
+				Warn("Failed to stop Git-monitored Watchtower container after successful build")
+			return "", false, fmt.Errorf("%w: %w", errStopContainerFailed, err)
+		}
+
+		logrus.WithFields(fields).Debug("Stopped old Watchtower container after successful build")
+
+		// Rename the stopped container to free up the original name
+		newName := util.RandName()
+		if err := client.RenameContainer(container, newName); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"container": container.Name(),
+				"new_name":  newName,
+			}).Warn("Failed to rename Git-monitored Watchtower container")
+
+			// Try to restart the old container since we failed to rename
+			if wasRunning {
+				if startErr := client.StartExistingContainer(container.ID()); startErr != nil {
+					logrus.WithError(startErr).WithFields(fields).
+						Error("Failed to restart old Watchtower container after rename failure")
+				} else {
+					logrus.WithFields(fields).Info("Restarted old Watchtower container after rename failure")
+				}
+			}
+
+			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
+		}
+
+		logrus.WithFields(fields).
+			WithField("new_name", newName).
+			Debug("Renamed stopped Git-monitored Watchtower container")
+		
+		// Restore the running state in the container's metadata so StartContainer knows to start it
+		if wasRunning && container.ContainerInfo() != nil && container.ContainerInfo().State != nil {
+			container.ContainerInfo().State.Running = true
+			logrus.WithFields(fields).Debug("Restored running state for Watchtower container restart")
+		}
+	}
+
 	// Update the container's configuration to use the newly built image
 	// We need to modify the container's Config.Image to point to the new image
 	// before calling StartContainer, which will create a new container with this image
@@ -1215,9 +1186,6 @@ func restartGitContainer(
 
 		return "", false, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
-
-	// Successfully started new container, disable rollback
-	needsRollback = false
 
 	// Run post-update lifecycle hooks
 	if container.ToRestart() && params.LifecycleHooks {
