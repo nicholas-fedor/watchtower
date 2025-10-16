@@ -51,6 +51,8 @@ var (
 	errStartContainerFailed = errors.New("failed to start container")
 	// errParseImageReference indicates a failure to parse a container’s image reference.
 	errParseImageReference = errors.New("failed to parse image reference")
+	// errNoContainerInfo indicates that container info is not available.
+	errNoContainerInfo = errors.New("container info not available")
 )
 
 // Update scans and updates containers based on parameters.
@@ -241,16 +243,27 @@ func Update(
 	UpdateImplicitRestart(containers)
 
 	// Separate containers into those to update (stale) and those to restart (linked).
+	// In RUN_ONCE mode, separate Watchtower to update it last (to allow other containers to update first).
 	var (
 		containersToUpdate  []types.Container
 		containersToRestart []types.Container
+		watchtowerToUpdate  types.Container
 	)
 
 	for _, c := range containers {
 		if c.IsStale() && !c.IsMonitorOnly(params) {
-			// Add stale containers to the update list and mark for update in progress.
-			containersToUpdate = append(containersToUpdate, c)
-			progress.MarkForUpdate(c.ID())
+			// In RUN_ONCE mode, defer Watchtower self-update to the end
+			if params.RunOnce && c.IsWatchtower() && !params.NoSelfUpdate {
+				watchtowerToUpdate = c
+				logrus.WithFields(logrus.Fields{
+					"container": c.Name(),
+					"image":     c.ImageName(),
+				}).Debug("Deferring Watchtower self-update to end of RUN_ONCE cycle")
+			} else {
+				// Add stale containers to the update list and mark for update in progress.
+				containersToUpdate = append(containersToUpdate, c)
+				progress.MarkForUpdate(c.ID())
+			}
 		} else if c.ToRestart() && !c.IsMonitorOnly(params) {
 			// Add linked containers to the restart list.
 			containersToRestart = append(containersToRestart, c)
@@ -299,6 +312,30 @@ func Update(
 		lifecycle.ExecutePostChecks(client, params)
 	}
 
+	// In RUN_ONCE mode, update Watchtower last (after all other containers have been processed)
+	// This ensures other containers get updated before Watchtower restarts itself
+	if params.RunOnce && watchtowerToUpdate != nil {
+		logrus.WithFields(logrus.Fields{
+			"container": watchtowerToUpdate.Name(),
+			"image":     watchtowerToUpdate.ImageName(),
+		}).Info("Updating Watchtower after all other containers")
+
+		progress.MarkForUpdate(watchtowerToUpdate.ID())
+
+		// Update Watchtower using rolling restart
+		if params.RollingRestart {
+			progress.UpdateFailed(
+				performRollingRestart(ctx, []types.Container{watchtowerToUpdate}, client, params, cleanupImageIDs),
+			)
+		} else {
+			failedStop, stoppedImages = stopContainersInReversedOrder([]types.Container{watchtowerToUpdate}, client, params)
+			progress.UpdateFailed(failedStop)
+
+			failedStart = restartContainersInSortedOrder(ctx, []types.Container{watchtowerToUpdate}, client, params, stoppedImages, cleanupImageIDs)
+			progress.UpdateFailed(failedStart)
+		}
+	}
+
 	// Add safeguard delay if Watchtower self-update pull failed to prevent rapid restarts.
 	if watchtowerPullFailed {
 		delay := params.PullFailureDelay
@@ -311,8 +348,41 @@ func Update(
 		time.Sleep(delay)
 	}
 
+	// Generate the final report summarizing the session.
+	report := progress.Report()
+
+	// Log update session results at info level.
+	logUpdateSessionResults(report)
+
 	// Return the final report summarizing the session and the cleanup image IDs.
-	return progress.Report(), cleanupImageIDs, nil
+	return report, cleanupImageIDs, nil
+}
+
+// logUpdateSessionResults logs the update session results at the info level.
+//
+// This function logs one line per container that was updated or failed to update.
+// For successful updates, it logs: "<container> successfully updated"
+// For failed updates, it logs: "<container> failed to update. Reason: <reason>"
+//
+// Parameters:
+//   - report: Session report containing updated and failed containers.
+func logUpdateSessionResults(report types.Report) {
+	updated := report.Updated()
+	failed := report.Failed()
+
+	// Log each successful update.
+	for _, c := range updated {
+		logrus.Infof("%s successfully updated", c.Name())
+	}
+
+	// Log each failed update with its reason.
+	for _, c := range failed {
+		reason := c.Error()
+		if reason == "" {
+			reason = "unknown error"
+		}
+		logrus.Infof("%s failed to update. Reason: %s", c.Name(), reason)
+	}
 }
 
 // isInvalidImageName checks if an image name is invalid.
@@ -610,8 +680,9 @@ func stopStaleContainer(
 		}
 	}
 
-	// Stop the container with the configured timeout.
-	if err := client.StopContainer(container, params.Timeout); err != nil {
+	// Stop the container WITHOUT removing it (for rollback capability).
+	// The container will be removed later after confirming the new container is healthy.
+	if err := client.StopContainerOnly(container, params.Timeout); err != nil {
 		logrus.WithFields(fields).WithError(err).Error("Failed to stop container")
 
 		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
@@ -688,6 +759,8 @@ func restartContainersInSortedOrder(
 // It handles both traditional image updates and Git-based rebuilds. For Git-monitored containers,
 // it builds a new image with the latest commit before restarting. It renames Watchtower containers
 // if applicable, starts a new container, and runs post-update hooks, handling errors for each step.
+// If the new container fails to start or become healthy, it restarts the old container to ensure
+// the service remains available.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -712,10 +785,11 @@ func restartStaleContainer(
 
 	renamed := false
 	newContainerID := container.ID() // Default to original ID
+	oldContainerID := container.ID()
 
 	// Handle Git-monitored containers differently
 	if isGitMonitoredContainer(container) {
-		return restartGitContainer(ctx, container, client, params)
+		return restartGitContainerWithRollback(ctx, container, client, params)
 	}
 
 	// Rename Watchtower containers only if restarts are enabled.
@@ -753,7 +827,8 @@ func restartStaleContainer(
 
 		newContainerID, err = client.StartContainer(container)
 		if err != nil {
-			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
+			logrus.WithFields(fields).WithError(err).Warn("Failed to start new container")
+			
 			// Clean up renamed Watchtower container on failure
 			if renamed && container.IsWatchtower() {
 				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
@@ -764,8 +839,37 @@ func restartStaleContainer(
 						Debug("Failed to remove failed Watchtower container")
 				}
 			}
-
 			return "", renamed, fmt.Errorf("%w: %w", errStartContainerFailed, err)
+		}
+
+		// Wait for the new container to become healthy if it has a health check
+		if waitErr := client.WaitForContainerHealthy(newContainerID, defaultHealthCheckTimeout); waitErr != nil {
+			logrus.WithFields(fields).WithError(waitErr).Warn("New container failed health check")
+			
+			// Stop the unhealthy new container
+			if newContainer, getErr := client.GetContainer(newContainerID); getErr == nil {
+				if stopErr := client.StopContainer(newContainer, params.Timeout); stopErr != nil {
+					logrus.WithFields(fields).
+						WithError(stopErr).
+						Warn("Failed to stop unhealthy new container")
+				}
+			}
+			
+			return "", renamed, fmt.Errorf("container failed health check: %w", waitErr)
+		}
+
+		// New container is healthy, now it's safe to remove the old container
+		if !renamed { // Don't remove renamed Watchtower containers (they clean themselves up)
+			if oldContainer, getErr := client.GetContainer(oldContainerID); getErr == nil {
+				if removeErr := client.RemoveContainer(oldContainer); removeErr != nil {
+					logrus.WithFields(fields).
+						WithError(removeErr).
+						Warn("Failed to remove old container after successful update")
+					// Don't fail the update just because we couldn't clean up the old container
+				} else {
+					logrus.WithFields(fields).Debug("Removed old container after successful update")
+				}
+			}
 		}
 
 		// Run post-update lifecycle hooks for restarting containers if enabled.
@@ -779,6 +883,284 @@ func restartStaleContainer(
 			)
 		}
 	}
+
+	return newContainerID, renamed, nil
+}
+
+// rollbackGitContainer attempts to rollback a failed git container update by renaming
+// the old container back to its original name and restarting it.
+func rollbackGitContainer(
+	client container.Client,
+	oldContainerID types.ContainerID,
+	originalName string,
+	fields logrus.Fields,
+) error {
+	// Get the current (renamed) container
+	currentContainer, getErr := client.GetContainer(oldContainerID)
+	if getErr != nil {
+		logrus.WithFields(fields).
+			WithError(getErr).
+			Error("Failed to get renamed container for rollback")
+		return fmt.Errorf("failed to get renamed container: %w", getErr)
+	}
+
+	// Rename back to original name
+	if renameErr := client.RenameContainer(currentContainer, originalName); renameErr != nil {
+		logrus.WithFields(fields).
+			WithError(renameErr).
+			WithField("original_name", originalName).
+			Error("Failed to rename container back to original name during rollback")
+		return fmt.Errorf("failed to rename back: %w", renameErr)
+	}
+
+	logrus.WithFields(fields).
+		WithField("original_name", originalName).
+		Debug("Renamed container back to original name for rollback")
+
+	// Restart the old container using the direct start method (not create+start)
+	startErr := client.StartExistingContainer(oldContainerID)
+	if startErr != nil {
+		logrus.WithFields(fields).
+			WithError(startErr).
+			Error("Failed to restart old container during rollback")
+		return fmt.Errorf("failed to restart: %w", startErr)
+	}
+
+	logrus.WithFields(fields).Info("Successfully rolled back to old container")
+	return nil
+}
+
+// restartGitContainerWithRollback handles restarting a Git-monitored container by building a new image.
+// If the new container fails to start or become healthy, it rolls back to the old container.
+func restartGitContainerWithRollback(
+	ctx context.Context,
+	container types.Container,
+	client container.Client,
+	params types.UpdateParams,
+) (types.ContainerID, bool, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+
+	oldContainerID := container.ID()
+	originalName := container.Name() // Save the original name before any operations
+	renamed := false
+
+	logrus.WithFields(fields).Debug("Restarting Git-monitored container")
+
+	// Extract Git information including custom Dockerfile path
+	repoURL, branch, _, dockerfilePath := gitInfoFromContainer(container)
+	if repoURL == "" {
+		return "", false, errNoGitRepoURL
+	}
+
+	if branch == "" {
+		branch = "main"
+	}
+
+	// Default to "Dockerfile" if not specified
+	if dockerfilePath == "" {
+		dockerfilePath = "Dockerfile"
+	}
+
+	logrus.WithFields(fields).WithField("dockerfile", dockerfilePath).Debug("Using Dockerfile path for Git build")
+
+	// Rename ALL containers (not just Watchtower) to avoid name conflicts when creating the new container
+	// This is necessary for Git-monitored containers because we need to create a new container with the same name
+	if !params.NoRestart {
+		newName := util.RandName()
+		if err := client.RenameContainer(container, newName); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"container": originalName,
+				"new_name":  newName,
+			}).Warn("Failed to rename Git-monitored container")
+
+			return "", false, fmt.Errorf("failed to rename container: %w", err)
+		}
+
+		logrus.WithFields(fields).
+			WithField("new_name", newName).
+			Debug("Renamed Git-monitored container to free up name for new container")
+
+		renamed = true
+	}
+
+	// Get latest commit hash
+	gitClientInstance := gitClient.NewClient()
+
+	authConfig := CreateGitAuthConfig(params)
+
+	latestCommit, err := gitClientInstance.GetLatestCommit(ctx, repoURL, branch, authConfig)
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Error("Failed to get latest commit, rolling back")
+
+		// Rollback: if we renamed the container, rename it back and restart it
+		if renamed {
+			if rollbackErr := rollbackGitContainer(client, oldContainerID, originalName, fields); rollbackErr != nil {
+				return "", renamed, fmt.Errorf("failed to get latest commit and rollback failed: %w (original error: %w)", rollbackErr, err)
+			}
+		}
+
+		return "", false, fmt.Errorf("failed to get latest commit: %w", err)
+	}
+
+	// Parse the image reference to get the base name without tag
+	ref, err := reference.ParseNormalizedNamed(container.ImageName())
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Error("Failed to parse image name, rolling back")
+
+		// Rollback: if we renamed the container, rename it back and restart it
+		if renamed {
+			if rollbackErr := rollbackGitContainer(client, oldContainerID, originalName, fields); rollbackErr != nil {
+				return "", renamed, fmt.Errorf("failed to parse image name and rollback failed: %w (original error: %w)", rollbackErr, err)
+			}
+		}
+
+		return "", false, fmt.Errorf(
+			"failed to parse image name %s: %w",
+			container.ImageName(),
+			err,
+		)
+	}
+
+	baseName := reference.Path(ref)
+
+	// Generate unique image name for the build
+	imageName := fmt.Sprintf("%s:git-%s", baseName, latestCommit[:8])
+
+	// Build new image using Docker's native Git support with branch specification
+	// Append branch to repoURL for Docker to check out the correct branch
+	buildContext := repoURL
+	if branch != "" {
+		buildContext = repoURL + "#" + branch
+	}
+
+	builtImageID, err := client.BuildImageFromGit(
+		ctx,
+		buildContext, // Use Docker's #branch syntax for remote Git URL
+		latestCommit,
+		imageName,
+		map[string]string{
+			// Pass auth if available - this would need to be expanded
+		},
+		dockerfilePath, // Custom Dockerfile path from label
+	)
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Error("Failed to build image from Git, rolling back")
+
+		// Rollback: if we renamed the container, rename it back and restart it
+		if renamed {
+			if rollbackErr := rollbackGitContainer(client, oldContainerID, originalName, fields); rollbackErr != nil {
+				return "", renamed, fmt.Errorf("failed to build image from Git and rollback failed: %w (original error: %w)", rollbackErr, err)
+			}
+		}
+
+		return "", false, fmt.Errorf("failed to build image from Git: %w", err)
+	}
+
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"built_image": builtImageID,
+		"repo_url":    repoURL,
+		"branch":      branch,
+		"commit":      latestCommit,
+		"dockerfile":  dockerfilePath,
+	}).Debug("Successfully built new image from Git")
+
+	// Update the container's configuration to use the newly built image
+	// We need to modify the container's Config.Image to point to the new image
+	// before calling StartContainer, which will create a new container with this image
+	if containerInfo := container.ContainerInfo(); containerInfo != nil && containerInfo.Config != nil {
+		// Update the image reference in the container configuration
+		containerInfo.Config.Image = imageName
+		logrus.WithFields(fields).
+			WithField("old_image", container.ImageName()).
+			WithField("new_image", imageName).
+			Debug("Updated container configuration with new image")
+	} else {
+		logrus.WithFields(fields).Error("Failed to get container info, rolling back")
+
+		// Rollback: if we renamed the container, rename it back and restart it
+		if renamed {
+			if rollbackErr := rollbackGitContainer(client, oldContainerID, originalName, fields); rollbackErr != nil {
+				return "", renamed, fmt.Errorf("failed to get container info and rollback failed: %w", rollbackErr)
+			}
+		}
+
+		return "", false, errNoContainerInfo
+	}
+
+	// Now start the container with the updated configuration
+	newContainerID, err := client.StartContainer(container)
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Warn("Failed to start new Git container, rolling back")
+
+		// Rollback: if we renamed the container, rename it back and restart it
+		if renamed {
+			if rollbackErr := rollbackGitContainer(client, oldContainerID, originalName, fields); rollbackErr != nil {
+				return "", renamed, fmt.Errorf("%w and rollback failed: %w (original error: %w)", errStartContainerFailed, rollbackErr, err)
+			}
+		}
+
+		return "", false, fmt.Errorf("%w: %w", errStartContainerFailed, err)
+	}
+
+	// Wait for the new container to become healthy if it has a health check
+	if waitErr := client.WaitForContainerHealthy(newContainerID, defaultHealthCheckTimeout); waitErr != nil {
+		logrus.WithFields(fields).WithError(waitErr).Warn("New Git container failed health check, rolling back")
+
+		// Stop the unhealthy new container
+		if newContainer, getErr := client.GetContainer(newContainerID); getErr == nil {
+			if stopErr := client.StopContainer(newContainer, params.Timeout); stopErr != nil {
+				logrus.WithFields(fields).
+					WithError(stopErr).
+					Warn("Failed to stop unhealthy new container")
+			}
+			// Remove the failed new container
+			if removeErr := client.RemoveContainer(newContainer); removeErr != nil {
+				logrus.WithFields(fields).
+					WithError(removeErr).
+					Warn("Failed to remove unhealthy new container")
+			}
+		}
+
+		// Rollback: if we renamed the container, rename it back and restart it
+		if renamed {
+			if rollbackErr := rollbackGitContainer(client, oldContainerID, originalName, fields); rollbackErr != nil {
+				return "", renamed, fmt.Errorf("container failed health check and rollback failed: %w (original error: %w)", rollbackErr, waitErr)
+			}
+		}
+
+		return "", false, fmt.Errorf("container failed health check: %w", waitErr)
+	}
+
+	// New container is healthy, now it's safe to remove the old container
+	if oldContainer, getErr := client.GetContainer(oldContainerID); getErr == nil {
+		if removeErr := client.RemoveContainer(oldContainer); removeErr != nil {
+			logrus.WithFields(fields).
+				WithError(removeErr).
+				Warn("Failed to remove old container after successful Git update")
+			// Don't fail the update just because we couldn't clean up the old container
+		} else {
+			logrus.WithFields(fields).Debug("Removed old container after successful Git update")
+		}
+	}
+
+	// Run post-update lifecycle hooks
+	// Run post-update lifecycle hooks
+	if container.ToRestart() && params.LifecycleHooks {
+		logrus.WithFields(fields).Debug("Executing post-update command")
+		lifecycle.ExecutePostUpdateCommand(
+			client,
+			newContainerID,
+			params.LifecycleUID,
+			params.LifecycleGID,
+		)
+	}
+
+	logrus.WithFields(fields).
+		WithField("new_container_id", newContainerID).
+		Info("Successfully restarted Git-monitored container")
 
 	return newContainerID, renamed, nil
 }
@@ -797,14 +1179,19 @@ func restartGitContainer(
 
 	logrus.WithFields(fields).Debug("Restarting Git-monitored container")
 
-	// Extract Git information
-	repoURL, branch, _ := gitInfoFromContainer(container)
+	// Extract Git information including custom Dockerfile path
+	repoURL, branch, _, dockerfilePath := gitInfoFromContainer(container)
 	if repoURL == "" {
 		return "", false, errNoGitRepoURL
 	}
 
 	if branch == "" {
 		branch = "main"
+	}
+
+	// Default to "Dockerfile" if not specified
+	if dockerfilePath == "" {
+		dockerfilePath = "Dockerfile"
 	}
 
 	// Get latest commit hash
@@ -847,6 +1234,7 @@ func restartGitContainer(
 		map[string]string{
 			// Pass auth if available - this would need to be expanded
 		},
+		dockerfilePath, // Custom Dockerfile path from label
 	)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to build image from Git: %w", err)
@@ -857,15 +1245,24 @@ func restartGitContainer(
 		"repo_url":    repoURL,
 		"branch":      branch,
 		"commit":      latestCommit,
+		"dockerfile":  dockerfilePath,
 	}).Debug("Successfully built new image from Git")
 
-	// Update container to use the newly built image
-	// Note: In a real implementation, this would require modifying the container's
-	// configuration to point to the new image. For now, we'll assume the container
-	// will be recreated with the updated image through docker-compose or similar.
+	// Update the container's configuration to use the newly built image
+	// We need to modify the container's Config.Image to point to the new image
+	// before calling StartContainer, which will create a new container with this image
+	if containerInfo := container.ContainerInfo(); containerInfo != nil && containerInfo.Config != nil {
+		// Update the image reference in the container configuration
+		containerInfo.Config.Image = imageName
+		logrus.WithFields(fields).
+			WithField("old_image", container.ImageName()).
+			WithField("new_image", imageName).
+			Debug("Updated container configuration with new image")
+	} else {
+		return "", false, errNoContainerInfo
+	}
 
-	// For this implementation, we'll use the existing StartContainer method
-	// but in practice, the container's image reference would need to be updated
+	// Now start the container with the updated configuration
 	newContainerID, err := client.StartContainer(container)
 	if err != nil {
 		logrus.WithFields(fields).WithError(err).Debug("Failed to start container with new image")
@@ -958,7 +1355,7 @@ func checkGitStaleness(
 	params types.UpdateParams,
 ) (bool, error) {
 	// Extract Git repository information from container labels
-	repoURL, branch, currentCommit := gitInfoFromContainer(container)
+	repoURL, branch, currentCommit, _ := gitInfoFromContainer(container)
 	if repoURL == "" {
 		return false, errNoGitRepoURLInLabels
 	}
@@ -1007,8 +1404,8 @@ func checkGitStaleness(
 }
 
 // gitInfoFromContainer extracts Git repository information from container labels.
-func gitInfoFromContainer(container types.Container) (string, string, string) {
-	var repoURL, branch, commit string
+func gitInfoFromContainer(container types.Container) (string, string, string, string) {
+	var repoURL, branch, commit, dockerfilePath string
 
 	if containerInfo := container.ContainerInfo(); containerInfo != nil &&
 		containerInfo.Config != nil {
@@ -1016,9 +1413,10 @@ func gitInfoFromContainer(container types.Container) (string, string, string) {
 		repoURL = labels["com.centurylinklabs.watchtower.git-repo"]
 		branch = labels["com.centurylinklabs.watchtower.git-branch"]
 		commit = labels["com.centurylinklabs.watchtower.git-commit"]
+		dockerfilePath = labels["com.centurylinklabs.watchtower.git-dockerfile"]
 	}
 
-	return repoURL, branch, commit
+	return repoURL, branch, commit, dockerfilePath
 }
 
 // createGitAuthConfig creates Git authentication config from Watchtower parameters.

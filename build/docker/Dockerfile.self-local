@@ -5,7 +5,7 @@
 FROM golang:alpine@sha256:06cdd34bd531b810650e47762c01e025eb9b1c7eadd191553b91c9f2d549fae8 AS builder
 
 # use version (for example "v0.3.3") or "main"
-ARG WATCHTOWER_VERSION=main
+ARG WATCHTOWER_VERSION=dev
 
 # Pre download required modules to avoid redownloading at each build thanks to docker layer caching.
 # Copying go.mod and go.sum ensure to invalid the layer/build cache if there is a change in module requirement
@@ -23,7 +23,9 @@ RUN apk add --no-cache \
 COPY . /watchtower
 
 RUN cd /watchtower && \
-    GO111MODULE=on CGO_ENABLED=0 go build -a -ldflags "-extldflags '-static' -X github.com/nicholas-fedor/watchtower/internal/meta.Version=$(git describe --tags) -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v$(git describe --tags)" .
+    VERSION="${WATCHTOWER_VERSION}" && \
+    if [ -d .git ]; then VERSION=$(git describe --tags 2>/dev/null || echo "${WATCHTOWER_VERSION}"); fi && \
+    GO111MODULE=on CGO_ENABLED=0 go build -a -ldflags "-extldflags '-static' -X github.com/nicholas-fedor/watchtower/internal/meta.Version=${VERSION} -X github.com/nicholas-fedor/watchtower/pkg/registry/digest.UserAgent=Watchtower/v${VERSION}" .
 
 
 #
