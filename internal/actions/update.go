@@ -857,8 +857,18 @@ func restartGitContainerWithRollback(
 
 	logrus.WithFields(fields).WithField("dockerfile", dockerfilePath).Debug("Using Dockerfile path for Git build")
 
-	// Rename and stop Watchtower containers to avoid name conflicts when creating the new container
+	// Stop and rename Watchtower containers to avoid name conflicts when creating the new container
 	if container.IsWatchtower() && !params.NoRestart {
+		// First stop the container before renaming to avoid any issues
+		if err := client.StopContainerOnly(container, params.Timeout); err != nil {
+			logrus.WithError(err).WithFields(fields).
+				Warn("Failed to stop Git-monitored Watchtower container")
+			return "", false, fmt.Errorf("%w: %w", errStopContainerFailed, err)
+		}
+
+		logrus.WithFields(fields).Debug("Stopped Git-monitored Watchtower container")
+
+		// Now rename the stopped container to free up the original name
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
@@ -871,18 +881,9 @@ func restartGitContainerWithRollback(
 
 		logrus.WithFields(fields).
 			WithField("new_name", newName).
-			Debug("Renamed Git-monitored Watchtower container")
+			Debug("Renamed stopped Git-monitored Watchtower container")
 
 		renamed = true
-
-		// Stop the renamed container to free up the original name
-		if err := client.StopContainer(container, params.Timeout); err != nil {
-			logrus.WithError(err).WithFields(fields).
-				Warn("Failed to stop renamed Git-monitored Watchtower container")
-			return "", false, fmt.Errorf("%w: %w", errStopContainerFailed, err)
-		}
-
-		logrus.WithFields(fields).Debug("Stopped renamed Git-monitored Watchtower container")
 	}
 
 	// Get latest commit hash
