@@ -48,6 +48,7 @@ func RunUpdatesWithNotifications(
 	timeout time.Duration,
 	lifecycleUID, lifecycleGID int,
 	cpuCopyMode string,
+	runOnce bool,
 ) *metrics.Metric {
 	// Start batching notifications to group update messages, if notifier is initialized
 	if notifier != nil {
@@ -70,6 +71,7 @@ func RunUpdatesWithNotifications(
 		LifecycleUID:    lifecycleUID,
 		LifecycleGID:    lifecycleGID,
 		CPUCopyMode:     cpuCopyMode,
+		RunOnce:         runOnce,
 	}
 
 	// Execute the update action, capturing results and image IDs for cleanup.

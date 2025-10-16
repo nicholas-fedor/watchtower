@@ -72,6 +72,12 @@ var (
 	// ideal for observing image staleness without triggering automatic updates.
 	monitorOnly bool
 
+	// runOnce is a boolean flag that runs Watchtower once and then exits.
+	//
+	// It is set in preRun via the --run-once flag or the WATCHTOWER_RUN_ONCE environment variable,
+	// useful for triggering updates on demand rather than running continuously.
+	runOnce bool
+
 	// enableLabel is a boolean flag restricting updates to containers with the "com.centurylinklabs.watchtower.enable" label set to true.
 	//
 	// It is configured in preRun via the --label-enable flag or the WATCHTOWER_LABEL_ENABLE environment variable,
@@ -215,6 +221,7 @@ var (
 			lifecycleUID,
 			lifecycleGID,
 			cpuCopyMode,
+			runOnce,
 		)
 	}
 )
@@ -290,7 +297,10 @@ func preRun(cmd *cobra.Command, _ []string) {
 	flags.GetSecretsFromFiles(cmd)
 	cleanup, noRestart, monitorOnly, noSelfUpdate, timeout = flags.ReadFlags(cmd)
 
-	// Validate the timeout value to ensure it’s non-negative, preventing invalid stop durations.
+	// Get run-once flag to configure one-time execution mode.
+	runOnce, _ = flagsSet.GetBool("run-once")
+
+	// Validate the timeout value to ensure it's non-negative, preventing invalid stop durations.
 	if timeout < 0 {
 		logrus.Fatal("Please specify a positive value for timeout value.")
 	}

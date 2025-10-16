@@ -74,11 +74,36 @@ func (client MockClient) ListAllContainers() ([]types.Container, error) {
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.
-// It records the container’s ID as stopped, increments the StopContainerCount,
+// It records the container's ID as stopped, increments the StopContainerCount,
 // and returns nil for simplicity.
 func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
 	client.Stopped[string(c.ID())] = true
 	client.TestData.StopContainerCount++
+	return nil
+}
+
+// StopContainerOnly simulates stopping a container without removing it.
+// It marks the container as stopped but doesn't remove it (for rollback testing).
+func (client MockClient) StopContainerOnly(c types.Container, _ time.Duration) error {
+	client.Stopped[string(c.ID())] = true
+	client.TestData.StopContainerCount++
+	return nil
+}
+
+// RemoveContainer simulates removing a stopped container.
+// It provides a minimal implementation for testing cleanup operations.
+func (client MockClient) RemoveContainer(c types.Container) error {
+	// In mock, we just verify the container was stopped
+	if !client.Stopped[string(c.ID())] {
+		return errors.New("cannot remove running container")
+	}
+	return nil
+}
+
+// StartExistingContainer simulates restarting an existing stopped container.
+// It marks the container as no longer stopped (running again).
+func (client MockClient) StartExistingContainer(containerID types.ContainerID) error {
+	client.Stopped[string(containerID)] = false
 	return nil
 }
 
@@ -192,6 +217,7 @@ func (client MockClient) BuildImageFromGit(
 	commitHash string,
 	imageName string,
 	auth map[string]string,
+	dockerfilePath string,
 ) (types.ImageID, error) {
 	return "", nil
 }

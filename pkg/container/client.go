@@ -9,17 +9,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/build"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
-
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerRegistry "github.com/docker/docker/api/types/registry"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
@@ -55,6 +56,24 @@ type Client interface {
 	//
 	// It ensures the container is no longer running or present on the host.
 	StopContainer(container types.Container, timeout time.Duration) error
+
+	// StopContainerOnly stops a container without removing it, respecting the given timeout.
+	//
+	// This is useful for update operations where rollback may be needed.
+	// The container remains on the host in a stopped state and can be restarted.
+	StopContainerOnly(container types.Container, timeout time.Duration) error
+
+	// RemoveContainer removes a stopped container from the host.
+	//
+	// This should be called after confirming a new container is healthy.
+	// Returns an error if the removal fails.
+	RemoveContainer(container types.Container) error
+
+	// StartExistingContainer starts a container that already exists but is stopped.
+	//
+	// Unlike StartContainer which creates a new container, this restarts an existing one.
+	// Returns an error if the container cannot be started.
+	StartExistingContainer(containerID types.ContainerID) error
 
 	// StartContainer creates and starts a new container based on the provided container's configuration.
 	//
@@ -291,6 +310,105 @@ func (c client) StopContainer(container types.Container, timeout time.Duration) 
 		"image":     container.ImageName(),
 	}).Debug("Stopped and removed container")
 
+	return nil
+}
+
+// StopContainerOnly stops a container without removing it.
+//
+// Parameters:
+//   - container: Container to stop.
+//   - timeout: Duration to wait before forcing stop.
+//
+// Returns:
+//   - error: Non-nil if stop fails, nil on success.
+func (c client) StopContainerOnly(container types.Container, timeout time.Duration) error {
+	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"id":        container.ID().ShortID(),
+	})
+
+	// Check if the container is running
+	if !container.IsRunning() {
+		clog.Debug("Container is not running, no stop needed")
+		return nil
+	}
+
+	// Retrieve the container's configured stop signal
+	signal := container.StopSignal()
+	if signal == "" {
+		signal = defaultStopSignal
+	}
+
+	clog.WithFields(logrus.Fields{
+		"signal":  signal,
+		"timeout": timeout,
+	}).Debug("Stopping container (without removing)")
+
+	timeoutSeconds := int(timeout / time.Second)
+
+	err := c.api.ContainerStop(ctx, string(container.ID()), dockerContainer.StopOptions{
+		Signal:  signal,
+		Timeout: &timeoutSeconds,
+	})
+	if err != nil {
+		clog.WithError(err).Error("Failed to stop container")
+		return fmt.Errorf("failed to stop container: %w", err)
+	}
+
+	clog.Debug("Container stopped successfully (not removed)")
+	return nil
+}
+
+// RemoveContainer removes a stopped container from the host.
+//
+// Parameters:
+//   - container: Container to remove.
+//
+// Returns:
+//   - error: Non-nil if removal fails, nil on success.
+func (c client) RemoveContainer(container types.Container) error {
+	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"id":        container.ID().ShortID(),
+	})
+
+	clog.Debug("Removing container")
+
+	err := c.api.ContainerRemove(ctx, string(container.ID()), dockerContainer.RemoveOptions{
+		Force:         true,
+		RemoveVolumes: c.RemoveVolumes,
+	})
+	if err != nil && !cerrdefs.IsNotFound(err) {
+		clog.WithError(err).Error("Failed to remove container")
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+
+	clog.Debug("Container removed successfully")
+	return nil
+}
+
+// StartExistingContainer starts a container that already exists but is stopped.
+//
+// Parameters:
+//   - containerID: ID of the container to start.
+//
+// Returns:
+//   - error: Non-nil if start fails, nil on success.
+func (c client) StartExistingContainer(containerID types.ContainerID) error {
+	ctx := context.Background()
+	clog := logrus.WithField("id", containerID.ShortID())
+
+	clog.Debug("Starting existing container")
+
+	err := c.api.ContainerStart(ctx, string(containerID), dockerContainer.StartOptions{})
+	if err != nil {
+		clog.WithError(err).Error("Failed to start existing container")
+		return fmt.Errorf("failed to start existing container: %w", err)
+	}
+
+	clog.Debug("Existing container started successfully")
 	return nil
 }
 
@@ -926,6 +1044,28 @@ func (c client) WaitForContainerHealthy(
 			}
 
 			if status == "unhealthy" {
+				// Check if we're still within the health check start period
+				// During the start period, failed health checks should not count as truly unhealthy
+				if inspect.Config != nil && inspect.Config.Healthcheck != nil {
+					startPeriod := inspect.Config.Healthcheck.StartPeriod
+					if startPeriod > 0 && inspect.State.StartedAt != "" {
+						// Parse the container start time
+						startTime, parseErr := time.Parse(time.RFC3339Nano, inspect.State.StartedAt)
+						if parseErr == nil {
+							timeSinceStart := time.Since(startTime)
+							if timeSinceStart < startPeriod {
+								clog.WithFields(logrus.Fields{
+									"time_since_start": timeSinceStart,
+									"start_period":     startPeriod,
+								}).Debug("Container unhealthy but still within start period, continuing to wait")
+								continue
+							}
+						} else {
+							clog.WithError(parseErr).Debug("Failed to parse container start time")
+						}
+					}
+				}
+
 				clog.Warn("Container health check failed")
 
 				return fmt.Errorf("%w: %s", errHealthCheckFailed, containerID)
@@ -967,13 +1107,17 @@ func (c client) BuildImageFromGit(
 
 	logrus.WithFields(fields).WithField("dockerfile", dockerfilePath).Debug("Starting Git-based image build")
 
+	// Determine the build platform (e.g., "linux/amd64")
+	buildPlatform := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+
 	// Set up build options
 	buildOptions := build.ImageBuildOptions{
 		RemoteContext: repoURL,          // Git URL as remote context
 		Dockerfile:    dockerfilePath,   // Use custom or default Dockerfile location
 		Tags:          []string{imageName},
 		BuildArgs: map[string]*string{
-			"GIT_COMMIT": &commitHash,
+			"GIT_COMMIT":    &commitHash,
+			"BUILDPLATFORM": &buildPlatform,
 		},
 		Labels: map[string]string{
 			"com.centurylinklabs.watchtower.git-repo":   repoURL,

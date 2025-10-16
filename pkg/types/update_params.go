@@ -19,6 +19,7 @@ type UpdateParams struct {
 	LifecycleUID     int           // Default UID for lifecycle hooks.
 	LifecycleGID     int           // Default GID for lifecycle hooks.
 	NoSelfUpdate     bool          // Skip self-update of Watchtower if true.
+	RunOnce          bool          // Run once and exit if true.
 	CPUCopyMode      string        // CPU copy mode for container recreation.
 	GitAuthToken     string        // Git authentication token for private repositories.
 	GitUsername      string        // Git username for basic authentication.

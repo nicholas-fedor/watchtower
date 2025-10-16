@@ -96,9 +96,10 @@ func (a *API) Start(ctx context.Context, blocking bool) error {
 		server = a.server
 	} else {
 		// Create real server for production
+		// Wrap the mux with authentication middleware
 		server = &http.Server{
 			Addr:              a.Addr,
-			Handler:           a.mux,
+			Handler:           a.authMiddleware(a.mux),
 			ReadTimeout:       serverReadTimeout,
 			WriteTimeout:      serverWriteTimeout,
 			IdleTimeout:       serverIdleTimeout,
