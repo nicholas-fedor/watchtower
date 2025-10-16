@@ -962,15 +962,13 @@ func restartGitContainerWithRollback(
 		if renamed && container.IsWatchtower() {
 			logrus.WithFields(fields).Debug("Rolling back: restarting old Watchtower container")
 
-			// Get the old container by ID and restart it
-			if oldContainer, getErr := client.GetContainer(oldContainerID); getErr == nil {
-				if restartErr := client.RestartContainer(oldContainer, params.Timeout); restartErr != nil {
-					logrus.WithError(restartErr).
-						WithFields(fields).
-						Error("Failed to restart old Watchtower container during rollback")
-				} else {
-					logrus.WithFields(fields).Info("Successfully rolled back to old Watchtower container")
-				}
+			// Restart the old container by ID
+			if restartErr := client.StartExistingContainer(oldContainerID); restartErr != nil {
+				logrus.WithError(restartErr).
+					WithFields(fields).
+					Error("Failed to restart old Watchtower container during rollback")
+			} else {
+				logrus.WithFields(fields).Info("Successfully rolled back to old Watchtower container")
 			}
 		}
 
@@ -994,14 +992,12 @@ func restartGitContainerWithRollback(
 		if renamed && container.IsWatchtower() {
 			logrus.WithFields(fields).Debug("Rolling back: restarting old Watchtower container after health check failure")
 
-			if oldContainer, getErr := client.GetContainer(oldContainerID); getErr == nil {
-				if restartErr := client.RestartContainer(oldContainer, params.Timeout); restartErr != nil {
-					logrus.WithError(restartErr).
-						WithFields(fields).
-						Error("Failed to restart old Watchtower container during rollback")
-				} else {
-					logrus.WithFields(fields).Info("Successfully rolled back to old Watchtower container")
-				}
+			if restartErr := client.StartExistingContainer(oldContainerID); restartErr != nil {
+				logrus.WithError(restartErr).
+					WithFields(fields).
+					Error("Failed to restart old Watchtower container during rollback")
+			} else {
+				logrus.WithFields(fields).Info("Successfully rolled back to old Watchtower container")
 			}
 		}
 
