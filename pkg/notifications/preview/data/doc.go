@@ -23,7 +23,7 @@
 // This package is used by the template preview tool (tplprev.go) to render templates defined in
 // notifications/common_templates.go. The PreviewData struct generates data that conforms to the
 // notifications.Data model (model.go), which includes a Report (types.Report) and log Entries.
-// The generated data is processed by the WASM module (tplprev.wasm, built from tools/tplprev/main_wasm.go)
+// The generated data is processed by the WASM module (tplprev.wasm, built from build/tplprev/main_wasm.go)
 // and displayed in the web interface (docs/notifications/template-preview/index.md, script.js, styles.css).
 //
 // Usage:

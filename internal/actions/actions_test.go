@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				client,
 				nil, // nil notifier
 				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
+				time.Minute, 1000, 1001, "auto", false,
 			)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				client,
 				notifier,
 				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
+				time.Minute, 1000, 1001, "auto", false,
 			)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
@@ -116,7 +116,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				client,
 				notifier,
 				true, true, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
+				time.Minute, 1000, 1001, "auto", false,
 			)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				client,
 				notifier,
 				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
+				time.Minute, 1000, 1001, "auto", false,
 			)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
@@ -173,7 +173,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				client,
 				nil,
 				false, false, filter, true, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
+				time.Minute, 1000, 1001, "auto", false,
 			)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
@@ -203,7 +203,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				client,
 				nil,
 				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
+				time.Minute, 1000, 1001, "auto", false,
 			)
 
 			gomega.Expect(metric.Scanned).To(gomega.Equal(0))

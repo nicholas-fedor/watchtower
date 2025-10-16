@@ -237,6 +237,8 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 	}
 }
 
+// TestDeriveScopeFromContainer_Logging tests logging behavior in deriveScopeFromContainer.
+
 func TestDeriveScopeFromContainer_Logging(t *testing.T) {
 	// Save original scope value to restore later
 	originalScope := scope
@@ -320,6 +322,7 @@ func (h *testLogHook) Fire(entry *logrus.Entry) error {
 }
 
 func (h *testLogHook) Levels() []logrus.Level {
+	// TestFormatDuration tests the formatDuration function with various time durations.
 	return []logrus.Level{logrus.DebugLevel}
 }
 
@@ -370,6 +373,7 @@ func TestFormatDuration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := util.FormatDuration(tt.duration)
 			assert.Equal(t, tt.expected, result)
+			// TestFormatTimeUnit tests the formatTimeUnit function with different values and options.
 		})
 	}
 }
@@ -461,6 +465,7 @@ func TestFilterEmpty(t *testing.T) {
 	}
 }
 
+// TestAwaitDockerClient tests that awaitDockerClient sleeps for the expected duration.
 func TestAwaitDockerClient(t *testing.T) {
 	// This function just sleeps for 1 second, so we test that it doesn't panic
 	// and completes within a reasonable time
@@ -468,6 +473,7 @@ func TestAwaitDockerClient(t *testing.T) {
 
 	awaitDockerClient()
 
+	// TestLifecycleFlags tests reading lifecycle UID and GID flags.
 	elapsed := time.Since(start)
 
 	// Should take at least 900ms but not more than 3 seconds (to account for CI timing variations)
@@ -1226,7 +1232,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 	// Mock runUpdatesWithNotifications to simulate a long-running update
 	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications = func(ctx context.Context, _ types.Filter, _ bool) *metrics.Metric {
 		// Signal that we're in the update
 		time.Sleep(100 * time.Millisecond) // Simulate update work
 

@@ -20,12 +20,15 @@ type Metric struct {
 
 // Metrics handles processing and exposing scan metrics.
 type Metrics struct {
-	channel chan *Metric       // Channel for queuing metrics.
-	scanned prometheus.Gauge   // Gauge for scanned containers.
-	updated prometheus.Gauge   // Gauge for updated containers.
-	failed  prometheus.Gauge   // Gauge for failed containers.
-	total   prometheus.Counter // Counter for total scans.
-	skipped prometheus.Counter // Counter for skipped scans.
+	channel    chan *Metric       // Channel for queuing metrics.
+	scanned    prometheus.Gauge   // Gauge for scanned containers.
+	updated    prometheus.Gauge   // Gauge for updated containers.
+	failed     prometheus.Gauge   // Gauge for failed containers.
+	total      prometheus.Counter // Counter for total scans.
+	skipped    prometheus.Counter // Counter for skipped scans.
+	scannedVal int                // Current scanned value.
+	updatedVal int                // Current updated value.
+	failedVal  int                // Current failed value.
 }
 
 // NewMetric creates a Metric from a scan report.
@@ -123,6 +126,9 @@ func (m *Metrics) HandleUpdate(channel <-chan *Metric) {
 			m.scanned.Set(0)
 			m.updated.Set(0)
 			m.failed.Set(0)
+			m.scannedVal = 0
+			m.updatedVal = 0
+			m.failedVal = 0
 
 			continue
 		}
@@ -131,5 +137,23 @@ func (m *Metrics) HandleUpdate(channel <-chan *Metric) {
 		m.scanned.Set(float64(change.Scanned))
 		m.updated.Set(float64(change.Updated))
 		m.failed.Set(float64(change.Failed))
+		m.scannedVal = change.Scanned
+		m.updatedVal = change.Updated
+		m.failedVal = change.Failed
 	}
+}
+
+// GetScanned returns the current scanned value.
+func (m *Metrics) GetScanned() int {
+	return m.scannedVal
+}
+
+// GetUpdated returns the current updated value.
+func (m *Metrics) GetUpdated() int {
+	return m.updatedVal
+}
+
+// GetFailed returns the current failed value.
+func (m *Metrics) GetFailed() int {
+	return m.failedVal
 }

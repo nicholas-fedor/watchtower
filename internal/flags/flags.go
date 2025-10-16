@@ -201,6 +201,12 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Restart containers one at a time")
 
 	flags.BoolP(
+		"no-self-update",
+		"",
+		envBool("WATCHTOWER_NO_SELF_UPDATE"),
+		"Disable self-update of the Watchtower container")
+
+	flags.BoolP(
 		"http-api-update",
 		"",
 		envBool("WATCHTOWER_HTTP_API_UPDATE"),
@@ -505,6 +511,56 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"Send separate notifications for each updated container instead of grouping them")
 }
 
+// RegisterGitFlags adds Git monitoring flags to the root command.
+//
+// Parameters:
+//   - rootCmd: Root Cobra command.
+func RegisterGitFlags(rootCmd *cobra.Command) {
+	flags := rootCmd.PersistentFlags()
+
+	flags.BoolP(
+		"enable-git-monitoring",
+		"",
+		envBool("WATCHTOWER_GIT_ENABLE"),
+		"Enable Git repository monitoring for container updates")
+
+	flags.StringP(
+		"git-auth-token",
+		"",
+		envString("WATCHTOWER_GIT_AUTH_TOKEN"),
+		"Authentication token for Git repository access (GitHub/GitLab token)")
+
+	flags.StringP(
+		"git-default-branch",
+		"",
+		envString("WATCHTOWER_GIT_DEFAULT_BRANCH"),
+		"Default branch to monitor for Git repositories (default: main)")
+
+	flags.StringP(
+		"git-update-policy",
+		"",
+		envString("WATCHTOWER_GIT_UPDATE_POLICY"),
+		"Git update policy: patch, minor, major, or all (default: minor)")
+
+	flags.StringP(
+		"git-username",
+		"",
+		envString("WATCHTOWER_GIT_USERNAME"),
+		"Git username for basic authentication")
+
+	flags.StringP(
+		"git-password",
+		"",
+		envString("WATCHTOWER_GIT_PASSWORD"),
+		"Git password for basic authentication")
+
+	flags.StringP(
+		"git-ssh-key-path",
+		"",
+		envString("WATCHTOWER_GIT_SSH_KEY_PATH"),
+		"Path to SSH private key file for Git authentication")
+}
+
 // envString fetches a string from an environment variable.
 //
 // Parameters:
@@ -658,8 +714,9 @@ func EnvConfig(cmd *cobra.Command) error {
 //   - bool: Cleanup setting.
 //   - bool: No-restart setting.
 //   - bool: Monitor-only setting.
+//   - bool: No-self-update setting.
 //   - time.Duration: Stop timeout.
-func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
+func ReadFlags(cmd *cobra.Command) (bool, bool, bool, bool, time.Duration) {
 	flags := cmd.PersistentFlags()
 
 	// Fetch flags, fatal on error.
@@ -684,6 +741,13 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 			Fatal("Failed to get monitor-only flag")
 	}
 
+	noSelfUpdate, err := flags.GetBool("no-self-update")
+	if err != nil {
+		logrus.WithField("flag", "no-self-update").
+			WithError(err).
+			Fatal("Failed to get no-self-update flag")
+	}
+
 	timeout, err := flags.GetDuration("stop-timeout")
 	if err != nil {
 		logrus.WithField("flag", "stop-timeout").
@@ -692,13 +756,14 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"cleanup":      cleanup,
-		"no_restart":   noRestart,
-		"monitor_only": monitorOnly,
-		"timeout":      timeout,
+		"cleanup":        cleanup,
+		"no_restart":     noRestart,
+		"monitor_only":   monitorOnly,
+		"no_self_update": noSelfUpdate,
+		"timeout":        timeout,
 	}).Debug("Retrieved operational flags")
 
-	return cleanup, noRestart, monitorOnly, timeout
+	return cleanup, noRestart, monitorOnly, noSelfUpdate, timeout
 }
 
 // setEnvOptStr sets an environment variable if needed.

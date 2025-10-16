@@ -1,3 +1,4 @@
+// Package meta provides metadata constants and variables for Watchtower.
 package meta
 
 var (

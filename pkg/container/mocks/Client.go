@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	"context"
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -36,6 +37,96 @@ type MockClient_Expecter struct {
 
 func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
+}
+
+// BuildImageFromGit provides a mock function for the type MockClient
+func (_mock *MockClient) BuildImageFromGit(ctx context.Context, repoURL string, commitHash string, imageName string, auth map[string]string, dockerfilePath string) (types.ImageID, error) {
+	ret := _mock.Called(ctx, repoURL, commitHash, imageName, auth, dockerfilePath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildImageFromGit")
+	}
+
+	var r0 types.ImageID
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, map[string]string, string) (types.ImageID, error)); ok {
+		return returnFunc(ctx, repoURL, commitHash, imageName, auth, dockerfilePath)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, map[string]string, string) types.ImageID); ok {
+		r0 = returnFunc(ctx, repoURL, commitHash, imageName, auth, dockerfilePath)
+	} else {
+		r0 = ret.Get(0).(types.ImageID)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, map[string]string, string) error); ok {
+		r1 = returnFunc(ctx, repoURL, commitHash, imageName, auth, dockerfilePath)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_BuildImageFromGit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildImageFromGit'
+type MockClient_BuildImageFromGit_Call struct {
+	*mock.Call
+}
+
+// BuildImageFromGit is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoURL string
+//   - commitHash string
+//   - imageName string
+//   - auth map[string]string
+//   - dockerfilePath string
+func (_e *MockClient_Expecter) BuildImageFromGit(ctx interface{}, repoURL interface{}, commitHash interface{}, imageName interface{}, auth interface{}, dockerfilePath interface{}) *MockClient_BuildImageFromGit_Call {
+	return &MockClient_BuildImageFromGit_Call{Call: _e.mock.On("BuildImageFromGit", ctx, repoURL, commitHash, imageName, auth, dockerfilePath)}
+}
+
+func (_c *MockClient_BuildImageFromGit_Call) Run(run func(ctx context.Context, repoURL string, commitHash string, imageName string, auth map[string]string, dockerfilePath string)) *MockClient_BuildImageFromGit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 map[string]string
+		if args[4] != nil {
+			arg4 = args[4].(map[string]string)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_BuildImageFromGit_Call) Return(imageID types.ImageID, err error) *MockClient_BuildImageFromGit_Call {
+	_c.Call.Return(imageID, err)
+	return _c
+}
+
+func (_c *MockClient_BuildImageFromGit_Call) RunAndReturn(run func(ctx context.Context, repoURL string, commitHash string, imageName string, auth map[string]string, dockerfilePath string) (types.ImageID, error)) *MockClient_BuildImageFromGit_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // ExecuteCommand provides a mock function for the type MockClient
@@ -524,6 +615,54 @@ func (_c *MockClient_RemoveImageByID_Call) RunAndReturn(run func(imageID types.I
 }
 
 // RenameContainer provides a mock function for the type MockClient
+func (_mock *MockClient) RemoveContainer(container types.Container) error {
+	ret := _mock.Called(container)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveContainer")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(types.Container) error); ok {
+		r0 = returnFunc(container)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_RemoveContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveContainer'
+type MockClient_RemoveContainer_Call struct {
+	*mock.Call
+}
+
+// RemoveContainer is a helper method to define mock.On call
+//   - container types.Container
+func (_e *MockClient_Expecter) RemoveContainer(container interface{}) *MockClient_RemoveContainer_Call {
+	return &MockClient_RemoveContainer_Call{Call: _e.mock.On("RemoveContainer", container)}
+}
+
+func (_c *MockClient_RemoveContainer_Call) Run(run func(container types.Container)) *MockClient_RemoveContainer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.Container
+		if args[0] != nil {
+			arg0 = args[0].(types.Container)
+		}
+		run(arg0)
+	})
+	return _c
+}
+
+func (_c *MockClient_RemoveContainer_Call) Return(err error) *MockClient_RemoveContainer_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_RemoveContainer_Call) RunAndReturn(run func(container types.Container) error) *MockClient_RemoveContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 func (_mock *MockClient) RenameContainer(container types.Container, newName string) error {
 	ret := _mock.Called(container, newName)
 
@@ -581,6 +720,54 @@ func (_c *MockClient_RenameContainer_Call) RunAndReturn(run func(container types
 }
 
 // StartContainer provides a mock function for the type MockClient
+func (_mock *MockClient) StartExistingContainer(containerID types.ContainerID) error {
+	ret := _mock.Called(containerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StartExistingContainer")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(types.ContainerID) error); ok {
+		r0 = returnFunc(containerID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_StartExistingContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartExistingContainer'
+type MockClient_StartExistingContainer_Call struct {
+	*mock.Call
+}
+
+// StartExistingContainer is a helper method to define mock.On call
+//   - containerID types.ContainerID
+func (_e *MockClient_Expecter) StartExistingContainer(containerID interface{}) *MockClient_StartExistingContainer_Call {
+	return &MockClient_StartExistingContainer_Call{Call: _e.mock.On("StartExistingContainer", containerID)}
+}
+
+func (_c *MockClient_StartExistingContainer_Call) Run(run func(containerID types.ContainerID)) *MockClient_StartExistingContainer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.ContainerID
+		if args[0] != nil {
+			arg0 = args[0].(types.ContainerID)
+		}
+		run(arg0)
+	})
+	return _c
+}
+
+func (_c *MockClient_StartExistingContainer_Call) Return(err error) *MockClient_StartExistingContainer_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_StartExistingContainer_Call) RunAndReturn(run func(containerID types.ContainerID) error) *MockClient_StartExistingContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 func (_mock *MockClient) StartContainer(container types.Container) (types.ContainerID, error) {
 	ret := _mock.Called(container)
 
@@ -636,6 +823,63 @@ func (_c *MockClient_StartContainer_Call) Return(containerID types.ContainerID, 
 }
 
 func (_c *MockClient_StartContainer_Call) RunAndReturn(run func(container types.Container) (types.ContainerID, error)) *MockClient_StartContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StopContainerOnly provides a mock function for the type MockClient
+func (_mock *MockClient) StopContainerOnly(container types.Container, timeout time.Duration) error {
+	ret := _mock.Called(container, timeout)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopContainerOnly")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(types.Container, time.Duration) error); ok {
+		r0 = returnFunc(container, timeout)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_StopContainerOnly_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopContainerOnly'
+type MockClient_StopContainerOnly_Call struct {
+	*mock.Call
+}
+
+// StopContainerOnly is a helper method to define mock.On call
+//   - container types.Container
+//   - timeout time.Duration
+func (_e *MockClient_Expecter) StopContainerOnly(container interface{}, timeout interface{}) *MockClient_StopContainerOnly_Call {
+	return &MockClient_StopContainerOnly_Call{Call: _e.mock.On("StopContainerOnly", container, timeout)}
+}
+
+func (_c *MockClient_StopContainerOnly_Call) Run(run func(container types.Container, timeout time.Duration)) *MockClient_StopContainerOnly_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.Container
+		if args[0] != nil {
+			arg0 = args[0].(types.Container)
+		}
+		var arg1 time.Duration
+		if args[1] != nil {
+			arg1 = args[1].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_StopContainerOnly_Call) Return(err error) *MockClient_StopContainerOnly_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_StopContainerOnly_Call) RunAndReturn(run func(container types.Container, timeout time.Duration) error) *MockClient_StopContainerOnly_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1,9 +1,9 @@
+// Package metrics provides HTTP handlers for serving Watchtower metrics data.
 package metrics
 
 import (
+	"encoding/json"
 	"net/http"
-
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 )
@@ -18,11 +18,22 @@ type Handler struct {
 // New is a factory function creating a new Metrics instance.
 func New() *Handler {
 	metrics := metrics.Default()
-	handler := promhttp.Handler()
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		data := map[string]any{
+			"scanned": metrics.GetScanned(),
+			"updated": metrics.GetUpdated(),
+			"failed":  metrics.GetFailed(),
+		}
+		if err := json.NewEncoder(w).Encode(data); err != nil {
+			http.Error(w, "Failed to encode metrics", http.StatusInternalServerError)
+		}
+	}
 
 	return &Handler{
 		Path:    "/v1/metrics",
-		Handle:  handler.ServeHTTP,
+		Handle:  handler,
 		Metrics: metrics,
 	}
 }
