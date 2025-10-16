@@ -754,7 +754,13 @@ func restartStaleContainer(
 
 	// Handle Git-monitored containers differently
 	if isGitMonitoredContainer(container) {
-		return restartGitContainer(ctx, container, client, params)
+		// Use rollback-capable restart for Git-monitored containers
+		// For Watchtower self-updates, this uses the simpler restart logic without rollback
+		// For other containers, this includes health check and rollback
+		if container.IsWatchtower() {
+			return restartGitContainer(ctx, container, client, params)
+		}
+		return restartGitContainerWithRollback(ctx, container, client, params)
 	}
 
 	// Rename Watchtower containers only if restarts are enabled.
