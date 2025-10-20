@@ -184,9 +184,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		logging.LogScheduleInfo(logger, cmd, sched)
 
 		output := buffer.String()
-		gomega.Expect(output).To(gomega.ContainSubstring("Scheduling next run"))
-		gomega.Expect(output).
-			To(gomega.ContainSubstring("Note that the next check will be performed in"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Next scheduled run"))
 	})
 
 	ginkgo.It("should log one-time update", func() {
@@ -206,7 +204,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		logging.LogScheduleInfo(logger, cmd, time.Time{})
 
 		output := buffer.String()
-		gomega.Expect(output).To(gomega.ContainSubstring("Running update on start"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Update on startup enabled"))
 	})
 
 	ginkgo.It("should log HTTP API without periodic polls", func() {
