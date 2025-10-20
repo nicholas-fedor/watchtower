@@ -132,7 +132,6 @@ func RunUpgradesOnSchedule(
 	// Check if update-on-start is enabled and trigger immediate update if so.
 	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
 	if updateOnStart {
-		logrus.Info("Update on startup enabled - performing immediate check")
 		updateFunc()
 	}
 
