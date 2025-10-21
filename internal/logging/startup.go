@@ -191,10 +191,11 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	// Log details of the next scheduled run if scheduling is active.
 	if !sched.IsZero() {
 		until := util.FormatDuration(time.Until(sched))
+		// Example: Next scheduled run: 2025-10-22 00:31:25 MST in 24 hours.
 		log.Info(
 			"Next scheduled run: " + sched.Format(
-				"2006-01-02 15:04:05 -0700 MST",
-			) + "(in " + until + ")",
+				"2006-01-02 15:04:05 MST",
+			) + " in " + until,
 		)
 	}
 
