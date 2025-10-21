@@ -57,6 +57,5 @@ func main() {
 		return
 	}
 
-	//nolint:forbidigo // fmt.Println is appropriate for tplprev output
-	fmt.Println(result)
+	os.Stdout.WriteString(result + "\n")
 }

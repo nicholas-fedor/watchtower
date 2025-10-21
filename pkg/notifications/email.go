@@ -49,7 +49,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
 	from, _ := flags.GetString("notification-email-from")
-	to, _ := flags.GetString("notification-email-to") //nolint:varnamelen
+	toAddr, _ := flags.GetString("notification-email-to")
 	server, _ := flags.GetString("notification-email-server")
 	user, _ := flags.GetString("notification-email-server-user")
 	password, _ := flags.GetString("notification-email-server-password")
@@ -59,7 +59,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 
 	clog := logrus.WithFields(logrus.Fields{
 		"from":          from,
-		"to":            to,
+		"to":            toAddr,
 		"server":        server,
 		"port":          port,
 		"tls_skip":      tlsSkipVerify,
@@ -78,7 +78,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	return &emailTypeNotifier{
 		entries:       []*logrus.Entry{},
 		From:          from,
-		To:            to,
+		To:            toAddr,
 		Server:        server,
 		User:          user,
 		Password:      password,

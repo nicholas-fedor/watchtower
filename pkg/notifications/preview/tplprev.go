@@ -12,7 +12,7 @@
 // to mimic real Watchtower operational logs and notification reports.
 //
 // Integration with Watchtower:
-// This package is consumed by the WebAssembly (WASM) module (tplprev.wasm, built from tools/tplprev/main_wasm.go), which is
+// This package is consumed by the WebAssembly (WASM) module (tplprev.wasm, built from build/tplprev/main_wasm.go), which is
 // loaded in the web interface (docs/notifications/template-preview/script.js) to dynamically render previews. The simulated
 // data conforms to the notifications.Data model (model.go), which includes a Report (types.Report from report.go) and log
 // Entries (logrus.Entry from logs.go). The web interface allows users to adjust container counts and log levels, triggering

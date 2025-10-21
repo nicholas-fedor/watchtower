@@ -72,6 +72,12 @@ var (
 	// ideal for observing image staleness without triggering automatic updates.
 	monitorOnly bool
 
+	// runOnce is a boolean flag that runs Watchtower once and then exits.
+	//
+	// It is set in preRun via the --run-once flag or the WATCHTOWER_RUN_ONCE environment variable,
+	// useful for triggering updates on demand rather than running continuously.
+	runOnce bool
+
 	// enableLabel is a boolean flag restricting updates to containers with the "com.centurylinklabs.watchtower.enable" label set to true.
 	//
 	// It is configured in preRun via the --label-enable flag or the WATCHTOWER_LABEL_ENABLE environment variable,
@@ -150,6 +156,36 @@ var (
 	// controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
 	cpuCopyMode string
 
+	// noSelfUpdate is a boolean flag that prevents Watchtower from updating itself.
+	//
+	// It is set during preRun via the --no-self-update flag or the WATCHTOWER_NO_SELF_UPDATE environment variable,
+	// preventing Watchtower from attempting to update its own container.
+	noSelfUpdate bool
+
+	// gitAuthToken is the authentication token for Git repository access.
+	//
+	// It is set during preRun via the --git-auth-token flag or the WATCHTOWER_GIT_AUTH_TOKEN environment variable,
+	// used when accessing private Git repositories for image updates.
+	gitAuthToken string
+
+	// gitUsername is the username for Git repository authentication.
+	//
+	// It is set during preRun via the --git-username flag or the WATCHTOWER_GIT_USERNAME environment variable,
+	// used in conjunction with gitPassword for basic Git authentication.
+	gitUsername string
+
+	// gitPassword is the password for Git repository authentication.
+	//
+	// It is set during preRun via the --git-password flag or the WATCHTOWER_GIT_PASSWORD environment variable,
+	// used in conjunction with gitUsername for basic Git authentication.
+	gitPassword string
+
+	// gitSSHKeyPath is the filesystem path to an SSH private key for Git repository access.
+	//
+	// It is set during preRun via the --git-ssh-key-path flag or the WATCHTOWER_GIT_SSH_KEY_PATH environment variable,
+	// used for SSH-based authentication to private Git repositories.
+	gitSSHKeyPath string
+
 	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 	//
 	// It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
@@ -185,6 +221,7 @@ var (
 			lifecycleUID,
 			lifecycleGID,
 			cpuCopyMode,
+			runOnce,
 		)
 	}
 )
@@ -219,6 +256,7 @@ func init() {
 	flags.RegisterDockerFlags(rootCmd)
 	flags.RegisterSystemFlags(rootCmd)
 	flags.RegisterNotificationFlags(rootCmd)
+	flags.RegisterGitFlags(rootCmd)
 }
 
 // Execute runs the root command and manages any errors encountered during its execution.
@@ -257,9 +295,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Get secrets from files (e.g., for notifications) and read core operational flags.
 	flags.GetSecretsFromFiles(cmd)
-	cleanup, noRestart, monitorOnly, timeout = flags.ReadFlags(cmd)
+	cleanup, noRestart, monitorOnly, noSelfUpdate, timeout = flags.ReadFlags(cmd)
 
-	// Validate the timeout value to ensure it’s non-negative, preventing invalid stop durations.
+	// Get run-once flag to configure one-time execution mode.
+	runOnce, _ = flagsSet.GetBool("run-once")
+
+	// Validate the timeout value to ensure it's non-negative, preventing invalid stop durations.
 	if timeout < 0 {
 		logrus.Fatal("Please specify a positive value for timeout value.")
 	}
@@ -302,6 +343,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
 	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
 	cpuCopyMode, _ = flagsSet.GetString("cpu-copy-mode")
+
+	// Retrieve Git authentication flags.
+	gitAuthToken, _ = flagsSet.GetString("git-auth-token")
+	gitUsername, _ = flagsSet.GetString("git-username")
+	gitPassword, _ = flagsSet.GetString("git-password")
+	gitSSHKeyPath, _ = flagsSet.GetString("git-ssh-key-path")
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
 	if monitorOnly && noPull {
