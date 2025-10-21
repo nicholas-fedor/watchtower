@@ -16,6 +16,10 @@ You can check for your current Go version as follows:
 go version
 ```
 
+## Devcontainer
+
+For ease of use a dev container is provided which lets you easily build, lint, format, test this project in a standardized environment.
+
 ## Security
 
 You must have GPG signing of Git commits enabled.
@@ -44,6 +48,14 @@ To use the linter, run the following from the root directory:
 
 ```bash
 golangci-lint run
+```
+
+## Formatting
+
+Please format your code with
+
+```bash
+go fmt ./...
 ```
 
 ## Testing
