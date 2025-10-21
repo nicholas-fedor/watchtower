@@ -157,43 +157,50 @@ func LogNotifierInfo(log *logrus.Entry, notifierNames []string) {
 //   - c: The cobra.Command instance, providing access to flags like --run-once.
 //   - sched: The time.Time of the first scheduled run, or zero if no schedule is set.
 func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
-	switch {
-	case !sched.IsZero(): // scheduled runs
-		until := util.FormatDuration(time.Until(sched))
-		log.Info("Scheduling next run: " + sched.Format("2006-01-02 15:04:05 -0700 MST"))
-		log.Info("Note that the next check will be performed in " + until)
-
-	case func() bool { // one-time updates
-		v, _ := c.PersistentFlags().GetBool("run-once")
-
-		return v
-	}():
+	// Check if running in one-time update mode.
+	runOnce, _ := c.PersistentFlags().GetBool("run-once")
+	if runOnce {
 		log.Info("Running a one time update.")
 
-	case func() bool { // update on start
-		v, _ := c.PersistentFlags().GetBool("update-on-start")
+		return
+	}
 
-		return v
-	}():
-		log.Info("Running update on start, then scheduling periodic updates.")
+	// Check if update on start is enabled.
+	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
+	if updateOnStart {
+		log.Info(
+			"Update on startup enabled - performing immediate check, then scheduling periodic updates.",
+		)
+	}
 
-	case func() bool { // HTTP API without periodic polling
-		a, _ := c.PersistentFlags().GetBool("http-api-update")
-		b, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
+	// Retrieve HTTP API related flags.
+	httpAPI, _ := c.PersistentFlags().GetBool("http-api-update")
+	periodicPolls, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
 
-		return a && !b
-	}():
-		log.Info("Updates via HTTP API enabled. Periodic updates are not enabled.")
+	// Handle HTTP API update configurations.
+	if httpAPI {
+		if periodicPolls {
+			log.Info("Updates via HTTP API enabled. Periodic updates are also enabled.")
+		} else {
+			log.Info("Updates via HTTP API enabled. Periodic updates are not enabled.")
 
-	case func() bool { // HTTP API with periodic polling
-		a, _ := c.PersistentFlags().GetBool("http-api-update")
-		b, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
+			return
+		}
+	}
 
-		return a && b
-	}():
-		log.Info("Updates via HTTP API enabled. Periodic updates are also enabled.")
+	// Log details of the next scheduled run if scheduling is active.
+	if !sched.IsZero() {
+		until := util.FormatDuration(time.Until(sched))
+		// Example: Next scheduled run: 2025-10-22 00:31:25 MST in 24 hours.
+		log.Info(
+			"Next scheduled run: " + sched.Format(
+				"2006-01-02 15:04:05 MST",
+			) + " in " + until,
+		)
+	}
 
-	default: // default periodic
+	// Default periodic updates are enabled.
+	if !updateOnStart && !httpAPI && sched.IsZero() {
 		log.Info("Periodic updates are enabled with default schedule.")
 	}
 }
