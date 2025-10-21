@@ -157,37 +157,49 @@ func LogNotifierInfo(log *logrus.Entry, notifierNames []string) {
 //   - c: The cobra.Command instance, providing access to flags like --run-once.
 //   - sched: The time.Time of the first scheduled run, or zero if no schedule is set.
 func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
-	// order of checks matters
-
+	// Check if running in one-time update mode.
 	runOnce, _ := c.PersistentFlags().GetBool("run-once")
-    if runOnce {
-        log.Info("Running a one time update.")
-        return
-    }
+	if runOnce {
+		log.Info("Running a one time update.")
 
+		return
+	}
+
+	// Check if update on start is enabled.
 	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
-    if updateOnStart {
-        log.Info("Update on startup enabled - performing immediate check, then scheduling periodic updates.")
-    }
-	
+	if updateOnStart {
+		log.Info(
+			"Update on startup enabled - performing immediate check, then scheduling periodic updates.",
+		)
+	}
+
+	// Retrieve HTTP API related flags.
 	httpAPI, _ := c.PersistentFlags().GetBool("http-api-update")
-    periodicPolls, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
+	periodicPolls, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
 
-    if httpAPI {
-        if periodicPolls {
-            log.Info("Updates via HTTP API enabled. Periodic updates are also enabled.")
-        } else {
-            log.Info("Updates via HTTP API enabled. Periodic updates are not enabled.")
+	// Handle HTTP API update configurations.
+	if httpAPI {
+		if periodicPolls {
+			log.Info("Updates via HTTP API enabled. Periodic updates are also enabled.")
+		} else {
+			log.Info("Updates via HTTP API enabled. Periodic updates are not enabled.")
+
 			return
-        }
-    }
+		}
+	}
 
-	if !sched.IsZero(): // scheduled runs
-	until := util.FormatDuration(time.Until(sched))
-	log.Info("Next scheduled run: " + sched.Format("2006-01-02 15:04:05 -0700 MST") + "(in " + until + ")")
+	// Log details of the next scheduled run if scheduling is active.
+	if !sched.IsZero() {
+		until := util.FormatDuration(time.Until(sched))
+		log.Info(
+			"Next scheduled run: " + sched.Format(
+				"2006-01-02 15:04:05 -0700 MST",
+			) + "(in " + until + ")",
+		)
+	}
 
-	// default periodic
-    if !updateOnStart && !httpAPI && sched.IsZero() {
-        log.Info("Periodic updates are enabled with default schedule.")
-    }
+	// Default periodic updates are enabled.
+	if !updateOnStart && !httpAPI && sched.IsZero() {
+		log.Info("Periodic updates are enabled with default schedule.")
+	}
 }

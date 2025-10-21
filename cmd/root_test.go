@@ -648,6 +648,7 @@ func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
 	// Mock update function for API handler that signals start and completion
 	// Mutex to protect concurrent t.Log calls from race conditions
 	var logMu sync.Mutex
+
 	updateFn := func(_ []string) *metrics.Metric {
 		close(apiStarted)
 		time.Sleep(100 * time.Millisecond) // Simulate API update work
