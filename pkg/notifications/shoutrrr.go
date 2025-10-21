@@ -287,6 +287,7 @@ func (n *shoutrrrTypeNotifier) StartNotification() {
 func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	n.entriesMutex.Lock()
 	entries := n.entries
+	n.entries = nil // Clear the queue after copying to prevent re-sending
 	n.entriesMutex.Unlock()
 	n.sendEntries(entries, report)
 }
