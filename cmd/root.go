@@ -552,10 +552,24 @@ func runMain(cfg config.RunConfig) int {
 
 	// Check for and resolve conflicts with multiple Watchtower instances.
 	cleanupImageIDs := make(map[types.ImageID]bool)
-	if err := actions.CheckForMultipleWatchtowerInstances(client, cleanup, scope, cleanupImageIDs); err != nil {
+
+	cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+		client,
+		cleanup,
+		scope,
+		cleanupImageIDs,
+	)
+	if err != nil {
 		logNotify("Multiple Watchtower instances detected", err)
 
 		return 1
+	}
+
+	// Disable update-on-start if cleanup occurred to prevent redundant updates after self-update
+	if cleanupOccurred {
+		cfg.UpdateOnStart = false
+
+		logrus.Debug("Disabled update-on-start due to cleanup of excess Watchtower instances")
 	}
 
 	// Create a cancellable context for managing API and scheduler shutdown.
@@ -568,7 +582,7 @@ func runMain(cfg config.RunConfig) int {
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
-	if err := scheduling.RunUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup, scheduleSpec, logging.WriteStartupMessage, runUpdatesWithNotifications, client, scope, notifier, meta.Version); err != nil {
+	if err := scheduling.RunUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup, scheduleSpec, logging.WriteStartupMessage, runUpdatesWithNotifications, client, scope, notifier, meta.Version, cfg.UpdateOnStart); err != nil {
 		logNotify("Scheduled upgrades failed", err)
 
 		return 1

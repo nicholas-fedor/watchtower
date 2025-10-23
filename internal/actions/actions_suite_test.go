@@ -33,8 +33,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 					false,
 				)
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(mockClient, false, "", cleanupImageIDs)).
-					To(gomega.Succeed())
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+					mockClient,
+					false,
+					"",
+					cleanupImageIDs,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
 				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 				gomega.Expect(mockClient.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 			})
@@ -64,8 +70,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 					false,
 				)
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				gomega.Expect(actions.CheckForMultipleWatchtowerInstances(client, false, "", cleanupImageIDs)).
-					To(gomega.Succeed())
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+					client,
+					false,
+					"",
+					cleanupImageIDs,
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
 				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 			})
@@ -114,13 +126,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should stop all but the latest one", func() {
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				err := actions.CheckForMultipleWatchtowerInstances(
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					false,
 					"",
 					cleanupImageIDs,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).
 					To(gomega.BeFalse(), "test-container-01 should be stopped")
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).
@@ -131,13 +144,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should collect image IDs and clean up when cleanup is enabled", func() {
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				err := actions.CheckForMultipleWatchtowerInstances(
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					true,
 					"",
 					cleanupImageIDs,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).
 					To(gomega.BeFalse(), "test-container-01 should be stopped")
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).
@@ -189,13 +203,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should stop the old instance and clean up its image", func() {
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				err := actions.CheckForMultipleWatchtowerInstances(
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					true,
 					"",
 					cleanupImageIDs,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).
 					To(gomega.BeFalse(), "test-container-old should be stopped")
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[1])).
@@ -270,13 +285,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should only clean up unscoped instances when scope is empty", func() {
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				err := actions.CheckForMultipleWatchtowerInstances(
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					false,
 					"",
 					cleanupImageIDs,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 
 				// Should stop the older unscoped instance
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).
@@ -293,13 +309,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should clean up within scoped instances when scope is specified", func() {
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				err := actions.CheckForMultipleWatchtowerInstances(
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					false,
 					"prod",
 					cleanupImageIDs,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
 
 				// Scoped cleanup should only see the scoped container, so no cleanup needed
 				gomega.Expect(client.IsContainerRunning(client.TestData.Containers[0])).

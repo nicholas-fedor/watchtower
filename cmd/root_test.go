@@ -763,7 +763,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 	updateLock <- true
 
 	// Call runUpgradesOnSchedule with a filter that matches no containers
-	filter := func(_ types.FilterableContainer) bool { return false }
+	filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 	filterDesc := testFilterDesc
 
 	// The function should trigger immediate update and then start scheduler
@@ -781,6 +781,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		"",
 		nil,
 		"",
+		true,
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -846,7 +847,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 	updateLock <- true
 
 	// Call runUpgradesOnSchedule
-	filter := func(_ types.FilterableContainer) bool { return false }
+	filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 	filterDesc := testFilterDesc
 
 	startTime := time.Now()
@@ -864,6 +865,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 		"",
 		nil,
 		"",
+		true,
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -933,7 +935,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 	defer cancel()
 
 	// Call runUpgradesOnSchedule
-	filter := func(_ types.FilterableContainer) bool { return false }
+	filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 	filterDesc := testFilterDesc
 
 	err = scheduling.RunUpgradesOnSchedule(
@@ -950,6 +952,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 		"",
 		nil,
 		"",
+		false,
 	)
 
 	// Should not return an error
@@ -972,6 +975,8 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 	flags.RegisterSystemFlags(cmd)
 	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 	require.NoError(t, err)
+
+	updateOnStart, _ := cmd.Flags().GetBool("update-on-start")
 
 	// Track update calls
 	updateCalled := make(chan bool, 1)
@@ -998,7 +1003,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 	updateLock <- true
 
 	// Call runUpgradesOnSchedule with a filter that includes containers
-	filter := func(_ types.FilterableContainer) bool { return true }
+	filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
 	filterDesc := testFilterDesc
 
 	err = scheduling.RunUpgradesOnSchedule(
@@ -1015,6 +1020,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 		"",
 		nil,
 		"",
+		updateOnStart,
 	)
 
 	// Should not return an error
@@ -1041,10 +1047,14 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 	err := cmd1.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 	require.NoError(t, err)
 
+	updateOnStart1, _ := cmd1.Flags().GetBool("update-on-start")
+
 	cmd2 := &cobra.Command{}
 	flags.RegisterSystemFlags(cmd2)
 	err = cmd2.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 	require.NoError(t, err)
+
+	updateOnStart2, _ := cmd2.Flags().GetBool("update-on-start")
 
 	// Shared update lock (simulating shared resource)
 	updateLock := make(chan bool, 1)
@@ -1074,7 +1084,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
-		filter := func(_ types.FilterableContainer) bool { return false }
+		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 		filterDesc := "instance1"
 
 		err := scheduling.RunUpgradesOnSchedule(
@@ -1091,6 +1101,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			"",
 			nil,
 			"",
+			updateOnStart1,
 		)
 		assert.NoError(t, err)
 		atomic.AddInt32(&completed, 1)
@@ -1101,7 +1112,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
-		filter := func(_ types.FilterableContainer) bool { return false }
+		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 		filterDesc := "instance2"
 
 		err := scheduling.RunUpgradesOnSchedule(
@@ -1118,6 +1129,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			"",
 			nil,
 			"",
+			updateOnStart2,
 		)
 		assert.NoError(t, err)
 		atomic.AddInt32(&completed, 1)
@@ -1241,7 +1253,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 	// Start runUpgradesOnSchedule in a goroutine
 	go func() {
-		filter := func(_ types.FilterableContainer) bool { return false }
+		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 		filterDesc := testFilterDesc
 
 		// This should start and wait for context cancellation
@@ -1259,6 +1271,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 			"",
 			nil,
 			"",
+			false,
 		)
 		assert.NoError(t, err)
 

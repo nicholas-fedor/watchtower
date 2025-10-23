@@ -66,6 +66,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 //   - scope: Defines a specific operational scope for Watchtower, limiting updates to containers matching this scope.
 //   - notifier: The notification system instance responsible for sending update status messages.
 //   - metaVersion: The version string for Watchtower, used in startup messaging.
+//   - updateOnStart: Boolean indicating whether to perform an update immediately on startup.
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
@@ -83,6 +84,7 @@ func RunUpgradesOnSchedule(
 	scope string,
 	notifier types.Notifier,
 	metaVersion string,
+	updateOnStart bool,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -130,7 +132,6 @@ func RunUpgradesOnSchedule(
 	writeStartupMessage(c, nextRun, filtering, scope, client, notifier, metaVersion)
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
-	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
 	if updateOnStart {
 		updateFunc()
 	}

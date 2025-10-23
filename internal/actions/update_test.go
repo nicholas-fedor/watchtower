@@ -191,13 +191,14 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 			cleanupImageIDs := make(map[types.ImageID]bool)
-			err := actions.CheckForMultipleWatchtowerInstances(
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				true, // cleanup=true
 				"prod",
 				cleanupImageIDs,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
 			gomega.Expect(client.TestData.StopContainerCount).
 				To(gomega.Equal(0), "StopContainer should not be called for unscoped container")
 			gomega.Expect(cleanupImageIDs).
@@ -236,8 +237,14 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 			cleanupImageIDs := make(map[types.ImageID]bool)
-			err := actions.CheckForMultipleWatchtowerInstances(client, true, "", cleanupImageIDs)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				true,
+				"",
+				cleanupImageIDs,
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty(), "No image cleanup for shared image")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 		})
