@@ -10,7 +10,7 @@ require (
 	github.com/docker/cli v28.5.1+incompatible
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/go-connections v0.6.0
-	github.com/nicholas-fedor/shoutrrr v0.10.3
+	github.com/nicholas-fedor/shoutrrr v0.11.0
 	github.com/onsi/gomega v1.38.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/robfig/cron v1.2.0
@@ -28,6 +28,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.28.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/term v0.36.0 // indirect
 )
 
 require (
@@ -41,7 +42,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
