@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"errors"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -113,9 +114,15 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			)
 
 			cleanupImageIDs := make(map[types.ImageID]bool)
-			err := actions.CheckForMultipleWatchtowerInstances(client, false, "", cleanupImageIDs)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				false,
+				"",
+				cleanupImageIDs,
+			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
 			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 		})
 
@@ -158,7 +165,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				cleanupImageIDs := make(map[types.ImageID]bool)
-				err := actions.CheckForMultipleWatchtowerInstances(
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					true,
 					"",
@@ -166,6 +173,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 				gomega.Expect(client.TestData.StopContainerCount).To(gomega.Equal(1))
 				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
 			},
@@ -211,7 +219,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			)
 
 			cleanupImageIDs := make(map[types.ImageID]bool)
-			err := actions.CheckForMultipleWatchtowerInstances(
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				true,
 				"prod",
@@ -219,7 +227,421 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
 			gomega.Expect(client.TestData.StopContainerCount).To(gomega.Equal(0))
+			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+		})
+		ginkgo.It("should clean up multiple instances within the same scope", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-prod-old",
+							"watchtower-prod-old",
+							"watchtower:1.11.0",
+							true,
+							false,
+							time.Now().Add(-time.Hour),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower":       "true",
+									"com.centurylinklabs.watchtower.scope": "prod",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-prod-new",
+							"watchtower-prod-new",
+							"watchtower:1.12.0",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower":       "true",
+									"com.centurylinklabs.watchtower.scope": "prod",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-dev",
+							"watchtower-dev",
+							"watchtower:1.12.0",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower":       "true",
+									"com.centurylinklabs.watchtower.scope": "dev",
+								},
+							},
+						),
+					},
+				},
+				false,
+				false,
+			)
+
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				true,
+				"prod",
+				cleanupImageIDs,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
+			gomega.Expect(client.TestData.StopContainerCount).To(gomega.Equal(1))
+			gomega.Expect(cleanupImageIDs).To(gomega.HaveKey(types.ImageID("watchtower:1.11.0")))
+			gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+		})
+
+		ginkgo.It("should return false when only one instance exists in scope", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-prod",
+							"watchtower-prod",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower":       "true",
+									"com.centurylinklabs.watchtower.scope": "prod",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-dev",
+							"watchtower-dev",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower":       "true",
+									"com.centurylinklabs.watchtower.scope": "dev",
+								},
+							},
+						),
+					},
+				},
+				false,
+				false,
+			)
+
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				false,
+				"prod",
+				cleanupImageIDs,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
+			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+		})
+	})
+
+	ginkgo.When("cleanup is disabled", func() {
+		ginkgo.It("should stop excess instances but not collect image IDs", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-old",
+							"watchtower-old",
+							"watchtower:old",
+							true,
+							false,
+							time.Now().Add(-time.Hour),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-new",
+							"watchtower-new",
+							"watchtower:new",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+					},
+				},
+				false,
+				false,
+			)
+
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				false, // cleanup disabled
+				"",
+				cleanupImageIDs,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
+			gomega.Expect(client.TestData.StopContainerCount).To(gomega.Equal(1))
+			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+		})
+	})
+
+	ginkgo.When("error scenarios", func() {
+		ginkgo.It("should return error when ListContainers fails", func() {
+			client := mocks.CreateMockClient(&mocks.TestData{
+				ListContainersError: errors.New("list containers failed"),
+			}, false, false)
+
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				false,
+				"",
+				cleanupImageIDs,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to list containers"))
+			gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
+			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should return error when stopping container fails", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-old",
+							"watchtower-old",
+							"watchtower:old",
+							true,
+							false,
+							time.Now().Add(-time.Hour),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-new",
+							"watchtower-new",
+							"watchtower:new",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+					},
+					StopContainerError:     errors.New("stop container failed"),
+					StopContainerFailCount: 1, // Fail the first stop
+				},
+				false,
+				false,
+			)
+
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				false,
+				"",
+				cleanupImageIDs,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("errors occurred while stopping watchtower containers"))
+			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
+			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should continue cleanup when some containers fail to stop", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-old1",
+							"watchtower-old1",
+							"watchtower:old1",
+							true,
+							false,
+							time.Now().Add(-2*time.Hour),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-old2",
+							"watchtower-old2",
+							"watchtower:old2",
+							true,
+							false,
+							time.Now().Add(-time.Hour),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-new",
+							"watchtower-new",
+							"watchtower:new",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+					},
+					StopContainerError:     errors.New("stop container failed"),
+					StopContainerFailCount: 1, // Only first stop fails
+				},
+				false,
+				false,
+			)
+
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				true,
+				"",
+				cleanupImageIDs,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("1 instances failed to stop"))
+			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
+			gomega.Expect(client.TestData.StopContainerCount).To(gomega.Equal(2))
+			gomega.Expect(cleanupImageIDs).To(gomega.HaveKey(types.ImageID("watchtower:old2")))
+			gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+		})
+	})
+
+	ginkgo.When("image ID handling", func() {
+		ginkgo.It(
+			"should not collect image ID when excess container shares image with newest",
+			func() {
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							mocks.CreateMockContainerWithConfig(
+								"watchtower-old",
+								"watchtower-old",
+								"watchtower:latest",
+								true,
+								false,
+								time.Now().Add(-time.Hour),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+								},
+							),
+							mocks.CreateMockContainerWithConfig(
+								"watchtower-new",
+								"watchtower-new",
+								"watchtower:latest",
+								true,
+								false,
+								time.Now(),
+								&container.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+								},
+							),
+						},
+					},
+					false,
+					false,
+				)
+
+				cleanupImageIDs := make(map[types.ImageID]bool)
+				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+					client,
+					true,
+					"",
+					cleanupImageIDs,
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
+				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+			},
+		)
+
+		ginkgo.It("should skip empty image IDs", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-old",
+							"watchtower-old",
+							"", // Empty image ID
+							true,
+							false,
+							time.Now().Add(-time.Hour),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+						mocks.CreateMockContainerWithConfig(
+							"watchtower-new",
+							"watchtower-new",
+							"watchtower:new",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+					},
+				},
+				false,
+				false,
+			)
+
+			cleanupImageIDs := make(map[types.ImageID]bool)
+			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
+				client,
+				false, // cleanup disabled
+				"",
+				cleanupImageIDs,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 		})
 	})

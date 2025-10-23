@@ -144,9 +144,11 @@ func CreateMockContainerWithConfig(
 		Config: config,
 	}
 
+	imageInfo := CreateMockImageInfo(image)
+
 	return container.NewContainer(
 		&content,
-		CreateMockImageInfo(image),
+		imageInfo,
 	)
 }
 

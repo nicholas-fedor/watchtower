@@ -91,13 +91,14 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 //   - cleanupImageIDs: Set of image IDs to clean up after stopping excess instances.
 //
 // Returns:
+//   - bool: True if cleanup occurred (multiple instances were found and excess ones stopped), false otherwise.
 //   - error: Non-nil if cleanup fails, nil if single instance or successful cleanup.
 func CheckForMultipleWatchtowerInstances(
 	client container.Client,
 	cleanup bool,
 	scope string,
 	cleanupImageIDs map[types.ImageID]bool,
-) error {
+) (bool, error) {
 	// Apply scope filter to target specific Watchtower instances, if provided.
 	var filter types.Filter
 
@@ -116,14 +117,14 @@ func CheckForMultipleWatchtowerInstances(
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
 
-		return fmt.Errorf("%w: %w", errListContainersFailed, err)
+		return false, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
 	// No action needed if one or fewer instances exist.
 	if len(containers) <= 1 {
 		logrus.WithField("count", len(containers)).Debug("No additional Watchtower instances found")
 
-		return nil
+		return false, nil
 	}
 
 	logrus.WithField("count", len(containers)).
@@ -144,13 +145,14 @@ func CheckForMultipleWatchtowerInstances(
 //   - cleanupImageIDs: Set of image IDs to clean up after stopping excess instances.
 //
 // Returns:
+//   - bool: Always true since cleanup occurred.
 //   - error: Non-nil if stopping fails, nil on success.
 func cleanupExcessWatchtowers(
 	containers []types.Container,
 	client container.Client,
 	cleanup bool,
 	cleanupImageIDs map[types.ImageID]bool,
-) error {
+) (bool, error) {
 	// Sort containers by creation time to identify the newest instance.
 	sort.Sort(sorter.ByCreated(containers))
 	logrus.WithField("containers", containerNames(containers)).
@@ -200,7 +202,7 @@ func cleanupExcessWatchtowers(
 		logrus.WithField("error_count", len(stopErrors)).
 			Debug("Encountered errors during Watchtower cleanup")
 
-		return fmt.Errorf(
+		return true, fmt.Errorf(
 			"%w: %d instances failed to stop",
 			errStopWatchtowerFailed,
 			len(stopErrors),
@@ -209,7 +211,7 @@ func cleanupExcessWatchtowers(
 
 	logrus.Info("Successfully cleaned up excess Watchtower instances")
 
-	return nil
+	return true, nil
 }
 
 // CleanupImages removes specified image IDs.

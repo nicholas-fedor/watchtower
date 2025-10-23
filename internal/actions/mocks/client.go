@@ -31,6 +31,9 @@ type TestData struct {
 	Containers                   []types.Container // List of mock containers.
 	Staleness                    map[string]bool   // Map of container names to staleness status.
 	IsContainerStaleError        error             // Error to return from IsContainerStale (for testing).
+	ListContainersError          error             // Error to return from ListContainers (for testing).
+	StopContainerError           error             // Error to return from StopContainer (for testing).
+	StopContainerFailCount       int               // Number of times StopContainer should fail before succeeding.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -54,6 +57,9 @@ func CreateMockClient(data *TestData, pullImages bool, removeVolumes bool) MockC
 // ListContainers returns the preconfigured list of containers from TestData, applying the provided filter.
 // If the filter is nil, all containers are returned.
 func (client MockClient) ListContainers(filter types.Filter) ([]types.Container, error) {
+	if client.TestData.ListContainersError != nil {
+		return nil, client.TestData.ListContainersError
+	}
 	filtered := []types.Container{}
 	effectiveFilter := filter
 	if effectiveFilter == nil {
@@ -76,8 +82,11 @@ func (client MockClient) ListAllContainers() ([]types.Container, error) {
 // It records the container’s ID as stopped, increments the StopContainerCount,
 // and returns nil for simplicity.
 func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
-	client.Stopped[string(c.ID())] = true
 	client.TestData.StopContainerCount++
+	if client.TestData.StopContainerError != nil && client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
+		return client.TestData.StopContainerError
+	}
+	client.Stopped[string(c.ID())] = true
 	return nil
 }
 

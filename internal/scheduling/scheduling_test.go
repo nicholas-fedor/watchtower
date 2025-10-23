@@ -92,6 +92,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			"",  // scope
 			nil, // no notifier
 			"v1.0.0",
+			false, // updateOnStart
 		)
 
 		// Should complete without error when context times out (clean cancellation)
@@ -122,6 +123,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			"",
 			nil,
 			"v1.0.0",
+			false, // updateOnStart
 		)
 
 		gomega.Expect(err).To(gomega.HaveOccurred())
@@ -161,6 +163,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			"",
 			nil,
 			"v1.0.0",
+			true, // updateOnStart
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred()) // clean timeout
@@ -188,13 +191,14 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			"test filter",
 			nil,
 			false,
-			"", // no schedule
+			"",
 			writeStartupMessage,
 			runUpdatesWithNotifications,
 			client,
 			"",
 			nil,
 			"v1.0.0",
+			false, // updateOnStart
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
