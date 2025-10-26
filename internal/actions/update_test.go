@@ -96,11 +96,11 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 			report, cleanupImageIDs, err := actions.Update(
 				client,
-				types.UpdateParams{
+				actions.UpdateConfig{
 					Cleanup:          true,
 					Filter:           filters.WatchtowerContainersFilter,
-					PullFailureDelay: 10 * time.Millisecond, // Test-specific short delay
 					CPUCopyMode:      "auto",
+					PullFailureDelay: 10 * time.Millisecond,
 				},
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -138,13 +138,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 				false,
 			)
-			params := types.UpdateParams{
+			config := actions.UpdateConfig{
 				Cleanup:     true,
 				NoRestart:   true,
 				Filter:      filters.WatchtowerContainersFilter,
 				CPUCopyMode: "auto",
 			}
-			report, cleanupImageIDs, err := actions.Update(client, params)
+			report, cleanupImageIDs, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Container should be scanned but not updated")
@@ -261,7 +261,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
@@ -294,7 +294,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(4))
@@ -314,7 +314,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness["test-container-01"] = true
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -336,7 +336,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
+					actions.UpdateConfig{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
@@ -356,7 +356,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness["test-container-01"] = true
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -405,7 +405,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -443,7 +443,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{Cleanup: true, MonitorOnly: true, CPUCopyMode: "auto"},
+					actions.UpdateConfig{Cleanup: true, MonitorOnly: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
@@ -479,7 +479,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					}
 					report, cleanupImageIDs, err := actions.Update(
 						client,
-						types.UpdateParams{
+						actions.UpdateConfig{
 							Cleanup:         true,
 							MonitorOnly:     true,
 							LabelPrecedence: true,
@@ -523,7 +523,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						}
 						report, cleanupImageIDs, err := actions.Update(
 							client,
-							types.UpdateParams{
+							actions.UpdateConfig{
 								Cleanup:         true,
 								MonitorOnly:     true,
 								LabelPrecedence: true,
@@ -557,7 +557,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					}
 					report, cleanupImageIDs, err := actions.Update(
 						client,
-						types.UpdateParams{
+						actions.UpdateConfig{
 							Cleanup:         true,
 							MonitorOnly:     true,
 							LabelPrecedence: true,
@@ -604,7 +604,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{
+					actions.UpdateConfig{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -646,7 +646,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{
+					actions.UpdateConfig{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						LifecycleUID:   1000,
@@ -693,7 +693,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{
+					actions.UpdateConfig{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -736,7 +736,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{
+					actions.UpdateConfig{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -826,7 +826,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{
+					actions.UpdateConfig{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -871,7 +871,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				}
 				report, cleanupImageIDs, err := actions.Update(
 					client,
-					types.UpdateParams{
+					actions.UpdateConfig{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -891,10 +891,10 @@ var _ = ginkgo.Describe("the update action", func() {
 	// Tests for image reference handling to cover isPinned functionality
 	ginkgo.When("handling different image reference formats", func() {
 		var client *mocks.MockClient
-		var params types.UpdateParams
+		var config actions.UpdateConfig
 
 		ginkgo.BeforeEach(func() {
-			params = types.UpdateParams{
+			config = actions.UpdateConfig{
 				Cleanup:     true,
 				Filter:      filters.NoFilter,
 				CPUCopyMode: "auto",
@@ -919,7 +919,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, params)
+			report, cleanupImageIDs, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Tagged container should be scanned")
@@ -948,7 +948,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, params)
+			report, cleanupImageIDs, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Untagged container should be scanned")
@@ -978,7 +978,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, params)
+			report, cleanupImageIDs, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Pinned container should be scanned")
@@ -1013,7 +1013,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					},
 					Stopped: make(map[string]bool),
 				}
-				report, cleanupImageIDs, err := actions.Update(client, params)
+				report, cleanupImageIDs, err := actions.Update(client, config)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Scanned()).
 					To(gomega.HaveLen(1), "Pinned container should be scanned")
@@ -1046,7 +1046,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, params)
+			report, cleanupImageIDs, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Skipped()).
 				To(gomega.HaveLen(1), "Invalid container should be skipped")
@@ -1083,7 +1083,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					},
 					Stopped: make(map[string]bool),
 				}
-				report, cleanupImageIDs, err := actions.Update(client, params)
+				report, cleanupImageIDs, err := actions.Update(client, config)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Skipped()).
 					To(gomega.HaveLen(1), "Container with missing image info should be skipped")
@@ -1118,7 +1118,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, params)
+			report, cleanupImageIDs, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Skipped()).
 				To(gomega.HaveLen(1), "Container with invalid fallback image should be skipped")
@@ -1164,11 +1164,11 @@ var _ = ginkgo.Describe("the update action", func() {
 			startTime := time.Now()
 			report, cleanupImageIDs, err := actions.Update(
 				client,
-				types.UpdateParams{
+				actions.UpdateConfig{
 					Cleanup:          true,
 					Filter:           filters.WatchtowerContainersFilter,
-					PullFailureDelay: 10 * time.Millisecond, // Test-specific very short delay
 					CPUCopyMode:      "auto",
+					PullFailureDelay: 10 * time.Millisecond,
 				},
 			)
 			elapsedTime := time.Since(startTime)

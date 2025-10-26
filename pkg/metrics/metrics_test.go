@@ -208,6 +208,50 @@ func TestDefault(t *testing.T) {
 	}
 }
 
+func TestNewWithRegistry(t *testing.T) {
+	tests := []struct {
+		name string
+	}{
+		{name: "new metrics with registry"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := prometheus.NewRegistry()
+			got := NewWithRegistry(registry)
+
+			if got == nil {
+				t.Fatalf("NewWithRegistry() returned nil pointer")
+			}
+
+			if got.channel == nil {
+				t.Errorf("NewWithRegistry().channel is nil")
+			} else if cap(got.channel) != 10 {
+				t.Errorf("NewWithRegistry() channel capacity = %d, want 10", cap(got.channel))
+			}
+
+			if got.scanned == nil {
+				t.Errorf("NewWithRegistry().scanned is nil")
+			}
+
+			if got.updated == nil {
+				t.Errorf("NewWithRegistry().updated is nil")
+			}
+
+			if got.failed == nil {
+				t.Errorf("NewWithRegistry().failed is nil")
+			}
+
+			if got.total == nil {
+				t.Errorf("NewWithRegistry().total is nil")
+			}
+
+			if got.skipped == nil {
+				t.Errorf("NewWithRegistry().skipped is nil")
+			}
+		})
+	}
+}
+
 func TestRegisterScan(t *testing.T) {
 	type args struct {
 		metric *Metric
@@ -301,10 +345,20 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Run HandleUpdate in a goroutine and wait briefly for it to process
-			go tt.m.HandleUpdate(tt.args.channel)
+			// Run HandleUpdate and deterministically wait for completion
+			done := make(chan struct{})
 
-			time.Sleep(100 * time.Millisecond) // Allow time for processing
+			go func() {
+				tt.m.HandleUpdate(tt.args.channel)
+				close(done)
+			}()
+
+			select {
+			case <-done:
+				// processed to completion
+			case <-time.After(1 * time.Second):
+				t.Fatal("HandleUpdate timed out")
+			}
 
 			// Check Prometheus metrics (simplified check since we can't directly access values easily in tests)
 			if len(tt.args.channel) > 0 {

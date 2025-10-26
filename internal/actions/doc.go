@@ -18,8 +18,25 @@
 //	if err := actions.CheckForSanity(client, filter, true); err != nil {
 //	    logrus.WithError(err).Error("Sanity check failed")
 //	}
-//	metric := actions.RunUpdatesWithNotifications(client, notifier, false, false, filter, true, false, false, false, false, false, false, 30*time.Second, 0, 0, "")
+//	params := actions.RunUpdatesWithNotificationsParams{
+//		Client:                       client,
+//		Notifier:                     notifier,
+//		NotificationSplitByContainer: false,
+//		NotificationReport:           false,
+//		Filter:                       filter,
+//		Cleanup:                      true,
+//		NoRestart:                    false,
+//		MonitorOnly:                  false,
+//		LifecycleHooks:               false,
+//		RollingRestart:               false,
+//		LabelPrecedence:              false,
+//		NoPull:                       false,
+//		Timeout:                      30 * time.Second,
+//		LifecycleUID:                 0,
+//		LifecycleGID:                 0,
+//		CPUCopyMode:                  "",
+//	}
+//	metric := actions.RunUpdatesWithNotifications(params)
 //
-// The package integrates with container, session, sorter, and lifecycle packages,
-// using logrus for logging operations and errors.
+// The package integrates with the container package for Docker operations, session package for update reporting, sorter package for container ordering, and lifecycle package for pre/post-update hooks, using logrus for logging operations and errors.
 package actions

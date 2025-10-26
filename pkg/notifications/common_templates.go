@@ -30,7 +30,7 @@ var commonTemplates = map[string]string{
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Container updated" -}}
-    Updated container: {{$e.Data.container}} ({{$e.Data.image}}): {{$e.Data.old_id}} updated to {{$e.Data.new_id}}
+    Updated container: {{with $e.Data.container}}{{.}}{{else}}unknown{{end}} ({{with $e.Data.image}}{{.}}{{else}}unknown{{end}}): {{with $e.Data.old_id}}{{.}}{{else}}unknown{{end}} updated to {{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
@@ -54,7 +54,6 @@ var commonTemplates = map[string]string{
   {{- /* Use report summary data */ -}}
   {{- with .Report -}}
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-    {{- if ( or .Updated .Failed ) -}}
       {{- /* List successfully updated containers */ -}}
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
@@ -71,7 +70,6 @@ var commonTemplates = map[string]string{
 	  {{- range .Failed}}
 - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
 	  {{- end -}}
-    {{- end -}}
   {{- end -}}
 {{- else -}}
   {{- /* Fallback to simple entry messages */ -}}
@@ -91,6 +89,8 @@ var commonTemplates = map[string]string{
   {{- else -}}
     no containers matched filter
   {{- end -}}
+{{- else -}}
+  no containers matched filter
 {{- end -}}`,
 
 	// "json.v1" template outputs the entire data structure as JSON for programmatic consumption.

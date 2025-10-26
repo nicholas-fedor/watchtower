@@ -50,70 +50,96 @@ func handleUpdateResult(result types.Report, err error) *metrics.Metric {
 	return nil
 }
 
+// RunUpdatesWithNotificationsParams holds the parameters for RunUpdatesWithNotifications.
+type RunUpdatesWithNotificationsParams struct {
+	Client                       container.Client
+	Notifier                     types.Notifier
+	NotificationSplitByContainer bool
+	NotificationReport           bool
+	Filter                       types.Filter
+	Cleanup                      bool
+	NoRestart                    bool
+	MonitorOnly                  bool
+	LifecycleHooks               bool
+	RollingRestart               bool
+	LabelPrecedence              bool
+	NoPull                       bool
+	Timeout                      time.Duration
+	LifecycleUID                 int
+	LifecycleGID                 int
+	CPUCopyMode                  string
+}
+
+// UpdateConfig holds the configuration parameters for container updates.
+type UpdateConfig struct {
+	Filter           types.Filter
+	Cleanup          bool
+	NoRestart        bool
+	MonitorOnly      bool
+	LifecycleHooks   bool
+	RollingRestart   bool
+	LabelPrecedence  bool
+	NoPull           bool
+	Timeout          time.Duration
+	LifecycleUID     int
+	LifecycleGID     int
+	CPUCopyMode      string
+	PullFailureDelay time.Duration
+}
+
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
 //
 // It executes the update action with configured parameters, batches notifications, and returns a metric
 // summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
 //
 // Parameters:
-//   - client: The Docker client instance used for container operations.
-//   - notifier: The notification system instance for sending update status messages.
-//   - notificationSplitByContainer: Boolean flag enabling separate notifications for each updated container.
-//   - notificationReport: Boolean flag enabling report-based notifications.
-//   - filter: The types.Filter determining which containers are targeted for updates.
-//   - cleanup: Boolean indicating whether to remove old images after updates.
-//   - noRestart: Boolean flag preventing containers from being restarted after updates.
-//   - timeout: Maximum duration allowed for container stop operations during updates.
-//   - monitorOnly: Boolean flag enabling mode where Watchtower monitors without updating.
-//   - lifecycleHooks: Boolean flag enabling execution of pre- and post-update lifecycle hooks.
-//   - rollingRestart: Boolean flag enabling rolling restarts for sequential updates.
-//   - labelPrecedence: Boolean flag giving container label settings priority over global flags.
-//   - noPull: Boolean flag skipping image pulls during updates.
-//   - lifecycleUID: Default UID for running lifecycle hooks.
-//   - lifecycleGID: Default GID for running lifecycle hooks.
-//   - cpuCopyMode: Specifies how CPU settings are handled during container recreation.
+//   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-func RunUpdatesWithNotifications(
-	client container.Client,
-	notifier types.Notifier,
-	notificationSplitByContainer, notificationReport bool,
-	filter types.Filter,
-	cleanup, noRestart, monitorOnly, lifecycleHooks, rollingRestart, labelPrecedence, noPull bool,
-	timeout time.Duration,
-	lifecycleUID, lifecycleGID int,
-	cpuCopyMode string,
-) *metrics.Metric {
+func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metrics.Metric {
 	logrus.Debug("Starting RunUpdatesWithNotifications")
 
 	// Initiate notification batching
-	startNotifications(notifier)
+	startNotifications(params.Notifier)
 
 	// Configure update parameters based on provided flags
-	updateParams := configureUpdateParams(
-		filter,
-		cleanup, noRestart, monitorOnly, lifecycleHooks, rollingRestart, labelPrecedence, noPull,
-		timeout,
-		lifecycleUID, lifecycleGID,
-		cpuCopyMode,
-	)
+	updateConfig := UpdateConfig{
+		Filter:           params.Filter,
+		Cleanup:          params.Cleanup,
+		NoRestart:        params.NoRestart,
+		MonitorOnly:      params.MonitorOnly,
+		LifecycleHooks:   params.LifecycleHooks,
+		RollingRestart:   params.RollingRestart,
+		LabelPrecedence:  params.LabelPrecedence,
+		NoPull:           params.NoPull,
+		Timeout:          params.Timeout,
+		PullFailureDelay: params.Timeout,
+		LifecycleUID:     params.LifecycleUID,
+		LifecycleGID:     params.LifecycleGID,
+		CPUCopyMode:      params.CPUCopyMode,
+	}
 
 	// Execute the container update operation
-	result, cleanupImageIDs, err := executeUpdate(client, updateParams)
+	result, cleanupImageIDs, err := executeUpdate(params.Client, updateConfig)
 	// Process update result, return metric on failure
 	if metric := handleUpdateResult(result, err); metric != nil {
 		return metric
 	}
 
 	// Perform image cleanup if enabled
-	performImageCleanup(client, cleanup, cleanupImageIDs)
+	performImageCleanup(params.Client, params.Cleanup, cleanupImageIDs)
 
 	// Log update report details for debugging
 	logUpdateReport(result)
 
 	// Send notifications about update results
-	sendNotifications(notifier, notificationSplitByContainer, notificationReport, result)
+	sendNotifications(
+		params.Notifier,
+		params.NotificationSplitByContainer,
+		params.NotificationReport,
+		result,
+	)
 
 	// Generate and return metric summarizing the session
 	return generateAndLogMetric(result)
@@ -144,6 +170,51 @@ func buildSingleContainerReport(
 	}
 }
 
+// buildUpdateEntries constructs log entries for container update events.
+//
+// It creates three logrus.Entry structs representing the key stages of a container update:
+// finding a new image, stopping the container, and starting the new container.
+//
+// Parameters:
+//   - c: The container report containing update details.
+//   - now: The current timestamp to use for all entries.
+//
+// Returns:
+//   - []*logrus.Entry: A slice of three log entries for the update events.
+func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry {
+	return []*logrus.Entry{
+		{
+			Level:   logrus.InfoLevel,
+			Message: "Found new image",
+			Data: logrus.Fields{
+				"container": c.Name(),
+				"image":     c.ImageName(),
+				"new_id":    c.LatestImageID().ShortID(),
+			},
+			Time: now,
+		},
+		{
+			Level:   logrus.InfoLevel,
+			Message: "Stopping container",
+			Data: logrus.Fields{
+				"container": c.Name(),
+				"id":        c.ID().ShortID(),
+				"old_id":    c.CurrentImageID().ShortID(),
+			},
+			Time: now,
+		},
+		{
+			Level:   logrus.InfoLevel,
+			Message: "Started new container",
+			Data: logrus.Fields{
+				"container": c.Name(),
+				"new_id":    c.LatestImageID().ShortID(),
+			},
+			Time: now,
+		},
+	}
+}
+
 // startNotifications initiates notification batching if a notifier is provided.
 //
 // It starts the notification process to group update messages, or logs a debug message
@@ -159,49 +230,6 @@ func startNotifications(notifier types.Notifier) {
 	}
 }
 
-// configureUpdateParams creates and configures the update parameters based on provided flags and settings.
-//
-// It constructs a types.UpdateParams struct with all necessary configuration for the update operation.
-//
-// Parameters:
-//   - filter: The types.Filter determining which containers are targeted for updates.
-//   - cleanup: Boolean indicating whether to remove old images after updates.
-//   - noRestart: Boolean flag preventing containers from being restarted after updates.
-//   - timeout: Maximum duration allowed for container stop operations during updates.
-//   - monitorOnly: Boolean flag enabling mode where Watchtower monitors without updating.
-//   - lifecycleHooks: Boolean flag enabling execution of pre- and post-update lifecycle hooks.
-//   - rollingRestart: Boolean flag enabling rolling restarts for sequential updates.
-//   - labelPrecedence: Boolean flag giving container label settings priority over global flags.
-//   - noPull: Boolean flag skipping image pulls during updates.
-//   - lifecycleUID: Default UID for running lifecycle hooks.
-//   - lifecycleGID: Default GID for running lifecycle hooks.
-//   - cpuCopyMode: Specifies how CPU settings are handled during container recreation.
-//
-// Returns:
-//   - types.UpdateParams: The configured update parameters.
-func configureUpdateParams(
-	filter types.Filter,
-	cleanup, noRestart, monitorOnly, lifecycleHooks, rollingRestart, labelPrecedence, noPull bool,
-	timeout time.Duration,
-	lifecycleUID, lifecycleGID int,
-	cpuCopyMode string,
-) types.UpdateParams {
-	return types.UpdateParams{
-		Filter:          filter,
-		Cleanup:         cleanup,
-		NoRestart:       noRestart,
-		Timeout:         timeout,
-		MonitorOnly:     monitorOnly,
-		LifecycleHooks:  lifecycleHooks,
-		RollingRestart:  rollingRestart,
-		LabelPrecedence: labelPrecedence,
-		NoPull:          noPull,
-		LifecycleUID:    lifecycleUID,
-		LifecycleGID:    lifecycleGID,
-		CPUCopyMode:     cpuCopyMode,
-	}
-}
-
 // executeUpdate performs the container update operation and handles errors.
 //
 // It calls the Update function with the provided parameters, captures the results,
@@ -209,7 +237,7 @@ func configureUpdateParams(
 //
 // Parameters:
 //   - client: The Docker client instance used for container operations.
-//   - updateParams: The configured parameters for the update operation.
+//   - config: The UpdateConfig struct containing all update configuration parameters.
 //
 // Returns:
 //   - types.Report: The report containing the results of the update operation.
@@ -217,12 +245,12 @@ func configureUpdateParams(
 //   - error: Any error encountered during the update execution.
 func executeUpdate(
 	client container.Client,
-	updateParams types.UpdateParams,
+	config UpdateConfig,
 ) (types.Report, map[types.ImageID]bool, error) {
 	// Log before calling the Update function
 	logrus.Debug("About to call Update function")
 
-	result, cleanupImageIDs, err := Update(client, updateParams)
+	result, cleanupImageIDs, err := Update(client, config)
 
 	// Log after Update function returns
 	logrus.Debug("Update function returned, about to check cleanup")
@@ -291,81 +319,62 @@ func sendNotifications(
 	if notifier != nil {
 		// Check if notifications should be split by container
 		if notificationSplitByContainer {
-			// Check if report-based notifications are enabled and there are updated containers
-			if notificationReport && len(result.Updated()) > 0 {
-				// Loop through updated containers and send individual report notifications
-				for _, updatedContainer := range result.Updated() {
-					singleContainerReport := buildSingleContainerReport(updatedContainer, result)
-					notifier.SendNotification(singleContainerReport)
-				}
-			} else if !notificationReport && len(result.Updated()) > 0 {
-				// Loop through updated containers for individual non-report notifications
-				for _, updatedContainer := range result.Updated() {
-					// Skip nil container reports
-					if updatedContainer == nil {
-						logrus.Debug("Encountered nil updated container report, skipping")
-
-						continue
-					}
-
-					// Skip containers with empty names
-					if strings.TrimSpace(updatedContainer.Name()) == "" {
-						logrus.Debug("Encountered container with empty name, skipping notification")
-
-						continue
-					}
-
-					logrus.WithFields(logrus.Fields{
-						"container": updatedContainer.Name(),
-						"image":     updatedContainer.ImageName(),
-					}).Debug("Sending individual notification for updated container")
-
-					singleContainerReport := buildSingleContainerReport(updatedContainer, result)
-
-					// Create log entries for container update events
-					entries := []*logrus.Entry{
-						{
-							Level:   logrus.InfoLevel,
-							Message: "Found new image",
-							Data: logrus.Fields{
-								"container": updatedContainer.Name(),
-								"image":     updatedContainer.ImageName(),
-								"new_id":    updatedContainer.LatestImageID().ShortID(),
-							},
-							Time: time.Now(),
-						},
-						{
-							Level:   logrus.InfoLevel,
-							Message: "Stopping container",
-							Data: logrus.Fields{
-								"container": updatedContainer.Name(),
-								"id":        updatedContainer.ID().ShortID(),
-								"old_id":    updatedContainer.CurrentImageID().ShortID(),
-							},
-							Time: time.Now(),
-						},
-						{
-							Level:   logrus.InfoLevel,
-							Message: "Started new container",
-							Data: logrus.Fields{
-								"container": updatedContainer.Name(),
-								"id":        updatedContainer.ID().ShortID(),
-								"new_id":    updatedContainer.LatestImageID().ShortID(),
-							},
-							Time: time.Now(),
-						},
-					}
-
-					notifier.SendFilteredEntries(entries, singleContainerReport)
-				}
-			}
-
-			logrus.Debug("About to return metric")
+			sendSplitNotifications(notifier, notificationReport, result)
 		} else {
 			// Send grouped notification if not splitting by container
 			notifier.SendNotification(result)
 		}
 	}
+}
+
+// sendSplitNotifications handles sending notifications when split by container is enabled.
+//
+// It processes updated containers and sends either report-based or filtered entry notifications
+// based on the notificationReport flag, skipping invalid containers.
+//
+// Parameters:
+//   - notifier: The notification system instance for sending update status messages.
+//   - notificationReport: Boolean flag enabling report-based notifications.
+//   - result: The report containing the results of the update operation.
+func sendSplitNotifications(notifier types.Notifier, notificationReport bool, result types.Report) {
+	if notificationReport {
+		// Send individual report notifications for each updated container
+		for _, updatedContainer := range result.Updated() {
+			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
+			notifier.SendNotification(singleContainerReport)
+		}
+	} else {
+		// Send individual filtered entry notifications for each updated container
+		for _, updatedContainer := range result.Updated() {
+			// Skip nil container reports
+			if updatedContainer == nil {
+				logrus.Debug("Encountered nil updated container report, skipping")
+
+				continue
+			}
+
+			// Skip containers with empty names
+			if strings.TrimSpace(updatedContainer.Name()) == "" {
+				logrus.Debug("Encountered container with empty name, skipping notification")
+
+				continue
+			}
+
+			logrus.WithFields(logrus.Fields{
+				"container": updatedContainer.Name(),
+				"image":     updatedContainer.ImageName(),
+			}).Debug("Sending individual notification for updated container")
+
+			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
+
+			// Create log entries for container update events
+			entries := buildUpdateEntries(updatedContainer, time.Now())
+
+			notifier.SendFilteredEntries(entries, singleContainerReport)
+		}
+	}
+
+	logrus.Debug("Finished sending notifications")
 }
 
 // generateAndLogMetric creates a metric from the update results and logs it.

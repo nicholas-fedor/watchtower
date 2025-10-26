@@ -58,12 +58,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				false,
 			)
 
-			metric := actions.RunUpdatesWithNotifications(
-				client,
-				nil, // nil notifier
-				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
-			)
+			params := actions.RunUpdatesWithNotificationsParams{
+				Client:                       client,
+				Notifier:                     nil,
+				NotificationSplitByContainer: false,
+				NotificationReport:           false,
+				Filter:                       filter,
+				Cleanup:                      false,
+				NoRestart:                    false,
+				MonitorOnly:                  false,
+				LifecycleHooks:               false,
+				RollingRestart:               false,
+				LabelPrecedence:              false,
+				NoPull:                       false,
+				Timeout:                      time.Minute,
+				LifecycleUID:                 1000,
+				LifecycleGID:                 1001,
+				CPUCopyMode:                  "auto",
+			}
+			metric := actions.RunUpdatesWithNotifications(params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 		})
@@ -95,12 +108,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			notifier.EXPECT().StartNotification().Return()
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			metric := actions.RunUpdatesWithNotifications(
-				client,
-				notifier,
-				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
-			)
+			params := actions.RunUpdatesWithNotificationsParams{
+				Client:                       client,
+				Notifier:                     notifier,
+				NotificationSplitByContainer: false,
+				NotificationReport:           false,
+				Filter:                       filter,
+				Cleanup:                      false,
+				NoRestart:                    false,
+				MonitorOnly:                  false,
+				LifecycleHooks:               false,
+				RollingRestart:               false,
+				LabelPrecedence:              false,
+				NoPull:                       false,
+				Timeout:                      time.Minute,
+				LifecycleUID:                 1000,
+				LifecycleGID:                 1001,
+				CPUCopyMode:                  "auto",
+			}
+			metric := actions.RunUpdatesWithNotifications(params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 		})
@@ -128,12 +154,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			notifier.EXPECT().StartNotification().Return()
 			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
 
-			metric := actions.RunUpdatesWithNotifications(
-				client,
-				notifier,
-				true, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
-			)
+			params := actions.RunUpdatesWithNotificationsParams{
+				Client:                       client,
+				Notifier:                     notifier,
+				NotificationSplitByContainer: true,
+				NotificationReport:           false,
+				Filter:                       filter,
+				Cleanup:                      false,
+				NoRestart:                    false,
+				MonitorOnly:                  false,
+				LifecycleHooks:               false,
+				RollingRestart:               false,
+				LabelPrecedence:              false,
+				NoPull:                       false,
+				Timeout:                      time.Minute,
+				LifecycleUID:                 1000,
+				LifecycleGID:                 1001,
+				CPUCopyMode:                  "auto",
+			}
+			metric := actions.RunUpdatesWithNotifications(params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 
@@ -159,12 +198,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			notifier.EXPECT().StartNotification().Return()
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			metric := actions.RunUpdatesWithNotifications(
-				client,
-				notifier,
-				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
-			)
+			params := actions.RunUpdatesWithNotificationsParams{
+				Client:                       client,
+				Notifier:                     notifier,
+				NotificationSplitByContainer: false,
+				NotificationReport:           false,
+				Filter:                       filter,
+				Cleanup:                      false,
+				NoRestart:                    false,
+				MonitorOnly:                  false,
+				LifecycleHooks:               false,
+				RollingRestart:               false,
+				LabelPrecedence:              false,
+				NoPull:                       false,
+				Timeout:                      time.Minute,
+				LifecycleUID:                 1000,
+				LifecycleGID:                 1001,
+				CPUCopyMode:                  "auto",
+			}
+			metric := actions.RunUpdatesWithNotifications(params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 
@@ -261,12 +313,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
 
-				metric := actions.RunUpdatesWithNotifications(
-					client,
-					notifier,
-					true, false, filter, false, false, false, false, false, false, false,
-					time.Minute, 1000, 1001, "auto",
-				)
+				params := actions.RunUpdatesWithNotificationsParams{
+					Client:                       client,
+					Notifier:                     notifier,
+					NotificationSplitByContainer: true,
+					NotificationReport:           false,
+					Filter:                       filter,
+					Cleanup:                      false,
+					NoRestart:                    false,
+					MonitorOnly:                  false,
+					LifecycleHooks:               false,
+					RollingRestart:               false,
+					LabelPrecedence:              false,
+					NoPull:                       false,
+					Timeout:                      time.Minute,
+					LifecycleUID:                 1000,
+					LifecycleGID:                 1001,
+					CPUCopyMode:                  "auto",
+				}
+				metric := actions.RunUpdatesWithNotifications(params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(3))
@@ -296,12 +361,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				notifier.EXPECT().StartNotification().Return()
 				// No SendNotification calls expected since no containers were updated
 
-				metric := actions.RunUpdatesWithNotifications(
-					client,
-					notifier,
-					true, false, filter, false, false, false, false, false, false, false,
-					time.Minute, 1000, 1001, "auto",
-				)
+				params := actions.RunUpdatesWithNotificationsParams{
+					Client:                       client,
+					Notifier:                     notifier,
+					NotificationSplitByContainer: true,
+					NotificationReport:           false,
+					Filter:                       filter,
+					Cleanup:                      false,
+					NoRestart:                    false,
+					MonitorOnly:                  false,
+					LifecycleHooks:               false,
+					RollingRestart:               false,
+					LabelPrecedence:              false,
+					NoPull:                       false,
+					Timeout:                      time.Minute,
+					LifecycleUID:                 1000,
+					LifecycleGID:                 1001,
+					CPUCopyMode:                  "auto",
+				}
+				metric := actions.RunUpdatesWithNotifications(params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -359,12 +437,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
 
-				metric := actions.RunUpdatesWithNotifications(
-					client,
-					notifier,
-					true, false, filter, false, false, false, false, false, false, false,
-					time.Minute, 1000, 1001, "auto",
-				)
+				params := actions.RunUpdatesWithNotificationsParams{
+					Client:                       client,
+					Notifier:                     notifier,
+					NotificationSplitByContainer: true,
+					NotificationReport:           false,
+					Filter:                       filter,
+					Cleanup:                      false,
+					NoRestart:                    false,
+					MonitorOnly:                  false,
+					LifecycleHooks:               false,
+					RollingRestart:               false,
+					LabelPrecedence:              false,
+					NoPull:                       false,
+					Timeout:                      time.Minute,
+					LifecycleUID:                 1000,
+					LifecycleGID:                 1001,
+					CPUCopyMode:                  "auto",
+				}
+				metric := actions.RunUpdatesWithNotifications(params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).
@@ -416,12 +507,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					Times(1)
 					// Exactly once
 
-				metric := actions.RunUpdatesWithNotifications(
-					client,
-					notifier,
-					true, false, filter, false, false, false, false, false, false, false,
-					time.Minute, 1000, 1001, "auto",
-				)
+				params := actions.RunUpdatesWithNotificationsParams{
+					Client:                       client,
+					Notifier:                     notifier,
+					NotificationSplitByContainer: true,
+					NotificationReport:           false,
+					Filter:                       filter,
+					Cleanup:                      false,
+					NoRestart:                    false,
+					MonitorOnly:                  false,
+					LifecycleHooks:               false,
+					RollingRestart:               false,
+					LabelPrecedence:              false,
+					NoPull:                       false,
+					Timeout:                      time.Minute,
+					LifecycleUID:                 1000,
+					LifecycleGID:                 1001,
+					CPUCopyMode:                  "auto",
+				}
+				metric := actions.RunUpdatesWithNotifications(params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(1))
@@ -448,12 +552,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				false,
 			)
 
-			metric := actions.RunUpdatesWithNotifications(
-				client,
-				nil,
-				false, false, filter, true, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
-			)
+			params := actions.RunUpdatesWithNotificationsParams{
+				Client:                       client,
+				Notifier:                     nil,
+				NotificationSplitByContainer: false,
+				NotificationReport:           false,
+				Filter:                       filter,
+				Cleanup:                      true,
+				NoRestart:                    false,
+				MonitorOnly:                  false,
+				LifecycleHooks:               false,
+				RollingRestart:               false,
+				LabelPrecedence:              false,
+				NoPull:                       false,
+				Timeout:                      time.Minute,
+				LifecycleUID:                 1000,
+				LifecycleGID:                 1001,
+				CPUCopyMode:                  "auto",
+			}
+			metric := actions.RunUpdatesWithNotifications(params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 			// CleanupImages is called internally by Update, so we check that cleanupImageIDs is processed
@@ -478,12 +595,25 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				false,
 			)
 
-			metric := actions.RunUpdatesWithNotifications(
-				client,
-				nil,
-				false, false, filter, false, false, false, false, false, false, false,
-				time.Minute, 1000, 1001, "auto",
-			)
+			params := actions.RunUpdatesWithNotificationsParams{
+				Client:                       client,
+				Notifier:                     nil,
+				NotificationSplitByContainer: false,
+				NotificationReport:           false,
+				Filter:                       filter,
+				Cleanup:                      false,
+				NoRestart:                    false,
+				MonitorOnly:                  false,
+				LifecycleHooks:               false,
+				RollingRestart:               false,
+				LabelPrecedence:              false,
+				NoPull:                       false,
+				Timeout:                      time.Minute,
+				LifecycleUID:                 1000,
+				LifecycleGID:                 1001,
+				CPUCopyMode:                  "auto",
+			}
+			metric := actions.RunUpdatesWithNotifications(params)
 
 			gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 			gomega.Expect(metric.Updated).To(gomega.Equal(0))

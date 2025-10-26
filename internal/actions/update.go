@@ -54,7 +54,7 @@ var (
 //
 // Parameters:
 //   - client: Container client for interacting with Docker API.
-//   - params: Update options specifying behavior like cleanup, restart, and filtering.
+//   - config: UpdateConfig specifying behavior like cleanup, restart, and filtering.
 //
 // Returns:
 //   - types.Report: Session report summarizing scanned, updated, and failed containers.
@@ -62,7 +62,7 @@ var (
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(
 	client container.Client,
-	params types.UpdateParams,
+	config UpdateConfig,
 ) (types.Report, map[types.ImageID]bool, error) {
 	// Initialize logging for the update process start.
 	logrus.Debug("Starting container update check")
@@ -75,6 +75,23 @@ func Update(
 	cleanupImageIDs := make(map[types.ImageID]bool)
 	// Track if Watchtower self-update pull failed to add safeguard delay.
 	watchtowerPullFailed := false
+
+	// Map UpdateConfig to types.UpdateParams for internal use.
+	params := types.UpdateParams{
+		Filter:           config.Filter,
+		Cleanup:          config.Cleanup,
+		NoRestart:        config.NoRestart,
+		Timeout:          config.Timeout,
+		MonitorOnly:      config.MonitorOnly,
+		LifecycleHooks:   config.LifecycleHooks,
+		RollingRestart:   config.RollingRestart,
+		LabelPrecedence:  config.LabelPrecedence,
+		NoPull:           config.NoPull,
+		PullFailureDelay: config.PullFailureDelay,
+		LifecycleUID:     config.LifecycleUID,
+		LifecycleGID:     config.LifecycleGID,
+		CPUCopyMode:      config.CPUCopyMode,
+	}
 
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if params.LifecycleHooks {

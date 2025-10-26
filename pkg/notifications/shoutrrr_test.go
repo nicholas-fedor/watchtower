@@ -272,8 +272,10 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.Describe("the default template", func() {
 			ginkgo.When("all containers are fresh", func() {
 				ginkgo.It("should return the summary", func() {
+					expected := `1 Scanned, 0 Updated, 0 Failed
+- frsh1 (mock/frsh1:latest): Fresh`
 					gomega.Expect(getTemplatedResult(``, false, mockDataAllFresh)).
-						To(gomega.Equal("1 Scanned, 0 Updated, 0 Failed"))
+						To(gomega.Equal(expected))
 				})
 			})
 			ginkgo.When("at least one container was updated", func() {
