@@ -168,24 +168,27 @@ var (
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
 	runUpdatesWithNotifications = func(filter types.Filter, cleanup bool) *metrics.Metric {
-		return actions.RunUpdatesWithNotifications(
-			client,
-			notifier,
-			notificationSplitByContainer,
-			notificationReport,
-			filter,
-			cleanup,
-			noRestart,
-			monitorOnly,
-			lifecycleHooks,
-			rollingRestart,
-			labelPrecedence,
-			noPull,
-			timeout,
-			lifecycleUID,
-			lifecycleGID,
-			cpuCopyMode,
-		)
+		params := actions.RunUpdatesWithNotificationsParams{
+			Client:                       client,
+			Notifier:                     notifier,
+			NotificationSplitByContainer: notificationSplitByContainer,
+			NotificationReport:           notificationReport,
+			Filter:                       filter,
+			Cleanup:                      cleanup,
+			NoRestart:                    noRestart,
+			MonitorOnly:                  monitorOnly,
+			LifecycleHooks:               lifecycleHooks,
+			RollingRestart:               rollingRestart,
+			LabelPrecedence:              labelPrecedence,
+			NoPull:                       noPull,
+			Timeout:                      timeout,
+			LifecycleUID:                 lifecycleUID,
+			LifecycleGID:                 lifecycleGID,
+			CPUCopyMode:                  cpuCopyMode,
+			PullFailureDelay:             time.Duration(0),
+		}
+
+		return actions.RunUpdatesWithNotifications(params)
 	}
 )
 

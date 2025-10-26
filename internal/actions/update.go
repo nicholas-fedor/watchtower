@@ -54,7 +54,7 @@ var (
 //
 // Parameters:
 //   - client: Container client for interacting with Docker API.
-//   - params: Update options specifying behavior like cleanup, restart, and filtering.
+//   - config: UpdateConfig specifying behavior like cleanup, restart, and filtering.
 //
 // Returns:
 //   - types.Report: Session report summarizing scanned, updated, and failed containers.
@@ -62,7 +62,7 @@ var (
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(
 	client container.Client,
-	params types.UpdateParams,
+	config UpdateConfig,
 ) (types.Report, map[types.ImageID]bool, error) {
 	// Initialize logging for the update process start.
 	logrus.Debug("Starting container update check")
@@ -75,6 +75,23 @@ func Update(
 	cleanupImageIDs := make(map[types.ImageID]bool)
 	// Track if Watchtower self-update pull failed to add safeguard delay.
 	watchtowerPullFailed := false
+
+	// Map UpdateConfig to types.UpdateParams for internal use.
+	params := types.UpdateParams{
+		Filter:           config.Filter,
+		Cleanup:          config.Cleanup,
+		NoRestart:        config.NoRestart,
+		Timeout:          config.Timeout,
+		MonitorOnly:      config.MonitorOnly,
+		LifecycleHooks:   config.LifecycleHooks,
+		RollingRestart:   config.RollingRestart,
+		LabelPrecedence:  config.LabelPrecedence,
+		NoPull:           config.NoPull,
+		PullFailureDelay: config.PullFailureDelay,
+		LifecycleUID:     config.LifecycleUID,
+		LifecycleGID:     config.LifecycleGID,
+		CPUCopyMode:      config.CPUCopyMode,
+	}
 
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if params.LifecycleHooks {
@@ -149,7 +166,7 @@ func Update(
 					"container_name": sourceContainer.Name(),
 					"container_id":   sourceContainer.ID().ShortID(),
 					"image_name":     sourceContainer.ImageName(),
-					"image_id":       sourceContainer.ID().ShortID(),
+					"image_id":       sourceContainer.ImageID().ShortID(),
 				}).Debug("Failed to verify container configuration")
 			}
 		}
@@ -287,18 +304,18 @@ func isInvalidImageName(name string) bool {
 }
 
 // getFallbackImage derives a fallback image name from container info.
-// Uses imageInfo.ID (sanitized) if available, otherwise uses container name with ":latest".
+// Uses sanitized imageInfo.ID if it contains a tag, otherwise uses sanitized container name with ":latest".
 func getFallbackImage(container types.Container) string {
 	if container.HasImageInfo() {
 		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
 		if !strings.Contains(fallback, ":") {
-			return container.Name() + ":latest"
+			return strings.TrimPrefix(container.Name(), "/") + ":latest"
 		}
 
 		return fallback
 	}
 
-	return container.Name() + ":latest"
+	return strings.TrimPrefix(container.Name(), "/") + ":latest"
 }
 
 // parseReference parses a Docker image reference with logging.
@@ -416,8 +433,6 @@ func performRollingRestart(
 	cleanupImageIDs map[types.ImageID]bool,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
-	// Track renamed containers to skip cleanup.
-	renamedContainers := make(map[types.ContainerID]bool)
 
 	// Process containers in reverse order to respect dependency chains.
 	for i := len(containers) - 1; i >= 0; i-- {
@@ -454,10 +469,6 @@ func performRollingRestart(
 					cleanupImageIDs[c.ImageID()] = true
 
 					logrus.WithFields(fields).Info("Updated container")
-				}
-
-				if renamed {
-					renamedContainers[c.ID()] = true
 				}
 			}
 		}
@@ -621,7 +632,7 @@ func restartContainersInSortedOrder(
 
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
-		if stoppedImages[c.SafeImageID()] {
+		if c.IsWatchtower() || stoppedImages[c.SafeImageID()] {
 			_, renamed, err := restartStaleContainer(c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
@@ -713,7 +724,7 @@ func restartStaleContainer(
 				if cleanupErr := client.StopContainer(container, params.Timeout); cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
-						Debug("Failed to remove failed Watchtower container")
+						Debug("Failed to stop failed Watchtower container")
 				}
 			}
 

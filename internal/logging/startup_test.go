@@ -216,7 +216,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 
 		output := buffer.String()
 		gomega.Expect(output).
-			To(gomega.ContainSubstring("Updates via HTTP API enabled. Periodic updates are not enabled"))
+			To(gomega.ContainSubstring("HTTP API enabled and periodic updates disabled"))
 	})
 
 	ginkgo.It("should log HTTP API with periodic polls", func() {
@@ -228,7 +228,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 
 		output := buffer.String()
 		gomega.Expect(output).
-			To(gomega.ContainSubstring("Updates via HTTP API enabled. Periodic updates are also enabled"))
+			To(gomega.ContainSubstring("HTTP API and periodic updates enabled"))
 	})
 
 	ginkgo.It("should log default periodic updates", func() {

@@ -160,7 +160,7 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	// Check if running in one-time update mode.
 	runOnce, _ := c.PersistentFlags().GetBool("run-once")
 	if runOnce {
-		log.Info("Running a one time update.")
+		log.Info("Running a one time update")
 
 		return
 	}
@@ -169,7 +169,7 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
 	if updateOnStart {
 		log.Info(
-			"Update on startup enabled - performing immediate check, then scheduling periodic updates.",
+			"Update on startup enabled: Performing immediate check",
 		)
 	}
 
@@ -180,9 +180,9 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	// Handle HTTP API update configurations.
 	if httpAPI {
 		if periodicPolls {
-			log.Info("Updates via HTTP API enabled. Periodic updates are also enabled.")
+			log.Info("HTTP API and periodic updates enabled")
 		} else {
-			log.Info("Updates via HTTP API enabled. Periodic updates are not enabled.")
+			log.Info("HTTP API enabled and periodic updates disabled")
 
 			return
 		}
@@ -201,6 +201,6 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 
 	// Default periodic updates are enabled.
 	if !updateOnStart && !httpAPI && sched.IsZero() {
-		log.Info("Periodic updates are enabled with default schedule.")
+		log.Info("Periodic updates are enabled with default schedule")
 	}
 }

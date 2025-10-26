@@ -25,6 +25,7 @@ type TestData struct {
 	TriedToRemoveImageCount      int               // Number of times RemoveImageByID was called.
 	RenameContainerCount         int               // Number of times RenameContainer was called.
 	StopContainerCount           int               // Number of times StopContainer was called.
+	StartContainerCount          int               // Number of times StartContainer was called.
 	IsContainerStaleCount        int               // Number of times IsContainerStale was called.
 	WaitForContainerHealthyCount int               // Number of times WaitForContainerHealthy was called.
 	NameOfContainerToKeep        string            // Name of the container to avoid stopping.
@@ -83,7 +84,8 @@ func (client MockClient) ListAllContainers() ([]types.Container, error) {
 // and returns nil for simplicity.
 func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount++
-	if client.TestData.StopContainerError != nil && client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
+	if client.TestData.StopContainerError != nil &&
+		client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
 		return client.TestData.StopContainerError
 	}
 	client.Stopped[string(c.ID())] = true
@@ -96,10 +98,11 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 	return !client.Stopped[string(c.ID())]
 }
 
-// StartContainer simulates starting a container, returning an empty ID and no error.
+// StartContainer simulates starting a container, returning the container's ID and no error.
 // It provides a minimal implementation for testing purposes.
-func (client MockClient) StartContainer(_ types.Container) (types.ContainerID, error) {
-	return "", nil
+func (client MockClient) StartContainer(c types.Container) (types.ContainerID, error) {
+	client.TestData.StartContainerCount++
+	return c.ID(), nil
 }
 
 // RenameContainer simulates renaming a container, incrementing the RenameContainerCount.

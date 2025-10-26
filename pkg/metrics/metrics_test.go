@@ -31,7 +31,6 @@ func TestNewMetric(t *testing.T) {
 					mock := mocks.NewMockReport(t)
 					mock.EXPECT().Scanned().Return([]types.ContainerReport{})
 					mock.EXPECT().Updated().Return([]types.ContainerReport{})
-					mock.EXPECT().Stale().Return([]types.ContainerReport{})
 					mock.EXPECT().Failed().Return([]types.ContainerReport{})
 
 					return mock
@@ -50,7 +49,6 @@ func TestNewMetric(t *testing.T) {
 					mock := mocks.NewMockReport(t)
 					mock.EXPECT().Scanned().Return(make([]types.ContainerReport, 3))
 					mock.EXPECT().Updated().Return(make([]types.ContainerReport, 1))
-					mock.EXPECT().Stale().Return(make([]types.ContainerReport, 2))
 					mock.EXPECT().Failed().Return(make([]types.ContainerReport, 1))
 
 					return mock
@@ -58,7 +56,7 @@ func TestNewMetric(t *testing.T) {
 			},
 			want: &Metric{
 				Scanned: 3,
-				Updated: 3, // 1 Updated + 2 Stale (for backwards compatibility)
+				Updated: 1, // Only count actually updated containers
 				Failed:  1,
 			},
 		},
@@ -163,6 +161,8 @@ func TestDefault(t *testing.T) {
 
 	got := Default()
 
+	t.Cleanup(func() { got.Shutdown() })
+
 	tests := []struct {
 		name string
 	}{
@@ -202,9 +202,88 @@ func TestDefault(t *testing.T) {
 				t.Errorf("Default().skipped is nil")
 			}
 
+			if got.dropped == nil {
+				t.Errorf("Default().dropped is nil")
+			}
+
 			gotAgain := Default()
 			if got != gotAgain {
 				t.Errorf("Default() did not return singleton: got %p, gotAgain %p", got, gotAgain)
+			}
+		})
+	}
+}
+
+func TestNewWithRegistry(t *testing.T) {
+	tests := []struct {
+		name string
+	}{
+		{name: "new metrics with registry"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := prometheus.NewRegistry()
+
+			got, err := NewWithRegistry(registry)
+			if err != nil {
+				t.Fatalf("NewWithRegistry() returned error: %v", err)
+			}
+
+			t.Cleanup(func() { got.Shutdown() })
+
+			if got == nil {
+				t.Fatalf("NewWithRegistry() returned nil pointer")
+			}
+
+			if got.channel == nil {
+				t.Errorf("NewWithRegistry().channel is nil")
+			} else if cap(got.channel) != 10 {
+				t.Errorf("NewWithRegistry() channel capacity = %d, want 10", cap(got.channel))
+			}
+
+			if got.scanned == nil {
+				t.Errorf("NewWithRegistry().scanned is nil")
+			}
+
+			if got.updated == nil {
+				t.Errorf("NewWithRegistry().updated is nil")
+			}
+
+			if got.failed == nil {
+				t.Errorf("NewWithRegistry().failed is nil")
+			}
+
+			if got.total == nil {
+				t.Errorf("NewWithRegistry().total is nil")
+			}
+
+			if got.skipped == nil {
+				t.Errorf("NewWithRegistry().skipped is nil")
+			}
+
+			// Gather metrics from the registry and verify registration
+			metricFamilies, err := registry.Gather()
+			if err != nil {
+				t.Fatalf("Failed to gather metrics: %v", err)
+			}
+
+			if len(metricFamilies) != 6 {
+				t.Errorf("Expected 6 metric families registered, got %d", len(metricFamilies))
+			}
+
+			expectedNames := map[string]bool{
+				"watchtower_containers_scanned":    true,
+				"watchtower_containers_updated":    true,
+				"watchtower_containers_failed":     true,
+				"watchtower_scans_total":           true,
+				"watchtower_scans_skipped_total":   true,
+				"watchtower_metrics_dropped_total": true,
+			}
+
+			for _, mf := range metricFamilies {
+				if !expectedNames[*mf.Name] {
+					t.Errorf("Unexpected metric family registered: %s", *mf.Name)
+				}
 			}
 		})
 	}
@@ -251,69 +330,78 @@ func TestRegisterScan(t *testing.T) {
 }
 
 func TestMetrics_HandleUpdate(t *testing.T) {
-	type args struct {
-		channel <-chan *Metric
-	}
-
 	tests := []struct {
 		name string
 		m    *Metrics
-		args args
 	}{
 		{
 			name: "handle valid metric",
-			m: &Metrics{
-				scanned: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_scanned"}),
-				updated: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_updated"}),
-				failed:  promauto.NewGauge(prometheus.GaugeOpts{Name: "test_failed"}),
-				total:   promauto.NewCounter(prometheus.CounterOpts{Name: "test_total"}),
-				skipped: promauto.NewCounter(prometheus.CounterOpts{Name: "test_skipped"}),
-			},
-			args: args{
-				channel: func() chan *Metric {
-					ch := make(chan *Metric, 1)
-					ch <- &Metric{Scanned: 3, Updated: 2, Failed: 1}
+			m: func() *Metrics {
+				reg := prometheus.NewRegistry()
 
-					close(ch)
-
-					return ch
-				}(),
-			},
+				return &Metrics{
+					channel: make(chan *Metric, 1),
+					stopCh:  make(chan struct{}),
+					scanned: promauto.With(reg).
+						NewGauge(prometheus.GaugeOpts{Name: "test_scanned"}),
+					updated: promauto.With(reg).
+						NewGauge(prometheus.GaugeOpts{Name: "test_updated"}),
+					failed: promauto.With(reg).NewGauge(prometheus.GaugeOpts{Name: "test_failed"}),
+					total: promauto.With(reg).
+						NewCounter(prometheus.CounterOpts{Name: "test_total"}),
+					skipped: promauto.With(reg).
+						NewCounter(prometheus.CounterOpts{Name: "test_skipped"}),
+				}
+			}(),
 		},
 		{
 			name: "handle nil metric (skipped)",
-			m: &Metrics{
-				scanned: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_scanned_skip"}),
-				updated: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_updated_skip"}),
-				failed:  promauto.NewGauge(prometheus.GaugeOpts{Name: "test_failed_skip"}),
-				total:   promauto.NewCounter(prometheus.CounterOpts{Name: "test_total_skip"}),
-				skipped: promauto.NewCounter(prometheus.CounterOpts{Name: "test_skipped_skip"}),
-			},
-			args: args{
-				channel: func() chan *Metric {
-					ch := make(chan *Metric, 1)
-					ch <- nil
+			m: func() *Metrics {
+				reg := prometheus.NewRegistry()
 
-					close(ch)
-
-					return ch
-				}(),
-			},
+				return &Metrics{
+					channel: make(chan *Metric, 1),
+					stopCh:  make(chan struct{}),
+					scanned: promauto.With(reg).
+						NewGauge(prometheus.GaugeOpts{Name: "test_scanned_skip"}),
+					updated: promauto.With(reg).
+						NewGauge(prometheus.GaugeOpts{Name: "test_updated_skip"}),
+					failed: promauto.With(reg).
+						NewGauge(prometheus.GaugeOpts{Name: "test_failed_skip"}),
+					total: promauto.With(reg).
+						NewCounter(prometheus.CounterOpts{Name: "test_total_skip"}),
+					skipped: promauto.With(reg).
+						NewCounter(prometheus.CounterOpts{Name: "test_skipped_skip"}),
+				}
+			}(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Run HandleUpdate in a goroutine and wait briefly for it to process
-			go tt.m.HandleUpdate(tt.args.channel)
+			// Run HandleUpdate and deterministically wait for completion
+			done := make(chan struct{})
 
-			time.Sleep(100 * time.Millisecond) // Allow time for processing
+			go func() {
+				tt.m.HandleUpdate()
+				close(done)
+			}()
 
-			// Check Prometheus metrics (simplified check since we can't directly access values easily in tests)
-			if len(tt.args.channel) > 0 {
-				t.Errorf("HandleUpdate did not consume all metrics from channel")
+			// Send metric to channel
+			if tt.name == "handle valid metric" {
+				tt.m.channel <- &Metric{Scanned: 3, Updated: 2, Failed: 1}
+			} else {
+				tt.m.channel <- nil
 			}
-			// Note: Full verification requires inspecting Prometheus metric values, which is complex in unit tests.
-			// Here, we assume HandleUpdate processes the channel correctly if it doesn't block or panic.
+
+			// Close stopCh to signal shutdown
+			close(tt.m.stopCh)
+
+			select {
+			case <-done:
+				// processed to completion
+			case <-time.After(1 * time.Second):
+				t.Fatal("HandleUpdate timed out")
+			}
 		})
 	}
 }

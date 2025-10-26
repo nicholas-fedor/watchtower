@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -28,6 +29,9 @@ const shoutrrrType = "shoutrrr"
 //
 // It sets a reasonable default for expected log entry batch sizes.
 const initialEntriesCapacity = 10
+
+// maxURLLengthForLogging defines the maximum length of URLs displayed in logs to avoid exposing sensitive information.
+const maxURLLengthForLogging = 50
 
 // LocalLog is a logrus logger that does not send entries as notifications.
 //
@@ -59,6 +63,7 @@ type shoutrrrTypeNotifier struct {
 	data           StaticData            // Static notification data.
 	receiving      bool                  // Tracks if receiving logs.
 	delay          time.Duration         // Delay between sends.
+	once           sync.Once             // Ensures AddLogHook executes only once.
 }
 
 // GetScheme extracts the scheme from a Shoutrrr URL.
@@ -102,17 +107,15 @@ func (n *shoutrrrTypeNotifier) GetURLs() []string {
 //
 // It starts a send goroutine if not already active.
 func (n *shoutrrrTypeNotifier) AddLogHook() {
-	if n.receiving {
-		return
-	}
+	n.once.Do(func() {
+		n.receiving = true
+		logrus.AddHook(n)
+		LocalLog.WithField("urls", n.Urls).
+			Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
 
-	n.receiving = true
-	logrus.AddHook(n)
-	LocalLog.WithField("urls", n.Urls).
-		Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
-
-	// Send using a separate goroutine to avoid blocking the main process.
-	go sendNotifications(n)
+		// Send using a separate goroutine to avoid blocking the main process.
+		go sendNotifications(n)
+	})
 }
 
 // createNotifier initializes a Shoutrrr notifier.
@@ -187,16 +190,101 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 	for msg := range notifier.messages {
 		LocalLog.WithField("message", msg).Debug("Sending notification")
 		time.Sleep(notifier.delay)
+
+		// Diagnostic logging: Log attempt details before sending
+		LocalLog.WithFields(logrus.Fields{
+			"total_urls": len(notifier.Urls),
+			"delay":      notifier.delay.String(),
+			"msg_length": len(msg),
+		}).Trace("Attempting to send notification to configured services")
+
 		errs := notifier.Router.Send(msg, notifier.params)
 
+		failureCount := 0
+
+		var authFailures, networkFailures, rateLimitFailures int
+
 		for i, err := range errs {
-			if err != nil {
-				scheme := GetScheme(notifier.Urls[i])
+			// Index guard against potential errs/Urls length mismatch
+			if i >= len(notifier.Urls) {
 				LocalLog.WithFields(logrus.Fields{
-					"service": scheme,
-					"index":   i,
-				}).WithError(err).Error("Failed to send shoutrrr notification")
+					"index":        i,
+					"urls_length":  len(notifier.Urls),
+					"errs_length":  len(errs),
+					"failure_type": "index_mismatch",
+				}).WithError(err).Error("Error index out of bounds for URLs slice")
+
+				continue
 			}
+
+			if err != nil {
+				failureCount++
+				scheme := GetScheme(notifier.Urls[i])
+				sanitizedURL := sanitizeURLForLogging(notifier.Urls[i])
+
+				// Diagnostic logging: Categorize failure types
+				errStr := err.Error()
+
+				errStrLower := strings.ToLower(errStr) // Compute lowercase once for efficiency
+				switch {
+				case strings.Contains(errStrLower, "unauthorized") ||
+					strings.Contains(errStrLower, "authentication") ||
+					strings.Contains(errStrLower, "invalid token") ||
+					strings.Contains(errStrLower, "invalid api") ||
+					strings.Contains(errStrLower, "invalid key") ||
+					strings.Contains(errStrLower, "invalid credentials"):
+					authFailures++
+
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          sanitizedURL,
+						"failure_type": "authentication",
+					}).WithError(err).Warn("Authentication failure detected - check API keys/tokens")
+				case strings.Contains(errStrLower, "timeout") ||
+					strings.Contains(errStrLower, "connection") ||
+					strings.Contains(errStrLower, "network"):
+					networkFailures++
+
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          sanitizedURL,
+						"failure_type": "network",
+					}).WithError(err).Warn("Network connectivity failure detected - check internet connection")
+				case strings.Contains(errStrLower, "rate limit") ||
+					strings.Contains(errStrLower, "too many requests"):
+					rateLimitFailures++
+
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          sanitizedURL,
+						"failure_type": "rate_limit",
+					}).WithError(err).Warn("Rate limiting detected - consider increasing delays or reducing frequency")
+				default:
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          sanitizedURL,
+						"failure_type": "unknown",
+					}).WithError(err).Error("Failed to send shoutrrr notification - no retry logic implemented")
+				}
+			}
+		}
+
+		// Diagnostic logging: Summary with categorized failures
+		if failureCount > 0 {
+			LocalLog.WithFields(logrus.Fields{
+				"total_urls":          len(notifier.Urls),
+				"failed_count":        failureCount,
+				"success_count":       len(notifier.Urls) - failureCount,
+				"auth_failures":       authFailures,
+				"network_failures":    networkFailures,
+				"rate_limit_failures": rateLimitFailures,
+			}).Warn("Notification send completed with failures - consider implementing retry logic for transient errors")
+		} else if len(notifier.Urls) > 0 {
+			LocalLog.WithField("total_urls", len(notifier.Urls)).Debug("Notification send completed successfully")
 		}
 	}
 
@@ -402,4 +490,55 @@ func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, err
 	}
 
 	return tpl, nil
+}
+
+// safeTruncate truncates a string to a maximum length for logging, appending "..." if truncated.
+// Uses rune-aware truncation to avoid breaking UTF-8 sequences.
+// If the string is shorter than or equal to maxURLLengthForLogging, returns it unchanged.
+//
+// Parameters:
+//   - s: String to truncate.
+//
+// Returns:
+//   - string: Truncated string or original if no truncation needed.
+func safeTruncate(s string) string {
+	runes := []rune(s)
+	if len(runes) <= maxURLLengthForLogging {
+		return s
+	}
+
+	return string(runes[:maxURLLengthForLogging]) + "..."
+}
+
+// sanitizeURLForLogging removes credentials and query parameters from URLs before truncating.
+// Falls back to safeTruncate on parse errors to ensure safe logging.
+//
+// Parameters:
+//   - rawURL: URL string to sanitize.
+//
+// Returns:
+//   - string: Sanitized and truncated URL safe for logging.
+func sanitizeURLForLogging(rawURL string) string {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		// Fallback to safe truncation if URL parsing fails
+		return safeTruncate(rawURL)
+	}
+
+	// Remove user info (credentials)
+	parsedURL.User = nil
+
+	// Remove query parameters
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+
+	// Remove path and opaque data (tokens/webhook IDs often live here)
+	parsedURL.Path = ""
+	parsedURL.RawPath = ""
+	parsedURL.Opaque = ""
+
+	// Reconstruct the URL without sensitive parts
+	sanitized := parsedURL.String()
+
+	return safeTruncate(sanitized)
 }
