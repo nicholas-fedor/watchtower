@@ -31,7 +31,6 @@ func TestNewMetric(t *testing.T) {
 					mock := mocks.NewMockReport(t)
 					mock.EXPECT().Scanned().Return([]types.ContainerReport{})
 					mock.EXPECT().Updated().Return([]types.ContainerReport{})
-					mock.EXPECT().Stale().Return([]types.ContainerReport{})
 					mock.EXPECT().Failed().Return([]types.ContainerReport{})
 
 					return mock
@@ -50,7 +49,6 @@ func TestNewMetric(t *testing.T) {
 					mock := mocks.NewMockReport(t)
 					mock.EXPECT().Scanned().Return(make([]types.ContainerReport, 3))
 					mock.EXPECT().Updated().Return(make([]types.ContainerReport, 1))
-					mock.EXPECT().Stale().Return(make([]types.ContainerReport, 2))
 					mock.EXPECT().Failed().Return(make([]types.ContainerReport, 1))
 
 					return mock
@@ -58,7 +56,7 @@ func TestNewMetric(t *testing.T) {
 			},
 			want: &Metric{
 				Scanned: 3,
-				Updated: 3, // 1 Updated + 2 Stale (for backwards compatibility)
+				Updated: 1, // Only count actually updated containers
 				Failed:  1,
 			},
 		},

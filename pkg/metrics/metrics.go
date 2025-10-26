@@ -38,7 +38,7 @@ type Metrics struct {
 func NewMetric(report types.Report) *Metric {
 	return &Metric{
 		Scanned: len(report.Scanned()),
-		Updated: len(report.Updated()) + len(report.Stale()), // Includes stale for compatibility.
+		Updated: len(report.Updated()), // Only count actually updated containers.
 		Failed:  len(report.Failed()),
 	}
 }

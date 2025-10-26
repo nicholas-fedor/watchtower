@@ -13,6 +13,8 @@ var commonTemplates = map[string]string{
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Container updated" -}}
+    Updated container: {{$e.Data.container}} ({{$e.Data.image}}): {{$e.Data.old_id}} updated to {{$e.Data.new_id}}
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}

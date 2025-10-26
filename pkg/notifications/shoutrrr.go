@@ -29,6 +29,9 @@ const shoutrrrType = "shoutrrr"
 // It sets a reasonable default for expected log entry batch sizes.
 const initialEntriesCapacity = 10
 
+// maxURLLengthForLogging defines the maximum length of URLs displayed in logs to avoid exposing sensitive information.
+const maxURLLengthForLogging = 50
+
 // LocalLog is a logrus logger that does not send entries as notifications.
 //
 // It’s used for internal logging to avoid notification loops.
@@ -187,16 +190,83 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 	for msg := range notifier.messages {
 		LocalLog.WithField("message", msg).Debug("Sending notification")
 		time.Sleep(notifier.delay)
+
+		// Diagnostic logging: Log attempt details before sending
+		LocalLog.WithFields(logrus.Fields{
+			"total_urls": len(notifier.Urls),
+			"delay":      notifier.delay.String(),
+			"msg_length": len(msg),
+		}).Debug("Attempting to send notification to configured services")
+
 		errs := notifier.Router.Send(msg, notifier.params)
+
+		failureCount := 0
+
+		var authFailures, networkFailures, rateLimitFailures int
 
 		for i, err := range errs {
 			if err != nil {
+				failureCount++
 				scheme := GetScheme(notifier.Urls[i])
-				LocalLog.WithFields(logrus.Fields{
-					"service": scheme,
-					"index":   i,
-				}).WithError(err).Error("Failed to send shoutrrr notification")
+
+				// Diagnostic logging: Categorize failure types
+				errStr := err.Error()
+				switch {
+				case strings.Contains(strings.ToLower(errStr), "unauthorized") ||
+					strings.Contains(strings.ToLower(errStr), "authentication") ||
+					strings.Contains(strings.ToLower(errStr), "invalid"):
+					authFailures++
+
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"failure_type": "authentication",
+					}).WithError(err).Warn("Authentication failure detected - check API keys/tokens")
+				case strings.Contains(strings.ToLower(errStr), "timeout") ||
+					strings.Contains(strings.ToLower(errStr), "connection") ||
+					strings.Contains(strings.ToLower(errStr), "network"):
+					networkFailures++
+
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"failure_type": "network",
+					}).WithError(err).Warn("Network connectivity failure detected - check internet connection")
+				case strings.Contains(strings.ToLower(errStr), "rate limit") ||
+					strings.Contains(strings.ToLower(errStr), "too many requests"):
+					rateLimitFailures++
+
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"failure_type": "rate_limit",
+					}).WithError(err).Warn("Rate limiting detected - consider increasing delays or reducing frequency")
+				default:
+					LocalLog.WithFields(logrus.Fields{
+						"service":      scheme,
+						"index":        i,
+						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"failure_type": "unknown",
+					}).WithError(err).Error("Failed to send shoutrrr notification - no retry logic implemented")
+				}
 			}
+		}
+
+		// Diagnostic logging: Summary with categorized failures
+		if failureCount > 0 {
+			LocalLog.WithFields(logrus.Fields{
+				"total_urls":          len(notifier.Urls),
+				"failed_count":        failureCount,
+				"success_count":       len(notifier.Urls) - failureCount,
+				"auth_failures":       authFailures,
+				"network_failures":    networkFailures,
+				"rate_limit_failures": rateLimitFailures,
+			}).Warn("Notification send completed with failures - consider implementing retry logic for transient errors")
+		} else if len(notifier.Urls) > 0 {
+			LocalLog.WithField("total_urls", len(notifier.Urls)).Debug("Notification send completed successfully")
 		}
 	}
 

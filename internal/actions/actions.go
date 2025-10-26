@@ -48,11 +48,12 @@ func RunUpdatesWithNotifications(
 	lifecycleUID, lifecycleGID int,
 	cpuCopyMode string,
 ) *metrics.Metric {
+	logrus.Debug("Starting RunUpdatesWithNotifications")
 	// Start batching notifications to group update messages, if notifier is initialized
 	if notifier != nil {
 		notifier.StartNotification()
 	} else {
-		logrus.Warn("Notifier is nil, skipping notification batching")
+		logrus.Debug("Notifier is nil, skipping notification batching")
 	}
 
 	// Configure update parameters based on provided flags and settings.
@@ -71,10 +72,24 @@ func RunUpdatesWithNotifications(
 		CPUCopyMode:     cpuCopyMode,
 	}
 
+	logrus.Debug("About to call Update function")
 	// Execute the update action, capturing results and image IDs for cleanup.
 	result, cleanupImageIDs, err := Update(client, updateParams)
+
+	logrus.Debug("Update function returned, about to check cleanup")
+
 	if err != nil {
 		logrus.WithError(err).Error("Update execution failed")
+
+		return &metrics.Metric{
+			Scanned: 0,
+			Updated: 0,
+			Failed:  0,
+		}
+	}
+
+	if result == nil {
+		logrus.Debug("Update result is nil, returning zero metric")
 
 		return &metrics.Metric{
 			Scanned: 0,
@@ -101,8 +116,11 @@ func RunUpdatesWithNotifications(
 		"updated_names": updatedNames,
 	}).Debug("Report before notification")
 
-	// Send the batched notification with update results, if notifier and result are initialized
-	if notifier != nil && result != nil {
+	logrus.Debug("About to send notifications")
+
+	// Send the batched notification with update results, if notifier is initialized
+	// (result is guaranteed non-nil at this point due to earlier nil check)
+	if notifier != nil {
 		if notificationSplitByContainer {
 			// Notification splitting by container is enabled - send separate notifications for each container
 			// instead of a single grouped notification. This provides more granular notifications when
@@ -117,9 +135,7 @@ func RunUpdatesWithNotifications(
 					// but include all other session results for comprehensive context.
 					singleContainerReport := &session.SingleContainerReport{
 						UpdatedReports: []types.ContainerReport{updatedContainer},
-						ScannedReports: []types.ContainerReport{
-							updatedContainer,
-						}, // Include all scanned for context
+						ScannedReports: result.Scanned(), // Include all scanned for context
 						FailedReports:  result.Failed(),  // Include all failed for context
 						SkippedReports: result.Skipped(), // Include all skipped for context
 						StaleReports:   result.Stale(),   // Include all stale for context
@@ -127,37 +143,80 @@ func RunUpdatesWithNotifications(
 					}
 					notifier.SendNotification(singleContainerReport)
 				}
-			} else if !notificationReport {
-				// In log mode: Send separate notifications for each container that had "Found new image" logs.
-				// This handles cases where containers may not have been updated (e.g., monitor-only mode)
-				// but still triggered relevant log entries that should be notified separately.
-				entries := notifier.GetEntries()
-				containerNames := make(map[string]bool)
+			} else if !notificationReport && len(result.Updated()) > 0 {
+				// In log mode: Send separate notifications for each container that was actually updated.
+				// Create synthetic log entries to maintain proper container splitting while preventing duplicates.
+				// This replaces the previous SendNotification approach with SendFilteredEntries to ensure
+				// log-based notifications without duplication from stale containers.
+				for _, updatedContainer := range result.Updated() {
+					if updatedContainer == nil {
+						logrus.Debug("Encountered nil updated container report, skipping")
 
-				// Extract unique container names from log entries that indicate new images were found.
-				// This ensures we only send notifications for containers that actually had update activity.
-				for _, entry := range entries {
-					if strings.Contains(entry.Message, "Found new image") {
-						if containerName, ok := entry.Data["container"].(string); ok {
-							containerNames[containerName] = true
-						}
-					}
-				}
-
-				// For each container with update activity, filter and send only its relevant log entries.
-				// This prevents mixing logs from different containers in the same notification.
-				for containerName := range containerNames {
-					filteredEntries := make([]*logrus.Entry, 0)
-
-					for _, entry := range entries {
-						if cn, ok := entry.Data["container"].(string); ok && cn == containerName {
-							filteredEntries = append(filteredEntries, entry)
-						}
+						continue
 					}
 
-					notifier.SendFilteredEntries(filteredEntries, nil)
+					if strings.TrimSpace(updatedContainer.Name()) == "" {
+						logrus.Debug("Encountered container with empty name, skipping notification")
+
+						continue
+					}
+
+					logrus.WithFields(logrus.Fields{
+						"container": updatedContainer.Name(),
+						"image":     updatedContainer.ImageName(),
+					}).Debug("Sending individual notification for updated container")
+
+					// Create a minimal report focused on this specific updated container,
+					// but include all other session results for comprehensive context.
+					singleContainerReport := &session.SingleContainerReport{
+						UpdatedReports: []types.ContainerReport{updatedContainer},
+						ScannedReports: result.Scanned(), // Include all scanned for context
+						FailedReports:  result.Failed(),  // Include all failed for context
+						SkippedReports: result.Skipped(), // Include all skipped for context
+						StaleReports:   result.Stale(),   // Include all stale for context
+						FreshReports:   result.Fresh(),   // Include all fresh for context
+					}
+
+					// Create synthetic log entries for the updated container with granular details
+					entries := []*logrus.Entry{
+						{
+							Level:   logrus.InfoLevel,
+							Message: "Found new image",
+							Data: logrus.Fields{
+								"container": updatedContainer.Name(),
+								"image":     updatedContainer.ImageName(),
+								"new_id":    updatedContainer.LatestImageID().ShortID(),
+							},
+							Time: time.Now(),
+						},
+						{
+							Level:   logrus.InfoLevel,
+							Message: "Stopping container",
+							Data: logrus.Fields{
+								"container": updatedContainer.Name(),
+								"id":        updatedContainer.ID().ShortID(),
+								"old_id":    updatedContainer.CurrentImageID().ShortID(),
+							},
+							Time: time.Now(),
+						},
+						{
+							Level:   logrus.InfoLevel,
+							Message: "Started new container",
+							Data: logrus.Fields{
+								"container": updatedContainer.Name(),
+								"id":        updatedContainer.ID().ShortID(),
+								"new_id":    updatedContainer.LatestImageID().ShortID(),
+							},
+							Time: time.Now(),
+						},
+					}
+
+					// Send the synthetic log entries via SendFilteredEntries to maintain log mode behavior
+					notifier.SendFilteredEntries(entries, singleContainerReport)
 				}
 			}
+
+			logrus.Debug("About to return metric")
 		} else {
 			// Standard behavior: Send a single grouped notification containing all session results
 			notifier.SendNotification(result)
