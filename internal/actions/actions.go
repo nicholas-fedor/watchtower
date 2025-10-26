@@ -115,7 +115,7 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 		LabelPrecedence:  params.LabelPrecedence,
 		NoPull:           params.NoPull,
 		Timeout:          params.Timeout,
-		PullFailureDelay: params.Timeout,
+		PullFailureDelay: params.PullFailureDelay,
 		LifecycleUID:     params.LifecycleUID,
 		LifecycleGID:     params.LifecycleGID,
 		CPUCopyMode:      params.CPUCopyMode,
