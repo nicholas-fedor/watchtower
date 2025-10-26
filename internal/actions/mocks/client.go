@@ -83,7 +83,8 @@ func (client MockClient) ListAllContainers() ([]types.Container, error) {
 // and returns nil for simplicity.
 func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount++
-	if client.TestData.StopContainerError != nil && client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
+	if client.TestData.StopContainerError != nil &&
+		client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
 		return client.TestData.StopContainerError
 	}
 	client.Stopped[string(c.ID())] = true

@@ -220,7 +220,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					LocalLog.WithFields(logrus.Fields{
 						"service":      scheme,
 						"index":        i,
-						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"url":          safeTruncate(notifier.Urls[i]),
 						"failure_type": "authentication",
 					}).WithError(err).Warn("Authentication failure detected - check API keys/tokens")
 				case strings.Contains(strings.ToLower(errStr), "timeout") ||
@@ -231,7 +231,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					LocalLog.WithFields(logrus.Fields{
 						"service":      scheme,
 						"index":        i,
-						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"url":          safeTruncate(notifier.Urls[i]),
 						"failure_type": "network",
 					}).WithError(err).Warn("Network connectivity failure detected - check internet connection")
 				case strings.Contains(strings.ToLower(errStr), "rate limit") ||
@@ -241,14 +241,14 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					LocalLog.WithFields(logrus.Fields{
 						"service":      scheme,
 						"index":        i,
-						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"url":          safeTruncate(notifier.Urls[i]),
 						"failure_type": "rate_limit",
 					}).WithError(err).Warn("Rate limiting detected - consider increasing delays or reducing frequency")
 				default:
 					LocalLog.WithFields(logrus.Fields{
 						"service":      scheme,
 						"index":        i,
-						"url":          notifier.Urls[i][:min(maxURLLengthForLogging, len(notifier.Urls[i]))] + "...",
+						"url":          safeTruncate(notifier.Urls[i]),
 						"failure_type": "unknown",
 					}).WithError(err).Error("Failed to send shoutrrr notification - no retry logic implemented")
 				}
@@ -472,4 +472,20 @@ func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, err
 	}
 
 	return tpl, nil
+}
+
+// safeTruncate truncates a string to a maximum length for logging, appending "..." if truncated.
+// If the string is shorter than or equal to maxURLLengthForLogging, returns it unchanged.
+//
+// Parameters:
+//   - s: String to truncate.
+//
+// Returns:
+//   - string: Truncated string or original if no truncation needed.
+func safeTruncate(s string) string {
+	if len(s) <= maxURLLengthForLogging {
+		return s
+	}
+
+	return s[:maxURLLengthForLogging] + "..."
 }
