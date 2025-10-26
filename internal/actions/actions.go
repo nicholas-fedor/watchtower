@@ -104,6 +104,12 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 	// Initiate notification batching
 	startNotifications(params.Notifier)
 
+	defer func() {
+		if params.Notifier != nil {
+			params.Notifier.Close()
+		}
+	}()
+
 	// Configure update parameters based on provided flags
 	updateConfig := UpdateConfig{
 		Filter:           params.Filter,
@@ -141,10 +147,6 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 		params.NotificationReport,
 		result,
 	)
-
-	if params.Notifier != nil {
-		params.Notifier.Close()
-	}
 
 	// Generate and return metric summarizing the session
 	return generateAndLogMetric(result)
