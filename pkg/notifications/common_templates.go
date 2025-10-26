@@ -22,15 +22,15 @@ var commonTemplates = map[string]string{
 {{- $msg := $e.Message -}}
 {{- /* Format based on specific message types */ -}}
 {{- if eq $msg "Found new image" -}}
-    Found new image: {{$e.Data.image}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
+    Found new image: {{index $e.Data "image"}} ({{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Stopping container" -}}
-    Stopped stale container: {{$e.Data.container}} ({{with $e.Data.id}}{{.}}{{else}}unknown{{end}})
+    Stopped stale container: {{index $e.Data "container"}} ({{with (index $e.Data "id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Started new container" -}}
-    Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
+    Started new container: {{index $e.Data "container"}} ({{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
-    Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+    Removed stale image: {{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Container updated" -}}
-    Updated container: {{with $e.Data.container}}{{.}}{{else}}unknown{{end}} ({{with $e.Data.image}}{{.}}{{else}}unknown{{end}}): {{with $e.Data.old_id}}{{.}}{{else}}unknown{{end}} updated to {{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}}
+    Updated container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}): {{with (index $e.Data "old_id")}}{{.}}{{else}}unknown{{end}} updated to {{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}

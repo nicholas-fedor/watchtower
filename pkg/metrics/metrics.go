@@ -3,6 +3,10 @@
 package metrics
 
 import (
+	"errors"
+	"fmt"
+	"sync"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -19,12 +23,14 @@ type Metric struct {
 
 // Metrics handles processing and exposing scan metrics.
 type Metrics struct {
-	channel chan *Metric       // Channel for queuing metrics.
-	scanned prometheus.Gauge   // Gauge for scanned containers.
-	updated prometheus.Gauge   // Gauge for updated containers.
-	failed  prometheus.Gauge   // Gauge for failed containers.
-	total   prometheus.Counter // Counter for total scans.
-	skipped prometheus.Counter // Counter for skipped scans.
+	channel      chan *Metric       // Channel for queuing metrics.
+	scanned      prometheus.Gauge   // Gauge for scanned containers.
+	updated      prometheus.Gauge   // Gauge for updated containers.
+	failed       prometheus.Gauge   // Gauge for failed containers.
+	total        prometheus.Counter // Counter for total scans.
+	skipped      prometheus.Counter // Counter for skipped scans.
+	stopCh       chan struct{}      // Channel for shutdown signaling.
+	shutdownOnce sync.Once          // Ensures shutdown is called only once.
 }
 
 // NewMetric creates a Metric from a scan report.
@@ -34,8 +40,8 @@ type Metrics struct {
 //   - registry: Prometheus registerer to use for metric registration.
 //
 // Returns:
-//   - *Metrics: Metrics handler with Prometheus metrics and goroutine.
-func NewWithRegistry(registry prometheus.Registerer) *Metrics {
+//   - (*Metrics, error): Metrics handler with Prometheus metrics and goroutine, or an error if registration fails.
+func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 	// channelBufferSize sets the metrics channel capacity.
 	const channelBufferSize = 10
 
@@ -62,21 +68,30 @@ func NewWithRegistry(registry prometheus.Registerer) *Metrics {
 			Help: "Number of skipped scans since watchtower started",
 		}),
 		channel: make(chan *Metric, channelBufferSize),
+		stopCh:  make(chan struct{}),
 	}
 
-	// Register the metrics with the provided registry.
-	registry.MustRegister(
+	// Register the metrics with the provided registry, ignoring already registered metrics.
+	metricsList := []prometheus.Collector{
 		metrics.scanned,
 		metrics.updated,
 		metrics.failed,
 		metrics.total,
 		metrics.skipped,
-	)
+	}
+	for _, m := range metricsList {
+		if err := registry.Register(m); err != nil {
+			alreadyRegisteredError := &prometheus.AlreadyRegisteredError{}
+			if errors.As(err, &alreadyRegisteredError) {
+				return nil, fmt.Errorf("failed to register metric: %w", err)
+			}
+		}
+	}
 
 	// Start goroutine to process metrics.
-	go metrics.HandleUpdate(metrics.channel)
+	go metrics.HandleUpdate()
 
-	return metrics
+	return metrics, nil
 }
 
 // NewMetric creates a Metric from a scan report.
@@ -119,7 +134,12 @@ func Default() *Metrics {
 		return metrics
 	}
 
-	metrics = NewWithRegistry(prometheus.DefaultRegisterer)
+	var err error
+
+	metrics, err = NewWithRegistry(prometheus.DefaultRegisterer)
+	if err != nil {
+		panic(err)
+	}
 
 	return metrics
 }
@@ -132,26 +152,37 @@ func (m *Metrics) RegisterScan(metric *Metric) {
 	m.Register(metric)
 }
 
-// HandleUpdate processes metrics from the channel.
-//
-// Parameters:
-//   - channel: Channel to dequeue metrics from.
-func (m *Metrics) HandleUpdate(channel <-chan *Metric) {
-	for change := range channel {
-		if change == nil {
-			// Update was skipped and rescheduled
-			m.total.Inc()
-			m.skipped.Inc()
-			m.scanned.Set(0)
-			m.updated.Set(0)
-			m.failed.Set(0)
+// Shutdown gracefully stops the metrics processing goroutine.
+// It closes the stopCh channel to signal the goroutine to exit.
+// This method is idempotent and can be called multiple times safely.
+func (m *Metrics) Shutdown() {
+	m.shutdownOnce.Do(func() {
+		close(m.stopCh)
+	})
+}
 
-			continue
+// HandleUpdate processes metrics from the channel.
+func (m *Metrics) HandleUpdate() {
+	for {
+		select {
+		case change := <-m.channel:
+			if change == nil {
+				// Update was skipped and rescheduled
+				m.total.Inc()
+				m.skipped.Inc()
+				m.scanned.Set(0)
+				m.updated.Set(0)
+				m.failed.Set(0)
+
+				continue
+			}
+			// Update metrics with scan results.
+			m.total.Inc()
+			m.scanned.Set(float64(change.Scanned))
+			m.updated.Set(float64(change.Updated))
+			m.failed.Set(float64(change.Failed))
+		case <-m.stopCh:
+			return
 		}
-		// Update metrics with scan results.
-		m.total.Inc()
-		m.scanned.Set(float64(change.Scanned))
-		m.updated.Set(float64(change.Updated))
-		m.failed.Set(float64(change.Failed))
 	}
 }

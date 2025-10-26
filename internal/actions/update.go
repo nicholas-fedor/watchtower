@@ -166,7 +166,7 @@ func Update(
 					"container_name": sourceContainer.Name(),
 					"container_id":   sourceContainer.ID().ShortID(),
 					"image_name":     sourceContainer.ImageName(),
-					"image_id":       sourceContainer.ID().ShortID(),
+					"image_id":       sourceContainer.ImageID().ShortID(),
 				}).Debug("Failed to verify container configuration")
 			}
 		}
@@ -433,8 +433,6 @@ func performRollingRestart(
 	cleanupImageIDs map[types.ImageID]bool,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
-	// Track renamed containers to skip cleanup.
-	renamedContainers := make(map[types.ContainerID]bool)
 
 	// Process containers in reverse order to respect dependency chains.
 	for i := len(containers) - 1; i >= 0; i-- {
@@ -471,10 +469,6 @@ func performRollingRestart(
 					cleanupImageIDs[c.ImageID()] = true
 
 					logrus.WithFields(fields).Info("Updated container")
-				}
-
-				if renamed {
-					renamedContainers[c.ID()] = true
 				}
 			}
 		}
@@ -638,7 +632,7 @@ func restartContainersInSortedOrder(
 
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
-		if stoppedImages[c.SafeImageID()] {
+		if c.IsWatchtower() || stoppedImages[c.SafeImageID()] {
 			_, renamed, err := restartStaleContainer(c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
@@ -730,7 +724,7 @@ func restartStaleContainer(
 				if cleanupErr := client.StopContainer(container, params.Timeout); cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
-						Debug("Failed to remove failed Watchtower container")
+						Debug("Failed to stop failed Watchtower container")
 				}
 			}
 

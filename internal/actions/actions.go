@@ -355,7 +355,7 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 
 			// Skip containers with empty names
 			if strings.TrimSpace(updatedContainer.Name()) == "" {
-				logrus.Debug("Encountered container with empty name, skipping notification")
+				logrus.WithField("container_id", updatedContainer.ID().ShortID()).Debug("Encountered container with empty name, skipping notification")
 
 				continue
 			}

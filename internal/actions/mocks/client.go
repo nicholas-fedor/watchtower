@@ -25,6 +25,7 @@ type TestData struct {
 	TriedToRemoveImageCount      int               // Number of times RemoveImageByID was called.
 	RenameContainerCount         int               // Number of times RenameContainer was called.
 	StopContainerCount           int               // Number of times StopContainer was called.
+	StartContainerCount          int               // Number of times StartContainer was called.
 	IsContainerStaleCount        int               // Number of times IsContainerStale was called.
 	WaitForContainerHealthyCount int               // Number of times WaitForContainerHealthy was called.
 	NameOfContainerToKeep        string            // Name of the container to avoid stopping.
@@ -100,6 +101,7 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 // StartContainer simulates starting a container, returning an empty ID and no error.
 // It provides a minimal implementation for testing purposes.
 func (client MockClient) StartContainer(_ types.Container) (types.ContainerID, error) {
+	client.TestData.StartContainerCount++
 	return "", nil
 }
 

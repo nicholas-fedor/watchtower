@@ -1184,4 +1184,52 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.BeNumerically(">=", 10*time.Millisecond), "Delay should have been applied")
 		})
 	})
+
+	ginkgo.When("restarting stale Watchtower containers in non-rolling mode", func() {
+		ginkgo.It("should restart stale Watchtower containers even if stop is skipped", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true, // Simulate stale Watchtower
+					},
+				},
+				false,
+				false,
+			)
+
+			report, cleanupImageIDs, err := actions.Update(
+				client,
+				actions.UpdateConfig{
+					Cleanup:     true,
+					Filter:      filters.WatchtowerContainersFilter,
+					CPUCopyMode: "auto",
+				},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
+			gomega.Expect(client.TestData.StopContainerCount).
+				To(gomega.Equal(0), "StopContainer should not be called for Watchtower")
+			gomega.Expect(client.TestData.StartContainerCount).
+				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
+			gomega.Expect(client.TestData.RenameContainerCount).
+				To(gomega.Equal(1), "RenameContainer should be called once")
+		})
+	})
 })

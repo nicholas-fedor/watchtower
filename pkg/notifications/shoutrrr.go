@@ -206,19 +206,19 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 		var authFailures, networkFailures, rateLimitFailures int
 
 		for i, err := range errs {
+			// Index guard against potential errs/Urls length mismatch
+			if i >= len(notifier.Urls) {
+				LocalLog.WithFields(logrus.Fields{
+					"index":        i,
+					"urls_length":  len(notifier.Urls),
+					"errs_length":  len(errs),
+					"failure_type": "index_mismatch",
+				}).WithError(err).Error("Error index out of bounds for URLs slice")
+
+				continue
+			}
+
 			if err != nil {
-				// Index guard against potential errs/Urls length mismatch
-				if i >= len(notifier.Urls) {
-					LocalLog.WithFields(logrus.Fields{
-						"index":        i,
-						"urls_length":  len(notifier.Urls),
-						"errs_length":  len(errs),
-						"failure_type": "index_mismatch",
-					}).WithError(err).Error("Error index out of bounds for URLs slice")
-
-					continue
-				}
-
 				failureCount++
 				scheme := GetScheme(notifier.Urls[i])
 				sanitizedURL := sanitizeURLForLogging(notifier.Urls[i])

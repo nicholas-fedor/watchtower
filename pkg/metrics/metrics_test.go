@@ -217,7 +217,13 @@ func TestNewWithRegistry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := prometheus.NewRegistry()
-			got := NewWithRegistry(registry)
+
+			got, err := NewWithRegistry(registry)
+			if err != nil {
+				t.Fatalf("NewWithRegistry() returned error: %v", err)
+			}
+
+			defer func() { close(got.channel) }()
 
 			if got == nil {
 				t.Fatalf("NewWithRegistry() returned nil pointer")
@@ -247,6 +253,30 @@ func TestNewWithRegistry(t *testing.T) {
 
 			if got.skipped == nil {
 				t.Errorf("NewWithRegistry().skipped is nil")
+			}
+
+			// Gather metrics from the registry and verify registration
+			metricFamilies, err := registry.Gather()
+			if err != nil {
+				t.Fatalf("Failed to gather metrics: %v", err)
+			}
+
+			if len(metricFamilies) != 5 {
+				t.Errorf("Expected 5 metric families registered, got %d", len(metricFamilies))
+			}
+
+			expectedNames := map[string]bool{
+				"watchtower_containers_scanned":  true,
+				"watchtower_containers_updated":  true,
+				"watchtower_containers_failed":   true,
+				"watchtower_scans_total":         true,
+				"watchtower_scans_skipped_total": true,
+			}
+
+			for _, mf := range metricFamilies {
+				if !expectedNames[*mf.Name] {
+					t.Errorf("Unexpected metric family registered: %s", *mf.Name)
+				}
 			}
 		})
 	}
@@ -293,53 +323,32 @@ func TestRegisterScan(t *testing.T) {
 }
 
 func TestMetrics_HandleUpdate(t *testing.T) {
-	type args struct {
-		channel <-chan *Metric
-	}
-
 	tests := []struct {
 		name string
 		m    *Metrics
-		args args
 	}{
 		{
 			name: "handle valid metric",
 			m: &Metrics{
+				channel: make(chan *Metric, 1),
+				stopCh:  make(chan struct{}),
 				scanned: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_scanned"}),
 				updated: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_updated"}),
 				failed:  promauto.NewGauge(prometheus.GaugeOpts{Name: "test_failed"}),
 				total:   promauto.NewCounter(prometheus.CounterOpts{Name: "test_total"}),
 				skipped: promauto.NewCounter(prometheus.CounterOpts{Name: "test_skipped"}),
 			},
-			args: args{
-				channel: func() chan *Metric {
-					ch := make(chan *Metric, 1)
-					ch <- &Metric{Scanned: 3, Updated: 2, Failed: 1}
-
-					close(ch)
-
-					return ch
-				}(),
-			},
 		},
 		{
 			name: "handle nil metric (skipped)",
 			m: &Metrics{
+				channel: make(chan *Metric, 1),
+				stopCh:  make(chan struct{}),
 				scanned: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_scanned_skip"}),
 				updated: promauto.NewGauge(prometheus.GaugeOpts{Name: "test_updated_skip"}),
 				failed:  promauto.NewGauge(prometheus.GaugeOpts{Name: "test_failed_skip"}),
 				total:   promauto.NewCounter(prometheus.CounterOpts{Name: "test_total_skip"}),
 				skipped: promauto.NewCounter(prometheus.CounterOpts{Name: "test_skipped_skip"}),
-			},
-			args: args{
-				channel: func() chan *Metric {
-					ch := make(chan *Metric, 1)
-					ch <- nil
-
-					close(ch)
-
-					return ch
-				}(),
 			},
 		},
 	}
@@ -349,9 +358,19 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 			done := make(chan struct{})
 
 			go func() {
-				tt.m.HandleUpdate(tt.args.channel)
+				tt.m.HandleUpdate()
 				close(done)
 			}()
+
+			// Send metric to channel
+			if tt.name == "handle valid metric" {
+				tt.m.channel <- &Metric{Scanned: 3, Updated: 2, Failed: 1}
+			} else {
+				tt.m.channel <- nil
+			}
+
+			// Close stopCh to signal shutdown
+			close(tt.m.stopCh)
 
 			select {
 			case <-done:
@@ -359,13 +378,6 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 			case <-time.After(1 * time.Second):
 				t.Fatal("HandleUpdate timed out")
 			}
-
-			// Check Prometheus metrics (simplified check since we can't directly access values easily in tests)
-			if len(tt.args.channel) > 0 {
-				t.Errorf("HandleUpdate did not consume all metrics from channel")
-			}
-			// Note: Full verification requires inspecting Prometheus metric values, which is complex in unit tests.
-			// Here, we assume HandleUpdate processes the channel correctly if it doesn't block or panic.
 		})
 	}
 }
