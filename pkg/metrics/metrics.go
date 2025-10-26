@@ -29,6 +29,7 @@ type Metrics struct {
 	failed       prometheus.Gauge   // Gauge for failed containers.
 	total        prometheus.Counter // Counter for total scans.
 	skipped      prometheus.Counter // Counter for skipped scans.
+	dropped      prometheus.Counter // Counter for dropped metrics.
 	stopCh       chan struct{}      // Channel for shutdown signaling.
 	shutdownOnce sync.Once          // Ensures shutdown is called only once.
 }
@@ -67,17 +68,23 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 			Name: "watchtower_scans_skipped_total",
 			Help: "Number of skipped scans since watchtower started",
 		}),
+		dropped: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "watchtower_metrics_dropped_total",
+			Help: "Number of metrics dropped due to full channel",
+		}),
 		channel: make(chan *Metric, channelBufferSize),
 		stopCh:  make(chan struct{}),
 	}
 
-	// Register the metrics with the provided registry, ignoring already registered metrics.
+	// Register the metrics with the provided registry.
+	// If a metric is already registered, return an error to avoid duplicate collectors.
 	metricsList := []prometheus.Collector{
 		metrics.scanned,
 		metrics.updated,
 		metrics.failed,
 		metrics.total,
 		metrics.skipped,
+		metrics.dropped,
 	}
 	for _, m := range metricsList {
 		if err := registry.Register(m); err != nil {
@@ -117,15 +124,22 @@ func (m *Metrics) QueueIsEmpty() bool {
 	return len(m.channel) == 0
 }
 
-// Register enqueues a metric for processing.
+// Register attempts to enqueue a metric for processing.
+// If the channel is full, the metric is dropped and the dropped counter is incremented.
 //
 // Parameters:
 //   - metric: Metric to register.
 func (m *Metrics) Register(metric *Metric) {
-	m.channel <- metric
+	select {
+	case m.channel <- metric:
+		// Metric sent successfully
+	default:
+		// Channel is full, drop the metric
+		m.dropped.Inc()
+	}
 }
 
-// Default initializes or returns the singleton Metrics handler.
+// Default initializes or returns the singleton Metrics handler. It panics on registration failure, such as duplicate registration against the default registry.
 //
 // Returns:
 //   - *Metrics: Metrics handler with Prometheus metrics and goroutine.
@@ -165,7 +179,12 @@ func (m *Metrics) Shutdown() {
 func (m *Metrics) HandleUpdate() {
 	for {
 		select {
-		case change := <-m.channel:
+		case change, ok := <-m.channel:
+			if !ok {
+				// Channel closed: exit handler.
+				return
+			}
+
 			if change == nil {
 				// Update was skipped and rescheduled
 				m.total.Inc()

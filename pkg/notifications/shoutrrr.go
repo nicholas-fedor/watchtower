@@ -63,6 +63,7 @@ type shoutrrrTypeNotifier struct {
 	data           StaticData            // Static notification data.
 	receiving      bool                  // Tracks if receiving logs.
 	delay          time.Duration         // Delay between sends.
+	once           sync.Once             // Ensures AddLogHook executes only once.
 }
 
 // GetScheme extracts the scheme from a Shoutrrr URL.
@@ -106,17 +107,15 @@ func (n *shoutrrrTypeNotifier) GetURLs() []string {
 //
 // It starts a send goroutine if not already active.
 func (n *shoutrrrTypeNotifier) AddLogHook() {
-	if n.receiving {
-		return
-	}
+	n.once.Do(func() {
+		n.receiving = true
+		logrus.AddHook(n)
+		LocalLog.WithField("urls", n.Urls).
+			Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
 
-	n.receiving = true
-	logrus.AddHook(n)
-	LocalLog.WithField("urls", n.Urls).
-		Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
-
-	// Send using a separate goroutine to avoid blocking the main process.
-	go sendNotifications(n)
+		// Send using a separate goroutine to avoid blocking the main process.
+		go sendNotifications(n)
+	})
 }
 
 // createNotifier initializes a Shoutrrr notifier.
@@ -230,7 +229,10 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				switch {
 				case strings.Contains(errStrLower, "unauthorized") ||
 					strings.Contains(errStrLower, "authentication") ||
-					strings.Contains(errStrLower, "invalid"):
+					strings.Contains(errStrLower, "invalid token") ||
+					strings.Contains(errStrLower, "invalid api") ||
+					strings.Contains(errStrLower, "invalid key") ||
+					strings.Contains(errStrLower, "invalid credentials"):
 					authFailures++
 
 					LocalLog.WithFields(logrus.Fields{
@@ -529,6 +531,11 @@ func sanitizeURLForLogging(rawURL string) string {
 	// Remove query parameters
 	parsedURL.RawQuery = ""
 	parsedURL.Fragment = ""
+
+	// Remove path and opaque data (tokens/webhook IDs often live here)
+	parsedURL.Path = ""
+	parsedURL.RawPath = ""
+	parsedURL.Opaque = ""
 
 	// Reconstruct the URL without sensitive parts
 	sanitized := parsedURL.String()

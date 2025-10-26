@@ -98,11 +98,11 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 	return !client.Stopped[string(c.ID())]
 }
 
-// StartContainer simulates starting a container, returning an empty ID and no error.
+// StartContainer simulates starting a container, returning the container's ID and no error.
 // It provides a minimal implementation for testing purposes.
-func (client MockClient) StartContainer(_ types.Container) (types.ContainerID, error) {
+func (client MockClient) StartContainer(c types.Container) (types.ContainerID, error) {
 	client.TestData.StartContainerCount++
-	return "", nil
+	return c.ID(), nil
 }
 
 // RenameContainer simulates renaming a container, incrementing the RenameContainerCount.

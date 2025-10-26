@@ -304,18 +304,18 @@ func isInvalidImageName(name string) bool {
 }
 
 // getFallbackImage derives a fallback image name from container info.
-// Uses imageInfo.ID (sanitized) if available, otherwise uses container name with ":latest".
+// Uses sanitized imageInfo.ID if it contains a tag, otherwise uses sanitized container name with ":latest".
 func getFallbackImage(container types.Container) string {
 	if container.HasImageInfo() {
 		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
 		if !strings.Contains(fallback, ":") {
-			return container.Name() + ":latest"
+			return strings.TrimPrefix(container.Name(), "/") + ":latest"
 		}
 
 		return fallback
 	}
 
-	return container.Name() + ":latest"
+	return strings.TrimPrefix(container.Name(), "/") + ":latest"
 }
 
 // parseReference parses a Docker image reference with logging.

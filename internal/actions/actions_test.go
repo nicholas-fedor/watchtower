@@ -75,6 +75,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				LifecycleUID:                 1000,
 				LifecycleGID:                 1001,
 				CPUCopyMode:                  "auto",
+				PullFailureDelay:             time.Duration(0),
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
 
@@ -107,6 +108,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 
 			notifier.EXPECT().StartNotification().Return()
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
+			notifier.EXPECT().Close().Return()
 
 			params := actions.RunUpdatesWithNotificationsParams{
 				Client:                       client,
@@ -125,6 +127,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				LifecycleUID:                 1000,
 				LifecycleGID:                 1001,
 				CPUCopyMode:                  "auto",
+				PullFailureDelay:             time.Duration(0),
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
 
@@ -153,6 +156,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 
 			notifier.EXPECT().StartNotification().Return()
 			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
+			notifier.EXPECT().Close().Return()
 
 			params := actions.RunUpdatesWithNotificationsParams{
 				Client:                       client,
@@ -171,6 +175,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				LifecycleUID:                 1000,
 				LifecycleGID:                 1001,
 				CPUCopyMode:                  "auto",
+				PullFailureDelay:             time.Duration(0),
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
 
@@ -197,6 +202,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 
 			notifier.EXPECT().StartNotification().Return()
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
+			notifier.EXPECT().Close().Return()
 
 			params := actions.RunUpdatesWithNotificationsParams{
 				Client:                       client,
@@ -215,6 +221,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				LifecycleUID:                 1000,
 				LifecycleGID:                 1001,
 				CPUCopyMode:                  "auto",
+				PullFailureDelay:             time.Duration(0),
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
 
@@ -313,6 +320,8 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
 
+				notifier.EXPECT().Close().Return()
+
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
 					Notifier:                     notifier,
@@ -330,6 +339,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					LifecycleUID:                 1000,
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
+					PullFailureDelay:             time.Duration(0),
 				}
 				metric := actions.RunUpdatesWithNotifications(params)
 
@@ -360,6 +370,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 
 				notifier.EXPECT().StartNotification().Return()
 				// No SendNotification calls expected since no containers were updated
+				notifier.EXPECT().Close().Return()
 
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
@@ -378,6 +389,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					LifecycleUID:                 1000,
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
+					PullFailureDelay:             time.Duration(0),
 				}
 				metric := actions.RunUpdatesWithNotifications(params)
 
@@ -436,6 +448,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 							entries[2].Data["container"] == validContainerName
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
+				notifier.EXPECT().Close().Return()
 
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
@@ -454,6 +467,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					LifecycleUID:                 1000,
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
+					PullFailureDelay:             time.Duration(0),
 				}
 				metric := actions.RunUpdatesWithNotifications(params)
 
@@ -506,6 +520,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					Return().
 					Times(1)
 					// Exactly once
+				notifier.EXPECT().Close().Return()
 
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
@@ -524,6 +539,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					LifecycleUID:                 1000,
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
+					PullFailureDelay:             time.Duration(0),
 				}
 				metric := actions.RunUpdatesWithNotifications(params)
 
@@ -569,6 +585,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				LifecycleUID:                 1000,
 				LifecycleGID:                 1001,
 				CPUCopyMode:                  "auto",
+				PullFailureDelay:             time.Duration(0),
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
 
@@ -612,6 +629,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				LifecycleUID:                 1000,
 				LifecycleGID:                 1001,
 				CPUCopyMode:                  "auto",
+				PullFailureDelay:             time.Duration(0),
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
 

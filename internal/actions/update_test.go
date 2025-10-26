@@ -111,6 +111,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			gomega.Expect(client.TestData.RenameContainerCount).
 				To(gomega.Equal(1), "RenameContainer should be called once")
+			gomega.Expect(client.TestData.IsContainerStaleCount).
+				To(gomega.Equal(2), "IsContainerStale should be called twice for Watchtower")
 		})
 
 		ginkgo.It("should skip rename with no-restart for Watchtower", func() {
@@ -1230,6 +1232,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
 			gomega.Expect(client.TestData.RenameContainerCount).
 				To(gomega.Equal(1), "RenameContainer should be called once")
+			gomega.Expect(client.TestData.IsContainerStaleCount).
+				To(gomega.Equal(2), "IsContainerStale should be called twice for Watchtower")
 		})
 	})
 })

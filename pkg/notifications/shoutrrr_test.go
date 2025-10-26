@@ -3,6 +3,7 @@
 package notifications
 
 import (
+	"errors"
 	"text/template"
 	"time"
 
@@ -372,7 +373,162 @@ Turns out everything is on fire
 			gomega.Eventually(blockingRouter.sent).Should(gomega.Receive(gomega.BeTrue()))
 		})
 	})
+
+	ginkgo.When("sending notifications with error handling", func() {
+		ginkgo.It("should handle index guard when errs length exceeds URLs length", func() {
+			mockRouter := &mockRouter{
+				sendErrors: []error{errors.New("test error"), errors.New("extra error")},
+			}
+
+			shoutrrr := createNotifier(
+				[]string{"logger://"},
+				allButTrace,
+				"",
+				true,
+				StaticData{},
+				false,
+				time.Duration(0),
+			)
+			shoutrrr.Router = mockRouter
+			shoutrrr.AddLogHook()
+			logrus.Info("test message")
+
+			shoutrrr.StartNotification()
+			shoutrrr.SendNotification(nil)
+
+			gomega.Eventually(logBuffer).Should(gbytes.Say(`index_mismatch`))
+		})
+
+		ginkgo.It("should categorize authentication errors", func() {
+			mockRouter := &mockRouter{
+				sendErrors: []error{errors.New("unauthorized access")},
+			}
+
+			shoutrrr := createNotifier(
+				[]string{"logger://"},
+				allButTrace,
+				"",
+				true,
+				StaticData{},
+				false,
+				time.Duration(0),
+			)
+			shoutrrr.Router = mockRouter
+			shoutrrr.AddLogHook()
+			logrus.Info("test message")
+
+			shoutrrr.StartNotification()
+			shoutrrr.SendNotification(nil)
+
+			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*authentication`))
+		})
+
+		ginkgo.It("should categorize network errors", func() {
+			mockRouter := &mockRouter{
+				sendErrors: []error{errors.New("connection timeout")},
+			}
+
+			shoutrrr := createNotifier(
+				[]string{"logger://"},
+				allButTrace,
+				"",
+				true,
+				StaticData{},
+				false,
+				time.Duration(0),
+			)
+			shoutrrr.Router = mockRouter
+			shoutrrr.AddLogHook()
+			logrus.Info("test message")
+
+			shoutrrr.StartNotification()
+			shoutrrr.SendNotification(nil)
+
+			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*network`))
+		})
+
+		ginkgo.It("should categorize rate limit errors", func() {
+			mockRouter := &mockRouter{
+				sendErrors: []error{errors.New("too many requests")},
+			}
+
+			shoutrrr := createNotifier(
+				[]string{"logger://"},
+				allButTrace,
+				"",
+				true,
+				StaticData{},
+				false,
+				time.Duration(0),
+			)
+			shoutrrr.Router = mockRouter
+			shoutrrr.AddLogHook()
+			logrus.Info("test message")
+
+			shoutrrr.StartNotification()
+			shoutrrr.SendNotification(nil)
+
+			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*rate_limit`))
+		})
+
+		ginkgo.It("should categorize unknown errors", func() {
+			mockRouter := &mockRouter{
+				sendErrors: []error{errors.New("some unknown error")},
+			}
+
+			shoutrrr := createNotifier(
+				[]string{"logger://"},
+				allButTrace,
+				"",
+				true,
+				StaticData{},
+				false,
+				time.Duration(0),
+			)
+			shoutrrr.Router = mockRouter
+			shoutrrr.AddLogHook()
+			logrus.Info("test message")
+
+			shoutrrr.StartNotification()
+			shoutrrr.SendNotification(nil)
+
+			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*unknown`))
+		})
+
+		ginkgo.It("should log summary with failure counts", func() {
+			mockRouter := &mockRouter{
+				sendErrors: []error{errors.New("auth error"), errors.New("network error")},
+			}
+
+			shoutrrr := createNotifier(
+				[]string{"logger://", "logger://"},
+				allButTrace,
+				"",
+				true,
+				StaticData{},
+				false,
+				time.Duration(0),
+			)
+			shoutrrr.Router = mockRouter
+			shoutrrr.AddLogHook()
+			logrus.Info("test message")
+
+			shoutrrr.StartNotification()
+			shoutrrr.SendNotification(nil)
+
+			gomega.Eventually(logBuffer).Should(gbytes.Say(`failed_count.*2`))
+		})
+	})
 })
+
+// mockRouter implements the router interface for testing error scenarios.
+type mockRouter struct {
+	sendErrors []error
+}
+
+func (m *mockRouter) Send(_ string, _ *types.Params) []error {
+	return m.sendErrors
+}
 
 // blockingRouter simulates a notification router with blocking behavior for testing.
 // It waits for an unlock signal before sending and signals completion via a channel.

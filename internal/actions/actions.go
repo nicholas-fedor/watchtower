@@ -68,6 +68,7 @@ type RunUpdatesWithNotificationsParams struct {
 	LifecycleUID                 int
 	LifecycleGID                 int
 	CPUCopyMode                  string
+	PullFailureDelay             time.Duration
 }
 
 // UpdateConfig holds the configuration parameters for container updates.
@@ -140,6 +141,10 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 		params.NotificationReport,
 		result,
 	)
+
+	if params.Notifier != nil {
+		params.Notifier.Close()
+	}
 
 	// Generate and return metric summarizing the session
 	return generateAndLogMetric(result)

@@ -185,6 +185,7 @@ var (
 			LifecycleUID:                 lifecycleUID,
 			LifecycleGID:                 lifecycleGID,
 			CPUCopyMode:                  cpuCopyMode,
+			PullFailureDelay:             time.Duration(0),
 		}
 
 		return actions.RunUpdatesWithNotifications(params)
