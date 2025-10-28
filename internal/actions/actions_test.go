@@ -18,17 +18,13 @@ import (
 )
 
 const (
-	foundNewImageMessage           = "Found new image"
-	stoppingContainerMessage       = "Stopping container"
-	startedNewContainerMessage     = "Started new container"
-	updateSkippedMessage           = "Update available but skipped (monitor-only mode)"
-	containerRemainsRunningMessage = "Container remains running (monitor-only mode)"
-	container1Name                 = "container-1"
-	container2Name                 = "container-2"
-	container3Name                 = "container-3"
-	validContainerName             = "valid-container"
-	duplicateTestName              = "duplicate-test"
-	monitorOnlyContainerName       = "monitor-only-container"
+	container1Name           = "container-1"
+	container2Name           = "container-2"
+	container3Name           = "container-3"
+	validContainerName       = "valid-container"
+	duplicateTestName        = "duplicate-test"
+	monitorOnlyContainerName = "monitor-only-container"
+	duplicateContainerName   = "duplicate-container"
 )
 
 var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
@@ -270,11 +266,11 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 							}
 
 							// Check all three entries for monitor-only-container
-							return entries[0].Message == foundNewImageMessage &&
+							return entries[0].Message == actions.FoundNewImageMessage &&
 								entries[0].Data["container"] == monitorOnlyContainerName &&
-								entries[1].Message == updateSkippedMessage &&
+								entries[1].Message == actions.UpdateSkippedMessage &&
 								entries[1].Data["container"] == monitorOnlyContainerName &&
-								entries[2].Message == containerRemainsRunningMessage &&
+								entries[2].Message == actions.ContainerRemainsRunningMessage &&
 								entries[2].Data["container"] == monitorOnlyContainerName
 						}), mock.AnythingOfType("*session.SingleContainerReport")).
 						Return()
@@ -362,11 +358,11 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						}
 
 						// Check all three entries for container-1
-						return entries[0].Message == foundNewImageMessage &&
+						return entries[0].Message == actions.FoundNewImageMessage &&
 							entries[0].Data["container"] == container1Name &&
-							entries[1].Message == stoppingContainerMessage &&
+							entries[1].Message == actions.StoppingContainerMessage &&
 							entries[1].Data["container"] == container1Name &&
-							entries[2].Message == startedNewContainerMessage &&
+							entries[2].Message == actions.StartedNewContainerMessage &&
 							entries[2].Data["container"] == container1Name
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
@@ -377,11 +373,11 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						}
 
 						// Check all three entries for container-2
-						return entries[0].Message == foundNewImageMessage &&
+						return entries[0].Message == actions.FoundNewImageMessage &&
 							entries[0].Data["container"] == container2Name &&
-							entries[1].Message == stoppingContainerMessage &&
+							entries[1].Message == actions.StoppingContainerMessage &&
 							entries[1].Data["container"] == container2Name &&
-							entries[2].Message == startedNewContainerMessage &&
+							entries[2].Message == actions.StartedNewContainerMessage &&
 							entries[2].Data["container"] == container2Name
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
@@ -392,11 +388,11 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						}
 
 						// Check all three entries for container-3
-						return entries[0].Message == foundNewImageMessage &&
+						return entries[0].Message == actions.FoundNewImageMessage &&
 							entries[0].Data["container"] == container3Name &&
-							entries[1].Message == stoppingContainerMessage &&
+							entries[1].Message == actions.StoppingContainerMessage &&
 							entries[1].Data["container"] == container3Name &&
-							entries[2].Message == startedNewContainerMessage &&
+							entries[2].Message == actions.StartedNewContainerMessage &&
 							entries[2].Data["container"] == container3Name
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
@@ -521,11 +517,11 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						}
 
 						// Check all three entries for valid-container
-						return entries[0].Message == foundNewImageMessage &&
+						return entries[0].Message == actions.FoundNewImageMessage &&
 							entries[0].Data["container"] == validContainerName &&
-							entries[1].Message == stoppingContainerMessage &&
+							entries[1].Message == actions.StoppingContainerMessage &&
 							entries[1].Data["container"] == validContainerName &&
-							entries[2].Message == startedNewContainerMessage &&
+							entries[2].Message == actions.StartedNewContainerMessage &&
 							entries[2].Data["container"] == validContainerName
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
@@ -591,11 +587,11 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						}
 
 						// Check all three entries for duplicate-test
-						return entries[0].Message == foundNewImageMessage &&
+						return entries[0].Message == actions.FoundNewImageMessage &&
 							entries[0].Data["container"] == duplicateTestName &&
-							entries[1].Message == stoppingContainerMessage &&
+							entries[1].Message == actions.StoppingContainerMessage &&
 							entries[1].Data["container"] == duplicateTestName &&
-							entries[2].Message == startedNewContainerMessage &&
+							entries[2].Message == actions.StartedNewContainerMessage &&
 							entries[2].Data["container"] == duplicateTestName
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return().
@@ -629,6 +625,89 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 
 				notifier.AssertExpectations(ginkgo.GinkgoT())
 			})
+
+			ginkgo.It(
+				"should prevent duplicate notifications for containers in both Updated and Stale lists",
+				func() {
+					// Create a container that will appear in both Updated and Stale lists
+					// This simulates a container that was updated but also marked as stale (monitor-only)
+					duplicateContainer := actionMocks.CreateMockContainerWithConfig(
+						duplicateContainerName,
+						duplicateContainerName,
+						"image:v1.0",
+						true,
+						false,
+						time.Now().Add(-time.Hour),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.monitor-only": "true",
+							},
+						},
+					)
+
+					client = actionMocks.CreateMockClient(
+						&actionMocks.TestData{
+							Containers: []types.Container{
+								duplicateContainer,
+							},
+							Staleness: map[string]bool{
+								duplicateContainerName: true, // Container is stale
+							},
+						},
+						false,
+						false,
+					)
+
+					notifier.EXPECT().StartNotification().Return()
+					// Expect exactly one notification for the container, even though it appears in both lists
+					// Since it's monitor-only, it should get the monitor-only notification format
+					notifier.EXPECT().
+						SendFilteredEntries(mock.MatchedBy(func(entries []*logrus.Entry) bool {
+							if len(entries) != 3 {
+								return false
+							}
+
+							// Check all three entries for duplicate-container (monitor-only format)
+							return entries[0].Message == actions.FoundNewImageMessage &&
+								entries[0].Data["container"] == duplicateContainerName &&
+								entries[1].Message == actions.UpdateSkippedMessage &&
+								entries[1].Data["container"] == duplicateContainerName &&
+								entries[2].Message == actions.ContainerRemainsRunningMessage &&
+								entries[2].Data["container"] == duplicateContainerName
+						}), mock.AnythingOfType("*session.SingleContainerReport")).
+						Return().
+						Times(1) // Exactly once - no duplicates
+					notifier.EXPECT().Close().Return()
+
+					params := actions.RunUpdatesWithNotificationsParams{
+						Client:                       client,
+						Notifier:                     notifier,
+						NotificationSplitByContainer: true,
+						NotificationReport:           false,
+						Filter:                       filter,
+						Cleanup:                      false,
+						NoRestart:                    false,
+						MonitorOnly:                  false, // Global monitor-only is false, but container has label
+						LifecycleHooks:               false,
+						RollingRestart:               false,
+						LabelPrecedence:              false,
+						NoPull:                       false,
+						Timeout:                      time.Minute,
+						LifecycleUID:                 1000,
+						LifecycleGID:                 1001,
+						CPUCopyMode:                  "auto",
+						PullFailureDelay:             time.Duration(0),
+					}
+					metric := actions.RunUpdatesWithNotifications(params)
+
+					gomega.Expect(metric).NotTo(gomega.BeNil())
+					gomega.Expect(metric.Updated).
+						To(gomega.Equal(0))
+						// Monitor-only containers are not "updated"
+
+					notifier.AssertExpectations(ginkgo.GinkgoT())
+				},
+			)
 		})
 	})
 

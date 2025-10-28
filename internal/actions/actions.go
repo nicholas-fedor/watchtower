@@ -13,6 +13,21 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Exported constants for update message literals to ensure consistency across the codebase.
+// These constants define the standard messages used in container update logging and notifications.
+const (
+	// FoundNewImageMessage is the message logged when a new image is found for a container.
+	FoundNewImageMessage = "Found new image"
+	// StoppingContainerMessage is the message logged when stopping a container for update.
+	StoppingContainerMessage = "Stopping container"
+	// StartedNewContainerMessage is the message logged when a new container is started after update.
+	StartedNewContainerMessage = "Started new container"
+	// UpdateSkippedMessage is the message logged when an update is skipped in monitor-only mode.
+	UpdateSkippedMessage = "Update available but skipped (monitor-only mode)"
+	// ContainerRemainsRunningMessage is the message logged when a container remains running in monitor-only mode.
+	ContainerRemainsRunningMessage = "Container remains running (monitor-only mode)"
+)
+
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
 //
 // It checks for errors or nil results, logging accordingly, and returns a zero metric on failure
@@ -194,7 +209,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 		return []*logrus.Entry{
 			{
 				Level:   logrus.InfoLevel,
-				Message: "Found new image",
+				Message: FoundNewImageMessage,
 				Data: logrus.Fields{
 					"container": c.Name(),
 					"image":     c.ImageName(),
@@ -204,7 +219,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 			},
 			{
 				Level:   logrus.InfoLevel,
-				Message: "Update available but skipped (monitor-only mode)",
+				Message: UpdateSkippedMessage,
 				Data: logrus.Fields{
 					"container": c.Name(),
 				},
@@ -212,7 +227,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 			},
 			{
 				Level:   logrus.InfoLevel,
-				Message: "Container remains running (monitor-only mode)",
+				Message: ContainerRemainsRunningMessage,
 				Data: logrus.Fields{
 					"container": c.Name(),
 				},
@@ -224,7 +239,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 	return []*logrus.Entry{
 		{
 			Level:   logrus.InfoLevel,
-			Message: "Found new image",
+			Message: FoundNewImageMessage,
 			Data: logrus.Fields{
 				"container": c.Name(),
 				"image":     c.ImageName(),
@@ -234,7 +249,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 		},
 		{
 			Level:   logrus.InfoLevel,
-			Message: "Stopping container",
+			Message: StoppingContainerMessage,
 			Data: logrus.Fields{
 				"container": c.Name(),
 				"id":        c.ID().ShortID(),
@@ -244,7 +259,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 		},
 		{
 			Level:   logrus.InfoLevel,
-			Message: "Started new container",
+			Message: StartedNewContainerMessage,
 			Data: logrus.Fields{
 				"container": c.Name(),
 				"new_id":    c.LatestImageID().ShortID(),
@@ -372,24 +387,81 @@ func sendNotifications(
 // based on the notificationReport flag, skipping invalid containers.
 // When notificationReport is true, it also sends notifications for monitor-only
 // containers from the stale list.
+// To prevent duplicate notifications for the same container, a map is used to track
+// which container IDs have already been notified during this notification session.
+// This tracking mechanism ensures that even if a container appears in multiple lists
+// (e.g., due to edge cases in report generation), it receives only one notification,
+// maintaining clean and non-redundant communication with users.
 //
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
 func sendSplitNotifications(notifier types.Notifier, notificationReport bool, result types.Report) {
+	// Map to track notified container IDs to prevent duplicate notifications.
+	// Key is the full container ID string for uniqueness, value is boolean indicating
+	// whether a notification has been sent for this container.
+	// This map is scoped to the function to ensure tracking is per-notification-session.
+	notified := make(map[string]bool)
+
 	if notificationReport {
 		// Send individual report notifications for each updated container
 		for _, updatedContainer := range result.Updated() {
+			// Skip nil container reports
+			if updatedContainer == nil {
+				logrus.Debug("Encountered nil updated container report, skipping")
+
+				continue
+			}
+
+			// Skip containers with empty names
+			if strings.TrimSpace(updatedContainer.Name()) == "" {
+				logrus.WithField("container_id", updatedContainer.ID().ShortID()).
+					Debug("Encountered container with empty name, skipping notification")
+
+				continue
+			}
+
+			containerID := string(updatedContainer.ID())
+			if notified[containerID] {
+				// Skip notification if already sent for this container ID
+				continue
+			}
+
 			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
 			notifier.SendNotification(singleContainerReport)
+
+			notified[containerID] = true
 		}
 
 		// Send notifications for monitor-only containers when notificationReport is true
 		for _, staleContainer := range result.Stale() {
+			// Skip nil container reports
+			if staleContainer == nil {
+				logrus.Debug("Encountered nil stale container report, skipping")
+
+				continue
+			}
+
+			// Skip containers with empty names
+			if strings.TrimSpace(staleContainer.Name()) == "" {
+				logrus.WithField("container_id", staleContainer.ID().ShortID()).
+					Debug("Encountered stale container with empty name, skipping notification")
+
+				continue
+			}
+
 			if staleContainer.IsMonitorOnly() {
+				containerID := string(staleContainer.ID())
+				if notified[containerID] {
+					// Skip notification if already sent for this container ID
+					continue
+				}
+
 				singleContainerReport := buildSingleContainerReport(staleContainer, result)
 				notifier.SendNotification(singleContainerReport)
+
+				notified[containerID] = true
 			}
 		}
 	} else {
@@ -409,6 +481,12 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 				continue
 			}
 
+			containerID := string(updatedContainer.ID())
+			if notified[containerID] {
+				// Skip notification if already sent for this container ID
+				continue
+			}
+
 			logrus.WithFields(logrus.Fields{
 				"container": updatedContainer.Name(),
 				"image":     updatedContainer.ImageName(),
@@ -420,22 +498,30 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 			entries := buildUpdateEntries(updatedContainer, time.Now())
 
 			notifier.SendFilteredEntries(entries, singleContainerReport)
+
+			notified[containerID] = true
 		}
 
 		// Send notifications for monitor-only containers when notificationReport is false
 		for _, staleContainer := range result.Stale() {
+			// Skip nil container reports
+			if staleContainer == nil {
+				logrus.Debug("Encountered nil stale container report, skipping")
+
+				continue
+			}
+
+			// Skip containers with empty names
+			if strings.TrimSpace(staleContainer.Name()) == "" {
+				logrus.WithField("container_id", staleContainer.ID().ShortID()).Debug("Encountered stale container with empty name, skipping notification")
+
+				continue
+			}
+
 			if staleContainer.IsMonitorOnly() {
-				// Skip nil container reports
-				if staleContainer == nil {
-					logrus.Debug("Encountered nil stale container report, skipping")
-
-					continue
-				}
-
-				// Skip containers with empty names
-				if strings.TrimSpace(staleContainer.Name()) == "" {
-					logrus.WithField("container_id", staleContainer.ID().ShortID()).Debug("Encountered stale container with empty name, skipping notification")
-
+				containerID := string(staleContainer.ID())
+				if notified[containerID] {
+					// Skip notification if already sent for this container ID
 					continue
 				}
 
@@ -450,6 +536,8 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 				entries := buildUpdateEntries(staleContainer, time.Now())
 
 				notifier.SendFilteredEntries(entries, singleContainerReport)
+
+				notified[containerID] = true
 			}
 		}
 	}
