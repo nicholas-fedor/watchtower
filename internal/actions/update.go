@@ -151,7 +151,6 @@ func Update(
 		if isPinned {
 			// Skip staleness checks for pinned images and mark as scanned.
 			clog.Debug("Skipping staleness check for pinned image")
-			progress.AddScanned(sourceContainer, sourceContainer.SafeImageID(), params)
 
 			continue
 		}
