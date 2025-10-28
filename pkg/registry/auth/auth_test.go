@@ -16,6 +16,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/image"
@@ -1066,7 +1067,11 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Tests GetBearerHeader’s error handling when the HTTP request fails
 		// (e.g., due to an unreachable host). Ensures proper error propagation.
 		ginkgo.It("should fail on HTTP request error", func() {
-			client := auth.NewAuthClient()
+			client := &testAuthClient{
+				client: &http.Client{
+					Timeout: 1 * time.Second,
+				},
+			}
 			challenge := `bearer realm="http://nonexistent.local/token",service="test-service",scope="repository:test/image:pull"`
 			ref, _ := reference.ParseNormalizedNamed("test/image")
 			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)

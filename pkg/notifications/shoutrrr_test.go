@@ -519,6 +519,113 @@ Turns out everything is on fire
 			gomega.Eventually(logBuffer).Should(gbytes.Say(`failed_count.*2`))
 		})
 	})
+
+	ginkgo.When("closing the notifier", func() {
+		ginkgo.When("Close() is called multiple times", func() {
+			ginkgo.It("should be idempotent and not panic", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					allButTrace,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+				shoutrrr.AddLogHook()
+
+				// First close should work normally
+				shoutrrr.Close()
+
+				// Subsequent closes should be no-ops
+				shoutrrr.Close()
+				shoutrrr.Close()
+
+				// Should not panic
+			})
+		})
+
+		ginkgo.When("Close() is called without starting the goroutine", func() {
+			ginkgo.It("should not panic or block", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					allButTrace,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+				// Note: Not calling AddLogHook(), so no goroutine is started
+
+				// Close should work without blocking
+				shoutrrr.Close()
+
+				// Should not panic
+			})
+		})
+
+		ginkgo.When("operations are attempted after Close()", func() {
+			ginkgo.It("should handle gracefully without panicking", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					allButTrace,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+				shoutrrr.AddLogHook()
+
+				// Close the notifier
+				shoutrrr.Close()
+
+				// These operations should not panic after close
+				shoutrrr.StartNotification()
+				shoutrrr.SendNotification(nil)
+				shoutrrr.SendFilteredEntries([]*logrus.Entry{}, nil)
+
+				// Fire should still work (but may not send if channel is closed)
+				entry := &logrus.Entry{Message: "test"}
+				err := shoutrrr.Fire(entry)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Should not panic
+			})
+		})
+
+		ginkgo.When("Close() is called concurrently", func() {
+			ginkgo.It("should handle concurrent calls safely", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					allButTrace,
+					"",
+					true,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+				shoutrrr.AddLogHook()
+
+				// Start multiple goroutines calling Close concurrently
+				done := make(chan bool, 10)
+				for range 10 {
+					go func() {
+						shoutrrr.Close()
+						done <- true
+					}()
+				}
+
+				// Wait for all to complete
+				for range 10 {
+					gomega.Eventually(done).Should(gomega.Receive())
+				}
+
+				// Should not panic and all should complete
+			})
+		})
+	})
 })
 
 // mockRouter implements the router interface for testing error scenarios.
@@ -559,7 +666,7 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 	shoutrrr := &shoutrrrTypeNotifier{
 		template:       tpl,
 		messages:       make(chan string, 1),
-		done:           make(chan bool),
+		done:           make(chan struct{}),
 		Router:         router,
 		legacyTemplate: legacy,
 		params:         &types.Params{},
