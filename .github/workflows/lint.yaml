@@ -1,6 +1,7 @@
 name: Lint
 
 on:
+  workflow_dispatch:
   workflow_call:
 
 permissions:
@@ -31,12 +32,8 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@14973f18c82b6d66679563f71666ccee11907cb2
         with:
-          args: --timeout=5m
-
-      - name: Format Go code
-        run: |
-          go fmt ./...
+          args: --timeout=5m --fix
 
       - name: Check for uncommitted changes after formatting
         run: |
-          git diff --exit-code || (echo "Detected unformatted files. Run 'go fmt' to format your code."; exit 1)
+          git diff --exit-code || (echo "Detected unformatted files. Run 'make fmt' to format your code."; exit 1)
