@@ -11,14 +11,14 @@
 				"eamodio.gitlens",
 				"EditorConfig.EditorConfig",
 				"golang.Go",
-        "github.vscode-github-actions"
+        		"github.vscode-github-actions"
 			]
 		}
 	},
   "containerEnv": {
     "GIT_EDITOR": "nano"
   },
-  "mounts": [
-    "type=bind,source=/home/${localEnv:USER}/.ssh,target=/root/.ssh,readonly"
-  ]
+	"mounts": [
+    "type=bind,source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly"
+	]
 }
