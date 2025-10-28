@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	mockPkg "github.com/stretchr/testify/mock"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -14,6 +16,7 @@ func TestUpdateFromContainer(t *testing.T) {
 		cont     types.Container
 		newImage types.ImageID
 		state    State
+		params   types.UpdateParams
 	}
 
 	tests := []struct {
@@ -30,11 +33,15 @@ func TestUpdateFromContainer(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(false)
 
 					return mock
 				}(),
 				newImage: "img2",
 				state:    ScannedState,
+				params:   types.UpdateParams{},
 			},
 			want: &ContainerStatus{
 				containerID:    "cont1",
@@ -44,6 +51,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				imageName:      "image1:latest",
 				containerError: nil,
 				state:          ScannedState,
+				monitorOnly:    false,
 			},
 		},
 		{
@@ -55,11 +63,15 @@ func TestUpdateFromContainer(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID(""))
 					mock.EXPECT().Name().Return("")
 					mock.EXPECT().ImageName().Return("")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(false)
 
 					return mock
 				}(),
 				newImage: "",
 				state:    UnknownState,
+				params:   types.UpdateParams{},
 			},
 			want: &ContainerStatus{
 				containerID:    "",
@@ -69,18 +81,85 @@ func TestUpdateFromContainer(t *testing.T) {
 				imageName:      "",
 				containerError: nil,
 				state:          UnknownState,
+				monitorOnly:    false,
+			},
+		},
+		{
+			name: "monitor-only container",
+			args: args{
+				cont: func() types.Container {
+					mock := mocks.NewMockContainer(t)
+					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
+					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
+					mock.EXPECT().Name().Return("container3")
+					mock.EXPECT().ImageName().Return("image3:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(true)
+
+					return mock
+				}(),
+				newImage: "img4",
+				state:    ScannedState,
+				params:   types.UpdateParams{},
+			},
+			want: &ContainerStatus{
+				containerID:    "cont3",
+				oldImage:       "img3",
+				newImage:       "img4",
+				containerName:  "container3",
+				imageName:      "image3:latest",
+				containerError: nil,
+				state:          ScannedState,
+				monitorOnly:    true,
+			},
+		},
+		{
+			name: "empty monitor-only container",
+			args: args{
+				cont: func() types.Container {
+					mock := mocks.NewMockContainer(t)
+					mock.EXPECT().ID().Return(types.ContainerID(""))
+					mock.EXPECT().SafeImageID().Return(types.ImageID(""))
+					mock.EXPECT().Name().Return("")
+					mock.EXPECT().ImageName().Return("")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(true)
+
+					return mock
+				}(),
+				newImage: "",
+				state:    UnknownState,
+				params:   types.UpdateParams{},
+			},
+			want: &ContainerStatus{
+				containerID:    "",
+				oldImage:       "",
+				newImage:       "",
+				containerName:  "",
+				imageName:      "",
+				containerError: nil,
+				state:          UnknownState,
+				monitorOnly:    true,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := UpdateFromContainer(tt.args.cont, tt.args.newImage, tt.args.state)
+			got := UpdateFromContainer(
+				tt.args.cont,
+				tt.args.newImage,
+				tt.args.state,
+				tt.args.params,
+			)
 			if got.containerID != tt.want.containerID ||
 				got.oldImage != tt.want.oldImage ||
 				got.newImage != tt.want.newImage ||
 				got.containerName != tt.want.containerName ||
 				got.imageName != tt.want.imageName ||
-				got.state != tt.want.state {
+				got.state != tt.want.state ||
+				got.monitorOnly != tt.want.monitorOnly {
 				t.Errorf("UpdateFromContainer() = %+v, want %+v", got, tt.want)
 			}
 			// Handle error field separately
@@ -99,8 +178,9 @@ func TestUpdateFromContainer(t *testing.T) {
 
 func TestProgress_AddSkipped(t *testing.T) {
 	type args struct {
-		cont types.Container
-		err  error
+		cont   types.Container
+		err    error
+		params types.UpdateParams
 	}
 
 	tests := []struct {
@@ -119,10 +199,14 @@ func TestProgress_AddSkipped(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(false)
 
 					return mock
 				}(),
-				err: errors.New("skipped due to policy"),
+				err:    errors.New("skipped due to policy"),
+				params: types.UpdateParams{},
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
@@ -133,6 +217,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 					imageName:      "image1:latest",
 					containerError: errors.New("skipped due to policy"),
 					state:          SkippedState,
+					monitorOnly:    false,
 				},
 			},
 		},
@@ -146,10 +231,14 @@ func TestProgress_AddSkipped(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(false)
 
 					return mock
 				}(),
-				err: nil,
+				err:    nil,
+				params: types.UpdateParams{},
 			},
 			want: Progress{
 				"cont2": &ContainerStatus{
@@ -160,13 +249,46 @@ func TestProgress_AddSkipped(t *testing.T) {
 					imageName:      "image2:latest",
 					containerError: nil,
 					state:          SkippedState,
+					monitorOnly:    false,
+				},
+			},
+		},
+		{
+			name: "add skipped monitor-only with error",
+			m:    Progress{},
+			args: args{
+				cont: func() types.Container {
+					mock := mocks.NewMockContainer(t)
+					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
+					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
+					mock.EXPECT().Name().Return("container3")
+					mock.EXPECT().ImageName().Return("image3:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(true)
+
+					return mock
+				}(),
+				err:    errors.New("monitor-only skipped"),
+				params: types.UpdateParams{},
+			},
+			want: Progress{
+				"cont3": &ContainerStatus{
+					containerID:    "cont3",
+					oldImage:       "img3",
+					newImage:       "img3",
+					containerName:  "container3",
+					imageName:      "image3:latest",
+					containerError: errors.New("monitor-only skipped"),
+					state:          SkippedState,
+					monitorOnly:    true,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.AddSkipped(tt.args.cont, tt.args.err)
+			tt.m.AddSkipped(tt.args.cont, tt.args.err, tt.args.params)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf("Progress.AddSkipped() map length = %d, want %d", len(tt.m), len(tt.want))
@@ -181,7 +303,8 @@ func TestProgress_AddSkipped(t *testing.T) {
 					gotStatus.newImage != wantStatus.newImage ||
 					gotStatus.containerName != wantStatus.containerName ||
 					gotStatus.imageName != wantStatus.imageName ||
-					gotStatus.state != wantStatus.state {
+					gotStatus.state != wantStatus.state ||
+					gotStatus.monitorOnly != wantStatus.monitorOnly {
 					t.Errorf(
 						"Progress.AddSkipped() status for %v = %+v, want %+v",
 						id,
@@ -207,6 +330,7 @@ func TestProgress_AddScanned(t *testing.T) {
 	type args struct {
 		cont     types.Container
 		newImage types.ImageID
+		params   types.UpdateParams
 	}
 
 	tests := []struct {
@@ -225,10 +349,14 @@ func TestProgress_AddScanned(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(false)
 
 					return mock
 				}(),
 				newImage: "img2",
+				params:   types.UpdateParams{},
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
@@ -239,6 +367,7 @@ func TestProgress_AddScanned(t *testing.T) {
 					imageName:      "image1:latest",
 					containerError: nil,
 					state:          ScannedState,
+					monitorOnly:    false,
 				},
 			},
 		},
@@ -252,10 +381,14 @@ func TestProgress_AddScanned(t *testing.T) {
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(false)
 
 					return mock
 				}(),
 				newImage: "img2",
+				params:   types.UpdateParams{},
 			},
 			want: Progress{
 				"cont2": &ContainerStatus{
@@ -266,13 +399,46 @@ func TestProgress_AddScanned(t *testing.T) {
 					imageName:      "image2:latest",
 					containerError: nil,
 					state:          ScannedState,
+					monitorOnly:    false,
+				},
+			},
+		},
+		{
+			name: "add scanned monitor-only with new image",
+			m:    Progress{},
+			args: args{
+				cont: func() types.Container {
+					mock := mocks.NewMockContainer(t)
+					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
+					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
+					mock.EXPECT().Name().Return("container3")
+					mock.EXPECT().ImageName().Return("image3:latest")
+					mock.EXPECT().
+						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						Return(true)
+
+					return mock
+				}(),
+				newImage: "img4",
+				params:   types.UpdateParams{},
+			},
+			want: Progress{
+				"cont3": &ContainerStatus{
+					containerID:    "cont3",
+					oldImage:       "img3",
+					newImage:       "img4",
+					containerName:  "container3",
+					imageName:      "image3:latest",
+					containerError: nil,
+					state:          ScannedState,
+					monitorOnly:    true,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.AddScanned(tt.args.cont, tt.args.newImage)
+			tt.m.AddScanned(tt.args.cont, tt.args.newImage, tt.args.params)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf("Progress.AddScanned() map length = %d, want %d", len(tt.m), len(tt.want))
@@ -287,7 +453,8 @@ func TestProgress_AddScanned(t *testing.T) {
 					gotStatus.newImage != wantStatus.newImage ||
 					gotStatus.containerName != wantStatus.containerName ||
 					gotStatus.imageName != wantStatus.imageName ||
-					gotStatus.state != wantStatus.state {
+					gotStatus.state != wantStatus.state ||
+					gotStatus.monitorOnly != wantStatus.monitorOnly {
 					t.Errorf(
 						"Progress.AddScanned() status for %v = %+v, want %+v",
 						id,
@@ -502,10 +669,11 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		m    Progress
-		args args
-		want Progress
+		name        string
+		m           Progress
+		args        args
+		want        Progress
+		expectPanic bool
 	}{
 		{
 			name: "mark existing container",
@@ -516,19 +684,26 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 			want: Progress{
 				"cont1": &ContainerStatus{containerID: "cont1", state: UpdatedState},
 			},
+			expectPanic: false,
 		},
 		{
-			name: "mark non-existent container",
-			m:    Progress{},
-			args: args{containerID: "cont1"},
-			want: Progress{}, // Expect panic or nil dereference, but we'll test behavior
+			name:        "mark non-existent container",
+			m:           Progress{},
+			args:        args{containerID: "cont1"},
+			want:        Progress{},
+			expectPanic: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer func() {
-				if r := recover(); r != nil && tt.args.containerID != "cont1" {
-					t.Errorf("Progress.MarkForUpdate() panicked unexpectedly: %v", r)
+				r := recover()
+				if tt.expectPanic && r == nil {
+					t.Errorf("expected panic, got none")
+				}
+
+				if !tt.expectPanic && r != nil {
+					t.Errorf("unexpected panic: %v", r)
 				}
 			}()
 

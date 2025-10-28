@@ -39,17 +39,17 @@ func CreateMockProgressReport(states ...session.State) types.Report {
 		switch state {
 		case session.SkippedState:
 			c, _ := CreateContainerForProgress(index, skippedIDPrefix, "skip%d")
-			progress.AddSkipped(c, errMockSkipped)
+			progress.AddSkipped(c, errMockSkipped, types.UpdateParams{})
 		case session.FreshState:
 			c, _ := CreateContainerForProgress(index, freshIDPrefix, "frsh%d")
-			progress.AddScanned(c, c.ImageID())
+			progress.AddScanned(c, c.ImageID(), types.UpdateParams{})
 		case session.UpdatedState:
 			c, newImage := CreateContainerForProgress(index, updatedIDPrefix, "updt%d")
-			progress.AddScanned(c, newImage)
+			progress.AddScanned(c, newImage, types.UpdateParams{})
 			progress.MarkForUpdate(c.ID())
 		case session.FailedState:
 			c, newImage := CreateContainerForProgress(index, failedIDPrefix, "fail%d")
-			progress.AddScanned(c, newImage)
+			progress.AddScanned(c, newImage, types.UpdateParams{})
 
 			failed[c.ID()] = errMockFailed
 		case session.UnknownState, session.ScannedState, session.StaleState:

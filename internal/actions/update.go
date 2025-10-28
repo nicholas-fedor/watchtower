@@ -133,11 +133,15 @@ func Update(
 		clog := logrus.WithFields(fields)
 
 		// Check if the container uses a pinned (digest-based) image to skip updates.
-		isPinned, err := isPinned(sourceContainer, progress)
+		isPinned, err := isPinned(sourceContainer, progress, params)
 		if err != nil {
 			// Log and skip containers with unparsable image references, marking as skipped.
 			clog.WithError(err).Debug("Failed to check pinned image, skipping container")
-			progress.AddSkipped(sourceContainer, fmt.Errorf("%w: %w", errParseImageReference, err))
+			progress.AddSkipped(
+				sourceContainer,
+				fmt.Errorf("%w: %w", errParseImageReference, err),
+				params,
+			)
 
 			staleCheckFailed++
 
@@ -147,7 +151,6 @@ func Update(
 		if isPinned {
 			// Skip staleness checks for pinned images and mark as scanned.
 			clog.Debug("Skipping staleness check for pinned image")
-			progress.AddScanned(sourceContainer, sourceContainer.SafeImageID())
 
 			continue
 		}
@@ -179,7 +182,7 @@ func Update(
 			stale = false
 			staleCheckFailed++
 
-			progress.AddSkipped(sourceContainer, err)
+			progress.AddSkipped(sourceContainer, err, params)
 
 			// Track if Watchtower self-update pull failed for safeguard.
 			if sourceContainer.IsWatchtower() {
@@ -191,7 +194,7 @@ func Update(
 				"stale":        stale,
 				"newest_image": newestImage,
 			}).Debug("Checked container staleness")
-			progress.AddScanned(sourceContainer, newestImage)
+			progress.AddScanned(sourceContainer, newestImage, params)
 		}
 
 		// Update the container’s stale status for dependency sorting.
@@ -360,11 +363,16 @@ func parseReference(
 // Parameters:
 //   - container: The container to check for a pinned image.
 //   - progress: The progress tracker to update for scanned or skipped containers.
+//   - params: Update parameters for monitor-only check.
 //
 // Returns:
 //   - bool: True if the image is pinned by digest, false otherwise.
 //   - error: Non-nil if no valid image reference can be parsed, nil on success.
-func isPinned(container types.Container, progress *session.Progress) (bool, error) {
+func isPinned(
+	container types.Container,
+	progress *session.Progress,
+	params types.UpdateParams,
+) (bool, error) {
 	// Set up logging with container and image details for debugging.
 	clog := logrus.WithFields(logrus.Fields{
 		"container": container.Name(),
@@ -407,7 +415,7 @@ func isPinned(container types.Container, progress *session.Progress) (bool, erro
 	if isDigested {
 		// Mark the container as scanned to skip updates for pinned images.
 		clog.WithField("is_digested", isDigested).Debug("Pinned image detected, marking as scanned")
-		progress.AddScanned(container, container.SafeImageID())
+		progress.AddScanned(container, container.SafeImageID(), params)
 	}
 
 	return isDigested, nil
