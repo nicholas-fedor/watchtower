@@ -666,7 +666,7 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 	shoutrrr := &shoutrrrTypeNotifier{
 		template:       tpl,
 		messages:       make(chan string, 1),
-		done:           make(chan bool),
+		done:           make(chan struct{}),
 		Router:         router,
 		legacyTemplate: legacy,
 		params:         &types.Params{},
