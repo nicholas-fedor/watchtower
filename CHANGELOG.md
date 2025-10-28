@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Make shoutrrr notifier thread-safe by @nicholas-fedor in [#844](https://github.com/nicholas-fedor/watchtower/pull/844)
 - Prevent double notification entries for unchanged containers by @nicholas-fedor in [#836](https://github.com/nicholas-fedor/watchtower/pull/836)
 - Implement cleanup detection for update-on-start control by @nicholas-fedor in [#831](https://github.com/nicholas-fedor/watchtower/pull/831)
 - Clear shoutrrr notification queue after sending by @nicholas-fedor in [#824](https://github.com/nicholas-fedor/watchtower/pull/824)
