@@ -5,7 +5,7 @@ ARG TARGETARCH
 
 RUN apk add --no-cache \
                 git \
-                nano\
+                nano \
                 openssh
 
 ARG USERNAME=vscode
