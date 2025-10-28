@@ -1,5 +1,5 @@
 {
-  "name": "Go",
+  "name": "Watchtower",
   "dockerFile": "Dockerfile",
 	// Use 'postCreateCommand' to run commands after the container is created.
 	//"postCreateCommand": "go version",
