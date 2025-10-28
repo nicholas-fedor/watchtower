@@ -18,17 +18,16 @@ go version
 
 ## Devcontainer
 
-
 ### Overview
 
 [Dev Containers](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/introduction-to-dev-containers) are a method of providing a standardized development environment when working on a project.
 
-This repository provides a baseline configuration that is expected to help contributors quickly get started. 
+This repository provides a baseline configuration that is expected to help contributors quickly get started.
 
 ### Getting Started
 
-If you are using VSCode and new to using Dev Containers, then review the following documentation to help you get started: https://code.visualstudio.com/docs/devcontainers/containers
-Documentation for GitHub's implementation, Codespaces, can be found here: https://docs.github.com/en/codespaces/quickstart
+If you are using VSCode and new to using Dev Containers, then review the following documentation to help you get started: [https://code.visualstudio.com/docs/devcontainers/containers](https://code.visualstudio.com/docs/devcontainers/containers)
+Documentation for GitHub's implementation, Codespaces, can be found here: [https://docs.github.com/en/codespaces/quickstart](https://docs.github.com/en/codespaces/quickstart)
 
 ## Security
 
