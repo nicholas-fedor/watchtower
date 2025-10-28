@@ -354,6 +354,12 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 
 	LocalLog.Debug("Queuing notification message")
 
+	if atomic.LoadUint32(&n.closed) != 0 {
+		LocalLog.Debug("Notifier closed, skipping send")
+
+		return
+	}
+
 	select {
 	case n.messages <- msg:
 		// Message sent successfully
@@ -361,6 +367,8 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 		// Channel is closed or full, skip sending
 		if atomic.LoadUint32(&n.closed) != 0 {
 			LocalLog.Debug("Channel closed, skipping send")
+
+			return
 		} else {
 			LocalLog.Debug("Channel full, skipping send (backpressure)")
 		}
