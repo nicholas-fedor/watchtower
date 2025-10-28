@@ -18,14 +18,17 @@ import (
 )
 
 const (
-	foundNewImageMessage       = "Found new image"
-	stoppingContainerMessage   = "Stopping container"
-	startedNewContainerMessage = "Started new container"
-	container1Name             = "container-1"
-	container2Name             = "container-2"
-	container3Name             = "container-3"
-	validContainerName         = "valid-container"
-	duplicateTestName          = "duplicate-test"
+	foundNewImageMessage           = "Found new image"
+	stoppingContainerMessage       = "Stopping container"
+	startedNewContainerMessage     = "Started new container"
+	updateSkippedMessage           = "Update available but skipped (monitor-only mode)"
+	containerRemainsRunningMessage = "Container remains running (monitor-only mode)"
+	container1Name                 = "container-1"
+	container2Name                 = "container-2"
+	container3Name                 = "container-3"
+	validContainerName             = "valid-container"
+	duplicateTestName              = "duplicate-test"
+	monitorOnlyContainerName       = "monitor-only-container"
 )
 
 var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
@@ -230,6 +233,84 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 		ginkgo.Context("notification splitting in log mode", func() {
+			ginkgo.It(
+				"should send notifications for monitor-only containers with stale images",
+				func() {
+					client = actionMocks.CreateMockClient(
+						&actionMocks.TestData{
+							Containers: []types.Container{
+								actionMocks.CreateMockContainerWithConfig(
+									monitorOnlyContainerName,
+									monitorOnlyContainerName,
+									"image:v1.0",
+									true,
+									false,
+									time.Now().Add(-time.Hour),
+									&container.Config{
+										Labels: map[string]string{
+											"com.centurylinklabs.watchtower.monitor-only": "true",
+										},
+									},
+								),
+							},
+							Staleness: map[string]bool{
+								monitorOnlyContainerName: true, // Container is stale
+							},
+						},
+						false,
+						false,
+					)
+
+					notifier.EXPECT().StartNotification().Return()
+					// Expect notification for the monitor-only stale container
+					notifier.EXPECT().
+						SendFilteredEntries(mock.MatchedBy(func(entries []*logrus.Entry) bool {
+							if len(entries) != 3 {
+								return false
+							}
+
+							// Check all three entries for monitor-only-container
+							return entries[0].Message == foundNewImageMessage &&
+								entries[0].Data["container"] == monitorOnlyContainerName &&
+								entries[1].Message == updateSkippedMessage &&
+								entries[1].Data["container"] == monitorOnlyContainerName &&
+								entries[2].Message == containerRemainsRunningMessage &&
+								entries[2].Data["container"] == monitorOnlyContainerName
+						}), mock.AnythingOfType("*session.SingleContainerReport")).
+						Return()
+
+					notifier.EXPECT().Close().Return()
+
+					params := actions.RunUpdatesWithNotificationsParams{
+						Client:                       client,
+						Notifier:                     notifier,
+						NotificationSplitByContainer: true,
+						NotificationReport:           false,
+						Filter:                       filter,
+						Cleanup:                      false,
+						NoRestart:                    false,
+						MonitorOnly:                  false, // Global monitor-only is false, but container has label
+						LifecycleHooks:               false,
+						RollingRestart:               false,
+						LabelPrecedence:              false,
+						NoPull:                       false,
+						Timeout:                      time.Minute,
+						LifecycleUID:                 1000,
+						LifecycleGID:                 1001,
+						CPUCopyMode:                  "auto",
+						PullFailureDelay:             time.Duration(0),
+					}
+					metric := actions.RunUpdatesWithNotifications(params)
+
+					gomega.Expect(metric).NotTo(gomega.BeNil())
+					gomega.Expect(metric.Updated).
+						To(gomega.Equal(0))
+						// Monitor-only containers are not "updated"
+
+					notifier.AssertExpectations(ginkgo.GinkgoT())
+				},
+			)
+
 			ginkgo.It("should send one notification per updated container", func() {
 				client = actionMocks.CreateMockClient(
 					&actionMocks.TestData{

@@ -15,6 +15,7 @@ type Progress map[types.ContainerID]*ContainerStatus
 //   - cont: Container to update from.
 //   - newImage: Latest image ID.
 //   - state: Container state.
+//   - params: Update parameters for monitor-only check.
 //
 // Returns:
 //   - *ContainerStatus: Updated status.
@@ -22,6 +23,7 @@ func UpdateFromContainer(
 	cont types.Container,
 	newImage types.ImageID,
 	state State,
+	params types.UpdateParams,
 ) *ContainerStatus {
 	update := &ContainerStatus{
 		containerID:    cont.ID(),
@@ -31,6 +33,7 @@ func UpdateFromContainer(
 		imageName:      cont.ImageName(),
 		containerError: nil,
 		state:          state,
+		monitorOnly:    cont.IsMonitorOnly(params),
 	}
 	logrus.WithFields(logrus.Fields{
 		"container_id": cont.ID().ShortID(),
@@ -47,7 +50,7 @@ func UpdateFromContainer(
 //   - cont: Container to add.
 //   - err: Skip reason error.
 func (m Progress) AddSkipped(cont types.Container, err error) {
-	update := UpdateFromContainer(cont, cont.SafeImageID(), SkippedState)
+	update := UpdateFromContainer(cont, cont.SafeImageID(), SkippedState, types.UpdateParams{})
 	update.containerError = err
 	m.Add(update)
 	logrus.WithFields(logrus.Fields{
@@ -62,7 +65,7 @@ func (m Progress) AddSkipped(cont types.Container, err error) {
 //   - cont: Container to add.
 //   - newImage: Latest image ID.
 func (m Progress) AddScanned(cont types.Container, newImage types.ImageID) {
-	m.Add(UpdateFromContainer(cont, newImage, ScannedState))
+	m.Add(UpdateFromContainer(cont, newImage, ScannedState, types.UpdateParams{}))
 	logrus.WithFields(logrus.Fields{
 		"container_id": cont.ID().ShortID(),
 		"name":         cont.Name(),

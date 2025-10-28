@@ -20,4 +20,5 @@ type ContainerReport interface {
 	ImageName() string       // Image name with tag.
 	Error() string           // Error message, if any.
 	State() string           // Human-readable state.
+	IsMonitorOnly() bool     // Monitor-only status.
 }

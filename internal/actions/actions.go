@@ -181,6 +181,7 @@ func buildSingleContainerReport(
 //
 // It creates three logrus.Entry structs representing the key stages of a container update:
 // finding a new image, stopping the container, and starting the new container.
+// For monitor-only containers, it reports detection without action.
 //
 // Parameters:
 //   - c: The container report containing update details.
@@ -189,6 +190,37 @@ func buildSingleContainerReport(
 // Returns:
 //   - []*logrus.Entry: A slice of three log entries for the update events.
 func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry {
+	if c.IsMonitorOnly() {
+		return []*logrus.Entry{
+			{
+				Level:   logrus.InfoLevel,
+				Message: "Found new image",
+				Data: logrus.Fields{
+					"container": c.Name(),
+					"image":     c.ImageName(),
+					"new_id":    c.LatestImageID().ShortID(),
+				},
+				Time: now,
+			},
+			{
+				Level:   logrus.InfoLevel,
+				Message: "Update available but skipped (monitor-only mode)",
+				Data: logrus.Fields{
+					"container": c.Name(),
+				},
+				Time: now,
+			},
+			{
+				Level:   logrus.InfoLevel,
+				Message: "Container remains running (monitor-only mode)",
+				Data: logrus.Fields{
+					"container": c.Name(),
+				},
+				Time: now,
+			},
+		}
+	}
+
 	return []*logrus.Entry{
 		{
 			Level:   logrus.InfoLevel,
@@ -338,6 +370,8 @@ func sendNotifications(
 //
 // It processes updated containers and sends either report-based or filtered entry notifications
 // based on the notificationReport flag, skipping invalid containers.
+// When notificationReport is true, it also sends notifications for monitor-only
+// containers from the stale list.
 //
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
@@ -349,6 +383,14 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 		for _, updatedContainer := range result.Updated() {
 			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
 			notifier.SendNotification(singleContainerReport)
+		}
+
+		// Send notifications for monitor-only containers when notificationReport is true
+		for _, staleContainer := range result.Stale() {
+			if staleContainer.IsMonitorOnly() {
+				singleContainerReport := buildSingleContainerReport(staleContainer, result)
+				notifier.SendNotification(singleContainerReport)
+			}
 		}
 	} else {
 		// Send individual filtered entry notifications for each updated container
@@ -378,6 +420,37 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 			entries := buildUpdateEntries(updatedContainer, time.Now())
 
 			notifier.SendFilteredEntries(entries, singleContainerReport)
+		}
+
+		// Send notifications for monitor-only containers when notificationReport is false
+		for _, staleContainer := range result.Stale() {
+			if staleContainer.IsMonitorOnly() {
+				// Skip nil container reports
+				if staleContainer == nil {
+					logrus.Debug("Encountered nil stale container report, skipping")
+
+					continue
+				}
+
+				// Skip containers with empty names
+				if strings.TrimSpace(staleContainer.Name()) == "" {
+					logrus.WithField("container_id", staleContainer.ID().ShortID()).Debug("Encountered stale container with empty name, skipping notification")
+
+					continue
+				}
+
+				logrus.WithFields(logrus.Fields{
+					"container": staleContainer.Name(),
+					"image":     staleContainer.ImageName(),
+				}).Debug("Sending individual notification for monitor-only stale container")
+
+				singleContainerReport := buildSingleContainerReport(staleContainer, result)
+
+				// Create log entries for container update events (monitor-only containers don't get updated, but we still send the same format)
+				entries := buildUpdateEntries(staleContainer, time.Now())
+
+				notifier.SendFilteredEntries(entries, singleContainerReport)
+			}
 		}
 	}
 

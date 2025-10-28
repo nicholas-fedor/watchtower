@@ -11,6 +11,7 @@ type containerStatus struct {
 	imageName      string
 	containerError error
 	state          State
+	monitorOnly    bool
 }
 
 func (u *containerStatus) ID() types.ContainerID {
@@ -43,4 +44,8 @@ func (u *containerStatus) Error() string {
 
 func (u *containerStatus) State() string {
 	return string(u.state)
+}
+
+func (u *containerStatus) IsMonitorOnly() bool {
+	return u.monitorOnly
 }

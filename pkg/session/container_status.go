@@ -29,6 +29,7 @@ type ContainerStatus struct {
 	imageName      string            // Image name with tag.
 	containerError error             // Error encountered, if any.
 	state          State             // Current state.
+	monitorOnly    bool              // Monitor-only flag.
 }
 
 // ID returns the container ID.
@@ -106,4 +107,12 @@ func (u *ContainerStatus) State() string {
 	default:
 		return "Unknown" // Fallback for unexpected values.
 	}
+}
+
+// IsMonitorOnly returns whether the container is in monitor-only mode.
+//
+// Returns:
+//   - bool: True if monitor-only, false otherwise.
+func (u *ContainerStatus) IsMonitorOnly() bool {
+	return u.monitorOnly
 }
