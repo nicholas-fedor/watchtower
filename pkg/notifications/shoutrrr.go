@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -48,7 +49,7 @@ type router interface {
 // shoutrrrTypeNotifier manages Shoutrrr notifications.
 //
 // It handles queuing, templating, and sending with delay.
-// Uses mutex for thread-safe access to entries.
+// Uses mutex for thread-safe access to entries and sync.Once for idempotent operations.
 type shoutrrrTypeNotifier struct {
 	Urls           []string              // Notification service URLs.
 	Router         router                // Router for sending messages.
@@ -61,9 +62,12 @@ type shoutrrrTypeNotifier struct {
 	legacyTemplate bool                  // Use legacy log-only template if true.
 	params         *shoutrrrTypes.Params // Notification parameters.
 	data           StaticData            // Static notification data.
-	receiving      bool                  // Tracks if receiving logs.
-	delay          time.Duration         // Delay between sends.
-	once           sync.Once             // Ensures AddLogHook executes only once.
+	// These fields must only be accessed via sync/atomic (e.g., atomic.LoadUint32/atomic.StoreUint32/atomic.CompareAndSwapUint32) to avoid data races.
+	receiving uint32        // Tracks if receiving logs.
+	delay     time.Duration // Delay between sends.
+	once      sync.Once     // Ensures AddLogHook executes only once.
+	closeOnce sync.Once     // Ensures Close executes only once.
+	closed    uint32        // Tracks if the notifier is closed.
 }
 
 // GetScheme extracts the scheme from a Shoutrrr URL.
@@ -108,7 +112,7 @@ func (n *shoutrrrTypeNotifier) GetURLs() []string {
 // It starts a send goroutine if not already active.
 func (n *shoutrrrTypeNotifier) AddLogHook() {
 	n.once.Do(func() {
-		n.receiving = true
+		atomic.StoreUint32(&n.receiving, 1)
 		logrus.AddHook(n)
 		LocalLog.WithField("urls", n.Urls).
 			Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
@@ -350,7 +354,17 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 
 	LocalLog.Debug("Queuing notification message")
 
-	n.messages <- msg
+	select {
+	case n.messages <- msg:
+		// Message sent successfully
+	default:
+		// Channel is closed or full, skip sending
+		if atomic.LoadUint32(&n.closed) != 0 {
+			LocalLog.Debug("Channel closed, skipping send")
+		} else {
+			LocalLog.Debug("Channel full, skipping send (backpressure)")
+		}
+	}
 }
 
 // StartNotification begins queuing messages for batching.
@@ -382,13 +396,19 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 
 // Close stops queuing and waits for sends to complete.
 //
-// It closes the messages channel and blocks until done.
+// It closes the messages channel and blocks until done if a goroutine is running.
+// This method is idempotent and can be called multiple times safely.
 func (n *shoutrrrTypeNotifier) Close() {
-	close(n.messages)
+	n.closeOnce.Do(func() {
+		atomic.StoreUint32(&n.closed, 1)
+		close(n.messages)
 
-	LocalLog.Debug("Waiting for the notification goroutine to finish")
+		if atomic.LoadUint32(&n.receiving) != 0 {
+			LocalLog.Debug("Waiting for the notification goroutine to finish")
 
-	<-n.done
+			<-n.done
+		}
+	})
 }
 
 // GetEntries returns a copy of the queued log entries.
@@ -435,6 +455,12 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 	}
 
 	n.entriesMutex.Lock()
+
+	if atomic.LoadUint32(&n.closed) != 0 {
+		n.entriesMutex.Unlock()
+
+		return nil // Skip if closed.
+	}
 
 	if n.entries != nil {
 		n.entries = append(n.entries, entry) // Queue if batching.
