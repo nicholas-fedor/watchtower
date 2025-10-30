@@ -753,8 +753,8 @@ var _ = ginkgo.Describe("the client", func() {
 							http.StatusOK,
 							dockerContainerType.InspectResponse{
 								ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
-									ID:   validContainer1ID,
-									Name: "/valid-container-1",
+									ID:    validContainer1ID,
+									Name:  "/valid-container-1",
 									Image: "test-image-1:latest",
 									State: &dockerContainerType.State{
 										Status: "running",
@@ -799,8 +799,8 @@ var _ = ginkgo.Describe("the client", func() {
 							http.StatusOK,
 							dockerContainerType.InspectResponse{
 								ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
-									ID:   validContainer2ID,
-									Name: "/valid-container-2",
+									ID:    validContainer2ID,
+									Name:  "/valid-container-2",
 									Image: "test-image-2:latest",
 									State: &dockerContainerType.State{
 										Status: "running",
@@ -823,6 +823,8 @@ var _ = ginkgo.Describe("the client", func() {
 				)
 
 				// Execute ListAllContainers
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
 				client := client{api: docker, ClientOptions: ClientOptions{}}
 				containers, err := client.ListAllContainers()
 
@@ -838,6 +840,7 @@ var _ = ginkgo.Describe("the client", func() {
 				gomega.Expect(containerIDs).To(gomega.ContainElement(validContainer1ID))
 				gomega.Expect(containerIDs).To(gomega.ContainElement(validContainer2ID))
 				gomega.Expect(containerIDs).NotTo(gomega.ContainElement(ghostContainerID))
+				gomega.Eventually(logbuf).Should(gbytes.Say(ghostContainerID))
 			})
 		})
 	})
