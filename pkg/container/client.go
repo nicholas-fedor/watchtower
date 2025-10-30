@@ -380,6 +380,15 @@ func (c client) ListAllContainers() ([]types.Container, error) {
 	for _, runningContainer := range containers {
 		container, err := GetSourceContainer(c.api, types.ContainerID(runningContainer.ID))
 		if err != nil {
+			// Check for "No such container" errors
+			// This error is expected when containers disappear between API calls
+			if strings.Contains(err.Error(), "No such container") {
+				logrus.WithField("container_id", runningContainer.ID).
+					Debug("Container no longer exists")
+
+				continue
+			}
+
 			return nil, err
 		}
 
