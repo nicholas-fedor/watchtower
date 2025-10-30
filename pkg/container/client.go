@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
 
@@ -380,9 +381,8 @@ func (c client) ListAllContainers() ([]types.Container, error) {
 	for _, runningContainer := range containers {
 		container, err := GetSourceContainer(c.api, types.ContainerID(runningContainer.ID))
 		if err != nil {
-			// Check for "No such container" errors
-			// This error is expected when containers disappear between API calls
-			if strings.Contains(err.Error(), "No such container") {
+			// Handle race condition where containers disappear between API calls
+			if cerrdefs.IsNotFound(err) {
 				logrus.WithField("container_id", runningContainer.ID).
 					Debug("Container no longer exists")
 
