@@ -715,6 +715,135 @@ var _ = ginkgo.Describe("the client", func() {
 				Should(gbytes.Say("Docker API returned 404 for container list"))
 		})
 	})
+
+	// Test suite for listing all containers with ghost container handling.
+	ginkgo.Describe("ListAllContainers", func() {
+		ginkgo.When("containers disappear during enumeration", func() {
+			ginkgo.It("should gracefully handle ghost containers and continue processing", func() {
+				// Create mock containers: two valid ones and one that will disappear
+				validContainer1 := MockContainer()
+				validContainer1ID := validContainer1.ContainerInfo().ID
+				validContainer2 := MockContainer()
+				validContainer2ID := validContainer2.ContainerInfo().ID
+				ghostContainerID := "ghost-container-id"
+
+				// Set up mock server handlers
+				mockServer.AppendHandlers(
+					// Handler for ContainerList - returns all three containers
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp(`^/v[0-9.]+/containers/json$`),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainerType.Summary{
+							{ID: validContainer1ID, Names: []string{"/valid-container-1"}},
+							{ID: ghostContainerID, Names: []string{"/ghost-container"}},
+							{ID: validContainer2ID, Names: []string{"/valid-container-2"}},
+						}),
+					),
+					// Handler for first valid container inspect
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp(
+								fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, validContainer1ID),
+							),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerContainerType.InspectResponse{
+								ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+									ID:    validContainer1ID,
+									Name:  "/valid-container-1",
+									Image: "test-image-1:latest",
+									State: &dockerContainerType.State{
+										Status: "running",
+									},
+									HostConfig: &dockerContainerType.HostConfig{},
+								},
+								Config: &dockerContainerType.Config{
+									Image: "test-image-1:latest",
+								},
+							},
+						),
+					),
+					// Handler for image inspect for first container
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/images/.*json$`)),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImageType.InspectResponse{
+							ID: "image-id-1",
+						}),
+					),
+					// Handler for ghost container inspect - returns "No such container" error
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp(
+								fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, ghostContainerID),
+							),
+						),
+						ghttp.RespondWith(
+							http.StatusNotFound,
+							`{"message":"No such container: `+ghostContainerID+`"}`,
+						),
+					),
+					// Handler for second valid container inspect
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp(
+								fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, validContainer2ID),
+							),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerContainerType.InspectResponse{
+								ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+									ID:    validContainer2ID,
+									Name:  "/valid-container-2",
+									Image: "test-image-2:latest",
+									State: &dockerContainerType.State{
+										Status: "running",
+									},
+									HostConfig: &dockerContainerType.HostConfig{},
+								},
+								Config: &dockerContainerType.Config{
+									Image: "test-image-2:latest",
+								},
+							},
+						),
+					),
+					// Handler for image inspect for second container
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/images/.*json$`)),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImageType.InspectResponse{
+							ID: "image-id-2",
+						}),
+					),
+				)
+
+				// Execute ListAllContainers
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
+				client := client{api: docker, ClientOptions: ClientOptions{}}
+				containers, err := client.ListAllContainers()
+
+				// Verify no error is returned and only valid containers are included
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(containers).To(gomega.HaveLen(2))
+
+				// Verify the ghost container is not in the result
+				containerIDs := make([]string, len(containers))
+				for i, c := range containers {
+					containerIDs[i] = string(c.ID())
+				}
+				gomega.Expect(containerIDs).To(gomega.ContainElement(validContainer1ID))
+				gomega.Expect(containerIDs).To(gomega.ContainElement(validContainer2ID))
+				gomega.Expect(containerIDs).NotTo(gomega.ContainElement(ghostContainerID))
+				gomega.Eventually(logbuf).Should(gbytes.Say(ghostContainerID))
+			})
+		})
+	})
 })
 
 // captureLogrus captures logrus output in a buffer for testing.

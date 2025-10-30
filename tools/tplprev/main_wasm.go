@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+
 	"syscall/js"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
