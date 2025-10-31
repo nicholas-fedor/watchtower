@@ -199,6 +199,13 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 	for {
 		select {
 		case msg := <-notifier.messages:
+			// Log goroutine receipt of message
+			LocalLog.WithFields(logrus.Fields{
+				"msg_length":        len(msg),
+				"notification_type": shoutrrrType,
+				"total_urls":        len(notifier.Urls),
+			}).Trace("Notification goroutine received message from channel")
+
 			LocalLog.WithField("message", msg).Debug("Sending notification")
 			time.Sleep(notifier.delay)
 
@@ -208,6 +215,13 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				"delay":      notifier.delay.String(),
 				"msg_length": len(msg),
 			}).Trace("Attempting to send notification to configured services")
+
+			// Log before calling Router.Send
+			LocalLog.WithFields(logrus.Fields{
+				"msg_length":        len(msg),
+				"total_urls":        len(notifier.Urls),
+				"notification_type": shoutrrrType,
+			}).Trace("Calling Router.Send with message")
 
 			errs := notifier.Router.Send(msg, notifier.params)
 
@@ -319,15 +333,42 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 		dataSource = data.Entries // Use entries only for legacy mode.
 	}
 
+	// Log template processing start with nil-safe report access
+	containerCount := 0
+
+	reportAvailable := data.Report != nil
+	if reportAvailable {
+		containerCount = len(data.Report.All())
+	}
+
+	LocalLog.WithFields(logrus.Fields{
+		"legacy_template":  n.legacyTemplate,
+		"entries_count":    len(data.Entries),
+		"container_count":  containerCount,
+		"report_available": reportAvailable,
+	}).Debug("Starting template processing for notification message")
+
 	// Execute template with data.
 	err := n.template.Execute(&body, dataSource)
 	if err != nil {
-		LocalLog.WithError(err).Debug("Template execution failed")
+		LocalLog.WithError(err).WithFields(logrus.Fields{
+			"legacy_template": n.legacyTemplate,
+			"template_name":   n.template.Name(),
+		}).Debug("Template execution failed")
 
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	msg := body.String()
+
+	// Log template processing result
+	LocalLog.WithFields(logrus.Fields{
+		"msg_length":      len(msg),
+		"legacy_template": n.legacyTemplate,
+		"template_name":   n.template.Name(),
+		"entries_count":   len(data.Entries),
+	}).Debug("Template processing completed successfully")
+
 	LocalLog.WithField("message", msg).Debug("Generated notification message")
 
 	return msg, nil
@@ -360,25 +401,56 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 		return
 	}
 
-	LocalLog.Debug("Queuing notification message")
+	// Log state check before queuing
+	closed := n.closed.Load()
+	LocalLog.WithFields(logrus.Fields{
+		"closed":        closed,
+		"receiving":     n.receiving.Load(),
+		"entries_count": len(entries),
+		"msg_length":    len(msg),
+	}).Debug("Checking notifier state before queuing message")
 
-	if n.closed.Load() {
-		LocalLog.Debug("Notifier closed, skipping send")
+	if closed {
+		LocalLog.WithFields(logrus.Fields{
+			"entries_count": len(entries),
+			"msg_length":    len(msg),
+		}).Debug("Notifier closed, skipping send")
 
 		return
 	}
 
+	// Log queuing attempt
+	LocalLog.WithFields(logrus.Fields{
+		"entries_count":     len(entries),
+		"msg_length":        len(msg),
+		"notification_type": shoutrrrType,
+	}).Debug("Queuing notification message to channel")
+
 	select {
 	case n.messages <- msg:
-		// Message sent successfully
+		// Message sent successfully to channel
+		LocalLog.WithFields(logrus.Fields{
+			"entries_count":  len(entries),
+			"msg_length":     len(msg),
+			"channel_status": "sent",
+		}).Debug("Successfully sent message to notification channel")
 	default:
 		// Channel is closed or full, skip sending
-		if n.closed.Load() {
-			LocalLog.Debug("Channel closed, skipping send")
+		closedAfter := n.closed.Load()
+		if closedAfter {
+			LocalLog.WithFields(logrus.Fields{
+				"entries_count":  len(entries),
+				"msg_length":     len(msg),
+				"channel_status": "closed",
+			}).Debug("Channel closed, skipping send")
 
 			return
 		} else {
-			LocalLog.Debug("Channel full, skipping send (backpressure)")
+			LocalLog.WithFields(logrus.Fields{
+				"entries_count":  len(entries),
+				"msg_length":     len(msg),
+				"channel_status": "full",
+			}).Debug("Channel full, skipping send (backpressure)")
 		}
 	}
 }
