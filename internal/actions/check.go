@@ -192,7 +192,11 @@ func cleanupExcessWatchtowers(
 		if cleanup && c.SafeImageID() != newestImageID {
 			*cleanupImageInfos = append(
 				*cleanupImageInfos,
-				types.CleanedImageInfo{ImageID: c.SafeImageID(), ContainerName: c.Name()},
+				types.CleanedImageInfo{
+					ImageID:       c.SafeImageID(),
+					ImageName:     c.ImageName(),
+					ContainerName: c.Name(),
+				},
 			)
 		}
 	}
@@ -282,7 +286,12 @@ func CleanupImages(
 	}
 
 	if len(removalErrors) > 0 {
-		return cleaned, fmt.Errorf("%w: %v", errImageCleanupFailed, removalErrors)
+		return cleaned, fmt.Errorf(
+			"%w: %d of %d image removals failed",
+			errImageCleanupFailed,
+			len(removalErrors),
+			len(cleanedImages),
+		)
 	}
 
 	return cleaned, nil

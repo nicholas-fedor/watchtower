@@ -530,6 +530,9 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 		n.sendEntries(n.entries, nil)
 	}
 
+	// Capture the count before resetting the slice.
+	preResetCount := len(n.entries)
+
 	// Reset the entries slice to an empty slice with initial capacity for new batching.
 	n.entries = make([]*logrus.Entry, 0, initialEntriesCapacity)
 
@@ -539,7 +542,7 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 	LocalLog.WithFields(logrus.Fields{
 		"legacy_template":  n.legacyTemplate,
 		"receiving":        n.receiving.Load(),
-		"entries_count":    len(n.entries),
+		"entries_count":    preResetCount,
 		"suppress_summary": suppressSummary,
 	}).Debug("StartNotification called - batching mode enabled")
 }

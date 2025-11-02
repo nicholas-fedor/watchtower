@@ -49,8 +49,7 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 	data := GetTemplateData(c)
 	urls, delay := AppendLegacyUrls(urls, c)
 
-	// Determine legacy template usage: use legacy for split notifications if report template is disabled,
-	// otherwise use legacy template for non-split notifications
+	// Non-split notifications always use the legacy template. Split notifications use the report template when reportTemplate is true, otherwise fall back to legacy.
 	legacy := !reportTemplate
 	if !notificationSplitByContainer {
 		legacy = true

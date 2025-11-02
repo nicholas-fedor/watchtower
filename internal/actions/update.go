@@ -46,6 +46,25 @@ var (
 	errParseImageReference = errors.New("failed to parse image reference")
 )
 
+// addCleanupImageInfo adds cleanup info if not already present.
+func addCleanupImageInfo(
+	cleanupImageInfos *[]types.CleanedImageInfo,
+	imageID types.ImageID,
+	imageName, containerName string,
+) {
+	for _, existing := range *cleanupImageInfos {
+		if existing.ImageID == imageID {
+			return
+		}
+	}
+
+	*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{
+		ImageID:       imageID,
+		ImageName:     imageName,
+		ContainerName: containerName,
+	})
+}
+
 // Update scans and updates containers based on parameters.
 //
 // It checks container staleness, sorts by dependencies, and updates or restarts containers as needed,
@@ -485,20 +504,7 @@ func performRollingRestart(
 					// Only collect cleaned image info for stale containers that were not renamed, as renamed
 					// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 					// in the new container.
-					imageID := c.ImageID()
-					found := false
-
-					for _, existing := range *cleanupImageInfos {
-						if existing.ImageID == imageID {
-							found = true
-
-							break
-						}
-					}
-
-					if !found {
-						*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{ImageID: imageID, ImageName: c.ImageName(), ContainerName: c.Name()})
-					}
+					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name())
 
 					logrus.WithFields(fields).Info("Updated container")
 				}
@@ -689,20 +695,7 @@ func restartContainersInSortedOrder(
 				// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 				// in the new container.
 				if c.IsStale() && !renamedContainers[c.ID()] {
-					imageID := c.ImageID()
-					found := false
-
-					for _, existing := range *cleanupImageInfos {
-						if existing.ImageID == imageID {
-							found = true
-
-							break
-						}
-					}
-
-					if !found {
-						*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{ImageID: imageID, ImageName: c.ImageName(), ContainerName: c.Name()})
-					}
+					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name())
 				}
 			}
 		}
