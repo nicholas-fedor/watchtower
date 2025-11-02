@@ -10,7 +10,7 @@ var commonTemplates = map[string]string{
 	// "default-legacy" template formats individual event entries in a legacy log style.
 	// It iterates over .Entries, checking each entry's Message to format specific container lifecycle events.
 	// Handles messages: "Found new image" (new image available), "Stopping container" (stopping old container),
-	// "Started new container" (new container started), "Old image cleaned up" (image cleanup completed), "Container updated" (update completed).
+	// "Started new container" (new container started), "Removing image" (image cleanup completed), "Container updated" (update completed).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
 	"default-legacy": `
