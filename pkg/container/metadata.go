@@ -464,6 +464,16 @@ func (c Container) getBoolLabelValue(label string) (bool, error) {
 	}
 
 	// Parse as boolean.
+	// Treat empty string as false to handle cases where label is explicitly set to empty
+	if strVal == "" {
+		clog.WithFields(logrus.Fields{
+			"label": label,
+			"value": strVal,
+		}).Debug("Treating empty string as false for boolean label")
+
+		return false, nil
+	}
+
 	value, err := strconv.ParseBool(strVal)
 	if err != nil {
 		clog.WithError(err).WithFields(logrus.Fields{

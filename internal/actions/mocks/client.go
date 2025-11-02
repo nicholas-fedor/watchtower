@@ -35,6 +35,7 @@ type TestData struct {
 	ListContainersError          error             // Error to return from ListContainers (for testing).
 	StopContainerError           error             // Error to return from StopContainer (for testing).
 	StopContainerFailCount       int               // Number of times StopContainer should fail before succeeding.
+	RemoveImageError             error             // Error to return from RemoveImageByID (for testing).
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -113,9 +114,12 @@ func (client MockClient) RenameContainer(_ types.Container, _ string) error {
 }
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
-// It simulates image cleanup and returns nil to indicate success.
-func (client MockClient) RemoveImageByID(_ types.ImageID) error {
+// It simulates image cleanup and returns configured error if set, nil otherwise.
+func (client MockClient) RemoveImageByID(_ types.ImageID, _ string) error {
 	client.TestData.TriedToRemoveImageCount++
+	if client.TestData.RemoveImageError != nil {
+		return client.TestData.RemoveImageError
+	}
 	return nil
 }
 

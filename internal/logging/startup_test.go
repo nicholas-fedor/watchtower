@@ -115,7 +115,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		)
 
 		output := buffer.String()
-		gomega.Expect(output).To(gomega.ContainSubstring("Trace level enabled"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Trace-level logging enabled"))
 	})
 })
 
@@ -195,6 +195,18 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Running a one time update"))
+	})
+
+	ginkgo.It("should log flag conflict when both run-once and update-on-start are set", func() {
+		cmd.PersistentFlags().Bool("run-once", true, "")
+		cmd.PersistentFlags().Bool("update-on-start", true, "")
+		logger := logrus.NewEntry(logrus.StandardLogger())
+
+		logging.LogScheduleInfo(logger, cmd, time.Time{})
+
+		output := buffer.String()
+		gomega.Expect(output).
+			To(gomega.ContainSubstring("Run once enabled: Disregarding redundant update on start"))
 	})
 
 	ginkgo.It("should log update on start", func() {

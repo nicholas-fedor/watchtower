@@ -82,7 +82,8 @@ var _ = ginkgo.Describe("the client", func() {
 				c := client{api: docker}
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
-				gomega.Expect(c.RemoveImageByID(types.ImageID(imageA))).To(gomega.Succeed())
+				gomega.Expect(c.RemoveImageByID(types.ImageID(imageA), "test-image")).
+					To(gomega.Succeed())
 				shortA := types.ImageID(imageA).ShortID()
 				shortAParent := types.ImageID(imageAParent).ShortID()
 				gomega.Eventually(logbuf).
@@ -94,7 +95,7 @@ var _ = ginkgo.Describe("the client", func() {
 				image := util.GenerateRandomSHA256()
 				mockServer.AppendHandlers(mocks.RemoveImageHandler(nil))
 				c := client{api: docker}
-				err := c.RemoveImageByID(types.ImageID(image))
+				err := c.RemoveImageByID(types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
 			})
 		})

@@ -28,7 +28,7 @@ build: ## Build the application binary
 test: ## Run all tests
 	$(GO) test -timeout 30s -v -coverprofile coverage.out -covermode atomic ./...
 
-mock: ## Generate mocks
+mocks: ## Generate mocks
 	$(MOCKERY)
 
 lint: ## Run linter and fix issues

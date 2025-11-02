@@ -34,6 +34,9 @@ const initialEntriesCapacity = 10
 // maxURLLengthForLogging defines the maximum length of URLs displayed in logs to avoid exposing sensitive information.
 const maxURLLengthForLogging = 50
 
+// messageChannelBufferSize defines the buffer size for the notification message channel.
+const messageChannelBufferSize = 1000
+
 // LocalLog is a logrus logger that does not send entries as notifications.
 //
 // It’s used for internal logging to avoid notification loops.
@@ -174,18 +177,121 @@ func createNotifier(
 	}
 
 	return &shoutrrrTypeNotifier{
-		Urls:           urls,
-		Router:         router,
-		messages:       make(chan string, 1),
-		done:           make(chan struct{}, 1),
-		stop:           make(chan struct{}),
-		logLevel:       level,
-		template:       tpl,
-		legacyTemplate: legacy,
-		data:           data,
-		params:         params,
-		delay:          delay,
-		entries:        make([]*logrus.Entry, 0, initialEntriesCapacity),
+		Urls:   urls,   // Notification service URLs.
+		Router: router, // Router for sending messages.
+		messages: make(
+			chan string,
+			messageChannelBufferSize,
+		), // Channel buffer size for notification messages
+		done: make(
+			chan struct{},
+			1,
+		), // Signal for send completion.
+		stop: make(
+			chan struct{},
+		), // Channel for stopping the notifier.
+		logLevel:       level,                                            // Minimum log level for notifications.
+		template:       tpl,                                              // Template for message formatting.
+		legacyTemplate: legacy,                                           // Use legacy log-only template if true.
+		data:           data,                                             // Static notification data.
+		params:         params,                                           // Notification parameters.
+		delay:          delay,                                            // Delay between sends.
+		entries:        make([]*logrus.Entry, 0, initialEntriesCapacity), // Queued log entries.
+	}
+}
+
+// processSendErrors processes errors from router send operations.
+//
+// Parameters:
+//   - notifier: Notifier instance.
+//   - errs: Errors returned from router send.
+func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
+	failureCount := 0
+
+	var authFailures, networkFailures, rateLimitFailures int
+
+	for i, err := range errs {
+		// Index guard against potential errs/Urls length mismatch
+		if i >= len(notifier.Urls) {
+			LocalLog.WithFields(logrus.Fields{
+				"index":        i,
+				"urls_length":  len(notifier.Urls),
+				"errs_length":  len(errs),
+				"failure_type": "index_mismatch",
+			}).WithError(err).Error("Error index out of bounds for URLs slice")
+
+			continue
+		}
+
+		// Increment failure count and prepare URL details for logging on notification failure.
+		if err != nil {
+			failureCount++
+			scheme := GetScheme(notifier.Urls[i])
+			sanitizedURL := sanitizeURLForLogging(notifier.Urls[i])
+
+			// Diagnostic logging: Categorize failure types
+			errStr := err.Error()
+
+			errStrLower := strings.ToLower(errStr) // Compute lowercase once for efficiency
+			switch {
+			case strings.Contains(errStrLower, "unauthorized") ||
+				strings.Contains(errStrLower, "authentication") ||
+				strings.Contains(errStrLower, "invalid token") ||
+				strings.Contains(errStrLower, "invalid api") ||
+				strings.Contains(errStrLower, "invalid key") ||
+				strings.Contains(errStrLower, "invalid credentials"):
+				authFailures++
+
+				LocalLog.WithFields(logrus.Fields{
+					"service":      scheme,
+					"index":        i,
+					"url":          sanitizedURL,
+					"failure_type": "authentication",
+				}).WithError(err).Warn("Authentication failure detected - check API keys/tokens")
+			case strings.Contains(errStrLower, "timeout") ||
+				strings.Contains(errStrLower, "connection") ||
+				strings.Contains(errStrLower, "network"):
+				networkFailures++
+
+				LocalLog.WithFields(logrus.Fields{
+					"service":      scheme,
+					"index":        i,
+					"url":          sanitizedURL,
+					"failure_type": "network",
+				}).WithError(err).Warn("Network connectivity failure detected - check internet connection")
+			case strings.Contains(errStrLower, "rate limit") ||
+				strings.Contains(errStrLower, "too many requests"):
+				rateLimitFailures++
+
+				LocalLog.WithFields(logrus.Fields{
+					"service":      scheme,
+					"index":        i,
+					"url":          sanitizedURL,
+					"failure_type": "rate_limit",
+				}).WithError(err).Warn("Rate limiting detected - consider increasing delays or reducing frequency")
+			default:
+				LocalLog.WithFields(logrus.Fields{
+					"service":      scheme,
+					"index":        i,
+					"url":          sanitizedURL,
+					"failure_type": "unknown",
+				}).WithError(err).Error("Failed to send shoutrrr notification - no retry logic implemented")
+			}
+		}
+	}
+
+	// Diagnostic logging: Summary with categorized failures
+	if failureCount > 0 {
+		LocalLog.WithFields(logrus.Fields{
+			"total_urls":          len(notifier.Urls),
+			"failed_count":        failureCount,
+			"success_count":       len(notifier.Urls) - failureCount,
+			"auth_failures":       authFailures,
+			"network_failures":    networkFailures,
+			"rate_limit_failures": rateLimitFailures,
+		}).Warn("Notification send completed with failures - consider implementing retry logic for transient errors")
+	} else if len(notifier.Urls) > 0 {
+		LocalLog.WithField("total_urls", len(notifier.Urls)).Debug("Notification send completed successfully")
 	}
 }
 
@@ -225,94 +331,51 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 
 			errs := notifier.Router.Send(msg, notifier.params)
 
-			failureCount := 0
-
-			var authFailures, networkFailures, rateLimitFailures int
-
-			for i, err := range errs {
-				// Index guard against potential errs/Urls length mismatch
-				if i >= len(notifier.Urls) {
-					LocalLog.WithFields(logrus.Fields{
-						"index":        i,
-						"urls_length":  len(notifier.Urls),
-						"errs_length":  len(errs),
-						"failure_type": "index_mismatch",
-					}).WithError(err).Error("Error index out of bounds for URLs slice")
-
-					continue
-				}
-
-				if err != nil {
-					failureCount++
-					scheme := GetScheme(notifier.Urls[i])
-					sanitizedURL := sanitizeURLForLogging(notifier.Urls[i])
-
-					// Diagnostic logging: Categorize failure types
-					errStr := err.Error()
-
-					errStrLower := strings.ToLower(errStr) // Compute lowercase once for efficiency
-					switch {
-					case strings.Contains(errStrLower, "unauthorized") ||
-						strings.Contains(errStrLower, "authentication") ||
-						strings.Contains(errStrLower, "invalid token") ||
-						strings.Contains(errStrLower, "invalid api") ||
-						strings.Contains(errStrLower, "invalid key") ||
-						strings.Contains(errStrLower, "invalid credentials"):
-						authFailures++
-
-						LocalLog.WithFields(logrus.Fields{
-							"service":      scheme,
-							"index":        i,
-							"url":          sanitizedURL,
-							"failure_type": "authentication",
-						}).WithError(err).Warn("Authentication failure detected - check API keys/tokens")
-					case strings.Contains(errStrLower, "timeout") ||
-						strings.Contains(errStrLower, "connection") ||
-						strings.Contains(errStrLower, "network"):
-						networkFailures++
-
-						LocalLog.WithFields(logrus.Fields{
-							"service":      scheme,
-							"index":        i,
-							"url":          sanitizedURL,
-							"failure_type": "network",
-						}).WithError(err).Warn("Network connectivity failure detected - check internet connection")
-					case strings.Contains(errStrLower, "rate limit") ||
-						strings.Contains(errStrLower, "too many requests"):
-						rateLimitFailures++
-
-						LocalLog.WithFields(logrus.Fields{
-							"service":      scheme,
-							"index":        i,
-							"url":          sanitizedURL,
-							"failure_type": "rate_limit",
-						}).WithError(err).Warn("Rate limiting detected - consider increasing delays or reducing frequency")
-					default:
-						LocalLog.WithFields(logrus.Fields{
-							"service":      scheme,
-							"index":        i,
-							"url":          sanitizedURL,
-							"failure_type": "unknown",
-						}).WithError(err).Error("Failed to send shoutrrr notification - no retry logic implemented")
-					}
-				}
-			}
-
-			// Diagnostic logging: Summary with categorized failures
-			if failureCount > 0 {
-				LocalLog.WithFields(logrus.Fields{
-					"total_urls":          len(notifier.Urls),
-					"failed_count":        failureCount,
-					"success_count":       len(notifier.Urls) - failureCount,
-					"auth_failures":       authFailures,
-					"network_failures":    networkFailures,
-					"rate_limit_failures": rateLimitFailures,
-				}).Warn("Notification send completed with failures - consider implementing retry logic for transient errors")
-			} else if len(notifier.Urls) > 0 {
-				LocalLog.WithField("total_urls", len(notifier.Urls)).Debug("Notification send completed successfully")
-			}
+			processSendErrors(notifier, errs)
 		case <-notifier.stop:
-			return
+			// Shutdown mode: drain all remaining messages from the channel
+			LocalLog.Debug("Shutdown signal received, draining remaining messages without delay")
+
+			for {
+				select {
+				case msg := <-notifier.messages:
+					// Log goroutine receipt of message during shutdown
+					LocalLog.WithFields(logrus.Fields{
+						"msg_length":        len(msg),
+						"notification_type": shoutrrrType,
+						"total_urls":        len(notifier.Urls),
+						"shutdown_mode":     true,
+					}).Trace("Processing remaining notification message during shutdown")
+
+					LocalLog.WithField("message", msg).Debug("Sending notification during shutdown")
+
+					// Skip delay during shutdown to expedite processing
+					// time.Sleep(notifier.delay) // Omitted for shutdown
+
+					// Diagnostic logging: Log attempt details before sending
+					LocalLog.WithFields(logrus.Fields{
+						"total_urls": len(notifier.Urls),
+						"delay":      notifier.delay.String(),
+						"msg_length": len(msg),
+					}).Trace("Attempting to send notification to configured services during shutdown")
+
+					// Log before calling Router.Send
+					LocalLog.WithFields(logrus.Fields{
+						"msg_length":        len(msg),
+						"total_urls":        len(notifier.Urls),
+						"notification_type": shoutrrrType,
+					}).Trace("Calling Router.Send with message during shutdown")
+
+					errs := notifier.Router.Send(msg, notifier.params)
+
+					processSendErrors(notifier, errs)
+				default:
+					// Channel is empty, all messages drained
+					LocalLog.Debug("All remaining messages drained during shutdown")
+
+					return
+				}
+			}
 		}
 	}
 }
@@ -457,15 +520,28 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 
 // StartNotification begins queuing messages for batching.
 //
-// It resets the entries slice if nil.
-func (n *shoutrrrTypeNotifier) StartNotification() {
+// It sends any existing queued entries before resetting the entries slice to ensure a fresh queue for each run.
+// When suppressSummary is true, skip sending queued entries.
+func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 	n.entriesMutex.Lock()
 
-	if n.entries == nil {
-		n.entries = make([]*logrus.Entry, 0, initialEntriesCapacity)
+	// Send any existing queued entries before resetting, unless suppressed
+	if len(n.entries) > 0 && !suppressSummary {
+		n.sendEntries(n.entries, nil)
 	}
 
+	// Reset the entries slice to an empty slice with initial capacity for new batching.
+	n.entries = make([]*logrus.Entry, 0, initialEntriesCapacity)
+
+	// Unlock the mutex after resetting the entries slice.
 	n.entriesMutex.Unlock()
+
+	LocalLog.WithFields(logrus.Fields{
+		"legacy_template":  n.legacyTemplate,
+		"receiving":        n.receiving.Load(),
+		"entries_count":    len(n.entries),
+		"suppress_summary": suppressSummary,
+	}).Debug("StartNotification called - batching mode enabled")
 }
 
 // SendNotification sends queued messages with a report.
@@ -479,6 +555,13 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	entries := n.entries
 	n.entries = nil // Clear the queue after copying to prevent re-sending
 	n.entriesMutex.Unlock()
+
+	LocalLog.WithFields(logrus.Fields{
+		"entries_count":    len(entries),
+		"legacy_template":  n.legacyTemplate,
+		"report_available": report != nil,
+	}).Debug("SendNotification called - sending queued entries and report")
+
 	n.sendEntries(entries, report)
 }
 
@@ -554,7 +637,18 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 
 	if n.entries != nil {
 		n.entries = append(n.entries, entry) // Queue if batching.
+		LocalLog.WithFields(logrus.Fields{
+			"message":         entry.Message,
+			"level":           entry.Level.String(),
+			"entries_count":   len(n.entries),
+			"legacy_template": n.legacyTemplate,
+		}).Debug("Log entry queued for batching")
 	} else {
+		LocalLog.WithFields(logrus.Fields{
+			"message":         entry.Message,
+			"level":           entry.Level.String(),
+			"legacy_template": n.legacyTemplate,
+		}).Debug("Log entry sent immediately (not batching)")
 		n.sendEntries([]*logrus.Entry{entry}, nil) // Send immediately if not batching.
 	}
 

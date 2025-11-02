@@ -65,6 +65,7 @@ const (
 type Container struct {
 	LinkedToRestarting bool                                 // Indicates if linked to a restarting container
 	Stale              bool                                 // Marks the container as having an outdated image
+	OldImageID         types.ImageID                        // Stores the image ID before update for cleanup tracking
 	containerInfo      *dockerContainerType.InspectResponse // Docker container metadata
 	imageInfo          *dockerImageType.InspectResponse     // Docker image metadata
 }
@@ -85,6 +86,7 @@ func NewContainer(
 	c := &Container{
 		LinkedToRestarting: false,
 		Stale:              false,
+		OldImageID:         "",
 		containerInfo:      containerInfo,
 		imageInfo:          imageInfo,
 	}

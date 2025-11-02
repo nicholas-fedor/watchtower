@@ -82,8 +82,12 @@ type Client interface {
 
 	// RemoveImageByID deletes an image from the Docker host by its ID.
 	//
+	// Parameters:
+	//   - imageID: ID of the image to remove.
+	//   - imageName: Name of the image to remove (for logging purposes).
+	//
 	// Returns an error if the removal fails.
-	RemoveImageByID(imageID types.ImageID) error
+	RemoveImageByID(imageID types.ImageID, imageName string) error
 
 	// WarnOnHeadPullFailed determines whether to log a warning when a HEAD request fails during image pulls.
 	//
@@ -758,21 +762,28 @@ func (c client) waitForExecOrTimeout(
 //
 // Parameters:
 //   - imageID: ID of the image to remove.
+//   - imageName: Name of the image to remove (for logging purposes).
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c client) RemoveImageByID(imageID types.ImageID) error {
+func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
 	// Use image client to remove the image.
 	imgClient := newImageClient(c.api)
 
-	err := imgClient.RemoveImageByID(imageID)
+	err := imgClient.RemoveImageByID(imageID, imageName)
 	if err != nil {
-		logrus.WithError(err).WithField("image_id", imageID).Debug("Failed to remove image")
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"image_id":   imageID,
+			"image_name": imageName,
+		}).Debug("Failed to remove image")
 
 		return err
 	}
 
-	logrus.WithField("image_id", imageID).Debug("Removed image")
+	logrus.WithFields(logrus.Fields{
+		"image_id":   imageID,
+		"image_name": imageName,
+	}).Debug("Removed image")
 
 	return nil
 }

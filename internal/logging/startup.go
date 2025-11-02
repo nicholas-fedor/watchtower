@@ -101,7 +101,7 @@ func WriteStartupMessage(
 	// Warn about trace-level logging if enabled, as it may expose sensitive data.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		startupLog.Warn(
-			"Trace level enabled: log will include sensitive information as credentials and tokens",
+			"Trace-level logging enabled: Sensitive credentials and tokens may be included in logs",
 		)
 	}
 }
@@ -125,7 +125,7 @@ func SetupStartupLogger(noStartupMessage bool, notifier types.Notifier) *logrus.
 	log := logrus.NewEntry(logrus.StandardLogger())
 
 	if notifier != nil {
-		notifier.StartNotification()
+		notifier.StartNotification(false)
 	}
 
 	return log
@@ -150,23 +150,31 @@ func LogNotifierInfo(log *logrus.Entry, notifierNames []string) {
 // LogScheduleInfo logs information about the scheduling or run mode configuration.
 //
 // It handles scheduled runs with timing details, one-time updates, or indicates no periodic runs,
-// ensuring users understand when and how updates will occur.
+// ensuring users understand when and how updates will occur. It also warns about flag conflicts
+// such as when both --run-once and --update-on-start are enabled.
 //
 // Parameters:
 //   - log: The logrus.Entry used to write the schedule information.
 //   - c: The cobra.Command instance, providing access to flags like --run-once.
 //   - sched: The time.Time of the first scheduled run, or zero if no schedule is set.
 func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
-	// Check if running in one-time update mode.
+	// Obtain flag values for run-once and update-on-start.
 	runOnce, _ := c.PersistentFlags().GetBool("run-once")
+	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
+
+	// Check if run-once is enabled.
 	if runOnce {
-		log.Info("Running a one time update")
+		// Warn if disregarding update-on-start when already performing on-time update
+		if updateOnStart {
+			log.Warn("Run once enabled: Disregarding redundant update on start")
+		} else {
+			log.Info("Running a one time update")
+		}
 
 		return
 	}
 
 	// Check if update on start is enabled.
-	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
 	if updateOnStart {
 		log.Info(
 			"Update on startup enabled: Performing immediate check",

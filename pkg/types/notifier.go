@@ -4,12 +4,12 @@ import "github.com/sirupsen/logrus"
 
 // Notifier defines the common interface for notification services.
 type Notifier interface {
-	StartNotification()                 // Begin queuing messages.
-	SendNotification(reportType Report) // Send queued messages with report.
-	AddLogHook()                        // Add as logrus hook.
-	GetNames() []string                 // Service names.
-	GetURLs() []string                  // Service URLs.
-	Close()                             // Stop and flush notifications.
+	StartNotification(suppressSummary bool) // Begin queuing messages.
+	SendNotification(reportType Report)     // Send queued messages with report.
+	AddLogHook()                            // Add as logrus hook.
+	GetNames() []string                     // Service names.
+	GetURLs() []string                      // Service URLs.
+	Close()                                 // Stop and flush notifications.
 
 	// GetEntries returns all queued logrus entries that have been captured during the session.
 	// This is used for notification splitting by container in log mode, allowing notifiers

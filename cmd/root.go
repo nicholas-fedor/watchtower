@@ -524,13 +524,6 @@ func runMain(cfg config.RunConfig) int {
 		return 1 // Exit immediately after logging
 	}
 
-	// Handle conflicts between --run-once and --update-on-start.
-	if cfg.RunOnce && cfg.UpdateOnStart {
-		logrus.Warn(
-			"--update-on-start is ignored when --run-once is specified; deferring to --run-once behavior",
-		)
-	}
-
 	// Initialize a lock channel to prevent concurrent updates.
 	updateLock := make(chan bool, 1)
 	updateLock <- true
@@ -554,13 +547,13 @@ func runMain(cfg config.RunConfig) int {
 	}
 
 	// Check for and resolve conflicts with multiple Watchtower instances.
-	cleanupImageIDs := make(map[types.ImageID]bool)
+	var cleanupImageInfos []types.CleanedImageInfo
 
 	cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 		client,
 		cleanup,
 		scope,
-		cleanupImageIDs,
+		&cleanupImageInfos,
 	)
 	if err != nil {
 		logNotify("Multiple Watchtower instances detected", err)
