@@ -979,6 +979,24 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 			want:    false,
 			wantErr: true,
 		},
+		{
+			name: "EmptyStringValue",
+			c: Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"test.label": "",
+						},
+					},
+				},
+			},
+			args:    args{label: "test.label"},
+			want:    false,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

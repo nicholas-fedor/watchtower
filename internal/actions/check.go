@@ -29,6 +29,8 @@ var (
 	errStopWatchtowerFailed = errors.New("errors occurred while stopping watchtower containers")
 	// errListContainersFailed flags failures in listing containers.
 	errListContainersFailed = errors.New("failed to list containers")
+	// errImageCleanupFailed flags failures in image cleanup.
+	errImageCleanupFailed = errors.New("errors occurred during image cleanup")
 )
 
 // CheckForSanity validates the environment for updates.
@@ -80,7 +82,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 // CheckForMultipleWatchtowerInstances ensures a single Watchtower instance within the same scope.
 //
 // It identifies multiple Watchtower containers within the same scope, stops all but the newest,
-// and collects image IDs for deferred cleanup if enabled, preventing conflicts from concurrent instances.
+// and collects cleaned images for deferred cleanup if enabled, preventing conflicts from concurrent instances.
 // Scoped instances only clean up other instances in the same scope, allowing coexistence with different scopes.
 // Cleanup operations respect scope boundaries to prevent cross-scope interference.
 //
@@ -88,7 +90,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 //   - client: Container client for Docker operations.
 //   - cleanup: Remove images if true.
 //   - scope: Scope UID to filter Watchtower instances.
-//   - cleanupImageIDs: Set of image IDs to clean up after stopping excess instances.
+//   - cleanupImageInfos: Pointer to slice of cleaned images to clean up after stopping excess instances.
 //
 // Returns:
 //   - bool: True if cleanup occurred (multiple instances were found and excess ones stopped), false otherwise.
@@ -97,7 +99,7 @@ func CheckForMultipleWatchtowerInstances(
 	client container.Client,
 	cleanup bool,
 	scope string,
-	cleanupImageIDs map[types.ImageID]bool,
+	cleanupImageInfos *[]types.CleanedImageInfo,
 ) (bool, error) {
 	// Apply scope filter to target specific Watchtower instances, if provided.
 	var filter types.Filter
@@ -130,19 +132,19 @@ func CheckForMultipleWatchtowerInstances(
 	logrus.WithField("count", len(containers)).
 		Info("Detected multiple Watchtower instances, initiating cleanup")
 
-	return cleanupExcessWatchtowers(containers, client, cleanup, cleanupImageIDs)
+	return cleanupExcessWatchtowers(containers, client, cleanup, cleanupImageInfos)
 }
 
 // cleanupExcessWatchtowers removes all but the latest Watchtower instance.
 //
-// It sorts containers by creation time, stops older instances, and collects their image IDs for
+// It sorts containers by creation time, stops older instances, and collects cleaned images for
 // deferred cleanup, ensuring only the newest instance remains active.
 //
 // Parameters:
 //   - containers: List of Watchtower container instances.
 //   - client: Container client for Docker operations.
 //   - cleanup: Remove images if true.
-//   - cleanupImageIDs: Set of image IDs to clean up after stopping excess instances.
+//   - cleanupImageInfos: Pointer to slice of cleaned images to clean up after stopping excess instances.
 //
 // Returns:
 //   - bool: Always true since cleanup occurred.
@@ -151,7 +153,7 @@ func cleanupExcessWatchtowers(
 	containers []types.Container,
 	client container.Client,
 	cleanup bool,
-	cleanupImageIDs map[types.ImageID]bool,
+	cleanupImageInfos *[]types.CleanedImageInfo,
 ) (bool, error) {
 	// Sort containers by creation time to identify the newest instance.
 	sort.Sort(sorter.ByCreated(containers))
@@ -188,13 +190,25 @@ func cleanupExcessWatchtowers(
 		logrus.WithField("container", c.Name()).Debug("Stopped Watchtower instance")
 		// Skip cleanup if the image is used by the newest container.
 		if cleanup && c.SafeImageID() != newestImageID {
-			cleanupImageIDs[c.SafeImageID()] = true
+			*cleanupImageInfos = append(
+				*cleanupImageInfos,
+				types.CleanedImageInfo{
+					ImageID:       c.SafeImageID(),
+					ImageName:     c.ImageName(),
+					ContainerName: c.Name(),
+				},
+			)
 		}
 	}
 
-	// Perform deferred cleanup of collected image IDs if enabled.
+	// Perform deferred cleanup of collected cleaned images if enabled.
 	if cleanup {
-		CleanupImages(client, cleanupImageIDs)
+		cleaned, err := CleanupImages(client, *cleanupImageInfos)
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to clean up some images during Watchtower cleanup")
+		} else if len(cleaned) > 0 {
+			logrus.WithField("cleaned_images", len(cleaned)).Debug("Successfully cleaned up images during Watchtower cleanup")
+		}
 	}
 
 	// Report any stop errors encountered during the process.
@@ -214,39 +228,73 @@ func cleanupExcessWatchtowers(
 	return true, nil
 }
 
-// CleanupImages removes specified image IDs.
+// CleanupImages removes specified cleaned images and returns successfully cleaned ones.
 //
-// It iterates through the provided image IDs, attempting to remove each from the Docker environment,
-// logging successes or failures for debugging and monitoring. If no image IDs are provided, it returns
-// early to avoid unnecessary processing.
+// It iterates through the provided cleaned images, attempting to remove each from the Docker environment,
+// logging successes or failures for debugging and monitoring. Tracks successfully cleaned image info.
+// If no cleaned images are provided, it returns an empty slice and no error.
 //
 // Parameters:
 //   - client: Container client for Docker operations.
-//   - imageIDs: Set of image IDs to remove.
-func CleanupImages(client container.Client, imageIDs map[types.ImageID]bool) {
+//   - cleanedImages: Slice of cleaned images to remove.
+//
+// Returns:
+//   - []CleanedImageInfo: Slice of successfully cleaned image info.
+//   - error: Non-nil if any image removal failed, nil otherwise.
+func CleanupImages(
+	client container.Client,
+	cleanedImages []types.CleanedImageInfo,
+) ([]types.CleanedImageInfo, error) {
 	// Return early if no images need cleanup to optimize performance.
-	if len(imageIDs) == 0 {
-		logrus.Debug("No image IDs provided for cleanup, skipping")
+	if len(cleanedImages) == 0 {
+		logrus.Debug("No cleaned images provided for cleanup, skipping")
 
-		return
+		return []types.CleanedImageInfo{}, nil
 	}
 
-	for imageID := range imageIDs {
+	cleaned := []types.CleanedImageInfo{}
+
+	var removalErrors []error
+
+	for _, cleanedImage := range cleanedImages {
+		imageID := cleanedImage.ImageID
 		if imageID == "" {
 			continue // Skip empty IDs to avoid invalid operations.
 		}
 
-		if err := client.RemoveImageByID(imageID); err != nil {
+		if err := client.RemoveImageByID(imageID, cleanedImage.ImageName); err != nil {
 			// Check if this is a "No such image" error (expected when multiple instances clean up the same image)
 			if strings.Contains(err.Error(), "No such image") {
-				logrus.WithField("image_id", imageID).Debug("Image already removed")
+				logrus.WithFields(logrus.Fields{
+					"image_id":   imageID,
+					"image_name": cleanedImage.ImageName,
+				}).Debug("Image already removed")
 			} else {
-				logrus.WithError(err).WithField("image_id", imageID).Warn("Failed to remove image")
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"image_id":   imageID,
+					"image_name": cleanedImage.ImageName,
+				}).Warn("Failed to remove image")
+				removalErrors = append(removalErrors, fmt.Errorf("failed to remove image %s: %w", imageID, err))
 			}
 		} else {
-			logrus.WithField("image_id", imageID).Debug("Removed image")
+			logrus.WithFields(logrus.Fields{
+				"image_id":   imageID,
+				"image_name": cleanedImage.ImageName,
+			}).Debug("Removed image")
+			cleaned = append(cleaned, types.CleanedImageInfo{ImageID: imageID, ImageName: cleanedImage.ImageName, ContainerName: cleanedImage.ContainerName})
 		}
 	}
+
+	if len(removalErrors) > 0 {
+		return cleaned, fmt.Errorf(
+			"%w: %d of %d image removals failed",
+			errImageCleanupFailed,
+			len(removalErrors),
+			len(cleanedImages),
+		)
+	}
+
+	return cleaned, nil
 }
 
 // containerNames extracts names from a container list.

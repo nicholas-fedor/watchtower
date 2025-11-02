@@ -155,7 +155,13 @@ func RunUpgradesOnSchedule(
 	scheduler.Stop()
 	logrus.Debug("Waiting for running update to be finished...")
 
+	// Wait for any currently running update to complete before proceeding with shutdown.
 	WaitForRunningUpdate(ctx, lock)
+
+	// Close the notification system to clean up resources during shutdown.
+	if notifier != nil {
+		notifier.Close()
+	}
 
 	logrus.Debug("Scheduler stopped and update completed.")
 

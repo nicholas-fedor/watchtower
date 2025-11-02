@@ -113,17 +113,17 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageInfo []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				false,
 				"",
-				cleanupImageIDs,
+				&cleanupImageInfo,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
-			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+			gomega.Expect(cleanupImageInfo).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It(
@@ -164,12 +164,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					false,
 				)
 
-				cleanupImageIDs := make(map[types.ImageID]bool)
+				var cleanupImageIDs []types.CleanedImageInfo
 				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					true,
 					"",
-					cleanupImageIDs,
+					&cleanupImageIDs,
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -218,12 +218,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				true,
 				"prod",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -283,18 +283,19 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				true,
 				"prod",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 			gomega.Expect(client.TestData.StopContainerCount).To(gomega.Equal(1))
-			gomega.Expect(cleanupImageIDs).To(gomega.HaveKey(types.ImageID("watchtower:1.11.0")))
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("watchtower:1.11.0"))))
 			gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
 		})
 
@@ -336,12 +337,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				false,
 				"prod",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -387,12 +388,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				false, // cleanup disabled
 				"",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -408,12 +409,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				ListContainersError: errors.New("list containers failed"),
 			}, false, false)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				false,
 				"",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -460,12 +461,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				false,
 				"",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -526,19 +527,20 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				true,
 				"",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("1 instances failed to stop"))
 			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
 			gomega.Expect(client.TestData.StopContainerCount).To(gomega.Equal(2))
-			gomega.Expect(cleanupImageIDs).To(gomega.HaveKey(types.ImageID("watchtower:old2")))
+			gomega.Expect(cleanupImageIDs).
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("watchtower:old2"))))
 			gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
 		})
 	})
@@ -582,12 +584,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					false,
 				)
 
-				cleanupImageIDs := make(map[types.ImageID]bool)
+				var cleanupImageIDs []types.CleanedImageInfo
 				cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 					client,
 					true,
 					"",
-					cleanupImageIDs,
+					&cleanupImageIDs,
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -632,12 +634,12 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				false,
 			)
 
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageIDs []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				false, // cleanup disabled
 				"",
-				cleanupImageIDs,
+				&cleanupImageIDs,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -651,20 +653,46 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 	ginkgo.It("should do nothing when no images are provided", func() {
 		client := mocks.CreateMockClient(&mocks.TestData{}, false, false)
 
-		actions.CleanupImages(client, nil)
+		cleaned, err := actions.CleanupImages(client, nil)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cleaned).To(gomega.BeEmpty())
 		gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 	})
 
 	ginkgo.It("should attempt to remove each image ID", func() {
 		client := mocks.CreateMockClient(&mocks.TestData{}, false, false)
 
-		imageIDs := map[types.ImageID]bool{
-			"image1": true,
-			"image2": true,
-			"":       true, // empty ID should be skipped
+		cleanedImages := []types.CleanedImageInfo{
+			{ImageID: "image1"},
+			{ImageID: "image2"},
+			{ImageID: ""}, // empty ID should be skipped
 		}
 
-		actions.CleanupImages(client, imageIDs)
+		cleaned, err := actions.CleanupImages(client, cleanedImages)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cleaned).To(gomega.HaveLen(2))
+		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
+		gomega.Expect(cleaned[1].ImageID).To(gomega.Equal(types.ImageID("image2")))
+		gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(2))
+	})
+
+	ginkgo.It("should return error when image removal fails", func() {
+		client := mocks.CreateMockClient(&mocks.TestData{
+			RemoveImageError: errors.New("image removal failed"),
+			FailedImageIDs:   []types.ImageID{"image2"},
+		}, false, false)
+
+		cleanedImages := []types.CleanedImageInfo{
+			{ImageID: "image1"},
+			{ImageID: "image2"},
+		}
+
+		cleaned, err := actions.CleanupImages(client, cleanedImages)
+		gomega.Expect(err).To(gomega.HaveOccurred())
+		gomega.Expect(err.Error()).
+			To(gomega.ContainSubstring("errors occurred during image cleanup"))
+		gomega.Expect(cleaned).To(gomega.HaveLen(1))
+		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
 		gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(2))
 	})
 })

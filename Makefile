@@ -20,7 +20,7 @@ help: ## Show this help message
 # Development Targets
 # =============================================================================
 
-.PHONY: build test mock lint vet run install
+.PHONY: build test mocks lint vet run install
 
 build: ## Build the application binary
 	$(GO) build -o bin/$(BINARY_NAME) ./...
@@ -28,7 +28,7 @@ build: ## Build the application binary
 test: ## Run all tests
 	$(GO) test -timeout 30s -v -coverprofile coverage.out -covermode atomic ./...
 
-mock: ## Generate mocks
+mocks: ## Generate mocks
 	$(MOCKERY)
 
 lint: ## Run linter and fix issues

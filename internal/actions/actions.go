@@ -2,6 +2,7 @@ package actions
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -117,13 +118,7 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 	logrus.Debug("Starting RunUpdatesWithNotifications")
 
 	// Initiate notification batching
-	startNotifications(params.Notifier)
-
-	defer func() {
-		if params.Notifier != nil {
-			params.Notifier.Close()
-		}
-	}()
+	startNotifications(params.Notifier, params.NotificationSplitByContainer)
 
 	// Configure update parameters based on provided flags
 	updateConfig := UpdateConfig{
@@ -143,17 +138,23 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 	}
 
 	// Execute the container update operation
-	result, cleanupImageIDs, err := executeUpdate(params.Client, updateConfig)
+	result, cleanupImageInfosPtr, err := executeUpdate(params.Client, updateConfig)
 	// Process update result, return metric on failure
 	if metric := handleUpdateResult(result, err); metric != nil {
 		return metric
 	}
 
 	// Perform image cleanup if enabled
-	performImageCleanup(params.Client, params.Cleanup, cleanupImageIDs)
+	cleanedImages := performImageCleanup(params.Client, params.Cleanup, cleanupImageInfosPtr)
 
 	// Log update report details for debugging
 	logUpdateReport(result)
+
+	logrus.WithFields(logrus.Fields{
+		"notification_split_by_container": params.NotificationSplitByContainer,
+		"notification_report":             params.NotificationReport,
+		"notifier_present":                params.Notifier != nil,
+	}).Debug("About to send notifications")
 
 	// Send notifications about update results
 	sendNotifications(
@@ -161,6 +162,7 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 		params.NotificationSplitByContainer,
 		params.NotificationReport,
 		result,
+		cleanedImages,
 	)
 
 	// Generate and return metric summarizing the session
@@ -192,6 +194,43 @@ func buildSingleContainerReport(
 	}
 }
 
+// buildCleanupEntriesForContainer constructs log entries for cleaned image events specific to a container.
+//
+// It creates a logrus.Entry struct for each cleaned image associated with the specified container
+// using a standardized message "Removing image" with the image name and ID in the entry data.
+//
+// Parameters:
+//   - cleanedImages: Slice of CleanedImageInfo containing details of cleaned images.
+//   - containerName: Name of the container to filter cleanup entries for.
+//
+// Returns:
+//   - []*logrus.Entry: A slice of log entries for the cleaned images associated with the container.
+func buildCleanupEntriesForContainer(
+	cleanedImages []types.CleanedImageInfo,
+	containerName string,
+) []*logrus.Entry {
+	entries := make([]*logrus.Entry, 0)
+	now := time.Now()
+
+	for _, cleanedImage := range cleanedImages {
+		if cleanedImage.ContainerName == containerName {
+			entry := &logrus.Entry{
+				Level:   logrus.InfoLevel,
+				Message: "Removing image",
+				Data: logrus.Fields{
+					"container_name": cleanedImage.ContainerName,
+					"image_name":     cleanedImage.ImageName,
+					"image_id":       cleanedImage.ImageID.ShortID(),
+				},
+				Time: now,
+			}
+			entries = append(entries, entry)
+		}
+	}
+
+	return entries
+}
+
 // buildUpdateEntries constructs log entries for container update events.
 //
 // It creates three logrus.Entry structs representing the key stages of a container update:
@@ -218,7 +257,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 				Time: now,
 			},
 			{
-				Level:   logrus.InfoLevel,
+				Level:   logrus.DebugLevel,
 				Message: UpdateSkippedMessage,
 				Data: logrus.Fields{
 					"container": c.Name(),
@@ -226,7 +265,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 				Time: now,
 			},
 			{
-				Level:   logrus.InfoLevel,
+				Level:   logrus.DebugLevel,
 				Message: ContainerRemainsRunningMessage,
 				Data: logrus.Fields{
 					"container": c.Name(),
@@ -272,13 +311,15 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 // startNotifications initiates notification batching if a notifier is provided.
 //
 // It starts the notification process to group update messages, or logs a debug message
-// if no notifier is available.
+// if no notifier is available. When notifications are split by container, it suppresses
+// the summary notification to prevent unwanted duplicates.
 //
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
-func startNotifications(notifier types.Notifier) {
+//   - notificationSplitByContainer: Boolean flag indicating whether notifications are split by container.
+func startNotifications(notifier types.Notifier, notificationSplitByContainer bool) {
 	if notifier != nil {
-		notifier.StartNotification()
+		notifier.StartNotification(notificationSplitByContainer)
 	} else {
 		logrus.Debug("Notifier is nil, skipping notification batching")
 	}
@@ -295,21 +336,21 @@ func startNotifications(notifier types.Notifier) {
 //
 // Returns:
 //   - types.Report: The report containing the results of the update operation.
-//   - map[types.ImageID]bool: Set of image IDs to be cleaned up.
+//   - []types.CleanedImageInfo: Slice of cleaned image info to be cleaned up.
 //   - error: Any error encountered during the update execution.
 func executeUpdate(
 	client container.Client,
 	config UpdateConfig,
-) (types.Report, map[types.ImageID]bool, error) {
+) (types.Report, []types.CleanedImageInfo, error) {
 	// Log before calling the Update function
 	logrus.Debug("About to call Update function")
 
-	result, cleanupImageIDs, err := Update(client, config)
+	result, cleanupImageInfos, err := Update(client, config)
 
 	// Log after Update function returns
 	logrus.Debug("Update function returned, about to check cleanup")
 
-	return result, cleanupImageIDs, err
+	return result, cleanupImageInfos, err
 }
 
 // performImageCleanup executes image cleanup if enabled.
@@ -319,15 +360,29 @@ func executeUpdate(
 // Parameters:
 //   - client: The Docker client instance used for container operations.
 //   - cleanup: Boolean indicating whether to perform image cleanup.
-//   - cleanupImageIDs: Set of image IDs to be removed.
+//   - cleanupImageInfos: Slice of cleaned image info to be removed.
+//
+// Returns:
+//   - []types.CleanedImageInfo: Slice of successfully cleaned image info.
 func performImageCleanup(
 	client container.Client,
 	cleanup bool,
-	cleanupImageIDs map[types.ImageID]bool,
-) {
+	cleanupImageInfos []types.CleanedImageInfo,
+) []types.CleanedImageInfo {
 	if cleanup {
-		CleanupImages(client, cleanupImageIDs)
+		cleaned, err := CleanupImages(client, cleanupImageInfos)
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to clean up some images after update")
+		}
+
+		if cleaned == nil {
+			cleaned = []types.CleanedImageInfo{}
+		}
+
+		return cleaned
 	}
+
+	return []types.CleanedImageInfo{}
 }
 
 // logUpdateReport logs the update report details for debugging purposes.
@@ -355,17 +410,21 @@ func logUpdateReport(result types.Report) {
 // sendNotifications handles sending notifications about update results.
 //
 // It supports both grouped and per-container notifications based on configuration flags,
-// including complex logic for splitting notifications by container.
+// including complex logic for splitting notifications by container. The non-split path
+// sends notifications asynchronously using a goroutine with proper synchronization
+// to ensure the notification completes before the notifier is closed.
 //
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
 //   - notificationSplitByContainer: Boolean flag enabling separate notifications for each updated container.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
+//   - cleanedImages: Slice of successfully cleaned image info.
 func sendNotifications(
 	notifier types.Notifier,
 	notificationSplitByContainer, notificationReport bool,
 	result types.Report,
+	cleanedImages []types.CleanedImageInfo,
 ) {
 	logrus.Debug("About to send notifications")
 
@@ -373,10 +432,16 @@ func sendNotifications(
 	if notifier != nil {
 		// Check if notifications should be split by container
 		if notificationSplitByContainer {
-			sendSplitNotifications(notifier, notificationReport, result)
+			sendSplitNotifications(notifier, notificationReport, result, cleanedImages)
 		} else {
-			// Send grouped notification if not splitting by container
-			notifier.SendNotification(result)
+			// Send grouped notification asynchronously with proper synchronization
+			var waitGroup sync.WaitGroup
+
+			waitGroup.Go(func() {
+				notifier.SendNotification(result)
+			})
+
+			waitGroup.Wait()
 		}
 	}
 }
@@ -397,7 +462,13 @@ func sendNotifications(
 //   - notifier: The notification system instance for sending update status messages.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
-func sendSplitNotifications(notifier types.Notifier, notificationReport bool, result types.Report) {
+//   - cleanedImages: Slice of successfully cleaned image info.
+func sendSplitNotifications(
+	notifier types.Notifier,
+	notificationReport bool,
+	result types.Report,
+	cleanedImages []types.CleanedImageInfo,
+) {
 	// Map to track notified container IDs to prevent duplicate notifications.
 	// Key is the full container ID string for uniqueness, value is boolean indicating
 	// whether a notification has been sent for this container.
@@ -497,6 +568,10 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 			// Create log entries for container update events
 			entries := buildUpdateEntries(updatedContainer, time.Now())
 
+			// Add cleanup entries for this container
+			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, updatedContainer.Name())
+			entries = append(entries, containerCleanupEntries...)
+
 			notifier.SendFilteredEntries(entries, singleContainerReport)
 
 			notified[containerID] = true
@@ -534,6 +609,10 @@ func sendSplitNotifications(notifier types.Notifier, notificationReport bool, re
 
 				// Create log entries for container update events (monitor-only containers don't get updated, but we still send the same format)
 				entries := buildUpdateEntries(staleContainer, time.Now())
+
+				// Add cleanup entries for this container
+				containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, staleContainer.Name())
+				entries = append(entries, containerCleanupEntries...)
 
 				notifier.SendFilteredEntries(entries, singleContainerReport)
 

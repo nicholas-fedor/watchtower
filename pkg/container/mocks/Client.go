@@ -473,16 +473,16 @@ func (_c *MockClient_ListContainers_Call) RunAndReturn(run func(filter types.Fil
 }
 
 // RemoveImageByID provides a mock function for the type MockClient
-func (_mock *MockClient) RemoveImageByID(imageID types.ImageID) error {
-	ret := _mock.Called(imageID)
+func (_mock *MockClient) RemoveImageByID(imageID types.ImageID, imageName string) error {
+	ret := _mock.Called(imageID, imageName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RemoveImageByID")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(types.ImageID) error); ok {
-		r0 = returnFunc(imageID)
+	if returnFunc, ok := ret.Get(0).(func(types.ImageID, string) error); ok {
+		r0 = returnFunc(imageID, imageName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -496,18 +496,24 @@ type MockClient_RemoveImageByID_Call struct {
 
 // RemoveImageByID is a helper method to define mock.On call
 //   - imageID types.ImageID
-func (_e *MockClient_Expecter) RemoveImageByID(imageID interface{}) *MockClient_RemoveImageByID_Call {
-	return &MockClient_RemoveImageByID_Call{Call: _e.mock.On("RemoveImageByID", imageID)}
+//   - imageName string
+func (_e *MockClient_Expecter) RemoveImageByID(imageID interface{}, imageName interface{}) *MockClient_RemoveImageByID_Call {
+	return &MockClient_RemoveImageByID_Call{Call: _e.mock.On("RemoveImageByID", imageID, imageName)}
 }
 
-func (_c *MockClient_RemoveImageByID_Call) Run(run func(imageID types.ImageID)) *MockClient_RemoveImageByID_Call {
+func (_c *MockClient_RemoveImageByID_Call) Run(run func(imageID types.ImageID, imageName string)) *MockClient_RemoveImageByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 types.ImageID
 		if args[0] != nil {
 			arg0 = args[0].(types.ImageID)
 		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -518,7 +524,7 @@ func (_c *MockClient_RemoveImageByID_Call) Return(err error) *MockClient_RemoveI
 	return _c
 }
 
-func (_c *MockClient_RemoveImageByID_Call) RunAndReturn(run func(imageID types.ImageID) error) *MockClient_RemoveImageByID_Call {
+func (_c *MockClient_RemoveImageByID_Call) RunAndReturn(run func(imageID types.ImageID, imageName string) error) *MockClient_RemoveImageByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

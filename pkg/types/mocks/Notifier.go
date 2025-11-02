@@ -328,8 +328,8 @@ func (_c *MockNotifier_SendNotification_Call) RunAndReturn(run func(reportType t
 }
 
 // StartNotification provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) StartNotification() {
-	_mock.Called()
+func (_mock *MockNotifier) StartNotification(suppressSummary bool) {
+	_mock.Called(suppressSummary)
 	return
 }
 
@@ -339,13 +339,20 @@ type MockNotifier_StartNotification_Call struct {
 }
 
 // StartNotification is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) StartNotification() *MockNotifier_StartNotification_Call {
-	return &MockNotifier_StartNotification_Call{Call: _e.mock.On("StartNotification")}
+//   - suppressSummary bool
+func (_e *MockNotifier_Expecter) StartNotification(suppressSummary interface{}) *MockNotifier_StartNotification_Call {
+	return &MockNotifier_StartNotification_Call{Call: _e.mock.On("StartNotification", suppressSummary)}
 }
 
-func (_c *MockNotifier_StartNotification_Call) Run(run func()) *MockNotifier_StartNotification_Call {
+func (_c *MockNotifier_StartNotification_Call) Run(run func(suppressSummary bool)) *MockNotifier_StartNotification_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 bool
+		if args[0] != nil {
+			arg0 = args[0].(bool)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -355,7 +362,7 @@ func (_c *MockNotifier_StartNotification_Call) Return() *MockNotifier_StartNotif
 	return _c
 }
 
-func (_c *MockNotifier_StartNotification_Call) RunAndReturn(run func()) *MockNotifier_StartNotification_Call {
+func (_c *MockNotifier_StartNotification_Call) RunAndReturn(run func(suppressSummary bool)) *MockNotifier_StartNotification_Call {
 	_c.Run(run)
 	return _c
 }

@@ -320,7 +320,7 @@ Turns out everything is on fire
 					false,
 					time.Duration(0),
 				)
-				shoutrrr.StartNotification()
+				shoutrrr.StartNotification(false)
 				shoutrrr.SendNotification(nil)
 				gomega.Consistently(logBuffer).ShouldNot(gbytes.Say(`Shoutrrr:`))
 			})
@@ -337,7 +337,7 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 				shoutrrr.AddLogHook()
-				shoutrrr.StartNotification()
+				shoutrrr.StartNotification(false)
 				logrus.Info("This log message is sponsored by ContainrrrVPN")
 				shoutrrr.SendNotification(nil)
 				gomega.Eventually(logBuffer).
@@ -393,9 +393,10 @@ Turns out everything is on fire
 			shoutrrr.AddLogHook()
 			logrus.Info("test message")
 
-			shoutrrr.StartNotification()
+			shoutrrr.StartNotification(false)
 			shoutrrr.SendNotification(nil)
 
+			shoutrrr.Close()
 			gomega.Eventually(logBuffer).Should(gbytes.Say(`index_mismatch`))
 		})
 
@@ -417,9 +418,10 @@ Turns out everything is on fire
 			shoutrrr.AddLogHook()
 			logrus.Info("test message")
 
-			shoutrrr.StartNotification()
+			shoutrrr.StartNotification(false)
 			shoutrrr.SendNotification(nil)
 
+			shoutrrr.Close()
 			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*authentication`))
 		})
 
@@ -441,9 +443,10 @@ Turns out everything is on fire
 			shoutrrr.AddLogHook()
 			logrus.Info("test message")
 
-			shoutrrr.StartNotification()
+			shoutrrr.StartNotification(false)
 			shoutrrr.SendNotification(nil)
 
+			shoutrrr.Close()
 			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*network`))
 		})
 
@@ -465,9 +468,10 @@ Turns out everything is on fire
 			shoutrrr.AddLogHook()
 			logrus.Info("test message")
 
-			shoutrrr.StartNotification()
+			shoutrrr.StartNotification(false)
 			shoutrrr.SendNotification(nil)
 
+			shoutrrr.Close()
 			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*rate_limit`))
 		})
 
@@ -487,11 +491,12 @@ Turns out everything is on fire
 			)
 			shoutrrr.Router = mockRouter
 			shoutrrr.AddLogHook()
+			shoutrrr.StartNotification(false)
 			logrus.Info("test message")
 
-			shoutrrr.StartNotification()
 			shoutrrr.SendNotification(nil)
 
+			shoutrrr.Close()
 			gomega.Eventually(logBuffer).Should(gbytes.Say(`failure_type.*unknown`))
 		})
 
@@ -513,9 +518,10 @@ Turns out everything is on fire
 			shoutrrr.AddLogHook()
 			logrus.Info("test message")
 
-			shoutrrr.StartNotification()
+			shoutrrr.StartNotification(false)
 			shoutrrr.SendNotification(nil)
 
+			shoutrrr.Close()
 			gomega.Eventually(logBuffer).Should(gbytes.Say(`failed_count.*2`))
 		})
 	})
@@ -582,7 +588,7 @@ Turns out everything is on fire
 				shoutrrr.Close()
 
 				// These operations should not panic after close
-				shoutrrr.StartNotification()
+				shoutrrr.StartNotification(false)
 				shoutrrr.SendNotification(nil)
 				shoutrrr.SendFilteredEntries([]*logrus.Entry{}, nil)
 
@@ -679,7 +685,7 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 
 	go sendNotifications(shoutrrr)
 
-	shoutrrr.StartNotification()
+	shoutrrr.StartNotification(false)
 	_ = shoutrrr.Fire(entry)
 	shoutrrr.SendNotification(nil)
 

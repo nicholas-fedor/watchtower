@@ -105,9 +105,8 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				false,
 			)
 
-			notifier.EXPECT().StartNotification().Return()
+			notifier.EXPECT().StartNotification(false).Return()
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
-			notifier.EXPECT().Close().Return()
 
 			params := actions.RunUpdatesWithNotificationsParams{
 				Client:                       client,
@@ -130,7 +129,12 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
 
+			// Allow time for async notification to complete
+			time.Sleep(10 * time.Millisecond)
+
 			gomega.Expect(metric).NotTo(gomega.BeNil())
+
+			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
 		ginkgo.It("should handle notification split by container", func() {
@@ -153,9 +157,8 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				false,
 			)
 
-			notifier.EXPECT().StartNotification().Return()
+			notifier.EXPECT().StartNotification(true).Return()
 			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
-			notifier.EXPECT().Close().Return()
 
 			params := actions.RunUpdatesWithNotificationsParams{
 				Client:                       client,
@@ -199,9 +202,8 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				false,
 			)
 
-			notifier.EXPECT().StartNotification().Return()
+			notifier.EXPECT().StartNotification(false).Return()
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
-			notifier.EXPECT().Close().Return()
 
 			params := actions.RunUpdatesWithNotificationsParams{
 				Client:                       client,
@@ -223,6 +225,9 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				PullFailureDelay:             time.Duration(0),
 			}
 			metric := actions.RunUpdatesWithNotifications(params)
+
+			// Allow time for async notification to complete
+			time.Sleep(10 * time.Millisecond)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 
@@ -257,7 +262,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						false,
 					)
 
-					notifier.EXPECT().StartNotification().Return()
+					notifier.EXPECT().StartNotification(true).Return()
 					// Expect notification for the monitor-only stale container
 					notifier.EXPECT().
 						SendFilteredEntries(mock.MatchedBy(func(entries []*logrus.Entry) bool {
@@ -274,8 +279,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 								entries[2].Data["container"] == monitorOnlyContainerName
 						}), mock.AnythingOfType("*session.SingleContainerReport")).
 						Return()
-
-					notifier.EXPECT().Close().Return()
 
 					params := actions.RunUpdatesWithNotificationsParams{
 						Client:                       client,
@@ -350,7 +353,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				)
 
 				// Expect exactly 3 notifications (one per updated container), each with 3 log entries
-				notifier.EXPECT().StartNotification().Return()
+				notifier.EXPECT().StartNotification(true).Return()
 				notifier.EXPECT().
 					SendFilteredEntries(mock.MatchedBy(func(entries []*logrus.Entry) bool {
 						if len(entries) != 3 {
@@ -396,8 +399,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 							entries[2].Data["container"] == container3Name
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
-
-				notifier.EXPECT().Close().Return()
 
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
@@ -445,9 +446,8 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					false,
 				)
 
-				notifier.EXPECT().StartNotification().Return()
+				notifier.EXPECT().StartNotification(true).Return()
 				// No SendNotification calls expected since no containers were updated
-				notifier.EXPECT().Close().Return()
 
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
@@ -508,7 +508,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					false,
 				)
 
-				notifier.EXPECT().StartNotification().Return()
+				notifier.EXPECT().StartNotification(true).Return()
 				// Only expect notification for the valid container, not the one with empty name
 				notifier.EXPECT().
 					SendFilteredEntries(mock.MatchedBy(func(entries []*logrus.Entry) bool {
@@ -525,8 +525,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 							entries[2].Data["container"] == validContainerName
 					}), mock.AnythingOfType("*session.SingleContainerReport")).
 					Return()
-				notifier.EXPECT().Close().Return()
-
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
 					Notifier:                     notifier,
@@ -578,7 +576,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					false,
 				)
 
-				notifier.EXPECT().StartNotification().Return()
+				notifier.EXPECT().StartNotification(true).Return()
 				// Expect exactly one notification for the single updated container with 3 entries
 				notifier.EXPECT().
 					SendFilteredEntries(mock.MatchedBy(func(entries []*logrus.Entry) bool {
@@ -597,7 +595,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					Return().
 					Times(1)
 					// Exactly once
-				notifier.EXPECT().Close().Return()
 
 				params := actions.RunUpdatesWithNotificationsParams{
 					Client:                       client,
@@ -658,7 +655,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						false,
 					)
 
-					notifier.EXPECT().StartNotification().Return()
+					notifier.EXPECT().StartNotification(true).Return()
 					// Expect exactly one notification for the container, even though it appears in both lists
 					// Since it's monitor-only, it should get the monitor-only notification format
 					notifier.EXPECT().
@@ -677,7 +674,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						}), mock.AnythingOfType("*session.SingleContainerReport")).
 						Return().
 						Times(1) // Exactly once - no duplicates
-					notifier.EXPECT().Close().Return()
 
 					params := actions.RunUpdatesWithNotificationsParams{
 						Client:                       client,

@@ -94,7 +94,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 				false,
 			)
-			report, cleanupImageIDs, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(
 				client,
 				actions.UpdateConfig{
 					Cleanup:          true,
@@ -105,7 +105,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-			gomega.Expect(cleanupImageIDs).
+			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).
 				To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
@@ -146,13 +146,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				Filter:      filters.WatchtowerContainersFilter,
 				CPUCopyMode: "auto",
 			}
-			report, cleanupImageIDs, err := actions.Update(client, config)
+			report, cleanupImageInfos, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Container should be scanned but not updated")
 			gomega.Expect(report.Updated()).
 				To(gomega.BeEmpty(), "No containers should be updated with no-restart")
-			gomega.Expect(cleanupImageIDs).
+			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No images should be collected for cleanup")
 			gomega.Expect(client.TestData.RenameContainerCount).
 				To(gomega.Equal(0), "RenameContainer should not be called with no-restart")
@@ -192,18 +192,18 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 				false,
 			)
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageInfos []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				true, // cleanup=true
 				"prod",
-				cleanupImageIDs,
+				&cleanupImageInfos,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cleanupOccurred).To(gomega.BeFalse())
 			gomega.Expect(client.TestData.StopContainerCount).
 				To(gomega.Equal(0), "StopContainer should not be called for unscoped container")
-			gomega.Expect(cleanupImageIDs).
+			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup should occur for unscoped container")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).
 				To(gomega.Equal(0), "RemoveImageByID should not be called for unscoped container")
@@ -238,16 +238,17 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 				false,
 			)
-			cleanupImageIDs := make(map[types.ImageID]bool)
+			var cleanupImageInfos []types.CleanedImageInfo
 			cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 				client,
 				true,
 				"",
-				cleanupImageIDs,
+				&cleanupImageInfos,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cleanupOccurred).To(gomega.BeTrue())
-			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty(), "No image cleanup for shared image")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.BeEmpty(), "No image cleanup for shared image")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
 		})
 	})
@@ -261,15 +262,17 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-02": true,
 					"test-container-03": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ContainerName", "test-container-01")))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -294,17 +297,17 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-03":     true,
 					"unique-test-container": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(4))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("unique-fake-image:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(2))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("unique-fake-image:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(2))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -314,15 +317,15 @@ var _ = ginkgo.Describe("the update action", func() {
 			ginkgo.It("should collect only the stale container's image ID", func() {
 				client := mocks.CreateMockClient(getLinkedTestData(true), false, false)
 				client.TestData.Staleness["test-container-01"] = true
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image1:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image1:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -336,15 +339,15 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-02": true,
 					"test-container-03": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 				gomega.Expect(client.TestData.WaitForContainerHealthyCount).
@@ -356,16 +359,16 @@ var _ = ginkgo.Describe("the update action", func() {
 			ginkgo.It("should gracefully fail and collect no image IDs", func() {
 				client := mocks.CreateMockClient(getLinkedTestData(false), false, false)
 				client.TestData.Staleness["test-container-01"] = true
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 				gomega.Expect(report.Fresh()).To(gomega.HaveLen(1))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image1:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image1:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -405,15 +408,15 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-01": true,
 					"test-container-02": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image1:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image1:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -443,13 +446,13 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-01": true,
 					"test-container-02": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{Cleanup: true, MonitorOnly: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
-				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -479,7 +482,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					client.TestData.Staleness = map[string]bool{
 						"test-container-02": true,
 					}
-					report, cleanupImageIDs, err := actions.Update(
+					report, cleanupImageInfos, err := actions.Update(
 						client,
 						actions.UpdateConfig{
 							Cleanup:         true,
@@ -490,9 +493,9 @@ var _ = ginkgo.Describe("the update action", func() {
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-					gomega.Expect(cleanupImageIDs).
-						To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
-					gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+					gomega.Expect(cleanupImageInfos).
+						To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image2:latest"))))
+					gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 					gomega.Expect(client.TestData.TriedToRemoveImageCount).
 						To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 				})
@@ -523,7 +526,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						client.TestData.Staleness = map[string]bool{
 							"test-container-02": true,
 						}
-						report, cleanupImageIDs, err := actions.Update(
+						report, cleanupImageInfos, err := actions.Update(
 							client,
 							actions.UpdateConfig{
 								Cleanup:         true,
@@ -534,7 +537,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						)
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
 						gomega.Expect(report.Updated()).To(gomega.BeEmpty())
-						gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+						gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 						gomega.Expect(client.TestData.TriedToRemoveImageCount).
 							To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 					},
@@ -557,7 +560,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					client.TestData.Staleness = map[string]bool{
 						"test-container-01": true,
 					}
-					report, cleanupImageIDs, err := actions.Update(
+					report, cleanupImageInfos, err := actions.Update(
 						client,
 						actions.UpdateConfig{
 							Cleanup:         true,
@@ -568,7 +571,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(report.Updated()).To(gomega.BeEmpty())
-					gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+					gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 					gomega.Expect(client.TestData.TriedToRemoveImageCount).
 						To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 				})
@@ -604,7 +607,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{
 						Cleanup:        true,
@@ -614,7 +617,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
-				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -646,7 +649,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-uid-gid": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{
 						Cleanup:        true,
@@ -658,9 +661,9 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -693,7 +696,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{
 						Cleanup:        true,
@@ -703,7 +706,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
-				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
+				gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -736,7 +739,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{
 						Cleanup:        true,
@@ -746,9 +749,9 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image2:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -826,7 +829,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{
 						Cleanup:        true,
@@ -836,9 +839,9 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image2:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -871,7 +874,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageIDs, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(
 					client,
 					actions.UpdateConfig{
 						Cleanup:        true,
@@ -881,9 +884,9 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-				gomega.Expect(cleanupImageIDs).
-					To(gomega.HaveKey(types.ImageID("fake-image2:latest")))
-				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image2:latest"))))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -921,13 +924,14 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, config)
+			report, cleanupImageInfos, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Tagged container should be scanned")
 			gomega.Expect(report.Updated()).
 				To(gomega.HaveLen(1), "Tagged container should be updated if stale")
-			gomega.Expect(cleanupImageIDs).To(gomega.HaveKey(types.ImageID("image:1.0.0")))
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("image:1.0.0"))))
 			gomega.Expect(client.TestData.IsContainerStaleCount).
 				To(gomega.Equal(1), "IsContainerStale should be called")
 		})
@@ -950,13 +954,14 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, config)
+			report, cleanupImageInfos, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Untagged container should be scanned")
 			gomega.Expect(report.Updated()).
 				To(gomega.HaveLen(1), "Untagged container should be updated if stale")
-			gomega.Expect(cleanupImageIDs).To(gomega.HaveKey(types.ImageID("image")))
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("image"))))
 			gomega.Expect(client.TestData.IsContainerStaleCount).
 				To(gomega.Equal(1), "IsContainerStale should be called")
 		})
@@ -980,13 +985,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, config)
+			report, cleanupImageInfos, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Pinned container should be scanned")
 			gomega.Expect(report.Updated()).
 				To(gomega.BeEmpty(), "Pinned container should not be updated")
-			gomega.Expect(cleanupImageIDs).
+			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No image IDs should be collected for pinned container")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).
 				To(gomega.Equal(0), "RemoveImageByID should not be called")
@@ -1015,13 +1020,13 @@ var _ = ginkgo.Describe("the update action", func() {
 					},
 					Stopped: make(map[string]bool),
 				}
-				report, cleanupImageIDs, err := actions.Update(client, config)
+				report, cleanupImageInfos, err := actions.Update(client, config)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Scanned()).
 					To(gomega.HaveLen(1), "Pinned container should be scanned")
 				gomega.Expect(report.Updated()).
 					To(gomega.BeEmpty(), "Pinned container should not be updated")
-				gomega.Expect(cleanupImageIDs).
+				gomega.Expect(cleanupImageInfos).
 					To(gomega.BeEmpty(), "No image IDs should be collected for pinned container")
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called")
@@ -1048,7 +1053,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, config)
+			report, cleanupImageInfos, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Skipped()).
 				To(gomega.HaveLen(1), "Invalid container should be skipped")
@@ -1056,7 +1061,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.BeEmpty(), "Invalid container should not be scanned")
 			gomega.Expect(report.Updated()).
 				To(gomega.BeEmpty(), "Invalid container should not be updated")
-			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty(), "No image IDs should be collected")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.BeEmpty(), "No image IDs should be collected")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).
 				To(gomega.Equal(0), "RemoveImageByID should not be called")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
@@ -1085,7 +1091,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					},
 					Stopped: make(map[string]bool),
 				}
-				report, cleanupImageIDs, err := actions.Update(client, config)
+				report, cleanupImageInfos, err := actions.Update(client, config)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Skipped()).
 					To(gomega.HaveLen(1), "Container with missing image info should be skipped")
@@ -1093,7 +1099,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					To(gomega.BeEmpty(), "Container should not be scanned")
 				gomega.Expect(report.Updated()).
 					To(gomega.BeEmpty(), "Container should not be updated")
-				gomega.Expect(cleanupImageIDs).
+				gomega.Expect(cleanupImageInfos).
 					To(gomega.BeEmpty(), "No image IDs should be collected")
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called")
@@ -1120,13 +1126,14 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageIDs, err := actions.Update(client, config)
+			report, cleanupImageInfos, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Skipped()).
 				To(gomega.HaveLen(1), "Container with invalid fallback image should be skipped")
 			gomega.Expect(report.Scanned()).To(gomega.BeEmpty(), "Container should not be scanned")
 			gomega.Expect(report.Updated()).To(gomega.BeEmpty(), "Container should not be updated")
-			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty(), "No image IDs should be collected")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.BeEmpty(), "No image IDs should be collected")
 			gomega.Expect(client.TestData.TriedToRemoveImageCount).
 				To(gomega.Equal(0), "RemoveImageByID should not be called")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
@@ -1164,7 +1171,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client.TestData.IsContainerStaleError = errors.New("failed to pull image")
 
 			startTime := time.Now()
-			report, cleanupImageIDs, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(
 				client,
 				actions.UpdateConfig{
 					Cleanup:          true,
@@ -1178,7 +1185,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).
 				To(gomega.BeEmpty(), "Watchtower should not be updated on pull failure")
-			gomega.Expect(cleanupImageIDs).
+			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup should occur on pull failure")
 
 			// Verify that the delay was applied (using test-specific short delay from PullFailureDelay)
@@ -1213,7 +1220,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 
-			report, cleanupImageIDs, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(
 				client,
 				actions.UpdateConfig{
 					Cleanup:     true,
@@ -1224,7 +1231,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
-			gomega.Expect(cleanupImageIDs).
+			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
 			gomega.Expect(client.TestData.StopContainerCount).
 				To(gomega.Equal(0), "StopContainer should not be called for Watchtower")

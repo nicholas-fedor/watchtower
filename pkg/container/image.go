@@ -305,12 +305,16 @@ func (c imageClient) performImagePull(
 //
 // Parameters:
 //   - imageID: ID of the image to remove.
+//   - imageName: Name of the image to remove (for logging purposes).
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c imageClient) RemoveImageByID(imageID types.ImageID) error {
-	clog := logrus.WithField("image_id", imageID.ShortID())
-	clog.Info("Removing image")
+func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) error {
+	clog := logrus.WithFields(logrus.Fields{
+		"image_id":   imageID.ShortID(),
+		"image_name": imageName,
+	})
+	clog.WithField("notify", "yes").Info("Removing image")
 
 	// Perform image removal with force and pruning.
 	items, err := c.api.ImageRemove(
