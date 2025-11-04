@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.12.0 by @renovate[bot] in [#871](https://github.com/nicholas-fedor/watchtower/pull/871)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.11.1 by @renovate[bot] in [#848](https://github.com/nicholas-fedor/watchtower/pull/848)
 - Update module github.com/onsi/ginkgo/v2 to v2.27.2 by @renovate[bot] in [#841](https://github.com/nicholas-fedor/watchtower/pull/841)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.11.0 by @renovate[bot] in [#832](https://github.com/nicholas-fedor/watchtower/pull/832)
@@ -39,10 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve Podman detection reliability by @nicholas-fedor in [#799](https://github.com/nicholas-fedor/watchtower/pull/799)
 - Resolve issues with notification split by container feature by @nicholas-fedor in [#775](https://github.com/nicholas-fedor/watchtower/pull/775)
 - Improve WATCHTOWER_UPDATE_ON_START logging messages by @nicholas-fedor in [#768](https://github.com/nicholas-fedor/watchtower/pull/768)
-
-### New Contributors
-
-- @yubiuser made their first contribution in [#821](https://github.com/nicholas-fedor/watchtower/pull/821)
 
 ## [1.12.1] - 2025-10-04
 
