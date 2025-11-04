@@ -59,6 +59,7 @@ jobs:
         uses: actions/checkout@71cf2267d89c5cb81562390fa70a37fa40b1305e
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec
@@ -76,7 +77,6 @@ jobs:
         env:
           OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
-          # GITHUB_TOKEN: ${{ secrets.CHANGELOG_PAT }}
 
       - name: Create Pull Request for Changelog
         if: ${{ !fromJson(inputs.dry-run || 'false') }}
