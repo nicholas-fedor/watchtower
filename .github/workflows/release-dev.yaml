@@ -76,7 +76,7 @@ jobs:
         env:
           OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.CHANGELOG_PAT }}
+          # GITHUB_TOKEN: ${{ secrets.CHANGELOG_PAT }}
 
       - name: Create Pull Request for Changelog
         if: ${{ !fromJson(inputs.dry-run || 'false') }}
