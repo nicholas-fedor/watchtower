@@ -84,7 +84,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@aab47043d04e2a835021cdb1992c289f33f7f459
+        uses: goreleaser/goreleaser-action@9cf36111e7ea38bea30119371229bf9ad8028289
         with:
           distribution: goreleaser
           version: "~> v2"
