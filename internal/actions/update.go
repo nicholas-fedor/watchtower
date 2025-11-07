@@ -2,7 +2,6 @@
 package actions
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -23,47 +22,6 @@ const defaultPullFailureDelay = 5 * time.Minute
 
 // defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
 const defaultHealthCheckTimeout = 5 * time.Minute
-
-// Errors for update operations.
-var (
-	// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
-	errSortDependenciesFailed = errors.New("failed to sort containers by dependencies")
-	// errVerifyConfigFailed indicates a failure to verify container configuration for recreation.
-	errVerifyConfigFailed = errors.New("failed to verify container configuration")
-	// errPreUpdateFailed indicates a failure in the pre-update lifecycle command execution.
-	errPreUpdateFailed = errors.New("pre-update command failed")
-	// errSkipUpdate signals that a container update should be skipped due to a specific condition (e.g., EX_TEMPFAIL).
-	errSkipUpdate = errors.New(
-		"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
-	)
-	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
-	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
-	// errStopContainerFailed indicates a failure to stop a container during the update process.
-	errStopContainerFailed = errors.New("failed to stop container")
-	// errStartContainerFailed indicates a failure to start a container after an update.
-	errStartContainerFailed = errors.New("failed to start container")
-	// errParseImageReference indicates a failure to parse a container’s image reference.
-	errParseImageReference = errors.New("failed to parse image reference")
-)
-
-// addCleanupImageInfo adds cleanup info if not already present.
-func addCleanupImageInfo(
-	cleanupImageInfos *[]types.CleanedImageInfo,
-	imageID types.ImageID,
-	imageName, containerName string,
-) {
-	for _, existing := range *cleanupImageInfos {
-		if existing.ImageID == imageID {
-			return
-		}
-	}
-
-	*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{
-		ImageID:       imageID,
-		ImageName:     imageName,
-		ContainerName: containerName,
-	})
-}
 
 // Update scans and updates containers based on parameters.
 //
@@ -702,6 +660,25 @@ func restartContainersInSortedOrder(
 	}
 
 	return failed
+}
+
+// addCleanupImageInfo adds cleanup info if not already present.
+func addCleanupImageInfo(
+	cleanupImageInfos *[]types.CleanedImageInfo,
+	imageID types.ImageID,
+	imageName, containerName string,
+) {
+	for _, existing := range *cleanupImageInfos {
+		if existing.ImageID == imageID {
+			return
+		}
+	}
+
+	*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{
+		ImageID:       imageID,
+		ImageName:     imageName,
+		ContainerName: containerName,
+	})
 }
 
 // restartStaleContainer restarts a stale container.

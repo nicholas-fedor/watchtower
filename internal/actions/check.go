@@ -2,7 +2,6 @@
 package actions
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -18,20 +17,6 @@ import (
 
 // stopContainerTimeout sets the container stop timeout.
 const stopContainerTimeout = 10 * time.Minute
-
-// Errors for sanity and instance checks.
-var (
-	// errRollingRestartDependency flags incompatible dependencies for rolling restarts.
-	errRollingRestartDependency = errors.New(
-		"container has dependencies incompatible with rolling restarts",
-	)
-	// errStopWatchtowerFailed flags failures in stopping excess Watchtower instances.
-	errStopWatchtowerFailed = errors.New("errors occurred while stopping watchtower containers")
-	// errListContainersFailed flags failures in listing containers.
-	errListContainersFailed = errors.New("failed to list containers")
-	// errImageCleanupFailed flags failures in image cleanup.
-	errImageCleanupFailed = errors.New("errors occurred during image cleanup")
-)
 
 // CheckForSanity validates the environment for updates.
 //
