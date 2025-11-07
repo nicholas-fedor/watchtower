@@ -48,7 +48,7 @@ jobs:
           go-version: 1.25.x
 
       - name: Set up QEMU # Enable multi-platform emulation.
-        uses: docker/setup-qemu-action@e77e8065d9f7ec6abdd9838668cd7b43924dd64d
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
         with:
           platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
 
@@ -84,7 +84,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@a08664b80c0ab417b1babcbf750274aed2018fef
+        uses: goreleaser/goreleaser-action@9cf36111e7ea38bea30119371229bf9ad8028289
         with:
           distribution: goreleaser
           version: "~> v2"

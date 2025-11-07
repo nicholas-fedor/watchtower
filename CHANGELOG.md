@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/docker to v28.5.2+incompatible by @renovate[bot] in [#884](https://github.com/nicholas-fedor/watchtower/pull/884)
+- Update module github.com/docker/cli to v28.5.2+incompatible by @renovate[bot] in [#880](https://github.com/nicholas-fedor/watchtower/pull/880)
+- Update dependency go to v1.25.4 by @renovate[bot] in [#879](https://github.com/nicholas-fedor/watchtower/pull/879)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.12.0 by @renovate[bot] in [#871](https://github.com/nicholas-fedor/watchtower/pull/871)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.11.1 by @renovate[bot] in [#848](https://github.com/nicholas-fedor/watchtower/pull/848)
 - Update module github.com/onsi/ginkgo/v2 to v2.27.2 by @renovate[bot] in [#841](https://github.com/nicholas-fedor/watchtower/pull/841)
