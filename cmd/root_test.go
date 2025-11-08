@@ -314,6 +314,7 @@ func (h *testLogHook) Fire(entry *logrus.Entry) error {
 	for k, v := range entry.Data {
 		stringBuilder.WriteString(fmt.Sprintf(" %s=%v", k, v))
 	}
+
 	formatted += stringBuilder.String()
 
 	formatted += "\n"
