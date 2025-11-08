@@ -1393,6 +1393,8 @@ var _ = ginkgo.Describe("Container", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("Started new container"))
+			gomega.Expect(logOutput.String()).
+				To(gomega.ContainSubstring(`new_id=new_container_id`))
 		})
 
 		ginkgo.It("attaches multiple networks for legacy API and handles success", func() {

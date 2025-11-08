@@ -355,14 +355,18 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 	}
 	allDocs := ""
 
+	var stringBuilder strings.Builder
+
 	for _, f := range docFiles {
 		bytes, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatalf("Could not load docs file %q: %v", f, err)
 		}
 
-		allDocs += string(bytes)
+		stringBuilder.Write(bytes)
 	}
+
+	allDocs += stringBuilder.String()
 
 	flags.VisitAll(func(flag *pflag.Flag) {
 		if !strings.Contains(allDocs, "--"+flag.Name) {

@@ -97,9 +97,11 @@ func (d Data) MarshalJSON() ([]byte, error) {
 func marshalReports(reports []types.ContainerReport) []jsonMap {
 	jsonReports := make([]jsonMap, len(reports))
 	for i, report := range reports {
+		containerID := report.ID().ShortID()
+
 		// Populate base report fields.
 		jsonReports[i] = jsonMap{
-			"id":             report.ID().ShortID(),
+			"id":             containerID,
 			"name":           report.Name(),
 			"currentImageId": report.CurrentImageID().ShortID(),
 			"latestImageId":  report.LatestImageID().ShortID(),

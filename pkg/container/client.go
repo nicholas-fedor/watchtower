@@ -344,7 +344,9 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		return "", err
 	}
 
-	logrus.WithFields(fields).WithField("new_id", newID).Debug("Started new container")
+	logrus.WithFields(fields).
+		WithField("new_id", newID.ShortID()).
+		Debug("Started new container")
 
 	return newID, nil
 }
@@ -781,9 +783,9 @@ func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"image_id":   imageID,
+		"image_id":   imageID.ShortID(),
 		"image_name": imageName,
-	}).Debug("Removed image")
+	}).Debug("Cleaned up old image")
 
 	return nil
 }

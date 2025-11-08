@@ -30,6 +30,7 @@ type ContainerStatus struct {
 	containerError error             // Error encountered, if any.
 	state          State             // Current state.
 	monitorOnly    bool              // Monitor-only flag.
+	newContainerID types.ContainerID // New container ID after update.
 }
 
 // ID returns the container ID.
@@ -115,4 +116,20 @@ func (u *ContainerStatus) State() string {
 //   - bool: True if monitor-only, false otherwise.
 func (u *ContainerStatus) IsMonitorOnly() bool {
 	return u.monitorOnly
+}
+
+// NewContainerID returns the new container ID after update.
+//
+// Returns:
+//   - types.ContainerID: New container ID or empty if not updated.
+func (u *ContainerStatus) NewContainerID() types.ContainerID {
+	return u.newContainerID
+}
+
+// SetNewContainerID sets the new container ID after update.
+//
+// Parameters:
+//   - newID: The new container ID.
+func (u *ContainerStatus) SetNewContainerID(newID types.ContainerID) {
+	u.newContainerID = newID
 }

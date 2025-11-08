@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -275,6 +276,7 @@ func TestDeriveScopeFromContainer_Logging(t *testing.T) {
 	hook := &testLogHook{logs: &logOutput}
 
 	logrus.AddHook(hook)
+
 	defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
 
 	// Execute function
@@ -308,9 +310,12 @@ func (h *testLogHook) Fire(entry *logrus.Entry) error {
 		entry.Message)
 
 	// Add fields
+	var stringBuilder strings.Builder
 	for k, v := range entry.Data {
-		formatted += fmt.Sprintf(" %s=%v", k, v)
+		stringBuilder.WriteString(fmt.Sprintf(" %s=%v", k, v))
 	}
+
+	formatted += stringBuilder.String()
 
 	formatted += "\n"
 

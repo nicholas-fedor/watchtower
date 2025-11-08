@@ -2,7 +2,6 @@
 package actions
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -23,47 +22,6 @@ const defaultPullFailureDelay = 5 * time.Minute
 
 // defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
 const defaultHealthCheckTimeout = 5 * time.Minute
-
-// Errors for update operations.
-var (
-	// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
-	errSortDependenciesFailed = errors.New("failed to sort containers by dependencies")
-	// errVerifyConfigFailed indicates a failure to verify container configuration for recreation.
-	errVerifyConfigFailed = errors.New("failed to verify container configuration")
-	// errPreUpdateFailed indicates a failure in the pre-update lifecycle command execution.
-	errPreUpdateFailed = errors.New("pre-update command failed")
-	// errSkipUpdate signals that a container update should be skipped due to a specific condition (e.g., EX_TEMPFAIL).
-	errSkipUpdate = errors.New(
-		"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
-	)
-	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
-	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
-	// errStopContainerFailed indicates a failure to stop a container during the update process.
-	errStopContainerFailed = errors.New("failed to stop container")
-	// errStartContainerFailed indicates a failure to start a container after an update.
-	errStartContainerFailed = errors.New("failed to start container")
-	// errParseImageReference indicates a failure to parse a container’s image reference.
-	errParseImageReference = errors.New("failed to parse image reference")
-)
-
-// addCleanupImageInfo adds cleanup info if not already present.
-func addCleanupImageInfo(
-	cleanupImageInfos *[]types.CleanedImageInfo,
-	imageID types.ImageID,
-	imageName, containerName string,
-) {
-	for _, existing := range *cleanupImageInfos {
-		if existing.ImageID == imageID {
-			return
-		}
-	}
-
-	*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{
-		ImageID:       imageID,
-		ImageName:     imageName,
-		ContainerName: containerName,
-	})
-}
 
 // Update scans and updates containers based on parameters.
 //
@@ -288,23 +246,29 @@ func Update(
 	if params.RollingRestart {
 		// Apply rolling restarts for updates and linked containers sequentially.
 		progress.UpdateFailed(
-			performRollingRestart(containersToUpdate, client, params, &cleanupImageInfos),
+			performRollingRestart(containersToUpdate, client, params, &cleanupImageInfos, progress),
 		)
 		progress.UpdateFailed(
-			performRollingRestart(containersToRestart, client, params, &cleanupImageInfos),
+			performRollingRestart(
+				containersToRestart,
+				client,
+				params,
+				&cleanupImageInfos,
+				progress,
+			),
 		)
 	} else {
 		// Stop and restart containers in batches, respecting dependency order.
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToUpdate, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, &cleanupImageInfos)
+		failedStart = restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, &cleanupImageInfos, progress)
 		progress.UpdateFailed(failedStart)
 
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToRestart, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(containersToRestart, client, params, stoppedImages, &cleanupImageInfos)
+		failedStart = restartContainersInSortedOrder(containersToRestart, client, params, stoppedImages, &cleanupImageInfos, progress)
 		progress.UpdateFailed(failedStart)
 	}
 
@@ -461,6 +425,7 @@ func isPinned(
 //   - client: Container client for Docker operations.
 //   - params: Update options controlling restart behavior.
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info for deferred cleanup.
+//   - progress: Progress tracker to update with new container IDs.
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
@@ -469,6 +434,7 @@ func performRollingRestart(
 	client container.Client,
 	params types.UpdateParams,
 	cleanupImageInfos *[]types.CleanedImageInfo,
+	progress *session.Progress,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -494,6 +460,13 @@ func performRollingRestart(
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
+				// Set the new container ID in progress
+				if progress != nil {
+					if status, exists := (*progress)[c.ID()]; exists {
+						status.SetNewContainerID(newContainerID)
+					}
+				}
+
 				// Wait for the container to become healthy if it has a health check
 				if waitErr := client.WaitForContainerHealthy(newContainerID, defaultHealthCheckTimeout); waitErr != nil {
 					logrus.WithFields(fields).WithError(waitErr).Warn("Failed to wait for container to become healthy")
@@ -504,7 +477,7 @@ func performRollingRestart(
 					// Only collect cleaned image info for stale containers that were not renamed, as renamed
 					// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 					// in the new container.
-					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name())
+					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
 
 					logrus.WithFields(fields).Info("Updated container")
 				}
@@ -547,7 +520,7 @@ func stopContainersInReversedOrder(
 		if err := stopStaleContainer(c, client, params); err != nil {
 			failed[c.ID()] = err
 		} else {
-			stopped = append(stopped, types.CleanedImageInfo{ImageID: c.SafeImageID(), ImageName: c.ImageName(), ContainerName: c.Name()})
+			stopped = append(stopped, types.CleanedImageInfo{ImageID: c.SafeImageID(), ContainerID: c.ID(), ImageName: c.ImageName(), ContainerName: c.Name()})
 
 			logrus.WithFields(fields).Debug("Stopped container")
 		}
@@ -643,6 +616,7 @@ func stopStaleContainer(
 //   - params: Update options controlling restart behavior.
 //   - stoppedImages: Slice of cleaned image info for previously stopped containers.
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info for deferred cleanup.
+//   - progress: Progress tracker to update with new container IDs.
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed restarts.
@@ -652,6 +626,7 @@ func restartContainersInSortedOrder(
 	params types.UpdateParams,
 	stoppedImages []types.CleanedImageInfo,
 	cleanupImageInfos *[]types.CleanedImageInfo,
+	progress *session.Progress,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
 	// Track renamed containers to skip cleanup.
@@ -682,10 +657,17 @@ func restartContainersInSortedOrder(
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
 		if c.IsWatchtower() || wasStopped {
-			_, renamed, err := restartStaleContainer(c, client, params)
+			newContainerID, renamed, err := restartStaleContainer(c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
+				// Set the new container ID in progress
+				if progress != nil {
+					if status, exists := (*progress)[c.ID()]; exists {
+						status.SetNewContainerID(newContainerID)
+					}
+				}
+
 				logrus.WithFields(fields).Debug("Restarted container")
 
 				if renamed {
@@ -695,13 +677,41 @@ func restartContainersInSortedOrder(
 				// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 				// in the new container.
 				if c.IsStale() && !renamedContainers[c.ID()] {
-					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name())
+					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
 				}
 			}
 		}
 	}
 
 	return failed
+}
+
+// addCleanupImageInfo adds cleanup info if not already present.
+//
+// Parameters:
+//   - cleanupImageInfos: Pointer to slice to collect cleaned image info.
+//   - imageID: ID of the image to clean up.
+//   - imageName: Name of the image.
+//   - containerName: Name of the container.
+//   - containerID: ID of the container (optional, pass empty string if not available).
+func addCleanupImageInfo(
+	cleanupImageInfos *[]types.CleanedImageInfo,
+	imageID types.ImageID,
+	imageName, containerName string,
+	containerID types.ContainerID,
+) {
+	for _, existing := range *cleanupImageInfos {
+		if existing.ImageID == imageID {
+			return
+		}
+	}
+
+	*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{
+		ImageID:       imageID,
+		ContainerID:   containerID,
+		ImageName:     imageName,
+		ContainerName: containerName,
+	})
 }
 
 // restartStaleContainer restarts a stale container.

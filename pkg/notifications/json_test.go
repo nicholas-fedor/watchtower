@@ -121,6 +121,17 @@ var _ = ginkgo.Describe("JSON template", func() {
 				gomega.Expect(getTemplatedResult(`json.v1`, false, data)).
 					To(gomega.MatchJSON(expected))
 			})
+			ginkgo.It("should use correct ID types in JSON output", func() {
+				data := mockDataFromStates(session.UpdatedState)
+				result := getTemplatedResult(`json.v1`, false, data)
+
+				// Verify that updated containers use container IDs for the id field, and image IDs for currentImageId and latestImageId
+				// Container IDs should be like "c79110000000"
+				// Image IDs are like "01d110000000" and "d0a110000000"
+				gomega.Expect(result).To(gomega.ContainSubstring("c79110000000"))
+				gomega.Expect(result).To(gomega.ContainSubstring("01d110000000"))
+				gomega.Expect(result).To(gomega.ContainSubstring("d0a110000000"))
+			})
 		})
 	})
 })

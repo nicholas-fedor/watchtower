@@ -12,6 +12,7 @@ type containerStatus struct {
 	containerError error
 	state          State
 	monitorOnly    bool
+	newContainerID types.ContainerID
 }
 
 func (u *containerStatus) ID() types.ContainerID {
@@ -48,4 +49,8 @@ func (u *containerStatus) State() string {
 
 func (u *containerStatus) IsMonitorOnly() bool {
 	return u.monitorOnly
+}
+
+func (u *containerStatus) NewContainerID() types.ContainerID {
+	return u.newContainerID
 }

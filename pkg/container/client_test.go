@@ -858,9 +858,11 @@ func captureLogrus(level logrus.Level) (func(), *gbytes.Buffer) {
 	logbuf := gbytes.NewBuffer()
 
 	origOut := logrus.StandardLogger().Out
+
 	logrus.SetOutput(logbuf)
 
 	origLev := logrus.StandardLogger().Level
+
 	logrus.SetLevel(level)
 
 	return func() {

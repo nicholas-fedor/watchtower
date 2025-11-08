@@ -337,6 +337,8 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) er
 		return fmt.Errorf("%w: %s: %w", errRemoveImageFailed, imageID, err)
 	}
 
+	clog.Debug("Cleaned up old image")
+
 	// Log removal details if debug is enabled.
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		deleted := strings.Builder{}
@@ -360,9 +362,11 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) er
 			}
 		}
 
-		clog.WithFields(logrus.Fields{
-			"deleted":  deleted.String(),
-			"untagged": untagged.String(),
+		logrus.WithFields(logrus.Fields{
+			"deleted":    deleted.String(),
+			"image_id":   imageID.ShortID(),
+			"image_name": imageName,
+			"untagged":   untagged.String(),
 		}).Debug("Image removal details")
 	}
 
