@@ -250,6 +250,17 @@ updt1 (mock/updt1:latest): Updated
 				)
 				gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
 			})
+			ginkgo.It("should use image IDs for container update reporting", func() {
+				data := mockDataFromStates(session.UpdatedState)
+				result := getTemplatedResult(``, false, data)
+
+				// Verify that the result contains image ID formats, not container IDs
+				// Image IDs in the mock data are like "01d110000000" and "d0a110000000"
+				// Container IDs are like "c79110000000"
+				gomega.Expect(result).To(gomega.ContainSubstring("01d110000000"))
+				gomega.Expect(result).To(gomega.ContainSubstring("d0a110000000"))
+				gomega.Expect(result).NotTo(gomega.ContainSubstring("c79110000000"))
+			})
 		})
 
 		ginkgo.When("using a template referencing Title", func() {

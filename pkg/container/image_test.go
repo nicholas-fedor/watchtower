@@ -88,6 +88,8 @@ var _ = ginkgo.Describe("the client", func() {
 				shortAParent := types.ImageID(imageAParent).ShortID()
 				gomega.Eventually(logbuf).
 					Should(gbytes.Say(`msg="Image removal details" deleted="%v, %v" image_id=%v image_name=%v untagged=%v`, shortA, shortAParent, shortA, "test-image", shortA))
+				gomega.Eventually(logbuf).
+					Should(gbytes.Say(`msg="Cleaned up old image" image_id=%v image_name=%v`, shortA, "test-image"))
 			})
 		})
 		ginkgo.When("image is not found", func() {
