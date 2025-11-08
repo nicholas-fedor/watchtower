@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Correct container ID handling in notifications and logging by @nicholas-fedor in [#893](https://github.com/nicholas-fedor/watchtower/pull/893)
 - fix: resolve notification buffer, formatting, and message issues by @nicholas-fedor in [#864](https://github.com/nicholas-fedor/watchtower/pull/864)
 - Handle ghost containers in ListAllContainers by @nicholas-fedor in [#859](https://github.com/nicholas-fedor/watchtower/pull/859)
 - Restore notifications for monitor-only containers by @nicholas-fedor in [#850](https://github.com/nicholas-fedor/watchtower/pull/850)
