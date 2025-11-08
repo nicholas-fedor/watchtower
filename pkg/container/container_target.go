@@ -163,7 +163,7 @@ func StartTargetContainer(
 	}
 
 	// Log detailed start message
-	clog.WithField("new_id", createdContainerID).Info("Started new container")
+	clog.WithField("new_id", createdContainerID.ShortID()).Info("Started new container")
 
 	return createdContainerID, nil
 }

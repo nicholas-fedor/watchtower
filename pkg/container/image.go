@@ -337,13 +337,7 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) er
 		return fmt.Errorf("%w: %s: %w", errRemoveImageFailed, imageID, err)
 	}
 
-	clog.Debug(
-		fmt.Sprintf(
-			`msg="Cleaned up old image" image_id=%s image_name=%s`,
-			imageID.ShortID(),
-			imageName,
-		),
-	)
+	clog.Debug("Cleaned up old image")
 
 	// Log removal details if debug is enabled.
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {

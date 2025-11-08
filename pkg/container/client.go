@@ -344,7 +344,9 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		return "", err
 	}
 
-	logrus.WithFields(fields).WithField("new_id", newID).Debug("Started new container")
+	logrus.WithFields(fields).
+		WithField("new_id", newID.ShortID()).
+		Debug("Started new container")
 
 	return newID, nil
 }
