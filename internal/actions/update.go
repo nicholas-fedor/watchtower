@@ -477,7 +477,7 @@ func performRollingRestart(
 					// Only collect cleaned image info for stale containers that were not renamed, as renamed
 					// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 					// in the new container.
-					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name())
+					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
 
 					logrus.WithFields(fields).Info("Updated container")
 				}
@@ -677,7 +677,7 @@ func restartContainersInSortedOrder(
 				// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 				// in the new container.
 				if c.IsStale() && !renamedContainers[c.ID()] {
-					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name())
+					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
 				}
 			}
 		}
@@ -687,10 +687,18 @@ func restartContainersInSortedOrder(
 }
 
 // addCleanupImageInfo adds cleanup info if not already present.
+//
+// Parameters:
+//   - cleanupImageInfos: Pointer to slice to collect cleaned image info.
+//   - imageID: ID of the image to clean up.
+//   - imageName: Name of the image.
+//   - containerName: Name of the container.
+//   - containerID: ID of the container (optional, pass empty string if not available).
 func addCleanupImageInfo(
 	cleanupImageInfos *[]types.CleanedImageInfo,
 	imageID types.ImageID,
 	imageName, containerName string,
+	containerID types.ContainerID,
 ) {
 	for _, existing := range *cleanupImageInfos {
 		if existing.ImageID == imageID {
@@ -700,7 +708,7 @@ func addCleanupImageInfo(
 
 	*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{
 		ImageID:       imageID,
-		ContainerID:   "",
+		ContainerID:   containerID,
 		ImageName:     imageName,
 		ContainerName: containerName,
 	})
