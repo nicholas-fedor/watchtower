@@ -239,11 +239,17 @@ func buildCleanupEntriesForContainer(
 //
 // Parameters:
 //   - c: The container report containing update details.
+//   - oldContainerID: The original container ID before update.
+//   - newContainerID: The new container ID after update.
 //   - now: The current timestamp to use for all entries.
 //
 // Returns:
 //   - []*logrus.Entry: A slice of three log entries for the update events.
-func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry {
+func buildUpdateEntries(
+	c types.ContainerReport,
+	oldContainerID, newContainerID types.ContainerID,
+	now time.Time,
+) []*logrus.Entry {
 	if c.IsMonitorOnly() {
 		return []*logrus.Entry{
 			{
@@ -291,7 +297,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 			Message: StoppingContainerMessage,
 			Data: logrus.Fields{
 				"container": c.Name(),
-				"id":        c.ID().ShortID(),
+				"id":        oldContainerID.ShortID(),
 				"old_id":    c.CurrentImageID().ShortID(),
 			},
 			Time: now,
@@ -301,7 +307,7 @@ func buildUpdateEntries(c types.ContainerReport, now time.Time) []*logrus.Entry 
 			Message: StartedNewContainerMessage,
 			Data: logrus.Fields{
 				"container": c.Name(),
-				"new_id":    c.LatestImageID().ShortID(),
+				"new_id":    newContainerID.ShortID(),
 			},
 			Time: now,
 		},
@@ -566,7 +572,7 @@ func sendSplitNotifications(
 			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
 
 			// Create log entries for container update events
-			entries := buildUpdateEntries(updatedContainer, time.Now())
+			entries := buildUpdateEntries(updatedContainer, updatedContainer.ID(), updatedContainer.NewContainerID(), time.Now())
 
 			// Add cleanup entries for this container
 			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, updatedContainer.Name())
@@ -608,7 +614,7 @@ func sendSplitNotifications(
 				singleContainerReport := buildSingleContainerReport(staleContainer, result)
 
 				// Create log entries for container update events (monitor-only containers don't get updated, but we still send the same format)
-				entries := buildUpdateEntries(staleContainer, time.Now())
+				entries := buildUpdateEntries(staleContainer, staleContainer.ID(), staleContainer.NewContainerID(), time.Now())
 
 				// Add cleanup entries for this container
 				containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, staleContainer.Name())

@@ -781,9 +781,9 @@ func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"image_id":   imageID,
+		"image_id":   imageID.ShortID(),
 		"image_name": imageName,
-	}).Debug("Removed image")
+	}).Debug("Cleaned up old image")
 
 	return nil
 }

@@ -246,23 +246,29 @@ func Update(
 	if params.RollingRestart {
 		// Apply rolling restarts for updates and linked containers sequentially.
 		progress.UpdateFailed(
-			performRollingRestart(containersToUpdate, client, params, &cleanupImageInfos),
+			performRollingRestart(containersToUpdate, client, params, &cleanupImageInfos, progress),
 		)
 		progress.UpdateFailed(
-			performRollingRestart(containersToRestart, client, params, &cleanupImageInfos),
+			performRollingRestart(
+				containersToRestart,
+				client,
+				params,
+				&cleanupImageInfos,
+				progress,
+			),
 		)
 	} else {
 		// Stop and restart containers in batches, respecting dependency order.
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToUpdate, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, &cleanupImageInfos)
+		failedStart = restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, &cleanupImageInfos, progress)
 		progress.UpdateFailed(failedStart)
 
 		failedStop, stoppedImages = stopContainersInReversedOrder(containersToRestart, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(containersToRestart, client, params, stoppedImages, &cleanupImageInfos)
+		failedStart = restartContainersInSortedOrder(containersToRestart, client, params, stoppedImages, &cleanupImageInfos, progress)
 		progress.UpdateFailed(failedStart)
 	}
 
@@ -419,6 +425,7 @@ func isPinned(
 //   - client: Container client for Docker operations.
 //   - params: Update options controlling restart behavior.
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info for deferred cleanup.
+//   - progress: Progress tracker to update with new container IDs.
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
@@ -427,6 +434,7 @@ func performRollingRestart(
 	client container.Client,
 	params types.UpdateParams,
 	cleanupImageInfos *[]types.CleanedImageInfo,
+	progress *session.Progress,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -452,6 +460,13 @@ func performRollingRestart(
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
+				// Set the new container ID in progress
+				if progress != nil {
+					if status, exists := (*progress)[c.ID()]; exists {
+						status.SetNewContainerID(newContainerID)
+					}
+				}
+
 				// Wait for the container to become healthy if it has a health check
 				if waitErr := client.WaitForContainerHealthy(newContainerID, defaultHealthCheckTimeout); waitErr != nil {
 					logrus.WithFields(fields).WithError(waitErr).Warn("Failed to wait for container to become healthy")
@@ -505,7 +520,7 @@ func stopContainersInReversedOrder(
 		if err := stopStaleContainer(c, client, params); err != nil {
 			failed[c.ID()] = err
 		} else {
-			stopped = append(stopped, types.CleanedImageInfo{ImageID: c.SafeImageID(), ImageName: c.ImageName(), ContainerName: c.Name()})
+			stopped = append(stopped, types.CleanedImageInfo{ImageID: c.SafeImageID(), ContainerID: c.ID(), ImageName: c.ImageName(), ContainerName: c.Name()})
 
 			logrus.WithFields(fields).Debug("Stopped container")
 		}
@@ -601,6 +616,7 @@ func stopStaleContainer(
 //   - params: Update options controlling restart behavior.
 //   - stoppedImages: Slice of cleaned image info for previously stopped containers.
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info for deferred cleanup.
+//   - progress: Progress tracker to update with new container IDs.
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed restarts.
@@ -610,6 +626,7 @@ func restartContainersInSortedOrder(
 	params types.UpdateParams,
 	stoppedImages []types.CleanedImageInfo,
 	cleanupImageInfos *[]types.CleanedImageInfo,
+	progress *session.Progress,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
 	// Track renamed containers to skip cleanup.
@@ -640,10 +657,17 @@ func restartContainersInSortedOrder(
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
 		if c.IsWatchtower() || wasStopped {
-			_, renamed, err := restartStaleContainer(c, client, params)
+			newContainerID, renamed, err := restartStaleContainer(c, client, params)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
+				// Set the new container ID in progress
+				if progress != nil {
+					if status, exists := (*progress)[c.ID()]; exists {
+						status.SetNewContainerID(newContainerID)
+					}
+				}
+
 				logrus.WithFields(fields).Debug("Restarted container")
 
 				if renamed {
@@ -676,6 +700,7 @@ func addCleanupImageInfo(
 
 	*cleanupImageInfos = append(*cleanupImageInfos, types.CleanedImageInfo{
 		ImageID:       imageID,
+		ContainerID:   "",
 		ImageName:     imageName,
 		ContainerName: containerName,
 	})

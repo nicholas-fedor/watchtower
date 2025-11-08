@@ -115,7 +115,7 @@ func StartTargetContainer(
 	}
 
 	createdContainerID := types.ContainerID(createdContainer.ID)
-	clog.WithField("new_id", createdContainerID.ShortID()).Debug("Created container successfully")
+	clog.WithField("new_id", createdContainerID).Debug("Created container successfully")
 
 	// Rename the container to the correct name to avoid conflicts during self-update
 	clog.Debug("Renaming container to correct name")
@@ -145,25 +145,25 @@ func StartTargetContainer(
 
 	// Skip starting if source isn’t running and revive isn’t enabled.
 	if !sourceContainer.IsRunning() && !reviveStopped {
-		clog.WithField("new_id", createdContainerID.ShortID()).
+		clog.WithField("new_id", createdContainerID).
 			Debug("Created container, not starting due to stopped state")
 
 		return createdContainerID, nil
 	}
 
 	// Start the newly created container.
-	clog.WithField("new_id", createdContainerID.ShortID()).Debug("Starting new container")
+	clog.WithField("new_id", createdContainerID).Debug("Starting new container")
 
 	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainerType.StartOptions{}); err != nil {
 		clog.WithError(err).
-			WithField("new_id", createdContainerID.ShortID()).
+			WithField("new_id", createdContainerID).
 			Debug("Failed to start new container")
 
 		return createdContainerID, fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
 
 	// Log detailed start message
-	clog.WithField("new_id", createdContainerID.ShortID()).Info("Started new container")
+	clog.WithField("new_id", createdContainerID).Info("Started new container")
 
 	return createdContainerID, nil
 }

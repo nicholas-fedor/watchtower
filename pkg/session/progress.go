@@ -34,6 +34,7 @@ func UpdateFromContainer(
 		containerError: nil,
 		state:          state,
 		monitorOnly:    cont.IsMonitorOnly(params),
+		newContainerID: "",
 	}
 	logrus.WithFields(logrus.Fields{
 		"container_id": cont.ID().ShortID(),
