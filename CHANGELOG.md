@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v29 by @renovate[bot] in [#898](https://github.com/nicholas-fedor/watchtower/pull/898)
 - Update module github.com/docker/docker to v28.5.2+incompatible by @renovate[bot] in [#884](https://github.com/nicholas-fedor/watchtower/pull/884)
 - Update module github.com/docker/cli to v28.5.2+incompatible by @renovate[bot] in [#880](https://github.com/nicholas-fedor/watchtower/pull/880)
 - Update dependency go to v1.25.4 by @renovate[bot] in [#879](https://github.com/nicholas-fedor/watchtower/pull/879)
