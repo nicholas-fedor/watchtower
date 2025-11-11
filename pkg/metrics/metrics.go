@@ -34,7 +34,6 @@ type Metrics struct {
 	shutdownOnce sync.Once          // Ensures shutdown is called only once.
 }
 
-// NewMetric creates a Metric from a scan report.
 // NewWithRegistry creates a new Metrics handler with a custom Prometheus registry.
 //
 // Parameters:
