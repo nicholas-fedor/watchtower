@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.31.0 by @renovate[bot] in [#902](https://github.com/nicholas-fedor/watchtower/pull/902)
 - Update module github.com/docker/cli to v29 by @renovate[bot] in [#898](https://github.com/nicholas-fedor/watchtower/pull/898)
 - Update module github.com/docker/docker to v28.5.2+incompatible by @renovate[bot] in [#884](https://github.com/nicholas-fedor/watchtower/pull/884)
 - Update module github.com/docker/cli to v28.5.2+incompatible by @renovate[bot] in [#880](https://github.com/nicholas-fedor/watchtower/pull/880)
