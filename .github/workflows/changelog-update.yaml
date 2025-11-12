@@ -6,7 +6,7 @@ on:
       - main
     tags:
       - v*.*.*
-    paths:
+    paths-ignore:
       - CHANGELOG.md
   workflow_dispatch:
 
