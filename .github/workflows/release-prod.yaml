@@ -21,54 +21,9 @@ jobs:
     permissions:
       contents: read # For code checkout
 
-  # Generate changelog for release
-  changelog:
-    # Runs after test
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # For repository checkout, git-cliff, and creating PR
-      pull-requests: write # For creating PR
-    steps:
-      - name: Checkout
-        uses: actions/checkout@71cf2267d89c5cb81562390fa70a37fa40b1305e
-        with:
-          ref: 'main'
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-
-      - name: Generate Changelog
-        uses: orhun/git-cliff-action@d77b37db2e3f7398432d34b72a12aa3e2ba87e51 # v4
-        with:
-          config: cliff.toml
-          args: --verbose
-        env:
-          OUTPUT: CHANGELOG.md
-          GITHUB_REPO: ${{ github.repository }}
-
-      - name: Create Pull Request for Changelog
-        if: ${{ !fromJson(inputs.dry-run || 'false') }}
-        uses: peter-evans/create-pull-request@0edc001d28a2959cd7a6b505629f1d82f0a6e67d
-        with:
-          token: ${{ secrets.CHANGELOG_PAT }}
-          committer: Nick Fedor <nick@nickfedor.com>
-          title: "docs(changelog): update changelog for ${{ github.ref_name }}"
-          commit-message: "docs(changelog): update changelog for ${{ github.ref_name }}"
-          body: "Automated changelog update for release ${{ github.ref_name }}"
-          branch: docs/update-changelog-${{ github.ref_name }}
-          delete-branch: true
-
   # Build binaries, images, SBOMs, and attestations
   build:
-    needs: [test, changelog] # Requires tests to pass and changelog to be generated
+    needs: [test] # Requires tests to pass
     uses: ./.github/workflows/build.yaml
     permissions:
       contents: write # For code checkout and publishing releases
@@ -100,7 +55,7 @@ jobs:
   # Update pkg.go.dev
   update-go-docs:
     # Runs after all jobs
-    needs: [test, build, manifest, changelog]
+    needs: [test, build, manifest]
     # Skips in dry-run
     if: ${{ !fromJson(inputs.dry-run || 'false') }}
     permissions:
