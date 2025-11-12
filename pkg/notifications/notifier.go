@@ -41,7 +41,6 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 
 	// Extract notification settings.
 	reportTemplate, _ := flag.GetBool("notification-report")
-	notificationSplitByContainer, _ := flag.GetBool("notification-split-by-container")
 	stdout, _ := flag.GetBool("notification-log-stdout")
 	tplString, _ := flag.GetString("notification-template")
 	urls, _ := flag.GetStringArray("notification-url")
@@ -49,13 +48,8 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 	data := GetTemplateData(c)
 	urls, delay := AppendLegacyUrls(urls, c)
 
-	// Non-split notifications use legacy template unless report template is enabled.
-	// Split notifications use the report template when reportTemplate is true,
-	// otherwise fall back to legacy.
+	// Use report template when enabled, otherwise use legacy template.
 	legacy := !reportTemplate
-	if !notificationSplitByContainer && !reportTemplate {
-		legacy = true
-	}
 
 	clog.WithFields(logrus.Fields{
 		"urls":        urls,
