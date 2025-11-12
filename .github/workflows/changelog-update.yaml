@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - v*.*.*
     paths-ignore:
       - CHANGELOG.md
   workflow_dispatch:
