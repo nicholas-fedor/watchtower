@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action digest to 014f16e by @renovate[bot] in [#925](https://github.com/nicholas-fedor/watchtower/pull/925)
 - Update actions/setup-python digest to 97aeb3e by @renovate[bot] in [#923](https://github.com/nicholas-fedor/watchtower/pull/923)
 
 ## [1.12.3] - 2025-11-13
