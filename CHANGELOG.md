@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Resolve mike deploy alias conflict by @nicholas-fedor in [#919](https://github.com/nicholas-fedor/watchtower/pull/919)
 
+### Chores
+
+- Update actions/setup-python digest to 97aeb3e by @renovate[bot] in [#923](https://github.com/nicholas-fedor/watchtower/pull/923)
+
 ## [1.12.3] - 2025-11-13
 
 ### Changed
