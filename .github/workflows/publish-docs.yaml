@@ -79,7 +79,7 @@ jobs:
       - name: Build and Deploy
         run: |
           if [ -n "${{ steps.mike.outputs.aliases }}" ]; then
-            mike delete latest || true
+            mike delete latest --push || true
             mike deploy \
               --config-file build/mkdocs/mkdocs.yaml \
               --push \
