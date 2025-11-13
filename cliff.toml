@@ -6,8 +6,10 @@ owner = "nicholas-fedor"
 repo = "watchtower"
 
 [changelog]
+# ──────────────────────────────────────────────────────────────
 # A Tera template to be rendered as the changelog's header.
 # See https://keats.github.io/tera/docs/#introduction
+# ──────────────────────────────────────────────────────────────
 header = """
 <!-- markdownlint-disable MD024 -->
 # Changelog
@@ -18,15 +20,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 """
 
+# ──────────────────────────────────────────────────────────────
 # A Tera template to be rendered for each release in the changelog.
 # See https://keats.github.io/tera/docs/#introduction
+# ──────────────────────────────────────────────────────────────
 body = """
 {%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
 {% if version %}
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | trim_start_matches(pat="v") }}] - {% if commits | length > 0 %}{{ commits[0].committer.timestamp | date(format="%Y-%m-%d") }}{% else %}{{ timestamp | date(format="%Y-%m-%d") }}{% endif %}
 {% else %}
     ## [Unreleased]
 {% endif -%}
@@ -54,8 +58,10 @@ body = """
 {%- if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}{{"\n"}}{% endif %}
 """
 
+# ──────────────────────────────────────────────────────────────
 # A Tera template to be rendered as the changelog's footer.
 # See https://keats.github.io/tera/docs/#introduction
+# ──────────────────────────────────────────────────────────────
 footer = """
 
 ## Compare Releases
@@ -85,15 +91,10 @@ trim = true
 conventional_commits = true
 # Exclude commits that do not match the conventional commits specification.
 filter_unconventional = false
-# An array of regex based parsers to modify commit messages prior to further processing.
-commit_preprocessors = [
-    # Remove issue numbers.
-    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "" },
-]
-# An array of regex based parsers for extracting data from the commit message.
-# Assigns commits to groups.
-# Optionally sets the commit's scope and can decide to exclude commits from further processing.
+commit_preprocessors = [{ pattern = '\((\w+\s)?#([0-9]+)\)', replace = "" }]
 commit_parsers = [
+    # Skip changelog updates (noise from generation/merges)
+    { message = "(?i)update.*changelog", skip = true },
     { field = "remote.username", pattern = "renovate\\[bot\\]", group = "Chores" },
     { message = "^chore", group = "Chores" },
     { message = "^.*: chore", group = "Chores" },
@@ -116,11 +117,9 @@ commit_parsers = [
     { message = "^.*", group = "Changed" },
 ]
 # Exclude commits that are not matched by any commit parser.
-filter_commits = false
+filter_commits = true
 # Order releases topologically instead of chronologically.
 topo_order = false
 # Order of commits in each group/release within the changelog.
 # Allowed values: newest, oldest
 sort_commits = "newest"
-# Include only commits that affect these paths
-include_paths = ["cmd/", "pkg/", "internal/", "go.mod"]
