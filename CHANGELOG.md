@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v29.0.1+incompatible by @renovate[bot] in [#935](https://github.com/nicholas-fedor/watchtower/pull/935)
+- Update cimg/go docker tag to v1.25.4 by @renovate[bot] in [#934](https://github.com/nicholas-fedor/watchtower/pull/934)
+- Update peter-evans/create-pull-request digest to b4733b9 by @renovate[bot] in [#932](https://github.com/nicholas-fedor/watchtower/pull/932)
+- Update cimg/go:1.25.3 docker digest to 0184935 by @renovate[bot] in [#931](https://github.com/nicholas-fedor/watchtower/pull/931)
 - Update github/codeql-action digest to 014f16e by @renovate[bot] in [#925](https://github.com/nicholas-fedor/watchtower/pull/925)
 - Update actions/setup-python digest to 97aeb3e by @renovate[bot] in [#923](https://github.com/nicholas-fedor/watchtower/pull/923)
 
