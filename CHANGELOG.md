@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Fix example notification template by @AzariasB in [#944](https://github.com/nicholas-fedor/watchtower/pull/944)
 - Resolve mike deploy alias conflict by @nicholas-fedor in [#919](https://github.com/nicholas-fedor/watchtower/pull/919)
 
 ### Chores
@@ -29,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update cimg/go:1.25.3 docker digest to 0184935 by @renovate[bot] in [#931](https://github.com/nicholas-fedor/watchtower/pull/931)
 - Update github/codeql-action digest to 014f16e by @renovate[bot] in [#925](https://github.com/nicholas-fedor/watchtower/pull/925)
 - Update actions/setup-python digest to 97aeb3e by @renovate[bot] in [#923](https://github.com/nicholas-fedor/watchtower/pull/923)
+
+### New Contributors
+
+- @AzariasB made their first contribution in [#944](https://github.com/nicholas-fedor/watchtower/pull/944)
 
 ## [1.12.3] - 2025-11-13
 
