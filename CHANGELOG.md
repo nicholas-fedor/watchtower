@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v29.0.2+incompatible by @renovate[bot] in [#948](https://github.com/nicholas-fedor/watchtower/pull/948)
 - Update cimg/go:1.25.4 docker digest to cf75b46 by @renovate[bot] in [#947](https://github.com/nicholas-fedor/watchtower/pull/947)
 - Update actions/checkout digest to 93cb6ef by @renovate[bot] in [#946](https://github.com/nicholas-fedor/watchtower/pull/946)
 - Update golangci/golangci-lint-action digest to 8b0f942 by @renovate[bot] in [#941](https://github.com/nicholas-fedor/watchtower/pull/941)
