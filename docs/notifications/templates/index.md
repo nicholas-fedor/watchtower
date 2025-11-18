@@ -116,6 +116,7 @@ When `--notification-report` is set, the template processes a `notifications.Dat
 Logs:
 {{- end -}}
 {{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
+{{- end -}}
 ```
 
 - This template generates a summary of container statuses (scanned, updated, failed, etc.) followed by logs, used for notifications like email or Slack messages.
@@ -134,16 +135,16 @@ Logs:
       {{- with .Report -}}
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
     {{- if ( or .Updated .Failed ) -}}
-          {{- range .Updated}}
+          {{- range .Updated -}}
     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
           {{- end -}}
-          {{- range .Fresh}}
+          {{- range .Fresh -}}
     - {{.Name}} ({{.ImageName}}): {{.State}}
           {{- end -}}
-          {{- range .Skipped}}
+          {{- range .Skipped -}}
     - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
           {{- end -}}
-          {{- range .Failed}}
+          {{- range .Failed -}}
     - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
           {{- end -}}
     {{- end -}}
@@ -152,7 +153,8 @@ Logs:
 
     Logs:
     {{- end -}}
-    {{range .Entries -}}{{.Time.Format \"2006-01-02T15:04:05Z07:00\"}} [{{.Level}}] {{.Message}}{{\"\n\"}}{{- end -}}
+    {{- range .Entries -}}{{.Time.Format \"2006-01-02T15:04:05Z07:00\"}} [{{.Level}}] {{.Message}}{{\"\n\"}}{{- end -}}
+    {{- end -}}
     " \
       watchtower-image
     ```
@@ -175,16 +177,16 @@ Logs:
               {{- with .Report -}}
             {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
             {{- if ( or .Updated .Failed ) -}}
-                {{- range .Updated}}
+                {{- range .Updated -}}
             - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
                 {{- end -}}
-                {{- range .Fresh}}
+                {{- range .Fresh -}}
             - {{.Name}} ({{.ImageName}}): {{.State}}
                 {{- end -}}
-                {{- range .Skipped}}
+                {{- range .Skipped -}}
             - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
                 {{- end -}}
-                {{- range .Failed}}
+                {{- range .Failed -}}
             - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
                 {{- end -}}
             {{- end -}}
@@ -193,7 +195,8 @@ Logs:
 
             Logs:
             {{- end -}}
-            {{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
+            {{- range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
+            {{- end -}}
     ```
 <!-- markdownlint-restore -->
 Example output for a session with one updated container and one error log:
