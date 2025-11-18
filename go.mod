@@ -7,7 +7,7 @@ retract [v1.7.2, v1.7.9]
 
 require (
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v29.0.1+incompatible
+	github.com/docker/cli v29.0.2+incompatible
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/nicholas-fedor/shoutrrr v0.12.0
