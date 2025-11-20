@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/govulncheck-action digest to 55deb21 by @renovate[bot] in [#963](https://github.com/nicholas-fedor/watchtower/pull/963)
 - Update actions/setup-go digest to 4dc6199 by @renovate[bot] in [#962](https://github.com/nicholas-fedor/watchtower/pull/962)
 - Update nicholas-fedor/govulncheck-action digest to 0ee4877 by @renovate[bot] in [#960](https://github.com/nicholas-fedor/watchtower/pull/960)
 - Update actions/setup-go digest to f3787be by @renovate[bot] in [#959](https://github.com/nicholas-fedor/watchtower/pull/959)
