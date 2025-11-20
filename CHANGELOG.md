@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/setup-go digest to 4dc6199 by @renovate[bot] in [#962](https://github.com/nicholas-fedor/watchtower/pull/962)
+- Update nicholas-fedor/govulncheck-action digest to 0ee4877 by @renovate[bot] in [#960](https://github.com/nicholas-fedor/watchtower/pull/960)
+- Update actions/setup-go digest to f3787be by @renovate[bot] in [#959](https://github.com/nicholas-fedor/watchtower/pull/959)
+- Update codecov/codecov-action digest to 96b38e9 by @renovate[bot] in [#958](https://github.com/nicholas-fedor/watchtower/pull/958)
+- Update golangci/golangci-lint-action digest to 1dfda28 by @renovate[bot] in [#955](https://github.com/nicholas-fedor/watchtower/pull/955)
+- Update github/codeql-action digest to e12f017 by @renovate[bot] in [#954](https://github.com/nicholas-fedor/watchtower/pull/954)
 - Update actions/setup-python digest to bfc4944 by @renovate[bot] in [#952](https://github.com/nicholas-fedor/watchtower/pull/952)
 - Update actions/attest-build-provenance digest to 268464d by @renovate[bot] in [#951](https://github.com/nicholas-fedor/watchtower/pull/951)
 - Update module github.com/docker/cli to v29.0.2+incompatible by @renovate[bot] in [#948](https://github.com/nicholas-fedor/watchtower/pull/948)
