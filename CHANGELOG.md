@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golangci/golangci-lint-action digest to e7fa5ac by @renovate[bot] in [#972](https://github.com/nicholas-fedor/watchtower/pull/972)
+- Update actions/checkout action to v6 by @renovate[bot] in [#966](https://github.com/nicholas-fedor/watchtower/pull/966)
+- Update nicholas-fedor/govulncheck-action digest to d800c37 by @renovate[bot] in [#969](https://github.com/nicholas-fedor/watchtower/pull/969)
+- Update actions/attest-build-provenance digest to f8ed128 by @renovate[bot] in [#968](https://github.com/nicholas-fedor/watchtower/pull/968)
+- Update actions/checkout digest to 1af3b93 by @renovate[bot] in [#965](https://github.com/nicholas-fedor/watchtower/pull/965)
 - Update nicholas-fedor/govulncheck-action digest to 55deb21 by @renovate[bot] in [#963](https://github.com/nicholas-fedor/watchtower/pull/963)
 - Update actions/setup-go digest to 4dc6199 by @renovate[bot] in [#962](https://github.com/nicholas-fedor/watchtower/pull/962)
 - Update nicholas-fedor/govulncheck-action digest to 0ee4877 by @renovate[bot] in [#960](https://github.com/nicholas-fedor/watchtower/pull/960)
