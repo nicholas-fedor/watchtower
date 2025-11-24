@@ -47,7 +47,7 @@ jobs:
           ./scripts/build-tplprev.sh
 
       - name: Setup python
-        uses: actions/setup-python@bfc4944b43a5d84377eca3cf6ab5b7992ba61923
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548
         with:
           python-version: 3.x
           cache: "pip"
