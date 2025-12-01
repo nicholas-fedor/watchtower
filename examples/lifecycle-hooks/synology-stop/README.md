@@ -96,7 +96,7 @@ services:
 
 ### Watchtower
 
-- Runs [`pre-update hook`](docs/advanced-features/lifecycle-hooks/index.md) **before** update/stop.
+- Runs [`pre-update hook`](https://watchtower.nickfedor.com/latest/advanced-features/lifecycle-hooks/) **before** update/stop.
 - Non-0 exit warns but continues.
 
 ### Synology DSM
