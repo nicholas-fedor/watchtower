@@ -68,19 +68,19 @@ docs: docs-setup docs-serve ## Build and serve documentation site for local deve
 
 docs-setup: ## Create virtual environment and install Mkdocs dependencies
 	python3 -m venv watchtower-docs
-	source watchtower-docs/bin/activate && pip install -r build/mkdocs/docs-requirements.txt
+	. watchtower-docs/bin/activate && pip install -r build/mkdocs/docs-requirements.txt
 
 docs-gen: ## Generate service configuration documentation
 	bash ./scripts/build-tplprev.sh
 
 docs-build: ## Build Mkdocs documentation site
-	source watchtower-docs/bin/activate && mkdocs build --config-file build/mkdocs/mkdocs.yaml
+	. watchtower-docs/bin/activate && mkdocs build --config-file build/mkdocs/mkdocs.yaml
 
 docs-serve: ## Serve Mkdocs documentation site locally
-	source watchtower-docs/bin/activate && mkdocs serve --config-file build/mkdocs/mkdocs.yaml --livereload
+	. watchtower-docs/bin/activate && mkdocs serve --config-file build/mkdocs/mkdocs.yaml --livereload
 
 docs-activate: ## Activate the watchtower-docs virtual environment for interactive work
-	@echo "Run 'source watchtower-docs/bin/activate' to activate the virtual environment."
+	@echo "Run '. watchtower-docs/bin/activate' to activate the virtual environment."
 
 docs-deactivate: ## Show instructions to deactivate the virtual environment
 	@echo "Run 'deactivate' to exit the virtual environment."

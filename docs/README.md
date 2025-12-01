@@ -479,7 +479,7 @@ The template preview is integrated into `docs/notifications/template-preview/ind
 
     ```bash
     python -m venv watchtower-docs
-    source watchtower-docs/bin/activate
+    . watchtower-docs/bin/activate
     ```
 
 3. **Install Dependencies**:
