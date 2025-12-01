@@ -171,6 +171,7 @@ volumes/
 go.sum.lock
 
 # Python/mkdocs-specific ignores
+watchtower-docs/
 *.pyc
 *.pyo
 *.pyd
