@@ -141,7 +141,7 @@ Both global and individual, container-specific uid/gid configurations are suppor
         ```
 
         ```bash title="Global GID for all hooks"
-        WATCHTOWER_LIFECYCLE_GID=1000"
+        WATCHTOWER_LIFECYCLE_GID=1000
         ```
 
 === "Individual Container Configuration"

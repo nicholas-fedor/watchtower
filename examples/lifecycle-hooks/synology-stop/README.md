@@ -43,7 +43,7 @@ The example hook itself is relatively simple. It performs the following actions:
 >
 > - Environment variables must be set in the **monitored container** (the one being updated), **not** in Watchtower.
 > - Set `CLIENT_SSL_VERIFY=0` for self-signed certs.
-> - Increase `CLIENT_TIMEOUT` as needed to accomodate low-power Synology devices.
+> - Increase `CLIENT_TIMEOUT` as needed to accommodate low-power Synology devices.
 
 ## Build
 
@@ -51,7 +51,7 @@ The example hook itself is relatively simple. It performs the following actions:
 
 ```bash
 cd examples/lifecycle-hooks/synology-stop
-go GOOS=linux GOARCH=arm64  build -o synology-stop synology-stop.go
+GOOS=linux GOARCH=arm64 go build -o synology-stop synology-stop.go
 ```
 
 ### Shell Script

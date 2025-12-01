@@ -41,25 +41,20 @@ abort() {
 parse_container_name() {
     # Input comes from stdin
     awk '
+    BEGIN { RS=""; FS="" }
     {
-        # Find "name":"
-        pos = index($0, "\"name\":")
-        if (!pos) exit 1
-        substr = substr($0, pos + 8)           # skip "name":"
-        # Find opening quote of value
-        if (substr !~ /^"/) {                  # handle optional whitespace
-            gsub(/^[ \t\r\n]+/, "", substr)
-            if (substr !~ /^"/) exit 1
+        # Find "name": followed by optional spaces and "
+        if (match($0, /"name"[[:space:]]*:[[:space:]]*"(\\.|[^"\\])*"/)) {
+            # Extract the content between the quotes
+            content = substr($0, RSTART, RLENGTH)
+            # Remove "name": " from start and " from end
+            sub(/^"name"[[:space:]]*:[[:space:]]*"/, "", content)
+            sub(/"$/, "", content)
+            # Unescape quotes
+            gsub(/\\"/, "\"", content)
+            print content
         }
-        substr = substr($0, pos + 8)
-        gsub(/^[^"]*"/, "", substr)            # remove everything up to first " after "name":
-        # Extract value until closing unescaped quote
-        match(substr, /^([^"\\]|\\.)*"/)
-        value = substr(0, RLENGTH - 1)
-        gsub(/\\./, "", value)                 # remove any \" escapes
-        print value
-        exit 0
-    }'
+    }' 2>/dev/null || true
 }
 
 CONTAINER_NAME=$(printf '%s\n' "$WT_CONTAINER" | parse_container_name) ||

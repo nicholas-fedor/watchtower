@@ -10,7 +10,8 @@ set -eu
 
 parse_container_name() {
     # Extract name field from JSON using awk (fixed version)
-    awk '
+    # Run awk and check its exit status to catch parse errors
+    if ! awk '
     BEGIN { RS=""; FS="" }
     {
         # Find "name": followed by optional spaces and "
@@ -24,7 +25,10 @@ parse_container_name() {
             gsub(/\\"/, "\"", content)
             print content
         }
-    }' 2>/dev/null || true
+    }' 2>/dev/null; then
+        echo "Error: awk failed to parse container name" >&2
+        return 1
+    fi
 }
 
 extract_sid() {
