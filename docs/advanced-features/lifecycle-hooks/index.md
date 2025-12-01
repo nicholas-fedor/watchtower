@@ -47,7 +47,7 @@ Enable them by using the following on the Watchtower container:
 Hook commands are defined using Docker labels on the containers being monitored by Watchtower:
 
 !!! Important
-    These commands require all necessary tooling (i.e. `sh`, `jq`, etc) to be installed in the monitored container.
+    These commands require all necessary tooling (i.e. `sh`, `jq`, etc.) to be installed in the monitored container.
 
 ```dockerfile title="Example pre-check hook (runs for each filtered container) "
 LABEL com.centurylinklabs.watchtower.lifecycle.pre-check="echo 'Starting update cycle'"
@@ -120,8 +120,8 @@ By default, hooks run as the monitored container's configured user and group (`u
 
 Both global and individual, container-specific uid/gid configurations are supported.
 
-> !!! Note
-> Container labels take precedence over global flags/variables.
+!!! Note
+    Container labels take precedence over global flags/variables.
 
 === "Global Configuration"
 
@@ -685,8 +685,8 @@ Hook execution results are evaluated based on exit codes, with different behavio
 
 ### Synology DSM Graceful Shutdown
 
-> !!! Warning
-> This is an example implementation that requires additional testing and validation.
+!!! Warning
+    This is an example implementation that requires additional testing and validation.
 
 There is a well-known issue with Synology devices sending warning notifications when containers are stopped by anything other than the Synology's Docker service. This can be problematic when using tools like Watchtower that stop and restart containers.
 
