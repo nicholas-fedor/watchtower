@@ -40,7 +40,7 @@ abort() {
 # ------------------------------------------------------------------
 parse_container_name() {
     # Input comes from stdin
-    awk '
+    if ! awk '
     BEGIN { RS=""; FS="" }
     {
         # Find "name": followed by optional spaces and "
@@ -54,7 +54,10 @@ parse_container_name() {
             gsub(/\\"/, "\"", content)
             print content
         }
-    }' 2>/dev/null || true
+    }' 2>/dev/null; then
+        echo "Error: awk failed to parse container name" >&2
+        return 1
+    fi
 }
 
 CONTAINER_NAME=$(printf '%s\n' "$WT_CONTAINER" | parse_container_name) ||
