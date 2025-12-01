@@ -272,6 +272,7 @@ func newClient(config *Config) *http.Client {
 	if !config.ClientSSLVerify {
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true, //nolint:gosec // Controlled by env var
+			MinVersion:         tls.VersionTLS12, // Minimum required by DSM 7 [DSM API Guide §2.1 p4]
 		}
 	}
 
