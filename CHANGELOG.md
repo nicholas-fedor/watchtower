@@ -14,11 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Enhance lifecycle hooks documentation and examples by @nicholas-fedor in [#998](https://github.com/nicholas-fedor/watchtower/pull/998)
 - Fix example notification template by @AzariasB in [#944](https://github.com/nicholas-fedor/watchtower/pull/944)
 - Resolve mike deploy alias conflict by @nicholas-fedor in [#919](https://github.com/nicholas-fedor/watchtower/pull/919)
 
 ### Chores
 
+- Update golangci/golangci-lint-action digest to 13fed6f by @renovate[bot] in [#996](https://github.com/nicholas-fedor/watchtower/pull/996)
+- Update module github.com/docker/cli to v29.1.1+incompatible by @renovate[bot] in [#995](https://github.com/nicholas-fedor/watchtower/pull/995)
+- Update module github.com/docker/cli to v29.1.0+incompatible by @renovate[bot] in [#994](https://github.com/nicholas-fedor/watchtower/pull/994)
+- Update goreleaser/goreleaser-action digest to f3511a2 by @renovate[bot] in [#993](https://github.com/nicholas-fedor/watchtower/pull/993)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.12.1 by @renovate[bot] in [#990](https://github.com/nicholas-fedor/watchtower/pull/990)
+- Update module github.com/docker/cli to v29.0.4+incompatible by @renovate[bot] in [#987](https://github.com/nicholas-fedor/watchtower/pull/987)
+- Update actions/setup-python digest to 83679a8 by @renovate[bot] in [#985](https://github.com/nicholas-fedor/watchtower/pull/985)
+- Update actions/attest-build-provenance digest to 08a89fb by @renovate[bot] in [#984](https://github.com/nicholas-fedor/watchtower/pull/984)
+- Update module github.com/docker/cli to v29.0.3+incompatible by @renovate[bot] in [#983](https://github.com/nicholas-fedor/watchtower/pull/983)
+- Update golangci/golangci-lint-action digest to a6071aa by @renovate[bot] in [#982](https://github.com/nicholas-fedor/watchtower/pull/982)
+- Update github/codeql-action digest to fdbfb4d by @renovate[bot] in [#981](https://github.com/nicholas-fedor/watchtower/pull/981)
+- Update nicholas-fedor/govulncheck-action digest to 22f7e2d by @renovate[bot] in [#979](https://github.com/nicholas-fedor/watchtower/pull/979)
+- Update actions/checkout digest to c2d88d3 by @renovate[bot] in [#978](https://github.com/nicholas-fedor/watchtower/pull/978)
 - Update peter-evans/create-pull-request digest to 84ae59a by @renovate[bot] in [#973](https://github.com/nicholas-fedor/watchtower/pull/973)
 - Update golangci/golangci-lint-action digest to e7fa5ac by @renovate[bot] in [#972](https://github.com/nicholas-fedor/watchtower/pull/972)
 - Update actions/checkout action to v6 by @renovate[bot] in [#966](https://github.com/nicholas-fedor/watchtower/pull/966)
