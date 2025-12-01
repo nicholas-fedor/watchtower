@@ -428,7 +428,7 @@ Lifecycle hook commands receive container metadata via the `WT_CONTAINER` enviro
 
         ```bash
         #!/bin/bash
-        BACKUP_TYPE=$(echo $WT_CONTAINER | jq -r '.labels["backup-type"] // "default"')
+        BACKUP_TYPE=$(echo $WT_CONTAINER | jq -r '.labels["com.centurylinklabs.watchtower.backup-type"] // "default"')
         case $BACKUP_TYPE in
             "full")
                 echo "Performing full backup"
