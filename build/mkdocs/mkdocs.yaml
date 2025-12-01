@@ -1,4 +1,6 @@
-# Project Information: https://www.mkdocs.org/user-guide/configuration/#project-information
+---
+# Project Information:
+# https://www.mkdocs.org/user-guide/configuration/#project-information
 # https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#repository-name
 site_name: Watchtower
 # https://www.mkdocs.org/user-guide/configuration/#site_url
@@ -6,13 +8,16 @@ site_url: https://watchtower.nickfedor.com/
 # https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#repository
 repo_url: https://github.com/nicholas-fedor/watchtower/
 
-# Path from repo_url to the docs directory for direct editing links, set to main branch.
+# Path from repo_url to the docs directory for direct editing links.
+# Set to main branch.
 # https://www.mkdocs.org/user-guide/configuration/#edit_uri
 edit_uri: edit/main/docs/
 
 # Description for meta tags in HTML header.
 # https://www.mkdocs.org/user-guide/configuration/#site_description
-site_description: Documentation for Watchtower, a solution for automating Docker container image updates.
+site_description: >
+  Documentation for Watchtower, a solution for automating Docker
+  container image updates.
 
 # Copyright information displayed in the documentation footer (Material theme).
 # https://squidfunk.github.io/mkdocs-material/setup/setting-up-the-footer/#copyright-notice
@@ -21,7 +26,8 @@ copyright: Copyright © 2025 Nicholas Fedor
 # Theme Configuration: https://www.mkdocs.org/user-guide/configuration/#theme
 theme:
   name: "material"
-  # Custom color scheme for the Material theme, defined in custom CSS or overrides.
+  # Custom color scheme for the Material theme,
+  # defined in custom CSS or overrides.
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: watchtower
@@ -100,12 +106,14 @@ extra_css:
   - assets/styles/theme.css
   - assets/styles/extra.css
 
-# Markdown Extensions: https://www.mkdocs.org/user-guide/configuration/#markdown_extensions
-# Custom formatting extensions beyond default meta, toc, tables, and fenced_code.
+# Markdown Extensions:
+# https://www.mkdocs.org/user-guide/configuration/#markdown_extensions
+# Custom formatting extensions beyond default meta, toc,
+# tables, and fenced_code.
 markdown_extensions:
   - toc:
       # Enables permalinks for table of contents headings.
-      permalink: True
+      permalink: true
       # Separator for permalinks in table of contents.
       separator: "_"
   # Enables admonition blocks (e.g., note, warning).
@@ -129,11 +137,15 @@ markdown_extensions:
   # Enables nested fenced code blocks.
   # https://facelessuser.github.io/pymdown-extensions/extensions/superfences/
   - pymdownx.superfences:
-  # Enables link-related functionality.
+      custom_fences:
+        # https://squidfunk.github.io/mkdocs-material/reference/diagrams/#configuration
+        - name: mermaid
+          class: mermaid
+  # Enables automatic linking of URLs and emails.
   # https://facelessuser.github.io/pymdown-extensions/extensions/magiclink/
   - pymdownx.magiclink:
       # Render commit, pull, and issue links in a shorthand syntax
-      repo_url_shortener: True
+      repo_url_shortener: true
       # The provider to use for repository shorthand syntax and shortener
       provider: github
       # The default user name to use for the specified provider
@@ -176,7 +188,8 @@ nav:
       - Linked Containers: advanced-features/linked-containers/index.md
       - Metrics: advanced-features/metrics/index.md
       - Remote Hosts: advanced-features/remote-hosts/index.md
-      - Running Multiple Instances: advanced-features/running-multiple-instances/index.md
+      - Running Multiple Instances:
+          advanced-features/running-multiple-instances/index.md
       - Stop Signals: advanced-features/stop-signals/index.md
 
 # Plugins: https://www.mkdocs.org/user-guide/configuration/#plugins
@@ -194,7 +207,8 @@ plugins:
       enable_creation_date: true
       type: timeago
 
-# Build Directories: https://www.mkdocs.org/user-guide/configuration/#build-directories
+# Build Directories:
+# https://www.mkdocs.org/user-guide/configuration/#build-directories
 # Default directories for documentation source and output.
 docs_dir: ../../docs
 site_dir: ../../site
@@ -217,7 +231,8 @@ validation:
     # Warns if relative links are unrecognized.
     unrecognized_links: warn
 
-# Live Reloading: https://www.mkdocs.org/user-guide/configuration/#live-reloading
+# Live Reloading:
+# https://www.mkdocs.org/user-guide/configuration/#live-reloading
 # Directories to watch for changes during mkdocs serve.
 watch:
   - ../../docs
