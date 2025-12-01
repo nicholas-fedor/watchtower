@@ -84,7 +84,7 @@ services:
             - ./Scripts/synology-stop:/synology-stop:ro
         ports:
             - 8080:80
-        label:
+        labels:
             - com.centurylinklabs.watchtower.lifecycle.pre-update: "/synology-stop"
         environment:
             - SYNO_URL=http://192.168.1.100:5000
