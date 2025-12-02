@@ -52,6 +52,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 			client,
 			nil, // no notifier
 			"v1.0.0",
+			nil, // read from flags
 		)
 
 		output := buffer.String()
@@ -72,6 +73,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 			client,
 			nil,
 			"v1.0.0",
+			nil, // read from flags
 		)
 
 		// Should not log to buffer when suppressed
@@ -90,6 +92,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 			client,
 			nil,
 			"v1.0.0",
+			nil, // read from flags
 		)
 
 		output := buffer.String()
@@ -112,6 +115,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 			client,
 			nil,
 			"v1.0.0",
+			nil, // read from flags
 		)
 
 		output := buffer.String()
@@ -181,7 +185,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		logger := logrus.NewEntry(logrus.StandardLogger())
 		sched := time.Now().Add(time.Hour)
 
-		logging.LogScheduleInfo(logger, cmd, sched)
+		logging.LogScheduleInfo(logger, cmd, sched, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Next scheduled run"))
@@ -191,7 +195,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		cmd.PersistentFlags().Bool("run-once", true, "")
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		logging.LogScheduleInfo(logger, cmd, time.Time{})
+		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Running a one time update"))
@@ -202,7 +206,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		cmd.PersistentFlags().Bool("update-on-start", true, "")
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		logging.LogScheduleInfo(logger, cmd, time.Time{})
+		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).
@@ -213,7 +217,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		cmd.PersistentFlags().Bool("update-on-start", true, "")
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		logging.LogScheduleInfo(logger, cmd, time.Time{})
+		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Update on startup enabled"))
@@ -224,7 +228,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		cmd.PersistentFlags().Bool("http-api-periodic-polls", false, "")
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		logging.LogScheduleInfo(logger, cmd, time.Time{})
+		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).
@@ -236,7 +240,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 		cmd.PersistentFlags().Bool("http-api-periodic-polls", true, "")
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		logging.LogScheduleInfo(logger, cmd, time.Time{})
+		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).
@@ -246,7 +250,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	ginkgo.It("should log default periodic updates", func() {
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		logging.LogScheduleInfo(logger, cmd, time.Time{})
+		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).

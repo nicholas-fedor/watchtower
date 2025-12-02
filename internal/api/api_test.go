@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				return filter
 			}
 			defaultMetrics := metrics.Default
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string) {}
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 			// Create mock HTTP server to avoid binding to real ports
 			mockServer := apiMocks.NewMockHTTPServer(ginkgo.GinkgoT())
@@ -134,7 +134,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				return filter
 			}
 			defaultMetrics := metrics.Default
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string) {}
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 			// Create mock HTTP server to avoid binding to real ports
 			mockServer := apiMocks.NewMockHTTPServer(ginkgo.GinkgoT())
@@ -190,7 +190,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				return filter
 			}
 			defaultMetrics := metrics.Default
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string) {}
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 			err := apiPkg.SetupAndStartAPI(
 				ctx,

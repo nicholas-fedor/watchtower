@@ -787,6 +787,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		nil,
 		"",
 		true,
+		false,
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -871,6 +872,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 		nil,
 		"",
 		true,
+		false,
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -958,6 +960,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 		nil,
 		"",
 		false,
+		false,
 	)
 
 	// Should not return an error
@@ -1026,6 +1029,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 		nil,
 		"",
 		updateOnStart,
+		false,
 	)
 
 	// Should not return an error
@@ -1107,6 +1111,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			nil,
 			"",
 			updateOnStart1,
+			false,
 		)
 		assert.NoError(t, err)
 		atomic.AddInt32(&completed, 1)
@@ -1135,6 +1140,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			nil,
 			"",
 			updateOnStart2,
+			false,
 		)
 		assert.NoError(t, err)
 		atomic.AddInt32(&completed, 1)
@@ -1276,6 +1282,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 			"",
 			nil,
 			"",
+			false,
 			false,
 		)
 		assert.NoError(t, err)
