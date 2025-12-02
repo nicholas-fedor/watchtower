@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/govulncheck-action digest to 5d80989 by @renovate[bot] in [#1007](https://github.com/nicholas-fedor/watchtower/pull/1007)
+- Update actions/checkout digest to 8e8c483 by @renovate[bot] in [#1006](https://github.com/nicholas-fedor/watchtower/pull/1006)
+- Update actions/attest-build-provenance digest to ca0aaa1 by @renovate[bot] in [#1005](https://github.com/nicholas-fedor/watchtower/pull/1005)
+- Update peter-evans/create-pull-request digest to bc8a47f by @renovate[bot] in [#1003](https://github.com/nicholas-fedor/watchtower/pull/1003)
+- Update goreleaser/goreleaser-action digest to d31d51a by @renovate[bot] in [#1002](https://github.com/nicholas-fedor/watchtower/pull/1002)
 - Update golangci/golangci-lint-action digest to 1e7e51e by @renovate[bot] in [#1000](https://github.com/nicholas-fedor/watchtower/pull/1000)
 - Update github/codeql-action digest to fe4161a by @renovate[bot] in [#999](https://github.com/nicholas-fedor/watchtower/pull/999)
 - Update golangci/golangci-lint-action digest to 13fed6f by @renovate[bot] in [#996](https://github.com/nicholas-fedor/watchtower/pull/996)
@@ -61,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update cimg/go:1.25.3 docker digest to 0184935 by @renovate[bot] in [#931](https://github.com/nicholas-fedor/watchtower/pull/931)
 - Update github/codeql-action digest to 014f16e by @renovate[bot] in [#925](https://github.com/nicholas-fedor/watchtower/pull/925)
 - Update actions/setup-python digest to 97aeb3e by @renovate[bot] in [#923](https://github.com/nicholas-fedor/watchtower/pull/923)
+
+### Fixed
+
+- Address gaps in self-update functionality by @nicholas-fedor in [#1008](https://github.com/nicholas-fedor/watchtower/pull/1008)
 
 ### New Contributors
 
