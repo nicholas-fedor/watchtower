@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -122,11 +123,10 @@ func RunUpgradesOnSchedule(
 	var scheduledUpdateFunc func()
 
 	if skipFirstRun {
-		firstRunSkipped := false
-		scheduledUpdateFunc = func() {
-			if !firstRunSkipped {
-				firstRunSkipped = true
+		var firstRunSkipped uint32
 
+		scheduledUpdateFunc = func() {
+			if atomic.CompareAndSwapUint32(&firstRunSkipped, 0, 1) {
 				logrus.Debug("Skipping first scheduled run due to cleanup")
 
 				return
