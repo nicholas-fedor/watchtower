@@ -13,4 +13,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Pull new module version
-        uses: nicholas-fedor/go-proxy-pull-action@a32dd3b8d23ece5e19342b103a9ba65cb49be9ed
+        uses: nicholas-fedor/go-proxy-pull-action@501ad3264cb3109719d5b501fc44e66b63e1d304
