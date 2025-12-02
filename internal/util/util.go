@@ -213,3 +213,14 @@ func FilterEmpty(parts []string) []string {
 
 	return filtered
 }
+
+// NormalizeContainerName trims the leading "/" from container names.
+//
+// Parameters:
+//   - name: Container name, potentially with leading "/".
+//
+// Returns:
+//   - string: Normalized name without leading "/".
+func NormalizeContainerName(name string) string {
+	return strings.TrimPrefix(name, "/")
+}

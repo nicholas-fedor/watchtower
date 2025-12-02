@@ -204,6 +204,62 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				gomega.Expect(watchtowerNames).To(gomega.ContainElement("watchtower1"))
 				gomega.Expect(watchtowerNames).To(gomega.ContainElement("watchtower2"))
 			})
+
+			ginkgo.It("handles chained dependencies with slash-prefixed links", func() {
+				testCases := []struct {
+					name          string
+					containers    []types.Container
+					expectedOrder []string
+				}{
+					{
+						name: "simple chain with slashes",
+						containers: []types.Container{
+							&mockContainer{name: "c", links: nil},
+							&mockContainer{name: "b", links: []string{"/c"}},
+							&mockContainer{name: "a", links: []string{"/b"}},
+						},
+						expectedOrder: []string{"c", "b", "a"},
+					},
+					{
+						name: "multiple dependencies with slashes",
+						containers: []types.Container{
+							&mockContainer{name: "d", links: nil},
+							&mockContainer{name: "c", links: nil},
+							&mockContainer{name: "b", links: []string{"/d"}},
+							&mockContainer{name: "a", links: []string{"/b", "/c"}},
+						},
+						expectedOrder: []string{"d", "c", "b", "a"},
+					},
+					{
+						name: "no dependencies",
+						containers: []types.Container{
+							&mockContainer{name: "a", links: nil},
+							&mockContainer{name: "b", links: nil},
+							&mockContainer{name: "c", links: nil},
+						},
+						expectedOrder: []string{"a", "b", "c"},
+					},
+					{
+						name: "mixed slash scenarios",
+						containers: []types.Container{
+							&mockContainer{name: "c", links: nil},
+							&mockContainer{name: "b", links: []string{"c"}},  // no slash
+							&mockContainer{name: "a", links: []string{"/b"}}, // with slash
+						},
+						expectedOrder: []string{"c", "b", "a"},
+					},
+				}
+				for _, tc := range testCases {
+					ginkgo.By(tc.name, func() {
+						sorted, err := sorter.SortByDependencies(tc.containers)
+						gomega.Expect(err).ToNot(gomega.HaveOccurred())
+						gomega.Expect(sorted).To(gomega.HaveLen(len(tc.expectedOrder)))
+						for i, name := range tc.expectedOrder {
+							gomega.Expect(sorted[i].Name()).To(gomega.Equal(name))
+						}
+					})
+				}
+			})
 		})
 	})
 })

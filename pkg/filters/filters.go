@@ -88,7 +88,13 @@ func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 
 		for _, name := range names {
 			// Match exact name with or without leading slash.
-			if name == c.Name() || name == c.Name()[1:] {
+			if name == "/" {
+				if c.Name() == "/" {
+					clog.Debug("Matched container by exact name")
+
+					return baseFilter(c)
+				}
+			} else if strings.TrimPrefix(name, "/") == strings.TrimPrefix(c.Name(), "/") {
 				clog.Debug("Matched container by exact name")
 
 				return baseFilter(c)
@@ -140,7 +146,13 @@ func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.
 		})
 
 		for _, name := range disableNames {
-			if name == c.Name() || name == c.Name()[1:] {
+			if name == "/" {
+				if c.Name() == "/" {
+					clog.Debug("Container excluded by disable name")
+
+					return false
+				}
+			} else if strings.TrimPrefix(name, "/") == strings.TrimPrefix(c.Name(), "/") {
 				clog.Debug("Container excluded by disable name")
 
 				return false
