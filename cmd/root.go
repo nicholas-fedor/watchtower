@@ -538,6 +538,7 @@ func runMain(cfg config.RunConfig) int {
 			client,
 			notifier,
 			meta.Version,
+			nil, // read from flags
 		)
 		metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
 		metrics.Default().RegisterScan(metric)
@@ -578,7 +579,7 @@ func runMain(cfg config.RunConfig) int {
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
-	if err := scheduling.RunUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup, scheduleSpec, logging.WriteStartupMessage, runUpdatesWithNotifications, client, scope, notifier, meta.Version, cfg.UpdateOnStart); err != nil {
+	if err := scheduling.RunUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup, scheduleSpec, logging.WriteStartupMessage, runUpdatesWithNotifications, client, scope, notifier, meta.Version, cfg.UpdateOnStart, cleanupOccurred); err != nil {
 		logNotify("Scheduled upgrades failed", err)
 
 		return 1

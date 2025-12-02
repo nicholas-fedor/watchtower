@@ -6,7 +6,7 @@ BINARY_NAME=watchtower
 GO=go
 DOCKER=docker
 GORELEASER=goreleaser
-GOLANGCI_LINT=golangci-lint-v2
+GOLANGCI_LINT=golangci-lint
 MOCKERY=mockery
 
 # Default target

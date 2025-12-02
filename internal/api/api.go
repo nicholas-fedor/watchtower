@@ -76,7 +76,7 @@ func SetupAndStartAPI(
 	runUpdatesWithNotifications func(types.Filter, bool) *metrics.Metric,
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
-	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string),
+	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
 	server ...pkgApi.HTTPServer,
 ) error {
 	// Get the formatted HTTP api address string.
@@ -112,6 +112,7 @@ func SetupAndStartAPI(
 				client,
 				notifier,
 				version,
+				nil, // read from flags
 			)
 		}
 	}

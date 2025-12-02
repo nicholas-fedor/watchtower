@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 //   - ctx: The context for cancellation, allowing early shutdown on context timeout.
 //   - lock: The channel used to synchronize updates, ensuring only one runs at a time.
 func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
-	const updateWaitTimeout = 30 * time.Second
+	const updateWaitTimeout = 60 * time.Second
 
 	logrus.Debug("Checking lock status before shutdown.")
 
@@ -51,6 +52,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 // It sets up a cron scheduler, runs updates at specified intervals, and ensures graceful shutdown on interrupt
 // signals (SIGINT, SIGTERM) or context cancellation, handling concurrency with a lock channel.
 // If update-on-start is enabled, it triggers the first update immediately before starting the scheduler.
+// If skipFirstRun is true, it skips the first scheduled run (useful after self-update cleanup).
 //
 // Parameters:
 //   - ctx: The context controlling the scheduler's lifecycle, enabling shutdown on cancellation.
@@ -67,6 +69,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 //   - notifier: The notification system instance responsible for sending update status messages.
 //   - metaVersion: The version string for Watchtower, used in startup messaging.
 //   - updateOnStart: Boolean indicating whether to perform an update immediately on startup.
+//   - skipFirstRun: Boolean indicating whether to skip the first scheduled run.
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
@@ -78,13 +81,14 @@ func RunUpgradesOnSchedule(
 	lock chan bool,
 	cleanup bool,
 	scheduleSpec string,
-	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string),
+	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
 	runUpdatesWithNotifications func(types.Filter, bool) *metrics.Metric,
 	client container.Client,
 	scope string,
 	notifier types.Notifier,
 	metaVersion string,
 	updateOnStart bool,
+	skipFirstRun bool,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -103,6 +107,7 @@ func RunUpgradesOnSchedule(
 
 			metric := runUpdatesWithNotifications(filter, cleanup)
 			metrics.Default().RegisterScan(metric)
+			logrus.Debug("Update operation completed successfully")
 		default:
 			metrics.Default().RegisterScan(nil)
 			logrus.Debug("Skipped another update already running.")
@@ -114,11 +119,30 @@ func RunUpgradesOnSchedule(
 		}
 	}
 
+	// Wrapper function that can skip the first run if needed
+	var scheduledUpdateFunc func()
+
+	if skipFirstRun {
+		var firstRunSkipped uint32
+
+		scheduledUpdateFunc = func() {
+			if atomic.CompareAndSwapUint32(&firstRunSkipped, 0, 1) {
+				logrus.Debug("Skipping first scheduled run due to cleanup")
+
+				return
+			}
+
+			updateFunc()
+		}
+	} else {
+		scheduledUpdateFunc = updateFunc
+	}
+
 	// Add the update function to the cron schedule, handling concurrency and metrics.
 	if scheduleSpec != "" {
 		if err := scheduler.AddFunc(
 			scheduleSpec,
-			updateFunc); err != nil {
+			scheduledUpdateFunc); err != nil {
 			return fmt.Errorf("failed to schedule updates: %w", err)
 		}
 	}
@@ -129,7 +153,7 @@ func RunUpgradesOnSchedule(
 		nextRun = scheduler.Entries()[0].Schedule.Next(time.Now())
 	}
 
-	writeStartupMessage(c, nextRun, filtering, scope, client, notifier, metaVersion)
+	writeStartupMessage(c, nextRun, filtering, scope, client, notifier, metaVersion, &updateOnStart)
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
 	if updateOnStart {

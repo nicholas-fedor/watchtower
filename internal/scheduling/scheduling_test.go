@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 		}
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string) {}
+		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 		// Use timeout to avoid hanging
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
@@ -93,6 +93,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			nil, // no notifier
 			"v1.0.0",
 			false, // updateOnStart
+			false, // skipFirstRun
 		)
 
 		// Should complete without error when context times out (clean cancellation)
@@ -107,7 +108,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 		}
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string) {}
+		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 		err := scheduling.RunUpgradesOnSchedule(
 			ctx,
@@ -124,6 +125,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			nil,
 			"v1.0.0",
 			false, // updateOnStart
+			false, // skipFirstRun
 		)
 
 		gomega.Expect(err).To(gomega.HaveOccurred())
@@ -143,7 +145,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 		}
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string) {}
+		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 		// Use timeout to avoid hanging
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
@@ -163,7 +165,8 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			"",
 			nil,
 			"v1.0.0",
-			true, // updateOnStart
+			true,  // updateOnStart
+			false, // skipFirstRun
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred()) // clean timeout
@@ -178,7 +181,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 		}
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string) {}
+		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 		// Cancel immediately
 		cancelledCtx, cancelFunc := context.WithCancel(ctx)
@@ -199,6 +202,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 			nil,
 			"v1.0.0",
 			false, // updateOnStart
+			false, // skipFirstRun
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())

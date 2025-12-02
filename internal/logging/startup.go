@@ -29,6 +29,7 @@ import (
 //   - client: The Docker client instance used to retrieve API version information.
 //   - notifier: The notification system instance for sending startup messages.
 //   - watchtowerVersion: The version string of Watchtower to include in startup messages.
+//   - updateOnStart: The actual update-on-start value, or nil to read from flags.
 func WriteStartupMessage(
 	c *cobra.Command,
 	sched time.Time,
@@ -37,6 +38,7 @@ func WriteStartupMessage(
 	client container.Client,
 	notifier types.Notifier,
 	watchtowerVersion string,
+	updateOnStart *bool,
 ) {
 	// Retrieve flags controlling startup message behavior and API setup.
 	noStartupMessage, _ := c.PersistentFlags().GetBool("no-startup-message")
@@ -86,7 +88,7 @@ func WriteStartupMessage(
 	}
 
 	// Log scheduling or run mode information based on configuration.
-	LogScheduleInfo(startupLog, c, sched)
+	LogScheduleInfo(startupLog, c, sched, updateOnStart)
 
 	// Report HTTP API status if enabled.
 	if enableUpdateAPI {
@@ -157,15 +159,23 @@ func LogNotifierInfo(log *logrus.Entry, notifierNames []string) {
 //   - log: The logrus.Entry used to write the schedule information.
 //   - c: The cobra.Command instance, providing access to flags like --run-once.
 //   - sched: The time.Time of the first scheduled run, or zero if no schedule is set.
-func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
-	// Obtain flag values for run-once and update-on-start.
+//   - updateOnStart: The actual update-on-start value, or nil to read from flags.
+func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time, updateOnStart *bool) {
+	// Obtain flag values for run-once.
 	runOnce, _ := c.PersistentFlags().GetBool("run-once")
-	updateOnStart, _ := c.PersistentFlags().GetBool("update-on-start")
+
+	// Use provided updateOnStart value if not nil, otherwise read from flags.
+	var updateOnStartVal bool
+	if updateOnStart != nil {
+		updateOnStartVal = *updateOnStart
+	} else {
+		updateOnStartVal, _ = c.PersistentFlags().GetBool("update-on-start")
+	}
 
 	// Check if run-once is enabled.
 	if runOnce {
 		// Warn if disregarding update-on-start when already performing on-time update
-		if updateOnStart {
+		if updateOnStartVal {
 			log.Warn("Run once enabled: Disregarding redundant update on start")
 		} else {
 			log.Info("Running a one time update")
@@ -175,7 +185,7 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	}
 
 	// Check if update on start is enabled.
-	if updateOnStart {
+	if updateOnStartVal {
 		log.Info(
 			"Update on startup enabled: Performing immediate check",
 		)
@@ -208,7 +218,7 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time) {
 	}
 
 	// Default periodic updates are enabled.
-	if !updateOnStart && !httpAPI && sched.IsZero() {
+	if !updateOnStartVal && !httpAPI && sched.IsZero() {
 		log.Info("Periodic updates are enabled with default schedule")
 	}
 }
