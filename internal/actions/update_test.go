@@ -800,6 +800,68 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
 			})
+			ginkgo.It("should propagate restart through chained dependencies", func() {
+				// Create a transitive dependency chain: A depends on B, B depends on C
+				containerC := mocks.CreateMockContainerWithConfig(
+					"test-container-c",
+					"/test-container-c",
+					"fake-image-c:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mocks.CreateMockContainerWithConfig(
+					"test-container-b",
+					"/test-container-b",
+					"fake-image-b:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "test-container-c",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerA := mocks.CreateMockContainerWithConfig(
+					"test-container-a",
+					"/test-container-a",
+					"fake-image-a:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "test-container-b",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{
+					containerC,
+					containerB,
+					containerA,
+				}
+
+				// Initially, only C should be marked for restart
+				containerC.SetStale(true)
+				gomega.Expect(containerC.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerB.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
+
+				// Run UpdateImplicitRestart to propagate restart through the chain
+				actions.UpdateImplicitRestart(containers)
+
+				// Verify that restart propagates: A and B should now be marked for restart
+				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue()) // C
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue()) // B
+				gomega.Expect(containers[2].ToRestart()).To(gomega.BeTrue()) // A
+			})
 		})
 
 		ginkgo.When("container is not running", func() {
@@ -892,6 +954,86 @@ var _ = ginkgo.Describe("the update action", func() {
 			})
 		})
 	})
+	ginkgo.When("updating containers with chained dependencies", func() {
+		ginkgo.It("should process containers in dependency order", func() {
+			// Create a dependency chain: A depends on B, B depends on C
+			containerC := mocks.CreateMockContainerWithConfig(
+				"test-container-c",
+				"/test-container-c",
+				"fake-image-c:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // Make it stale
+				&container.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			containerB := mocks.CreateMockContainerWithConfig(
+				"test-container-b",
+				"/test-container-b",
+				"fake-image-b:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // Make it stale
+				&container.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "test-container-c",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			containerA := mocks.CreateMockContainerWithConfig(
+				"test-container-a",
+				"/test-container-a",
+				"fake-image-a:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // Make it stale
+				&container.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "test-container-b",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						containerA,
+						containerB,
+						containerC,
+					},
+					Staleness: map[string]bool{
+						"test-container-a": true,
+						"test-container-b": true,
+						"test-container-c": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, cleanupImageInfos, err := actions.Update(
+				client,
+				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
+
+			// Verify that all containers were updated (dependencies were handled correctly)
+			gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(3))
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image-a:latest"))))
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image-b:latest"))))
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image-c:latest"))))
+		})
+	})
+
+	// Tests for image reference handling to cover isPinned functionality
 
 	// Tests for image reference handling to cover isPinned functionality
 	ginkgo.When("handling different image reference formats", func() {
@@ -1241,6 +1383,565 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(1), "RenameContainer should be called once")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
 				To(gomega.Equal(2), "IsContainerStale should be called twice for Watchtower")
+		})
+		ginkgo.When("handling chained dependencies with multiple dependents", func() {
+			ginkgo.It(
+				"should restart all containers depending on the same base dependency when it updates",
+				func() {
+					// Create a base container that will be updated
+					baseContainer := mocks.CreateMockContainerWithConfig(
+						"base-container",
+						"/base-container",
+						"base-image:latest",
+						true,
+						false,
+						time.Now().AddDate(0, 0, -1), // Make it stale
+						&container.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					// Create multiple containers that all depend on the base container
+					dependent1 := mocks.CreateMockContainerWithConfig(
+						"dependent-1",
+						"/dependent-1",
+						"dep1-image:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "base-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					dependent2 := mocks.CreateMockContainerWithConfig(
+						"dependent-2",
+						"/dependent-2",
+						"dep2-image:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "base-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					dependent3 := mocks.CreateMockContainerWithConfig(
+						"dependent-3",
+						"/dependent-3",
+						"dep3-image:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "base-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					client := mocks.CreateMockClient(
+						&mocks.TestData{
+							Containers: []types.Container{
+								baseContainer,
+								dependent1,
+								dependent2,
+								dependent3,
+							},
+							Staleness: map[string]bool{
+								"base-container": true,
+								"dependent-1":    false,
+								"dependent-2":    false,
+								"dependent-3":    false,
+							},
+						},
+						false,
+						false,
+					)
+
+					report, cleanupImageInfos, err := actions.Update(
+						client,
+						actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					)
+
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(report.Updated()).
+						To(gomega.HaveLen(1))
+						// Only base container is stale and updated
+
+					// Verify that base container was updated
+					gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+					gomega.Expect(cleanupImageInfos).
+						To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("base-image:latest"))))
+				},
+			)
+		})
+
+		ginkgo.When("handling circular dependencies", func() {
+			ginkgo.It("should detect circular dependencies and return an error", func() {
+				// Create containers with circular dependencies: A depends on B, B depends on A
+				containerA := mocks.CreateMockContainerWithConfig(
+					"container-a",
+					"/container-a",
+					"image-a:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-b",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mocks.CreateMockContainerWithConfig(
+					"container-b",
+					"/container-b",
+					"image-b:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-a",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							containerA,
+							containerB,
+						},
+						Staleness: map[string]bool{
+							"container-a": false,
+							"container-b": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					client,
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).
+					To(gomega.HaveOccurred(), "Circular dependencies should cause an error")
+				gomega.Expect(report).To(gomega.BeNil(), "No report should be returned on error")
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.BeEmpty(), "No cleanup should occur on error")
+			})
+		})
+
+		ginkgo.When("handling depends-on with non-existent containers", func() {
+			ginkgo.It(
+				"should gracefully handle depends-on referencing containers that don't exist",
+				func() {
+					// Create a container that depends on a non-existent container
+					dependent := mocks.CreateMockContainerWithConfig(
+						"dependent-container",
+						"/dependent-container",
+						"dep-image:latest",
+						true,
+						false,
+						time.Now().AddDate(0, 0, -1), // Make it stale
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "non-existent-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					client := mocks.CreateMockClient(
+						&mocks.TestData{
+							Containers: []types.Container{
+								dependent,
+							},
+							Staleness: map[string]bool{
+								"dependent-container": true,
+							},
+						},
+						false,
+						false,
+					)
+
+					report, cleanupImageInfos, err := actions.Update(
+						client,
+						actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					)
+
+					gomega.Expect(err).
+						NotTo(gomega.HaveOccurred(), "Non-existent dependencies should not cause errors")
+					gomega.Expect(report.Updated()).
+						To(gomega.HaveLen(1), "Dependent container should still be updated")
+
+					// Verify that the container was updated
+					gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+					gomega.Expect(cleanupImageInfos).
+						To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("dep-image:latest"))))
+				},
+			)
+		})
+
+		ginkgo.When("handling diamond dependency patterns", func() {
+			ginkgo.It("should propagate restart through multiple dependency paths", func() {
+				// Create diamond pattern: A depends on B and C, both B and C depend on D
+				containerD := mocks.CreateMockContainerWithConfig(
+					"container-d",
+					"/container-d",
+					"image-d:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mocks.CreateMockContainerWithConfig(
+					"container-b",
+					"/container-b",
+					"image-b:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-d",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerC := mocks.CreateMockContainerWithConfig(
+					"container-c",
+					"/container-c",
+					"image-c:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-d",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerA := mocks.CreateMockContainerWithConfig(
+					"container-a",
+					"/container-a",
+					"image-a:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-b,container-c",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							containerD,
+							containerB,
+							containerC,
+							containerA,
+						},
+						Staleness: map[string]bool{
+							"container-d": true,
+							"container-b": false,
+							"container-c": false,
+							"container-a": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					client,
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).
+					To(gomega.HaveLen(1)) // Only base container D is stale and updated
+
+				// Verify that base container was updated
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("image-d:latest"))))
+			})
+		})
+
+		ginkgo.When("handling self-dependency in depends-on", func() {
+			ginkgo.It("should gracefully handle containers that depend on themselves", func() {
+				// Create a container that depends on itself
+				selfDependent := mocks.CreateMockContainerWithConfig(
+					"self-container",
+					"/self-container",
+					"self-image:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "self-container",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							selfDependent,
+						},
+						Staleness: map[string]bool{
+							"self-container": true,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					client,
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).
+					To(gomega.HaveOccurred(), "Self-dependency should cause circular reference error")
+				gomega.Expect(report).To(gomega.BeNil(), "No report should be returned on error")
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.BeEmpty(), "No cleanup should occur on error")
+			})
+		})
+
+		ginkgo.When("handling malformed container names in depends-on", func() {
+			ginkgo.It("should gracefully handle depends-on with invalid container names", func() {
+				// Create a container with malformed depends-on names
+				dependent := mocks.CreateMockContainerWithConfig(
+					"dependent-container",
+					"/dependent-container",
+					"dep-image:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "invalid name,another-invalid",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							dependent,
+						},
+						Staleness: map[string]bool{
+							"dependent-container": true,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					client,
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).
+					NotTo(gomega.HaveOccurred(), "Malformed names should not cause errors")
+				gomega.Expect(report.Updated()).
+					To(gomega.HaveLen(1), "Dependent container should still be updated")
+
+				// Verify that the container was updated
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("dep-image:latest"))))
+			})
+		})
+
+		ginkgo.When("handling deep dependency chains", func() {
+			ginkgo.It("should handle dependency chains with more than 3 levels", func() {
+				// Create a deep dependency chain: A depends on B, B depends on C, C depends on D, D depends on E
+				containerE := mocks.CreateMockContainerWithConfig(
+					"container-e",
+					"/container-e",
+					"image-e:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerD := mocks.CreateMockContainerWithConfig(
+					"container-d",
+					"/container-d",
+					"image-d:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-e",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerC := mocks.CreateMockContainerWithConfig(
+					"container-c",
+					"/container-c",
+					"image-c:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-d",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mocks.CreateMockContainerWithConfig(
+					"container-b",
+					"/container-b",
+					"image-b:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-c",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerA := mocks.CreateMockContainerWithConfig(
+					"container-a",
+					"/container-a",
+					"image-a:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-b",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							containerE,
+							containerD,
+							containerC,
+							containerB,
+							containerA,
+						},
+						Staleness: map[string]bool{
+							"container-e": true,
+							"container-d": false,
+							"container-c": false,
+							"container-b": false,
+							"container-a": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					client,
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).
+					To(gomega.HaveLen(1)) // Only base container E is stale and updated
+
+				// Verify that base container was updated
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("image-e:latest"))))
+			})
+		})
+
+		ginkgo.When("handling mixed valid and invalid dependencies", func() {
+			ginkgo.It(
+				"should handle containers with some valid and some invalid dependencies",
+				func() {
+					// Create containers where A depends on both a valid container B and an invalid container
+					containerB := mocks.CreateMockContainerWithConfig(
+						"container-b",
+						"/container-b",
+						"image-b:latest",
+						true,
+						false,
+						time.Now().AddDate(0, 0, -1), // Make it stale
+						&container.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					containerA := mocks.CreateMockContainerWithConfig(
+						"container-a",
+						"/container-a",
+						"image-a:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "container-b,non-existent-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					client := mocks.CreateMockClient(
+						&mocks.TestData{
+							Containers: []types.Container{
+								containerB,
+								containerA,
+							},
+							Staleness: map[string]bool{
+								"container-b": true,
+								"container-a": false,
+							},
+						},
+						false,
+						false,
+					)
+
+					report, cleanupImageInfos, err := actions.Update(
+						client,
+						actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					)
+
+					gomega.Expect(err).
+						NotTo(gomega.HaveOccurred(), "Mixed valid/invalid dependencies should not cause errors")
+					gomega.Expect(report.Updated()).
+						To(gomega.HaveLen(1), "Only stale container should be updated")
+
+					// Verify that base container was updated
+					gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+					gomega.Expect(cleanupImageInfos).
+						To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("image-b:latest"))))
+				},
+			)
 		})
 	})
 })
