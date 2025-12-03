@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -167,7 +168,7 @@ func (ds *dependencySorter) Sort(containers []types.Container) ([]types.Containe
 //   - error: Non-nil if circular reference detected, nil on success.
 func (ds *dependencySorter) visit(c types.Container) error {
 	// Check for circular reference.
-	if _, ok := ds.marked[c.Name()]; ok {
+	if _, ok := ds.marked[util.NormalizeContainerName(c.Name())]; ok {
 		logrus.WithFields(logrus.Fields{
 			"container_id": c.ID().ShortID(),
 			"name":         c.Name(),
@@ -177,8 +178,8 @@ func (ds *dependencySorter) visit(c types.Container) error {
 	}
 
 	// Mark as visited, unmark on exit.
-	ds.marked[c.Name()] = true
-	defer delete(ds.marked, c.Name())
+	ds.marked[util.NormalizeContainerName(c.Name())] = true
+	defer delete(ds.marked, util.NormalizeContainerName(c.Name()))
 
 	// Visit all linked containers.
 	for _, linkName := range c.Links() {
@@ -209,7 +210,7 @@ func (ds *dependencySorter) visit(c types.Container) error {
 //   - *types.Container: Found container or nil.
 func (ds *dependencySorter) findUnvisited(name string) *types.Container {
 	for _, c := range ds.unvisited {
-		if c.Name() == name {
+		if util.NormalizeContainerName(c.Name()) == util.NormalizeContainerName(name) {
 			return &c
 		}
 	}
@@ -225,7 +226,11 @@ func (ds *dependencySorter) removeUnvisited(c types.Container) {
 	var idx int
 
 	for i := range ds.unvisited {
-		if ds.unvisited[i].Name() == c.Name() {
+		if util.NormalizeContainerName(
+			ds.unvisited[i].Name(),
+		) == util.NormalizeContainerName(
+			c.Name(),
+		) {
 			idx = i
 
 			break

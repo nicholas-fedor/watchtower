@@ -8,6 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -88,7 +89,13 @@ func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 
 		for _, name := range names {
 			// Match exact name with or without leading slash.
-			if name == c.Name() || name == c.Name()[1:] {
+			if name == "/" {
+				if c.Name() == "/" {
+					clog.Debug("Matched container by exact name")
+
+					return baseFilter(c)
+				}
+			} else if util.NormalizeContainerName(name) == util.NormalizeContainerName(c.Name()) {
 				clog.Debug("Matched container by exact name")
 
 				return baseFilter(c)
@@ -140,7 +147,13 @@ func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.
 		})
 
 		for _, name := range disableNames {
-			if name == c.Name() || name == c.Name()[1:] {
+			if name == "/" {
+				if c.Name() == "/" {
+					clog.Debug("Container excluded by disable name")
+
+					return false
+				}
+			} else if util.NormalizeContainerName(name) == util.NormalizeContainerName(c.Name()) {
 				clog.Debug("Container excluded by disable name")
 
 				return false

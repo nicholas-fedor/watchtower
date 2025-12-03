@@ -300,19 +300,19 @@ func isInvalidImageName(name string) bool {
 	return name == "" || name == ":latest" || strings.HasPrefix(name, ":")
 }
 
-// getFallbackImage derives a fallback image name from container info.
+// GetFallbackImage derives a fallback image name from container info.
 // Uses sanitized imageInfo.ID if it contains a tag, otherwise uses sanitized container name with ":latest".
-func getFallbackImage(container types.Container) string {
+func GetFallbackImage(container types.Container) string {
 	if container.HasImageInfo() {
 		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
 		if !strings.Contains(fallback, ":") {
-			return strings.TrimPrefix(container.Name(), "/") + ":latest"
+			return util.NormalizeContainerName(container.Name()) + ":latest"
 		}
 
 		return fallback
 	}
 
-	return strings.TrimPrefix(container.Name(), "/") + ":latest"
+	return util.NormalizeContainerName(container.Name()) + ":latest"
 }
 
 // parseReference parses a Docker image reference with logging.
@@ -376,7 +376,7 @@ func isPinned(
 	// Get initial image name and configuration.
 	imageName := container.ImageName()
 	configImage := container.ContainerInfo().Config.Image
-	fallbackImage := getFallbackImage(container)
+	fallbackImage := GetFallbackImage(container)
 
 	// Check if ImageName is invalid and fall back to Config.Image or a derived name.
 	if isInvalidImageName(imageName) {
@@ -818,7 +818,7 @@ func UpdateImplicitRestart(containers []types.Container) {
 			continue // Skip already marked containers.
 		}
 
-		if link := linkedContainerMarkedForRestart(c.Links(), containers); link != "" {
+		if link := LinkedContainerMarkedForRestart(c.Links(), containers); link != "" {
 			logrus.WithFields(logrus.Fields{
 				"container":  c.Name(),
 				"restarting": link,
@@ -828,7 +828,7 @@ func UpdateImplicitRestart(containers []types.Container) {
 	}
 }
 
-// linkedContainerMarkedForRestart finds a restarting linked container.
+// LinkedContainerMarkedForRestart finds a restarting linked container.
 //
 // It searches for a container in the links list that is marked for restart, returning its name.
 //
@@ -838,10 +838,14 @@ func UpdateImplicitRestart(containers []types.Container) {
 //
 // Returns:
 //   - string: Name of restarting linked container, or empty if none.
-func linkedContainerMarkedForRestart(links []string, containers []types.Container) string {
+func LinkedContainerMarkedForRestart(links []string, containers []types.Container) string {
 	for _, linkName := range links {
 		for _, candidate := range containers {
-			if strings.TrimPrefix(candidate.Name(), "/") == strings.TrimPrefix(linkName, "/") &&
+			if util.NormalizeContainerName(
+				candidate.Name(),
+			) == util.NormalizeContainerName(
+				linkName,
+			) &&
 				candidate.ToRestart() {
 				return linkName
 			}
