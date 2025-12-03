@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Normalize container name handling to resolve chained dependencies by @nicholas-fedor in [#1015](https://github.com/nicholas-fedor/watchtower/pull/1015)
+- Update module github.com/docker/cli to v29.1.2+incompatible by @renovate[bot] in [#1017](https://github.com/nicholas-fedor/watchtower/pull/1017)
+- Update cimg/go docker tag to v1.25.5 by @renovate[bot] in [#1016](https://github.com/nicholas-fedor/watchtower/pull/1016)
+- Update golang docker tag to v1.25.5 by @renovate[bot] in [#1014](https://github.com/nicholas-fedor/watchtower/pull/1014)
+- Update nicholas-fedor/go-proxy-pull-action digest to 501ad32 by @renovate[bot] in [#1013](https://github.com/nicholas-fedor/watchtower/pull/1013)
+- Update actions/checkout digest to 8e8c483 by @renovate[bot] in [#1011](https://github.com/nicholas-fedor/watchtower/pull/1011)
+- Update golang:alpine docker digest to 3587db7 by @renovate[bot] in [#1012](https://github.com/nicholas-fedor/watchtower/pull/1012)
+- Update dependency go to v1.25.5 by @renovate[bot] in [#1009](https://github.com/nicholas-fedor/watchtower/pull/1009)
 - Update nicholas-fedor/govulncheck-action digest to 5d80989 by @renovate[bot] in [#1007](https://github.com/nicholas-fedor/watchtower/pull/1007)
 - Update actions/checkout digest to 8e8c483 by @renovate[bot] in [#1006](https://github.com/nicholas-fedor/watchtower/pull/1006)
 - Update actions/attest-build-provenance digest to ca0aaa1 by @renovate[bot] in [#1005](https://github.com/nicholas-fedor/watchtower/pull/1005)
