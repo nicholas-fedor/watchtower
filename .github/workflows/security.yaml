@@ -20,7 +20,6 @@ permissions:
   security-events: write
 
 env:
-  GO_VERSION: 1.25.x
   OUTPUT_FILE: results.sarif
 
 jobs:
@@ -49,7 +48,8 @@ jobs:
         with:
           output-format: sarif
           output-file: ${{ env.OUTPUT_FILE }}
-          go-version-input: ${{ env.GO_VERSION }}
+          go-version-file: "go.mod"
+          go-version-input: ""
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@fe4161a26a8629af62121b670040955b330f9af2 # v4
