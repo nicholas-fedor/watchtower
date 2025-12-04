@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update alpine docker tag to v3.23.0 by @renovate[bot] in [#1022](https://github.com/nicholas-fedor/watchtower/pull/1022)
 - Update docker/setup-buildx-action digest to 65d18f8 by @renovate[bot] in [#1020](https://github.com/nicholas-fedor/watchtower/pull/1020)
 - Normalize container name handling to resolve chained dependencies by @nicholas-fedor in [#1015](https://github.com/nicholas-fedor/watchtower/pull/1015)
 - Update module github.com/docker/cli to v29.1.2+incompatible by @renovate[bot] in [#1017](https://github.com/nicholas-fedor/watchtower/pull/1017)
