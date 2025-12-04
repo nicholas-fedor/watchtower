@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/spf13/cobra to v1.10.2 by @renovate[bot] in [#1026](https://github.com/nicholas-fedor/watchtower/pull/1026)
+- Update golang:alpine docker digest to 2611181 by @renovate[bot] in [#1025](https://github.com/nicholas-fedor/watchtower/pull/1025)
 - Update alpine docker tag to v3.23.0 by @renovate[bot] in [#1022](https://github.com/nicholas-fedor/watchtower/pull/1022)
 - Update docker/setup-buildx-action digest to 65d18f8 by @renovate[bot] in [#1020](https://github.com/nicholas-fedor/watchtower/pull/1020)
 - Normalize container name handling to resolve chained dependencies by @nicholas-fedor in [#1015](https://github.com/nicholas-fedor/watchtower/pull/1015)
