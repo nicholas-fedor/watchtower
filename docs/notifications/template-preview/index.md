@@ -4,7 +4,7 @@ hide:
 ---
 
 <!-- Page title for the template preview tool -->
-# Template Preview
+# Notification Template Preview
 
 <!-- Page description -->
 The following tool allows you to test your notification templates with mock data.
