@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Standardize formatting rules by @nicholas-fedor in [#1037](https://github.com/nicholas-fedor/watchtower/pull/1037)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.13.0 by @renovate[bot] in [#1035](https://github.com/nicholas-fedor/watchtower/pull/1035)
+- Update peter-evans/create-pull-request digest to 22a9089 by @renovate[bot] in [#1034](https://github.com/nicholas-fedor/watchtower/pull/1034)
+- Update github/codeql-action digest to cf1bb45 by @renovate[bot] in [#1033](https://github.com/nicholas-fedor/watchtower/pull/1033)
+- Update peter-evans/create-pull-request digest to d4f3be6 by @renovate[bot] in [#1031](https://github.com/nicholas-fedor/watchtower/pull/1031)
 - Update module github.com/spf13/cobra to v1.10.2 by @renovate[bot] in [#1026](https://github.com/nicholas-fedor/watchtower/pull/1026)
 - Update golang:alpine docker digest to 2611181 by @renovate[bot] in [#1025](https://github.com/nicholas-fedor/watchtower/pull/1025)
 - Update alpine docker tag to v3.23.0 by @renovate[bot] in [#1022](https://github.com/nicholas-fedor/watchtower/pull/1022)
