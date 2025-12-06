@@ -2,10 +2,16 @@
 hide:
   - toc
 ---
-<!-- markdownlint-disable -->
 
 <!-- Page title for the template preview tool -->
 # Template Preview
+
+<!-- Page description -->
+The following tool allows you to test your notification templates with mock data.
+
+For more information on templates, see [Templates](../templates/index.md).
+
+<!-- markdownlint-disable -->
 
 <!-- Link to the custom CSS stylesheet for styling the form and preview -->
 <link rel="stylesheet" href="styles.css">
