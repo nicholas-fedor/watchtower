@@ -342,6 +342,8 @@ func preRun(cmd *cobra.Command, _ []string) {
 //   - c: The cobra.Command instance being executed, providing access to parsed flags.
 //   - names: A slice of container names provided as positional arguments, used for filtering.
 func run(c *cobra.Command, names []string) {
+	logrus.WithField("positional_args", names).
+		Debug("Received positional arguments for container filtering")
 	// Attempt to derive the operational scope from the current container's scope label
 	// if not explicitly set. This ensures scope persistence during self-updates.
 	if err := deriveScopeFromContainer(client); err != nil {

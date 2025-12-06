@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -702,4 +703,445 @@ func TestUpdateOnStartDefault(t *testing.T) {
 	updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
 	require.NoError(t, err)
 	assert.False(t, updateOnStart, "--update-on-start flag should default to false")
+}
+
+// TestWatchtowerNotificationsEnvironmentVariable verifies that WATCHTOWER_NOTIFICATIONS environment variable
+// correctly sets the notifications flag as a string slice.
+func TestWatchtowerNotificationsEnvironmentVariable(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATIONS", "email,slack")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"email", "slack"}, notifications)
+}
+
+// TestWatchtowerNotificationURLEnvironmentVariable verifies that WATCHTOWER_NOTIFICATION_URL environment variable
+// correctly sets the notification-url flag as a string array.
+func TestWatchtowerNotificationURLEnvironmentVariable(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://user:pass@host:port slack://token@channel")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	expected := []string{"smtp://user:pass@host:port", "slack://token@channel"}
+	assert.Equal(t, expected, urls)
+}
+
+// TestNotificationEnvVarsDoNotAffectContainerFiltering verifies that setting notification environment variables
+// does not interfere with container filtering flags like disable-containers.
+func TestNotificationEnvVarsDoNotAffectContainerFiltering(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATIONS", "email")
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://test")
+	t.Setenv("WATCHTOWER_DISABLE_CONTAINERS", "container1,container2")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterSystemFlags(cmd)
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	disableContainers, err := cmd.PersistentFlags().GetStringSlice("disable-containers")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"container1", "container2"}, disableContainers)
+
+	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"email"}, notifications)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"smtp://test"}, urls)
+}
+
+// TestNotificationsConfigurationFromEnvVarsVsFlags verifies that notifications are configured identically
+// whether set via environment variables or command-line flags.
+func TestNotificationsConfigurationFromEnvVarsVsFlags(t *testing.T) {
+	testCases := []struct {
+		name         string
+		envVar       string
+		envValue     string
+		flagArgs     []string
+		expectedNot  []string
+		expectedURLs []string
+	}{
+		{
+			name:         "notifications env var",
+			envVar:       "WATCHTOWER_NOTIFICATIONS",
+			envValue:     "email,slack",
+			flagArgs:     []string{},
+			expectedNot:  []string{"email", "slack"},
+			expectedURLs: []string{},
+		},
+		{
+			name:         "notifications flag",
+			envVar:       "",
+			envValue:     "",
+			flagArgs:     []string{"--notifications", "email", "--notifications", "slack"},
+			expectedNot:  []string{"email", "slack"},
+			expectedURLs: []string{},
+		},
+		{
+			name:         "notification-url env var",
+			envVar:       "WATCHTOWER_NOTIFICATION_URL",
+			envValue:     "smtp://test slack://test",
+			flagArgs:     []string{},
+			expectedNot:  []string{},
+			expectedURLs: []string{"smtp://test", "slack://test"},
+		},
+		{
+			name:     "notification-url flag",
+			envVar:   "",
+			envValue: "",
+			flagArgs: []string{
+				"--notification-url",
+				"smtp://test",
+				"--notification-url",
+				"slack://test",
+			},
+			expectedNot:  []string{},
+			expectedURLs: []string{"smtp://test", "slack://test"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.envVar != "" {
+				t.Setenv(tc.envVar, tc.envValue)
+			}
+
+			cmd := new(cobra.Command)
+
+			SetDefaults()
+			RegisterNotificationFlags(cmd)
+
+			err := cmd.ParseFlags(tc.flagArgs)
+			require.NoError(t, err)
+
+			notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expectedNot, notifications)
+
+			urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expectedURLs, urls)
+		})
+	}
+}
+
+// TestNotificationURLParsingWithMixedSeparators verifies that notification-url env var splits on both comma and space.
+func TestNotificationURLParsingWithMixedSeparators(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://test, slack://test gotify://test")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	expected := []string{"smtp://test", "slack://test", "gotify://test"}
+	assert.Equal(t, expected, urls)
+}
+
+// TestNotificationURLParsingWithInvalidValues verifies that invalid URLs are parsed (parsing doesn't validate).
+func TestNotificationURLParsingWithInvalidValues(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "invalid-url  smtp://valid")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	expected := []string{"invalid-url", "smtp://valid"}
+	assert.Equal(t, expected, urls)
+}
+
+// TestNotificationURLParsingWithEmptyValues verifies that empty values from splitting are filtered out.
+func TestNotificationURLParsingWithEmptyValues(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://test  ,  slack://test")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	expected := []string{"smtp://test", "slack://test"}
+	assert.Equal(t, expected, urls)
+}
+
+// TestNotificationParsingEmptyEnvVar verifies that empty or unset WATCHTOWER_NOTIFICATIONS results in empty slice.
+func TestNotificationParsingEmptyEnvVar(t *testing.T) {
+	// Unset the env var
+	_ = os.Unsetenv("WATCHTOWER_NOTIFICATIONS")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
+	require.NoError(t, err)
+
+	assert.Empty(t, notifications)
+}
+
+// TestNotificationParsingWhitespaceOnly verifies that whitespace-only values are filtered out.
+func TestNotificationParsingWhitespaceOnly(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATIONS", "  , \t ,  ")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
+	require.NoError(t, err)
+
+	assert.Empty(t, notifications)
+}
+
+// TestNotificationParsingSpecialCharsInURLs verifies URLs with special characters including commas.
+func TestNotificationParsingSpecialCharsInURLs(t *testing.T) {
+	t.Setenv(
+		"WATCHTOWER_NOTIFICATION_URL",
+		"smtp://user:pass@host:port,withcomma slack://token@channel",
+	)
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	expected := []string{"smtp://user:pass@host:port", "withcomma", "slack://token@channel"}
+	assert.Equal(t, expected, urls)
+}
+
+// TestNotificationParsingLongURLs verifies handling of very long URLs.
+func TestNotificationParsingLongURLs(t *testing.T) {
+	longURL := "https://very.long.url.with.many.subdomains.and.parameters?param1=value1&param2=value2&param3=" + strings.Repeat(
+		"a",
+		1000,
+	)
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", longURL)
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{})
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{longURL}, urls)
+}
+
+// TestNotificationParsingFlagOverridesEnv verifies that flags override environment variables.
+func TestNotificationParsingFlagOverridesEnv(t *testing.T) {
+	t.Setenv("WATCHTOWER_NOTIFICATIONS", "email")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err := cmd.ParseFlags([]string{"--notifications", "slack"})
+	require.NoError(t, err)
+
+	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"slack"}, notifications)
+}
+
+// TestGetSecretsFromFilesEmptyLines verifies handling of empty lines in secret files.
+func TestGetSecretsFromFilesEmptyLines(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+
+	_, err = file.WriteString("entry1\n\nentry2\n  \nentry3")
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	testGetSecretsFromFiles(t, "notification-url", "[entry1,entry2,\"  \",entry3]",
+		"--notification-url", file.Name())
+}
+
+// TestGetSecretsFromFilesSpecialChars verifies handling of special characters in secret files.
+func TestGetSecretsFromFilesSpecialChars(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+
+	content := "smtp://user:pass@host:port\nslack://token@channel\n!@#$%^&*()"
+	_, err = file.WriteString(content)
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	testGetSecretsFromFiles(t, "notification-url", "["+strings.ReplaceAll(content, "\n", ",")+"]",
+		"--notification-url", file.Name())
+}
+
+// TestGetSecretsFromFilesPathEdgeCases verifies file path edge cases.
+func TestGetSecretsFromFilesPathEdgeCases(t *testing.T) {
+	// Test non-existent file for string flag
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	fileName := t.TempDir() + "/nonexistent-file"
+
+	err := cmd.ParseFlags([]string{"--notification-email-server-password", fileName})
+	require.NoError(t, err)
+
+	err = getSecretFromFile(cmd.PersistentFlags(), "notification-email-server-password")
+	require.NoError(t, err) // Since not a file path, no error
+
+	password, err := cmd.PersistentFlags().GetString("notification-email-server-password")
+	require.NoError(t, err)
+	assert.Equal(t, fileName, password) // Remains unchanged
+}
+
+// TestGetSecretsFromFilesMixedValues verifies mixing direct values and file paths.
+func TestGetSecretsFromFilesMixedValues(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+
+	_, err = file.WriteString("fileentry1\nfileentry2")
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	testGetSecretsFromFiles(t, "notification-url", "[direct1,fileentry1,fileentry2,direct2]",
+		"--notification-url", "direct1",
+		"--notification-url", file.Name(),
+		"--notification-url", "direct2")
+}
+
+// TestGetSecretsFromFilesReadErrors verifies file read errors.
+func TestGetSecretsFromFilesReadErrors(t *testing.T) {
+	// Create a file and then remove it to simulate read error
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+
+	fileName := file.Name()
+	require.NoError(t, file.Close())
+
+	// Remove the file
+	require.NoError(t, os.Remove(fileName))
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	err = cmd.ParseFlags([]string{"--notification-email-server-password", fileName})
+	require.NoError(t, err)
+
+	// This should log an error but not panic
+	err = getSecretFromFile(cmd.PersistentFlags(), "notification-email-server-password")
+	require.NoError(t, err) // Since not a file path, no error
+
+	password, err := cmd.PersistentFlags().GetString("notification-email-server-password")
+	require.NoError(t, err)
+	assert.Equal(t, fileName, password) // Remains unchanged since not a file
+}
+
+// TestFilterEmptyStrings verifies filterEmptyStrings function.
+func TestFilterEmptyStrings(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected any
+	}{
+		{[]string{"a", "", "b"}, []string{"a", "b"}},
+		{[]string{"  ", "c", "\t"}, []string{"c"}},
+		{[]string{}, nil},
+		{[]string{"", " ", ""}, nil},
+		{[]string{"valid"}, []string{"valid"}},
+	}
+
+	for _, tt := range tests {
+		result := filterEmptyStrings(tt.input)
+		if tt.expected == nil {
+			assert.Nil(t, result)
+		} else {
+			assert.Equal(t, tt.expected, result)
+		}
+	}
+}
+
+// TestRegexpSplittingLogic verifies regexp splitting with [, ]+.
+func TestRegexpSplittingLogic(t *testing.T) {
+	re := regexp.MustCompile("[, ]+")
+
+	tests := []struct {
+		input    string
+		expected []string
+	}{
+		{"a,b c", []string{"a", "b", "c"}},
+		{"a  ,  b", []string{"a", "b"}},
+		{"a,b,c", []string{"a", "b", "c"}},
+		{"  a   b  ", []string{"", "a", "b", ""}},
+		{"", []string{""}},
+		{"   ", []string{"", ""}},
+	}
+
+	for _, tt := range tests {
+		result := re.Split(tt.input, -1)
+		assert.Equal(t, tt.expected, result)
+	}
 }
