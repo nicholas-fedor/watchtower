@@ -174,8 +174,12 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
+      - nickfedor/watchtower:amd64-{{ .Major }}
+      - nickfedor/watchtower:amd64-{{ .Major }}.{{ .Minor }}
       - nickfedor/watchtower:amd64-{{ .Version }}
       - nickfedor/watchtower:amd64-latest
+      - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Major }}
+      - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Major }}.{{ .Minor }}
       - ghcr.io/nicholas-fedor/watchtower:amd64-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:amd64-latest
 
@@ -227,8 +231,12 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
+      - nickfedor/watchtower:i386-{{ .Major }}
+      - nickfedor/watchtower:i386-{{ .Major }}.{{ .Minor }}
       - nickfedor/watchtower:i386-{{ .Version }}
       - nickfedor/watchtower:i386-latest
+      - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Major }}
+      - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Major }}.{{ .Minor }}
       - ghcr.io/nicholas-fedor/watchtower:i386-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:i386-latest
 
@@ -284,8 +292,12 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
+      - nickfedor/watchtower:armhf-{{ .Major }}
+      - nickfedor/watchtower:armhf-{{ .Major }}.{{ .Minor }}
       - nickfedor/watchtower:armhf-{{ .Version }}
       - nickfedor/watchtower:armhf-latest
+      - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Major }}
+      - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Major }}.{{ .Minor }}
       - ghcr.io/nicholas-fedor/watchtower:armhf-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:armhf-latest
 
@@ -340,8 +352,12 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
+      - nickfedor/watchtower:arm64v8-{{ .Major }}
+      - nickfedor/watchtower:arm64v8-{{ .Major }}.{{ .Minor }}
       - nickfedor/watchtower:arm64v8-{{ .Version }}
       - nickfedor/watchtower:arm64v8-latest
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Major }}
+      - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Major }}.{{ .Minor }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:arm64v8-latest
 
@@ -394,8 +410,12 @@ dockers:
     # Templates of the Docker image names.
     # Templates: allowed.
     image_templates:
+      - nickfedor/watchtower:riscv64-{{ .Major }}
+      - nickfedor/watchtower:riscv64-{{ .Major }}.{{ .Minor }}
       - nickfedor/watchtower:riscv64-{{ .Version }}
       - nickfedor/watchtower:riscv64-latest
+      - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Major }}
+      - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Major }}.{{ .Minor }}
       - ghcr.io/nicholas-fedor/watchtower:riscv64-{{ .Version }}
       - ghcr.io/nicholas-fedor/watchtower:riscv64-latest
 
