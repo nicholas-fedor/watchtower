@@ -217,6 +217,15 @@ linters:
         linters:
           - revive
         text: "avoid meaningless package names"
+      # Exclude revive from flagging the api package's name.
+      - path: "internal/api/.*"
+        linters:
+          - revive
+        text: "avoid meaningless package names"
+      - path: "pkg/api/.*"
+        linters:
+          - revive
+        text: "avoid meaningless package names"
       - path: "doc.go$"
         linters:
           - dupword
