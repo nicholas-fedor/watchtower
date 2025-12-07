@@ -129,7 +129,9 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	flags.StringSliceP(
 		"disable-containers",
 		"x",
-		regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_DISABLE_CONTAINERS"), -1),
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_DISABLE_CONTAINERS"), -1),
+		),
 		"Comma-separated list of containers to explicitly exclude from watching.")
 
 	flags.StringP(
@@ -562,13 +564,13 @@ func envDuration(key string) time.Duration {
 	return viper.GetDuration(key)
 }
 
-// filterEmptyStrings removes empty strings from a slice.
+// filterEmptyStrings removes empty or whitespace-only strings from a slice.
 //
 // Parameters:
 //   - ss: Slice of strings.
 //
 // Returns:
-//   - []string: Filtered slice without empty strings.
+//   - []string: Filtered slice without empty or whitespace-only strings.
 func filterEmptyStrings(ss []string) []string {
 	var res []string
 
