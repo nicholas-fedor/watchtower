@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Exclude revive linter for api packages by @nicholas-fedor in [#1042](https://github.com/nicholas-fedor/watchtower/pull/1042)
 - Improve notification flag parsing by @nicholas-fedor in [#1039](https://github.com/nicholas-fedor/watchtower/pull/1039)
 - Enhance lifecycle hooks documentation and examples by @nicholas-fedor in [#998](https://github.com/nicholas-fedor/watchtower/pull/998)
 - Fix example notification template by @AzariasB in [#944](https://github.com/nicholas-fedor/watchtower/pull/944)
