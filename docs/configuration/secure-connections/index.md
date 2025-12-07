@@ -8,7 +8,32 @@ The `docker-machine` certificates for a particular host can be located by execut
 
 The directory containing the certificates for the remote host needs to be mounted into the Watchtower container at `/etc/ssl/docker`.
 
-With the certificates mounted into the Watchtower container you need to specify the `--tlsverify` flag to enable verification of the certificate:
+With the certificates mounted into the Watchtower container you need to specify the `--tlsverify` flag to enable verification of the certificate.
+
+## DOCKER_HOST Scheme Requirements
+
+When using `--tlsverify`, the `DOCKER_HOST` environment variable must use a secure scheme:
+
+- Use `tcp://` (automatically converted to `https://` by Watchtower) or `https://` directly.
+- Avoid `http://` or `unix://` schemes when TLS verification is enabled, as they are incompatible.
+
+Watchtower automatically converts `tcp://` to `https://` when `--tlsverify` is specified to ensure secure connections.
+
+## Common Pitfalls and Validation Warnings
+
+Watchtower includes validation to help identify configuration issues:
+
+!!! warning "Insecure Scheme with TLS Verification"
+    If `DOCKER_HOST` uses `http://` while `--tlsverify` is enabled, Watchtower will log a warning:
+    _"TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification."_
+
+!!! warning "Local Socket with TLS Verification"
+    If `DOCKER_HOST` uses `unix://` while `--tlsverify` is enabled, Watchtower will log a warning:
+    _"TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification."_
+
+!!! tip "Common Mistakes to Avoid"
+    - Using `tcp://` without `--tlsverify`: This will not enable TLS and may fail to connect securely.
+    - Mismatched schemes: Ensure the scheme matches your TLS configuration (e.g., don't use `https://` without `--tlsverify` unless the endpoint supports it).
 
 === "Docker CLI"
 

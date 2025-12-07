@@ -25,6 +25,7 @@ func TestEnvConfig_Defaults(t *testing.T) {
 	// Unset testing environment variables to isolate defaults.
 	_ = os.Unsetenv("DOCKER_TLS_VERIFY")
 	_ = os.Unsetenv("DOCKER_HOST")
+	_ = os.Unsetenv("DOCKER_CERT_PATH")
 
 	cmd := new(cobra.Command)
 
@@ -41,6 +42,7 @@ func TestEnvConfig_Defaults(t *testing.T) {
 		os.Getenv("DOCKER_API_VERSION"),
 		"DOCKER_API_VERSION should be unset for autonegotiation",
 	)
+	assert.Empty(t, os.Getenv("DOCKER_CERT_PATH"))
 }
 
 // TestEnvConfig_Custom verifies that custom Docker flags override default environment variables.
@@ -52,7 +54,15 @@ func TestEnvConfig_Custom(t *testing.T) {
 	RegisterDockerFlags(cmd)
 
 	err := cmd.ParseFlags(
-		[]string{"--host", "some-custom-docker-host", "--tlsverify", "--api-version", "1.99"},
+		[]string{
+			"--host",
+			"some-custom-docker-host",
+			"--tlsverify",
+			"--api-version",
+			"1.99",
+			"--cert-path",
+			"/path/to/certs",
+		},
 	)
 	require.NoError(t, err)
 
@@ -62,6 +72,7 @@ func TestEnvConfig_Custom(t *testing.T) {
 	assert.Equal(t, "some-custom-docker-host", os.Getenv("DOCKER_HOST"))
 	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
 	assert.Equal(t, "1.99", os.Getenv("DOCKER_API_VERSION"))
+	assert.Equal(t, "/path/to/certs", os.Getenv("DOCKER_CERT_PATH"))
 }
 
 // TestEnvConfig_FlagErrors tests error handling in EnvConfig for flag retrieval failures.
@@ -331,12 +342,14 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 	ignoredEnvs := map[string]string{
 		"WATCHTOWER_NOTIFICATION_SLACK_ICON_EMOJI": "legacy",
 		"WATCHTOWER_NOTIFICATION_SLACK_ICON_URL":   "legacy",
+		"DOCKER_CERT_PATH":                         "new feature",
 	}
 
 	ignoredFlags := map[string]string{
 		"notification-gotify-url":       "legacy",
 		"notification-slack-icon-emoji": "legacy",
 		"notification-slack-icon-url":   "legacy",
+		"cert-path":                     "new feature",
 	}
 
 	cmd := new(cobra.Command)
@@ -1124,6 +1137,106 @@ func TestFilterEmptyStrings(t *testing.T) {
 	}
 }
 
+// TestEnvConfig_TLSHostConversion verifies that when DOCKER_HOST is set to a tcp:// URL
+// and TLS verification is enabled, the DOCKER_HOST is converted to https://.
+func TestEnvConfig_TLSHostConversion(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "tcp://example.com:2376")
+	t.Setenv("DOCKER_TLS_VERIFY", "1")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://example.com:2376", os.Getenv("DOCKER_HOST"))
+}
+
+// TestEnvConfig_CertPathFromEnv verifies that DOCKER_CERT_PATH is set from environment variable.
+func TestEnvConfig_CertPathFromEnv(t *testing.T) {
+	t.Setenv("DOCKER_CERT_PATH", "/env/cert/path")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+
+	assert.Equal(t, "/env/cert/path", os.Getenv("DOCKER_CERT_PATH"))
+}
+
+// TestEnvConfig_TLSWarnings verifies that warnings are logged for mismatched TLS settings.
+func TestEnvConfig_TLSWarnings(t *testing.T) {
+	testCases := []struct {
+		name     string
+		host     string
+		tls      bool
+		expected string
+	}{
+		{
+			"http with tls",
+			"http://example.com",
+			true,
+			"TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
+		},
+		{
+			"unix with tls",
+			"unix:///var/run/docker.sock",
+			true,
+			"TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.",
+		},
+		{"https with tls", "https://example.com", true, ""},
+		{"tcp with tls", "tcp://example.com", true, ""}, // will be converted
+		{"unix without tls", "unix:///var/run/docker.sock", false, ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Ensure clean env state
+			os.Unsetenv("DOCKER_TLS_VERIFY")
+
+			if tc.tls {
+				t.Setenv("DOCKER_TLS_VERIFY", "1")
+			}
+
+			var logOutput strings.Builder
+			logrus.SetOutput(&logOutput)
+			logrus.SetLevel(logrus.WarnLevel)
+
+			defer func() {
+				logrus.SetOutput(os.Stderr)
+				logrus.SetLevel(logrus.InfoLevel)
+			}()
+
+			cmd := new(cobra.Command)
+
+			SetDefaults()
+			RegisterDockerFlags(cmd)
+
+			args := []string{"--host", tc.host}
+			if tc.tls {
+				args = append(args, "--tlsverify")
+			}
+
+			err := cmd.ParseFlags(args)
+			require.NoError(t, err)
+
+			err = EnvConfig(cmd)
+			require.NoError(t, err)
+
+			if tc.expected != "" {
+				assert.Contains(t, logOutput.String(), tc.expected)
+			} else {
+				assert.Empty(t, logOutput.String())
+			}
+		})
+	}
+}
+
 // TestRegexpSplittingLogic verifies regexp splitting with [, ]+.
 func TestRegexpSplittingLogic(t *testing.T) {
 	re := regexp.MustCompile("[, ]+")
@@ -1144,4 +1257,139 @@ func TestRegexpSplittingLogic(t *testing.T) {
 		result := re.Split(tt.input, -1)
 		assert.Equal(t, tt.expected, result)
 	}
+}
+
+func TestEnvConfig_DOCKER_HOST_EnvVar(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+
+	defer os.Unsetenv("DOCKER_HOST")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Equal(t, "unix:///var/run/docker.sock", os.Getenv("DOCKER_HOST"))
+}
+
+func TestEnvConfig_DOCKER_TLS_VERIFY_EnvVar(t *testing.T) {
+	t.Setenv("DOCKER_TLS_VERIFY", "1")
+
+	defer os.Unsetenv("DOCKER_TLS_VERIFY")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
+}
+
+func TestEnvConfig_DOCKER_CERT_PATH_EnvVar(t *testing.T) {
+	t.Setenv("DOCKER_CERT_PATH", "/env/certs")
+
+	defer os.Unsetenv("DOCKER_CERT_PATH")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Equal(t, "/env/certs", os.Getenv("DOCKER_CERT_PATH"))
+}
+
+func TestEnvConfig_DOCKER_API_VERSION_EnvVar(t *testing.T) {
+	t.Setenv("DOCKER_API_VERSION", "1.41")
+
+	defer os.Unsetenv("DOCKER_API_VERSION")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Equal(t, "1.41", os.Getenv("DOCKER_API_VERSION"))
+}
+
+func TestEnvConfig_TLSHostConversion_https_no_change(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "https://example.com:2376")
+	t.Setenv("DOCKER_TLS_VERIFY", "1")
+
+	defer os.Unsetenv("DOCKER_HOST")
+	defer os.Unsetenv("DOCKER_TLS_VERIFY")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com:2376", os.Getenv("DOCKER_HOST"))
+}
+
+func TestEnvConfig_TLSWarnings_tcp_converted_no_warning(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "tcp://example.com:2376")
+	t.Setenv("DOCKER_TLS_VERIFY", "1")
+
+	defer os.Unsetenv("DOCKER_HOST")
+	defer os.Unsetenv("DOCKER_TLS_VERIFY")
+
+	var logOutput strings.Builder
+	logrus.SetOutput(&logOutput)
+	logrus.SetLevel(logrus.WarnLevel)
+
+	defer func() {
+		logrus.SetOutput(os.Stderr)
+		logrus.SetLevel(logrus.InfoLevel)
+	}()
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com:2376", os.Getenv("DOCKER_HOST"))
+	assert.Empty(t, logOutput.String())
+}
+
+func TestEnvConfig_TLSWarnings_unix_without_tls_no_warning(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+
+	defer os.Unsetenv("DOCKER_HOST")
+
+	var logOutput strings.Builder
+	logrus.SetOutput(&logOutput)
+	logrus.SetLevel(logrus.WarnLevel)
+
+	defer func() {
+		logrus.SetOutput(os.Stderr)
+		logrus.SetLevel(logrus.InfoLevel)
+	}()
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Empty(t, logOutput.String())
+}
+
+func TestEnvConfig_EdgeCase_Empty_API_Version(t *testing.T) {
+	t.Setenv("DOCKER_API_VERSION", "")
+
+	defer os.Unsetenv("DOCKER_API_VERSION")
+
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterDockerFlags(cmd)
+	err := EnvConfig(cmd)
+	require.NoError(t, err)
+	assert.Empty(t, os.Getenv("DOCKER_API_VERSION"))
 }
