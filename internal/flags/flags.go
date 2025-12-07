@@ -129,8 +129,9 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	flags.StringSliceP(
 		"disable-containers",
 		"x",
-		// Due to issue spf13/viper#380, can't use viper.GetStringSlice:
-		regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_DISABLE_CONTAINERS"), -1),
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_DISABLE_CONTAINERS"), -1),
+		),
 		"Comma-separated list of containers to explicitly exclude from watching.")
 
 	flags.StringP(
@@ -327,8 +328,11 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 	flags.StringSliceP(
 		"notifications",
 		"n",
-		envStringSlice("WATCHTOWER_NOTIFICATIONS"),
-		"Notification types to send (valid: email, slack, msteams, gotify, shoutrrr)")
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATIONS"), -1),
+		),
+		"Notification types to send (valid: email, slack, msteams, gotify, shoutrrr)",
+	)
 
 	flags.String(
 		"notifications-level",
@@ -471,8 +475,11 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 
 	flags.StringArray(
 		"notification-url",
-		envStringSlice("WATCHTOWER_NOTIFICATION_URL"),
-		"The shoutrrr URL to send notifications to")
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATION_URL"), -1),
+		),
+		"The shoutrrr URL to send notifications to",
+	)
 
 	flags.Bool("notification-report",
 		envBool("WATCHTOWER_NOTIFICATION_REPORT"),
@@ -518,19 +525,6 @@ func envString(key string) string {
 	return viper.GetString(key)
 }
 
-// envStringSlice fetches a string slice from an environment variable.
-//
-// Parameters:
-//   - key: Environment variable key.
-//
-// Returns:
-//   - []string: Values or empty slice if unset.
-func envStringSlice(key string) []string {
-	viper.MustBindEnv(key)
-
-	return viper.GetStringSlice(key)
-}
-
 // envInt fetches an integer from an environment variable.
 //
 // Parameters:
@@ -568,6 +562,25 @@ func envDuration(key string) time.Duration {
 	viper.MustBindEnv(key)
 
 	return viper.GetDuration(key)
+}
+
+// filterEmptyStrings removes empty or whitespace-only strings from a slice.
+//
+// Parameters:
+//   - ss: Slice of strings.
+//
+// Returns:
+//   - []string: Filtered slice without empty or whitespace-only strings.
+func filterEmptyStrings(ss []string) []string {
+	var res []string
+
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			res = append(res, s)
+		}
+	}
+
+	return res
 }
 
 // SetDefaults sets default environment variable values.
