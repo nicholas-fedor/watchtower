@@ -71,7 +71,17 @@ docker logs "$DIND_NAME"
 
 # Wait for DinD to be ready
 echo "Waiting for DinD to be ready..."
-sleep 30
+for i in {1..30}; do
+	if docker --tlsverify \
+		--tlscacert="$CERT_DIR/ca.pem" \
+		--tlscert="$CERT_DIR/cert.pem" \
+		--tlskey="$CERT_DIR/key.pem" \
+		-H "tcp://localhost:2376" info >/dev/null 2>&1; then
+		echo "DinD is ready after ${i}s"
+		break
+	fi
+	sleep 1
+done
 
 # Build Watchtower image
 echo "Building Watchtower image..."
