@@ -1129,12 +1129,14 @@ func havingRunningState(expected bool) gomegaTypes.GomegaMatcher {
 //   - func(): Function to restore original environment variables.
 func withEnvVars(vars map[string]string) func() {
 	original := make(map[string]string)
+
 	for k, v := range vars {
 		if orig, exists := os.LookupEnv(k); exists {
 			original[k] = orig
 		} else {
 			original[k] = ""
 		}
+
 		os.Setenv(k, v)
 	}
 
