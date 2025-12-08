@@ -1128,24 +1128,23 @@ func havingRunningState(expected bool) gomegaTypes.GomegaMatcher {
 // Returns:
 //   - func(): Function to restore original environment variables.
 func withEnvVars(vars map[string]string) func() {
-	original := make(map[string]string)
-
+	type envState struct {
+		value  string
+		exists bool
+	}
+	original := make(map[string]envState)
 	for k, v := range vars {
-		if orig, exists := os.LookupEnv(k); exists {
-			original[k] = orig
-		} else {
-			original[k] = ""
-		}
-
+		orig, exists := os.LookupEnv(k)
+		original[k] = envState{value: orig, exists: exists}
 		os.Setenv(k, v)
 	}
 
 	return func() {
-		for k, v := range original {
-			if v == "" {
+		for k, state := range original {
+			if !state.exists {
 				os.Unsetenv(k)
 			} else {
-				os.Setenv(k, v)
+				os.Setenv(k, state.value)
 			}
 		}
 	}
