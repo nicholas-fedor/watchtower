@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -844,6 +845,228 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 	})
+
+	ginkgo.Describe("TLS client methods", func() {
+		var tlsServer *ghttp.Server
+		var testClient Client
+
+		ginkgo.BeforeEach(func() {
+			tlsServer = ghttp.NewTLSServer()
+			docker, _ := dockerClient.NewClientWithOpts(
+				dockerClient.WithHost(tlsServer.URL()),
+				dockerClient.WithHTTPClient(tlsServer.HTTPTestServer.Client()))
+			testClient = &client{api: docker}
+			gomega.Expect(testClient).NotTo(gomega.BeNil())
+		})
+
+		ginkgo.AfterEach(func() {
+			tlsServer.Close()
+		})
+
+		ginkgo.It("GetVersion returns correct API version with TLS client", func() {
+			version := testClient.GetVersion()
+			gomega.Expect(version).To(gomega.MatchRegexp(`^\d+\.\d+$`))
+		})
+
+		ginkgo.It("GetInfo successfully retrieves system information over TLS", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"Name":            "docker-server",
+						"ServerVersion":   "24.0.0",
+						"OSType":          "linux",
+						"OperatingSystem": "Ubuntu 20.04",
+						"Driver":          "overlay2",
+					}),
+				),
+			)
+			info, err := testClient.GetInfo()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(info).NotTo(gomega.BeNil())
+			gomega.Expect(info["Name"]).To(gomega.Equal("docker-server"))
+		})
+
+		ginkgo.It("GetInfo handles TLS connection failures gracefully", func() {
+			// Create a non-TLS server to simulate TLS failure
+			httpServer := ghttp.NewServer()
+			defer httpServer.Close()
+			httpServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.RespondWith(http.StatusOK, "OK"),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"ApiVersion": "1.44",
+						"Version":    "24.0.0",
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
+					ghttp.RespondWith(http.StatusInternalServerError, "TLS connection failed"),
+				),
+			)
+			// Override DOCKER_HOST to point to HTTP server while TLS is required
+			restore := withEnvVars(map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+				"DOCKER_HOST":       httpServer.URL(),
+			})
+			defer restore()
+			// Create client that expects TLS but gets HTTP
+			failingClient := NewClient(ClientOptions{})
+			_, err := failingClient.GetInfo()
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get system info"))
+		})
+
+		ginkgo.It("GetInfo returns expected system info fields over TLS", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"Name":            "test-docker",
+						"ServerVersion":   "25.0.0",
+						"OSType":          "linux",
+						"OperatingSystem": "Alpine Linux",
+						"Driver":          "btrfs",
+					}),
+				),
+			)
+			info, err := testClient.GetInfo()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(info).To(gomega.HaveKeyWithValue("Name", "test-docker"))
+			gomega.Expect(info).To(gomega.HaveKeyWithValue("ServerVersion", "25.0.0"))
+			gomega.Expect(info).To(gomega.HaveKeyWithValue("OSType", "linux"))
+			gomega.Expect(info).To(gomega.HaveKeyWithValue("OperatingSystem", "Alpine Linux"))
+			gomega.Expect(info).To(gomega.HaveKeyWithValue("Driver", "btrfs"))
+		})
+	})
+
+	ginkgo.Describe("NewClient", func() {
+		ginkgo.It(
+			"should successfully connect with TLS when DOCKER_TLS_VERIFY=1 and DOCKER_HOST points to TLS server",
+			func() {
+				tlsServer := ghttp.NewTLSServer()
+				defer tlsServer.Close()
+				tlsServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/_ping"),
+						ghttp.RespondWith(http.StatusOK, "OK"),
+					),
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+							"ApiVersion": "1.40",
+							"Version":    "20.10.0",
+						}),
+					),
+				)
+				restore := withEnvVars(map[string]string{
+					"DOCKER_TLS_VERIFY": "1",
+					"DOCKER_HOST":       tlsServer.URL(),
+				})
+				defer restore()
+				client := NewClient(ClientOptions{})
+				gomega.Expect(client).NotTo(gomega.BeNil())
+			},
+		)
+
+		ginkgo.It("should fail when TLS is required but server is HTTP-only", func() {
+			httpServer := ghttp.NewServer()
+			defer httpServer.Close()
+			httpServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.RespondWith(http.StatusOK, "OK"),
+				),
+				ghttp.CombineHandlers(
+					ghttp.RespondWith(http.StatusInternalServerError, "TLS connection failed"),
+				),
+			)
+			restore := withEnvVars(map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+				"DOCKER_HOST":       httpServer.URL(),
+			})
+			defer restore()
+			gomega.Expect(func() { NewClient(ClientOptions{}) }).ToNot(gomega.Panic())
+		})
+
+		ginkgo.It("should negotiate API version with TLS", func() {
+			tlsServer := ghttp.NewTLSServer()
+			defer tlsServer.Close()
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"ApiVersion": "1.40",
+						"Version":    "20.10.0",
+					}),
+				),
+			)
+			restore := withEnvVars(map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+				"DOCKER_HOST":       tlsServer.URL(),
+			})
+			defer restore()
+			client := NewClient(ClientOptions{})
+			gomega.Expect(client).NotTo(gomega.BeNil())
+		})
+
+		ginkgo.It("should use forced API version with TLS", func() {
+			tlsServer := ghttp.NewTLSServer()
+			defer tlsServer.Close()
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/_ping"),
+					ghttp.RespondWith(http.StatusOK, "OK"),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"ApiVersion": "1.40",
+						"Version":    "20.10.0",
+					}),
+				),
+			)
+			restore := withEnvVars(map[string]string{
+				"DOCKER_TLS_VERIFY":  "1",
+				"DOCKER_HOST":        tlsServer.URL(),
+				"DOCKER_API_VERSION": "1.40",
+			})
+			defer restore()
+			client := NewClient(ClientOptions{})
+			gomega.Expect(client).NotTo(gomega.BeNil())
+		})
+
+		ginkgo.It(
+			"should handle invalid API version with TLS and fall back to negotiation",
+			func() {
+				tlsServer := ghttp.NewTLSServer()
+				defer tlsServer.Close()
+				tlsServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/_ping"),
+						ghttp.RespondWith(http.StatusNotFound, "page not found"),
+					),
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+							"ApiVersion": "1.40",
+							"Version":    "20.10.0",
+						}),
+					),
+				)
+				restore := withEnvVars(map[string]string{
+					"DOCKER_TLS_VERIFY":  "1",
+					"DOCKER_HOST":        tlsServer.URL(),
+					"DOCKER_API_VERSION": "1.99",
+				})
+				defer restore()
+				client := NewClient(ClientOptions{})
+				gomega.Expect(client).NotTo(gomega.BeNil())
+			},
+		)
+	})
 })
 
 // captureLogrus captures logrus output in a buffer for testing.
@@ -895,4 +1118,33 @@ func havingRunningState(expected bool) gomegaTypes.GomegaMatcher {
 	return gomega.WithTransform(func(container types.Container) bool {
 		return container.ContainerInfo().State.Running
 	}, gomega.Equal(expected))
+}
+
+// withEnvVars sets environment variables and returns a restore function.
+//
+// Parameters:
+//   - vars: Map of environment variables to set.
+//
+// Returns:
+//   - func(): Function to restore original environment variables.
+func withEnvVars(vars map[string]string) func() {
+	original := make(map[string]string)
+	for k, v := range vars {
+		if orig, exists := os.LookupEnv(k); exists {
+			original[k] = orig
+		} else {
+			original[k] = ""
+		}
+		os.Setenv(k, v)
+	}
+
+	return func() {
+		for k, v := range original {
+			if v == "" {
+				os.Unsetenv(k)
+			} else {
+				os.Setenv(k, v)
+			}
+		}
+	}
 }
