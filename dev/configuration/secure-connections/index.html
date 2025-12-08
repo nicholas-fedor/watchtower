@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#secure_connections" class="md-skip">
+        <a href="#securely_connecting_watchtower_to_docker" class="md-skip">
           Skip to content
         </a>
       
@@ -798,6 +798,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secure Connections
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -814,6 +832,302 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls_certificate_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS Certificate Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_host_url" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Host URL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_api_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker API Version
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#basic_tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Tutorial
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Basic Tutorial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tutorial_overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#certificate_generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Certificate Generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Certificate Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create_a_ca_key_and_certificate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a CA Key and Certificate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create_a_server_key_and_certificate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a Server Key and Certificate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create_a_client_key_and_certificate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a Client Key and Certificate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key_and_certificate_management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key and Certificate Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup_the_docker_daemon_with_tls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup the Docker Daemon with TLS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#watchtower_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchtower Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insecure_scheme_with_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insecure Scheme with TLS Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local_socket_with_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Socket with TLS Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing_tls_certificates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing TLS Certificates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other_common_mistakes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other Common Mistakes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#certificate_management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Certificate Management
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker_socket_proxies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Socket Proxies
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1249,6 +1563,291 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls_certificate_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS Certificate Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_host_url" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Host URL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_api_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker API Version
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#basic_tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic Tutorial
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Basic Tutorial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tutorial_overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorial Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#certificate_generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Certificate Generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Certificate Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create_a_ca_key_and_certificate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a CA Key and Certificate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create_a_server_key_and_certificate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a Server Key and Certificate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create_a_client_key_and_certificate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a Client Key and Certificate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key_and_certificate_management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key and Certificate Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup_the_docker_daemon_with_tls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup the Docker Daemon with TLS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#watchtower_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchtower Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#insecure_scheme_with_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insecure Scheme with TLS Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local_socket_with_tls_verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Socket with TLS Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing_tls_certificates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing TLS Certificates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other_common_mistakes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other Common Mistakes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#certificate_management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Certificate Management
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker_socket_proxies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Socket Proxies
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1267,39 +1866,486 @@
   
 
 
-<h1 id="secure_connections">Secure Connections<a class="headerlink" href="#secure_connections" title="Permanent link">&para;</a></h1>
-<p>Watchtower is also capable of connecting to Docker endpoints which are protected by SSL/TLS.</p>
-<p>If you've used <code>docker-machine</code> to provision your remote Docker host, you simply need to volume mount the certificates generated by <em>docker-machine</em> into the Watchtower container and optionally specify <code>--tlsverify</code> flag.</p>
-<p>The <code>docker-machine</code> certificates for a particular host can be located by executing the <code>docker-machine env</code> command for the desired host (note the values for the <code>DOCKER_HOST</code> and <code>DOCKER_CERT_PATH</code> environment variables that are returned from this command).</p>
-<p>The directory containing the certificates for the remote host needs to be mounted into the Watchtower container at <code>/etc/ssl/docker</code>.</p>
-<p>With the certificates mounted into the Watchtower container you need to specify the <code>--tlsverify</code> flag to enable verification of the certificate:</p>
+<h1 id="securely_connecting_watchtower_to_docker">Securely Connecting Watchtower to Docker<a class="headerlink" href="#securely_connecting_watchtower_to_docker" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>Watchtower supports secure TLS connections to Docker hosts through its usage of <a href="https://docs.docker.com/reference/api/engine/sdk/" rel="noopener noreferrer" target="_blank">Docker's Go SDK</a> to create a Docker client.</p>
+<p>It is highly recommended to review Docker's documentation:</p>
+<ul>
+<li><a href="https://docs.docker.com/engine/daemon/remote-access/" rel="noopener noreferrer" target="_blank">https://docs.docker.com/engine/daemon/remote-access/</a></li>
+<li><a href="https://docs.docker.com/engine/security/protect-access" rel="noopener noreferrer" target="_blank">https://docs.docker.com/engine/security/protect-access</a></li>
+<li><a href="https://docs.docker.com/reference/cli/dockerd/#daemon-socket-option" rel="noopener noreferrer" target="_blank">https://docs.docker.com/reference/cli/dockerd/#daemon-socket-option</a></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Docker has <a href="https://docs.docker.com/retired/#docker-machine" rel="noopener noreferrer" target="_blank">retired</a> the <a href="https://github.com/docker-archive-public/docker.machine" rel="noopener noreferrer" target="_blank">Docker Machine</a> project that was previously noted in Watchtower's documentation.</p>
+</div>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h3 id="tls_verification">TLS Verification<a class="headerlink" href="#tls_verification" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>            Argument: --tlsverify
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Environment Variable: DOCKER_TLS_VERIFY
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                Type: Boolean
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>             Default: false
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title"><code>http://</code> and <code>unix://</code> schemes are incompatible with TLS verification.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">When TLS verification is enabled</p>
+<ul>
+<li>The use of <code>tcp://</code> or <code>https://</code> schemes for the Docker host URL is required.</li>
+<li><code>tcp://</code> is converted to <code>https://</code> when TLS verification is enabled.</li>
+</ul>
+</div>
+<h3 id="tls_certificate_path">TLS Certificate Path<a class="headerlink" href="#tls_certificate_path" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>            Argument: --cert-path
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Environment Variable: DOCKER_CERT_PATH
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                Type: String
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>             Default: /etc/ssl/docker
+</code></pre></div>
+<div class="admonition notes">
+<p class="admonition-title">Notes</p>
+<ul>
+<li>This specifies the directory where Watchtower's Docker client should find the certificate files within the Watchtower container.</li>
+<li>Docker expects the following filenames:<ul>
+<li><code>ca.pem</code></li>
+<li><code>cert.pem</code></li>
+<li><code>key.pem</code></li>
+</ul>
+</li>
+</ul>
+</div>
+<h3 id="docker_host_url">Docker Host URL<a class="headerlink" href="#docker_host_url" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>            Argument: --host
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Environment Variable: DOCKER_HOST
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                Type: String
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>             Default: unix:///var/run/docker.sock
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Specifying multiple connections, such as both the local socket (i.e. <code>/var/run/docker.sock</code>) and a remote host is not supported.</p>
+</div>
+<div class="admonition notes">
+<p class="admonition-title">Notes</p>
+<ul>
+<li>This is required for connections to any Docker host.</li>
+<li>The use of <code>tcp://</code> or <code>https://</code> schemes is required when using a TLS connection.</li>
+<li><code>tcp://</code> is internally converted to <code>https://</code> when TLS verification is enabled.</li>
+</ul>
+</div>
+<h3 id="docker_api_version">Docker API Version<a class="headerlink" href="#docker_api_version" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>            Argument: --api-version
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Environment Variable: DOCKER_API_VERSION
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>                Type: String
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>             Default: &lt;Auto-negotiated&gt;
+</code></pre></div>
+<div class="admonition notes">
+<p class="admonition-title">Notes</p>
+<ul>
+<li>This provides the ability to manually specify the Docker API version.</li>
+<li>The default version autonegotiation should be sufficient for normal use cases.</li>
+</ul>
+</div>
+<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Replace <code>remote-host</code> with your actual Docker host address and <code>/path/to/certs</code> with the path to your certificate directory.</p>
+</div>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker CLI</label><label for="__tabbed_1_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>-e<span class="w"> </span><span class="nv">DOCKER_HOST</span><span class="o">=</span><span class="nv">$DOCKER_HOST</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>-e<span class="w"> </span><span class="nv">DOCKER_CERT_PATH</span><span class="o">=</span>/etc/ssl/docker<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>-v<span class="w"> </span><span class="nv">$DOCKER_CERT_PATH</span>:/etc/ssl/docker<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>--restart<span class="w"> </span>unless-stopped
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>nickfedor/watchtower<span class="w"> </span>--tlsverify
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/certs:/etc/ssl/docker:ro<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span>--host<span class="w"> </span>tcp://remote-host:2376<span class="w"> </span>--cert-path<span class="w"> </span>/etc/ssl/docker<span class="w"> </span>--tlsverify
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--name watchtower</code></td>
+<td>Assigns the name "watchtower" to the container for easy identification and management.</td>
+</tr>
+<tr>
+<td><code>-v /path/to/certs:/etc/ssl/docker:ro</code></td>
+<td>Mounts the local certificate directory to the container's SSL directory as read-only.</td>
+</tr>
+<tr>
+<td><code>nickfedor/watchtower</code></td>
+<td>Specifies the Docker image to run, which is the Watchtower container image.</td>
+</tr>
+<tr>
+<td><code>--host tcp://remote-host:2376</code></td>
+<td>Sets the Docker host to connect to via TCP on port 2376.</td>
+</tr>
+<tr>
+<td><code>--cert-path /etc/ssl/docker</code></td>
+<td>Defines the path inside the container where TLS certificates are located.</td>
+</tr>
+<tr>
+<td><code>--tlsverify</code></td>
+<td>Enables TLS verification for secure connections to the Docker host.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If using <code>-e</code> flags to pass environment variables, then remember to place them before the <code>nickfedor/watchtower</code> image reference.</p>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_HOST=tcp://remote-host:2376</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_CERT_PATH=/etc/ssl/docker</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_TLS_VERIFY=1</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/certs:/etc/ssl/docker:ro</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>image: nickfedor/watchtower</code></td>
+<td>Specifies the Docker image for the Watchtower service.</td>
+</tr>
+<tr>
+<td><code>- DOCKER_HOST=tcp://remote-host:2376</code></td>
+<td>Sets the Docker host connection URL.</td>
+</tr>
+<tr>
+<td><code>- DOCKER_CERT_PATH=/etc/ssl/docker</code></td>
+<td>Specifies the path to the directory containing TLS certificates.</td>
+</tr>
+<tr>
+<td><code>- DOCKER_TLS_VERIFY=1</code></td>
+<td>Enables TLS verification for secure connections.</td>
+</tr>
+<tr>
+<td><code>/path/to/certs:/etc/ssl/docker:ro</code></td>
+<td>Mounts the local certificate directory to the container's SSL directory as read-only.</td>
+</tr>
+<tr>
+<td><code>restart: unless-stopped</code></td>
+<td>Configures the container to restart automatically unless it was manually stopped.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<h2 id="basic_tutorial">Basic Tutorial<a class="headerlink" href="#basic_tutorial" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">This is not a comprehensive guide and is merely a simple tutorial to illustrate a basic test deployment.</p>
+<p>The following tutorial is intended to provide a basic walkthrough for manually setting up Watchtower to perform container updates on a Docker host that has enabled access to the Docker daemon using TLS.</p>
+<p>This largely follow's <a href="https://docs.docker.com/engine/security/protect-access/#use-tls-https-to-protect-the-docker-daemon-socket" rel="noopener noreferrer" target="_blank">Docker's guide</a> for setting up TLS on the Docker host.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Configuring Docker to accept network connections has critical security implications that can leave you vulnerable to unauthorized access.
+You are <strong>highly</strong> encouraged to perform your own due diligence to mitigate these risks.</p>
+</div>
+<h3 id="tutorial_overview">Tutorial Overview<a class="headerlink" href="#tutorial_overview" title="Permanent link">&para;</a></h3>
+<p>In order for Watchtower to connect via TLS to a Docker daemon, the Docker daemon must be setup to accept remote connections using TLS.</p>
+<p>Setting up TLS for Docker involves several key steps:</p>
+<ol>
+<li>
+<p><strong>Certificate Generation:</strong></p>
+<ul>
+<li>Create a Certificate Authority (CA), server certificate, and client certificates using OpenSSL or similar tools.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Server certificates must include the Docker host's IP or DNS name in the Subject Alternative Name (SAN) field.</p>
+</div>
+</li>
+<li>
+<p><strong>Daemon Configuration:</strong></p>
+<p>Start the Docker daemon with TLS options:</p>
+<ul>
+<li><code>--tlsverify</code>: Enable TLS verification</li>
+<li><code>--tlscacert</code>: Path to CA certificate</li>
+<li><code>--tlscert</code>: Path to server certificate</li>
+<li><code>--tlskey</code>: Path to server private key</li>
+</ul>
+</li>
+<li>
+<p><strong>Client Setup:</strong></p>
+<ul>
+<li>Prepare client certificates (<code>cert.pem</code> and <code>key.pem</code>) for authentication.</li>
+</ul>
+</li>
+<li>
+<p><strong>Environment Variables:</strong></p>
+<ul>
+<li>Set <code>DOCKER_HOST</code> to the secure endpoint (e.g., <code>tcp://host:2376</code>)</li>
+<li>Set <code>DOCKER_CERT_PATH</code> to the directory containing client certificates</li>
+<li>Set <code>DOCKER_TLS_VERIFY=1</code> to enable verification</li>
+</ul>
+</li>
+</ol>
+<p>For detailed instructions, refer to the <a href="https://docs.docker.com/engine/security/protect-access/#use-tls-https-to-protect-the-docker-daemon-socket" rel="noopener noreferrer" target="_blank">Docker documentation on protecting the Docker daemon socket</a>.</p>
+<h3 id="certificate_generation">Certificate Generation<a class="headerlink" href="#certificate_generation" title="Permanent link">&para;</a></h3>
+<p>Generate self-signed certificates for testing (replace with proper certificates for production):</p>
+<h4 id="create_a_ca_key_and_certificate">Create a CA Key and Certificate<a class="headerlink" href="#create_a_ca_key_and_certificate" title="Permanent link">&para;</a></h4>
+<ol>
+<li>
+<p>Generate a 4096-bit RSA private key for the Certificate Authority and save it to <code>ca-key.pem</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openssl<span class="w"> </span>genrsa<span class="w"> </span>-aes256<span class="w"> </span>-out<span class="w"> </span>ca-key.pem<span class="w"> </span><span class="m">4096</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Make sure to take note of the passphrase</p>
+</div>
+</li>
+<li>
+<p>Create a self-signed X.509 certificate for the Certificate Authority (valid for 365 days) using the private key and save it to <code>ca.pem</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-new<span class="w"> </span>-x509<span class="w"> </span>-days<span class="w"> </span><span class="m">365</span><span class="w"> </span>-key<span class="w"> </span>ca-key.pem<span class="w"> </span>-sha256<span class="w"> </span>-out<span class="w"> </span>ca.pem<span class="w"> </span>-subj<span class="w"> </span><span class="s2">&quot;/C=US/ST=State/L=City/O=Org/CN=ca&quot;</span>
+</code></pre></div>
+</li>
+</ol>
+<h4 id="create_a_server_key_and_certificate">Create a Server Key and Certificate<a class="headerlink" href="#create_a_server_key_and_certificate" title="Permanent link">&para;</a></h4>
+<ol>
+<li>
+<p>Generate a 4096-bit RSA private key for the server certificate and save it to <code>server-key.pem</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>openssl<span class="w"> </span>genrsa<span class="w"> </span>-out<span class="w"> </span>server-key.pem<span class="w"> </span><span class="m">4096</span>
+</code></pre></div>
+</li>
+<li>
+<p>Generate a certificate signing request (CSR) for the server with common name "localhost" and save it to <code>server.csr</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-subj<span class="w"> </span><span class="s2">&quot;/CN=</span><span class="nv">$HOST</span><span class="s2">&quot;</span><span class="w"> </span>-sha256<span class="w"> </span>-new<span class="w"> </span>-key<span class="w"> </span>server-key.pem<span class="w"> </span>-out<span class="w"> </span>server.csr
+</code></pre></div>
+</li>
+<li>
+<p>Sign the server CSR with the CA certificate, creating a server certificate valid for 365 days with the specified extensions, and save it to <code>server-cert.pem</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;subjectAltName = DNS:</span><span class="nv">$HOST</span><span class="s2">,IP:10.10.10.20,IP:127.0.0.1&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>extfile-server.cnf
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title"><code>IP:10.10.10.20</code> is an example IP. Replace with your host's actual IP.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title"><code>$HOST</code> typically resolves to the hostname. Change this as necessary (i.e. <code>localhost</code> for testing) </p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;extendedKeyUsage = serverAuth&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>extfile-server.cnf
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">This sets the Docker daemon key's extended usage attributes to be used only for server authentication.</p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>openssl<span class="w"> </span>x509<span class="w"> </span>-req<span class="w"> </span>-days<span class="w"> </span><span class="m">365</span><span class="w"> </span>-sha256<span class="w"> </span>-in<span class="w"> </span>server.csr<span class="w"> </span>-CA<span class="w"> </span>ca.pem<span class="w"> </span>-CAkey<span class="w"> </span>ca-key.pem<span class="w"> </span>-CAcreateserial<span class="w"> </span>-out<span class="w"> </span>server-cert.pem<span class="w"> </span>-extfile<span class="w"> </span>extfile-server.cnf
+</code></pre></div>
+</li>
+</ol>
+<h4 id="create_a_client_key_and_certificate">Create a Client Key and Certificate<a class="headerlink" href="#create_a_client_key_and_certificate" title="Permanent link">&para;</a></h4>
+<ol>
+<li>
+<p>Generate a 4096-bit RSA private key for the client certificate and save it to <code>key.pem</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>openssl<span class="w"> </span>genrsa<span class="w"> </span>-out<span class="w"> </span>key.pem<span class="w"> </span><span class="m">4096</span>
+</code></pre></div>
+</li>
+<li>
+<p>Generate a certificate signing request (CSR) for the client with common name "client" and save it to <code>client.csr</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-subj<span class="w"> </span><span class="s1">&#39;/CN=client&#39;</span><span class="w"> </span>-new<span class="w"> </span>-key<span class="w"> </span>key.pem<span class="w"> </span>-out<span class="w"> </span>client.csr
+</code></pre></div>
+</li>
+<li>
+<p>Sign the client CSR with the CA certificate, creating a client certificate valid for 365 days with the client authentication extension, and save it to <code>cert.pem</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;extendedKeyUsage = clientAuth&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>extfile-client.cnf
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">This makes the key suitable for client authentication.</p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>openssl<span class="w"> </span>x509<span class="w"> </span>-req<span class="w"> </span>-days<span class="w"> </span><span class="m">365</span><span class="w"> </span>-sha256<span class="w"> </span>-in<span class="w"> </span>client.csr<span class="w"> </span>-CA<span class="w"> </span>ca.pem<span class="w"> </span>-CAkey<span class="w"> </span>ca-key.pem<span class="w"> </span>-CAcreateserial<span class="w"> </span>-out<span class="w"> </span>cert.pem<span class="w"> </span>-extfile<span class="w"> </span>extfile-client.cnf
+</code></pre></div>
+</li>
+</ol>
+<h3 id="key_and_certificate_management">Key and Certificate Management<a class="headerlink" href="#key_and_certificate_management" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p>Remove both the certificate signing requests (<code>client.csr</code> and <code>server.csr</code>) and extensions config files (<code>extfile-server.cnf</code> and <code>extfile-client.cnf</code>) after generating the server (<code>server-cert.pem</code>) and client <code>cert.pem</code> certificates:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>rm<span class="w"> </span>-v<span class="w"> </span>client.csr<span class="w"> </span>server.csr<span class="w"> </span>extfile-server.cnf<span class="w"> </span>extfile-client.cnf
+</code></pre></div>
+</li>
+<li>
+<p>Update the file permissions of the <code>ca-key.pem</code>, <code>server-key.pem</code>, and <code>key.pem</code> secret keys:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>-v<span class="w"> </span><span class="m">0400</span><span class="w"> </span>ca-key.pem<span class="w"> </span>server-key.pem<span class="w"> </span>key.pem
+</code></pre></div>
+</li>
+<li>
+<p>Remove <code>ca.pem</code>, <code>server-cert.pem</code>, and <code>cert.pem</code> file write access:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>-v<span class="w"> </span><span class="m">0444</span><span class="w"> </span>ca.pem<span class="w"> </span>server-cert.pem<span class="w"> </span>cert.pem
+</code></pre></div>
+</li>
+<li>
+<p>Create the <code>/etc/docker/certs</code> directory if it doesn't exist:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/docker/certs
+</code></pre></div>
+</li>
+<li>
+<p>Copy the server-specific files:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sudo<span class="w"> </span>cp<span class="w"> </span>ca.pem<span class="w"> </span>ca-key.pem<span class="w"> </span>server-cert.pem<span class="w"> </span>server-key.pem<span class="w"> </span>/etc/docker/certs/
+</code></pre></div>
+</li>
+<li>
+<p>(Optional): Copy the client-specific files:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sudo<span class="w"> </span>cp<span class="w"> </span>cert.pem<span class="w"> </span>key.pem<span class="w"> </span>/etc/docker/certs/
+</code></pre></div>
+</li>
+<li>
+<p>Ensure root ownership:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sudo<span class="w"> </span>chown<span class="w"> </span>root:root<span class="w"> </span>/etc/docker/certs/*
+</code></pre></div>
+</li>
+<li>
+<p>Set directory-level access:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>sudo<span class="w"> </span>chmod<span class="w"> </span><span class="m">0755</span><span class="w"> </span>/etc/docker/certs/
+</code></pre></div>
+</li>
+<li>
+<p>Verify the files:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>ls<span class="w"> </span>-la<span class="w"> </span>/etc/docker/certs/
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Output should show files with <code>-r--------</code> for keys and <code>-r--r--r--</code> for certs.</p>
+</div>
+</li>
+<li>
+<p>(Optional) Remove the original files (in the original directory, not <code>/etc/docker/certs</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>rm<span class="w"> </span>-v<span class="w"> </span><span class="o">{</span>ca,ca-key,server-cert,server-key,cert,key<span class="o">}</span>.pem
+</code></pre></div>
+</li>
+</ol>
+<div class="admonition notes">
+<p class="admonition-title">Notes</p>
+<ul>
+<li>The server files (<code>ca.pem</code>, <code>server-key.pem</code>, <code>server-cert.pem</code>) stay on the daemon host.</li>
+<li>The client's files (<code>ca.pem</code>, <code>key.pem</code>, and <code>cert.pem</code>) can be moved the client's Docker directory (e.g. <code>~/.docker/</code>).</li>
+</ul>
+</div>
+<h3 id="setup_the_docker_daemon_with_tls">Setup the Docker Daemon with TLS<a class="headerlink" href="#setup_the_docker_daemon_with_tls" title="Permanent link">&para;</a></h3>
+<div class="admonition note">
+<p class="admonition-title">This assumes Docker is already installed on the host system.</p>
+</div>
+<ol>
+<li>
+<p>Edit or create <code>/etc/docker/daemon.json</code> to enable TLS and TCP listening:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="p">{</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">&quot;tls&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="w">  </span><span class="nt">&quot;tlscacert&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/etc/docker/certs/ca.pem&quot;</span><span class="p">,</span>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="w">  </span><span class="nt">&quot;tlscert&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/etc/docker/certs/server-cert.pem&quot;</span><span class="p">,</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="w">  </span><span class="nt">&quot;tlskey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/etc/docker/certs/server-key.pem&quot;</span><span class="p">,</span>
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="w">  </span><span class="nt">&quot;hosts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;unix:///var/run/docker.sock&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tcp://0.0.0.0:2376&quot;</span><span class="p">]</span>
+<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="p">}</span>
+</code></pre></div>
+<div class="admonition notes">
+<p class="admonition-title">Notes</p>
+<ul>
+<li><code>"tls": true</code> enables TLS verification.</li>
+<li><code>"hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2376"]</code> adds TCP listening on port 2376 and retains the Unix socket for local access.</li>
+<li>Alternatively, use dockerd flags in <code>/etc/systemd/system/docker.service.d/override.conf</code> for overrides without editing <code>daemon.json</code>.</li>
+</ul>
+</div>
+</li>
+<li>
+<p>Restart the daemon:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>docker
+</code></pre></div>
+</li>
+<li>
+<p>Verify the daemon is listening:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>sudo<span class="w"> </span>netstat<span class="w"> </span>-tlnp<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="m">2376</span>
+</code></pre></div>
+</li>
+</ol>
+<h3 id="watchtower_configuration">Watchtower Configuration<a class="headerlink" href="#watchtower_configuration" title="Permanent link">&para;</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker CLI</label><label for="__tabbed_2_2">Docker Compose</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/certs:/etc/ssl/docker:ro<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span>--host<span class="w"> </span>tcp://remote-host:2376<span class="w"> </span>--cert-path<span class="w"> </span>/etc/ssl/docker<span class="w"> </span>--tlsverify
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_HOST=$DOCKER_HOST</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_CERT_PATH=/etc/ssl/docker</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_TLS_VERIFY=true</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_HOST=tcp://remote-host:2376</span>
+<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_CERT_PATH=/etc/ssl/docker</span>
+<a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_TLS_VERIFY=1</span>
+<a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-31-9" name="__codelineno-31-9" href="#__codelineno-31-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/certs:/etc/ssl/docker:ro</span>
+<a id="__codelineno-31-10" name="__codelineno-31-10" href="#__codelineno-31-10"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 </code></pre></div>
 </div>
 </div>
 </div>
+<div class="admonition note">
+<p class="admonition-title"><code>remote-host</code> is used, but can be replaced with <code>localhost</code> for local testing.</p>
+</div>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="insecure_scheme_with_tls_verification">Insecure Scheme with TLS Verification<a class="headerlink" href="#insecure_scheme_with_tls_verification" title="Permanent link">&para;</a></h3>
+<p>When <a href="#tls-verification" rel="noopener noreferrer" target="_blank">TLS verification</a> is enabled and the <a href="#docker-host-url" rel="noopener noreferrer" target="_blank">Docker host URL</a> uses <code>http://</code>,  Watchtower logs the following warning:</p>
+<div class="admonition warning">
+<p class="admonition-title">TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.</p>
+</div>
+<p>Possible Solutions:</p>
+<ul>
+<li>If using a secure connection, then use <code>https://</code>.</li>
+<li>If using <code>http://</code>, then disable TLS verification.</li>
+</ul>
+<h3 id="local_socket_with_tls_verification">Local Socket with TLS Verification<a class="headerlink" href="#local_socket_with_tls_verification" title="Permanent link">&para;</a></h3>
+<p>When <a href="#tls-verification" rel="noopener noreferrer" target="_blank">TLS verification</a> is enabled and the <a href="#docker-host-url" rel="noopener noreferrer" target="_blank">Docker host URL</a> is not configured or uses <code>unix://</code>,  Watchtower logs the following warning:</p>
+<div class="admonition warning">
+<p class="admonition-title">TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.</p>
+</div>
+<p>Possible Solutions:</p>
+<ul>
+<li>If the <a href="#docker-host-url" rel="noopener noreferrer" target="_blank">Docker host URL</a> is not configured, then the default <code>unix:///var/run/docker.sock</code> is used.</li>
+<li>If using a local socket (i.e. <code>unix://</code>), then disable <a href="#tls-verification" rel="noopener noreferrer" target="_blank">TLS verification</a>.</li>
+</ul>
+<h3 id="missing_tls_certificates">Missing TLS Certificates<a class="headerlink" href="#missing_tls_certificates" title="Permanent link">&para;</a></h3>
+<p>In order for Watchtower's Docker client to connect to the Docker daemon via TLS, the certificates must be provided to the Watchtower container.</p>
+<p>If the certificates are available via the host filesystem of the Watchtower container's Docker host, then this can be accomplished using <a href="https://docs.docker.com/engine/storage/bind-mounts/" rel="noopener noreferrer" target="_blank">bind mounts</a>. Other options, such as building a custom Watchtower image with the certificates, are outside the scope of this documentation.</p>
+<p>Refer to the documentation for the <a href="#tls-certificate-path" rel="noopener noreferrer" target="_blank">TLS Certificate Path</a> and the <a href="#examples" rel="noopener noreferrer" target="_blank">examples</a>.</p>
+<h3 id="other_common_mistakes">Other Common Mistakes<a class="headerlink" href="#other_common_mistakes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Using <code>tcp://</code> without <code>--tlsverify</code>: This disables TLS, potentially allowing insecure connections.</li>
+<li>Mismatched certificate paths: Ensure <code>DOCKER_CERT_PATH</code> points to the correct directory containing <code>cert.pem</code> and <code>key.pem</code>.</li>
+<li>Expired or invalid certificates: Check certificate validity and SAN fields matching the host.</li>
+<li>Firewall blocking TLS port: Ensure port 2376 is open for remote connections.</li>
+</ul>
+<h2 id="certificate_management">Certificate Management<a class="headerlink" href="#certificate_management" title="Permanent link">&para;</a></h2>
+<p>This documentation is not intended to be a guide on TLS/mTLS certificate deployment or management.
+Manual certificate management might be acceptable for smaller deployments; however, there are solutions for automating certificate management.
+If you are exposing your Docker daemon to external network connections, then both proper TLS setup and management is a highly recommended.</p>
+<p>Here are just a few available solutions:</p>
+<ul>
+<li><a href="https://github.com/smallstep/certificates" rel="noopener noreferrer" target="_blank">Step-CA</a>: Smallstep's private, self-hostable certificate authority. [<a href="https://smallstep.com/docs/tutorials/docker-tls-certificate-authority/" rel="noopener noreferrer" target="_blank">Tutorial</a>]</li>
+<li><a href="https://www.vaultproject.io/" rel="noopener noreferrer" target="_blank">Vault</a>: HashiCorp's secret management tool with PKI secrets engine for certificate generation</li>
+<li><a href="https://github.com/cloudflare/cfssl" rel="noopener noreferrer" target="_blank">CFSSL</a>: Cloudflare's PKI toolkit for certificate management</li>
+</ul>
+<h2 id="docker_socket_proxies">Docker Socket Proxies<a class="headerlink" href="#docker_socket_proxies" title="Permanent link">&para;</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">You are <strong>highly</strong> encouraged to perform your own due diligence before using any software that interacts directly with the Docker socket.</p>
+</div>
+<p>Docker socket proxies provide a security layer between applications and the Docker daemon by filtering API calls and preventing unrestricted access to the Docker socket.</p>
+<p>While this documentation focuses on TLS-based connections, socket proxies represent another approach for securing Docker daemon access in environments where full socket exposure is undesirable.</p>
+<p>The following projects are examples of Docker socket proxies:</p>
+<ul>
+<li><a class="magiclink magiclink-github magiclink-repository" href="https://github.com/Tecnativa/docker-socket-proxy" rel="noopener noreferrer" target="_blank" title="GitHub Repository: Tecnativa/docker-socket-proxy">Tecnativa/docker-socket-proxy</a></li>
+<li><a class="magiclink magiclink-github magiclink-repository" href="https://github.com/11notes/docker-socket-proxy" rel="noopener noreferrer" target="_blank" title="GitHub Repository: 11notes/docker-socket-proxy">11notes/docker-socket-proxy</a></li>
+</ul>
 
 
 
@@ -1322,7 +2368,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 8, 2025 23:25:10 UTC"><span class="timeago" datetime="2025-12-08T23:25:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 8, 2025 23:25:10 UTC">2025-12-08</span>
   </span>
 
     
