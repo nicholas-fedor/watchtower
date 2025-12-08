@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.32.0 by @renovate[bot] in [#1050](https://github.com/nicholas-fedor/watchtower/pull/1050)
+- Update module github.com/onsi/gomega to v1.38.3 by @renovate[bot] in [#1049](https://github.com/nicholas-fedor/watchtower/pull/1049)
+- Update module github.com/onsi/ginkgo/v2 to v2.27.3 by @renovate[bot] in [#1048](https://github.com/nicholas-fedor/watchtower/pull/1048)
+- Update actions/attest-build-provenance digest to c6f9859 by @renovate[bot] in [#1047](https://github.com/nicholas-fedor/watchtower/pull/1047)
+- Update golangci/golangci-lint-action digest to ca80bee by @renovate[bot] in [#1045](https://github.com/nicholas-fedor/watchtower/pull/1045)
 - Standardize formatting rules by @nicholas-fedor in [#1037](https://github.com/nicholas-fedor/watchtower/pull/1037)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.13.0 by @renovate[bot] in [#1035](https://github.com/nicholas-fedor/watchtower/pull/1035)
 - Update peter-evans/create-pull-request digest to 22a9089 by @renovate[bot] in [#1034](https://github.com/nicholas-fedor/watchtower/pull/1034)
@@ -88,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolve TLS connection issues by @nicholas-fedor in [#1044](https://github.com/nicholas-fedor/watchtower/pull/1044)
 - Address gaps in self-update functionality by @nicholas-fedor in [#1008](https://github.com/nicholas-fedor/watchtower/pull/1008)
 
 ### New Contributors
