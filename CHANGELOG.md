@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Add AzariasB to contributors list by @nicholas-fedor in [#1053](https://github.com/nicholas-fedor/watchtower/pull/1053)
+- Add contributors to README.md by @nicholas-fedor in [#1052](https://github.com/nicholas-fedor/watchtower/pull/1052)
+- Enable major and minor Docker production image release tags by @RoboMagus in [#1036](https://github.com/nicholas-fedor/watchtower/pull/1036)
 - Exclude revive linter for api packages by @nicholas-fedor in [#1042](https://github.com/nicholas-fedor/watchtower/pull/1042)
 - Improve notification flag parsing by @nicholas-fedor in [#1039](https://github.com/nicholas-fedor/watchtower/pull/1039)
 - Enhance lifecycle hooks documentation and examples by @nicholas-fedor in [#998](https://github.com/nicholas-fedor/watchtower/pull/998)
@@ -98,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Contributors
 
+- @RoboMagus made their first contribution in [#1036](https://github.com/nicholas-fedor/watchtower/pull/1036)
 - @AzariasB made their first contribution in [#944](https://github.com/nicholas-fedor/watchtower/pull/944)
 
 ## [1.12.3] - 2025-11-13
