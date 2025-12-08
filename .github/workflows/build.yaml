@@ -101,7 +101,7 @@ jobs:
 
       - name: Generate artifact attestation # Generate attestations for prod builds.
         if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
-        uses: actions/attest-build-provenance@ca0aaa1889e301c8331fbdb338d9475431b75b13
+        uses: actions/attest-build-provenance@c6f9859ac6fd46168bba4ac441e2994fa837fc39
         with:
           subject-checksums: ./dist/checksums.txt
 
