@@ -1132,7 +1132,9 @@ func withEnvVars(vars map[string]string) func() {
 		value  string
 		exists bool
 	}
+
 	original := make(map[string]envState)
+
 	for k, v := range vars {
 		orig, exists := os.LookupEnv(k)
 		original[k] = envState{value: orig, exists: exists}
