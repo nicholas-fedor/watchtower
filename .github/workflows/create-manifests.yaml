@@ -65,12 +65,26 @@ jobs:
           # Strip the 'v' prefix from inputs.version
           VERSION="${{ inputs.version }}"
           VERSION="${VERSION#v}"
+          MAJOR=`echo $VERSION | cut -d. --fields=1`
+          MINOR=`echo $VERSION | cut -d. --fields=1,2`
           docker buildx imagetools create -t "nickfedor/watchtower:${VERSION}" \
             "nickfedor/watchtower:amd64-${VERSION}" \
             "nickfedor/watchtower:i386-${VERSION}" \
             "nickfedor/watchtower:armhf-${VERSION}" \
             "nickfedor/watchtower:arm64v8-${VERSION}" \
             "nickfedor/watchtower:riscv64-${VERSION}"
+          docker buildx imagetools create -t "nickfedor/watchtower:${MINOR}" \
+            "nickfedor/watchtower:amd64-${MINOR}" \
+            "nickfedor/watchtower:i386-${MINOR}" \
+            "nickfedor/watchtower:armhf-${MINOR}" \
+            "nickfedor/watchtower:arm64v8-${MINOR}" \
+            "nickfedor/watchtower:riscv64-${MINOR}"
+          docker buildx imagetools create -t "nickfedor/watchtower:${MAJOR}" \
+            "nickfedor/watchtower:amd64-${MAJOR}" \
+            "nickfedor/watchtower:i386-${MAJOR}" \
+            "nickfedor/watchtower:armhf-${MAJOR}" \
+            "nickfedor/watchtower:arm64v8-${MAJOR}" \
+            "nickfedor/watchtower:riscv64-${MAJOR}"
           docker buildx imagetools create -t "nickfedor/watchtower:latest" \
             "nickfedor/watchtower:amd64-latest" \
             "nickfedor/watchtower:i386-latest" \
@@ -83,6 +97,18 @@ jobs:
             "ghcr.io/nicholas-fedor/watchtower:armhf-${VERSION}" \
             "ghcr.io/nicholas-fedor/watchtower:arm64v8-${VERSION}" \
             "ghcr.io/nicholas-fedor/watchtower:riscv64-${VERSION}"
+          docker buildx imagetools create -t "ghcr.io/nicholas-fedor/watchtower:${MINOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:amd64-${MINOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:i386-${MINOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:armhf-${MINOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:arm64v8-${MINOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:riscv64-${MINOR}"
+          docker buildx imagetools create -t "ghcr.io/nicholas-fedor/watchtower:${MAJOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:amd64-${MAJOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:i386-${MAJOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:armhf-${MAJOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:arm64v8-${MAJOR}" \
+            "ghcr.io/nicholas-fedor/watchtower:riscv64-${MAJOR}"
           docker buildx imagetools create -t "ghcr.io/nicholas-fedor/watchtower:latest" \
             "ghcr.io/nicholas-fedor/watchtower:amd64-latest" \
             "ghcr.io/nicholas-fedor/watchtower:i386-latest" \
