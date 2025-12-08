@@ -50,7 +50,7 @@ generate_certs() {
 cleanup
 
 # Check if certs exist
-if true; then
+if [ ! -f "$CERT_DIR/ca.pem" ]; then
 	generate_certs
 else
 	echo "Certificates already exist in $CERT_DIR, skipping generation."
@@ -102,3 +102,6 @@ else
 fi
 
 echo "Test result: $RESULT"
+if [ "$RESULT" = "FAIL" ]; then
+	exit 1
+fi
