@@ -415,7 +415,6 @@ Refer to the documentation for the [TLS Certificate Path](#tls-certificate-path)
 - Mismatched certificate paths: Ensure `DOCKER_CERT_PATH` points to the correct directory containing `cert.pem` and `key.pem`.
 - Expired or invalid certificates: Check certificate validity and SAN fields matching the host.
 - Firewall blocking TLS port: Ensure port 2376 is open for remote connections.
-- Ensure certificates are not expired, SAN fields match the host, and firewall rules allow TLS traffic.
 
 ## Certificate Management
 
