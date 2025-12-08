@@ -150,7 +150,7 @@ func NewClient(opts ClientOptions) Client {
 
 	// Initialize client with autonegotiation, ignoring DOCKER_API_VERSION initially.
 	cli, err := dockerClient.NewClientWithOpts(
-		dockerClient.WithHost(os.Getenv("DOCKER_HOST")),
+		dockerClient.FromEnv,
 		dockerClient.WithAPIVersionNegotiation(),
 	)
 	if err != nil {

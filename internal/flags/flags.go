@@ -64,6 +64,7 @@ func RegisterDockerFlags(rootCmd *cobra.Command) {
 		strings.Trim(envString("DOCKER_API_VERSION"), "\""),
 		"api version to use by docker client (omit for autonegotiation)",
 	)
+	flags.StringP("cert-path", "", envString("DOCKER_CERT_PATH"), "Path to TLS certificates")
 }
 
 // RegisterSystemFlags adds Watchtower flow control flags to the root command.
@@ -640,6 +641,29 @@ func EnvConfig(cmd *cobra.Command) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
+	certPath, err := flags.GetString("cert-path")
+	if err != nil {
+		logrus.WithError(err).WithField("flag", "cert-path").Debug("Failed to get cert-path flag")
+
+		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
+	}
+
+	// Convert tcp:// to https:// when TLS is enabled
+	if tls && strings.HasPrefix(host, "tcp://") {
+		host = strings.Replace(host, "tcp://", "https://", 1)
+	}
+
+	// Warn about mismatched TLS settings
+	if tls {
+		if strings.HasPrefix(host, "http://") {
+			logrus.Warn(
+				"TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
+			)
+		} else if strings.HasPrefix(host, "unix://") {
+			logrus.Warn("TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.")
+		}
+	}
+
 	// Set environment variables.
 	if err := setEnvOptStr("DOCKER_HOST", host); err != nil {
 		return err
@@ -653,10 +677,15 @@ func EnvConfig(cmd *cobra.Command) error {
 		return err
 	}
 
+	if err := setEnvOptStr("DOCKER_CERT_PATH", certPath); err != nil {
+		return err
+	}
+
 	logrus.WithFields(logrus.Fields{
-		"host":    host,
-		"tls":     tls,
-		"version": version,
+		"host":     host,
+		"tls":      tls,
+		"version":  version,
+		"certPath": certPath,
 	}).Debug("Configured Docker environment variables")
 
 	return nil
