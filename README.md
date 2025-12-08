@@ -196,6 +196,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/stffabi"><img src="https://avatars0.githubusercontent.com/u/9464631?v=4?s=100" width="100px;" alt="stffabi"/><br /><sub><b>stffabi</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=stffabi" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/yubiuser"><img src="https://avatars.githubusercontent.com/u/26622301?v=4?s=100" width="100px;" alt="yubiuser"/><br /><sub><b>yubiuser</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=yubiuser" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/RoboMagus"><img src="https://avatars.githubusercontent.com/u/68224306?v=4?s=100" width="100px;" alt="RoboMagus"/><br /><sub><b>RoboMagus</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=RoboMagus" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/AzariasB"><img src="https://avatars.githubusercontent.com/u/10064282?v=4?s=100" width="100px;" alt="AzariasB"/><br /><sub><b>AzariasB</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=AzariasB" title="Documentation">📖</a></td>
     </tr>
   </tbody>
 </table>
