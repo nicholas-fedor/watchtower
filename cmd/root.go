@@ -562,8 +562,10 @@ func runMain(cfg config.RunConfig) int {
 	if err != nil {
 		if strings.Contains(err.Error(), "failed to list containers") {
 			logNotify("Failed to detect Watchtower instances", err)
+
 			return 1
 		}
+
 		logNotify("Multiple Watchtower instances detected", err)
 
 		return 1
