@@ -148,6 +148,28 @@ var _ = ginkgo.Describe("Container", func() {
 					Retries:     2,
 				}))
 		})
+
+		ginkgo.Context("UTS mode hostname handling", func() {
+			ginkgo.It("clears hostname when UTS mode is non-empty", func() {
+				c := MockContainer(
+					WithUTSMode("host"),
+					WithHostname("test-hostname"),
+				)
+				config := c.GetCreateConfig()
+				gomega.Expect(config.Hostname).
+					To(gomega.Equal(""), "Hostname should be cleared when UTS mode is set")
+			})
+
+			ginkgo.It("preserves hostname when UTS mode is empty", func() {
+				c := MockContainer(
+					WithUTSMode(""),
+					WithHostname("test-hostname"),
+				)
+				config := c.GetCreateConfig()
+				gomega.Expect(config.Hostname).
+					To(gomega.Equal("test-hostname"), "Hostname should be preserved when UTS mode is empty")
+			})
+		})
 	})
 
 	ginkgo.Describe("Metadata Retrieval", func() {
