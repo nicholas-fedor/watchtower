@@ -275,7 +275,7 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 					"index":        i,
 					"url":          sanitizedURL,
 					"failure_type": "unknown",
-				}).WithError(err).Error("Failed to send shoutrrr notification - no retry logic implemented")
+				}).WithError(err).Error("Failed to send shoutrrr notification")
 			}
 		}
 	}
@@ -289,7 +289,7 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 			"auth_failures":       authFailures,
 			"network_failures":    networkFailures,
 			"rate_limit_failures": rateLimitFailures,
-		}).Warn("Notification send completed with failures - consider implementing retry logic for transient errors")
+		}).Warn("Notification send completed with failures")
 	} else if len(notifier.Urls) > 0 {
 		LocalLog.WithField("total_urls", len(notifier.Urls)).Debug("Notification send completed successfully")
 	}
