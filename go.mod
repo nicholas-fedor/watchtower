@@ -10,7 +10,7 @@ require (
 	github.com/docker/cli v29.1.2+incompatible
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
-	github.com/nicholas-fedor/shoutrrr v0.13.0
+	github.com/nicholas-fedor/shoutrrr v0.13.1
 	github.com/onsi/gomega v1.38.3
 	github.com/prometheus/client_golang v1.23.2
 	github.com/robfig/cron v1.2.0
@@ -30,7 +30,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/term v0.38.0 // indirect
 	google.golang.org/grpc v1.76.0 // indirect
 )
 
@@ -88,7 +88,7 @@ require (
 
 require (
 	github.com/onsi/ginkgo/v2 v2.27.3
-	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
