@@ -285,6 +285,10 @@ func (c Container) GetCreateConfig() *dockerContainerType.Config {
 		config.Hostname = "" // Clear hostname for container network mode.
 	}
 
+	if hostConfig.UTSMode != "" {
+		config.Hostname = "" // Clear hostname for UTS mode.
+	}
+
 	if util.SliceEqual(config.Entrypoint, imageConfig.Entrypoint) {
 		config.Entrypoint = nil
 		if util.SliceEqual(config.Cmd, imageConfig.Cmd) {

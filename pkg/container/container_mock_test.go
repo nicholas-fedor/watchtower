@@ -245,6 +245,40 @@ func WithNetworks(networkNames ...string) MockContainerUpdate {
 	}
 }
 
+// WithUTSMode sets the UTS mode for the mock container.
+//
+// Parameters:
+//   - mode: UTS mode to set (e.g., "host").
+//
+// Returns:
+//   - MockContainerUpdate: Function to set UTS mode in container HostConfig.
+func WithUTSMode(mode string) MockContainerUpdate {
+	return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainerType.HostConfig{}
+		}
+
+		c.HostConfig.UTSMode = dockerContainerType.UTSMode(mode)
+	}
+}
+
+// WithHostname sets the hostname for the mock container.
+//
+// Parameters:
+//   - hostname: Hostname to set.
+//
+// Returns:
+//   - MockContainerUpdate: Function to set hostname in container Config.
+func WithHostname(hostname string) MockContainerUpdate {
+	return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+		if c.Config == nil {
+			c.Config = &dockerContainerType.Config{}
+		}
+
+		c.Config.Hostname = hostname
+	}
+}
+
 // MockClient is a mock implementation of the Operations interface for testing container operations.
 type MockClient struct {
 	createFunc  func(context.Context, *dockerContainerType.Config, *dockerContainerType.HostConfig, *dockerNetworkType.NetworkingConfig, *ocispec.Platform, string) (dockerContainerType.CreateResponse, error)
