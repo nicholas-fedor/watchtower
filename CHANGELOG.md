@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Clean up shoutrrr notification warning messages by @nicholas-fedor in [#1054](https://github.com/nicholas-fedor/watchtower/pull/1054)
 - Update module golang.org/x/text to v0.32.0 by @renovate[bot] in [#1050](https://github.com/nicholas-fedor/watchtower/pull/1050)
 - Update module github.com/onsi/gomega to v1.38.3 by @renovate[bot] in [#1049](https://github.com/nicholas-fedor/watchtower/pull/1049)
 - Update module github.com/onsi/ginkgo/v2 to v2.27.3 by @renovate[bot] in [#1048](https://github.com/nicholas-fedor/watchtower/pull/1048)
