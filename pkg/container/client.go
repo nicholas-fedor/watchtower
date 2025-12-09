@@ -217,7 +217,20 @@ func NewClient(opts ClientOptions) Client {
 //   - error: Non-nil if listing fails, nil on success.
 func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
 	// Fetch and filter containers using helper function.
-	containers, err := ListSourceContainers(c.api, c.ClientOptions, filter)
+	isPodman := false
+	if c.CPUCopyMode == "auto" {
+		var err error
+		isPodman, err = c.detectPodman()
+		if err != nil {
+			// If detection fails, fall back to Docker behavior.
+			// This conservative approach ensures compatibility in environments where runtime detection
+			// is not possible, defaulting to the Docker runtime.
+			logrus.WithError(err).
+				Debug("Failed to detect container runtime, falling back to Docker")
+		}
+	}
+
+	containers, err := ListSourceContainers(c.api, c.ClientOptions, filter, isPodman)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
 

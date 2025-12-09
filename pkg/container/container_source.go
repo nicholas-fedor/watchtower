@@ -38,7 +38,13 @@ func ListSourceContainers(
 	api dockerClient.APIClient,
 	opts ClientOptions,
 	filter types.Filter,
+	isPodmanOptional ...bool,
 ) ([]types.Container, error) {
+	isPodman := false
+	if len(isPodmanOptional) > 0 {
+		isPodman = isPodmanOptional[0]
+	}
+
 	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"include_stopped":    opts.IncludeStopped,
@@ -48,10 +54,10 @@ func ListSourceContainers(
 	clog.Debug("Retrieving container list")
 
 	// Build filter arguments for container states.
-	filterArgs := buildListFilterArgs(opts)
+	filterArgs := buildListFilterArgs(opts, isPodman)
 
 	// Fetch containers with applied filters.
-	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{Filters: *filterArgs})
+	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{Filters: filterArgs})
 	if err != nil {
 		if strings.Contains(err.Error(), "page not found") {
 			clog.WithFields(logrus.Fields{
@@ -267,8 +273,8 @@ func StopSourceContainer(
 //   - opts: Client options for filtering.
 //
 // Returns:
-//   - *dockerFiltersType.Args: Arguments for filtering Docker containers
-func buildListFilterArgs(opts ClientOptions) *dockerFiltersType.Args {
+//   - dockerFiltersType.Args: Arguments for filtering Docker containers
+func buildListFilterArgs(opts ClientOptions, isPodman bool) dockerFiltersType.Args {
 	filterArgs := dockerFiltersType.NewArgs()
 
 	filterArgs.Add("status", "running")
@@ -278,14 +284,12 @@ func buildListFilterArgs(opts ClientOptions) *dockerFiltersType.Args {
 		filterArgs.Add("status", "exited")
 	}
 
-	isPodman := os.Getenv("container") == "podman"
-
 	// Podman doesn't have the "restarting" status
 	if opts.IncludeRestarting && !isPodman {
 		filterArgs.Add("status", "restarting")
 	}
 
-	return &filterArgs
+	return filterArgs
 }
 
 // getNetworkConfig extracts and sanitizes the network configuration from a container.
