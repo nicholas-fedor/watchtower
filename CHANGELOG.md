@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update peter-evans/create-pull-request digest to 41c0e4b by @renovate[bot] in [#1059](https://github.com/nicholas-fedor/watchtower/pull/1059)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.13.1 by @renovate[bot] in [#1058](https://github.com/nicholas-fedor/watchtower/pull/1058)
 - Clean up shoutrrr notification warning messages by @nicholas-fedor in [#1054](https://github.com/nicholas-fedor/watchtower/pull/1054)
 - Update module golang.org/x/text to v0.32.0 by @renovate[bot] in [#1050](https://github.com/nicholas-fedor/watchtower/pull/1050)
