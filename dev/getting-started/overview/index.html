@@ -541,6 +541,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -557,6 +575,47 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how_image_updates_work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Image Updates Work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples_of_different_tagging_schemes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples of Different Tagging Schemes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1249,6 +1308,36 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how_image_updates_work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Image Updates Work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples_of_different_tagging_schemes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples of Different Tagging Schemes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1272,15 +1361,54 @@
 If Watchtower detects that an image has changed, it will automatically restart the container using the new image.</p>
 <p>With Watchtower you can update the container by pushing a new image to the registry that's repective to the container's image.
 Watchtower will pull the new image, gracefully shut down the existing container, and restart it with the same options that were used when it was deployed initially.</p>
-<p>For example, let's say you were running Watchtower along with an instance of <em>centurylink/wetty-cli</em> image:</p>
-<div class="highlight"><span class="filename">List Docker containers</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>ps
+<h2 id="how_image_updates_work">How Image Updates Work<a class="headerlink" href="#how_image_updates_work" title="Permanent link">&para;</a></h2>
+<p>Watchtower monitors containers using their <strong>exact image reference</strong>, including any tags specified.</p>
+<p>This means:</p>
+<ul>
+<li>A container running <code>nginx:1.29</code> will <strong>only</strong> be updated when new images become available under the <code>nginx:1.29</code> tag</li>
+<li>It will <strong>not</strong> update when <code>nginx:latest</code>, <code>nginx:1.30</code>, or other tags receive updates</li>
+<li>A container running <code>myapp</code> (without a tag) will update when <code>myapp:latest</code> changes</li>
+</ul>
+<p>This tag-specific behavior provides fine-grained control over update scopes, allowing you to pin containers to specific versions while still receiving updates within that version series.</p>
+<h2 id="examples_of_different_tagging_schemes">Examples of Different Tagging Schemes<a class="headerlink" href="#examples_of_different_tagging_schemes" title="Permanent link">&para;</a></h2>
+<p>While semantic versioning is ideal for predictable updates, many popular Docker images use different approaches.</p>
+<p>The following examples show how Watchtower handles various tag types:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Latest Tags</label><label for="__tabbed_1_2">Semantic Version Tags</label><label for="__tabbed_1_3">Other Tagging Schemes</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Containers using the implicit or explicit <code>latest</code> tag will update when the image maintainer pushes new content to the <code>latest</code> tag.</p>
+<div class="highlight"><span class="filename">Running an nginx:latest container</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>CONTAINER<span class="w"> </span>ID<span class="w">   </span>IMAGE<span class="w">          </span>STATUS<span class="w">          </span>PORTS<span class="w">                    </span>NAMES
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>abc123def456<span class="w">   </span>nginx:latest<span class="w">   </span>Up<span class="w"> </span><span class="m">10</span><span class="w"> </span>minutes<span class="w">   </span><span class="m">0</span>.0.0.0:80-&gt;80/tcp<span class="w">       </span>webserver
 </code></pre></div>
-<div class="highlight"><span class="filename">Output</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>CONTAINER<span class="w"> </span>ID<span class="w">   </span>IMAGE<span class="w">                   </span>STATUS<span class="w">          </span>PORTS<span class="w">                    </span>NAMES
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>967848166a45<span class="w">   </span>centurylink/wetty-cli<span class="w">   </span>Up<span class="w"> </span><span class="m">10</span><span class="w"> </span>minutes<span class="w">   </span><span class="m">0</span>.0.0.0:8080-&gt;3000/tcp<span class="w">   </span>wetty
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>6cc4d2a9d1a5<span class="w">   </span>nickfedor/watchtower<span class="w">    </span>Up<span class="w"> </span><span class="m">15</span><span class="w"> </span>minutes<span class="w">                            </span>watchtower
+<p><strong>Expected behavior:</strong></p>
+<p>Watchtower checks for updates to <code>nginx:latest</code>.
+If nginx releases a new version and tags it as <code>latest</code>, the container will be updated.</p>
+<div class="admonition warning">
+<p class="admonition-title">This is commonly used, but can lead to unexpected changes because <code>latest</code> may include breaking changes from major version updates.</p>
+</div>
+</div>
+<div class="tabbed-block">
+<p>Semantic versioning (e.g., <code>1.29</code>) provides more predictable updates within a major version.</p>
+<div class="highlight"><span class="filename">Running an nginx:1.29 container</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>CONTAINER<span class="w"> </span>ID<span class="w">   </span>IMAGE<span class="w">          </span>STATUS<span class="w">          </span>PORTS<span class="w">                    </span>NAMES
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>def456ghi789<span class="w">   </span>nginx:1.29<span class="w">     </span>Up<span class="w"> </span><span class="m">10</span><span class="w"> </span>minutes<span class="w">   </span><span class="m">0</span>.0.0.0:80-&gt;80/tcp<span class="w">       </span>webserver
 </code></pre></div>
-<p>Every day Watchtower will pull the latest <em>centurylink/wetty-cli</em> image and compare it to the one that was used to run the "wetty" container.
-If it sees that the image has changed it will stop/remove the "wetty" container and then restart it using the new image and the same <code>docker run</code> options that were used to start the container initially (in this case, that would include the <code>-p 8080:3000</code> port mapping).</p>
+<p><strong>Expected behavior:</strong></p>
+<p>Watchtower monitors the image <code>nginx:1.29</code> specifically.
+When nginx releases a new patch for version 1.29 (e.g. <code>1.29.1</code>, <code>1.29.2</code>, etc.), the maintainers will typically build and release a new patched version of the image with the <code>1.29</code> tag being applied to the updated image.
+Watchtower will then update the container to reflect the updated, <code>1.29</code>-tagged image.</p>
+</div>
+<div class="tabbed-block">
+<p>Some images use date-based or incremental versioning schemes instead of semantic versioning.</p>
+<div class="highlight"><span class="filename">Running a pihole:2023.11 container</span><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>CONTAINER<span class="w"> </span>ID<span class="w">   </span>IMAGE<span class="w">               </span>STATUS<span class="w">          </span>PORTS<span class="w">                    </span>NAMES
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ghi789jkl012<span class="w">   </span>pihole/pihole:2023.11<span class="w">   </span>Up<span class="w"> </span><span class="m">10</span><span class="w"> </span>minutes<span class="w">   </span><span class="m">0</span>.0.0.0:8080-&gt;80/tcp<span class="w">   </span>pihole
+</code></pre></div>
+<p><strong>Expected behavior:</strong></p>
+<p>Watchtower checks for updates to <code>pihole/pihole:2023.11</code>.
+Pi-hole releases updates like <code>2023.11.1</code>, <code>2023.11.2</code> within the same month/year tag.
+The container updates to the latest patch within that period but not to <code>2023.12</code> or newer major releases.</p>
+</div>
+</div>
+</div>
 
 
 
@@ -1303,7 +1431,7 @@ If it sees that the image has changed it will stop/remove the "wetty" container 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 9, 2025 20:08:53 UTC"><span class="timeago" datetime="2025-12-09T20:08:53+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 9, 2025 20:08:53 UTC">2025-12-09</span>
   </span>
 
     
