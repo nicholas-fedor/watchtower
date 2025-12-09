@@ -56,7 +56,9 @@ func ListSourceContainers(
 		filterArgs.Add("status", "exited")
 	}
 
-	if opts.IncludeRestarting {
+	isPodman := os.Getenv("container") == "podman"
+
+	if opts.IncludeRestarting && !isPodman {
 		filterArgs.Add("status", "restarting")
 	}
 
