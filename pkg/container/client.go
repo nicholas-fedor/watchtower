@@ -23,6 +23,12 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Constants for CPUCopyMode values.
+const (
+	// CPUCopyModeAuto indicates automatic detection of container runtime for CPU copying behavior.
+	CPUCopyModeAuto = "auto"
+)
+
 // Errors for container health operations.
 var (
 	// errHealthCheckTimeout indicates that waiting for a container to become healthy timed out.
@@ -216,8 +222,11 @@ func NewClient(opts ClientOptions) Client {
 //   - []types.Container: List of matching containers.
 //   - error: Non-nil if listing fails, nil on success.
 func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
-	// Fetch and filter containers using helper function.
-	containers, err := ListSourceContainers(c.api, c.ClientOptions, filter)
+	// Determine if the container runtime is Podman to handle runtime-specific differences.
+	isPodman := c.getPodmanFlag()
+
+	// Attempt to list source containers and handle errors by logging and returning them.
+	containers, err := ListSourceContainers(c.api, c.ClientOptions, filter, isPodman)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
 
@@ -294,6 +303,8 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
+	// Determine if the container runtime is Podman to handle runtime-specific differences.
+	isPodman := c.getPodmanFlag()
 
 	clientVersion := c.GetVersion()
 
@@ -302,29 +313,6 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 
 	// Get unified network config.
 	networkConfig := getNetworkConfig(container, clientVersion)
-
-	// Detect if running on Podman for CPU compatibility.
-	// Podman and Docker handle CPU resource allocation differently when copying container configurations.
-	// Podman requires special handling for CPU settings to ensure proper resource limits are applied,
-	// whereas Docker can use standard copying mechanisms. This detection ensures Watchtower applies
-	// the correct CPU copying strategy based on the container runtime being used.
-	isPodman := false
-
-	if c.CPUCopyMode == "auto" {
-		// When CPUCopyMode is set to "auto", automatically detect the container runtime (Podman vs Docker)
-		// to determine the appropriate CPU copying behavior. This prevents resource allocation issues
-		// that could occur if Docker-specific logic is applied to Podman or vice versa.
-		var err error
-
-		isPodman, err = c.detectPodman()
-		if err != nil {
-			// If detection fails, fall back to Docker behavior.
-			// This conservative approach ensures compatibility in environments where runtime detection
-			// is not possible, defaulting to the Docker runtime.
-			logrus.WithError(err).
-				Debug("Failed to detect container runtime, falling back to Docker")
-		}
-	}
 
 	// Start new container with selected config.
 	newID, err := StartTargetContainer(
@@ -876,6 +864,29 @@ func (c client) detectPodman() (bool, error) {
 	logrus.Debug("No Podman detection criteria met, assuming Docker")
 
 	return false, nil
+}
+
+// getPodmanFlag determines if Podman detection is needed and performs it.
+//
+// Returns:
+//   - bool: True if Podman is detected, false otherwise.
+func (c client) getPodmanFlag() bool {
+	// Only perform detection in auto mode; otherwise, assume Docker
+	if c.CPUCopyMode != CPUCopyModeAuto {
+		return false
+	}
+
+	// Attempt to detect Podman using various methods (marker files, env vars, API info)
+	isPodman, err := c.detectPodman()
+	if err != nil {
+		// On detection failure, fall back to assuming Docker
+		logrus.WithError(err).Debug("Failed to detect container runtime, falling back to Docker")
+
+		return false
+	}
+
+	// Return the detection result
+	return isPodman
 }
 
 // WaitForContainerHealthy waits for a container to become healthy or times out.

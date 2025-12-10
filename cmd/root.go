@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -559,6 +560,12 @@ func runMain(cfg config.RunConfig) int {
 		&cleanupImageInfos,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "failed to list containers") {
+			logNotify("Failed to detect Watchtower instances", err)
+
+			return 1
+		}
+
 		logNotify("Multiple Watchtower instances detected", err)
 
 		return 1

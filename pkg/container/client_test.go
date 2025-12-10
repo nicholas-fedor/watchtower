@@ -12,6 +12,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	dockerBackendType "github.com/docker/docker/api/types/backend"
 	dockerContainerType "github.com/docker/docker/api/types/container"
@@ -560,6 +561,143 @@ var _ = ginkgo.Describe("the client", func() {
 						gomega.Expect(err).To(gomega.HaveOccurred())
 						gomega.Expect(err.Error()).To(gomega.ContainSubstring("timeout"))
 					})
+				})
+			})
+		})
+
+		ginkgo.Describe("getPodmanFlag", func() {
+			ginkgo.When("CPUCopyMode is auto", func() {
+				ginkgo.It("should detect Podman via marker file", func() {
+					memFs := afero.NewMemMapFs()
+					afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
+					testClient := client{
+						api: docker,
+						ClientOptions: ClientOptions{
+							CPUCopyMode: CPUCopyModeAuto,
+							Fs:          memFs,
+						},
+					}
+					result := testClient.getPodmanFlag()
+					gomega.Expect(result).To(gomega.BeTrue())
+				})
+
+				ginkgo.It("should detect Podman via CONTAINER environment variable", func() {
+					memFs := afero.NewMemMapFs()
+					restore := withEnvVars(map[string]string{"CONTAINER": "podman"})
+					defer restore()
+					testClient := client{
+						api: docker,
+						ClientOptions: ClientOptions{
+							CPUCopyMode: CPUCopyModeAuto,
+							Fs:          memFs,
+						},
+					}
+					result := testClient.getPodmanFlag()
+					gomega.Expect(result).To(gomega.BeTrue())
+				})
+
+				ginkgo.It("should detect Podman via API Name field", func() {
+					memFs := afero.NewMemMapFs()
+					mockServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
+							ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+								"Name": "podman",
+							}),
+						),
+					)
+					testClient := client{
+						api: docker,
+						ClientOptions: ClientOptions{
+							CPUCopyMode: CPUCopyModeAuto,
+							Fs:          memFs,
+						},
+					}
+					result := testClient.getPodmanFlag()
+					gomega.Expect(result).To(gomega.BeTrue())
+				})
+
+				ginkgo.It("should detect Podman via API ServerVersion field", func() {
+					memFs := afero.NewMemMapFs()
+					mockServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
+							ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+								"ServerVersion": "podman/4.0.0",
+							}),
+						),
+					)
+					testClient := client{
+						api: docker,
+						ClientOptions: ClientOptions{
+							CPUCopyMode: CPUCopyModeAuto,
+							Fs:          memFs,
+						},
+					}
+					result := testClient.getPodmanFlag()
+					gomega.Expect(result).To(gomega.BeTrue())
+				})
+
+				ginkgo.It("should detect Docker via marker file", func() {
+					memFs := afero.NewMemMapFs()
+					afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
+					mockServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
+							ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+								"Name": "docker",
+							}),
+						),
+					)
+					testClient := client{
+						api: docker,
+						ClientOptions: ClientOptions{
+							CPUCopyMode: CPUCopyModeAuto,
+							Fs:          memFs,
+						},
+					}
+					result := testClient.getPodmanFlag()
+					gomega.Expect(result).To(gomega.BeFalse())
+				})
+
+				ginkgo.It("should fall back to Docker when detection fails", func() {
+					memFs := afero.NewMemMapFs()
+					mockServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
+							ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+						),
+					)
+					resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+					defer resetLogrus()
+					testClient := client{
+						api: docker,
+						ClientOptions: ClientOptions{
+							CPUCopyMode: CPUCopyModeAuto,
+							Fs:          memFs,
+						},
+					}
+					result := testClient.getPodmanFlag()
+					gomega.Expect(result).To(gomega.BeFalse())
+					gomega.Eventually(logbuf).
+						Should(gbytes.Say("Failed to detect container runtime, falling back to Docker"))
+				})
+			})
+
+			ginkgo.When("CPUCopyMode is not auto", func() {
+				ginkgo.It("should return false without calling detection", func() {
+					memFs := afero.NewMemMapFs()
+					testClient := client{
+						api: docker,
+						ClientOptions: ClientOptions{
+							CPUCopyMode: "manual",
+							Fs:          memFs,
+						},
+					}
+					result := testClient.getPodmanFlag()
+					gomega.Expect(result).To(gomega.BeFalse())
+					// No API calls should have been made
+					gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
 				})
 			})
 		})
