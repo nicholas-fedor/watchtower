@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Correct actionlint issues in create-manifests.yaml by @nicholas-fedor in [#1071](https://github.com/nicholas-fedor/watchtower/pull/1071)
 - Add ApprenticeofEnder to contributors list by @nicholas-fedor in [#1070](https://github.com/nicholas-fedor/watchtower/pull/1070)
 
 ### Chores
