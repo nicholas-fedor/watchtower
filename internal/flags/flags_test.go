@@ -73,7 +73,7 @@ func TestEnvConfig(t *testing.T) {
 		},
 		{
 			name: "flag errors",
-			setupCmd: func(_cmd *cobra.Command) {
+			setupCmd: func(_ *cobra.Command) {
 				// Don't register flags to force retrieval errors
 			},
 			expectError: true,
@@ -468,6 +468,8 @@ func TestProcessFlagAliases(t *testing.T) {
 				"--trace",
 			},
 			checks: func(t *testing.T, flags *pflag.FlagSet) {
+				t.Helper()
+
 				urls, _ := flags.GetStringArray("notification-url")
 				assert.Contains(t, urls, "logger://")
 
@@ -491,6 +493,8 @@ func TestProcessFlagAliases(t *testing.T) {
 			name:    "log level from environment",
 			envVars: map[string]string{"WATCHTOWER_DEBUG": "true"},
 			checks: func(t *testing.T, flags *pflag.FlagSet) {
+				t.Helper()
+
 				logLevel, _ := flags.GetString("log-level")
 				assert.Equal(t, "debug", logLevel)
 			},
@@ -499,6 +503,8 @@ func TestProcessFlagAliases(t *testing.T) {
 			name:    "schedule from environment",
 			envVars: map[string]string{"WATCHTOWER_SCHEDULE": "@hourly"},
 			checks: func(t *testing.T, flags *pflag.FlagSet) {
+				t.Helper()
+
 				sched, _ := flags.GetString("schedule")
 				assert.Equal(t, "@hourly", sched)
 			},
@@ -556,6 +562,7 @@ func TestSetupLogging(t *testing.T) {
 			name:  "default format",
 			flags: []string{},
 			checks: func(t *testing.T) {
+				t.Helper()
 				assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
 			},
 		},
@@ -563,6 +570,7 @@ func TestSetupLogging(t *testing.T) {
 			name:  "JSON format",
 			flags: []string{"--log-format", "JSON"},
 			checks: func(t *testing.T) {
+				t.Helper()
 				assert.IsType(t, &logrus.JSONFormatter{}, logrus.StandardLogger().Formatter)
 			},
 		},
@@ -570,6 +578,7 @@ func TestSetupLogging(t *testing.T) {
 			name:  "pretty format",
 			flags: []string{"--log-format", "pretty"},
 			checks: func(t *testing.T) {
+				t.Helper()
 				assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
 				textFormatter, isOk := logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
 				assert.True(t, isOk)
@@ -581,6 +590,8 @@ func TestSetupLogging(t *testing.T) {
 			name:  "logfmt format",
 			flags: []string{"--log-format", "logfmt"},
 			checks: func(t *testing.T) {
+				t.Helper()
+
 				textFormatter, isOk := logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
 				assert.True(t, isOk)
 				assert.True(t, textFormatter.DisableColors)
