@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add image update explanation and tagging examples by @nicholas-fedor in [#1062](https://github.com/nicholas-fedor/watchtower/pull/1062)
+
+### Changed
+
+- Add ApprenticeofEnder to contributors list by @nicholas-fedor in [#1070](https://github.com/nicholas-fedor/watchtower/pull/1070)
+
+### Chores
+
+- Update peter-evans/create-pull-request digest to 0979079 by @renovate[bot] in [#1068](https://github.com/nicholas-fedor/watchtower/pull/1068)
+- Update peter-evans/create-pull-request digest to 98357b1 by @renovate[bot] in [#1065](https://github.com/nicholas-fedor/watchtower/pull/1065)
+- Update codecov/codecov-action digest to 671740a by @renovate[bot] in [#1064](https://github.com/nicholas-fedor/watchtower/pull/1064)
+
+### Fixed
+
+- Resolve notification URL parsing regression with comma handling and whitespace trimming by @nicholas-fedor in [#1069](https://github.com/nicholas-fedor/watchtower/pull/1069)
+- Resolve container listing failure due to unsupported "restarting" status by @ApprenticeofEnder in [#1061](https://github.com/nicholas-fedor/watchtower/pull/1061)
+- Refine MAC address validation logging messages by @nicholas-fedor in [#1066](https://github.com/nicholas-fedor/watchtower/pull/1066)
+
+### New Contributors
+
+- @ApprenticeofEnder made their first contribution in [#1061](https://github.com/nicholas-fedor/watchtower/pull/1061)
+
+## [1.12.4] - 2025-12-09
+
+### Added
+
 - Add push option to delete command by @nicholas-fedor in [#920](https://github.com/nicholas-fedor/watchtower/pull/920)
 
 ### Changed
@@ -2400,7 +2426,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.12.3...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.12.4...HEAD)
+- [1.12.4](https://github.com/nicholas-fedor/watchtower/compare/v1.12.3...v1.12.4)
 - [1.12.3](https://github.com/nicholas-fedor/watchtower/compare/v1.12.2...v1.12.3)
 - [1.12.2](https://github.com/nicholas-fedor/watchtower/compare/v1.12.1...v1.12.2)
 - [1.12.1](https://github.com/nicholas-fedor/watchtower/compare/v1.12.0...v1.12.1)
