@@ -1463,6 +1463,31 @@ func TestNotificationURLParsingComprehensive(t *testing.T) {
 			},
 		},
 
+		// Telegram service tests
+		{
+			name:     "Telegram single URL",
+			envValue: "telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+			expected: []string{
+				"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+			},
+		},
+		{
+			name:     "Telegram space separator",
+			envValue: "telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html telegram://another@telegram",
+			expected: []string{
+				"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+				"telegram://another@telegram",
+			},
+		},
+		{
+			name:     "Telegram comma-space separator",
+			envValue: "telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html, telegram://another@telegram",
+			expected: []string{
+				"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+				"telegram://another@telegram",
+			},
+		},
+
 		// Generic webhook tests
 		{
 			name:     "Generic webhook single URL",
