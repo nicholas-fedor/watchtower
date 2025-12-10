@@ -65,8 +65,8 @@ jobs:
           # Strip the 'v' prefix from inputs.version
           VERSION="${{ inputs.version }}"
           VERSION="${VERSION#v}"
-          MAJOR=`echo $VERSION | cut -d. --fields=1`
-          MINOR=`echo $VERSION | cut -d. --fields=1,2`
+          MAJOR=$(echo "$VERSION" | cut -d. --fields=1)
+          MINOR=$(echo "$VERSION" | cut -d. --fields=1,2)
           docker buildx imagetools create -t "nickfedor/watchtower:${VERSION}" \
             "nickfedor/watchtower:amd64-${VERSION}" \
             "nickfedor/watchtower:i386-${VERSION}" \
