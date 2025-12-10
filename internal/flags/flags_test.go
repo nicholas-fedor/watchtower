@@ -1199,7 +1199,7 @@ func TestNotificationParsingEmptyEnvVar(t *testing.T) {
 	assert.Empty(t, notifications)
 }
 
-// TestNotificationParsingWhitespaceOnly verifies that whitecomma-space values are filtered out.
+// TestNotificationParsingWhitespaceOnly verifies that whitespace values are filtered out.
 func TestNotificationParsingWhitespaceOnly(t *testing.T) {
 	t.Setenv("WATCHTOWER_NOTIFICATIONS", "   \t   ")
 
