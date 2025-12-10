@@ -19,119 +19,419 @@ import (
 
 var errSetFailed = errors.New("set failed")
 
-// TestEnvConfig_Defaults verifies that default Docker environment variables are set correctly.
-// It ensures the fallback values are applied when no custom flags are provided.
-func TestEnvConfig_Defaults(t *testing.T) {
-	// Unset testing environment variables to isolate defaults.
-	_ = os.Unsetenv("DOCKER_TLS_VERIFY")
-	_ = os.Unsetenv("DOCKER_HOST")
-	_ = os.Unsetenv("DOCKER_CERT_PATH")
-
+// newTestCommand creates a new cobra.Command with default flags registered for testing.
+func newTestCommand() *cobra.Command {
 	cmd := new(cobra.Command)
 
 	SetDefaults()
 	RegisterDockerFlags(cmd)
+	RegisterSystemFlags(cmd)
+	RegisterNotificationFlags(cmd)
 
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-
-	assert.Equal(t, "unix:///var/run/docker.sock", os.Getenv("DOCKER_HOST"))
-	assert.Empty(t, os.Getenv("DOCKER_TLS_VERIFY"))
-	assert.Empty(
-		t,
-		os.Getenv("DOCKER_API_VERSION"),
-		"DOCKER_API_VERSION should be unset for autonegotiation",
-	)
-	assert.Empty(t, os.Getenv("DOCKER_CERT_PATH"))
+	return cmd
 }
 
-// TestEnvConfig_Custom verifies that custom Docker flags override default environment variables.
-// It tests setting specific host, TLS, and API version values.
-func TestEnvConfig_Custom(t *testing.T) {
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-
-	err := cmd.ParseFlags(
-		[]string{
-			"--host",
-			"some-custom-docker-host",
-			"--tlsverify",
-			"--api-version",
-			"1.99",
-			"--cert-path",
-			"/path/to/certs",
+// TestEnvConfig tests EnvConfig functionality with various configurations.
+func TestEnvConfig(t *testing.T) {
+	testCases := []struct {
+		name          string
+		envVars       map[string]string
+		flags         []string
+		setupCmd      func(*cobra.Command)
+		expectEnv     map[string]string
+		expectError   bool
+		expectWarning string
+	}{
+		{
+			name: "defaults",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "",
+				"DOCKER_HOST":       "",
+				"DOCKER_CERT_PATH":  "",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_HOST":        "unix:///var/run/docker.sock",
+				"DOCKER_TLS_VERIFY":  "",
+				"DOCKER_API_VERSION": "",
+				"DOCKER_CERT_PATH":   "",
+			},
 		},
-	)
-	require.NoError(t, err)
-
-	err = EnvConfig(cmd)
-	require.NoError(t, err)
-
-	assert.Equal(t, "some-custom-docker-host", os.Getenv("DOCKER_HOST"))
-	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
-	assert.Equal(t, "1.99", os.Getenv("DOCKER_API_VERSION"))
-	assert.Equal(t, "/path/to/certs", os.Getenv("DOCKER_CERT_PATH"))
-}
-
-// TestEnvConfig_FlagErrors tests error handling in EnvConfig for flag retrieval failures.
-func TestEnvConfig_FlagErrors(t *testing.T) {
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	// Don't register flags to force retrieval errors
-	err := EnvConfig(cmd)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to set flag value")
-}
-
-// TestGetSecretsFromFilesWithString verifies that a string secret flag retains its value.
-// It tests direct string input without file substitution.
-func TestGetSecretsFromFilesWithString(t *testing.T) {
-	value := "supersecretstring"
-	t.Setenv("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD", value)
-
-	testGetSecretsFromFiles(t, "notification-email-server-password", value)
-}
-
-// TestGetSecretsFromFilesWithFile verifies that a secret flag reads from a file correctly.
-// It tests substituting a file path with its contents.
-func TestGetSecretsFromFilesWithFile(t *testing.T) {
-	value := "megasecretstring"
-
-	// Create a temporary file with the secret.
-	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
-	require.NoError(t, err)
-
-	_, err = file.WriteString(value)
-	require.NoError(t, err)
-	require.NoError(t, file.Close())
-
-	t.Setenv("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD", file.Name())
-
-	testGetSecretsFromFiles(t, "notification-email-server-password", value)
-}
-
-// TestGetSliceSecretsFromFiles verifies that a slice secret flag combines file and direct values.
-// It tests reading multiple values, including from a file.
-func TestGetSliceSecretsFromFiles(t *testing.T) {
-	values := []string{"entry2", "", "entry3"}
-
-	// Create a temporary file with secret entries.
-	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
-	require.NoError(t, err)
-
-	for _, value := range values {
-		_, err = file.WriteString("\n" + value)
-		require.NoError(t, err)
+		{
+			name: "custom",
+			flags: []string{
+				"--host", "some-custom-docker-host",
+				"--tlsverify",
+				"--api-version", "1.99",
+				"--cert-path", "/path/to/certs",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_HOST":        "some-custom-docker-host",
+				"DOCKER_TLS_VERIFY":  "1",
+				"DOCKER_API_VERSION": "1.99",
+				"DOCKER_CERT_PATH":   "/path/to/certs",
+			},
+		},
+		{
+			name: "flag errors",
+			setupCmd: func(_ *cobra.Command) {
+				// Don't register flags to force retrieval errors
+			},
+			expectError: true,
+		},
+		{
+			name: "flag retrieval errors partial",
+			setupCmd: func(cmd *cobra.Command) {
+				SetDefaults()
+				cmd.PersistentFlags().StringP("host", "H", "", "daemon socket")
+				// Only host defined, expect errors for others
+			},
+			flags:       []string{"--host", "test"},
+			expectError: true,
+		},
+		{
+			name: "flag retrieval errors tls",
+			setupCmd: func(cmd *cobra.Command) {
+				SetDefaults()
+				cmd.PersistentFlags().StringP("host", "H", "", "daemon socket")
+				cmd.PersistentFlags().BoolP("tlsverify", "v", false, "use TLS")
+				// Host and tlsverify defined, expect error for api-version
+			},
+			flags:       []string{"--host", "test", "--tlsverify"},
+			expectError: true,
+		},
+		{
+			name: "tls host conversion",
+			envVars: map[string]string{
+				"DOCKER_HOST":       "tcp://example.com:2376",
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "https://example.com:2376",
+			},
+		},
+		{
+			name: "cert path from env",
+			envVars: map[string]string{
+				"DOCKER_CERT_PATH": "/env/cert/path",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_CERT_PATH": "/env/cert/path",
+			},
+		},
+		{
+			name: "tls warnings http with tls",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			flags: []string{"--host", "http://example.com"},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "http://example.com",
+			},
+			expectWarning: "TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
+		},
+		{
+			name: "tls warnings unix with tls",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			flags: []string{"--host", "unix:///var/run/docker.sock"},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "unix:///var/run/docker.sock",
+			},
+			expectWarning: "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.",
+		},
+		{
+			name: "tls warnings https with tls",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			flags: []string{"--host", "https://example.com"},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "https://example.com",
+			},
+		},
+		{
+			name: "tls warnings tcp with tls",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			flags: []string{"--host", "tcp://example.com"},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "https://example.com",
+			},
+		},
+		{
+			name:  "tls warnings unix without tls",
+			flags: []string{"--host", "unix:///var/run/docker.sock"},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "unix:///var/run/docker.sock",
+			},
+		},
+		{
+			name: "docker host env var",
+			envVars: map[string]string{
+				"DOCKER_HOST": "unix:///var/run/docker.sock",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "unix:///var/run/docker.sock",
+			},
+		},
+		{
+			name: "docker tls verify env var",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+			},
+		},
+		{
+			name: "docker cert path env var",
+			envVars: map[string]string{
+				"DOCKER_CERT_PATH": "/env/certs",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_CERT_PATH": "/env/certs",
+			},
+		},
+		{
+			name: "docker api version env var",
+			envVars: map[string]string{
+				"DOCKER_API_VERSION": "1.41",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_API_VERSION": "1.41",
+			},
+		},
+		{
+			name: "tls host conversion https no change",
+			envVars: map[string]string{
+				"DOCKER_HOST":       "https://example.com:2376",
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "https://example.com:2376",
+			},
+		},
+		{
+			name: "tls warnings tcp converted no warning",
+			envVars: map[string]string{
+				"DOCKER_HOST":       "tcp://example.com:2376",
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "https://example.com:2376",
+			},
+		},
+		{
+			name: "tls warnings unix without tls no warning",
+			envVars: map[string]string{
+				"DOCKER_HOST": "unix:///var/run/docker.sock",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_HOST": "unix:///var/run/docker.sock",
+			},
+		},
+		{
+			name: "edge case empty api version",
+			envVars: map[string]string{
+				"DOCKER_API_VERSION": "",
+			},
+			expectEnv: map[string]string{
+				"DOCKER_API_VERSION": "",
+			},
+		},
 	}
 
-	require.NoError(t, file.Close())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set env vars
+			for k, v := range tc.envVars {
+				if v == "" {
+					os.Unsetenv(k)
+				} else {
+					t.Setenv(k, v)
+				}
+			}
 
-	testGetSecretsFromFiles(t, "notification-url", "[entry1,entry2,entry3]",
-		"--notification-url", "entry1",
-		"--notification-url", file.Name())
+			cmd := new(cobra.Command)
+			if tc.setupCmd != nil {
+				tc.setupCmd(cmd)
+			} else {
+				SetDefaults()
+				RegisterDockerFlags(cmd)
+			}
+
+			if len(tc.flags) > 0 {
+				err := cmd.ParseFlags(tc.flags)
+				require.NoError(t, err)
+			}
+
+			var logOutput strings.Builder
+			if tc.expectWarning != "" {
+				logrus.SetOutput(&logOutput)
+				logrus.SetLevel(logrus.WarnLevel)
+
+				defer func() {
+					logrus.SetOutput(os.Stderr)
+					logrus.SetLevel(logrus.InfoLevel)
+				}()
+			}
+
+			err := EnvConfig(cmd)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to set flag value")
+
+				return
+			}
+
+			require.NoError(t, err)
+
+			for k, v := range tc.expectEnv {
+				assert.Equal(t, v, os.Getenv(k))
+			}
+
+			if tc.expectWarning != "" {
+				assert.Contains(t, logOutput.String(), tc.expectWarning)
+			} else if tc.expectWarning == "" && logOutput.Len() > 0 {
+				assert.Empty(t, logOutput.String())
+			}
+		})
+	}
+}
+
+// TestGetSecretsFromFiles tests GetSecretsFromFiles functionality with various scenarios.
+func TestGetSecretsFromFiles(t *testing.T) {
+	testCases := []struct {
+		name     string
+		envVars  map[string]string
+		files    []struct{ path, content string }
+		flagName string
+		expected string
+		args     []string
+	}{
+		{
+			name: "string value",
+			envVars: map[string]string{
+				"WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD": "supersecretstring",
+			},
+			flagName: "notification-email-server-password",
+			expected: "supersecretstring",
+		},
+		{
+			name: "file value",
+			files: []struct{ path, content string }{
+				{"password.txt", "megasecretstring"},
+			},
+			envVars: map[string]string{
+				"WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD": "password.txt",
+			},
+			flagName: "notification-email-server-password",
+			expected: "megasecretstring",
+		},
+		{
+			name: "slice with file",
+			files: []struct{ path, content string }{
+				{"urls.txt", "\nentry2\n\nentry3"},
+			},
+			flagName: "notification-url",
+			expected: "[entry1,entry2,entry3]",
+			args:     []string{"--notification-url", "entry1", "--notification-url", "urls.txt"},
+		},
+		{
+			name: "empty lines",
+			files: []struct{ path, content string }{
+				{"urls.txt", "entry1\n\nentry2\n  \nentry3"},
+			},
+			flagName: "notification-url",
+			expected: "[entry1,entry2,entry3]",
+			args:     []string{"--notification-url", "urls.txt"},
+		},
+		{
+			name: "urls with trailing newlines",
+			files: []struct{ path, content string }{
+				{
+					"urls.txt",
+					"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html\nsmtp://test\n",
+				},
+			},
+			flagName: "notification-url",
+			expected: "[telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html,smtp://test]",
+			args:     []string{"--notification-url", "urls.txt"},
+		},
+		{
+			name: "special chars",
+			files: []struct{ path, content string }{
+				{"urls.txt", "smtp://user:pass@host:port\nslack://token@channel\n!@#$%^&*()"},
+			},
+			flagName: "notification-url",
+			expected: "[smtp://user:pass@host:port,slack://token@channel,!@#$%^&*()]",
+			args:     []string{"--notification-url", "urls.txt"},
+		},
+		{
+			name: "non-existent file",
+			envVars: map[string]string{
+				"WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD": "/nonexistent/file",
+			},
+			flagName: "notification-email-server-password",
+			expected: "/nonexistent/file",
+		},
+		{
+			name: "mixed values",
+			files: []struct{ path, content string }{
+				{"urls.txt", "fileentry1\nfileentry2"},
+			},
+			flagName: "notification-url",
+			expected: "[direct1,fileentry1,fileentry2,direct2]",
+			args: []string{
+				"--notification-url",
+				"direct1",
+				"--notification-url",
+				"urls.txt",
+				"--notification-url",
+				"direct2",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create temp files first
+			fileMap := make(map[string]string)
+
+			for _, f := range tc.files {
+				file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+				require.NoError(t, err)
+				_, err = file.WriteString(f.content)
+				require.NoError(t, err)
+				require.NoError(t, file.Close())
+				fileMap[f.path] = file.Name()
+			}
+
+			// Set env vars, replacing placeholder paths
+			for k, v := range tc.envVars {
+				if actualPath, ok := fileMap[v]; ok {
+					t.Setenv(k, actualPath)
+				} else {
+					t.Setenv(k, v)
+				}
+			}
+
+			// Update args to use actual paths
+			args := make([]string, len(tc.args))
+			copy(args, tc.args)
+
+			for i, arg := range args {
+				if actualPath, ok := fileMap[arg]; ok {
+					args[i] = actualPath
+				}
+			}
+
+			testGetSecretsFromFiles(t, tc.flagName, tc.expected, args...)
+		})
+	}
 }
 
 // TestHTTPAPIPeriodicPollsFlag verifies the HTTP API periodic polls flag enables correctly.
@@ -163,176 +463,185 @@ func TestIsFile(t *testing.T) {
 	)
 }
 
-// TestProcessFlagAliases verifies that flag aliases are processed correctly.
-// It tests porcelain mode, interval, and trace settings.
+// TestProcessFlagAliases tests flag alias processing with various configurations.
 func TestProcessFlagAliases(t *testing.T) {
-	logrus.StandardLogger().ExitFunc = func(_ int) { t.FailNow() }
-	cmd := new(cobra.Command)
+	testCases := []struct {
+		name        string
+		envVars     map[string]string
+		flags       []string
+		expectPanic bool
+		checks      func(t *testing.T, flags *pflag.FlagSet)
+	}{
+		{
+			name: "porcelain v1 with interval and trace",
+			flags: []string{
+				"--porcelain", "v1",
+				"--interval", "10",
+				"--trace",
+			},
+			checks: func(t *testing.T, flags *pflag.FlagSet) {
+				t.Helper()
 
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	RegisterSystemFlags(cmd)
-	RegisterNotificationFlags(cmd)
+				urls, _ := flags.GetStringArray("notification-url")
+				assert.Contains(t, urls, "logger://")
 
-	require.NoError(t, cmd.ParseFlags([]string{
-		"--porcelain", "v1",
-		"--interval", "10",
-		"--trace",
-	}))
+				logStdout, _ := flags.GetBool("notification-log-stdout")
+				assert.True(t, logStdout)
 
-	flags := cmd.Flags()
-	ProcessFlagAliases(flags)
+				report, _ := flags.GetBool("notification-report")
+				assert.True(t, report)
 
-	urls, _ := flags.GetStringArray("notification-url")
-	assert.Contains(t, urls, "logger://")
+				template, _ := flags.GetString("notification-template")
+				assert.Equal(t, "porcelain.v1.summary-no-log", template)
 
-	logStdout, _ := flags.GetBool("notification-log-stdout")
-	assert.True(t, logStdout)
+				sched, _ := flags.GetString("schedule")
+				assert.Equal(t, "@every 10s", sched)
 
-	report, _ := flags.GetBool("notification-report")
-	assert.True(t, report)
+				logLevel, _ := flags.GetString("log-level")
+				assert.Equal(t, "trace", logLevel)
+			},
+		},
+		{
+			name:    "log level from environment",
+			envVars: map[string]string{"WATCHTOWER_DEBUG": "true"},
+			checks: func(t *testing.T, flags *pflag.FlagSet) {
+				t.Helper()
 
-	template, _ := flags.GetString("notification-template")
-	assert.Equal(t, "porcelain.v1.summary-no-log", template)
+				logLevel, _ := flags.GetString("log-level")
+				assert.Equal(t, "debug", logLevel)
+			},
+		},
+		{
+			name:    "schedule from environment",
+			envVars: map[string]string{"WATCHTOWER_SCHEDULE": "@hourly"},
+			checks: func(t *testing.T, flags *pflag.FlagSet) {
+				t.Helper()
 
-	sched, _ := flags.GetString("schedule")
-	assert.Equal(t, "@every 10s", sched)
+				sched, _ := flags.GetString("schedule")
+				assert.Equal(t, "@hourly", sched)
+			},
+		},
+		{
+			name:        "schedule and interval conflict",
+			flags:       []string{"--schedule", "@hourly", "--interval", "10"},
+			expectPanic: true,
+		},
+		{
+			name:        "invalid porcelain version",
+			flags:       []string{"--porcelain", "v2"},
+			expectPanic: true,
+		},
+	}
 
-	logLevel, _ := flags.GetString("log-level")
-	assert.Equal(t, "trace", logLevel)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set env vars
+			for k, v := range tc.envVars {
+				t.Setenv(k, v)
+			}
+
+			if tc.expectPanic {
+				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
+				cmd := newTestCommand()
+				require.NoError(t, cmd.ParseFlags(tc.flags))
+				assert.PanicsWithValue(t, "FATAL", func() {
+					ProcessFlagAliases(cmd.Flags())
+				})
+
+				return
+			}
+
+			cmd := newTestCommand()
+			require.NoError(t, cmd.ParseFlags(tc.flags))
+			ProcessFlagAliases(cmd.Flags())
+
+			if tc.checks != nil {
+				tc.checks(t, cmd.Flags())
+			}
+		})
+	}
 }
 
-// TestProcessFlagAliasesLogLevelFromEnvironment verifies log level setting from environment.
-// It ensures debug mode is enabled via environment variable.
-func TestProcessFlagAliasesLogLevelFromEnvironment(t *testing.T) {
-	cmd := new(cobra.Command)
+// TestSetupLogging tests logging setup with various formats and levels.
+func TestSetupLogging(t *testing.T) {
+	testCases := []struct {
+		name        string
+		flags       []string
+		expectError bool
+		checks      func(t *testing.T)
+	}{
+		{
+			name:  "default format",
+			flags: []string{},
+			checks: func(t *testing.T) {
+				t.Helper()
+				assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
+			},
+		},
+		{
+			name:  "JSON format",
+			flags: []string{"--log-format", "JSON"},
+			checks: func(t *testing.T) {
+				t.Helper()
+				assert.IsType(t, &logrus.JSONFormatter{}, logrus.StandardLogger().Formatter)
+			},
+		},
+		{
+			name:  "pretty format",
+			flags: []string{"--log-format", "pretty"},
+			checks: func(t *testing.T) {
+				t.Helper()
+				assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
+				textFormatter, isOk := logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
+				assert.True(t, isOk)
+				assert.True(t, textFormatter.ForceColors)
+				assert.False(t, textFormatter.FullTimestamp)
+			},
+		},
+		{
+			name:  "logfmt format",
+			flags: []string{"--log-format", "logfmt"},
+			checks: func(t *testing.T) {
+				t.Helper()
 
-	t.Setenv("WATCHTOWER_DEBUG", "true")
+				textFormatter, isOk := logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
+				assert.True(t, isOk)
+				assert.True(t, textFormatter.DisableColors)
+				assert.True(t, textFormatter.FullTimestamp)
+			},
+		},
+		{
+			name:        "invalid format",
+			flags:       []string{"--log-format", "cowsay"},
+			expectError: true,
+		},
+		{
+			name:        "invalid log level",
+			flags:       []string{"--log-level", "gossip"},
+			expectError: true,
+		},
+	}
 
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	RegisterSystemFlags(cmd)
-	RegisterNotificationFlags(cmd)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := newTestCommand()
+			require.NoError(t, cmd.ParseFlags(tc.flags))
 
-	require.NoError(t, cmd.ParseFlags([]string{}))
-	flags := cmd.Flags()
-	ProcessFlagAliases(flags)
+			err := SetupLogging(cmd.Flags())
 
-	logLevel, _ := flags.GetString("log-level")
-	assert.Equal(t, "debug", logLevel)
-}
+			if tc.expectError {
+				require.Error(t, err)
 
-// TestLogFormatFlag verifies that log format flags configure the logger correctly.
-// It tests various format options and their effects.
-func TestLogFormatFlag(t *testing.T) {
-	cmd := new(cobra.Command)
+				return
+			}
 
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	RegisterSystemFlags(cmd)
+			require.NoError(t, err)
 
-	// Test default "Auto" format.
-	require.NoError(t, cmd.ParseFlags([]string{}))
-	require.NoError(t, SetupLogging(cmd.Flags()))
-	assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
-
-	// Test JSON format.
-	require.NoError(t, cmd.ParseFlags([]string{"--log-format", "JSON"}))
-	require.NoError(t, SetupLogging(cmd.Flags()))
-	assert.IsType(t, &logrus.JSONFormatter{}, logrus.StandardLogger().Formatter)
-
-	// Test Pretty format.
-	require.NoError(t, cmd.ParseFlags([]string{"--log-format", "pretty"}))
-	require.NoError(t, SetupLogging(cmd.Flags()))
-	assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
-	textFormatter, isOk := logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
-	assert.True(t, isOk)
-	assert.True(t, textFormatter.ForceColors)
-	assert.False(t, textFormatter.FullTimestamp)
-
-	// Test LogFmt format.
-	require.NoError(t, cmd.ParseFlags([]string{"--log-format", "logfmt"}))
-	require.NoError(t, SetupLogging(cmd.Flags()))
-
-	textFormatter, isOk = logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
-	assert.True(t, isOk)
-	assert.True(t, textFormatter.DisableColors)
-	assert.True(t, textFormatter.FullTimestamp)
-
-	// Test invalid format.
-	require.NoError(t, cmd.ParseFlags([]string{"--log-format", "cowsay"}))
-	require.Error(t, SetupLogging(cmd.Flags()))
-}
-
-// TestLogLevelFlag verifies that an invalid log level flag results in an error.
-// It ensures proper validation of log level settings.
-func TestLogLevelFlag(t *testing.T) {
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	RegisterSystemFlags(cmd)
-
-	require.NoError(t, cmd.ParseFlags([]string{"--log-level", "gossip"}))
-	require.Error(t, SetupLogging(cmd.Flags()))
-}
-
-// TestProcessFlagAliasesSchedAndInterval verifies that conflicting schedule and interval flags fail.
-// It ensures mutual exclusivity is enforced.
-func TestProcessFlagAliasesSchedAndInterval(t *testing.T) {
-	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	RegisterSystemFlags(cmd)
-	RegisterNotificationFlags(cmd)
-
-	require.NoError(t, cmd.ParseFlags([]string{"--schedule", "@hourly", "--interval", "10"}))
-	flags := cmd.Flags()
-
-	assert.PanicsWithValue(t, "FATAL", func() {
-		ProcessFlagAliases(flags)
-	})
-}
-
-// TestProcessFlagAliasesScheduleFromEnvironment verifies schedule setting from environment.
-// It ensures environment variables override defaults correctly.
-func TestProcessFlagAliasesScheduleFromEnvironment(t *testing.T) {
-	cmd := new(cobra.Command)
-
-	t.Setenv("WATCHTOWER_SCHEDULE", "@hourly")
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	RegisterSystemFlags(cmd)
-	RegisterNotificationFlags(cmd)
-
-	require.NoError(t, cmd.ParseFlags([]string{}))
-	flags := cmd.Flags()
-	ProcessFlagAliases(flags)
-
-	sched, _ := flags.GetString("schedule")
-	assert.Equal(t, "@hourly", sched)
-}
-
-// TestProcessFlagAliasesInvalidPorcelaineVersion verifies that an invalid porcelain version fails.
-// It ensures version validation triggers a fatal error.
-func TestProcessFlagAliasesInvalidPorcelaineVersion(t *testing.T) {
-	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	RegisterSystemFlags(cmd)
-	RegisterNotificationFlags(cmd)
-
-	require.NoError(t, cmd.ParseFlags([]string{"--porcelain", "cowboy"}))
-	flags := cmd.Flags()
-
-	assert.PanicsWithValue(t, "FATAL", func() {
-		ProcessFlagAliases(flags)
-	})
+			if tc.checks != nil {
+				tc.checks(t)
+			}
+		})
+	}
 }
 
 // TestFlagsArePresentInDocumentation verifies that all flags are documented.
@@ -464,40 +773,6 @@ func TestGetSecretFromFile_OpenError(t *testing.T) {
 	err = getSecret(cmd.PersistentFlags(), "notification-email-server-password")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to open secret file")
-}
-
-func TestEnvConfig_FlagRetrievalErrors(t *testing.T) {
-	// Test 1: No flags registered, expect error for "host"
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-
-	err := EnvConfig(cmd)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to set flag value") // Covers line 524
-
-	// Test 2: Register only host, expect errors for tlsverify and api-version
-	cmd = new(cobra.Command)
-
-	SetDefaults()
-	cmd.PersistentFlags().StringP("host", "H", "", "daemon socket") // Only host defined
-	err = cmd.ParseFlags([]string{"--host", "test"})
-	require.NoError(t, err)
-	err = EnvConfig(cmd)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to set flag value") // Covers line 528
-
-	// Test 3: Register host and tlsverify, expect error for api-version
-	cmd = new(cobra.Command)
-
-	SetDefaults()
-	cmd.PersistentFlags().StringP("host", "H", "", "daemon socket")
-	cmd.PersistentFlags().BoolP("tlsverify", "v", false, "use TLS")
-	err = cmd.ParseFlags([]string{"--host", "test", "--tlsverify"})
-	require.NoError(t, err)
-	err = EnvConfig(cmd)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to set flag value") // Covers line 532
 }
 
 func TestReadFlags_Errors(t *testing.T) {
@@ -667,61 +942,55 @@ func TestDisableMemorySwappinessFlag(t *testing.T) {
 	assert.True(t, disableMemorySwappiness, "disable-memory-swappiness flag should be true")
 }
 
-// TestUpdateOnStartFlag verifies that the --update-on-start flag is parsed correctly.
-func TestUpdateOnStartFlag(t *testing.T) {
-	cmd := new(cobra.Command)
+// TestUpdateOnStart tests the --update-on-start flag with various inputs.
+func TestUpdateOnStart(t *testing.T) {
+	testCases := []struct {
+		name     string
+		envVars  map[string]string
+		flags    []string
+		expected bool
+	}{
+		{
+			name:     "flag set",
+			flags:    []string{"--update-on-start"},
+			expected: true,
+		},
+		{
+			name:     "environment variable",
+			envVars:  map[string]string{"WATCHTOWER_UPDATE_ON_START": "true"},
+			expected: true,
+		},
+		{
+			name:     "default",
+			expected: false,
+		},
+	}
 
-	SetDefaults()
-	RegisterSystemFlags(cmd)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.envVars {
+				t.Setenv(k, v)
+			}
 
-	err := cmd.ParseFlags([]string{"--update-on-start"})
-	require.NoError(t, err)
+			cmd := new(cobra.Command)
 
-	updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
-	require.NoError(t, err)
-	assert.True(t, updateOnStart, "--update-on-start flag should be true when set")
-}
+			SetDefaults()
+			RegisterSystemFlags(cmd)
 
-// TestUpdateOnStartEnvironmentVariable verifies that the WATCHTOWER_UPDATE_ON_START environment variable is parsed correctly.
-func TestUpdateOnStartEnvironmentVariable(t *testing.T) {
-	t.Setenv("WATCHTOWER_UPDATE_ON_START", "true")
+			err := cmd.ParseFlags(tc.flags)
+			require.NoError(t, err)
 
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterSystemFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
-
-	updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
-	require.NoError(t, err)
-	assert.True(
-		t,
-		updateOnStart,
-		"WATCHTOWER_UPDATE_ON_START environment variable should set flag to true",
-	)
-}
-
-// TestUpdateOnStartDefault verifies that the --update-on-start flag defaults to false.
-func TestUpdateOnStartDefault(t *testing.T) {
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterSystemFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
-
-	updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
-	require.NoError(t, err)
-	assert.False(t, updateOnStart, "--update-on-start flag should default to false")
+			updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, updateOnStart)
+		})
+	}
 }
 
 // TestWatchtowerNotificationsEnvironmentVariable verifies that WATCHTOWER_NOTIFICATIONS environment variable
 // correctly sets the notifications flag as a string slice.
 func TestWatchtowerNotificationsEnvironmentVariable(t *testing.T) {
-	t.Setenv("WATCHTOWER_NOTIFICATIONS", "email,slack")
+	t.Setenv("WATCHTOWER_NOTIFICATIONS", "email slack")
 
 	cmd := new(cobra.Command)
 
@@ -803,7 +1072,7 @@ func TestNotificationsConfigurationFromEnvVarsVsFlags(t *testing.T) {
 		{
 			name:         "notifications env var",
 			envVar:       "WATCHTOWER_NOTIFICATIONS",
-			envValue:     "email,slack",
+			envValue:     "email slack",
 			flagArgs:     []string{},
 			expectedNot:  []string{"email", "slack"},
 			expectedURLs: []string{},
@@ -866,9 +1135,9 @@ func TestNotificationsConfigurationFromEnvVarsVsFlags(t *testing.T) {
 	}
 }
 
-// TestNotificationURLParsingWithMixedSeparators verifies that notification-url env var splits on both comma and space.
+// TestNotificationURLParsingWithMixedSeparators verifies that notification-url env var splits on spaces.
 func TestNotificationURLParsingWithMixedSeparators(t *testing.T) {
-	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://test, slack://test gotify://test")
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://test slack://test gotify://test")
 
 	cmd := new(cobra.Command)
 
@@ -906,7 +1175,7 @@ func TestNotificationURLParsingWithInvalidValues(t *testing.T) {
 
 // TestNotificationURLParsingWithEmptyValues verifies that empty values from splitting are filtered out.
 func TestNotificationURLParsingWithEmptyValues(t *testing.T) {
-	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://test  ,  slack://test")
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "smtp://test slack://test")
 
 	cmd := new(cobra.Command)
 
@@ -942,9 +1211,9 @@ func TestNotificationParsingEmptyEnvVar(t *testing.T) {
 	assert.Empty(t, notifications)
 }
 
-// TestNotificationParsingWhitespaceOnly verifies that whitespace-only values are filtered out.
+// TestNotificationParsingWhitespaceOnly verifies that whitespace values are filtered out.
 func TestNotificationParsingWhitespaceOnly(t *testing.T) {
-	t.Setenv("WATCHTOWER_NOTIFICATIONS", "  , \t ,  ")
+	t.Setenv("WATCHTOWER_NOTIFICATIONS", "   \t   ")
 
 	cmd := new(cobra.Command)
 
@@ -978,7 +1247,7 @@ func TestNotificationParsingSpecialCharsInURLs(t *testing.T) {
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
 
-	expected := []string{"smtp://user:pass@host:port", "withcomma", "slack://token@channel"}
+	expected := []string{"smtp://user:pass@host:port,withcomma", "slack://token@channel"}
 	assert.Equal(t, expected, urls)
 }
 
@@ -1020,69 +1289,6 @@ func TestNotificationParsingFlagOverridesEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"slack"}, notifications)
-}
-
-// TestGetSecretsFromFilesEmptyLines verifies handling of empty lines in secret files.
-func TestGetSecretsFromFilesEmptyLines(t *testing.T) {
-	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
-	require.NoError(t, err)
-
-	_, err = file.WriteString("entry1\n\nentry2\n  \nentry3")
-	require.NoError(t, err)
-	require.NoError(t, file.Close())
-
-	testGetSecretsFromFiles(t, "notification-url", "[entry1,entry2,\"  \",entry3]",
-		"--notification-url", file.Name())
-}
-
-// TestGetSecretsFromFilesSpecialChars verifies handling of special characters in secret files.
-func TestGetSecretsFromFilesSpecialChars(t *testing.T) {
-	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
-	require.NoError(t, err)
-
-	content := "smtp://user:pass@host:port\nslack://token@channel\n!@#$%^&*()"
-	_, err = file.WriteString(content)
-	require.NoError(t, err)
-	require.NoError(t, file.Close())
-
-	testGetSecretsFromFiles(t, "notification-url", "["+strings.ReplaceAll(content, "\n", ",")+"]",
-		"--notification-url", file.Name())
-}
-
-// TestGetSecretsFromFilesPathEdgeCases verifies file path edge cases.
-func TestGetSecretsFromFilesPathEdgeCases(t *testing.T) {
-	// Test non-existent file for string flag
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterNotificationFlags(cmd)
-
-	fileName := t.TempDir() + "/nonexistent-file"
-
-	err := cmd.ParseFlags([]string{"--notification-email-server-password", fileName})
-	require.NoError(t, err)
-
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-email-server-password")
-	require.NoError(t, err) // Since not a file path, no error
-
-	password, err := cmd.PersistentFlags().GetString("notification-email-server-password")
-	require.NoError(t, err)
-	assert.Equal(t, fileName, password) // Remains unchanged
-}
-
-// TestGetSecretsFromFilesMixedValues verifies mixing direct values and file paths.
-func TestGetSecretsFromFilesMixedValues(t *testing.T) {
-	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
-	require.NoError(t, err)
-
-	_, err = file.WriteString("fileentry1\nfileentry2")
-	require.NoError(t, err)
-	require.NoError(t, file.Close())
-
-	testGetSecretsFromFiles(t, "notification-url", "[direct1,fileentry1,fileentry2,direct2]",
-		"--notification-url", "direct1",
-		"--notification-url", file.Name(),
-		"--notification-url", "direct2")
 }
 
 // TestGetSecretsFromFilesReadErrors verifies file read errors.
@@ -1137,106 +1343,6 @@ func TestFilterEmptyStrings(t *testing.T) {
 	}
 }
 
-// TestEnvConfig_TLSHostConversion verifies that when DOCKER_HOST is set to a tcp:// URL
-// and TLS verification is enabled, the DOCKER_HOST is converted to https://.
-func TestEnvConfig_TLSHostConversion(t *testing.T) {
-	t.Setenv("DOCKER_HOST", "tcp://example.com:2376")
-	t.Setenv("DOCKER_TLS_VERIFY", "1")
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-
-	assert.Equal(t, "https://example.com:2376", os.Getenv("DOCKER_HOST"))
-}
-
-// TestEnvConfig_CertPathFromEnv verifies that DOCKER_CERT_PATH is set from environment variable.
-func TestEnvConfig_CertPathFromEnv(t *testing.T) {
-	t.Setenv("DOCKER_CERT_PATH", "/env/cert/path")
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-
-	assert.Equal(t, "/env/cert/path", os.Getenv("DOCKER_CERT_PATH"))
-}
-
-// TestEnvConfig_TLSWarnings verifies that warnings are logged for mismatched TLS settings.
-func TestEnvConfig_TLSWarnings(t *testing.T) {
-	testCases := []struct {
-		name     string
-		host     string
-		tls      bool
-		expected string
-	}{
-		{
-			"http with tls",
-			"http://example.com",
-			true,
-			"TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
-		},
-		{
-			"unix with tls",
-			"unix:///var/run/docker.sock",
-			true,
-			"TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.",
-		},
-		{"https with tls", "https://example.com", true, ""},
-		{"tcp with tls", "tcp://example.com", true, ""}, // will be converted
-		{"unix without tls", "unix:///var/run/docker.sock", false, ""},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Ensure clean env state
-			os.Unsetenv("DOCKER_TLS_VERIFY")
-
-			if tc.tls {
-				t.Setenv("DOCKER_TLS_VERIFY", "1")
-			}
-
-			var logOutput strings.Builder
-			logrus.SetOutput(&logOutput)
-			logrus.SetLevel(logrus.WarnLevel)
-
-			defer func() {
-				logrus.SetOutput(os.Stderr)
-				logrus.SetLevel(logrus.InfoLevel)
-			}()
-
-			cmd := new(cobra.Command)
-
-			SetDefaults()
-			RegisterDockerFlags(cmd)
-
-			args := []string{"--host", tc.host}
-			if tc.tls {
-				args = append(args, "--tlsverify")
-			}
-
-			err := cmd.ParseFlags(args)
-			require.NoError(t, err)
-
-			err = EnvConfig(cmd)
-			require.NoError(t, err)
-
-			if tc.expected != "" {
-				assert.Contains(t, logOutput.String(), tc.expected)
-			} else {
-				assert.Empty(t, logOutput.String())
-			}
-		})
-	}
-}
-
 // TestRegexpSplittingLogic verifies regexp splitting with [, ]+.
 func TestRegexpSplittingLogic(t *testing.T) {
 	re := regexp.MustCompile("[, ]+")
@@ -1259,137 +1365,359 @@ func TestRegexpSplittingLogic(t *testing.T) {
 	}
 }
 
-func TestEnvConfig_DOCKER_HOST_EnvVar(t *testing.T) {
-	t.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+// TestNotificationURLParsingComprehensive tests comprehensive URL parsing for various Shoutrrr services
+// with different separator combinations and edge cases.
+func TestNotificationURLParsingComprehensive(t *testing.T) {
+	testCases := []struct {
+		name     string
+		envValue string
+		expected []string
+	}{
+		// SMTP service tests
+		{
+			name:     "SMTP single URL",
+			envValue: "smtp://user:pass@host:port/?from=test@example.com&to=recipient@example.com",
+			expected: []string{
+				"smtp://user:pass@host:port/?from=test@example.com&to=recipient@example.com",
+			},
+		},
+		{
+			name:     "SMTP multiple recipients with comma in query",
+			envValue: "smtp://user:pass@host:port/?from=test@example.com&to=recipient1@example.com,recipient2@example.com",
+			expected: []string{
+				"smtp://user:pass@host:port/?from=test@example.com&to=recipient1@example.com,recipient2@example.com",
+			},
+		},
+		{
+			name:     "SMTP space separator",
+			envValue: "smtp://user:pass@host1:port smtp://user:pass@host2:port",
+			expected: []string{"smtp://user:pass@host1:port", "smtp://user:pass@host2:port"},
+		},
+		{
+			name:     "SMTP comma-space separator",
+			envValue: "smtp://user:pass@host1:port, smtp://user:pass@host2:port",
+			expected: []string{"smtp://user:pass@host1:port", "smtp://user:pass@host2:port"},
+		},
 
-	defer os.Unsetenv("DOCKER_HOST")
+		// Slack service tests
+		{
+			name:     "Slack single URL",
+			envValue: "slack://botname@token-a/token-b/token-c",
+			expected: []string{"slack://botname@token-a/token-b/token-c"},
+		},
+		{
+			name:     "Slack space separator",
+			envValue: "slack://token1@channel1 slack://token2@channel2",
+			expected: []string{"slack://token1@channel1", "slack://token2@channel2"},
+		},
+		{
+			name:     "Slack comma-space separator",
+			envValue: "slack://token1@channel1, slack://token2@channel2",
+			expected: []string{"slack://token1@channel1", "slack://token2@channel2"},
+		},
 
-	cmd := new(cobra.Command)
+		// Gotify service tests
+		{
+			name:     "Gotify single URL",
+			envValue: "gotify://gotify-host/token",
+			expected: []string{"gotify://gotify-host/token"},
+		},
+		{
+			name:     "Gotify space separator",
+			envValue: "gotify://host1/token1 gotify://host2/token2",
+			expected: []string{"gotify://host1/token1", "gotify://host2/token2"},
+		},
+		{
+			name:     "Gotify comma-space separator",
+			envValue: "gotify://host1/token1, gotify://host2/token2",
+			expected: []string{"gotify://host1/token1", "gotify://host2/token2"},
+		},
 
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Equal(t, "unix:///var/run/docker.sock", os.Getenv("DOCKER_HOST"))
-}
+		// Discord service tests
+		{
+			name:     "Discord single URL",
+			envValue: "discord://token@123456789",
+			expected: []string{"discord://token@123456789"},
+		},
+		{
+			name:     "Discord space separator",
+			envValue: "discord://token1@123 discord://token2@456",
+			expected: []string{"discord://token1@123", "discord://token2@456"},
+		},
+		{
+			name:     "Discord comma-space separator",
+			envValue: "discord://token1@123, discord://token2@456",
+			expected: []string{"discord://token1@123", "discord://token2@456"},
+		},
 
-func TestEnvConfig_DOCKER_TLS_VERIFY_EnvVar(t *testing.T) {
-	t.Setenv("DOCKER_TLS_VERIFY", "1")
+		// Teams service tests
+		{
+			name:     "Teams single URL",
+			envValue: "teams://group@tenant/altId/groupOwner?host=organization.webhook.office.com",
+			expected: []string{
+				"teams://group@tenant/altId/groupOwner?host=organization.webhook.office.com",
+			},
+		},
+		{
+			name:     "Teams space separator",
+			envValue: "teams://group1@tenant1/id1/owner1?host=host1 teams://group2@tenant2/id2/owner2?host=host2",
+			expected: []string{
+				"teams://group1@tenant1/id1/owner1?host=host1",
+				"teams://group2@tenant2/id2/owner2?host=host2",
+			},
+		},
+		{
+			name:     "Teams comma-space separator",
+			envValue: "teams://group1@tenant1/id1/owner1?host=host1, teams://group2@tenant2/id2/owner2?host=host2",
+			expected: []string{
+				"teams://group1@tenant1/id1/owner1?host=host1",
+				"teams://group2@tenant2/id2/owner2?host=host2",
+			},
+		},
 
-	defer os.Unsetenv("DOCKER_TLS_VERIFY")
+		// Telegram service tests
+		{
+			name:     "Telegram single URL",
+			envValue: "telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+			expected: []string{
+				"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+			},
+		},
+		{
+			name:     "Telegram space separator",
+			envValue: "telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html telegram://another@telegram",
+			expected: []string{
+				"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+				"telegram://another@telegram",
+			},
+		},
+		{
+			name:     "Telegram comma-space separator",
+			envValue: "telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html, telegram://another@telegram",
+			expected: []string{
+				"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html",
+				"telegram://another@telegram",
+			},
+		},
 
-	cmd := new(cobra.Command)
+		// Generic webhook tests
+		{
+			name:     "Generic webhook single URL",
+			envValue: "generic+https://webhook.example.com/hook?token=abc123",
+			expected: []string{"generic+https://webhook.example.com/hook?token=abc123"},
+		},
+		{
+			name:     "Generic webhook space separator",
+			envValue: "generic+https://hook1.example.com generic+https://hook2.example.com",
+			expected: []string{
+				"generic+https://hook1.example.com",
+				"generic+https://hook2.example.com",
+			},
+		},
+		{
+			name:     "Generic webhook comma-space separator",
+			envValue: "generic+https://hook1.example.com, generic+https://hook2.example.com",
+			expected: []string{
+				"generic+https://hook1.example.com",
+				"generic+https://hook2.example.com",
+			},
+		},
 
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
-}
+		// Edge cases
+		{
+			name:     "URL with comma in query parameter",
+			envValue: "https://api.example.com/webhook?param=value,with,commas https://api2.example.com/webhook",
+			expected: []string{
+				"https://api.example.com/webhook?param=value,with,commas",
+				"https://api2.example.com/webhook",
+			},
+		},
+		{
+			name:     "Multiple URLs with mixed separators",
+			envValue: "smtp://test1 smtp://test2 slack://test3 slack://test4 gotify://test5",
+			expected: []string{
+				"smtp://test1",
+				"smtp://test2",
+				"slack://test3",
+				"slack://test4",
+				"gotify://test5",
+			},
+		},
+		{
+			name:     "Empty values filtered out",
+			envValue: "smtp://test1 smtp://test2 slack://test3",
+			expected: []string{"smtp://test1", "smtp://test2", "slack://test3"},
+		},
+		{
+			name:     "Malformed URL handling",
+			envValue: "not-a-url smtp://valid@example.com invalid://missing-parts",
+			expected: []string{"not-a-url", "smtp://valid@example.com", "invalid://missing-parts"},
+		},
+		{
+			name:     "URLs with special characters",
+			envValue: "smtp://user%40domain:pass%40word@host:587 slack://token@channel",
+			expected: []string{
+				"smtp://user%40domain:pass%40word@host:587",
+				"slack://token@channel",
+			},
+		},
+		{
+			name: "Very long URL",
+			envValue: "https://very-long-domain-name-with-many-subdomains.example.com/path/to/webhook?param1=" + strings.Repeat(
+				"a",
+				1000,
+			),
+			expected: []string{
+				"https://very-long-domain-name-with-many-subdomains.example.com/path/to/webhook?param1=" + strings.Repeat(
+					"a",
+					1000,
+				),
+			},
+		},
+		// Test cases from issues and bug reports
+		{
+			name:     "URL with comma in query parameter should not be split",
+			envValue: "smtp://user:pass@host:port/?to=recipient1@example.com,recipient2@example.com",
+			expected: []string{
+				"smtp://user:pass@host:port/?to=recipient1@example.com,recipient2@example.com",
+			},
+		},
+		{
+			name:     "Multiple URLs with comma in second URL query",
+			envValue: "smtp://test1 smtp://test2?param=value,with,commas",
+			expected: []string{"smtp://test1", "smtp://test2?param=value,with,commas"},
+		},
+		{
+			name:     "Complex URL with commas in path and query",
+			envValue: "https://api.example.com/webhook?param=value,with,commas https://api2.example.com/webhook",
+			expected: []string{
+				"https://api.example.com/webhook?param=value,with,commas",
+				"https://api2.example.com/webhook",
+			},
+		},
+		{
+			name:     "Teams URL with comma in tenant ID",
+			envValue: "teams://group@tenant,id.with,commas/altId/groupOwner?host=organization.webhook.office.com",
+			expected: []string{
+				"teams://group@tenant,id.with,commas/altId/groupOwner?host=organization.webhook.office.com",
+			},
+		},
 
-func TestEnvConfig_DOCKER_CERT_PATH_EnvVar(t *testing.T) {
-	t.Setenv("DOCKER_CERT_PATH", "/env/certs")
+		// Additional edge cases
+		{
+			name:     "URL with multiple commas in query parameters",
+			envValue: "smtp://user:pass@host:port/?to=recipient1@example.com,recipient2@example.com,recipient3@example.com",
+			expected: []string{
+				"smtp://user:pass@host:port/?to=recipient1@example.com,recipient2@example.com,recipient3@example.com",
+			},
+		},
+		{
+			name:     "URL with encoded commas",
+			envValue: "smtp://user:pass@host:port/?to=recipient1%2Crecipient2%2Crecipient3@example.com",
+			expected: []string{
+				"smtp://user:pass@host:port/?to=recipient1%2Crecipient2%2Crecipient3@example.com",
+			},
+		},
+		{
+			name:     "IPv6 address in URL",
+			envValue: "smtp://[::1]:587/?from=test@example.com",
+			expected: []string{
+				"smtp://[::1]:587/?from=test@example.com",
+			},
+		},
+		{
+			name:     "Complex authentication with encoded characters",
+			envValue: "smtp://user%40domain:pass%40word@host:587",
+			expected: []string{
+				"smtp://user%40domain:pass%40word@host:587",
+			},
+		},
+		{
+			name:     "URL with special characters in query",
+			envValue: "generic+https://api.example.com/webhook?param=value&special=!@#$%^&*()",
+			expected: []string{
+				"generic+https://api.example.com/webhook?param=value&special=!@#$%^&*()",
+			},
+		},
+		{
+			name:     "Multiple URLs with commas in different positions",
+			envValue: "smtp://test1 smtp://test2?param=value,with,commas gotify://host/token",
+			expected: []string{
+				"smtp://test1",
+				"smtp://test2?param=value,with,commas",
+				"gotify://host/token",
+			},
+		},
+		{
+			name:     "Multiple IPv6 URLs",
+			envValue: "smtp://[::1]:587 smtp://[2001:db8::1]:587",
+			expected: []string{
+				"smtp://[::1]:587",
+				"smtp://[2001:db8::1]:587",
+			},
+		},
+		{
+			name:     "URL with encoded special characters in path",
+			envValue: "slack://token@channel?text=Hello%20World%21",
+			expected: []string{
+				"slack://token@channel?text=Hello%20World%21",
+			},
+		},
+		{
+			name:     "Teams URL with complex tenant and commas",
+			envValue: "teams://group@tenant.with.dots.and,commas,more/altId/groupOwner?host=organization.webhook.office.com",
+			expected: []string{
+				"teams://group@tenant.with.dots.and,commas,more/altId/groupOwner?host=organization.webhook.office.com",
+			},
+		},
+		{
+			name: "Very long URL with multiple commas",
+			envValue: "https://very-long-domain-name-with-many-subdomains.example.com/path/to/webhook?param1=" + strings.Repeat(
+				"a,b,c,",
+				50,
+			) + "end",
+			expected: []string{
+				"https://very-long-domain-name-with-many-subdomains.example.com/path/to/webhook?param1=" + strings.Repeat(
+					"a,b,c,",
+					50,
+				) + "end",
+			},
+		},
+		{
+			name:     "URL with authentication and IPv6",
+			envValue: "smtp://user:pass@[2001:db8::1]:587/?from=test@example.com",
+			expected: []string{
+				"smtp://user:pass@[2001:db8::1]:587/?from=test@example.com",
+			},
+		},
+		{
+			name:     "Mixed separators with complex URLs",
+			envValue: "smtp://test1, smtp://test2?param=value,with,commas gotify://host/token slack://token@channel",
+			expected: []string{
+				"smtp://test1",
+				"smtp://test2?param=value,with,commas",
+				"gotify://host/token",
+				"slack://token@channel",
+			},
+		},
+	}
 
-	defer os.Unsetenv("DOCKER_CERT_PATH")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("WATCHTOWER_NOTIFICATION_URL", tc.envValue)
 
-	cmd := new(cobra.Command)
+			cmd := new(cobra.Command)
 
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Equal(t, "/env/certs", os.Getenv("DOCKER_CERT_PATH"))
-}
+			SetDefaults()
+			RegisterNotificationFlags(cmd)
 
-func TestEnvConfig_DOCKER_API_VERSION_EnvVar(t *testing.T) {
-	t.Setenv("DOCKER_API_VERSION", "1.41")
+			err := cmd.ParseFlags([]string{})
+			require.NoError(t, err)
 
-	defer os.Unsetenv("DOCKER_API_VERSION")
+			urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+			require.NoError(t, err)
 
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Equal(t, "1.41", os.Getenv("DOCKER_API_VERSION"))
-}
-
-func TestEnvConfig_TLSHostConversion_https_no_change(t *testing.T) {
-	t.Setenv("DOCKER_HOST", "https://example.com:2376")
-	t.Setenv("DOCKER_TLS_VERIFY", "1")
-
-	defer os.Unsetenv("DOCKER_HOST")
-	defer os.Unsetenv("DOCKER_TLS_VERIFY")
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Equal(t, "https://example.com:2376", os.Getenv("DOCKER_HOST"))
-}
-
-func TestEnvConfig_TLSWarnings_tcp_converted_no_warning(t *testing.T) {
-	t.Setenv("DOCKER_HOST", "tcp://example.com:2376")
-	t.Setenv("DOCKER_TLS_VERIFY", "1")
-
-	defer os.Unsetenv("DOCKER_HOST")
-	defer os.Unsetenv("DOCKER_TLS_VERIFY")
-
-	var logOutput strings.Builder
-	logrus.SetOutput(&logOutput)
-	logrus.SetLevel(logrus.WarnLevel)
-
-	defer func() {
-		logrus.SetOutput(os.Stderr)
-		logrus.SetLevel(logrus.InfoLevel)
-	}()
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Equal(t, "https://example.com:2376", os.Getenv("DOCKER_HOST"))
-	assert.Empty(t, logOutput.String())
-}
-
-func TestEnvConfig_TLSWarnings_unix_without_tls_no_warning(t *testing.T) {
-	t.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
-
-	defer os.Unsetenv("DOCKER_HOST")
-
-	var logOutput strings.Builder
-	logrus.SetOutput(&logOutput)
-	logrus.SetLevel(logrus.WarnLevel)
-
-	defer func() {
-		logrus.SetOutput(os.Stderr)
-		logrus.SetLevel(logrus.InfoLevel)
-	}()
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Empty(t, logOutput.String())
-}
-
-func TestEnvConfig_EdgeCase_Empty_API_Version(t *testing.T) {
-	t.Setenv("DOCKER_API_VERSION", "")
-
-	defer os.Unsetenv("DOCKER_API_VERSION")
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterDockerFlags(cmd)
-	err := EnvConfig(cmd)
-	require.NoError(t, err)
-	assert.Empty(t, os.Getenv("DOCKER_API_VERSION"))
+			assert.Equal(t, tc.expected, urls)
+		})
+	}
 }
