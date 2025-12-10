@@ -472,11 +472,11 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(endpoint.IPAddress).To(gomega.Equal("172.17.0.2"))
 				gomega.Expect(endpoint.MacAddress).To(gomega.Equal("02:42:ac:11:00:02"))
 				gomega.Expect(logOutput.String()).
-					To(gomega.ContainSubstring("Found MAC address in config"))
+					To(gomega.ContainSubstring("MAC address found in network configuration"))
 			})
 
-			ginkgo.It("logs warning for missing MAC address in running containers", func() {
-				logrus.SetLevel(logrus.WarnLevel)
+			ginkgo.It("logs debug message for missing MAC address in running containers", func() {
+				logrus.SetLevel(logrus.DebugLevel)
 				container := MockContainer(
 					WithNetworkMode("bridge"),
 					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
@@ -493,7 +493,10 @@ var _ = ginkgo.Describe("Container", func() {
 				config := getNetworkConfig(container, "1.49")
 				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
 				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"Negotiated API version 1.49 is at least 1.44 but no MAC address found; preservation may not be supported",
+					"MAC address validation issue",
+				))
+				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
+					"no MAC address found in non-host network config",
 				))
 				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=running"))
 			})
@@ -518,7 +521,7 @@ var _ = ginkgo.Describe("Container", func() {
 					config := getNetworkConfig(container, "1.49")
 					gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
 					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-						"No MAC address found for non-running container"))
+						"No MAC address for non-running container (expected)"))
 					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=created"))
 					gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
 						"Negotiated API version 1.49 is at least 1.44 but no MAC address found"))
@@ -543,7 +546,7 @@ var _ = ginkgo.Describe("Container", func() {
 					config := getNetworkConfig(container, "1.49")
 					gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
 					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-						"No MAC address found for non-running container"))
+						"No MAC address for non-running container (expected)"))
 					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=exited"))
 					gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
 						"Negotiated API version 1.49 is at least 1.44 but no MAC address found"))
@@ -731,7 +734,7 @@ var _ = ginkgo.Describe("Container", func() {
 						To(gomega.ContainElement("test-watchtower"),
 							"Aliases should match mock setup for network2")
 					gomega.Expect(logOutput.String()).
-						To(gomega.ContainSubstring("No MAC address in legacy config, as expected"))
+						To(gomega.ContainSubstring("No MAC address in legacy API configuration (expected)"))
 				},
 			)
 
@@ -784,7 +787,7 @@ var _ = ginkgo.Describe("Container", func() {
 						To(gomega.ContainElement("test-watchtower"),
 							"Aliases should match mock setup for network2")
 					gomega.Expect(logOutput.String()).
-						To(gomega.ContainSubstring("Found MAC address in config"))
+						To(gomega.ContainSubstring("MAC address found in network configuration"))
 				},
 			)
 
@@ -800,7 +803,7 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(config.EndpointsConfig).
 					To(gomega.BeEmpty(), "Network config should have no endpoints")
 				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"Negotiated API version 1.44 is at least 1.44 but no MAC address found"))
+					"MAC address validation issue"))
 				gomega.Expect(logOutput.String()).
 					To(gomega.ContainSubstring("no MAC address found in non-host network config"))
 			})
@@ -834,8 +837,9 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.It(
-			"returns error and logs warning for running container with no MAC address",
+			"returns error and logs debug message for running container with no MAC address",
 			func() {
+				logrus.SetLevel(logrus.DebugLevel)
 				container := MockContainer(
 					WithNetworkMode("bridge"),
 					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
@@ -853,7 +857,8 @@ var _ = ginkgo.Describe("Container", func() {
 				err := validateMacAddresses(config, container.ID(), "1.49", false, container)
 				gomega.Expect(err).To(gomega.Equal(errNoMacInNonHost))
 				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"Negotiated API version 1.49 is at least 1.44 but no MAC address found"))
+					"No MAC address for running container in non-host network"))
+				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=running"))
 				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=running"))
 			},
 		)
@@ -877,7 +882,7 @@ var _ = ginkgo.Describe("Container", func() {
 			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-				"No MAC address found for non-running container"))
+				"No MAC address for non-running container (expected)"))
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=created"))
 		})
 
@@ -900,7 +905,7 @@ var _ = ginkgo.Describe("Container", func() {
 			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-				"No MAC address found for non-running container"))
+				"No MAC address for non-running container (expected)"))
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=exited"))
 		})
 
@@ -923,9 +928,9 @@ var _ = ginkgo.Describe("Container", func() {
 			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(logOutput.String()).
-				To(gomega.ContainSubstring("Found MAC address in config"))
+				To(gomega.ContainSubstring("MAC address found in network configuration"))
 			gomega.Expect(logOutput.String()).
-				To(gomega.ContainSubstring("Verified MAC address presence"))
+				To(gomega.ContainSubstring("MAC address validation passed for running container"))
 		})
 
 		ginkgo.It("returns nil and logs debug for nil container state", func() {
@@ -946,7 +951,7 @@ var _ = ginkgo.Describe("Container", func() {
 			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-				"No MAC address found for non-running container"))
+				"No MAC address for non-running container (expected)"))
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=unknown"))
 		})
 	})
