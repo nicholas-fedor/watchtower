@@ -346,7 +346,19 @@ func TestGetSecretsFromFiles(t *testing.T) {
 				{"urls.txt", "entry1\n\nentry2\n  \nentry3"},
 			},
 			flagName: "notification-url",
-			expected: "[entry1,entry2,\"  \",entry3]",
+			expected: "[entry1,entry2,entry3]",
+			args:     []string{"--notification-url", "urls.txt"},
+		},
+		{
+			name: "urls with trailing newlines",
+			files: []struct{ path, content string }{
+				{
+					"urls.txt",
+					"telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html\nsmtp://test\n",
+				},
+			},
+			flagName: "notification-url",
+			expected: "[telegram://1234567890:AAEJ_AAAAABBBBBccccccccdddddddd@telegram/?channels=123456789&parseMode=html,smtp://test]",
 			args:     []string{"--notification-url", "urls.txt"},
 		},
 		{

@@ -943,7 +943,7 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 
 				scanner := bufio.NewScanner(file)
 				for scanner.Scan() {
-					line := scanner.Text()
+					line := strings.TrimSpace(scanner.Text())
 					if line != "" {
 						values = append(values, line)
 					}
