@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -476,9 +477,7 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 
 	flags.StringArray(
 		"notification-url",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATION_URL"), -1),
-		),
+		filterEmptyStrings(splitNotificationValues(envString("WATCHTOWER_NOTIFICATION_URL"))),
 		"The shoutrrr URL to send notifications to",
 	)
 
@@ -582,6 +581,105 @@ func filterEmptyStrings(ss []string) []string {
 	}
 
 	return res
+}
+
+// splitNotificationValues parses a string containing notification URLs separated by commas or spaces.
+//
+// Parameters:
+//   - value: A string containing one or more notification URLs separated by commas or spaces.
+//
+// Returns:
+//   - []string: A slice of parsed notification URLs. Invalid URLs are included in the result but logged as warnings.
+func splitNotificationValues(value string) []string {
+	// Define delimiter types to track how parts were separated (comma or space)
+	type delimiterType int
+
+	const (
+		delimiterComma delimiterType = iota
+		delimiterSpace
+	)
+
+	// Struct to hold a part and its delimiter type
+	type splitPart struct {
+		text      string
+		delimiter delimiterType
+	}
+
+	// Manual scanner to split on commas and spaces, tracking delimiter types
+	// Prepare variables for the manual scanning process
+	var (
+		parts   []splitPart
+		current strings.Builder
+	)
+
+	lastDelimiter := delimiterSpace // Default for first part
+
+	// Scan the input string character by character to identify delimiters and build parts
+	for _, char := range value {
+		switch char {
+		case ',':
+			// Encountered comma: finalize current part and set delimiter to comma
+			if current.Len() > 0 {
+				parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
+				current.Reset()
+			}
+
+			lastDelimiter = delimiterComma
+		case ' ':
+			// Encountered space: finalize current part and set delimiter to space
+			// Note: consecutive spaces are handled by trimming later
+			if current.Len() > 0 {
+				parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
+				current.Reset()
+			}
+
+			lastDelimiter = delimiterSpace
+		default:
+			// Append non-delimiter character to current part
+			current.WriteRune(char)
+		}
+	}
+
+	// Add the last part if any
+	if current.Len() > 0 {
+		parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
+	}
+
+	// Process parts: trim spaces and handle recombination
+	// Initialize result slice to hold processed parts
+	var result []string
+
+	// Iterate through each split part to trim whitespace and apply recombination logic
+	for _, part := range parts {
+		part.text = strings.TrimSpace(part.text)
+		if part.text == "" {
+			continue
+		}
+
+		// Recombination logic: only for comma delimiters
+		// Conditionally recombine comma-delimited parts that don't contain '://'
+		// (indicating not a complete URL) with the previous part
+		if part.delimiter == delimiterComma && len(result) > 0 &&
+			!strings.Contains(part.text, "://") {
+			result[len(result)-1] = result[len(result)-1] + "," + part.text
+		} else {
+			result = append(result, part.text)
+		}
+	}
+
+	// Validate URLs and log warnings for invalid ones
+	// Prepare final result slice with capacity for all results
+	final := make([]string, 0, len(result))
+	// Validate each URL string using net/url.Parse
+	for _, urlStr := range result {
+		if _, err := url.Parse(urlStr); err != nil {
+			logrus.Warnf("Invalid notification URL '%s': %v", urlStr, err)
+		}
+
+		final = append(final, urlStr)
+	}
+
+	return final
 }
 
 // SetDefaults sets default environment variable values.
