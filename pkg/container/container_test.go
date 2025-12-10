@@ -1487,4 +1487,87 @@ var _ = ginkgo.Describe("Container", func() {
 				To(gomega.ContainSubstring("Failed to attach additional network"))
 		})
 	})
+
+	ginkgo.Describe("buildListFilterArgs", func() {
+		ginkgo.It("includes running status always", func() {
+			opts := ClientOptions{}
+			filterArgs := buildListFilterArgs(opts, false)
+			statuses := filterArgs.Get("status")
+			gomega.Expect(statuses).To(gomega.ContainElement("running"))
+		})
+
+		ginkgo.It("includes created and exited when IncludeStopped is true", func() {
+			opts := ClientOptions{IncludeStopped: true}
+			filterArgs := buildListFilterArgs(opts, false)
+			statuses := filterArgs.Get("status")
+			gomega.Expect(statuses).To(gomega.ContainElement("created"))
+			gomega.Expect(statuses).To(gomega.ContainElement("exited"))
+			gomega.Expect(statuses).To(gomega.ContainElement("running"))
+		})
+
+		ginkgo.It("does not include created and exited when IncludeStopped is false", func() {
+			opts := ClientOptions{IncludeStopped: false}
+			filterArgs := buildListFilterArgs(opts, false)
+			statuses := filterArgs.Get("status")
+			gomega.Expect(statuses).ToNot(gomega.ContainElement("created"))
+			gomega.Expect(statuses).ToNot(gomega.ContainElement("exited"))
+			gomega.Expect(statuses).To(gomega.ContainElement("running"))
+		})
+
+		ginkgo.It(
+			"includes restarting when IncludeRestarting is true and isPodman is false",
+			func() {
+				opts := ClientOptions{IncludeRestarting: true}
+				filterArgs := buildListFilterArgs(opts, false)
+				statuses := filterArgs.Get("status")
+				gomega.Expect(statuses).To(gomega.ContainElement("restarting"))
+				gomega.Expect(statuses).To(gomega.ContainElement("running"))
+			},
+		)
+
+		ginkgo.It("does not include restarting when IncludeRestarting is false", func() {
+			opts := ClientOptions{IncludeRestarting: false}
+			filterArgs := buildListFilterArgs(opts, false)
+			statuses := filterArgs.Get("status")
+			gomega.Expect(statuses).ToNot(gomega.ContainElement("restarting"))
+			gomega.Expect(statuses).To(gomega.ContainElement("running"))
+		})
+
+		ginkgo.It(
+			"does not include restarting when isPodman is true regardless of IncludeRestarting",
+			func() {
+				opts := ClientOptions{IncludeRestarting: true}
+				filterArgs := buildListFilterArgs(opts, true)
+				statuses := filterArgs.Get("status")
+				gomega.Expect(statuses).ToNot(gomega.ContainElement("restarting"))
+				gomega.Expect(statuses).To(gomega.ContainElement("running"))
+			},
+		)
+
+		ginkgo.It(
+			"includes all statuses when IncludeStopped and IncludeRestarting are true and isPodman is false",
+			func() {
+				opts := ClientOptions{IncludeStopped: true, IncludeRestarting: true}
+				filterArgs := buildListFilterArgs(opts, false)
+				statuses := filterArgs.Get("status")
+				gomega.Expect(statuses).To(gomega.ContainElement("running"))
+				gomega.Expect(statuses).To(gomega.ContainElement("created"))
+				gomega.Expect(statuses).To(gomega.ContainElement("exited"))
+				gomega.Expect(statuses).To(gomega.ContainElement("restarting"))
+			},
+		)
+
+		ginkgo.It(
+			"includes running, created, exited but not restarting when IncludeStopped is true, IncludeRestarting is true, and isPodman is true",
+			func() {
+				opts := ClientOptions{IncludeStopped: true, IncludeRestarting: true}
+				filterArgs := buildListFilterArgs(opts, true)
+				statuses := filterArgs.Get("status")
+				gomega.Expect(statuses).To(gomega.ContainElement("running"))
+				gomega.Expect(statuses).To(gomega.ContainElement("created"))
+				gomega.Expect(statuses).To(gomega.ContainElement("exited"))
+				gomega.Expect(statuses).ToNot(gomega.ContainElement("restarting"))
+			},
+		)
+	})
 })
