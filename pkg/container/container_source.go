@@ -22,7 +22,7 @@ import (
 // defaultStopSignal is the default signal for stopping containers ("SIGTERM").
 const defaultStopSignal = "SIGTERM"
 
-// ListSourceContainers retrieves a list of containers from the Docker host.
+// ListSourceContainers retrieves a list of containers from the container runtime host.
 //
 // It filters containers based on options and a provided filter function.
 //
@@ -30,6 +30,7 @@ const defaultStopSignal = "SIGTERM"
 //   - api: Docker API client.
 //   - opts: Client options for filtering.
 //   - filter: Function to filter containers.
+//   - isPodmanOptional: Optional variadic flag indicating Podman runtime (defaults to false).
 //
 // Returns:
 //   - []types.Container: Filtered list of containers.
@@ -40,11 +41,6 @@ func ListSourceContainers(
 	filter types.Filter,
 	isPodmanOptional ...bool,
 ) ([]types.Container, error) {
-	isPodman := false
-	if len(isPodmanOptional) > 0 {
-		isPodman = isPodmanOptional[0]
-	}
-
 	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"include_stopped":    opts.IncludeStopped,
@@ -52,6 +48,12 @@ func ListSourceContainers(
 	})
 
 	clog.Debug("Retrieving container list")
+
+	// Determine if the container runtime is Podman; default to false (Docker) if not specified.
+	isPodman := false
+	if len(isPodmanOptional) > 0 {
+		isPodman = isPodmanOptional[0]
+	}
 
 	// Build filter arguments for container states.
 	filterArgs := buildListFilterArgs(opts, isPodman)
