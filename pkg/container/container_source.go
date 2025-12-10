@@ -462,7 +462,7 @@ func validateMacAddresses(
 			clog.WithFields(logrus.Fields{
 				"network":     networkName,
 				"mac_address": endpoint.MacAddress,
-			}).Debug("Found MAC address in config")
+			}).Debug("MAC address found in network configuration")
 		}
 	}
 
@@ -488,7 +488,7 @@ func validateMacAddresses(
 			return fmt.Errorf("%w: API version %s", errUnexpectedMacInLegacy, clientVersion)
 		}
 		// No MAC address in legacy config is expected; log at debug level and return no error.
-		clog.Debug("No MAC address in legacy config, as expected")
+		clog.Debug("No MAC address in legacy API configuration (expected)")
 
 		return nil
 	}
@@ -502,7 +502,7 @@ func validateMacAddresses(
 			return errUnexpectedMacInHost
 		}
 		// No MAC address in host mode is correct; log at debug level and return no error.
-		clog.Debug("No MAC address in host network mode, as expected")
+		clog.Debug("No MAC address in host network mode (expected)")
 
 		return nil
 	}
@@ -511,26 +511,24 @@ func validateMacAddresses(
 	// MAC addresses are expected for running containers but not for non-running ones.
 	if !foundMac {
 		if !isRunning {
-			// Non-running containers (e.g., created, exited) typically lack MAC addresses because their network interfaces
-			// are inactive. Log at debug level to avoid user-facing warnings, as this is expected behavior.
+			// Non-running containers (e.g., created, exited) typically lack MAC addresses
+			// because their network interfaces are inactive.
 			clog.WithField("state", containerState).
-				Debug("No MAC address found for non-running container")
+				Debug("No MAC address for non-running container (expected)")
 
 			return nil
 		}
-		// Running containers without MAC addresses in modern APIs may indicate a configuration issue or lack of support
-		// for MAC preservation. Log a warning to alert users and return an error for further handling.
-		clog.WithField("state", containerState).Warnf(
-			"Negotiated API version %s is at least 1.44 but no MAC address found; preservation may not be supported",
-			clientVersion,
-		)
+		// Running containers should have MAC addresses, but absence may indicate
+		// either a lack of support or a configuration issue.
+		clog.WithField("state", containerState).
+			Debug("No MAC address found in non-host network config")
 
 		return errNoMacInNonHost
 	}
 
 	// MAC address found in a running container with a modern API; this is the expected case.
 	// Log at debug level to confirm successful validation.
-	clog.Debug("Verified MAC address presence")
+	clog.Debug("MAC address validation passed")
 
 	return nil
 }
