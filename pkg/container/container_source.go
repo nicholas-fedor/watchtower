@@ -521,14 +521,14 @@ func validateMacAddresses(
 		// Running containers should have MAC addresses, but absence may indicate
 		// either a lack of support or a configuration issue.
 		clog.WithField("state", containerState).
-			Debug("No MAC address for running container in non-host network")
+			Debug("No MAC address found in non-host network config")
 
 		return errNoMacInNonHost
 	}
 
 	// MAC address found in a running container with a modern API; this is the expected case.
 	// Log at debug level to confirm successful validation.
-	clog.Debug("MAC address validation passed for running container")
+	clog.Debug("MAC address validation passed")
 
 	return nil
 }

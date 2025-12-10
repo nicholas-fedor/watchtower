@@ -857,8 +857,7 @@ var _ = ginkgo.Describe("Container", func() {
 				err := validateMacAddresses(config, container.ID(), "1.49", false, container)
 				gomega.Expect(err).To(gomega.Equal(errNoMacInNonHost))
 				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"No MAC address for running container in non-host network"))
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=running"))
+					"No MAC address found in non-host network config"))
 				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=running"))
 			},
 		)
@@ -930,7 +929,7 @@ var _ = ginkgo.Describe("Container", func() {
 			gomega.Expect(logOutput.String()).
 				To(gomega.ContainSubstring("MAC address found in network configuration"))
 			gomega.Expect(logOutput.String()).
-				To(gomega.ContainSubstring("MAC address validation passed for running container"))
+				To(gomega.ContainSubstring("MAC address validation passed"))
 		})
 
 		ginkgo.It("returns nil and logs debug for nil container state", func() {
