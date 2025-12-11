@@ -753,8 +753,9 @@ func restartStaleContainer(
 
 	renamed := false
 	newContainerID := container.ID() // Default to original ID
-	// Rename Watchtower containers regardless of NoRestart flag.
-	if container.IsWatchtower() {
+	// Rename Watchtower containers regardless of NoRestart flag, but skip in run-once mode
+	// as there's no need to avoid conflicts with a continuously running instance.
+	if container.IsWatchtower() && !params.RunOnce {
 		// Check pull success before renaming
 		stale, _, err := client.IsContainerStale(container, params)
 		if err != nil || !stale {

@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(0), "RenameContainer should not be called with no-restart")
 		})
 
-		ginkgo.It("should skip self-update in run-once mode for Watchtower", func() {
+		ginkgo.It("should not rename Watchtower container in run-once mode", func() {
 			client := mocks.CreateMockClient(
 				&mocks.TestData{
 					Containers: []types.Container{
