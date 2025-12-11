@@ -163,14 +163,9 @@ Environment Variable: WATCHTOWER_RUN_ONCE
              Default: false
 ```
 
-!!! Warning
-    When using `--run-once` with Docker Compose or similar orchestration tools, ensure your container's restart policy is compatible.
-    Using `restart: unless-stopped` or similar policies may cause restart loops after Watchtower exits successfully.
-    Consider using `restart: "no"` or `--rm` with `docker run` for one-time updates.
+!!! Note "Watchtower automatically sets its own restart policy to "no" in run-once mode to prevent unwanted restarts."
 
-!!! Note
-    Enables debug output during execution, suitable for interactive use.
-    Use with `--rm` to remove the Watchtower container after completion.
+!!! Note "Use with `--rm` to remove the Watchtower container after completion."
 
 ### Update on Start
 
