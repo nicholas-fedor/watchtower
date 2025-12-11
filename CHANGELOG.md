@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update cimg/go:1.25.5 docker digest to 9a8ad8c by @renovate[bot] in [#1073](https://github.com/nicholas-fedor/watchtower/pull/1073)
+
+### Fixed
+
+- Prevent multiple orphaned containers on self-update by @nicholas-fedor in [#1075](https://github.com/nicholas-fedor/watchtower/pull/1075)
+
+## [1.12.5] - 2025-12-10
+
 ### Added
 
 - Add image update explanation and tagging examples by @nicholas-fedor in [#1062](https://github.com/nicholas-fedor/watchtower/pull/1062)
@@ -2427,7 +2437,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.12.4...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.12.5...HEAD)
+- [1.12.5](https://github.com/nicholas-fedor/watchtower/compare/v1.12.4...v1.12.5)
 - [1.12.4](https://github.com/nicholas-fedor/watchtower/compare/v1.12.3...v1.12.4)
 - [1.12.3](https://github.com/nicholas-fedor/watchtower/compare/v1.12.2...v1.12.3)
 - [1.12.2](https://github.com/nicholas-fedor/watchtower/compare/v1.12.1...v1.12.2)
