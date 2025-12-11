@@ -31,6 +31,8 @@ var commonTemplates = map[string]string{
     Cleaned up old image: {{with (index $e.Data "image_name")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Container updated" -}}
     Updated container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}): {{with (index $e.Data "old_id")}}{{.}}{{else}}unknown{{end}} updated to {{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Skipping Watchtower self-update in run-once mode" -}}
+    Run once mode: Watchtower self-update skipped
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}

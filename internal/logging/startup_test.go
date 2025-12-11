@@ -210,7 +210,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 
 		output := buffer.String()
 		gomega.Expect(output).
-			To(gomega.ContainSubstring("Run once enabled: Disregarding redundant update on start"))
+			To(gomega.ContainSubstring("Run once mode: Disregarding update on start"))
 	})
 
 	ginkgo.It("should log update on start", func() {
