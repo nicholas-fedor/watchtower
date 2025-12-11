@@ -156,4 +156,105 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(report).To(gomega.BeNil())
 		gomega.Expect(cleanupInfos).To(gomega.BeNil())
 	})
+
+	ginkgo.It("should execute update logic for stale containers", func() {
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"test-container",
+						"/test-container",
+						"test:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{},
+					),
+				},
+				Staleness: map[string]bool{
+					"test-container": true,
+				},
+			},
+			false,
+			false,
+		)
+		config := UpdateConfig{
+			Filter: filters.NoFilter,
+		}
+		report, cleanupInfos, err := executeUpdate(client, config)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(report).NotTo(gomega.BeNil())
+		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
+		gomega.Expect(client.TestData.StartContainerCount).To(gomega.Equal(1))
+	})
+
+	ginkgo.It("should propagate RunOnce mode and skip Watchtower self-update", func() {
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"watchtower",
+						"/watchtower",
+						"watchtower:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower": "true",
+							},
+						}),
+				},
+				Staleness: map[string]bool{
+					"watchtower": true,
+				},
+			},
+			false,
+			false,
+		)
+		config := UpdateConfig{
+			Filter:  filters.NoFilter,
+			RunOnce: true,
+		}
+		report, cleanupInfos, err := executeUpdate(client, config)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(report).NotTo(gomega.BeNil())
+		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
+		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(0))
+		gomega.Expect(client.TestData.StartContainerCount).To(gomega.Equal(0))
+	})
+
+	ginkgo.It("should call UpdateContainer for Watchtower restart policy changes", func() {
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"watchtower",
+						"/watchtower",
+						"watchtower:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower": "true",
+							},
+						}),
+				},
+				Staleness: map[string]bool{
+					"watchtower": true,
+				},
+			},
+			false,
+			false,
+		)
+		config := UpdateConfig{
+			Filter: filters.NoFilter,
+		}
+		report, cleanupInfos, err := executeUpdate(client, config)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(report).NotTo(gomega.BeNil())
+		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
+		gomega.Expect(client.TestData.UpdateContainerCount).To(gomega.Equal(1))
+	})
 })
