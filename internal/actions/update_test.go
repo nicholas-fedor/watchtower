@@ -111,6 +111,10 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			gomega.Expect(client.TestData.RenameContainerCount).
 				To(gomega.Equal(1), "RenameContainer should be called once")
+			gomega.Expect(client.TestData.UpdateContainerCount).
+				To(gomega.Equal(1), "UpdateContainer should be called once for old Watchtower")
+			gomega.Expect(client.TestData.StopContainerCount).
+				To(gomega.Equal(1), "StopContainer should be called once for old Watchtower")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
 				To(gomega.Equal(2), "IsContainerStale should be called twice for Watchtower")
 		})
@@ -156,6 +160,50 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.BeEmpty(), "No images should be collected for cleanup")
 			gomega.Expect(client.TestData.RenameContainerCount).
 				To(gomega.Equal(0), "RenameContainer should not be called with no-restart")
+		})
+
+		ginkgo.It("should skip self-update in run-once mode for Watchtower", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+				},
+				false,
+				false,
+			)
+			config := actions.UpdateConfig{
+				Cleanup:     true,
+				RunOnce:     true,
+				Filter:      filters.WatchtowerContainersFilter,
+				CPUCopyMode: "auto",
+			}
+			report, cleanupImageInfos, err := actions.Update(client, config)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Scanned()).
+				To(gomega.HaveLen(1), "Container should be scanned")
+			gomega.Expect(report.Updated()).
+				To(gomega.BeEmpty(), "Watchtower should not be updated in run-once mode")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.BeEmpty(), "No images should be collected for cleanup")
+			gomega.Expect(client.TestData.RenameContainerCount).
+				To(gomega.Equal(0), "RenameContainer should not be called in run-once mode")
+			gomega.Expect(client.TestData.IsContainerStaleCount).
+				To(gomega.Equal(1), "IsContainerStale should be called once to pull the image")
 		})
 
 		ginkgo.It("should not clean up unscoped instances when scope is specified", func() {
@@ -1376,7 +1424,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
 			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(0), "StopContainer should not be called for Watchtower")
+				To(gomega.Equal(1), "StopContainer should be called once for old Watchtower")
 			gomega.Expect(client.TestData.StartContainerCount).
 				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
 			gomega.Expect(client.TestData.RenameContainerCount).

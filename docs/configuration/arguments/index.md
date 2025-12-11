@@ -161,9 +161,12 @@ Triggers a single update attempt for specified containers and exits immediately.
 Environment Variable: WATCHTOWER_RUN_ONCE
                 Type: Boolean
              Default: false
-!!! Warning
-    When using `--run-once` with Docker Compose or similar orchestration tools, ensure your container's restart policy is compatible. Using `restart: unless-stopped` or similar policies may cause restart loops after Watchtower exits successfully. Consider using `restart: "no"` or `--rm` with `docker run` for one-time updates.
 ```
+
+!!! Warning
+    When using `--run-once` with Docker Compose or similar orchestration tools, ensure your container's restart policy is compatible.
+    Using `restart: unless-stopped` or similar policies may cause restart loops after Watchtower exits successfully.
+    Consider using `restart: "no"` or `--rm` with `docker run` for one-time updates.
 
 !!! Note
     Enables debug output during execution, suitable for interactive use.
