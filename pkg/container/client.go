@@ -118,6 +118,11 @@ type Client interface {
 	//
 	// Returns all containers without filtering by status or other criteria.
 	ListAllContainers() ([]types.Container, error)
+
+	// UpdateContainer updates the configuration of an existing container.
+	//
+	// It modifies container settings such as restart policy using the Docker API ContainerUpdate.
+	UpdateContainer(container types.Container, config dockerContainer.UpdateConfig) error
 }
 
 // client is the concrete implementation of the Client interface.
@@ -392,6 +397,35 @@ func (c client) ListAllContainers() ([]types.Container, error) {
 	clog.WithField("count", len(hostContainers)).Debug("Listed all containers")
 
 	return hostContainers, nil
+}
+
+// UpdateContainer updates the configuration of an existing container.
+//
+// Parameters:
+//   - container: Container to update.
+//   - config: Update configuration containing the changes to apply.
+//
+// Returns:
+//   - error: Non-nil if update fails, nil on success.
+func (c client) UpdateContainer(
+	container types.Container,
+	config dockerContainer.UpdateConfig,
+) error {
+	ctx := context.Background()
+	clog := logrus.WithField("container_id", container.ID())
+
+	clog.Debug("Updating container configuration")
+
+	_, err := c.api.ContainerUpdate(ctx, string(container.ID()), config)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to update container")
+
+		return fmt.Errorf("failed to update container %s: %w", container.ID(), err)
+	}
+
+	clog.Debug("Container configuration updated")
+
+	return nil
 }
 
 // RenameContainer renames an existing container to a new name.

@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock the runUpdatesWithNotifications function
-			runUpdatesWithNotifications := func(_ types.Filter, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
 				return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 			}
 
@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock functions
-			runUpdatesWithNotifications := func(_ types.Filter, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 			filterByImage := func(_ []string, filter types.Filter) types.Filter {
@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
 
-			runUpdatesWithNotifications := func(_ types.Filter, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 			filterByImage := func(_ []string, filter types.Filter) types.Filter {

@@ -19,4 +19,5 @@ type UpdateParams struct {
 	LifecycleUID     int           // Default UID for lifecycle hooks.
 	LifecycleGID     int           // Default GID for lifecycle hooks.
 	CPUCopyMode      string        // CPU copy mode for container recreation.
+	RunOnce          bool          // Run once mode if true.
 }

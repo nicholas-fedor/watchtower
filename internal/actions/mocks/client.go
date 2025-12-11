@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -26,6 +28,7 @@ type TestData struct {
 	RenameContainerCount         int               // Number of times RenameContainer was called.
 	StopContainerCount           int               // Number of times StopContainer was called.
 	StartContainerCount          int               // Number of times StartContainer was called.
+	UpdateContainerCount         int               // Number of times UpdateContainer was called.
 	IsContainerStaleCount        int               // Number of times IsContainerStale was called.
 	WaitForContainerHealthyCount int               // Number of times WaitForContainerHealthy was called.
 	NameOfContainerToKeep        string            // Name of the container to avoid stopping.
@@ -34,6 +37,7 @@ type TestData struct {
 	IsContainerStaleError        error             // Error to return from IsContainerStale (for testing).
 	ListContainersError          error             // Error to return from ListContainers (for testing).
 	StopContainerError           error             // Error to return from StopContainer (for testing).
+	UpdateContainerError         error             // Error to return from UpdateContainer (for testing).
 	StopContainerFailCount       int               // Number of times StopContainer should fail before succeeding.
 	RemoveImageError             error             // Error to return from RemoveImageByID (for testing).
 	FailedImageIDs               []types.ImageID   // List of image IDs that should fail removal.
@@ -112,6 +116,13 @@ func (client MockClient) StartContainer(c types.Container) (types.ContainerID, e
 func (client MockClient) RenameContainer(_ types.Container, _ string) error {
 	client.TestData.RenameContainerCount++
 	return nil
+}
+
+// UpdateContainer simulates updating a container's configuration.
+// It increments the UpdateContainerCount and returns the configured error if set.
+func (client MockClient) UpdateContainer(_ types.Container, _ dockerContainer.UpdateConfig) error {
+	client.TestData.UpdateContainerCount++
+	return client.TestData.UpdateContainerError
 }
 
 // RemoveImageByID increments the count of image removal attempts in TestData.

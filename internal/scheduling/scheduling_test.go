@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 
 		cmd.Flags().Bool("update-on-start", false, "")
 
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
 			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 		}
 
@@ -104,7 +104,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
 			return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 		}
 
@@ -139,7 +139,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 		cmd.PersistentFlags().Bool("update-on-start", true, "")
 
 		updateCalled := false
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
 			updateCalled = true
 
 			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
 			return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 		}
 

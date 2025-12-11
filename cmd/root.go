@@ -17,6 +17,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/config"
@@ -168,7 +170,7 @@ var (
 	//
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-	runUpdatesWithNotifications = func(filter types.Filter, cleanup bool) *metrics.Metric {
+	runUpdatesWithNotifications = func(filter types.Filter, cleanup bool, runOnce bool) *metrics.Metric {
 		params := actions.RunUpdatesWithNotificationsParams{
 			Client:                       client,
 			Notifier:                     notifier,
@@ -187,6 +189,7 @@ var (
 			LifecycleGID:                 lifecycleGID,
 			CPUCopyMode:                  cpuCopyMode,
 			PullFailureDelay:             time.Duration(0),
+			RunOnce:                      runOnce,
 		}
 
 		return actions.RunUpdatesWithNotifications(params)
@@ -543,9 +546,28 @@ func runMain(cfg config.RunConfig) int {
 			meta.Version,
 			nil, // read from flags
 		)
-		metric := runUpdatesWithNotifications(cfg.Filter, cleanup)
+		metric := runUpdatesWithNotifications(cfg.Filter, cleanup, cfg.RunOnce)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
+
+		// Update current Watchtower container's restart policy to "no" to prevent unwanted restarts
+		if containerID, err := getContainerID(client); err != nil {
+			logrus.WithError(err).
+				Warn("Failed to get current container ID for restart policy update")
+		} else if container, err := client.GetContainer(containerID); err != nil {
+			logrus.WithError(err).Warn("Failed to get current container for restart policy update")
+		} else {
+			updateConfig := dockerContainer.UpdateConfig{
+				RestartPolicy: dockerContainer.RestartPolicy{
+					Name: "no",
+				},
+			}
+			if err := client.UpdateContainer(container, updateConfig); err != nil {
+				logrus.WithError(err).Warn("Failed to update restart policy to 'no' for current container")
+			} else {
+				logrus.Debug("Updated current container restart policy to 'no'")
+			}
+		}
 
 		return 0
 	}

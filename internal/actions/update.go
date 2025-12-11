@@ -9,6 +9,8 @@ import (
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
@@ -68,6 +70,7 @@ func Update(
 		LifecycleUID:     config.LifecycleUID,
 		LifecycleGID:     config.LifecycleGID,
 		CPUCopyMode:      config.CPUCopyMode,
+		RunOnce:          config.RunOnce,
 	}
 
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
@@ -82,7 +85,7 @@ func Update(
 		// Log and return an error if container listing fails.
 		logrus.WithError(err).Debug("Failed to list containers")
 
-		return nil, []types.CleanedImageInfo{}, fmt.Errorf("%w: %w", errListContainersFailed, err)
+		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
 	// Prepare a list of container names and images for detailed debugging output.
@@ -135,7 +138,15 @@ func Update(
 		// Check if the container’s image is stale (outdated) and get the newest image ID.
 		stale, newestImage, err := client.IsContainerStale(sourceContainer, params)
 		// Determine if the container should be updated based on staleness and params.
-		shouldUpdate := stale && !params.NoRestart && !sourceContainer.IsMonitorOnly(params)
+		// For Watchtower containers, allow update regardless of NoRestart flag, but skip in run-once mode.
+		shouldUpdate := stale && (!params.NoRestart || sourceContainer.IsWatchtower()) &&
+			(!params.RunOnce || !sourceContainer.IsWatchtower()) &&
+			!sourceContainer.IsMonitorOnly(params)
+
+		// Log when skipping Watchtower self-update in run-once mode
+		if stale && sourceContainer.IsWatchtower() && params.RunOnce {
+			clog.Info("Skipping Watchtower self-update in run-once mode")
+		}
 
 		// Track old image ID before update for cleanup notifications.
 		if shouldUpdate {
@@ -182,7 +193,8 @@ func Update(
 		}
 
 		// Update the container’s stale status for dependency sorting.
-		containers[i].SetStale(stale)
+		// Only mark as stale if the container should actually be updated.
+		containers[i].SetStale(stale && shouldUpdate)
 
 		// Increment stale count for logging summary.
 		if stale {
@@ -716,7 +728,8 @@ func addCleanupImageInfo(
 
 // restartStaleContainer restarts a stale container.
 //
-// It renames Watchtower containers if applicable, starts a new container, and runs post-update hooks,
+// It renames Watchtower containers if applicable,
+// starts a new container, and runs post-update hooks,
 // handling errors for each step.
 //
 // Parameters:
@@ -740,8 +753,9 @@ func restartStaleContainer(
 
 	renamed := false
 	newContainerID := container.ID() // Default to original ID
-	// Rename Watchtower containers only if restarts are enabled.
-	if container.IsWatchtower() && !params.NoRestart {
+	// Rename Watchtower containers regardless of NoRestart flag, but skip in run-once mode
+	// as there's no need to avoid conflicts with a continuously running instance.
+	if container.IsWatchtower() && !params.RunOnce {
 		// Check pull success before renaming
 		stale, _, err := client.IsContainerStale(container, params)
 		if err != nil || !stale {
@@ -769,8 +783,8 @@ func restartStaleContainer(
 		renamed = true
 	}
 
-	// Start the new container unless restarts are disabled.
-	if !params.NoRestart {
+	// Start the new container unless restarts are disabled (but always start for Watchtower).
+	if !params.NoRestart || container.IsWatchtower() {
 		var err error
 
 		newContainerID, err = client.StartContainer(container)
@@ -799,6 +813,34 @@ func restartStaleContainer(
 				params.LifecycleUID,
 				params.LifecycleGID,
 			)
+		}
+	}
+
+	// For renamed Watchtower containers, update restart policy to "no" and stop the old container
+	if renamed && container.IsWatchtower() {
+		logrus.WithFields(fields).
+			Debug("Updating restart policy and stopping old Watchtower container")
+
+		// Update restart policy to "no"
+		updateConfig := dockerContainer.UpdateConfig{
+			RestartPolicy: dockerContainer.RestartPolicy{
+				Name: "no",
+			},
+		}
+		if err := client.UpdateContainer(container, updateConfig); err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Warn("Failed to update restart policy for old Watchtower container")
+
+			// Continue with stopping even if update fails
+		}
+
+		// Stop the old container gracefully
+		if err := client.StopContainer(container, params.Timeout); err != nil {
+			logrus.WithError(err).WithFields(fields).Warn("Failed to stop old Watchtower container")
+			// Don't fail the update, just log the warning
+		} else {
+			logrus.WithFields(fields).Debug("Stopped old Watchtower container")
 		}
 	}
 
