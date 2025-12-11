@@ -3060,13 +3060,12 @@ As an argument, does not accept a value (e.g., <code>--trace true</code> is inva
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Environment Variable: WATCHTOWER_RUN_ONCE
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>                Type: Boolean
 <a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>             Default: false
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>!!! Warning
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    When using `--run-once` with Docker Compose or similar orchestration tools, ensure your container&#39;s restart policy is compatible. Using `restart: unless-stopped` or similar policies may cause restart loops after Watchtower exits successfully. Consider using `restart: &quot;no&quot;` or `--rm` with `docker run` for one-time updates.
 </code></pre></div>
 <div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Enables debug output during execution, suitable for interactive use.
-Use with <code>--rm</code> to remove the Watchtower container after completion.</p>
+<p class="admonition-title">Watchtower automatically sets its own restart policy to "no" in run-once mode to prevent unwanted restarts.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Use with <code>--rm</code> to remove the Watchtower container after completion.</p>
 </div>
 <h3 id="update_on_start">Update on Start<a class="headerlink" href="#update_on_start" title="Permanent link">&para;</a></h3>
 <p>Performs an update check on startup.
@@ -3641,7 +3640,7 @@ Do not use on the main command line.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 26, 2025 16:49:17 UTC"><span class="timeago" datetime="2025-09-26T16:49:17+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 26, 2025 16:49:17 UTC">2025-09-26</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 11, 2025 06:20:00 UTC"><span class="timeago" datetime="2025-12-11T06:20:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 11, 2025 06:20:00 UTC">2025-12-11</span>
   </span>
 
     
