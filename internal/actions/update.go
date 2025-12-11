@@ -85,7 +85,7 @@ func Update(
 		// Log and return an error if container listing fails.
 		logrus.WithError(err).Debug("Failed to list containers")
 
-		return nil, []types.CleanedImageInfo{}, fmt.Errorf("%w: %w", errListContainersFailed, err)
+		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
 	// Prepare a list of container names and images for detailed debugging output.
