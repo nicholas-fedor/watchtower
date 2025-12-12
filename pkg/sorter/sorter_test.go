@@ -1,105 +1,54 @@
 package sorter_test
 
 import (
-	"testing"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	dockerContainerTypes "github.com/docker/docker/api/types/container"
-	dockerImageTypes "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
-
-// mockContainer implements types.Container for testing sorting.
-type mockContainer struct {
-	name         string
-	created      string
-	links        []string
-	isWatchtower bool
-}
-
-func (m *mockContainer) ContainerInfo() *dockerContainerTypes.InspectResponse {
-	return &dockerContainerTypes.InspectResponse{
-		ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-			Name:    m.name,
-			Created: m.created,
-		},
-		Config: &dockerContainerTypes.Config{
-			Labels: map[string]string{},
-		},
-	}
-}
-
-func (m *mockContainer) Name() string    { return m.name }
-func (m *mockContainer) Links() []string { return m.links }
-func (m *mockContainer) ID() types.ContainerID {
-	return types.ContainerID("id-" + m.name)
-}
-func (m *mockContainer) IsRunning() bool                              { return true }
-func (m *mockContainer) IsRestarting() bool                           { return false }
-func (m *mockContainer) ImageID() types.ImageID                       { return "" }
-func (m *mockContainer) SafeImageID() types.ImageID                   { return "" }
-func (m *mockContainer) ImageName() string                            { return "mock/image" }
-func (m *mockContainer) Enabled() (bool, bool)                        { return true, true }
-func (m *mockContainer) IsMonitorOnly(types.UpdateParams) bool        { return false }
-func (m *mockContainer) Scope() (string, bool)                        { return "", false }
-func (m *mockContainer) ToRestart() bool                              { return false }
-func (m *mockContainer) IsWatchtower() bool                           { return m.isWatchtower }
-func (m *mockContainer) StopSignal() string                           { return "SIGTERM" }
-func (m *mockContainer) HasImageInfo() bool                           { return false }
-func (m *mockContainer) ImageInfo() *dockerImageTypes.InspectResponse { return nil }
-func (m *mockContainer) GetLifecyclePreCheckCommand() string          { return "" }
-func (m *mockContainer) GetLifecyclePostCheckCommand() string         { return "" }
-func (m *mockContainer) GetLifecyclePreUpdateCommand() string         { return "" }
-func (m *mockContainer) GetLifecyclePostUpdateCommand() string        { return "" }
-func (m *mockContainer) VerifyConfiguration() error                   { return nil }
-func (m *mockContainer) SetStale(bool)                                {}
-func (m *mockContainer) IsStale() bool                                { return false }
-func (m *mockContainer) IsNoPull(types.UpdateParams) bool             { return false }
-func (m *mockContainer) SetLinkedToRestarting(bool)                   {}
-func (m *mockContainer) IsLinkedToRestarting() bool                   { return false }
-func (m *mockContainer) PreUpdateTimeout() int                        { return 0 }
-func (m *mockContainer) PostUpdateTimeout() int                       { return 0 }
-func (m *mockContainer) GetLifecycleUID() (int, bool)                 { return 0, false }
-func (m *mockContainer) GetLifecycleGID() (int, bool)                 { return 0, false }
-
-func (m *mockContainer) GetCreateConfig() *dockerContainerTypes.Config {
-	return &dockerContainerTypes.Config{}
-}
-
-func (m *mockContainer) GetCreateHostConfig() *dockerContainerTypes.HostConfig {
-	return &dockerContainerTypes.HostConfig{}
-}
-
-func TestSorter(t *testing.T) {
-	t.Parallel()
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Sorter Suite")
-}
 
 var _ = ginkgo.Describe("Container Sorting", func() {
 	ginkgo.Describe("SortByCreated", func() {
 		ginkgo.When("sorting by creation date", func() {
 			ginkgo.It("sorts containers in ascending order", func() {
 				now := time.Now()
-				containers := []types.Container{
-					&mockContainer{
-						name:    "c3",
-						created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
+				c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c3.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+						Created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
 					},
-					&mockContainer{
-						name:    "c1",
-						created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano),
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
 					},
-					&mockContainer{
-						name:    "c2",
-						created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
+				})
+				c3.EXPECT().Name().Return("c3")
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+						Created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano),
 					},
-				}
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c1.EXPECT().Name().Return("c1")
+				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+						Created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
+					},
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c2.EXPECT().Name().Return("c2")
+				containers := []types.Container{c3, c1, c2}
 				sorter.SortByCreated(containers)
 				gomega.Expect(containers[0].Name()).To(gomega.Equal("c1"))
 				gomega.Expect(containers[1].Name()).To(gomega.Equal("c2"))
@@ -108,10 +57,29 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 
 			ginkgo.It("handles invalid creation dates gracefully", func() {
 				now := time.Now()
-				containers := []types.Container{
-					&mockContainer{name: "c1", created: "invalid-date"},
-					&mockContainer{name: "c2", created: now.Format(time.RFC3339Nano)},
-				}
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+						Created: "invalid-date",
+					},
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c1.EXPECT().Name().Return("c1").Maybe()
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+						Created: now.Format(time.RFC3339Nano),
+					},
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c2.EXPECT().Name().Return("c2").Maybe()
+				c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
+				containers := []types.Container{c1, c2}
 				sorter.SortByCreated(containers)
 				// Invalid date uses current time, order may vary; check stability
 				gomega.Expect(containers).To(gomega.HaveLen(2))
@@ -128,10 +96,27 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 	ginkgo.Describe("SortByDependencies", func() {
 		ginkgo.When("sorting by dependencies", func() {
 			ginkgo.It("sorts containers with no links first", func() {
-				containers := []types.Container{
-					&mockContainer{name: "c1", links: []string{"c2"}},
-					&mockContainer{name: "c2", links: nil},
-				}
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("c1")
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().IsWatchtower().Return(false)
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().Name().Return("c2")
+				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
+				c2.EXPECT().Links().Return([]string(nil))
+				c2.EXPECT().IsWatchtower().Return(false)
+				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				containers := []types.Container{c1, c2}
 				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.HaveLen(2))
@@ -140,11 +125,37 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			})
 
 			ginkgo.It("handles multiple dependencies", func() {
-				containers := []types.Container{
-					&mockContainer{name: "c1", links: []string{"c2", "c3"}},
-					&mockContainer{name: "c2", links: []string{"c3"}},
-					&mockContainer{name: "c3", links: nil},
-				}
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("c1")
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+				c1.EXPECT().Links().Return([]string{"c2", "c3"})
+				c1.EXPECT().IsWatchtower().Return(false)
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().Name().Return("c2")
+				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
+				c2.EXPECT().Links().Return([]string{"c3"})
+				c2.EXPECT().IsWatchtower().Return(false)
+				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c3.EXPECT().Name().Return("c3")
+				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
+				c3.EXPECT().Links().Return([]string(nil))
+				c3.EXPECT().IsWatchtower().Return(false)
+				c3.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				containers := []types.Container{c1, c2, c3}
 				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.HaveLen(3))
@@ -154,19 +165,52 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			})
 
 			ginkgo.It("detects circular references", func() {
-				containers := []types.Container{
-					&mockContainer{name: "c1", links: []string{"c2"}},
-					&mockContainer{name: "c2", links: []string{"c1"}},
-				}
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("c1")
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().IsWatchtower().Return(false)
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().Name().Return("c2")
+				c2.EXPECT().Links().Return([]string{"c1"})
+				c2.EXPECT().IsWatchtower().Return(false)
+				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				containers := []types.Container{c1, c2}
 				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).To(gomega.MatchError("circular reference detected: c1"))
 			})
 
 			ginkgo.It("handles missing dependencies gracefully", func() {
-				containers := []types.Container{
-					&mockContainer{name: "c1", links: []string{"c2"}},
-					&mockContainer{name: "c3", links: nil},
-				}
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("c1")
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().IsWatchtower().Return(false)
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c3.EXPECT().Name().Return("c3")
+				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
+				c3.EXPECT().Links().Return([]string(nil))
+				c3.EXPECT().IsWatchtower().Return(false)
+				c3.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				containers := []types.Container{c1, c3}
 				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.HaveLen(2))
@@ -182,11 +226,30 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			})
 
 			ginkgo.It("places Watchtower containers last", func() {
-				containers := []types.Container{
-					&mockContainer{name: "watchtower", isWatchtower: true},
-					&mockContainer{name: "c1", links: []string{"c2"}},
-					&mockContainer{name: "c2", links: nil},
-				}
+				watchtower := mocks.NewMockContainer(ginkgo.GinkgoT())
+				watchtower.EXPECT().Name().Return("watchtower")
+				watchtower.EXPECT().IsWatchtower().Return(true)
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("c1")
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().IsWatchtower().Return(false)
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().Name().Return("c2")
+				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
+				c2.EXPECT().Links().Return([]string(nil))
+				c2.EXPECT().IsWatchtower().Return(false)
+				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				containers := []types.Container{watchtower, c1, c2}
 				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.HaveLen(3))
@@ -198,12 +261,33 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			})
 
 			ginkgo.It("places multiple Watchtower containers last", func() {
-				containers := []types.Container{
-					&mockContainer{name: "watchtower1", isWatchtower: true},
-					&mockContainer{name: "c1", links: []string{"c2"}},
-					&mockContainer{name: "watchtower2", isWatchtower: true},
-					&mockContainer{name: "c2", links: nil},
-				}
+				watchtower1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				watchtower1.EXPECT().Name().Return("watchtower1")
+				watchtower1.EXPECT().IsWatchtower().Return(true)
+				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("c1")
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().IsWatchtower().Return(false)
+				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				watchtower2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				watchtower2.EXPECT().Name().Return("watchtower2")
+				watchtower2.EXPECT().IsWatchtower().Return(true)
+				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().Name().Return("c2")
+				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
+				c2.EXPECT().Links().Return([]string(nil))
+				c2.EXPECT().IsWatchtower().Return(false)
+				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+					Config: &dockerContainerTypes.Config{
+						Labels: map[string]string{},
+					},
+				})
+				containers := []types.Container{watchtower1, c1, watchtower2, c2}
 				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.HaveLen(4))
@@ -218,51 +302,198 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			ginkgo.It("handles chained dependencies with slash-prefixed links", func() {
 				testCases := []struct {
 					name          string
-					containers    []types.Container
+					containers    func() []types.Container
 					expectedOrder []string
 				}{
 					{
 						name: "simple chain with slashes",
-						containers: []types.Container{
-							&mockContainer{name: "c", links: nil},
-							&mockContainer{name: "b", links: []string{"/c"}},
-							&mockContainer{name: "a", links: []string{"/b"}},
+						containers: func() []types.Container {
+							c := mocks.NewMockContainer(ginkgo.GinkgoT())
+							c.EXPECT().Name().Return("c")
+							c.EXPECT().ID().Return(types.ContainerID("id-c"))
+							c.EXPECT().Links().Return([]string(nil))
+							c.EXPECT().IsWatchtower().Return(false)
+							c.EXPECT().ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							b := mocks.NewMockContainer(ginkgo.GinkgoT())
+							b.EXPECT().Name().Return("b")
+							b.EXPECT().ID().Return(types.ContainerID("id-b"))
+							b.EXPECT().Links().Return([]string{"/c"})
+							b.EXPECT().IsWatchtower().Return(false)
+							b.EXPECT().ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							a := mocks.NewMockContainer(ginkgo.GinkgoT())
+							a.EXPECT().Name().Return("a")
+							a.EXPECT().ID().Return(types.ContainerID("id-a"))
+							a.EXPECT().Links().Return([]string{"/b"})
+							a.EXPECT().IsWatchtower().Return(false)
+							a.EXPECT().ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+
+							return []types.Container{c, b, a}
 						},
 						expectedOrder: []string{"c", "b", "a"},
 					},
 					{
 						name: "multiple dependencies with slashes",
-						containers: []types.Container{
-							&mockContainer{name: "d", links: nil},
-							&mockContainer{name: "c", links: nil},
-							&mockContainer{name: "b", links: []string{"/d"}},
-							&mockContainer{name: "a", links: []string{"/b", "/c"}},
+						containers: func() []types.Container {
+							d := mocks.NewMockContainer(ginkgo.GinkgoT())
+							d.EXPECT().Name().Return("d")
+							d.EXPECT().ID().Return(types.ContainerID("id-d"))
+							d.EXPECT().Links().Return([]string(nil))
+							d.EXPECT().IsWatchtower().Return(false)
+							d.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							c := mocks.NewMockContainer(ginkgo.GinkgoT())
+							c.EXPECT().Name().Return("c")
+							c.EXPECT().ID().Return(types.ContainerID("id-c"))
+							c.EXPECT().Links().Return([]string(nil))
+							c.EXPECT().IsWatchtower().Return(false)
+							c.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							b := mocks.NewMockContainer(ginkgo.GinkgoT())
+							b.EXPECT().Name().Return("b")
+							b.EXPECT().ID().Return(types.ContainerID("id-b"))
+							b.EXPECT().Links().Return([]string{"/d"})
+							b.EXPECT().IsWatchtower().Return(false)
+							b.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							a := mocks.NewMockContainer(ginkgo.GinkgoT())
+							a.EXPECT().Name().Return("a")
+							a.EXPECT().ID().Return(types.ContainerID("id-a"))
+							a.EXPECT().Links().Return([]string{"/b", "/c"})
+							a.EXPECT().IsWatchtower().Return(false)
+							a.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+
+							return []types.Container{d, c, b, a}
 						},
 						expectedOrder: []string{"d", "c", "b", "a"},
 					},
 					{
 						name: "no dependencies",
-						containers: []types.Container{
-							&mockContainer{name: "a", links: nil},
-							&mockContainer{name: "b", links: nil},
-							&mockContainer{name: "c", links: nil},
+						containers: func() []types.Container {
+							a := mocks.NewMockContainer(ginkgo.GinkgoT())
+							a.EXPECT().Name().Return("a")
+							a.EXPECT().ID().Return(types.ContainerID("id-a"))
+							a.EXPECT().Links().Return([]string(nil))
+							a.EXPECT().IsWatchtower().Return(false)
+							a.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							b := mocks.NewMockContainer(ginkgo.GinkgoT())
+							b.EXPECT().Name().Return("b")
+							b.EXPECT().ID().Return(types.ContainerID("id-b"))
+							b.EXPECT().Links().Return([]string(nil))
+							b.EXPECT().IsWatchtower().Return(false)
+							b.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							c := mocks.NewMockContainer(ginkgo.GinkgoT())
+							c.EXPECT().Name().Return("c")
+							c.EXPECT().ID().Return(types.ContainerID("id-c"))
+							c.EXPECT().Links().Return([]string(nil))
+							c.EXPECT().IsWatchtower().Return(false)
+							c.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+
+							return []types.Container{a, b, c}
 						},
 						expectedOrder: []string{"a", "b", "c"},
 					},
 					{
 						name: "mixed slash scenarios",
-						containers: []types.Container{
-							&mockContainer{name: "c", links: nil},
-							&mockContainer{name: "b", links: []string{"c"}},  // no slash
-							&mockContainer{name: "a", links: []string{"/b"}}, // with slash
+						containers: func() []types.Container {
+							c := mocks.NewMockContainer(ginkgo.GinkgoT())
+							c.EXPECT().Name().Return("c")
+							c.EXPECT().ID().Return(types.ContainerID("id-c"))
+							c.EXPECT().Links().Return([]string(nil))
+							c.EXPECT().IsWatchtower().Return(false)
+							c.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							b := mocks.NewMockContainer(ginkgo.GinkgoT())
+							b.EXPECT().Name().Return("b")
+							b.EXPECT().ID().Return(types.ContainerID("id-b"))
+							b.EXPECT().Links().Return([]string{"c"})
+							b.EXPECT().IsWatchtower().Return(false)
+							b.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							a := mocks.NewMockContainer(ginkgo.GinkgoT())
+							a.EXPECT().Name().Return("a")
+							a.EXPECT().ID().Return(types.ContainerID("id-a"))
+							a.EXPECT().Links().Return([]string{"/b"})
+							a.EXPECT().IsWatchtower().Return(false)
+							a.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+
+							return []types.Container{c, b, a}
 						},
 						expectedOrder: []string{"c", "b", "a"},
 					},
 				}
 				for _, tc := range testCases {
 					ginkgo.By(tc.name, func() {
-						containers := make([]types.Container, len(tc.containers))
-						copy(containers, tc.containers)
+						containers := tc.containers()
 						err := sorter.SortByDependencies(containers)
 						gomega.Expect(err).ToNot(gomega.HaveOccurred())
 						gomega.Expect(containers).To(gomega.HaveLen(len(tc.expectedOrder)))
