@@ -403,6 +403,67 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						expectedOrder: []string{"d", "c", "b", "a"},
 					},
 					{
+						name: "diamond dependency graph",
+						containers: func() []types.Container {
+							d := mocks.NewMockContainer(ginkgo.GinkgoT())
+							d.EXPECT().Name().Return("d")
+							d.EXPECT().ID().Return(types.ContainerID("id-d"))
+							d.EXPECT().Links().Return([]string(nil))
+							d.EXPECT().IsWatchtower().Return(false)
+							d.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							b := mocks.NewMockContainer(ginkgo.GinkgoT())
+							b.EXPECT().Name().Return("b")
+							b.EXPECT().ID().Return(types.ContainerID("id-b"))
+							b.EXPECT().Links().Return([]string{"/d"})
+							b.EXPECT().IsWatchtower().Return(false)
+							b.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							c := mocks.NewMockContainer(ginkgo.GinkgoT())
+							c.EXPECT().Name().Return("c")
+							c.EXPECT().ID().Return(types.ContainerID("id-c"))
+							c.EXPECT().Links().Return([]string{"/d"})
+							c.EXPECT().IsWatchtower().Return(false)
+							c.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+							a := mocks.NewMockContainer(ginkgo.GinkgoT())
+							a.EXPECT().Name().Return("a")
+							a.EXPECT().ID().Return(types.ContainerID("id-a"))
+							a.EXPECT().Links().Return([]string{"/b", "/c"})
+							a.EXPECT().IsWatchtower().Return(false)
+							a.EXPECT().
+								ContainerInfo().
+								Return(&dockerContainerTypes.InspectResponse{
+									Config: &dockerContainerTypes.Config{
+										Labels: map[string]string{},
+									},
+								})
+
+							return []types.Container{d, b, c, a}
+						},
+						expectedOrder: []string{
+							"d",
+							"b",
+							"c",
+							"a",
+						}, // D first, then B and C (order may vary), then A
+					},
+					{
 						name: "no dependencies",
 						containers: func() []types.Container {
 							a := mocks.NewMockContainer(ginkgo.GinkgoT())
@@ -497,8 +558,17 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						err := sorter.SortByDependencies(containers)
 						gomega.Expect(err).ToNot(gomega.HaveOccurred())
 						gomega.Expect(containers).To(gomega.HaveLen(len(tc.expectedOrder)))
-						for i, name := range tc.expectedOrder {
-							gomega.Expect(containers[i].Name()).To(gomega.Equal(name))
+						// For diamond, check that D is first, A is last, and B/C are in middle
+						if tc.name == "diamond dependency graph" {
+							gomega.Expect(containers[0].Name()).To(gomega.Equal("d"))
+							gomega.Expect(containers[3].Name()).To(gomega.Equal("a"))
+							middleNames := []string{containers[1].Name(), containers[2].Name()}
+							gomega.Expect(middleNames).To(gomega.ContainElement("b"))
+							gomega.Expect(middleNames).To(gomega.ContainElement("c"))
+						} else {
+							for i, name := range tc.expectedOrder {
+								gomega.Expect(containers[i].Name()).To(gomega.Equal(name))
+							}
 						}
 					})
 				}
