@@ -183,7 +183,7 @@ func (ds *dependencySorter) findUnvisited(name string) *types.Container {
 // Parameters:
 //   - c: Container to remove.
 func (ds *dependencySorter) removeUnvisited(c types.Container) {
-	var idx int
+	idx := -1
 
 	for i := range ds.unvisited {
 		if util.NormalizeContainerName(
@@ -197,7 +197,11 @@ func (ds *dependencySorter) removeUnvisited(c types.Container) {
 		}
 	}
 
-	ds.unvisited = append(ds.unvisited[0:idx], ds.unvisited[idx+1:]...)
+	if idx == -1 {
+		return
+	}
+
+	ds.unvisited = append(ds.unvisited[:idx], ds.unvisited[idx+1:]...)
 }
 
 // GetContainerIdentifier returns the service name if available, otherwise container name.
