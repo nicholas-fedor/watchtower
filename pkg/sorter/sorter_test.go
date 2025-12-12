@@ -75,6 +75,12 @@ func (m *mockContainer) GetCreateHostConfig() *dockerContainerTypes.HostConfig {
 	return &dockerContainerTypes.HostConfig{}
 }
 
+func TestSorter(t *testing.T) {
+	t.Parallel()
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, "Sorter Suite")
+}
+
 var _ = ginkgo.Describe("Container Sorting", func() {
 	ginkgo.Describe("SortByCreated", func() {
 		ginkgo.When("sorting by creation date", func() {
@@ -269,9 +275,3 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 		})
 	})
 })
-
-func TestSorter(t *testing.T) {
-	t.Parallel()
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Sorter Suite")
-}
