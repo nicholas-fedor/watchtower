@@ -1,5 +1,3 @@
-// Package compose provides functionality for handling Docker Compose-specific logic,
-// including parsing depends_on labels and extracting service names for dependency management.
 package compose
 
 import (
