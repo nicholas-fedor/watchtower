@@ -55,9 +55,9 @@ func (c byCreated) Less(i, indexJ int) bool {
 			"container_id": c[i].ID().ShortID(),
 			"name":         c[i].Name(),
 			"created":      c[i].ContainerInfo().Created,
-		}).WithError(err).Debug("Failed to parse created time, using current time as fallback")
+		}).WithError(err).Debug("Failed to parse created time, using epoch time as fallback")
 
-		createdTimeI = time.Now()
+		createdTimeI = time.Time{} // Unix epoch (zero value)
 	}
 
 	// Parse creation time for container j.
@@ -67,9 +67,9 @@ func (c byCreated) Less(i, indexJ int) bool {
 			"container_id": c[indexJ].ID().ShortID(),
 			"name":         c[indexJ].Name(),
 			"created":      c[indexJ].ContainerInfo().Created,
-		}).WithError(err).Debug("Failed to parse created time, using current time as fallback")
+		}).WithError(err).Debug("Failed to parse created time, using epoch time as fallback")
 
-		createdTimeJ = time.Now()
+		createdTimeJ = time.Time{} // Unix epoch (zero value)
 	}
 
 	return createdTimeI.Before(createdTimeJ)
