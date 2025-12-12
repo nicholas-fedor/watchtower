@@ -1,18 +1,12 @@
 package sorter
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
-
-// ErrCircularReference indicates a circular dependency between containers.
-var ErrCircularReference = errors.New("circular reference detected")
 
 // DependencySorter handles topological sorting by dependencies.
 type DependencySorter struct{}
@@ -136,7 +130,7 @@ func (ds *dependencySorter) visit(c types.Container) error {
 			"name":         c.Name(),
 		}).Debug("Detected circular reference")
 
-		return fmt.Errorf("%w: %s", ErrCircularReference, c.Name())
+		return CircularReferenceError{ContainerName: c.Name()}
 	}
 
 	// Mark as visited, unmark on exit.

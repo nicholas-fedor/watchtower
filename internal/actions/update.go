@@ -255,10 +255,9 @@ func Update(
 	err = sorter.SortByDependencies(containers)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
-			// Parse the circular container name from the error.
-			errMsg := err.Error()
-			if after, ok := strings.CutPrefix(errMsg, "circular reference detected: "); ok {
-				circularName := after
+			var circularErr sorter.CircularReferenceError
+			if errors.As(err, &circularErr) {
+				circularName := circularErr.ContainerName
 				// Find the container and mark as skipped.
 				for _, c := range containers {
 					if c.Name() == circularName {
