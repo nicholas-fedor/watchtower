@@ -633,6 +633,8 @@ func logNotify(msg string, err error) {
 	}
 
 	logrus.WithError(err).Error(msg)
+	notifier.StartNotification(false)
+	notifier.SendNotification(nil)
 	notifier.Close()
 }
 
