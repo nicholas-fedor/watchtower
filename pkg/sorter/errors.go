@@ -2,7 +2,6 @@ package sorter
 
 import (
 	"errors"
-	"fmt"
 )
 
 // ErrCircularReference indicates a circular dependency between containers.
@@ -15,7 +14,7 @@ type CircularReferenceError struct {
 
 // Error implements the error interface.
 func (e CircularReferenceError) Error() string {
-	return fmt.Sprintf("circular reference detected: %s", e.ContainerName)
+	return "circular reference detected: " + e.ContainerName
 }
 
 // Unwrap returns the underlying error for errors.Is compatibility.

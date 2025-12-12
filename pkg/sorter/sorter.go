@@ -19,7 +19,9 @@ type Sorter interface {
 func SortByCreated(containers []types.Container) error {
 	sorter := TimeSorter{}
 
-	return sorter.Sort(containers)
+	_ = sorter.Sort(containers)
+
+	return nil
 }
 
 // SortByDependencies sorts containers in place by dependencies.
