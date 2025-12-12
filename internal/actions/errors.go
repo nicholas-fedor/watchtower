@@ -36,4 +36,6 @@ var (
 	errStartContainerFailed = errors.New("failed to start container")
 	// errParseImageReference indicates a failure to parse a container’s image reference.
 	errParseImageReference = errors.New("failed to parse image reference")
+	// errCircularDependency indicates a circular dependency between containers.
+	errCircularDependency = errors.New("circular dependency detected")
 )

@@ -3,76 +3,28 @@ package sorter
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ErrCircularReference indicates a circular dependency between containers.
 var ErrCircularReference = errors.New("circular reference detected")
 
-// ByCreated implements sort.Interface for creation time sorting.
-type ByCreated []types.Container
+// DependencySorter handles topological sorting by dependencies.
+type DependencySorter struct{}
 
-// Len returns the number of containers.
-//
-// Returns:
-//   - int: Container count.
-func (c ByCreated) Len() int { return len(c) }
-
-// Swap exchanges two containers by index.
+// Sort sorts containers in place by dependencies, placing Watchtower containers last.
 //
 // Parameters:
-//   - i, indexJ: Indices to swap.
-func (c ByCreated) Swap(i, indexJ int) { c[i], c[indexJ] = c[indexJ], c[i] }
-
-// Less compares creation times, using now as fallback.
-//
-// Parameters:
-//   - i, indexJ: Indices to compare.
+//   - containers: Slice to sort in place.
 //
 // Returns:
-//   - bool: True if i was created before j.
-func (c ByCreated) Less(i, indexJ int) bool {
-	// Parse creation time for container i.
-	createdTimeI, err := time.Parse(time.RFC3339Nano, c[i].ContainerInfo().Created)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"container_id": c[i].ID().ShortID(),
-			"name":         c[i].Name(),
-			"created":      c[i].ContainerInfo().Created,
-		}).WithError(err).Debug("Failed to parse created time, using current time as fallback")
-
-		createdTimeI = time.Now()
-	}
-
-	// Parse creation time for container j.
-	createdTimeJ, err := time.Parse(time.RFC3339Nano, c[indexJ].ContainerInfo().Created)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"container_id": c[indexJ].ID().ShortID(),
-			"name":         c[indexJ].Name(),
-			"created":      c[indexJ].ContainerInfo().Created,
-		}).WithError(err).Debug("Failed to parse created time, using current time as fallback")
-
-		createdTimeJ = time.Now()
-	}
-
-	return createdTimeI.Before(createdTimeJ)
-}
-
-// SortByDependencies sorts containers by dependencies.
-//
-// Parameters:
-//   - containers: List to sort.
-//
-// Returns:
-//   - []types.Container: Sorted list.
 //   - error: Non-nil if circular reference detected, nil on success.
-func SortByDependencies(containers []types.Container) ([]types.Container, error) {
+func (ds DependencySorter) Sort(containers []types.Container) error {
 	logrus.WithField("container_count", len(containers)).Debug("Starting dependency sort")
 
 	// Separate Watchtower containers from non-Watchtower containers
@@ -94,29 +46,38 @@ func SortByDependencies(containers []types.Container) ([]types.Container, error)
 		"watchtower_count":     len(watchtowerContainers),
 	}).Debug("Separated containers by Watchtower status")
 
-	// Sort non-Watchtower containers by dependencies
+	// Sort non-Watchtower containers by dependencies using internal sorter
 	sorter := dependencySorter{
 		unvisited: nil, // Containers yet to be visited
 		marked:    nil, // Marks visited containers for cycle detection
 		sorted:    nil, // Sorted result
 	}
 
-	sortedNonWatchtower, err := sorter.Sort(nonWatchtowerContainers)
+	sortedNonWatchtower, err := sorter.sort(nonWatchtowerContainers)
 	if err != nil {
 		logrus.WithError(err).Debug("Dependency sort failed for non-Watchtower containers")
 
-		return nil, err
+		return err
 	}
 
-	// Append Watchtower containers at the end
-	sorted := make([]types.Container, 0, len(sortedNonWatchtower)+len(watchtowerContainers))
-	sorted = append(sorted, sortedNonWatchtower...)
-	sorted = append(sorted, watchtowerContainers...)
+	// Copy sorted results back to original slice
+	copy(containers, sortedNonWatchtower)
 
-	logrus.WithField("sorted_count", len(sorted)).
-		Debug("Completed dependency sort with Watchtower containers last")
+	for i, wt := range watchtowerContainers {
+		containers[len(sortedNonWatchtower)+i] = wt
+	}
 
-	return sorted, nil
+	sortedNames := make([]string, len(containers))
+	for i, c := range containers {
+		sortedNames[i] = c.Name()
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"sorted_count": len(containers),
+		"sorted_order": sortedNames,
+	}).Debug("Completed dependency sort with Watchtower containers last")
+
+	return nil
 }
 
 // dependencySorter handles topological sorting by dependencies.
@@ -126,7 +87,7 @@ type dependencySorter struct {
 	sorted    []types.Container // Sorted result.
 }
 
-// Sort performs topological sort on containers.
+// sort performs topological sort on containers.
 //
 // Parameters:
 //   - containers: List to sort.
@@ -134,8 +95,9 @@ type dependencySorter struct {
 // Returns:
 //   - []types.Container: Sorted list.
 //   - error: Non-nil if circular reference detected, nil on success.
-func (ds *dependencySorter) Sort(containers []types.Container) ([]types.Container, error) {
-	ds.unvisited = containers
+func (ds *dependencySorter) sort(containers []types.Container) ([]types.Container, error) {
+	ds.unvisited = make([]types.Container, len(containers))
+	copy(ds.unvisited, containers)
 	ds.marked = map[string]bool{}
 
 	// Process containers with no links first.
@@ -168,7 +130,7 @@ func (ds *dependencySorter) Sort(containers []types.Container) ([]types.Containe
 //   - error: Non-nil if circular reference detected, nil on success.
 func (ds *dependencySorter) visit(c types.Container) error {
 	// Check for circular reference.
-	if _, ok := ds.marked[util.NormalizeContainerName(c.Name())]; ok {
+	if _, ok := ds.marked[util.NormalizeContainerName(GetContainerIdentifier(c))]; ok {
 		logrus.WithFields(logrus.Fields{
 			"container_id": c.ID().ShortID(),
 			"name":         c.Name(),
@@ -178,8 +140,8 @@ func (ds *dependencySorter) visit(c types.Container) error {
 	}
 
 	// Mark as visited, unmark on exit.
-	ds.marked[util.NormalizeContainerName(c.Name())] = true
-	defer delete(ds.marked, util.NormalizeContainerName(c.Name()))
+	ds.marked[util.NormalizeContainerName(GetContainerIdentifier(c))] = true
+	defer delete(ds.marked, util.NormalizeContainerName(GetContainerIdentifier(c)))
 
 	// Visit all linked containers.
 	for _, linkName := range c.Links() {
@@ -210,7 +172,11 @@ func (ds *dependencySorter) visit(c types.Container) error {
 //   - *types.Container: Found container or nil.
 func (ds *dependencySorter) findUnvisited(name string) *types.Container {
 	for _, c := range ds.unvisited {
-		if util.NormalizeContainerName(c.Name()) == util.NormalizeContainerName(name) {
+		if util.NormalizeContainerName(
+			GetContainerIdentifier(c),
+		) == util.NormalizeContainerName(
+			name,
+		) {
 			return &c
 		}
 	}
@@ -227,9 +193,9 @@ func (ds *dependencySorter) removeUnvisited(c types.Container) {
 
 	for i := range ds.unvisited {
 		if util.NormalizeContainerName(
-			ds.unvisited[i].Name(),
+			GetContainerIdentifier(ds.unvisited[i]),
 		) == util.NormalizeContainerName(
-			c.Name(),
+			GetContainerIdentifier(c),
 		) {
 			idx = i
 
@@ -238,4 +204,13 @@ func (ds *dependencySorter) removeUnvisited(c types.Container) {
 	}
 
 	ds.unvisited = append(ds.unvisited[0:idx], ds.unvisited[idx+1:]...)
+}
+
+// GetContainerIdentifier returns the service name if available, otherwise container name.
+func GetContainerIdentifier(c types.Container) string {
+	if serviceName := compose.GetServiceName(c.ContainerInfo().Config.Labels); serviceName != "" {
+		return serviceName
+	}
+
+	return c.Name()
 }

@@ -1,7 +1,6 @@
 package sorter_test
 
 import (
-	"sort"
 	"testing"
 	"time"
 
@@ -28,6 +27,9 @@ func (m *mockContainer) ContainerInfo() *dockerContainerTypes.InspectResponse {
 		ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
 			Name:    m.name,
 			Created: m.created,
+		},
+		Config: &dockerContainerTypes.Config{
+			Labels: map[string]string{},
 		},
 	}
 }
@@ -74,7 +76,7 @@ func (m *mockContainer) GetCreateHostConfig() *dockerContainerTypes.HostConfig {
 }
 
 var _ = ginkgo.Describe("Container Sorting", func() {
-	ginkgo.Describe("ByCreated", func() {
+	ginkgo.Describe("SortByCreated", func() {
 		ginkgo.When("sorting by creation date", func() {
 			ginkgo.It("sorts containers in ascending order", func() {
 				now := time.Now()
@@ -92,7 +94,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
 					},
 				}
-				sort.Sort(sorter.ByCreated(containers))
+				sorter.SortByCreated(containers)
 				gomega.Expect(containers[0].Name()).To(gomega.Equal("c1"))
 				gomega.Expect(containers[1].Name()).To(gomega.Equal("c2"))
 				gomega.Expect(containers[2].Name()).To(gomega.Equal("c3"))
@@ -104,14 +106,14 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					&mockContainer{name: "c1", created: "invalid-date"},
 					&mockContainer{name: "c2", created: now.Format(time.RFC3339Nano)},
 				}
-				sort.Sort(sorter.ByCreated(containers))
+				sorter.SortByCreated(containers)
 				// Invalid date uses current time, order may vary; check stability
 				gomega.Expect(containers).To(gomega.HaveLen(2))
 			})
 
 			ginkgo.It("handles empty list", func() {
 				containers := []types.Container{}
-				sort.Sort(sorter.ByCreated(containers))
+				sorter.SortByCreated(containers)
 				gomega.Expect(containers).To(gomega.BeEmpty())
 			})
 		})
@@ -124,11 +126,11 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					&mockContainer{name: "c1", links: []string{"c2"}},
 					&mockContainer{name: "c2", links: nil},
 				}
-				sorted, err := sorter.SortByDependencies(containers)
+				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(sorted).To(gomega.HaveLen(2))
-				gomega.Expect(sorted[0].Name()).To(gomega.Equal("c2")) // No links
-				gomega.Expect(sorted[1].Name()).To(gomega.Equal("c1")) // Depends on c2
+				gomega.Expect(containers).To(gomega.HaveLen(2))
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("c2")) // No links
+				gomega.Expect(containers[1].Name()).To(gomega.Equal("c1")) // Depends on c2
 			})
 
 			ginkgo.It("handles multiple dependencies", func() {
@@ -137,12 +139,12 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					&mockContainer{name: "c2", links: []string{"c3"}},
 					&mockContainer{name: "c3", links: nil},
 				}
-				sorted, err := sorter.SortByDependencies(containers)
+				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(sorted).To(gomega.HaveLen(3))
-				gomega.Expect(sorted[0].Name()).To(gomega.Equal("c3")) // No links
-				gomega.Expect(sorted[1].Name()).To(gomega.Equal("c2")) // Links to c3
-				gomega.Expect(sorted[2].Name()).To(gomega.Equal("c1")) // Links to c2, c3
+				gomega.Expect(containers).To(gomega.HaveLen(3))
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("c3")) // No links
+				gomega.Expect(containers[1].Name()).To(gomega.Equal("c2")) // Links to c3
+				gomega.Expect(containers[2].Name()).To(gomega.Equal("c1")) // Links to c2, c3
 			})
 
 			ginkgo.It("detects circular references", func() {
@@ -150,7 +152,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					&mockContainer{name: "c1", links: []string{"c2"}},
 					&mockContainer{name: "c2", links: []string{"c1"}},
 				}
-				_, err := sorter.SortByDependencies(containers)
+				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).To(gomega.MatchError("circular reference detected: c1"))
 			})
 
@@ -159,18 +161,18 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					&mockContainer{name: "c1", links: []string{"c2"}},
 					&mockContainer{name: "c3", links: nil},
 				}
-				sorted, err := sorter.SortByDependencies(containers)
+				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(sorted).To(gomega.HaveLen(2))
-				gomega.Expect(sorted[0].Name()).To(gomega.Equal("c3")) // No links
-				gomega.Expect(sorted[1].Name()).To(gomega.Equal("c1")) // Links to missing c2
+				gomega.Expect(containers).To(gomega.HaveLen(2))
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("c3")) // No links
+				gomega.Expect(containers[1].Name()).To(gomega.Equal("c1")) // Links to missing c2
 			})
 
 			ginkgo.It("handles empty list", func() {
 				containers := []types.Container{}
-				sorted, err := sorter.SortByDependencies(containers)
+				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(sorted).To(gomega.BeEmpty())
+				gomega.Expect(containers).To(gomega.BeEmpty())
 			})
 
 			ginkgo.It("places Watchtower containers last", func() {
@@ -179,12 +181,14 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					&mockContainer{name: "c1", links: []string{"c2"}},
 					&mockContainer{name: "c2", links: nil},
 				}
-				sorted, err := sorter.SortByDependencies(containers)
+				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(sorted).To(gomega.HaveLen(3))
-				gomega.Expect(sorted[0].Name()).To(gomega.Equal("c2"))         // No links
-				gomega.Expect(sorted[1].Name()).To(gomega.Equal("c1"))         // Depends on c2
-				gomega.Expect(sorted[2].Name()).To(gomega.Equal("watchtower")) // Watchtower last
+				gomega.Expect(containers).To(gomega.HaveLen(3))
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("c2")) // No links
+				gomega.Expect(containers[1].Name()).To(gomega.Equal("c1")) // Depends on c2
+				gomega.Expect(containers[2].Name()).
+					To(gomega.Equal("watchtower"))
+				// Watchtower last
 			})
 
 			ginkgo.It("places multiple Watchtower containers last", func() {
@@ -194,13 +198,13 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					&mockContainer{name: "watchtower2", isWatchtower: true},
 					&mockContainer{name: "c2", links: nil},
 				}
-				sorted, err := sorter.SortByDependencies(containers)
+				err := sorter.SortByDependencies(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(sorted).To(gomega.HaveLen(4))
-				gomega.Expect(sorted[0].Name()).To(gomega.Equal("c2")) // No links
-				gomega.Expect(sorted[1].Name()).To(gomega.Equal("c1")) // Depends on c2
+				gomega.Expect(containers).To(gomega.HaveLen(4))
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("c2")) // No links
+				gomega.Expect(containers[1].Name()).To(gomega.Equal("c1")) // Depends on c2
 				// Watchtower containers at the end (order may vary)
-				watchtowerNames := []string{sorted[2].Name(), sorted[3].Name()}
+				watchtowerNames := []string{containers[2].Name(), containers[3].Name()}
 				gomega.Expect(watchtowerNames).To(gomega.ContainElement("watchtower1"))
 				gomega.Expect(watchtowerNames).To(gomega.ContainElement("watchtower2"))
 			})
@@ -251,11 +255,13 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				}
 				for _, tc := range testCases {
 					ginkgo.By(tc.name, func() {
-						sorted, err := sorter.SortByDependencies(tc.containers)
+						containers := make([]types.Container, len(tc.containers))
+						copy(containers, tc.containers)
+						err := sorter.SortByDependencies(containers)
 						gomega.Expect(err).ToNot(gomega.HaveOccurred())
-						gomega.Expect(sorted).To(gomega.HaveLen(len(tc.expectedOrder)))
+						gomega.Expect(containers).To(gomega.HaveLen(len(tc.expectedOrder)))
 						for i, name := range tc.expectedOrder {
-							gomega.Expect(sorted[i].Name()).To(gomega.Equal(name))
+							gomega.Expect(containers[i].Name()).To(gomega.Equal(name))
 						}
 					})
 				}

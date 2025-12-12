@@ -2,16 +2,20 @@
 // It implements dependency-based topological sorting and creation time ordering.
 //
 // Key components:
-//   - SortByDependencies: Sorts containers by links, detecting circular references.
-//   - ByCreated: Sorts containers by creation time with fallback to current time.
+//   - SortByDependencies: Sorts containers in place by links, detecting circular references.
+//   - SortByCreated: Sorts containers in place by creation time with fallback to current time.
+//   - Sorter: Common interface for all sorting implementations.
 //
 // Usage example:
 //
-//	sorted, err := sorter.SortByDependencies(containers)
+//	err := sorter.SortByDependencies(containers)
 //	if err != nil {
-//	    logrus.WithError(err).Error("Sort failed")
-//	} else {
-//	    sort.Sort(sorter.ByCreated(sorted))
+//	    logrus.WithError(err).Error("Dependency sort failed")
+//	}
+//
+//	err = sorter.SortByCreated(containers)
+//	if err != nil {
+//	    logrus.WithError(err).Error("Time sort failed")
 //	}
 //
 // The package uses logrus for logging sort operations and errors.

@@ -17,6 +17,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -410,46 +411,154 @@ func (c Container) VerifyConfiguration() error {
 
 // Links returns a list of container names this container depends on.
 //
-// It combines depends-on label and HostConfig links, ensuring leading slashes.
+// It checks com.centurylinklabs.watchtower.depends-on first,
+// then com.docker.compose.depends_on using Docker Compose v5 API functions,
+// then falls back to HostConfig links and network mode.
 //
 // Returns:
 //   - []string: List of linked container names.
 func (c Container) Links() []string {
 	clog := logrus.WithField("container", c.Name())
 
-	var links []string
+	// Log all labels present on the container for debugging
+	if c.containerInfo != nil && c.containerInfo.Config != nil &&
+		c.containerInfo.Config.Labels != nil {
+		clog.WithField("labels", c.containerInfo.Config.Labels).Debug("All labels on container")
+	} else {
+		clog.Debug("No labels available on container")
+	}
 
-	// Check depends-on label first.
-	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
-	if dependsOnLabelValue != "" {
-		for link := range strings.SplitSeq(dependsOnLabelValue, ",") {
-			if !strings.HasPrefix(link, "/") {
-				link = "/" + link // Add leading slash if missing.
-			}
+	// Check watchtower depends-on label first.
+	if links := getLinksFromWatchtowerLabel(c, clog); links != nil {
+		return links
+	}
 
-			links = append(links, link)
-		}
-
-		clog.WithField("depends_on", dependsOnLabelValue).
-			Debug("Retrieved links from depends-on label")
-
+	// Check compose depends-on label.
+	if links := getLinksFromComposeLabel(c, clog); links != nil {
 		return links
 	}
 
 	// Fall back to HostConfig links and network mode.
-	if c.containerInfo != nil && c.containerInfo.HostConfig != nil {
-		for _, link := range c.containerInfo.HostConfig.Links {
-			name := strings.Split(link, ":")[0]
-			links = append(links, name)
-		}
+	return getLinksFromHostConfig(c, clog)
+}
 
-		networkMode := c.containerInfo.HostConfig.NetworkMode
-		if networkMode.IsContainer() {
-			links = append(links, networkMode.ConnectedContainer()) // Add network dependency.
-		}
-
-		clog.WithField("links", links).Debug("Retrieved links from host config")
+// getLinksFromWatchtowerLabel extracts dependency links from the watchtower depends-on label.
+//
+// It parses the com.centurylinklabs.watchtower.depends-on label value,
+// splitting on commas and ensuring each link has a leading slash.
+//
+// Parameters:
+//   - c: Container instance
+//   - clog: Logger instance for debug output
+//
+// Returns:
+//   - []string: List of linked container names, empty if label not present
+func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
+	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
+	if dependsOnLabelValue == "" {
+		return nil
 	}
+
+	// Pre-allocate slice based on comma-separated values
+	parts := strings.Split(dependsOnLabelValue, ",")
+	links := make([]string, 0, len(parts))
+
+	for _, link := range parts {
+		link = strings.TrimSpace(link)
+		// Add leading slash if missing.
+		if !strings.HasPrefix(link, "/") {
+			link = "/" + link
+		}
+
+		links = append(links, link)
+	}
+
+	clog.WithField("depends_on", dependsOnLabelValue).
+		Debug("Retrieved links from watchtower depends-on label")
+
+	return links
+}
+
+// getLinksFromComposeLabel extracts dependency links from the Docker Compose depends-on label.
+//
+// It parses the com.docker.compose.depends_on label value using the compose package,
+// and ensures each service name has a leading slash.
+//
+// Parameters:
+//   - c: Container instance
+//   - clog: Logger instance for debug output
+//
+// Returns:
+//   - []string: List of linked container names, empty if label not present
+func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
+	composeDependsOnLabelValue := c.getLabelValueOrEmpty(compose.ComposeDependsOnLabel)
+	clog.WithFields(logrus.Fields{
+		"label": compose.ComposeDependsOnLabel,
+		"value": composeDependsOnLabelValue,
+	}).Debug("Checked compose depends-on label")
+
+	if composeDependsOnLabelValue == "" {
+		return nil
+	}
+
+	clog.WithField("raw_label_value", composeDependsOnLabelValue).
+		Debug("Parsing compose depends-on label")
+
+	services := compose.ParseDependsOnLabel(composeDependsOnLabelValue)
+
+	links := make([]string, 0, len(services))
+	for _, service := range services {
+		if !strings.HasPrefix(service, "/") {
+			service = "/" + service
+		}
+
+		links = append(links, service)
+	}
+
+	clog.WithFields(logrus.Fields{
+		"compose_depends_on": composeDependsOnLabelValue,
+		"parsed_links":       links,
+	}).Debug("Retrieved links from compose depends-on label")
+
+	return links
+}
+
+// getLinksFromHostConfig extracts dependency links from Docker HostConfig.
+//
+// It parses HostConfig.Links and network mode to determine container dependencies.
+//
+// Parameters:
+//   - c: Container instance
+//   - clog: Logger instance for debug output
+//
+// Returns:
+//   - []string: List of linked container names
+func getLinksFromHostConfig(c Container, clog *logrus.Entry) []string {
+	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
+		return nil
+	}
+
+	// Pre-allocate for links plus potential network mode dependency
+	capacity := len(c.containerInfo.HostConfig.Links)
+
+	networkMode := c.containerInfo.HostConfig.NetworkMode
+	if networkMode.IsContainer() {
+		capacity++
+	}
+
+	links := make([]string, 0, capacity)
+
+	for _, link := range c.containerInfo.HostConfig.Links {
+		name := strings.Split(link, ":")[0]
+		links = append(links, name)
+	}
+
+	// Add network dependency.
+	if networkMode.IsContainer() {
+		links = append(links, networkMode.ConnectedContainer())
+	}
+
+	clog.WithField("links", links).Debug("Retrieved links from host config")
 
 	return links
 }

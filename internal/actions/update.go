@@ -2,6 +2,7 @@
 package actions
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
@@ -88,6 +90,15 @@ func Update(
 		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
+	// Fetch all containers to find linked dependencies that may not be in the filtered list.
+	allContainers, err := client.ListContainers(filters.NoFilter)
+	if err != nil {
+		// Log and return an error if listing all containers fails.
+		logrus.WithError(err).Debug("Failed to list all containers")
+
+		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
+	}
+
 	// Prepare a list of container names and images for detailed debugging output.
 	containerNames := make([]string, len(containers))
 	for i, c := range containers {
@@ -100,11 +111,29 @@ func Update(
 		"filter":     fmt.Sprintf("%T", params.Filter),
 	}).Debug("Retrieved containers for update check")
 
+	// Detect circular dependencies and mark affected containers as skipped.
+	cycles := sorter.DetectCycles(containers)
+	for _, c := range containers {
+		if cycles[sorter.GetContainerIdentifier(c)] {
+			progress.AddSkipped(c, errCircularDependency, params)
+			logrus.Warnf(
+				"Skipping container update (circular dependency): %s (%s)",
+				c.Name(),
+				c.ID().ShortID(),
+			)
+		}
+	}
+
 	// Track containers that fail staleness checks for reporting.
 	staleCheckFailed := 0
 
 	// Iterate through containers to check staleness and prepare for updates or restarts.
 	for i, sourceContainer := range containers {
+		// Skip containers already processed (e.g., skipped due to circular dependencies).
+		if _, exists := (*progress)[sourceContainer.ID()]; exists {
+			continue
+		}
+
 		// Set up logging fields for the current container.
 		fields := logrus.Fields{
 			"container": sourceContainer.Name(),
@@ -209,43 +238,71 @@ func Update(
 		"failed": staleCheckFailed,
 	}).Debug("Completed container staleness check")
 
-	// Sort containers by dependencies to ensure correct update and restart order.
-	containers, err = sorter.SortByDependencies(containers)
-	if err != nil {
-		// Log and return an error if dependency sorting fails.
-		logrus.WithError(err).Debug("Failed to sort containers by dependencies")
-
-		return nil, []types.CleanedImageInfo{}, fmt.Errorf(
-			"%w: %w",
-			errSortDependenciesFailed,
-			err,
-		)
-	}
-
-	// Mark containers linked to restarting ones for restart without updating.
-	UpdateImplicitRestart(containers)
-
-	// Separate containers into those to update (stale) and those to restart (linked).
-	var (
-		containersToUpdate  []types.Container
-		containersToRestart []types.Container
-	)
-
+	// Propagate stale status to allContainers since they are different instances.
 	for _, c := range containers {
-		if c.IsStale() && !c.IsMonitorOnly(params) {
-			// Add stale containers to the update list and mark for update in progress.
-			containersToUpdate = append(containersToUpdate, c)
-			progress.MarkForUpdate(c.ID())
-		} else if c.ToRestart() && !c.IsMonitorOnly(params) {
-			// Add linked containers to the restart list.
-			containersToRestart = append(containersToRestart, c)
+		if c.IsStale() {
+			for _, ac := range allContainers {
+				if ac.ID() == c.ID() {
+					ac.SetStale(true)
+
+					break
+				}
+			}
 		}
 	}
 
-	// Log the number of containers prepared for update and restart.
-	logrus.WithField("update_count", len(containersToUpdate)).
-		Debug("Prepared containers for update")
-	logrus.WithField("restart_count", len(containersToRestart)).
+	// Sort containers by dependencies to ensure correct update and restart order.
+	err = sorter.SortByDependencies(containers)
+	if err != nil {
+		if errors.Is(err, sorter.ErrCircularReference) {
+			// Parse the circular container name from the error.
+			errMsg := err.Error()
+			if after, ok := strings.CutPrefix(errMsg, "circular reference detected: "); ok {
+				circularName := after
+				// Find the container and mark as skipped.
+				for _, c := range containers {
+					if c.Name() == circularName {
+						// Only add if not already skipped (e.g., from initial cycle detection)
+						if _, exists := (*progress)[c.ID()]; !exists {
+							progress.AddSkipped(c, errCircularDependency, params)
+							logrus.Warnf(
+								"Skipping container update (circular dependency): %s (%s)",
+								c.Name(),
+								c.ID().ShortID(),
+							)
+						}
+
+						break
+					}
+				}
+			}
+			// Skip UpdateImplicitRestart to avoid potential issues with circular dependencies.
+		} else {
+			// Log and return an error if dependency sorting fails for other reasons.
+			logrus.WithError(err).Debug("Failed to sort containers by dependencies")
+
+			return nil, []types.CleanedImageInfo{}, fmt.Errorf(
+				"%w: %w",
+				errSortDependenciesFailed,
+				err,
+			)
+		}
+	} else {
+		// Mark containers linked to restarting ones for restart without updating.
+		UpdateImplicitRestart(containers, allContainers)
+	}
+
+	// Collect all containers to restart (updates and implicit restarts)
+	var allContainersToRestart []types.Container
+
+	for _, c := range containers {
+		if c.ToRestart() && !c.IsMonitorOnly(params) {
+			allContainersToRestart = append(allContainersToRestart, c)
+		}
+	}
+
+	// Log the number of containers prepared for restart.
+	logrus.WithField("restart_count", len(allContainersToRestart)).
 		Debug("Prepared containers for restart")
 
 	// Perform updates and restarts, either with rolling restarts or in batches.
@@ -256,13 +313,22 @@ func Update(
 	)
 
 	if params.RollingRestart {
-		// Apply rolling restarts for updates and linked containers sequentially.
-		progress.UpdateFailed(
-			performRollingRestart(containersToUpdate, client, params, &cleanupImageInfos, progress),
-		)
+		// Sort all containers to restart by dependencies
+		err = sorter.SortByDependencies(allContainersToRestart)
+		if err != nil {
+			logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
+
+			return nil, []types.CleanedImageInfo{}, fmt.Errorf(
+				"%w: %w",
+				errSortDependenciesFailed,
+				err,
+			)
+		}
+
+		// Apply rolling restarts for all containers in dependency order.
 		progress.UpdateFailed(
 			performRollingRestart(
-				containersToRestart,
+				allContainersToRestart,
 				client,
 				params,
 				&cleanupImageInfos,
@@ -270,17 +336,35 @@ func Update(
 			),
 		)
 	} else {
+		// Mark containers to update for update in progress
+		for _, c := range allContainersToRestart {
+			if c.IsStale() {
+				progress.MarkForUpdate(c.ID())
+			}
+		}
+
+		// Sort by dependencies
+		err = sorter.SortByDependencies(allContainersToRestart)
+		if err != nil {
+			if errors.Is(err, sorter.ErrCircularReference) {
+				// Log warning for circular dependency and proceed without sorting.
+				logrus.WithError(err).Warn("Circular dependency detected, proceeding without dependency sorting for restart")
+			} else {
+				logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
+
+				return nil, []types.CleanedImageInfo{}, fmt.Errorf(
+					"%w: %w",
+					errSortDependenciesFailed,
+					err,
+				)
+			}
+		}
+
 		// Stop and restart containers in batches, respecting dependency order.
-		failedStop, stoppedImages = stopContainersInReversedOrder(containersToUpdate, client, params)
+		failedStop, stoppedImages = stopContainersInReversedOrder(allContainersToRestart, client, params)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(containersToUpdate, client, params, stoppedImages, &cleanupImageInfos, progress)
-		progress.UpdateFailed(failedStart)
-
-		failedStop, stoppedImages = stopContainersInReversedOrder(containersToRestart, client, params)
-		progress.UpdateFailed(failedStop)
-
-		failedStart = restartContainersInSortedOrder(containersToRestart, client, params, stoppedImages, &cleanupImageInfos, progress)
+		failedStart = restartContainersInSortedOrder(allContainersToRestart, client, params, stoppedImages, &cleanupImageInfos, progress)
 		progress.UpdateFailed(failedStart)
 	}
 
@@ -306,25 +390,70 @@ func Update(
 	return progress.Report(), cleanupImageInfos, nil
 }
 
-// isInvalidImageName checks if an image name is invalid.
-// Returns true if the name is empty, ":latest", or starts with ":".
-func isInvalidImageName(name string) bool {
-	return name == "" || name == ":latest" || strings.HasPrefix(name, ":")
-}
+// UpdateImplicitRestart marks containers linked to restarting ones.
+//
+// It checks each container's links, marking those dependent on restarting containers to ensure
+// they are restarted in the correct order without being marked as updated.
+//
+// Parameters:
+//   - containers: List of containers to update.
+//   - allContainers: List of all containers to search for linked dependencies.
+func UpdateImplicitRestart(containers []types.Container, allContainers []types.Container) {
+	logrus.Debug("Starting UpdateImplicitRestart")
 
-// GetFallbackImage derives a fallback image name from container info.
-// Uses sanitized imageInfo.ID if it contains a tag, otherwise uses sanitized container name with ":latest".
-func GetFallbackImage(container types.Container) string {
-	if container.HasImageInfo() {
-		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
-		if !strings.Contains(fallback, ":") {
-			return util.NormalizeContainerName(container.Name()) + ":latest"
+	markedContainers := []string{}
+
+	for i, c := range containers {
+		if c.ToRestart() {
+			continue // Skip already marked containers.
 		}
 
-		return fallback
+		links := c.Links()
+		logrus.WithFields(logrus.Fields{
+			"container": c.Name(),
+			"links":     links,
+		}).Debug("Checking links for container")
+
+		if link := linkedContainerMarkedForRestart(links, allContainers); link != "" {
+			logrus.WithFields(logrus.Fields{
+				"container":  c.Name(),
+				"restarting": link,
+			}).Debug("Marked container as linked to restarting")
+			containers[i].SetLinkedToRestarting(true)
+
+			markedContainers = append(markedContainers, c.Name())
+		}
 	}
 
-	return util.NormalizeContainerName(container.Name()) + ":latest"
+	logrus.WithField("marked_containers", markedContainers).Debug("Completed UpdateImplicitRestart")
+}
+
+// linkedContainerMarkedForRestart finds a restarting linked container.
+//
+// It searches for a container in the links list that is marked for restart, returning its name.
+//
+// Parameters:
+//   - links: List of linked container names.
+//   - allContainers: List of all containers to check against.
+//
+// Returns:
+//   - string: Name of restarting linked container, or empty if none.
+func linkedContainerMarkedForRestart(links []string, allContainers []types.Container) string {
+	for _, linkName := range links {
+		for _, candidate := range allContainers {
+			if util.NormalizeContainerName(
+				candidate.Name(),
+			) == strings.TrimLeft(
+				linkName,
+				"/",
+			) &&
+				candidate.ToRestart() {
+				return linkName
+			}
+		}
+	}
+
+	return ""
 }
 
 // parseReference parses a Docker image reference with logging.
@@ -388,7 +517,7 @@ func isPinned(
 	// Get initial image name and configuration.
 	imageName := container.ImageName()
 	configImage := container.ContainerInfo().Config.Image
-	fallbackImage := GetFallbackImage(container)
+	fallbackImage := getFallbackImage(container)
 
 	// Check if ImageName is invalid and fall back to Config.Image or a derived name.
 	if isInvalidImageName(imageName) {
@@ -427,6 +556,27 @@ func isPinned(
 	return isDigested, nil
 }
 
+// getFallbackImage derives a fallback image name from container info.
+// Uses sanitized imageInfo.ID if it contains a tag, otherwise uses sanitized container name with ":latest".
+func getFallbackImage(container types.Container) string {
+	if container.HasImageInfo() {
+		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
+		if !strings.Contains(fallback, ":") {
+			return util.NormalizeContainerName(container.Name()) + ":latest"
+		}
+
+		return fallback
+	}
+
+	return util.NormalizeContainerName(container.Name()) + ":latest"
+}
+
+// isInvalidImageName checks if an image name is invalid.
+// Returns true if the name is empty, ":latest", or starts with ":".
+func isInvalidImageName(name string) bool {
+	return name == "" || name == ":latest" || strings.HasPrefix(name, ":")
+}
+
 // performRollingRestart updates containers with rolling restarts.
 //
 // It processes containers sequentially in reverse order, stopping and restarting each as needed,
@@ -450,8 +600,15 @@ func performRollingRestart(
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
 
-	// Process containers in reverse order to respect dependency chains.
-	for i := len(containers) - 1; i >= 0; i-- {
+	containerNames := make([]string, len(containers))
+	for i, c := range containers {
+		containerNames[i] = c.Name()
+	}
+
+	logrus.WithField("processing_order", containerNames).Debug("Starting performRollingRestart")
+
+	// Process containers in forward order to respect dependency chains.
+	for i := range containers {
 		c := containers[i]
 		if !c.ToRestart() {
 			continue
@@ -463,6 +620,11 @@ func performRollingRestart(
 		}
 
 		logrus.WithFields(fields).Debug("Processing container for rolling restart")
+
+		// Mark for update if stale
+		if c.IsStale() && progress != nil {
+			progress.MarkForUpdate(c.ID())
+		}
 
 		// Stop the container, handling any errors.
 		if err := stopStaleContainer(c, client, params); err != nil {
@@ -845,54 +1007,4 @@ func restartStaleContainer(
 	}
 
 	return newContainerID, renamed, nil
-}
-
-// UpdateImplicitRestart marks containers linked to restarting ones.
-//
-// It checks each container's links, marking those dependent on restarting containers to ensure
-// they are restarted in the correct order without being marked as updated.
-//
-// Parameters:
-//   - containers: List of containers to update.
-func UpdateImplicitRestart(containers []types.Container) {
-	for i, c := range containers {
-		if c.ToRestart() {
-			continue // Skip already marked containers.
-		}
-
-		if link := LinkedContainerMarkedForRestart(c.Links(), containers); link != "" {
-			logrus.WithFields(logrus.Fields{
-				"container":  c.Name(),
-				"restarting": link,
-			}).Debug("Marked container as linked to restarting")
-			containers[i].SetLinkedToRestarting(true)
-		}
-	}
-}
-
-// LinkedContainerMarkedForRestart finds a restarting linked container.
-//
-// It searches for a container in the links list that is marked for restart, returning its name.
-//
-// Parameters:
-//   - links: List of linked container names.
-//   - containers: List of containers to check against.
-//
-// Returns:
-//   - string: Name of restarting linked container, or empty if none.
-func LinkedContainerMarkedForRestart(links []string, containers []types.Container) string {
-	for _, linkName := range links {
-		for _, candidate := range containers {
-			if util.NormalizeContainerName(
-				candidate.Name(),
-			) == util.NormalizeContainerName(
-				linkName,
-			) &&
-				candidate.ToRestart() {
-				return linkName
-			}
-		}
-	}
-
-	return ""
 }

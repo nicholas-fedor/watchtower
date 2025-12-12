@@ -309,6 +309,86 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.Context("fetching container links", func() {
+			ginkgo.When("compose depends-on label is present", func() {
+				ginkgo.It("returns single dependent container", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("/postgres"),
+						gomega.HaveLen(1),
+					))
+				})
+
+				ginkgo.It("returns multiple dependent containers", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres,redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("/redis"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("trims whitespace from service names", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": " postgres , redis ",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("/redis"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("normalizes container names with slashes", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "/postgres,redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("/redis"),
+					))
+				})
+
+				ginkgo.It("takes precedence over compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on":             "postgres",
+						"com.centurylinklabs.watchtower.depends-on": "redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("/redis"),
+						gomega.Not(gomega.ContainElement("/postgres")),
+						gomega.HaveLen(1),
+					))
+				})
+
+				ginkgo.It("returns empty links for blank compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "",
+					}))
+					gomega.Expect(container.Links()).To(gomega.BeEmpty())
+				})
+
+				ginkgo.It("parses colon-separated service:condition:required format", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres:service_started:required,redis:service_healthy",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("/redis"),
+						gomega.HaveLen(2),
+					))
+				})
+			})
+
 			ginkgo.When("depends-on label is present", func() {
 				ginkgo.It("returns single dependent container", func() {
 					container = MockContainer(WithLabels(map[string]string{
@@ -352,7 +432,7 @@ var _ = ginkgo.Describe("Container", func() {
 				})
 			})
 
-			ginkgo.It("returns links from host config when depends-on label is absent", func() {
+			ginkgo.It("returns links from host config when depends-on labels are absent", func() {
 				container = MockContainer(WithLinks([]string{
 					"redis:test-watchtower",
 					"postgres:test-watchtower",
