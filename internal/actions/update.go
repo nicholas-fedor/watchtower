@@ -652,7 +652,7 @@ func performRollingRestart(
 					// in the new container.
 					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
 
-					logrus.WithFields(fields).Info("Updated container")
+					logrus.WithFields(fields).Debug("Updated container")
 				}
 			}
 		}
