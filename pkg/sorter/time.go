@@ -12,7 +12,7 @@ import (
 // TimeSorter sorts containers by creation time.
 type TimeSorter struct{}
 
-// Sort sorts containers in place by creation time, using current time as fallback for invalid dates.
+// Sort sorts containers in place by creation time, using far future time as fallback for invalid dates.
 //
 // Parameters:
 //   - containers: Slice to sort in place.
@@ -20,27 +20,51 @@ type TimeSorter struct{}
 // Returns:
 //   - error: Always nil (no errors possible).
 func (ts TimeSorter) Sort(containers []types.Container) error {
-	sort.Sort(byCreated(containers))
+	parsedTimes := make([]time.Time, len(containers))
+	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	for i, container := range containers {
+		createdTime, err := time.Parse(time.RFC3339Nano, container.ContainerInfo().Created)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"container_id": container.ID().ShortID(),
+				"name":         container.Name(),
+				"created":      container.ContainerInfo().Created,
+			}).WithError(err).Debug("Failed to parse created time, using far future time as fallback")
+
+			createdTime = farFuture
+		}
+
+		parsedTimes[i] = createdTime
+	}
+
+	sort.Sort(byCreated{containers: containers, parsedTimes: parsedTimes})
 
 	return nil
 }
 
 // byCreated implements sort.Interface for creation time sorting.
-type byCreated []types.Container
+type byCreated struct {
+	containers  []types.Container
+	parsedTimes []time.Time
+}
 
 // Len returns the number of containers.
 //
 // Returns:
 //   - int: Container count.
-func (c byCreated) Len() int { return len(c) }
+func (c byCreated) Len() int { return len(c.containers) }
 
 // Swap exchanges two containers by index.
 //
 // Parameters:
 //   - i, indexJ: Indices to swap.
-func (c byCreated) Swap(i, indexJ int) { c[i], c[indexJ] = c[indexJ], c[i] }
+func (c byCreated) Swap(i, indexJ int) {
+	c.containers[i], c.containers[indexJ] = c.containers[indexJ], c.containers[i]
+	c.parsedTimes[i], c.parsedTimes[indexJ] = c.parsedTimes[indexJ], c.parsedTimes[i]
+}
 
-// Less compares creation times, using now as fallback.
+// Less compares creation times using pre-parsed times.
 //
 // Parameters:
 //   - i, indexJ: Indices to compare.
@@ -48,29 +72,5 @@ func (c byCreated) Swap(i, indexJ int) { c[i], c[indexJ] = c[indexJ], c[i] }
 // Returns:
 //   - bool: True if i was created before j.
 func (c byCreated) Less(i, indexJ int) bool {
-	// Parse creation time for container i.
-	createdTimeI, err := time.Parse(time.RFC3339Nano, c[i].ContainerInfo().Created)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"container_id": c[i].ID().ShortID(),
-			"name":         c[i].Name(),
-			"created":      c[i].ContainerInfo().Created,
-		}).WithError(err).Debug("Failed to parse created time, using epoch time as fallback")
-
-		createdTimeI = time.Time{} // Unix epoch (zero value)
-	}
-
-	// Parse creation time for container j.
-	createdTimeJ, err := time.Parse(time.RFC3339Nano, c[indexJ].ContainerInfo().Created)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"container_id": c[indexJ].ID().ShortID(),
-			"name":         c[indexJ].Name(),
-			"created":      c[indexJ].ContainerInfo().Created,
-		}).WithError(err).Debug("Failed to parse created time, using epoch time as fallback")
-
-		createdTimeJ = time.Time{} // Unix epoch (zero value)
-	}
-
-	return createdTimeI.Before(createdTimeJ)
+	return c.parsedTimes[i].Before(c.parsedTimes[indexJ])
 }

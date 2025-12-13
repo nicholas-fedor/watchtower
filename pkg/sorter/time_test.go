@@ -60,7 +60,7 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 		})
 
 		ginkgo.It(
-			"should handle invalid creation timestamps by using epoch time as fallback",
+			"should handle invalid creation timestamps by using far future time as fallback",
 			func() {
 				now := time.Now()
 				ts := TimeSorter{}
@@ -91,9 +91,9 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 				containers := []types.Container{c1, c2}
 				err := ts.Sort(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				// Invalid date uses epoch time, so c1 (epoch) should come before c2 (now)
-				gomega.Expect(containers[0].Name()).To(gomega.Equal("c1"))
-				gomega.Expect(containers[1].Name()).To(gomega.Equal("c2"))
+				// Invalid date uses far future time, so c1 (far future) should come after c2 (now)
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("c2"))
+				gomega.Expect(containers[1].Name()).To(gomega.Equal("c1"))
 			},
 		)
 
@@ -169,7 +169,7 @@ var _ = ginkgo.Describe("byCreated", func() {
 
 		ginkgo.It("should return length of slice with one element", func() {
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			bc := byCreated{c1}
+			bc := byCreated{containers: []types.Container{c1}}
 			gomega.Expect(bc.Len()).To(gomega.Equal(1))
 		})
 
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("byCreated", func() {
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
 			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
 			c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			bc := byCreated{c1, c2, c3}
+			bc := byCreated{containers: []types.Container{c1, c2, c3}}
 			gomega.Expect(bc.Len()).To(gomega.Equal(3))
 		})
 	})
@@ -191,11 +191,14 @@ var _ = ginkgo.Describe("byCreated", func() {
 			c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
 			c3.EXPECT().Name().Return("c3")
 
-			bc := byCreated{c1, c2, c3}
+			bc := byCreated{
+				containers:  []types.Container{c1, c2, c3},
+				parsedTimes: []time.Time{{}, {}, {}},
+			}
 			bc.Swap(0, 2)
-			gomega.Expect(bc[0].Name()).To(gomega.Equal("c3"))
-			gomega.Expect(bc[2].Name()).To(gomega.Equal("c1"))
-			gomega.Expect(bc[1].Name()).To(gomega.Equal("c2"))
+			gomega.Expect(bc.containers[0].Name()).To(gomega.Equal("c3"))
+			gomega.Expect(bc.containers[2].Name()).To(gomega.Equal("c1"))
+			gomega.Expect(bc.containers[1].Name()).To(gomega.Equal("c2"))
 		})
 
 		ginkgo.It("should swap adjacent elements", func() {
@@ -204,19 +207,19 @@ var _ = ginkgo.Describe("byCreated", func() {
 			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 
-			bc := byCreated{c1, c2}
+			bc := byCreated{containers: []types.Container{c1, c2}, parsedTimes: []time.Time{{}, {}}}
 			bc.Swap(0, 1)
-			gomega.Expect(bc[0].Name()).To(gomega.Equal("c2"))
-			gomega.Expect(bc[1].Name()).To(gomega.Equal("c1"))
+			gomega.Expect(bc.containers[0].Name()).To(gomega.Equal("c2"))
+			gomega.Expect(bc.containers[1].Name()).To(gomega.Equal("c1"))
 		})
 
 		ginkgo.It("should handle swapping same index", func() {
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
 
-			bc := byCreated{c1}
+			bc := byCreated{containers: []types.Container{c1}, parsedTimes: []time.Time{{}}}
 			bc.Swap(0, 0)
-			gomega.Expect(bc[0].Name()).To(gomega.Equal("c1"))
+			gomega.Expect(bc.containers[0].Name()).To(gomega.Equal("c1"))
 		})
 	})
 
@@ -225,26 +228,12 @@ var _ = ginkgo.Describe("byCreated", func() {
 			now := time.Now()
 
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-
 			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
 
-			bc := byCreated{c1, c2}
+			bc := byCreated{
+				containers:  []types.Container{c1, c2},
+				parsedTimes: []time.Time{now.Add(-2 * time.Hour), now.Add(-1 * time.Hour)},
+			}
 			gomega.Expect(bc.Less(0, 1)).To(gomega.BeTrue())
 		})
 
@@ -252,26 +241,12 @@ var _ = ginkgo.Describe("byCreated", func() {
 			now := time.Now()
 
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-
 			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
 
-			bc := byCreated{c1, c2}
+			bc := byCreated{
+				containers:  []types.Container{c1, c2},
+				parsedTimes: []time.Time{now.Add(-1 * time.Hour), now.Add(-2 * time.Hour)},
+			}
 			gomega.Expect(bc.Less(0, 1)).To(gomega.BeFalse())
 		})
 
@@ -279,116 +254,56 @@ var _ = ginkgo.Describe("byCreated", func() {
 			now := time.Now()
 
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-
 			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
 
-			bc := byCreated{c1, c2}
+			bc := byCreated{
+				containers:  []types.Container{c1, c2},
+				parsedTimes: []time.Time{now, now},
+			}
 			gomega.Expect(bc.Less(0, 1)).To(gomega.BeFalse())
 		})
 
-		ginkgo.It("should handle invalid timestamp for i by using epoch time", func() {
+		ginkgo.It("should handle invalid timestamp for i by using far future time", func() {
 			now := time.Now()
+			farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: "invalid-date",
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-
 			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
 
-			bc := byCreated{c1, c2}
-			// c1 uses epoch (1970), c2 uses now, so c1 < c2
+			bc := byCreated{
+				containers:  []types.Container{c1, c2},
+				parsedTimes: []time.Time{farFuture, now},
+			}
+			// c1 uses far future, c2 uses now, so c1 > c2, Less(0,1) false
+			gomega.Expect(bc.Less(0, 1)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should handle invalid timestamp for j by using far future time", func() {
+			now := time.Now()
+			farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+
+			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+
+			bc := byCreated{
+				containers:  []types.Container{c1, c2},
+				parsedTimes: []time.Time{now, farFuture},
+			}
+			// c1 uses now, c2 uses far future, so c1 < c2, so Less(0,1) true
 			gomega.Expect(bc.Less(0, 1)).To(gomega.BeTrue())
 		})
 
-		ginkgo.It("should handle invalid timestamp for j by using epoch time", func() {
-			now := time.Now()
+		ginkgo.It("should handle both invalid timestamps by using far future time", func() {
+			farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
 			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: now.Format(time.RFC3339Nano),
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-
 			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: "invalid-date",
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
 
-			bc := byCreated{c1, c2}
-			// c1 uses now, c2 uses epoch, so c1 > c2, so Less(0,1) false
-			gomega.Expect(bc.Less(0, 1)).To(gomega.BeFalse())
-		})
-
-		ginkgo.It("should handle both invalid timestamps by using epoch time", func() {
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: "invalid-date-1",
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
-					Created: "invalid-date-2",
-				},
-				Config: &dockerContainerTypes.Config{
-					Labels: map[string]string{},
-				},
-			})
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-
-			bc := byCreated{c1, c2}
-			// Both use epoch, so equal, Less returns false
+			bc := byCreated{
+				containers:  []types.Container{c1, c2},
+				parsedTimes: []time.Time{farFuture, farFuture},
+			}
+			// Both use far future, so equal, Less returns false
 			gomega.Expect(bc.Less(0, 1)).To(gomega.BeFalse())
 		})
 	})
