@@ -344,33 +344,13 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.HaveLen(4))
 
-			// Verify ordering: all nodes with no dependencies come first
-			// B and D should come before A and C respectively
 			resultNames := make([]string, len(result))
 			for i, c := range result {
 				resultNames[i] = c.Name()
 			}
 
-			// B should come before A, D should come before C
-			bIndex := -1
-			aIndex := -1
-			dIndex := -1
-			cIndex := -1
-			for i, name := range resultNames {
-				switch name {
-				case "b":
-					bIndex = i
-				case "a":
-					aIndex = i
-				case "d":
-					dIndex = i
-				case "c":
-					cIndex = i
-				}
-			}
-
-			gomega.Expect(bIndex).To(gomega.BeNumerically("<", aIndex))
-			gomega.Expect(dIndex).To(gomega.BeNumerically("<", cIndex))
+			assertOrderBefore(resultNames, "b", "a")
+			assertOrderBefore(resultNames, "d", "c")
 		})
 
 		ginkgo.It("should detect self-referencing containers as cycles", func() {
@@ -413,16 +393,6 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(result).To(gomega.HaveLen(2))
 			gomega.Expect(result[0].Name()).To(gomega.Equal("container2")) // web service
 			gomega.Expect(result[1].Name()).To(gomega.Equal("container1")) // depends on web
-		})
-	})
-
-	ginkgo.Describe("Fuzz Testing", func() {
-		ginkgo.It("should handle random dependency graphs without panicking", func() {
-			ginkgo.Skip("Fuzz tests are run separately with go test -fuzz")
-
-			// This test is a placeholder - actual fuzz tests are in the _test.go file
-			// and run with: go test -fuzz=FuzzDependencySort -fuzztime=30s ./pkg/sorter/
-			gomega.Expect(true).To(gomega.BeTrue())
 		})
 	})
 })
@@ -475,3 +445,17 @@ var _ = ginkgo.Describe("ResolveContainerIdentifier", func() {
 		gomega.Expect(result).To(gomega.Equal("container1"))
 	})
 })
+
+func assertOrderBefore(names []string, first, second string) {
+	gomega.Expect(indexOf(names, first)).To(gomega.BeNumerically("<", indexOf(names, second)))
+}
+
+func indexOf(names []string, target string) int {
+	for i, name := range names {
+		if name == target {
+			return i
+		}
+	}
+
+	return -1
+}
