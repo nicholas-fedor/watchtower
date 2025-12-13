@@ -58,19 +58,19 @@ func (c byCreated) Len() int { return len(c.containers) }
 // Swap exchanges two containers by index.
 //
 // Parameters:
-//   - i, indexJ: Indices to swap.
-func (c byCreated) Swap(i, indexJ int) {
-	c.containers[i], c.containers[indexJ] = c.containers[indexJ], c.containers[i]
-	c.parsedTimes[i], c.parsedTimes[indexJ] = c.parsedTimes[indexJ], c.parsedTimes[i]
+//   - i, j: Indices to swap.
+func (c byCreated) Swap(i, j int) {
+	c.containers[i], c.containers[j] = c.containers[j], c.containers[i]
+	c.parsedTimes[i], c.parsedTimes[j] = c.parsedTimes[j], c.parsedTimes[i]
 }
 
 // Less compares creation times using pre-parsed times.
 //
 // Parameters:
-//   - i, indexJ: Indices to compare.
+//   - i, j: Indices to compare.
 //
 // Returns:
 //   - bool: True if i was created before j.
-func (c byCreated) Less(i, indexJ int) bool {
-	return c.parsedTimes[i].Before(c.parsedTimes[indexJ])
+func (c byCreated) Less(i, j int) bool {
+	return c.parsedTimes[i].Before(c.parsedTimes[j])
 }
