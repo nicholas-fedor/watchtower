@@ -385,6 +385,14 @@ func Update(
 func UpdateImplicitRestart(containers []types.Container, allContainers []types.Container) {
 	logrus.Debug("Starting UpdateImplicitRestart")
 
+	byID := make(map[types.ContainerID]types.Container, len(allContainers))
+
+	restartByIdent := make(map[string]bool, len(allContainers))
+	for _, c := range allContainers {
+		byID[c.ID()] = c
+		restartByIdent[container.ResolveContainerIdentifier(c)] = c.ToRestart()
+	}
+
 	markedContainers := []string{}
 
 	for i, c := range containers {
@@ -399,12 +407,17 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 			"links":     links,
 		}).Debug("Checking links for container")
 
-		if link := linkedContainerMarkedForRestart(links, allContainers); link != "" {
+		if link := linkedIdentifierMarkedForRestart(links, restartByIdent); link != "" {
 			logrus.WithFields(logrus.Fields{
 				"container":  c.Name(),
 				"restarting": link,
 			}).Debug("Marked container as linked to restarting")
 			containers[i].SetLinkedToRestarting(true)
+
+			if ac, ok := byID[c.ID()]; ok {
+				ac.SetLinkedToRestarting(true)
+				restartByIdent[container.ResolveContainerIdentifier(ac)] = true
+			}
 
 			markedContainers = append(markedContainers, c.Name())
 		}
@@ -413,23 +426,20 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 	logrus.WithField("marked_containers", markedContainers).Debug("Completed UpdateImplicitRestart")
 }
 
-// linkedContainerMarkedForRestart finds a restarting linked container.
+// linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.
 //
-// It searches for a container in the links list that is marked for restart, returning its name.
+// It searches for a container identifier in the links list that is marked for restart, returning its identifier.
 //
 // Parameters:
-//   - links: List of linked container names.
-//   - allContainers: List of all containers to check against.
+//   - links: List of linked container identifiers.
+//   - restartByIdent: Map of container identifiers to restart status.
 //
 // Returns:
-//   - string: Name of restarting linked container, or empty if none.
-func linkedContainerMarkedForRestart(links []string, allContainers []types.Container) string {
-	for _, linkName := range links {
-		for _, candidate := range allContainers {
-			if candidate.Name() == linkName &&
-				candidate.ToRestart() {
-				return linkName
-			}
+//   - string: Identifier of restarting linked container, or empty if none.
+func linkedIdentifierMarkedForRestart(links []string, restartByIdent map[string]bool) string {
+	for _, ident := range links {
+		if restartByIdent[ident] {
+			return ident
 		}
 	}
 

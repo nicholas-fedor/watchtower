@@ -97,6 +97,107 @@ func getNetworkModeTestData() *mocks.TestData {
 	}
 }
 
+func getComposeTestData() *mocks.TestData {
+	// Create a database container with service name "db" but container name "myproject_db_1"
+	dbContainer := mocks.CreateMockContainerWithConfig(
+		"myproject_db_1",
+		"/myproject_db_1",
+		"postgres:latest",
+		true,
+		false,
+		time.Now().AddDate(0, 0, -1),
+		&container.Config{
+			Image: "postgres:latest",
+			Labels: map[string]string{
+				"com.docker.compose.service": "db",
+			},
+			ExposedPorts: map[nat.Port]struct{}{},
+		})
+
+	// Create a web container with service name "web" but container name "myproject_web_1"
+	// that depends on "db"
+	webContainer := mocks.CreateMockContainerWithConfig(
+		"myproject_web_1",
+		"/myproject_web_1",
+		"web:latest",
+		true,
+		false,
+		time.Now(),
+		&container.Config{
+			Image: "web:latest",
+			Labels: map[string]string{
+				"com.docker.compose.service":    "web",
+				"com.docker.compose.depends_on": "db",
+			},
+			ExposedPorts: map[nat.Port]struct{}{},
+		})
+
+	return &mocks.TestData{
+		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
+		Containers: []types.Container{dbContainer, webContainer},
+	}
+}
+
+func getComposeMultiHopTestData() *mocks.TestData {
+	// Create containers for a chain: cache -> db -> app
+	// depends on db, db depends on cache
+	cacheContainer := mocks.CreateMockContainerWithConfig(
+		"myproject_cache_1",
+		"/myproject_cache_1",
+		"redis:latest",
+		true,
+		false,
+		time.Now().AddDate(0, 0, -1),
+		&container.Config{
+			Image: "redis:latest",
+			Labels: map[string]string{
+				"com.docker.compose.service": "cache",
+			},
+			ExposedPorts: map[nat.Port]struct{}{},
+		})
+
+	dbContainer := mocks.CreateMockContainerWithConfig(
+		"myproject_db_1",
+		"/myproject_db_1",
+		"postgres:latest",
+		true,
+		false,
+		time.Now(),
+		&container.Config{
+			Image: "postgres:latest",
+			Labels: map[string]string{
+				"com.docker.compose.service":    "db",
+				"com.docker.compose.depends_on": "cache",
+			},
+			ExposedPorts: map[nat.Port]struct{}{},
+		})
+
+	appContainer := mocks.CreateMockContainerWithConfig(
+		"myproject_app_1",
+		"/myproject_app_1",
+		"app:latest",
+		true,
+		false,
+		time.Now(),
+		&container.Config{
+			Image: "app:latest",
+			Labels: map[string]string{
+				"com.docker.compose.service":    "app",
+				"com.docker.compose.depends_on": "db",
+			},
+			ExposedPorts: map[nat.Port]struct{}{},
+		})
+
+	return &mocks.TestData{
+		Staleness: map[string]bool{
+			cacheContainer.Name(): true,
+			dbContainer.Name():    false,
+			appContainer.Name():   false,
+		},
+		Containers: []types.Container{cacheContainer, dbContainer, appContainer},
+	}
+}
+
 func createDependencyChain(names []string) []types.Container {
 	containers := make([]types.Container, len(names))
 	for i := range names {
@@ -910,6 +1011,48 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
 			})
+
+			ginkgo.It(
+				"should propagate restart in Docker Compose with service name mismatch",
+				func() {
+					testData := getComposeTestData()
+					containers := testData.Containers
+
+					// db container is stale
+					containers[0].SetStale(true)
+
+					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // db
+					gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // web
+
+					actions.UpdateImplicitRestart(containers, containers)
+
+					// web should be marked for restart because it depends on db
+					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
+					gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+				},
+			)
+
+			ginkgo.It(
+				"should propagate restart through multi-hop chains in Docker Compose",
+				func() {
+					testData := getComposeMultiHopTestData()
+					containers := testData.Containers
+
+					// cache container is stale
+					containers[0].SetStale(true)
+
+					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // cache
+					gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // db
+					gomega.Expect(containers[2].ToRestart()).To(gomega.BeFalse()) // app
+
+					actions.UpdateImplicitRestart(containers, containers)
+
+					// All should be marked for restart: cache -> db -> app
+					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
+					gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+					gomega.Expect(containers[2].ToRestart()).To(gomega.BeTrue())
+				},
+			)
 			ginkgo.It("should propagate restart through chained dependencies", func() {
 				// Create a transitive dependency chain: A depends on B, B depends on C
 				containerC := mocks.CreateMockContainerWithConfig(
