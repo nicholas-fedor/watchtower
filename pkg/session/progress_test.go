@@ -692,7 +692,7 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 			m:           Progress{},
 			args:        args{containerID: "cont1"},
 			want:        Progress{},
-			expectPanic: true,
+			expectPanic: false,
 		},
 	}
 	for _, tt := range tests {
@@ -900,7 +900,7 @@ func TestProgress_MarkRestarted(t *testing.T) {
 			m:           Progress{},
 			args:        args{containerID: "cont1"},
 			want:        Progress{},
-			expectPanic: true,
+			expectPanic: false,
 		},
 	}
 	for _, tt := range tests {

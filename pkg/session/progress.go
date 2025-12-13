@@ -114,7 +114,14 @@ func (m Progress) Add(update *ContainerStatus) {
 // Parameters:
 //   - containerID: ID of container to mark.
 func (m Progress) MarkForUpdate(containerID types.ContainerID) {
-	update := m[containerID]
+	update, exists := m[containerID]
+	if !exists {
+		logrus.WithField("container_id", containerID.ShortID()).
+			Debug("Attempted to mark non-existent container for update")
+
+		return
+	}
+
 	update.state = UpdatedState
 	logrus.WithFields(logrus.Fields{
 		"container_id": containerID.ShortID(),
@@ -127,7 +134,14 @@ func (m Progress) MarkForUpdate(containerID types.ContainerID) {
 // Parameters:
 //   - containerID: ID of container to mark.
 func (m Progress) MarkRestarted(containerID types.ContainerID) {
-	update := m[containerID]
+	update, exists := m[containerID]
+	if !exists {
+		logrus.WithField("container_id", containerID.ShortID()).
+			Debug("Attempted to mark non-existent container as restarted")
+
+		return
+	}
+
 	update.state = RestartedState
 	logrus.WithFields(logrus.Fields{
 		"container_id": containerID.ShortID(),
