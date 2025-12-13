@@ -403,10 +403,10 @@ func TestMetrics_PriorityOrdering(t *testing.T) {
 
 	// Verify aggregated values
 	expectedTotals := map[string]float64{
-		"watchtower_containers_scanned":   1, // Last metric value
-		"watchtower_containers_updated":   1, // Last metric value
-		"watchtower_containers_failed":    0, // Last metric value
-		"watchtower_containers_restarted": 0, // Last metric value
+		"watchtower_containers_scanned":   1, // Most recent gauge value
+		"watchtower_containers_updated":   1, // Most recent gauge value
+		"watchtower_containers_failed":    0, // Most recent gauge value
+		"watchtower_containers_restarted": 0, // Most recent gauge value
 	}
 
 	for _, mf := range metricFamilies {
