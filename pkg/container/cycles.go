@@ -187,6 +187,18 @@ func DetectCycles(containers []types.Container) map[string]bool {
 		cycleDetector.colors[name] = 0
 	}
 
+	// Filter out unknown dependencies: only keep neighbors that are present in the containers list
+	// This prevents DFS from recursing into containers not in the original input
+	for name, neighbors := range cycleDetector.graph {
+		filtered := make([]string, 0, len(neighbors))
+		for _, neighbor := range neighbors {
+			if _, exists := cycleDetector.colors[neighbor]; exists {
+				filtered = append(filtered, neighbor)
+			}
+		}
+		cycleDetector.graph[name] = filtered
+	}
+
 	// Phase 2: Run DFS from each unvisited node to ensure complete graph coverage
 	// Multiple DFS calls needed because graph may have disconnected components
 	// Each DFS traversal detects cycles within its reachable component

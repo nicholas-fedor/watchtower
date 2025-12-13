@@ -152,4 +152,28 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		cycles := DetectCycles(containers)
 		gomega.Expect(cycles).To(gomega.BeEmpty())
 	})
+
+	ginkgo.It("should ignore unknown dependencies", func() {
+		c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+		c1.EXPECT().Name().Return("c1")
+		c1.EXPECT().Links().Return([]string{"c2", "unknown"}) // c1 links to c2 (known) and unknown (not in list)
+		c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+			ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{Name: "/c1"},
+			Config:            &dockerContainerTypes.Config{Labels: map[string]string{}},
+		})
+
+		c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+		c2.EXPECT().Name().Return("c2")
+		c2.EXPECT().Links().Return([]string{"c1"}) // c2 links back to c1, creating a cycle
+		c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+			ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{Name: "/c2"},
+			Config:            &dockerContainerTypes.Config{Labels: map[string]string{}},
+		})
+
+		containers := []types.Container{c1, c2} // Only c1 and c2 provided, "unknown" is not in the list
+		cycles := DetectCycles(containers)
+		gomega.Expect(cycles).To(gomega.HaveLen(2)) // Cycle should still be detected between c1 and c2
+		gomega.Expect(cycles).To(gomega.HaveKey("c1"))
+		gomega.Expect(cycles).To(gomega.HaveKey("c2"))
+	})
 })
