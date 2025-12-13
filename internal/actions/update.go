@@ -238,15 +238,17 @@ func Update(
 		"failed": staleCheckFailed,
 	}).Debug("Completed container staleness check")
 
+	// Build a map for a lookup of containers by ID.
+	containerByID := make(map[types.ContainerID]types.Container, len(allContainers))
+	for _, ac := range allContainers {
+		containerByID[ac.ID()] = ac
+	}
+
 	// Propagate stale status to allContainers since they are different instances.
 	for _, c := range containers {
 		if c.IsStale() {
-			for _, ac := range allContainers {
-				if ac.ID() == c.ID() {
-					ac.SetStale(true)
-
-					break
-				}
+			if ac, ok := containerByID[c.ID()]; ok {
+				ac.SetStale(true)
 			}
 		}
 	}
@@ -300,6 +302,18 @@ func Update(
 		}
 	}
 
+	// Sort containers to restart by dependencies to ensure correct update and restart order.
+	err = sorter.SortByDependencies(allContainersToRestart)
+	if err != nil {
+		logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
+
+		return nil, []types.CleanedImageInfo{}, fmt.Errorf(
+			"%w: %w",
+			errSortDependenciesFailed,
+			err,
+		)
+	}
+
 	// Log the number of containers prepared for restart.
 	logrus.WithField("restart_count", len(allContainersToRestart)).
 		Debug("Prepared containers for restart")
@@ -312,18 +326,6 @@ func Update(
 	)
 
 	if params.RollingRestart {
-		// Sort all containers to restart by dependencies
-		err = sorter.SortByDependencies(allContainersToRestart)
-		if err != nil {
-			logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
-
-			return nil, []types.CleanedImageInfo{}, fmt.Errorf(
-				"%w: %w",
-				errSortDependenciesFailed,
-				err,
-			)
-		}
-
 		// Apply rolling restarts for all containers in dependency order.
 		progress.UpdateFailed(
 			performRollingRestart(
@@ -340,18 +342,6 @@ func Update(
 			if c.IsStale() {
 				progress.MarkForUpdate(c.ID())
 			}
-		}
-
-		// Sort by dependencies
-		err = sorter.SortByDependencies(allContainersToRestart)
-		if err != nil {
-			logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
-
-			return nil, []types.CleanedImageInfo{}, fmt.Errorf(
-				"%w: %w",
-				errSortDependenciesFailed,
-				err,
-			)
 		}
 
 		// Stop and restart containers in batches, respecting dependency order.
