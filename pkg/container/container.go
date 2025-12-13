@@ -551,6 +551,10 @@ func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
 		links = append(links, service)
 	}
 
+	if len(links) == 0 {
+		return nil
+	}
+
 	clog.WithFields(logrus.Fields{
 		"compose_depends_on": composeDependsOnLabelValue,
 		"parsed_links":       links,
