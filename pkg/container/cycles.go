@@ -10,18 +10,19 @@ import (
 // The three-color DFS algorithm is a graph traversal technique that detects cycles by maintaining
 // three states for each node during depth-first search:
 //
-// 1. White (0): Node has not been visited yet. Represents unexplored territory in the graph.
-// 2. Gray (1): Node is currently being visited (in the current DFS path). If we encounter a gray
-//    node while traversing, it indicates a back edge and thus a cycle.
-// 3. Black (2): Node has been fully explored, including all its descendants. No cycles can exist
-//    through this node in future traversals.
+//  1. White (0): Node has not been visited yet. Represents unexplored territory in the graph.
+//  2. Gray (1): Node is currently being visited (in the current DFS path). If we encounter a gray
+//     node while traversing, it indicates a back edge and thus a cycle.
+//  3. Black (2): Node has been fully explored, including all its descendants. No cycles can exist
+//     through this node in future traversals.
 //
 // Cycle Detection Logic:
 // - When DFS visits a node, it marks it gray and adds it to the current path.
 // - For each neighbor:
-//   * If white: Recurse on it (continue exploration)
-//   * If gray: Cycle detected! Mark all nodes from the gray node to current node in the path as cyclic
-//   * If black: Already fully explored, no cycle through this edge
+//   - If white: Recurse on it (continue exploration)
+//   - If gray: Cycle detected! Mark all nodes from the gray node to current node in the path as cyclic
+//   - If black: Already fully explored, no cycle through this edge
+//
 // - After exploring all neighbors, mark node black and remove from path (backtrack)
 //
 // This algorithm efficiently detects all nodes involved in cycles in a single pass, with
@@ -32,7 +33,7 @@ import (
 // - graph: Adjacency list mapping container names to their dependency lists (outgoing edges)
 // - colors: State map for three-color algorithm (0=white, 1=gray, 2=black)
 // - cycles: Result map marking containers involved in cycles (true = cyclic)
-// - path: Current DFS path for cycle reconstruction when back edges are found
+// - path: Current DFS path for cycle reconstruction when back edges are found.
 type CycleDetector struct {
 	graph  map[string][]string
 	colors map[string]int // 0: white, 1: gray, 2: black
@@ -47,14 +48,14 @@ type CycleDetector struct {
 // all nodes in the cycle (from the gray node to the current node in the path) are marked as cyclic.
 //
 // Algorithm Steps:
-// 1. Mark current node as gray (visiting) and add to current path
-// 2. For each dependency (neighbor) of current node:
-//    a. If neighbor is white (unvisited): Recurse on neighbor to continue exploration
-//    b. If neighbor is gray (visiting): CYCLE DETECTED!
-//       - Find the position of neighbor in current path (start of cycle)
-//       - Mark all nodes from cycle start to current node as involved in cycle
-//    c. If neighbor is black (visited): Already fully explored, no cycle through this edge
-// 3. After exploring all neighbors: Mark node black (fully visited) and remove from path (backtrack)
+//  1. Mark current node as gray (visiting) and add to current path
+//  2. For each dependency (neighbor) of current node:
+//     a. If neighbor is white (unvisited): Recurse on neighbor to continue exploration
+//     b. If neighbor is gray (visiting): CYCLE DETECTED!
+//     - Find the position of neighbor in current path (start of cycle)
+//     - Mark all nodes from cycle start to current node as involved in cycle
+//     c. If neighbor is black (visited): Already fully explored, no cycle through this edge
+//  3. After exploring all neighbors: Mark node black (fully visited) and remove from path (backtrack)
 //
 // Cycle Reconstruction:
 // When a cycle is detected (back edge to gray node), the cycle consists of all nodes in the
@@ -86,9 +87,11 @@ func (cd *CycleDetector) dfs(node string) {
 
 			// Find the starting index of the cycle in the current path
 			idx := -1
+
 			for i, n := range cd.path {
 				if n == neighbor {
 					idx = i
+
 					break
 				}
 			}
