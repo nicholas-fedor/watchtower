@@ -3,6 +3,7 @@
 package notifications
 
 import (
+	"encoding/json"
 	"errors"
 	"text/template"
 	"time"
@@ -333,8 +334,23 @@ updt1 (mock/updt1:latest): Updated
 				ginkgo.It("should include restarted containers in JSON response", func() {
 					data := mockDataFromStates(session.UpdatedState, session.RestartedState)
 					jsonResult := getTemplatedResult(`{{ . | ToJSON }}`, false, data)
-					gomega.Expect(jsonResult).To(gomega.ContainSubstring(`"restarted"`))
-					gomega.Expect(jsonResult).To(gomega.ContainSubstring(`"updated"`))
+
+					var result map[string]any
+					gomega.Expect(json.Unmarshal([]byte(jsonResult), &result)).To(gomega.Succeed())
+
+					report, ok := result["report"].(map[string]any)
+					gomega.Expect(ok).To(gomega.BeTrue())
+
+					updated, ok := report["updated"].([]any)
+					gomega.Expect(ok).To(gomega.BeTrue())
+					gomega.Expect(updated).To(gomega.HaveLen(1))
+
+					restarted, ok := report["restarted"].([]any)
+					gomega.Expect(ok).To(gomega.BeTrue())
+					gomega.Expect(restarted).To(gomega.HaveLen(1))
+					gomega.Expect(restarted[0]).To(gomega.HaveKey("state"))
+					gomega.Expect(restarted[0].(map[string]any)["state"]).
+						To(gomega.Equal("Restarted"))
 				})
 			})
 			ginkgo.When("the report is nil", func() {
