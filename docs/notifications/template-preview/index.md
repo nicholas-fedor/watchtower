@@ -37,10 +37,13 @@ hide:
   <!-- Textarea for user to edit the notification template, with default Go template content for report and logs -->
   <textarea name="template" rows="20">{{- if .Report -}}
  {{- with .Report -}}
-   {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-   {{- if ( or .Updated .Failed ) -}}
+   {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed, {{len .Restarted}} Restarted
+   {{- if ( or .Updated .Failed .Restarted ) -}}
      {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+     {{- end -}}
+     {{- range .Restarted}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
      {{- end -}}
      {{- range .Fresh}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
@@ -94,6 +97,12 @@ hide:
     <label class="numfield">
         Failed:
         <input type="number" name="failed" value="3" min="0" />
+    </label>
+
+    <!-- Label and number input for restarted containers count, default value 3, minimum value 0 -->
+    <label class="numfield">
+        Restarted:
+        <input type="number" name="restarted" value="3" min="0" />
     </label>
 
     <!-- Label and number input for fresh containers count, default value 3, minimum value 0 -->

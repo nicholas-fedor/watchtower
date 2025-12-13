@@ -84,6 +84,7 @@
             ...arrFromCount("scanned"), // Array of "scanned" states
             ...arrFromCount("updated"), // Array of "updated" states
             ...arrFromCount("failed"), // Array of "failed" states
+            ...arrFromCount("restarted"), // Array of "restarted" states based on input
             ...arrFromCount("fresh"), // Array of "fresh" states
             ...arrFromCount("stale"), // Array of "stale" states
           ]

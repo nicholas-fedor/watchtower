@@ -127,9 +127,10 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	// Return enhanced JSON response with detailed update results
 	response := map[string]any{
 		"summary": map[string]any{
-			"scanned": metric.Scanned,
-			"updated": metric.Updated,
-			"failed":  metric.Failed,
+			"scanned":   metric.Scanned,
+			"updated":   metric.Updated,
+			"failed":    metric.Failed,
+			"restarted": metric.Restarted,
 		},
 		"timing": map[string]any{
 			"duration_ms": duration.Milliseconds(),

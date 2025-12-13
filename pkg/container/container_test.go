@@ -18,8 +18,99 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// mockContainer is a minimal mock implementation of types.Container for testing ResolveContainerIdentifier.
+type mockContainer struct {
+	name string
+	info *dockerContainerType.InspectResponse
+}
+
+var _ types.Container = mockContainer{}
+
+func (m mockContainer) ContainerInfo() *dockerContainerType.InspectResponse { return m.info }
+func (m mockContainer) Name() string                                        { return m.name }
+
+func (m mockContainer) ID() types.ContainerID { panic("not implemented") }
+
+func (m mockContainer) IsRunning() bool { panic("not implemented") }
+
+func (m mockContainer) ImageID() types.ImageID { panic("not implemented") }
+
+func (m mockContainer) SafeImageID() types.ImageID { panic("not implemented") }
+
+func (m mockContainer) ImageName() string { panic("not implemented") }
+
+func (m mockContainer) Enabled() (bool, bool) { panic("not implemented") }
+
+func (m mockContainer) IsMonitorOnly(
+	_ types.UpdateParams,
+) bool {
+	panic("not implemented")
+}
+
+func (m mockContainer) Scope() (string, bool) { panic("not implemented") }
+
+func (m mockContainer) Links() []string { panic("not implemented") }
+
+func (m mockContainer) ToRestart() bool { panic("not implemented") }
+
+func (m mockContainer) IsWatchtower() bool { panic("not implemented") }
+
+func (m mockContainer) StopSignal() string { panic("not implemented") }
+
+func (m mockContainer) HasImageInfo() bool { panic("not implemented") }
+
+func (m mockContainer) ImageInfo() *dockerImageType.InspectResponse { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePreCheckCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePostCheckCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePreUpdateCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePostUpdateCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecycleUID() (int, bool) { panic("not implemented") }
+
+func (m mockContainer) GetLifecycleGID() (int, bool) { panic("not implemented") }
+
+func (m mockContainer) VerifyConfiguration() error { panic("not implemented") }
+
+func (m mockContainer) SetStale(
+	_ bool,
+) {
+	panic("not implemented")
+}
+
+func (m mockContainer) IsStale() bool { panic("not implemented") }
+
+func (m mockContainer) IsNoPull(
+	_ types.UpdateParams,
+) bool {
+	panic("not implemented")
+}
+
+func (m mockContainer) SetLinkedToRestarting(
+	_ bool,
+) {
+	panic("not implemented")
+}
+
+func (m mockContainer) IsLinkedToRestarting() bool { panic("not implemented") }
+
+func (m mockContainer) PreUpdateTimeout() int { panic("not implemented") }
+
+func (m mockContainer) PostUpdateTimeout() int { panic("not implemented") }
+
+func (m mockContainer) IsRestarting() bool { panic("not implemented") }
+
+func (m mockContainer) GetCreateConfig() *dockerContainerType.Config { panic("not implemented") }
+func (m mockContainer) GetCreateHostConfig() *dockerContainerType.HostConfig {
+	panic("not implemented")
+}
 
 var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Configuration Validation", func() {
@@ -309,6 +400,89 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.Context("fetching container links", func() {
+			ginkgo.When("compose depends-on label is present", func() {
+				ginkgo.It("returns single dependent container", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.HaveLen(1),
+					))
+				})
+
+				ginkgo.It("returns multiple dependent containers", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres,redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("trims whitespace from service names", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": " postgres , redis ",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("normalizes container names with slashes", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						compose.ComposeDependsOnLabel: "/postgres,/redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+					))
+				})
+
+				ginkgo.It(
+					"watchtower depends-on label takes precedence over compose depends_on",
+					func() {
+						container = MockContainer(WithLabels(map[string]string{
+							"com.docker.compose.depends_on":             "postgres",
+							"com.centurylinklabs.watchtower.depends-on": "redis",
+						}))
+						links := container.Links()
+						gomega.Expect(links).To(gomega.SatisfyAll(
+							gomega.ContainElement("redis"),
+							gomega.Not(gomega.ContainElement("postgres")),
+							gomega.HaveLen(1),
+						))
+					},
+				)
+
+				ginkgo.It("returns empty links for blank compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "",
+					}))
+					gomega.Expect(container.Links()).To(gomega.BeEmpty())
+				})
+
+				ginkgo.It("parses colon-separated service:condition:required format", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres:service_started:required,redis:service_healthy",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.HaveLen(2),
+					))
+				})
+			})
+
 			ginkgo.When("depends-on label is present", func() {
 				ginkgo.It("returns single dependent container", func() {
 					container = MockContainer(WithLabels(map[string]string{
@@ -316,7 +490,7 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("postgres"),
 						gomega.HaveLen(1),
 					))
 				})
@@ -327,20 +501,20 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 						gomega.HaveLen(2),
 					))
 				})
 
 				ginkgo.It("normalizes container names with slashes", func() {
 					container = MockContainer(WithLabels(map[string]string{
-						"com.centurylinklabs.watchtower.depends-on": "/postgres,redis",
+						"com.centurylinklabs.watchtower.depends-on": "/postgres,/redis",
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 					))
 				})
 
@@ -352,7 +526,7 @@ var _ = ginkgo.Describe("Container", func() {
 				})
 			})
 
-			ginkgo.It("returns links from host config when depends-on label is absent", func() {
+			ginkgo.It("returns links from host config when depends-on labels are absent", func() {
 				container = MockContainer(WithLinks([]string{
 					"redis:test-watchtower",
 					"postgres:test-watchtower",
@@ -373,6 +547,67 @@ var _ = ginkgo.Describe("Container", func() {
 			}))
 			gomega.Expect(container.PreUpdateTimeout()).To(gomega.Equal(3))
 			gomega.Expect(container.PostUpdateTimeout()).To(gomega.Equal(5))
+		})
+	})
+
+	ginkgo.Describe("ResolveContainerIdentifier", func() {
+		ginkgo.It("returns service name when compose service label is present", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service": "web-service",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("web-service"))
+		})
+
+		ginkgo.It("returns container name when compose service label is absent", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"other.label": "value",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when labels are empty", func() {
+			container := MockContainer(WithLabels(map[string]string{}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when labels are nil", func() {
+			container := MockContainer(WithLabels(nil))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns service name when compose service label has value", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service": "api",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("api"))
+		})
+
+		ginkgo.It("handles multiple labels with service name present", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service":     "db-service",
+				"com.docker.compose.project":     "myproject",
+				"com.centurylinklabs.watchtower": "true",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("db-service"))
+		})
+
+		ginkgo.It("returns container name when ContainerInfo returns nil", func() {
+			container := mockContainer{name: "test-watchtower", info: nil}
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when ContainerInfo.Config is nil", func() {
+			container := MockContainer(WithLabels(map[string]string{}))
+			container.containerInfo.Config = nil
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
 		})
 	})
 
@@ -982,7 +1217,7 @@ var _ = ginkgo.Describe("Container", func() {
 			inspectResponse := dockerContainerType.InspectResponse{
 				ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
 					ID:         containerID,
-					Name:       "/" + containerName,
+					Name:       containerName,
 					HostConfig: mockContainer.GetCreateHostConfig(),
 					State:      &dockerContainerType.State{Running: true},
 				},
@@ -1074,7 +1309,7 @@ var _ = ginkgo.Describe("Container", func() {
 				inspectResponse := dockerContainerType.InspectResponse{
 					ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
 						ID:         containerID,
-						Name:       "/" + containerName,
+						Name:       containerName,
 						HostConfig: mockContainer.GetCreateHostConfig(),
 						State:      &dockerContainerType.State{Running: true},
 					},

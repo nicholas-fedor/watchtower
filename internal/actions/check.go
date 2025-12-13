@@ -3,7 +3,6 @@ package actions
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -48,6 +47,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 
 	// Check each container for links, which are incompatible with rolling restarts.
 	for _, c := range containers {
+		// c.Links() already returns normalized container names
 		if links := c.Links(); len(links) > 0 {
 			logrus.WithFields(logrus.Fields{
 				"container": c.Name(),
@@ -141,7 +141,12 @@ func cleanupExcessWatchtowers(
 	cleanupImageInfos *[]types.CleanedImageInfo,
 ) (bool, error) {
 	// Sort containers by creation time to identify the newest instance.
-	sort.Sort(sorter.ByCreated(containers))
+	if err := sorter.SortByCreated(containers); err != nil {
+		logrus.WithError(err).Debug("Failed to sort containers by creation time")
+
+		return false, fmt.Errorf("%w: %w", errStopWatchtowerFailed, err)
+	}
+
 	logrus.WithField("containers", containerNames(containers)).
 		Debug("Sorted Watchtower instances by creation time")
 

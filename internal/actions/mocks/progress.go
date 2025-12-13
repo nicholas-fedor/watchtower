@@ -18,10 +18,11 @@ var errMockFailed = errors.New("accidentally the whole container")
 
 // State ID prefixes for generating unique mock container IDs.
 const (
-	skippedIDPrefix = 41 // Prefix for SkippedState containers (e.g., "c7941...").
-	freshIDPrefix   = 31 // Prefix for FreshState containers (e.g., "c7931...").
-	updatedIDPrefix = 11 // Prefix for UpdatedState containers (e.g., "c7911...").
-	failedIDPrefix  = 21 // Prefix for FailedState containers (e.g., "c7921...").
+	skippedIDPrefix  = 41 // Prefix for SkippedState containers (e.g., "c7941...").
+	freshIDPrefix    = 31 // Prefix for FreshState containers (e.g., "c7931...").
+	updatedIDPrefix  = 11 // Prefix for UpdatedState containers (e.g., "c7911...").
+	failedIDPrefix   = 21 // Prefix for FailedState containers (e.g., "c7921...").
+	restartedIDPrefix = 51 // Prefix for RestartedState containers (e.g., "c7951...").
 )
 
 // CreateMockProgressReport generates a mock report from a given set of container states.
@@ -52,6 +53,10 @@ func CreateMockProgressReport(states ...session.State) types.Report {
 			progress.AddScanned(c, newImage, types.UpdateParams{})
 
 			failed[c.ID()] = errMockFailed
+		case session.RestartedState:
+			c, _ := CreateContainerForProgress(index, restartedIDPrefix, "rstr%d")
+			progress.AddScanned(c, c.ImageID(), types.UpdateParams{})
+			progress.MarkRestarted(c.ID())
 		case session.UnknownState, session.ScannedState, session.StaleState:
 			// These states are not explicitly handled in this mock as they’re intermediate or unused here.
 			continue

@@ -41,6 +41,8 @@ type TestData struct {
 	StopContainerFailCount       int               // Number of times StopContainer should fail before succeeding.
 	RemoveImageError             error             // Error to return from RemoveImageByID (for testing).
 	FailedImageIDs               []types.ImageID   // List of image IDs that should fail removal.
+	StopOrder                    []string          // Order in which containers were stopped.
+	StartOrder                   []string          // Order in which containers were started.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -95,6 +97,7 @@ func (client MockClient) StopContainer(c types.Container, _ time.Duration) error
 		return client.TestData.StopContainerError
 	}
 	client.Stopped[string(c.ID())] = true
+	client.TestData.StopOrder = append(client.TestData.StopOrder, c.Name())
 	return nil
 }
 
@@ -108,6 +111,7 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 // It provides a minimal implementation for testing purposes.
 func (client MockClient) StartContainer(c types.Container) (types.ContainerID, error) {
 	client.TestData.StartContainerCount++
+	client.TestData.StartOrder = append(client.TestData.StartOrder, c.Name())
 	return c.ID(), nil
 }
 

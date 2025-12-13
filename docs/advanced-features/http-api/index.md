@@ -9,10 +9,10 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 ## Endpoints
 
-|            **Name**            | **Endpoint**  |          **Parameters**           |                                    **Description**                                    |
-|:------------------------------:|:-------------:|:---------------------------------:|:-------------------------------------------------------------------------------------:|
-|   [Update](#http_api_update)   | `/v1/update`  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation                 |
-| [Metrics](../metrics/index.md) | `/v1/metrics` |                                   | Exposes Prometheus-compatible metrics for monitoring and alerting                     |
+|            **Name**            | **Endpoint**  |          **Parameters**           |                           **Description**                            |
+|:------------------------------:|:-------------:|:---------------------------------:|:--------------------------------------------------------------------:|
+|   [Update](#http_api_update)   | `/v1/update`  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation |
+| [Metrics](../metrics/index.md) | `/v1/metrics` |                                   |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
 
 ### HTTP API Update
 
@@ -27,7 +27,8 @@ The `/v1/update` endpoint returns a JSON response containing the results of the 
   "summary": {
     "scanned": 8,
     "updated": 0,
-    "failed": 0
+    "failed": 0,
+    "restarted": 0
   },
   "timing": {
     "duration_ms": 1250,
@@ -43,6 +44,9 @@ The `/v1/update` endpoint returns a JSON response containing the results of the 
 - `scanned`: Number of containers that were scanned for updates
 - `updated`: Number of containers that were successfully updated
 - `failed`: Number of containers where the update failed
+- `restarted`: Number of containers that were restarted due to linked dependencies
+
+Restarted containers represent containers that were restarted because they have dependencies on other containers that were updated. This is part of Watchtower's linked container functionality, which ensures that dependent services are restarted when their linked containers are updated to maintain consistency.
 
 **Timing Section:**
 

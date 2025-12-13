@@ -3,6 +3,7 @@
 package notifications
 
 import (
+	"encoding/json"
 	"errors"
 	"text/template"
 	"time"
@@ -235,7 +236,7 @@ updt1 (mock/updt1:latest): Updated
 	ginkgo.When("using report templates", func() {
 		ginkgo.When("no custom template is provided", func() {
 			ginkgo.It("should format the messages using the default template", func() {
-				expected := `4 Scanned, 2 Updated, 1 Failed
+				expected := `4 Scanned, 2 Updated, 0 Restarted, 1 Failed
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000
 - updt2 (mock/updt2:latest): 01d120000000 updated to d0a120000000
 - frsh1 (mock/frsh1:latest): Fresh
@@ -284,7 +285,7 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.Describe("the default template", func() {
 			ginkgo.When("all containers are fresh", func() {
 				ginkgo.It("should return the summary", func() {
-					expected := `1 Scanned, 0 Updated, 0 Failed
+					expected := `1 Scanned, 0 Updated, 0 Restarted, 0 Failed
 - frsh1 (mock/frsh1:latest): Fresh`
 					gomega.Expect(getTemplatedResult(``, false, mockDataAllFresh)).
 						To(gomega.Equal(expected))
@@ -292,7 +293,7 @@ updt1 (mock/updt1:latest): Updated
 			})
 			ginkgo.When("at least one container was updated", func() {
 				ginkgo.It("should send a report", func() {
-					expected := `1 Scanned, 1 Updated, 0 Failed
+					expected := `1 Scanned, 1 Updated, 0 Restarted, 0 Failed
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000`
 					data := mockDataFromStates(session.UpdatedState)
 					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
@@ -300,10 +301,56 @@ updt1 (mock/updt1:latest): Updated
 			})
 			ginkgo.When("at least one container failed to update", func() {
 				ginkgo.It("should send a report", func() {
-					expected := `1 Scanned, 0 Updated, 1 Failed
+					expected := `1 Scanned, 0 Updated, 0 Restarted, 1 Failed
 - fail1 (mock/fail1:latest): Failed: accidentally the whole container`
 					data := mockDataFromStates(session.FailedState)
 					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
+				})
+			})
+			ginkgo.When("containers are restarted due to dependencies", func() {
+				ginkgo.It("should send a report with restarted containers", func() {
+					expected := `2 Scanned, 1 Updated, 1 Restarted, 0 Failed
+- updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000
+- rstr1 (mock/rstr1:latest): Restarted`
+					data := mockDataFromStates(session.UpdatedState, session.RestartedState)
+					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
+				})
+			})
+			ginkgo.When("mixing updated and restarted containers", func() {
+				ginkgo.It("should show different states for updated vs restarted", func() {
+					expected := `3 Scanned, 2 Updated, 1 Restarted, 0 Failed
+- updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000
+- updt2 (mock/updt2:latest): 01d120000000 updated to d0a120000000
+- rstr1 (mock/rstr1:latest): Restarted`
+					data := mockDataFromStates(
+						session.UpdatedState,
+						session.RestartedState,
+						session.UpdatedState,
+					)
+					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
+				})
+			})
+			ginkgo.When("testing JSON output format", func() {
+				ginkgo.It("should include restarted containers in JSON response", func() {
+					data := mockDataFromStates(session.UpdatedState, session.RestartedState)
+					jsonResult := getTemplatedResult(`{{ . | ToJSON }}`, false, data)
+
+					var result map[string]any
+					gomega.Expect(json.Unmarshal([]byte(jsonResult), &result)).To(gomega.Succeed())
+
+					report, ok := result["report"].(map[string]any)
+					gomega.Expect(ok).To(gomega.BeTrue())
+
+					updated, ok := report["updated"].([]any)
+					gomega.Expect(ok).To(gomega.BeTrue())
+					gomega.Expect(updated).To(gomega.HaveLen(1))
+
+					restarted, ok := report["restarted"].([]any)
+					gomega.Expect(ok).To(gomega.BeTrue())
+					gomega.Expect(restarted).To(gomega.HaveLen(1))
+					gomega.Expect(restarted[0]).To(gomega.HaveKey("state"))
+					gomega.Expect(restarted[0].(map[string]any)["state"]).
+						To(gomega.Equal("Restarted"))
 				})
 			})
 			ginkgo.When("the report is nil", func() {

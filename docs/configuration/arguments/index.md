@@ -308,6 +308,9 @@ Environment Variable: WATCHTOWER_ROLLING_RESTART
 
     If a container fails to become healthy within 5 minutes, Watchtower logs a warning but continues with the next container to avoid blocking the entire update process.
 
+!!! Warning "This functionality is currently not supported when used in combination with linked-containers."
+     This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.
+
 ### Cleanup Old Images
 
 Removes old images after updating containers to free disk space.

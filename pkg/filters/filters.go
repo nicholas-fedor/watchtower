@@ -8,7 +8,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -71,53 +70,28 @@ func NoFilter(c types.FilterableContainer) bool {
 // FilterByNames selects containers matching specified names.
 //
 // Parameters:
-//   - names: List of names or regex patterns to match.
+//   - normalizedNames: List of normalized names or regex patterns to match.
 //   - baseFilter: Base filter to chain.
 //
 // Returns:
 //   - types.Filter: Filter function combining name check with base filter.
-func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
-	if len(names) == 0 {
+func FilterByNames(normalizedNames []string, baseFilter types.Filter) types.Filter {
+	if len(normalizedNames) == 0 {
 		return baseFilter
 	}
 
 	return func(c types.FilterableContainer) bool {
+		containerName := c.Name() // Normalized name
 		clog := logrus.WithFields(logrus.Fields{
 			"container": c.Name(),
-			"names":     names,
+			"names":     normalizedNames,
 		})
 
-		for _, name := range names {
-			// Match exact name with or without leading slash.
-			if name == "/" {
-				if c.Name() == "/" {
-					clog.Debug("Matched container by exact name")
-
-					return baseFilter(c)
-				}
-			} else if util.NormalizeContainerName(name) == util.NormalizeContainerName(c.Name()) {
-				clog.Debug("Matched container by exact name")
+		for _, pattern := range normalizedNames {
+			if matchesName(containerName, pattern) {
+				clog.Debug("Matched container by name/pattern")
 
 				return baseFilter(c)
-			}
-
-			// Try regex match if name is a pattern.
-			if re, err := regexp.Compile(name); err == nil {
-				indices := re.FindStringIndex(c.Name())
-				if indices == nil {
-					continue
-				}
-
-				start := indices[0]
-				end := indices[1]
-
-				if start <= 1 && end >= len(c.Name())-1 {
-					clog.Debug("Matched container by regex")
-
-					return baseFilter(c)
-				}
-			} else {
-				clog.WithError(err).Warn("Invalid regex in name filter")
 			}
 		}
 
@@ -130,31 +104,26 @@ func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 // FilterByDisableNames excludes containers matching specified names.
 //
 // Parameters:
-//   - disableNames: Names to exclude.
+//   - normalizedDisableNames: Names or regex patterns to exclude.
 //   - baseFilter: Base filter to chain.
 //
 // Returns:
 //   - types.Filter: Filter function excluding names and applying base filter.
-func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.Filter {
-	if len(disableNames) == 0 {
+func FilterByDisableNames(normalizedDisableNames []string, baseFilter types.Filter) types.Filter {
+	if len(normalizedDisableNames) == 0 {
 		return baseFilter
 	}
 
 	return func(c types.FilterableContainer) bool {
+		containerName := c.Name() // Normalized name
 		clog := logrus.WithFields(logrus.Fields{
 			"container":    c.Name(),
-			"disableNames": disableNames,
+			"disableNames": normalizedDisableNames,
 		})
 
-		for _, name := range disableNames {
-			if name == "/" {
-				if c.Name() == "/" {
-					clog.Debug("Container excluded by disable name")
-
-					return false
-				}
-			} else if util.NormalizeContainerName(name) == util.NormalizeContainerName(c.Name()) {
-				clog.Debug("Container excluded by disable name")
+		for _, pattern := range normalizedDisableNames {
+			if matchesName(containerName, pattern) {
+				clog.Debug("Container excluded by disable name/pattern")
 
 				return false
 			}
@@ -279,6 +248,29 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	}
 }
 
+// matchesName checks if a container name matches a given pattern (exact or regex).
+// Returns true if it matches, false otherwise.
+// Invalid regex patterns are treated as literal strings for exact matching.
+func matchesName(containerName, pattern string) bool {
+	// Normalize the pattern by trimming leading slash.
+	// This is retained to ensure robust handling, despite existing input normalization.
+	pattern = strings.TrimPrefix(pattern, "/")
+
+	// Exact match first.
+	if pattern == containerName {
+		return true
+	}
+
+	// Try regex match (anchored to match whole string).
+	regex, err := regexp.Compile("^" + pattern + "$")
+	if err != nil {
+		// Treat invalid regex as literal string (exact match already checked above).
+		return false
+	}
+
+	return regex.MatchString(containerName)
+}
+
 // matchImageAndTag checks if a container's image matches a target image, including optional tag.
 //
 // Parameters:
@@ -305,8 +297,8 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 // BuildFilter constructs a composite filter for containers.
 //
 // Parameters:
-//   - names: Names to include.
-//   - disableNames: Names to exclude.
+//   - normalizedNames: Normalized names or regex patterns to include.
+//   - disableNames: Normalized names or regex patterns to exclude.
 //   - enableLabel: Require enable label if true.
 //   - scope: Scope to match.
 //
@@ -314,14 +306,14 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 //   - types.Filter: Combined filter function.
 //   - string: Description of the filter.
 func BuildFilter(
-	names []string,
-	disableNames []string,
+	normalizedNames []string,
+	normalizedDisableNames []string,
 	enableLabel bool,
 	scope string,
 ) (types.Filter, string) {
 	clog := logrus.WithFields(logrus.Fields{
-		"names":        names,
-		"disableNames": disableNames,
+		"names":        normalizedNames,
+		"disableNames": normalizedDisableNames,
 		"enableLabel":  enableLabel,
 		"scope":        scope,
 	})
@@ -330,17 +322,17 @@ func BuildFilter(
 	// Start with no filter and chain additional filters.
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
-	filter = FilterByNames(names, filter)
-	filter = FilterByDisableNames(disableNames, filter)
+	filter = FilterByNames(normalizedNames, filter)
+	filter = FilterByDisableNames(normalizedDisableNames, filter)
 
 	// Add name-based filter description.
-	if len(names) > 0 {
+	if len(normalizedNames) > 0 {
 		stringBuilder.WriteString("which name matches \"")
 
-		for i, n := range names {
+		for i, n := range normalizedNames {
 			stringBuilder.WriteString(n)
 
-			if i < len(names)-1 {
+			if i < len(normalizedNames)-1 {
 				stringBuilder.WriteString(`" or "`)
 			}
 		}
@@ -349,13 +341,13 @@ func BuildFilter(
 	}
 
 	// Add disable-name-based filter description.
-	if len(disableNames) > 0 {
+	if len(normalizedDisableNames) > 0 {
 		stringBuilder.WriteString("not named one of \"")
 
-		for i, n := range disableNames {
+		for i, n := range normalizedDisableNames {
 			stringBuilder.WriteString(n)
 
-			if i < len(disableNames)-1 {
+			if i < len(normalizedDisableNames)-1 {
 				stringBuilder.WriteString(`" or "`)
 			}
 		}

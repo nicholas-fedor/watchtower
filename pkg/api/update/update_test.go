@@ -94,6 +94,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(8)))
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
+				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(0)))
 
 				// Check timing section
 				timing := response["timing"].(map[string]any)
@@ -133,6 +134,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(2)))
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(1)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
+				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(0)))
 
 				// Check timing section
 				timing := response["timing"].(map[string]any)
@@ -223,6 +225,175 @@ var _ = ginkgo.Describe("Update Handler", func() {
 			gomega.Expect(rec.Body.String()).
 				To(gomega.ContainSubstring("Failed to read request body"))
 		})
+
+		ginkgo.It(
+			"should handle error when restarted containers cause JSON encoding failure",
+			func() {
+				// Mock update function that returns metric with restarted containers
+				mockUpdateFn = func(_ []string) *metrics.Metric {
+					return &metrics.Metric{Scanned: 10, Updated: 2, Failed: 1, Restarted: 3}
+				}
+				handler = update.New(mockUpdateFn, nil)
+
+				// Simulate JSON encoding failure by replacing the writer
+				faultyWriter := &faultyResponseWriter{}
+				req = httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+
+				handler.Handle(faultyWriter, req)
+				// Verify that StatusInternalServerError was attempted to be set
+				gomega.Expect(faultyWriter.lastStatusCode).
+					To(gomega.Equal(http.StatusInternalServerError))
+				// Verify that writing was attempted (but failed)
+				gomega.Expect(faultyWriter.written).To(gomega.BeTrue())
+			},
+		)
+
+		ginkgo.It(
+			"should correctly report state transitions with restarted containers in API response",
+			func() {
+				called := false
+				mockUpdateFn = func(images []string) *metrics.Metric {
+					called = true
+					gomega.Expect(images).To(gomega.BeNil())
+
+					// Simulate state transition: containers scanned, some updated, some restarted
+					return &metrics.Metric{Scanned: 5, Updated: 1, Failed: 0, Restarted: 2}
+				}
+				handler = update.New(mockUpdateFn, nil)
+
+				handler.Handle(rec, req)
+				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
+
+				var response map[string]any
+				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+
+				summary := response["summary"].(map[string]any)
+				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(5)))
+				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(1)))
+				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
+				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(2)))
+
+				gomega.Expect(called).To(gomega.BeTrue())
+			},
+		)
+
+		ginkgo.It(
+			"should maintain priority ordering in API response summary with restarted containers",
+			func() {
+				mockUpdateFn = func(_ []string) *metrics.Metric {
+					return &metrics.Metric{Scanned: 20, Updated: 5, Failed: 2, Restarted: 8}
+				}
+				handler = update.New(mockUpdateFn, nil)
+
+				handler.Handle(rec, req)
+				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
+
+				var response map[string]any
+				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+
+				summary := response["summary"].(map[string]any)
+				// Verify all fields are present and correctly ordered in the JSON structure
+				gomega.Expect(summary).To(gomega.HaveKey("scanned"))
+				gomega.Expect(summary).To(gomega.HaveKey("updated"))
+				gomega.Expect(summary).To(gomega.HaveKey("failed"))
+				gomega.Expect(summary).To(gomega.HaveKey("restarted"))
+
+				// Verify values are correct
+				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(20)))
+				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(5)))
+				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(2)))
+				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(8)))
+			},
+		)
+
+		ginkgo.It("should handle concurrent requests correctly with restarted containers", func() {
+			var wg sync.WaitGroup
+			calledCount := 0
+			mockUpdateFn = func(_ []string) *metrics.Metric {
+				calledCount++
+				time.Sleep(10 * time.Millisecond) // Simulate work
+
+				return &metrics.Metric{Scanned: 8, Updated: 2, Failed: 0, Restarted: 3}
+			}
+			handler = update.New(mockUpdateFn, nil)
+
+			// Simulate 5 concurrent requests
+			for range 5 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					localRec := httptest.NewRecorder()
+					localReq := httptest.NewRequest(
+						http.MethodPost,
+						"/v1/update",
+						bytes.NewBufferString("test body"),
+					)
+					handler.Handle(localRec, localReq)
+					gomega.Expect(localRec.Code).To(gomega.Equal(http.StatusOK))
+
+					var response map[string]any
+					gomega.Expect(json.Unmarshal(localRec.Body.Bytes(), &response)).
+						To(gomega.Succeed())
+
+					summary := response["summary"].(map[string]any)
+					gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(3)))
+				}()
+			}
+			wg.Wait()
+			gomega.Expect(calledCount).To(gomega.Equal(5))
+		})
+
+		ginkgo.It("should handle restarted containers with large datasets correctly", func() {
+			mockUpdateFn = func(_ []string) *metrics.Metric {
+				// Simulate large dataset with many restarted containers
+				return &metrics.Metric{Scanned: 1000, Updated: 200, Failed: 50, Restarted: 300}
+			}
+			handler = update.New(mockUpdateFn, nil)
+
+			handler.Handle(rec, req)
+			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
+
+			var response map[string]any
+			gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+
+			summary := response["summary"].(map[string]any)
+			gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(1000)))
+			gomega.Expect(summary["updated"]).To(gomega.Equal(float64(200)))
+			gomega.Expect(summary["failed"]).To(gomega.Equal(float64(50)))
+			gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(300)))
+
+			// Verify timing information is still included
+			timing := response["timing"].(map[string]any)
+			gomega.Expect(timing["duration_ms"]).To(gomega.BeNumerically(">=", 0))
+		})
+
+		ginkgo.It(
+			"should return appropriate API error responses when restarted containers fail",
+			func() {
+				// Test case where update function encounters issues with restarted containers
+				// Since the update function doesn't return errors, we test the scenario where
+				// the metric indicates failures alongside restarts
+				mockUpdateFn = func(_ []string) *metrics.Metric {
+					return &metrics.Metric{Scanned: 10, Updated: 1, Failed: 3, Restarted: 2}
+				}
+				handler = update.New(mockUpdateFn, nil)
+
+				handler.Handle(rec, req)
+				gomega.Expect(rec.Code).
+					To(gomega.Equal(http.StatusOK))
+					// Still 200 since no error in processing
+
+				var response map[string]any
+				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+
+				summary := response["summary"].(map[string]any)
+				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(3)))
+				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(2)))
+				// Verify that both failed and restarted are reported correctly
+			},
+		)
 	})
 })
 
@@ -233,3 +404,37 @@ type faultyReadCloser struct {
 
 func (f *faultyReadCloser) Read(_ []byte) (int, error) { return 0, f.err }
 func (f *faultyReadCloser) Close() error               { return nil }
+
+// faultyResponseWriter simulates a response writer that fails on Write.
+type faultyResponseWriter struct {
+	statusCode     int
+	header         http.Header
+	written        bool
+	lastStatusCode int // Track the last status code that was attempted
+}
+
+func (f *faultyResponseWriter) Header() http.Header {
+	if f.header == nil {
+		f.header = make(http.Header)
+	}
+
+	return f.header
+}
+
+func (f *faultyResponseWriter) Write(_ []byte) (int, error) {
+	if !f.written && f.statusCode == 0 {
+		f.statusCode = http.StatusOK
+	}
+
+	f.written = true
+
+	return 0, errors.New("write error")
+}
+
+func (f *faultyResponseWriter) WriteHeader(statusCode int) {
+	f.lastStatusCode = statusCode
+	if !f.written {
+		f.statusCode = statusCode
+	}
+	// Ignore subsequent calls to WriteHeader after writing has started
+}

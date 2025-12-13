@@ -16,6 +16,7 @@ import (
 	dockerAPIVersion "github.com/docker/docker/api/types/versions"
 	dockerClient "github.com/docker/docker/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -130,14 +131,14 @@ func GetSourceContainer(
 		parentContainer, err := api.ContainerInspect(ctx, netContainerID)
 		if err != nil {
 			clog.WithError(err).WithFields(logrus.Fields{
-				"container":         containerInfo.Name,
+				"container":         util.NormalizeContainerName(containerInfo.Name),
 				"network_container": netContainerID,
 			}).Warn("Unable to resolve network container")
 		} else {
 			containerInfo.HostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + parentContainer.Name)
 			clog.WithFields(logrus.Fields{
-				"container":         containerInfo.Name,
-				"network_container": parentContainer.Name,
+				"container":         util.NormalizeContainerName(containerInfo.Name),
+				"network_container": util.NormalizeContainerName(parentContainer.Name),
 			}).Debug("Resolved network container name")
 		}
 	}
@@ -193,10 +194,15 @@ func StopSourceContainer(
 		}
 
 		// Log the stop attempt with the signal and configured timeout for clarity.
+		message := "Stopping container"
+		if sourceContainer.IsLinkedToRestarting() {
+			message = "Stopping linked container"
+		}
+
 		clog.WithFields(logrus.Fields{
 			"signal":  signal,
 			"timeout": timeout,
-		}).Info("Stopping container")
+		}).Info(message)
 
 		// Record the start time to measure elapsed duration for the stop operation.
 		startTime := time.Now()

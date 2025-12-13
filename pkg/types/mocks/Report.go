@@ -174,6 +174,52 @@ func (_c *MockReport_Fresh_Call) RunAndReturn(run func() []types.ContainerReport
 	return _c
 }
 
+// Restarted provides a mock function for the type MockReport
+func (_mock *MockReport) Restarted() []types.ContainerReport {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Restarted")
+	}
+
+	var r0 []types.ContainerReport
+	if returnFunc, ok := ret.Get(0).(func() []types.ContainerReport); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.ContainerReport)
+		}
+	}
+	return r0
+}
+
+// MockReport_Restarted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Restarted'
+type MockReport_Restarted_Call struct {
+	*mock.Call
+}
+
+// Restarted is a helper method to define mock.On call
+func (_e *MockReport_Expecter) Restarted() *MockReport_Restarted_Call {
+	return &MockReport_Restarted_Call{Call: _e.mock.On("Restarted")}
+}
+
+func (_c *MockReport_Restarted_Call) Run(run func()) *MockReport_Restarted_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockReport_Restarted_Call) Return(containerReports []types.ContainerReport) *MockReport_Restarted_Call {
+	_c.Call.Return(containerReports)
+	return _c
+}
+
+func (_c *MockReport_Restarted_Call) RunAndReturn(run func() []types.ContainerReport) *MockReport_Restarted_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Scanned provides a mock function for the type MockReport
 func (_mock *MockReport) Scanned() []types.ContainerReport {
 	ret := _mock.Called()

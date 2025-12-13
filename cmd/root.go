@@ -26,6 +26,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
@@ -273,7 +274,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Set additional configuration flags that control update behavior and scope.
 	enableLabel, _ = flagsSet.GetBool("label-enable")
+
 	disableContainers, _ = flagsSet.GetStringSlice("disable-containers")
+	for i := range disableContainers {
+		disableContainers[i] = util.NormalizeContainerName(disableContainers[i])
+	}
+
 	lifecycleHooks, _ = flagsSet.GetBool("enable-lifecycle-hooks")
 	rollingRestart, _ = flagsSet.GetBool("rolling-restart")
 	scope, _ = flagsSet.GetString("scope")
@@ -336,17 +342,21 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 // run executes the main Watchtower logic based on parsed command-line flags.
 //
-// It determines the operational mode (one-time update, HTTP API, or scheduled updates), builds
-// the container filter, and delegates to runMain for core execution, exiting with a status code
-// based on the outcome (0 for success, non-zero for failure).
+// It determines the operational mode (one-time update, HTTP API, or scheduled updates),
+// builds the container filter, and delegates to runMain for core execution,
+// exiting with a status code based on the outcome (0 for success, non-zero for failure).
 //
 // This function bridges flag parsing and the application’s primary workflow.
 //
 // Parameters:
 //   - c: The cobra.Command instance being executed, providing access to parsed flags.
 //   - names: A slice of container names provided as positional arguments, used for filtering.
-func run(c *cobra.Command, names []string) {
-	logrus.WithField("positional_args", names).
+func run(c *cobra.Command, normalizedNames []string) {
+	for i := range normalizedNames {
+		normalizedNames[i] = util.NormalizeContainerName(normalizedNames[i])
+	}
+
+	logrus.WithField("positional_args", normalizedNames).
 		Debug("Received positional arguments for container filtering")
 	// Attempt to derive the operational scope from the current container's scope label
 	// if not explicitly set. This ensures scope persistence during self-updates.
@@ -354,8 +364,13 @@ func run(c *cobra.Command, names []string) {
 		logrus.WithError(err).Debug("Scope derivation failed, continuing with current scope")
 	}
 
-	// Build the filter and its description based on names, exclusions, and label settings.
-	filter, filterDesc := filters.BuildFilter(names, disableContainers, enableLabel, scope)
+	// Build the filter and its description based on normalized names, exclusions, and label settings.
+	filter, filterDesc := filters.BuildFilter(
+		normalizedNames,
+		disableContainers, // Normalized container names
+		enableLabel,
+		scope,
+	)
 
 	// Get flags controlling execution mode and HTTP API behavior.
 	runOnce, _ := c.PersistentFlags().GetBool("run-once")
@@ -406,7 +421,7 @@ func run(c *cobra.Command, names []string) {
 	// Set configuration for core execution, encapsulating all operational parameters.
 	cfg := config.RunConfig{
 		Command:          c,
-		Names:            names,
+		Names:            normalizedNames,
 		Filter:           filter,
 		FilterDesc:       filterDesc,
 		RunOnce:          runOnce,

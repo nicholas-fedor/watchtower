@@ -3,17 +3,20 @@ package session
 import (
 	"sort"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // report implements the Report interface for session results.
 type report struct {
-	scanned []types.ContainerReport // Scanned containers.
-	updated []types.ContainerReport // Updated containers.
-	failed  []types.ContainerReport // Failed containers.
-	skipped []types.ContainerReport // Skipped containers.
-	stale   []types.ContainerReport // Stale containers.
-	fresh   []types.ContainerReport // Fresh containers.
+	scanned   []types.ContainerReport // Scanned containers.
+	updated   []types.ContainerReport // Updated containers.
+	failed    []types.ContainerReport // Failed containers.
+	skipped   []types.ContainerReport // Skipped containers.
+	stale     []types.ContainerReport // Stale containers.
+	fresh     []types.ContainerReport // Fresh containers.
+	restarted []types.ContainerReport // Restarted containers (linked dependencies).
 }
 
 // SingleContainerReport implements types.Report for individual container notifications.
@@ -21,15 +24,16 @@ type report struct {
 // This struct is used when notification splitting by container is enabled (--notification-split-by-container).
 // Unlike the standard report which groups all containers from a session, SingleContainerReport focuses
 // on a specific container while providing context from all other containers in the session.
-// This allows notifications to be sent separately for each updated container while maintaining
+// This allows notifications to be sent separately for each updated or restarted container while maintaining
 // awareness of the overall session state (failed, skipped, stale, fresh containers).
 type SingleContainerReport struct {
-	UpdatedReports []types.ContainerReport // Primary container(s) that were updated in this notification
-	ScannedReports []types.ContainerReport // All containers scanned during the session (for context)
-	FailedReports  []types.ContainerReport // All containers that failed to update (for context)
-	SkippedReports []types.ContainerReport // All containers that were skipped (for context)
-	StaleReports   []types.ContainerReport // All containers with stale images (for context)
-	FreshReports   []types.ContainerReport // All containers with fresh images (for context)
+	UpdatedReports   []types.ContainerReport // Primary container(s) that were updated in this notification
+	RestartedReports []types.ContainerReport // Primary container(s) that were restarted in this notification
+	ScannedReports   []types.ContainerReport // All containers scanned during the session (for context)
+	FailedReports    []types.ContainerReport // All containers that failed to update (for context)
+	SkippedReports   []types.ContainerReport // All containers that were skipped (for context)
+	StaleReports     []types.ContainerReport // All containers with stale images (for context)
+	FreshReports     []types.ContainerReport // All containers with fresh images (for context)
 }
 
 // SortableContainers implements sort.Interface for reports.
@@ -83,19 +87,27 @@ func (r *report) Fresh() []types.ContainerReport {
 	return r.fresh
 }
 
+// Restarted returns restarted containers.
+//
+// Returns:
+//   - []types.ContainerReport: Restarted list.
+func (r *report) Restarted() []types.ContainerReport {
+	return r.restarted
+}
+
 // allFromSlices returns deduplicated containers from the provided slices, prioritized by state.
 //
 // This function ensures that each container appears only once in the final result, with priority
-// given to containers in more significant states (updated > failed > skipped > stale > fresh > scanned).
+// given to containers in more significant states (updated > restarted > failed > skipped > stale > fresh > scanned).
 // The priority order reflects the importance of the container's update status for notification purposes.
 //
 // Parameters:
-//   - scanned, updated, failed, skipped, stale, fresh: Slices of container reports categorized by their update state.
+//   - scanned, updated, restarted, failed, skipped, stale, fresh: Slices of container reports categorized by their update state.
 //
 // Returns:
 //   - []types.ContainerReport: Sorted, unique list with containers prioritized by their most significant state.
 func allFromSlices(
-	scanned, updated, failed, skipped, stale, fresh []types.ContainerReport,
+	scanned, updated, restarted, failed, skipped, stale, fresh []types.ContainerReport,
 ) []types.ContainerReport {
 	// Calculate total capacity for all containers to pre-allocate slice efficiently.
 	allLen := len(scanned) + len(updated) + len(failed) + len(skipped) + len(stale) + len(fresh)
@@ -116,15 +128,16 @@ func allFromSlices(
 	}
 
 	// Add containers in priority order: updated containers get highest priority,
-	// followed by failed, skipped, stale, fresh, and finally scanned (lowest priority).
+	// followed by restarted, failed, skipped, stale, fresh, and finally scanned (lowest priority).
 	// This ensures that if a container appears in multiple categories, only the most
 	// significant state representation is included in the final list.
-	appendUnique(updated) // Highest priority - containers that were successfully updated
-	appendUnique(failed)  // Containers that failed to update
-	appendUnique(skipped) // Containers that were intentionally skipped
-	appendUnique(stale)   // Containers with stale images available
-	appendUnique(fresh)   // Containers with fresh images (no update needed)
-	appendUnique(scanned) // Lowest priority - all containers that were scanned
+	appendUnique(updated)   // Highest priority - containers that were successfully updated
+	appendUnique(restarted) // Containers that were restarted (linked dependencies)
+	appendUnique(failed)    // Containers that failed to update
+	appendUnique(skipped)   // Containers that were intentionally skipped
+	appendUnique(stale)     // Containers with stale images available
+	appendUnique(fresh)     // Containers with fresh images (no update needed)
+	appendUnique(scanned)   // Lowest priority - all containers that were scanned
 
 	sort.Sort(SortableContainers(all)) // Sort final list by container ID for consistent ordering
 
@@ -136,7 +149,7 @@ func allFromSlices(
 // Returns:
 //   - []types.ContainerReport: Sorted, unique list.
 func (r *report) All() []types.ContainerReport {
-	return allFromSlices(r.scanned, r.updated, r.failed, r.skipped, r.stale, r.fresh)
+	return allFromSlices(r.scanned, r.updated, r.restarted, r.failed, r.skipped, r.stale, r.fresh)
 }
 
 // NewReport creates a report from progress data.
@@ -148,12 +161,13 @@ func (r *report) All() []types.ContainerReport {
 //   - types.Report: Categorized and sorted report.
 func NewReport(progress Progress) types.Report {
 	report := &report{
-		scanned: make([]types.ContainerReport, 0, len(progress)),
-		updated: make([]types.ContainerReport, 0),
-		failed:  make([]types.ContainerReport, 0),
-		skipped: make([]types.ContainerReport, 0),
-		stale:   make([]types.ContainerReport, 0),
-		fresh:   make([]types.ContainerReport, 0),
+		scanned:   make([]types.ContainerReport, 0, len(progress)),
+		updated:   make([]types.ContainerReport, 0),
+		failed:    make([]types.ContainerReport, 0),
+		skipped:   make([]types.ContainerReport, 0),
+		stale:     make([]types.ContainerReport, 0),
+		fresh:     make([]types.ContainerReport, 0),
+		restarted: make([]types.ContainerReport, 0),
 	}
 
 	// Categorize each container status.
@@ -182,8 +196,21 @@ func categorizeContainer(report *report, update *ContainerStatus) {
 	// Add non-skipped to scanned list.
 	report.scanned = append(report.scanned, update)
 
+	logrus.WithFields(logrus.Fields{
+		"container":                update.containerName,
+		"state_before_image_check": update.state,
+		"new_image":                update.newImage.ShortID(),
+		"old_image":                update.oldImage.ShortID(),
+		"images_equal":             update.newImage == update.oldImage,
+	}).Debug("Categorizing container status")
+
 	// Categorize based on image or state.
-	if update.newImage == update.oldImage {
+	if update.newImage == update.oldImage && update.state != RestartedState {
+		logrus.WithFields(logrus.Fields{
+			"container": update.containerName,
+			"old_state": update.state,
+			"new_state": FreshState,
+		}).Debug("Setting container state to fresh due to equal images")
 		update.state = FreshState
 		report.fresh = append(report.fresh, update)
 
@@ -199,6 +226,10 @@ func categorizeContainer(report *report, update *ContainerStatus) {
 		report.failed = append(report.failed, update)
 	case StaleState:
 		report.stale = append(report.stale, update)
+	case RestartedState:
+		logrus.WithField("container", update.containerName).
+			Debug("Adding container to restarted list")
+		report.restarted = append(report.restarted, update)
 	default:
 		update.state = StaleState
 		report.stale = append(report.stale, update)
@@ -216,6 +247,7 @@ func sortCategories(report *report) {
 	sort.Sort(SortableContainers(report.skipped))
 	sort.Sort(SortableContainers(report.stale))
 	sort.Sort(SortableContainers(report.fresh))
+	sort.Sort(SortableContainers(report.restarted))
 }
 
 // Len returns the slice length.
@@ -255,6 +287,9 @@ func (r *SingleContainerReport) Stale() []types.ContainerReport { return r.Stale
 // Fresh returns fresh containers.
 func (r *SingleContainerReport) Fresh() []types.ContainerReport { return r.FreshReports }
 
+// Restarted returns restarted containers.
+func (r *SingleContainerReport) Restarted() []types.ContainerReport { return r.RestartedReports }
+
 // All returns deduplicated containers, prioritized by state.
 //
 // Returns:
@@ -263,6 +298,7 @@ func (r *SingleContainerReport) All() []types.ContainerReport {
 	return allFromSlices(
 		r.ScannedReports,
 		r.UpdatedReports,
+		r.RestartedReports,
 		r.FailedReports,
 		r.SkippedReports,
 		r.StaleReports,
