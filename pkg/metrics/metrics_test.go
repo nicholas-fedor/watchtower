@@ -11,6 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	dto "github.com/prometheus/client_model/go"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -505,6 +507,29 @@ func TestDefault(t *testing.T) {
 	}
 }
 
+// verifyMetricValue is a helper function that checks for empty mf.Metric,
+// reads either Gauge or Counter value and compares to expectedValue.
+func verifyMetricValue(t *testing.T, mf *dto.MetricFamily, expectedValue float64) {
+	t.Helper()
+
+	if len(mf.Metric) == 0 {
+		t.Errorf("No metrics found for %s", *mf.Name)
+
+		return
+	}
+
+	var actualValue float64
+	if mf.Metric[0].Gauge != nil {
+		actualValue = *mf.Metric[0].Gauge.Value
+	} else if mf.Metric[0].Counter != nil {
+		actualValue = *mf.Metric[0].Counter.Value
+	}
+
+	if actualValue != expectedValue {
+		t.Errorf("Metric %s = %v, want %v", *mf.Name, actualValue, expectedValue)
+	}
+}
+
 func TestMetrics_IntegrationWithOtherTypes(t *testing.T) {
 	registry := prometheus.NewRegistry()
 
@@ -551,22 +576,7 @@ func TestMetrics_IntegrationWithOtherTypes(t *testing.T) {
 
 	for _, mf := range metricFamilies {
 		if expectedValue, exists := expectedValues[*mf.Name]; exists {
-			if len(mf.Metric) == 0 {
-				t.Errorf("No metrics found for %s", *mf.Name)
-
-				continue
-			}
-
-			var actualValue float64
-			if mf.Metric[0].Gauge != nil {
-				actualValue = *mf.Metric[0].Gauge.Value
-			} else if mf.Metric[0].Counter != nil {
-				actualValue = *mf.Metric[0].Counter.Value
-			}
-
-			if actualValue != expectedValue {
-				t.Errorf("Metric %s = %v, want %v", *mf.Name, actualValue, expectedValue)
-			}
+			verifyMetricValue(t, mf, expectedValue)
 		}
 	}
 
@@ -592,22 +602,7 @@ func TestMetrics_IntegrationWithOtherTypes(t *testing.T) {
 
 	for _, mf := range metricFamilies {
 		if expectedValue, exists := finalExpectedValues[*mf.Name]; exists {
-			if len(mf.Metric) == 0 {
-				t.Errorf("No metrics found for %s", *mf.Name)
-
-				continue
-			}
-
-			var actualValue float64
-			if mf.Metric[0].Gauge != nil {
-				actualValue = *mf.Metric[0].Gauge.Value
-			} else if mf.Metric[0].Counter != nil {
-				actualValue = *mf.Metric[0].Counter.Value
-			}
-
-			if actualValue != expectedValue {
-				t.Errorf("Final metric %s = %v, want %v", *mf.Name, actualValue, expectedValue)
-			}
+			verifyMetricValue(t, mf, expectedValue)
 		}
 	}
 
