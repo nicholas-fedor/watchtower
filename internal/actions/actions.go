@@ -700,6 +700,13 @@ func sendSplitNotifications(
 
 			singleContainerReport := buildSingleRestartedContainerReport(restartedContainer, result)
 
+			now := time.Now()
+
+			newID := restartedContainer.NewContainerID()
+			if newID == "" {
+				newID = restartedContainer.ID()
+			}
+
 			// Create log entries for container restart events (similar to update but without "Found new image")
 			entries := []*logrus.Entry{
 				{
@@ -710,16 +717,16 @@ func sendSplitNotifications(
 						"id":        restartedContainer.ID().ShortID(),
 						"old_id":    restartedContainer.CurrentImageID().ShortID(),
 					},
-					Time: time.Now(),
+					Time: now,
 				},
 				{
 					Level:   logrus.InfoLevel,
 					Message: StartedLinkedContainerMessage,
 					Data: logrus.Fields{
 						"container": restartedContainer.Name(),
-						"new_id":    restartedContainer.NewContainerID().ShortID(),
+						"new_id":    newID.ShortID(),
 					},
-					Time: time.Now(),
+					Time: now,
 				},
 			}
 
