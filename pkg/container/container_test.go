@@ -28,6 +28,8 @@ type mockContainer struct {
 	info *dockerContainerType.InspectResponse
 }
 
+var _ types.Container = mockContainer{}
+
 func (m mockContainer) ContainerInfo() *dockerContainerType.InspectResponse { return m.info }
 func (m mockContainer) Name() string                                        { return m.name }
 

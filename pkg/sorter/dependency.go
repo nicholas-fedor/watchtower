@@ -37,6 +37,10 @@ type DependencySorter struct{}
 //   - error: Non-nil if circular reference detected, nil on success.
 //     Error includes the container name and cycle path for debugging.
 func (ds DependencySorter) Sort(containers []types.Container) error {
+	if containers == nil {
+		return nil
+	}
+
 	logrus.WithField("container_count", len(containers)).Debug("Starting dependency sort")
 
 	// Separate Watchtower containers from non-Watchtower containers
@@ -118,7 +122,7 @@ func (ds DependencySorter) Sort(containers []types.Container) error {
 //     Error includes container name and cycle path for debugging.
 func sortByDependencies(containers []types.Container) ([]types.Container, error) {
 	// Phase 1: Build the dependency graph data structures
-	containerMap, indegree, adjacency := buildDependencyGraph(containers)
+	containerMap, indegree, adjacency, normalizedMap := buildDependencyGraph(containers)
 
 	// Phase 2: Initialize processing queue with containers that have no dependencies
 	queue := initializeQueue(indegree)
@@ -152,7 +156,7 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 	}
 
 	// Phase 4: Cycle detection
-	if err := detectAndReportCycle(sorted, containers, containerMap, adjacency); err != nil {
+	if err := detectAndReportCycle(sorted, containers, containerMap, adjacency, normalizedMap); err != nil {
 		return nil, err
 	}
 
@@ -178,23 +182,25 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 //   - map[string][]string: Adjacency list (container -> dependents)
 func buildDependencyGraph(
 	containers []types.Container,
-) (map[string]types.Container, map[string]int, map[string][]string) {
+) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string) {
 	containerMap := make(map[string]types.Container)
 	indegree := make(map[string]int)
 	adjacency := make(map[string][]string)
+	normalizedMap := make(map[types.Container]string)
 
 	// Initialize all containers in the maps with zero indegree
 	for _, c := range containers {
 		normalizedIdentifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
 		containerMap[normalizedIdentifier] = c
 		indegree[normalizedIdentifier] = 0
+		normalizedMap[c] = normalizedIdentifier
 	}
 
 	// Build the graph by processing container links (dependencies)
 	// For each container, increment its indegree for each link it has to an existing container
 	// Add reverse edges in adjacency list: link target -> dependent container
 	for _, c := range containers {
-		normalizedIdentifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		normalizedIdentifier := normalizedMap[c]
 		// c.Links() already returns normalized container names
 		for _, normalizedLink := range c.Links() {
 			if _, exists := containerMap[normalizedLink]; exists {
@@ -206,7 +212,7 @@ func buildDependencyGraph(
 		}
 	}
 
-	return containerMap, indegree, adjacency
+	return containerMap, indegree, adjacency, normalizedMap
 }
 
 // initializeQueue creates the initial processing queue for Kahn's algorithm.
@@ -248,6 +254,7 @@ func initializeQueue(indegree map[string]int) []string {
 //   - containers: Original list of all containers
 //   - containerMap: Map of container identifiers to container objects
 //   - adjacency: Graph adjacency list (container -> dependents)
+//   - normalizedMap: Map of containers to their normalized identifiers
 //
 // Returns:
 //   - error: CircularReferenceError if cycle detected, nil otherwise
@@ -256,15 +263,14 @@ func detectAndReportCycle(
 	containers []types.Container,
 	containerMap map[string]types.Container,
 	adjacency map[string][]string,
+	normalizedMap map[types.Container]string,
 ) error {
 	if len(sorted) != len(containers) {
 		// Identify which containers were not processed (part of cycles)
 		processed := make(map[string]bool)
 
 		for _, c := range sorted {
-			normalizedIdentifier := util.NormalizeContainerName(
-				container.ResolveContainerIdentifier(c),
-			)
+			normalizedIdentifier := normalizedMap[c]
 			processed[normalizedIdentifier] = true
 		}
 
@@ -330,13 +336,12 @@ func detectAndReportCycle(
 //   - []string: Cycle path if found (empty slice if no cycle)
 //     Path includes the starting node at both ends to show the cycle
 func findCyclePath(start string, adjacency map[string][]string, visited map[string]bool) []string {
-	path := []string{}                // Current path in DFS traversal
 	visiting := make(map[string]bool) // Nodes currently in recursion stack
 
 	// Recursive DFS function to detect cycles
-	var dfs func(string) []string
+	var dfs func(string, []string) []string
 
-	dfs = func(node string) []string {
+	dfs = func(node string, path []string) []string {
 		// If node is already in visiting set, we found a back edge (cycle)
 		if visiting[node] {
 			// Extract the cycle path: from first occurrence of node to current position
@@ -369,18 +374,17 @@ func findCyclePath(start string, adjacency map[string][]string, visited map[stri
 
 		// Explore all neighbors (containers that depend on this one)
 		for _, neighbor := range adjacency[node] {
-			if cycle := dfs(neighbor); cycle != nil {
+			if cycle := dfs(neighbor, path); cycle != nil {
 				return cycle // Propagate cycle up the call stack
 			}
 		}
 
 		// Backtrack: remove from path and visiting set, mark as fully visited
-		path = path[:len(path)-1]
 		visiting[node] = false
 		visited[node] = true
 
 		return nil // No cycle found from this path
 	}
 
-	return dfs(start)
+	return dfs(start, []string{})
 }
