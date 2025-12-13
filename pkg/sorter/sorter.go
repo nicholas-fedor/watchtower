@@ -15,7 +15,7 @@ type Sorter interface {
 //   - containers: Slice to sort in place.
 //
 // Returns:
-//   - error: Always nil, propagated from sorter.Sort.
+//   - error: propagated from TimeSorter.Sort.
 func SortByCreated(containers []types.Container) error {
 	sorter := TimeSorter{}
 
