@@ -90,7 +90,7 @@ func generateDiamondDependencies(levels int) []types.Container {
 
 	// Create levels
 	for level := 1; level <= levels; level++ {
-		nodesInLevel := level * 2 // Exponential growth
+		nodesInLevel := level * 2 // Linear growth per level
 
 		for i := range nodesInLevel {
 			name := fmt.Sprintf("diamond-l%d-n%d", level, i)
@@ -324,9 +324,9 @@ func BenchmarkMemoryUsage(b *testing.B) {
 func BenchmarkSortStability(b *testing.B) {
 	containers := generateBenchmarkContainers(100, 0.3)
 
-	b.Run("StabilityCheck", func(b *testing.B) {
-		var results [][]string
+	var firstResult []string
 
+	b.Run("StabilityCheck", func(b *testing.B) {
 		for b.Loop() {
 			ds := DependencySorter{}
 			testContainers := make([]types.Container, len(containers))
@@ -342,23 +342,14 @@ func BenchmarkSortStability(b *testing.B) {
 				names[j] = c.Name()
 			}
 
-			results = append(results, names)
-		}
-
-		// Check stability - all results should be identical
-		for i := 1; i < len(results); i++ {
-			if len(results[0]) != len(results[i]) {
-				b.Fatalf("Inconsistent result lengths: %d vs %d", len(results[0]), len(results[i]))
-			}
-
-			for j := range results[0] {
-				if results[0][j] != results[i][j] {
-					b.Fatalf(
-						"Sort not stable at position %d: %s vs %s",
-						j,
-						results[0][j],
-						results[i][j],
-					)
+			// Verify against first result
+			if firstResult == nil {
+				firstResult = names
+			} else {
+				for j := range firstResult {
+					if firstResult[j] != names[j] {
+						b.Fatalf("Sort not stable at position %d", j)
+					}
 				}
 			}
 		}
