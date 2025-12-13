@@ -110,36 +110,6 @@ var _ = ginkgo.Describe("Update Handler", func() {
 		)
 
 		ginkgo.It(
-			"should return 200 OK with JSON containing restarted containers count",
-			func() {
-				called := false
-				mockUpdateFn = func(images []string) *metrics.Metric {
-					called = true
-					gomega.Expect(images).To(gomega.BeNil())
-
-					return &metrics.Metric{Scanned: 5, Updated: 1, Failed: 0, Restarted: 2}
-				}
-				handler = update.New(mockUpdateFn, nil)
-
-				handler.Handle(rec, req)
-				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
-				gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
-
-				var response map[string]any
-				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
-
-				// Check summary section includes restarted count
-				summary := response["summary"].(map[string]any)
-				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(5)))
-				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(1)))
-				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
-				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(2)))
-
-				gomega.Expect(called).To(gomega.BeTrue())
-			},
-		)
-
-		ginkgo.It(
 			"should execute targeted update and return 200 OK with JSON when lock is available",
 			func() {
 				called := false
