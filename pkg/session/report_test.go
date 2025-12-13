@@ -880,7 +880,8 @@ func compareReports(got, want *report) bool {
 		compareSlice(got.failed, want.failed) &&
 		compareSlice(got.skipped, want.skipped) &&
 		compareSlice(got.stale, want.stale) &&
-		compareSlice(got.fresh, want.fresh)
+		compareSlice(got.fresh, want.fresh) &&
+		compareSlice(got.restarted, want.restarted)
 }
 
 func Test_categorizeContainer(t *testing.T) {
