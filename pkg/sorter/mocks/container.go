@@ -2,6 +2,8 @@
 package mocks
 
 import (
+	"strings"
+
 	dockerContainerTypes "github.com/docker/docker/api/types/container"
 	dockerImageTypes "github.com/docker/docker/api/types/image"
 
@@ -47,21 +49,26 @@ func (c *SimpleContainer) IsRunning() bool { return true }
 
 func (c *SimpleContainer) ImageID() types.ImageID {
 	if c.ContainerInfoField != nil {
-		return ""
+		image := string(c.ContainerInfoField.Image)
+		if strings.HasPrefix(image, "sha256:") {
+			return types.ImageID(image)
+		} else {
+			return types.ImageID("sha256:" + image)
+		}
 	}
 	return types.ImageID("sha256:" + string(c.ContainerID))
 }
 
 func (c *SimpleContainer) SafeImageID() types.ImageID {
 	if c.ContainerInfoField != nil {
-		return ""
+		return types.ImageID(c.ContainerInfoField.Config.Image)
 	}
 	return c.ImageID()
 }
 
 func (c *SimpleContainer) ImageName() string {
 	if c.ContainerInfoField != nil {
-		return ""
+		return c.ContainerInfoField.Config.Image
 	}
 	return "test-image"
 }
@@ -74,7 +81,7 @@ func (c *SimpleContainer) ToRestart() bool       { return false }
 
 func (c *SimpleContainer) StopSignal() string {
 	if c.ContainerInfoField != nil {
-		return ""
+		return c.ContainerInfoField.Config.StopSignal
 	}
 	return "SIGTERM"
 }
