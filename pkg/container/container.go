@@ -84,12 +84,16 @@ func NewContainer(
 	containerInfo *dockerContainerType.InspectResponse,
 	imageInfo *dockerImageType.InspectResponse,
 ) *Container {
+	name := ""
+	if containerInfo != nil {
+		name = containerInfo.Name
+	}
 	// Initialize with default state.
 	c := &Container{
 		LinkedToRestarting: false,
 		Stale:              false,
 		OldImageID:         "",
-		normalizedName:     util.NormalizeContainerName(containerInfo.Name),
+		normalizedName:     util.NormalizeContainerName(name),
 		containerInfo:      containerInfo,
 		imageInfo:          imageInfo,
 	}
@@ -353,12 +357,13 @@ func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 
 	hostConfig := c.containerInfo.HostConfig
 
-	// Adjust link format for each entry.
-	for i, link := range hostConfig.Links {
+	// Adjust link format for each entry (and drop invalid ones).
+	adjusted := make([]string, 0, len(hostConfig.Links))
+	for _, link := range hostConfig.Links {
 		if !strings.Contains(link, ":") {
 			clog.WithField("link", link).Error("Invalid link format, expected 'name:alias'")
 
-			continue // Skip invalid links
+			continue
 		}
 
 		parts := strings.SplitN(link, ":", linkPartsCount)
@@ -366,15 +371,17 @@ func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 			clog.WithField("link", link).
 				Error("Invalid link format, expected exactly one colon separator")
 
-			continue // Skip invalid links
+			continue
 		}
 
 		normalizedName := util.NormalizeContainerName(parts[0])
-		// Aliases are simple names for linking, not container identifiers, so use as-is
 		alias := parts[1]
-		hostConfig.Links[i] = fmt.Sprintf("%s:%s", normalizedName, alias)
-		clog.WithField("link", hostConfig.Links[i]).Debug("Adjusted link for host config")
+		adjustedLink := fmt.Sprintf("%s:%s", normalizedName, alias)
+		adjusted = append(adjusted, adjustedLink)
+		clog.WithField("link", adjustedLink).Debug("Adjusted link for host config")
 	}
+
+	hostConfig.Links = adjusted
 
 	return hostConfig
 }

@@ -559,7 +559,7 @@ func isInvalidImageName(name string) bool {
 
 // performRollingRestart updates containers with rolling restarts.
 //
-// It processes containers sequentially in reverse order, stopping and restarting each as needed,
+// It processes containers sequentially in forward order, stopping and restarting each as needed,
 // collecting cleaned image info for stale containers only to ensure proper cleanup.
 //
 // Parameters:
