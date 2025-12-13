@@ -97,6 +97,33 @@ func getNetworkModeTestData() *mocks.TestData {
 	}
 }
 
+func createDependencyChain(names []string) []types.Container {
+	containers := make([]types.Container, len(names))
+	for i := range names {
+		name := names[i]
+		image := "image-" + name[10:] + ":latest"
+
+		labels := make(map[string]string)
+		if i < len(names)-1 {
+			labels["com.centurylinklabs.watchtower.depends-on"] = names[i+1]
+		}
+
+		containers[i] = mocks.CreateMockContainerWithConfig(
+			name,
+			"/"+name,
+			image,
+			true,
+			false,
+			time.Now().AddDate(0, 0, -1),
+			&container.Config{
+				Labels:       labels,
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+	}
+
+	return containers
+}
+
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("updating a Watchtower container", func() {
 		ginkgo.It("should rename and start a new container without cleanup", func() {
@@ -2900,46 +2927,12 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 		ginkgo.It("should ensure dependencies are stopped and started in correct order", func() {
 			// Create dependency chain: A depends on B, B depends on C
-			containerC := mocks.CreateMockContainerWithConfig(
-				"container-c",
-				"/container-c",
-				"image-c:latest",
-				true,
-				false,
-				time.Now().AddDate(0, 0, -1),
-				&container.Config{
-					Labels:       map[string]string{},
-					ExposedPorts: map[nat.Port]struct{}{},
-				})
-			containerB := mocks.CreateMockContainerWithConfig(
-				"container-b",
-				"/container-b",
-				"image-b:latest",
-				true,
-				false,
-				time.Now().AddDate(0, 0, -1),
-				&container.Config{
-					Labels: map[string]string{
-						"com.centurylinklabs.watchtower.depends-on": "container-c",
-					},
-					ExposedPorts: map[nat.Port]struct{}{},
-				})
-			containerA := mocks.CreateMockContainerWithConfig(
-				"container-a",
-				"/container-a",
-				"image-a:latest",
-				true,
-				false,
-				time.Now().AddDate(0, 0, -1),
-				&container.Config{
-					Labels: map[string]string{
-						"com.centurylinklabs.watchtower.depends-on": "container-b",
-					},
-					ExposedPorts: map[nat.Port]struct{}{},
-				})
+			containers := createDependencyChain(
+				[]string{"container-a", "container-b", "container-c"},
+			)
 			client := mocks.CreateMockClient(
 				&mocks.TestData{
-					Containers: []types.Container{containerA, containerB, containerC},
+					Containers: containers,
 					Staleness: map[string]bool{
 						"container-a": true,
 						"container-b": true,
