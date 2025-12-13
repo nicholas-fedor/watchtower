@@ -69,8 +69,8 @@ docker run --network container:database nginx
 Watchtower uses topological sorting to determine the correct update order. This algorithm:
 
 - Builds a dependency graph from all detected relationships
-- Performs depth-first search to detect cycles (which would cause update failures)
-- Produces a linear ordering where dependencies come before dependents
+- Detects cycles (failing with a circular dependency error)
+- Produces a linear ordering where dependencies precede dependents
 
 !!! Warning
     Circular dependencies between containers will cause the update process to fail with an error.
