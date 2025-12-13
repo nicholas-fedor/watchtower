@@ -201,6 +201,31 @@ func buildSingleContainerReport(
 	}
 }
 
+// buildSingleRestartedContainerReport creates a SingleContainerReport for a specific restarted container.
+//
+// It populates the report with the restarted container as the primary item and includes
+// all other session results (scanned, failed, skipped, stale, fresh) for comprehensive context.
+//
+// Parameters:
+//   - restartedContainer: The container that was restarted.
+//   - result: The full session report containing all container statuses.
+//
+// Returns:
+//   - *session.SingleContainerReport: A report focused on the restarted container with full session context.
+func buildSingleRestartedContainerReport(
+	restartedContainer types.ContainerReport,
+	result types.Report,
+) *session.SingleContainerReport {
+	return &session.SingleContainerReport{
+		RestartedReports: []types.ContainerReport{restartedContainer},
+		ScannedReports:   result.Scanned(),
+		FailedReports:    result.Failed(),
+		SkippedReports:   result.Skipped(),
+		StaleReports:     result.Stale(),
+		FreshReports:     result.Fresh(),
+	}
+}
+
 // buildCleanupEntriesForContainer constructs log entries for cleaned image events specific to a container.
 //
 // It creates a logrus.Entry struct for each cleaned image associated with the specified container
@@ -644,7 +669,7 @@ func sendSplitNotifications(
 				"image":     restartedContainer.ImageName(),
 			}).Debug("Sending individual notification for restarted container")
 
-			singleContainerReport := buildSingleContainerReport(restartedContainer, result)
+			singleContainerReport := buildSingleRestartedContainerReport(restartedContainer, result)
 
 			// Create log entries for container restart events (similar to update but without "Found new image")
 			entries := []*logrus.Entry{

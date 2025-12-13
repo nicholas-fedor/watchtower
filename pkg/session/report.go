@@ -24,15 +24,16 @@ type report struct {
 // This struct is used when notification splitting by container is enabled (--notification-split-by-container).
 // Unlike the standard report which groups all containers from a session, SingleContainerReport focuses
 // on a specific container while providing context from all other containers in the session.
-// This allows notifications to be sent separately for each updated container while maintaining
+// This allows notifications to be sent separately for each updated or restarted container while maintaining
 // awareness of the overall session state (failed, skipped, stale, fresh containers).
 type SingleContainerReport struct {
-	UpdatedReports []types.ContainerReport // Primary container(s) that were updated in this notification
-	ScannedReports []types.ContainerReport // All containers scanned during the session (for context)
-	FailedReports  []types.ContainerReport // All containers that failed to update (for context)
-	SkippedReports []types.ContainerReport // All containers that were skipped (for context)
-	StaleReports   []types.ContainerReport // All containers with stale images (for context)
-	FreshReports   []types.ContainerReport // All containers with fresh images (for context)
+	UpdatedReports   []types.ContainerReport // Primary container(s) that were updated in this notification
+	RestartedReports []types.ContainerReport // Primary container(s) that were restarted in this notification
+	ScannedReports   []types.ContainerReport // All containers scanned during the session (for context)
+	FailedReports    []types.ContainerReport // All containers that failed to update (for context)
+	SkippedReports   []types.ContainerReport // All containers that were skipped (for context)
+	StaleReports     []types.ContainerReport // All containers with stale images (for context)
+	FreshReports     []types.ContainerReport // All containers with fresh images (for context)
 }
 
 // SortableContainers implements sort.Interface for reports.
@@ -287,7 +288,7 @@ func (r *SingleContainerReport) Stale() []types.ContainerReport { return r.Stale
 func (r *SingleContainerReport) Fresh() []types.ContainerReport { return r.FreshReports }
 
 // Restarted returns restarted containers.
-func (r *SingleContainerReport) Restarted() []types.ContainerReport { return nil }
+func (r *SingleContainerReport) Restarted() []types.ContainerReport { return r.RestartedReports }
 
 // All returns deduplicated containers, prioritized by state.
 //
@@ -297,7 +298,7 @@ func (r *SingleContainerReport) All() []types.ContainerReport {
 	return allFromSlices(
 		r.ScannedReports,
 		r.UpdatedReports,
-		nil, // restarted - not used in SingleContainerReport
+		r.RestartedReports,
 		r.FailedReports,
 		r.SkippedReports,
 		r.StaleReports,
