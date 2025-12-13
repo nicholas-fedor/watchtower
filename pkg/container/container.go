@@ -481,6 +481,9 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 
 	for _, link := range parts {
 		link = strings.TrimSpace(link)
+		if link == "" {
+			continue
+		}
 		// Add leading slash if missing.
 		if !strings.HasPrefix(link, "/") {
 			link = "/" + link
