@@ -121,6 +121,10 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 // Returns:
 //   - *Metric: New metric instance.
 func NewMetric(report types.Report) *Metric {
+	if report == nil {
+		panic("NewMetric: report is nil")
+	}
+
 	return &Metric{
 		Scanned:   len(report.Scanned()),
 		Updated:   len(report.Updated()), // Only count actually updated containers.
