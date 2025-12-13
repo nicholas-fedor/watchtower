@@ -145,18 +145,12 @@ var _ = ginkgo.Describe("JSON template", func() {
 				gomega.Expect(result).To(gomega.ContainSubstring("rstr1"))
 			})
 
-			ginkgo.It(
-				"should handle error handling in template rendering for restarted containers",
-				func() {
-					// Test with invalid template that would cause rendering errors
-					data := mockDataFromStates(session.RestartedState)
-					// Using a valid template since ToJSON should handle errors internally
-					result := getTemplatedResult(`json.v1`, false, data)
-					gomega.Expect(result).To(gomega.ContainSubstring(`"restarted"`))
-					// Ensure no error messages in output
-					gomega.Expect(result).NotTo(gomega.ContainSubstring("Error:"))
-				},
-			)
+			ginkgo.It("should render restarted containers without errors", func() {
+				data := mockDataFromStates(session.RestartedState)
+				result := getTemplatedResult(`json.v1`, false, data)
+				gomega.Expect(result).To(gomega.ContainSubstring(`"restarted"`))
+				gomega.Expect(result).NotTo(gomega.ContainSubstring("Error:"))
+			})
 
 			ginkgo.It("should handle state transitions in notification templates", func() {
 				// Test mixing different states
