@@ -1088,6 +1088,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linked Containers
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -1104,6 +1122,353 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how_it_works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How It Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependency_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependency Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#watchtower_depends-on_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchtower Depends-On Label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_compose_depends-on_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Compose Depends-On Label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_links_and_network_mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Links and Network Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#topological_sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topological Sorting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Update Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explicit_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced_scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complex_dependency_chains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complex Dependency Chains
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mysql-wordpress_scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MySQL-WordPress Scenario
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#microservices_architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Microservices Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#legacy_docker_links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Docker Links
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network_mode_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network Mode Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common_issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updates_failing_due_to_circular_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updates Failing Due to Circular Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#containers_not_updating_in_expected_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containers Not Updating in Expected Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debugging_commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#best_practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1249,6 +1614,342 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how_it_works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How It Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependency_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependency Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#watchtower_depends-on_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchtower Depends-On Label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_compose_depends-on_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Compose Depends-On Label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker_links_and_network_mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Links and Network Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#topological_sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topological Sorting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Update Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explicit_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced_scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complex_dependency_chains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complex Dependency Chains
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mysql-wordpress_scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MySQL-WordPress Scenario
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#microservices_architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Microservices Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#legacy_docker_links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Docker Links
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#network_mode_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network Mode Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common_issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updates_failing_due_to_circular_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updates Failing Due to Circular Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#containers_not_updating_in_expected_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containers Not Updating in Expected Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing_dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debugging_commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#best_practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1268,10 +1969,283 @@
 
 
 <h1 id="linked_containers">Linked Containers<a class="headerlink" href="#linked_containers" title="Permanent link">&para;</a></h1>
-<p>Watchtower will detect if there are links between any of the running containers and ensures that things are stopped/started in a way that won't break any of the links. If an update is detected for one of the dependencies in a group of linked containers, watchtower will stop and start all of the containers in the correct order so that the application comes back up correctly.</p>
-<p>For example, imagine you were running a <em>mysql</em> container and a <em>wordpress</em> container which had been linked to the <em>mysql</em> container. If watchtower were to detect that the <em>mysql</em> container required an update, it would first shut down the linked <em>wordpress</em> container followed by the <em>mysql</em> container. When restarting the containers it would handle <em>mysql</em> first and then <em>wordpress</em> to ensure that the link continued to work.</p>
-<p>If you want to override existing links, or if you are not using links, you can use special <code>com.centurylinklabs.watchtower.depends-on</code> label with dependent container names, separated by a comma.</p>
-<p>When you have a depending container that is using <code>network_mode: service:container</code> then watchtower will treat that container as an implicit link.</p>
+<p>Watchtower's linked containers feature ensures that interdependent containers are updated in the correct order to maintain application stability.
+This feature automatically detects container dependencies through various mechanisms and uses topological sorting to determine the optimal update sequence.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>When containers have dependencies on each other (such as a web application depending on a database), updating them in the wrong order can cause service disruptions.</p>
+<p>Watchtower addresses this by:</p>
+<ul>
+<li><strong>Detecting dependencies</strong> through Docker links, labels, and network configurations</li>
+<li><strong>Performing topological sorting</strong> to determine the correct update order</li>
+<li><strong>Stopping containers in reverse dependency order</strong> (dependents first - i.e., web app before database)</li>
+<li><strong>Restarting containers in dependency order</strong> (dependencies first - i.e., database before web app)</li>
+</ul>
+<p>This ensures that dependent services are stopped before their dependencies are updated, and dependencies are available when dependents restart.</p>
+<h2 id="how_it_works">How It Works<a class="headerlink" href="#how_it_works" title="Permanent link">&para;</a></h2>
+<h3 id="dependency_detection">Dependency Detection<a class="headerlink" href="#dependency_detection" title="Permanent link">&para;</a></h3>
+<p>Watchtower detects container dependencies through multiple mechanisms, checked in the following priority order:</p>
+<ol>
+<li><strong>Watchtower depends-on label</strong> (<code>com.centurylinklabs.watchtower.depends-on</code>)</li>
+<li><strong>Docker Compose depends_on label</strong> (<code>com.docker.compose.depends_on</code>)</li>
+<li><strong>Docker links and network mode</strong> (legacy Docker linking and <code>network_mode: service:container</code>)</li>
+</ol>
+<h4 id="watchtower_depends-on_label">Watchtower Depends-On Label<a class="headerlink" href="#watchtower_depends-on_label" title="Permanent link">&para;</a></h4>
+<p>The <code>com.centurylinklabs.watchtower.depends-on</code> label allows explicit declaration of dependencies:</p>
+<div class="highlight"><span class="filename">Explicit dependency declaration</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">&quot;database,redis&quot;</span>
+</code></pre></div>
+<p>This label accepts a comma-separated list of container names that must be available before this container starts.</p>
+<h4 id="docker_compose_depends-on_label">Docker Compose Depends-On Label<a class="headerlink" href="#docker_compose_depends-on_label" title="Permanent link">&para;</a></h4>
+<p>Watchtower automatically recognizes Docker Compose's <code>depends_on</code> relationships:</p>
+<div class="highlight"><span class="filename">Docker Compose dependency</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">web</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+</code></pre></div>
+<p>The <code>com.docker.compose.depends_on</code> label is automatically set by Docker Compose and parsed by Watchtower to extract service names.</p>
+<h4 id="docker_links_and_network_mode">Docker Links and Network Mode<a class="headerlink" href="#docker_links_and_network_mode" title="Permanent link">&para;</a></h4>
+<p>For legacy Docker setups using links or <code>network_mode: service:container</code>, Watchtower treats these as implicit dependencies:</p>
+<div class="highlight"><span class="filename">Legacy Docker linking</span><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c"># Container with explicit link</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--link<span class="w"> </span>database:db<span class="w"> </span>nginx
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c"># Container using service network mode</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>docker<span class="w"> </span>run<span class="w"> </span>--network<span class="w"> </span>container:database<span class="w"> </span>nginx
+</code></pre></div>
+<h3 id="topological_sorting">Topological Sorting<a class="headerlink" href="#topological_sorting" title="Permanent link">&para;</a></h3>
+<p>Watchtower uses topological sorting to determine the correct update order. This algorithm:</p>
+<ul>
+<li>Builds a dependency graph from all detected relationships</li>
+<li>Detects cycles (failing with a circular dependency error)</li>
+<li>Produces a linear ordering where dependencies precede dependents</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Circular dependencies between containers will cause the update process to fail with an error.
+Ensure your dependency graph is acyclic.</p>
+</div>
+<h3 id="update_order">Update Order<a class="headerlink" href="#update_order" title="Permanent link">&para;</a></h3>
+<p>When updates are needed, Watchtower follows this sequence:</p>
+<ol>
+<li><strong>Identify all containers requiring updates</strong></li>
+<li><strong>Expand the set</strong> to include all containers in the dependency chain</li>
+<li><strong>Sort containers</strong> using topological order (dependencies first)</li>
+<li><strong>Stop containers</strong> in reverse topological order (dependents first)</li>
+<li><strong>Update and restart containers</strong> in topological order (dependencies first)</li>
+</ol>
+<p>This ensures that:</p>
+<ul>
+<li>Dependent services are stopped before their dependencies change</li>
+<li>Dependencies are fully restarted before dependents attempt to connect</li>
+</ul>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h3 id="automatic_detection">Automatic Detection<a class="headerlink" href="#automatic_detection" title="Permanent link">&para;</a></h3>
+<p>In most cases, no additional configuration is required. Watchtower automatically detects dependencies from:</p>
+<ul>
+<li>Docker Compose <code>depends_on</code> declarations</li>
+<li>Existing Docker links</li>
+<li><code>network_mode: service:container</code> configurations</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Docker Compose Considerations</p>
+<p>When using Docker Compose, Watchtower leverages <code>depends_on</code> declarations for dependency detection. Dependencies are resolved using service names, not container names. Ensure your <code>depends_on</code> references service names correctly.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Rolling restart is currently not supported when used in combination with linked-containers.</p>
+<p>This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.</p>
+</div>
+<h3 id="explicit_dependencies">Explicit Dependencies<a class="headerlink" href="#explicit_dependencies" title="Permanent link">&para;</a></h3>
+<p>For cases where automatic detection is insufficient, use the Watchtower depends-on label:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Dockerfile</label><label for="__tabbed_1_2">Docker Compose</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">FROM</span><span class="w"> </span><span class="s">nginx:latest</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c"># Declare dependencies on database and cache services</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">&quot;postgres,redis&quot;</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">web</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">com.centurylinklabs.watchtower.depends-on=postgres,redis</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">postgres</span><span class="p">:</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">redis</span><span class="p">:</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h3 id="advanced_scenarios">Advanced Scenarios<a class="headerlink" href="#advanced_scenarios" title="Permanent link">&para;</a></h3>
+<h4 id="multiple_dependencies">Multiple Dependencies<a class="headerlink" href="#multiple_dependencies" title="Permanent link">&para;</a></h4>
+<div class="highlight"><span class="filename">Multiple dependencies</span><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">&quot;database,cache,queue&quot;</span>
+</code></pre></div>
+<h4 id="complex_dependency_chains">Complex Dependency Chains<a class="headerlink" href="#complex_dependency_chains" title="Permanent link">&para;</a></h4>
+<div class="highlight"><span class="filename">Complex dependency chain</span><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">web</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">api</span><span class="p">:</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapi</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cache</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">  </span><span class="nt">cache</span><span class="p">:</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span>
+</code></pre></div>
+<p>In this scenario, Watchtower will update containers in the order: <code>cache</code>, <code>database</code>, <code>api</code>, <code>web</code>.</p>
+<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
+<h3 id="mysql-wordpress_scenario">MySQL-WordPress Scenario<a class="headerlink" href="#mysql-wordpress_scenario" title="Permanent link">&para;</a></h3>
+<p>Consider a classic WordPress setup with MySQL database:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker Compose</label><label for="__tabbed_2_2">Update Process</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">wordpress</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wordpress:latest</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="nt">WORDPRESS_DB_HOST</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">mysql</span><span class="p">:</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql:8.0</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">      </span><span class="nt">MYSQL_ROOT_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>When Watchtower detects a MySQL update:</p>
+<ol>
+<li><strong>Dependency Detection</strong>: Identifies that <code>wordpress</code> depends on <code>mysql</code></li>
+<li><strong>Stop Order</strong>: Stops <code>wordpress</code> first, then <code>mysql</code></li>
+<li><strong>Update Order</strong>: Updates and restarts <code>mysql</code> first, then <code>wordpress</code></li>
+</ol>
+<p>This prevents WordPress from losing database connectivity during the update.</p>
+</div>
+</div>
+</div>
+<h3 id="microservices_architecture">Microservices Architecture<a class="headerlink" href="#microservices_architecture" title="Permanent link">&para;</a></h3>
+<p>For complex applications with multiple services:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Docker Compose</label><label for="__tabbed_3_2">Dependency Graph</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">api-gateway</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auth-service</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user-service</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">auth-service</span><span class="p">:</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auth-service</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">user-service</span><span class="p">:</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user-service</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">  </span><span class="nt">redis</span><span class="p">:</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">  </span><span class="nt">postgres</span><span class="p">:</span>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>postgres → user-service
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>redis → auth-service
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>auth-service → api-gateway
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>user-service → api-gateway
+</code></pre></div>
+<p>Update order: <code>postgres</code>, <code>redis</code>, <code>user-service</code>, <code>auth-service</code>, <code>api-gateway</code></p>
+</div>
+</div>
+</div>
+<h3 id="legacy_docker_links">Legacy Docker Links<a class="headerlink" href="#legacy_docker_links" title="Permanent link">&para;</a></h3>
+<p>For applications using traditional Docker linking:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Docker Run Commands</label><label for="__tabbed_4_2">Watchtower Behavior</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Start database</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>mysql<span class="w"> </span>mysql:8.0
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Start web app with link</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>webapp<span class="w"> </span>--link<span class="w"> </span>mysql:db<span class="w"> </span>nginx
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Watchtower automatically detects the link and ensures <code>webapp</code> is stopped before <code>mysql</code> updates, and <code>mysql</code> restarts before <code>webapp</code>.</p>
+</div>
+</div>
+</div>
+<h3 id="network_mode_dependencies">Network Mode Dependencies<a class="headerlink" href="#network_mode_dependencies" title="Permanent link">&para;</a></h3>
+<p>Containers using <code>network_mode: service:container</code>:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="5:2"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Docker Compose</label><label for="__tabbed_5_2">Watchtower Behavior</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">sidecar</span><span class="p">:</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sidecar</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">network_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service:main-app</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="nt">main-app</span><span class="p">:</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main-app</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>The <code>sidecar</code> container is treated as dependent on <code>main-app</code>, ensuring proper update sequencing.</p>
+</div>
+</div>
+</div>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="common_issues">Common Issues<a class="headerlink" href="#common_issues" title="Permanent link">&para;</a></h3>
+<h4 id="updates_failing_due_to_circular_dependencies">Updates Failing Due to Circular Dependencies<a class="headerlink" href="#updates_failing_due_to_circular_dependencies" title="Permanent link">&para;</a></h4>
+<div class="admonition error">
+<p class="admonition-title">Error</p>
+<p>If you see "circular reference detected" errors, check your dependency declarations for cycles.</p>
+</div>
+<p><strong>Solution</strong>: Review and remove circular dependencies. For example, if A depends on B and B depends on A, remove one of the dependencies or restructure your services.</p>
+<h4 id="containers_not_updating_in_expected_order">Containers Not Updating in Expected Order<a class="headerlink" href="#containers_not_updating_in_expected_order" title="Permanent link">&para;</a></h4>
+<p><strong>Check</strong>:</p>
+<ul>
+<li>Verify dependency labels are correctly formatted</li>
+<li>Ensure container names match exactly</li>
+<li>Check Docker Compose service names vs container names</li>
+</ul>
+<h4 id="missing_dependencies">Missing Dependencies<a class="headerlink" href="#missing_dependencies" title="Permanent link">&para;</a></h4>
+<p><strong>Symptoms</strong>: Containers update out of order or fail to connect after updates.</p>
+<p><strong>Debug</strong>: Enable debug logging to see detected dependencies:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>watchtower<span class="w"> </span>--debug
+</code></pre></div>
+<p>Look for log messages like:</p>
+<ul>
+<li>"Retrieved links from watchtower depends-on label"</li>
+<li>"Retrieved links from compose depends-on label"</li>
+<li>"Completed dependency sort"</li>
+</ul>
+<h3 id="debugging_commands">Debugging Commands<a class="headerlink" href="#debugging_commands" title="Permanent link">&para;</a></h3>
+<p>Enable verbose logging to inspect dependency detection:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span>--debug<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span>--run-once
+</code></pre></div>
+<p>Check container labels:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>inspect<span class="w"> </span>container_name<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.[0].Config.Labels&#39;</span>
+</code></pre></div>
+<h3 id="best_practices">Best Practices<a class="headerlink" href="#best_practices" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Use Docker Compose</strong> for complex applications - it provides clear dependency declarations</li>
+<li><strong>Avoid circular dependencies</strong> - they prevent successful updates</li>
+<li><strong>Test update scenarios</strong> in staging environments first</li>
+<li><strong>Use explicit labels</strong> when automatic detection doesn't work</li>
+<li><strong>Monitor logs</strong> during updates to verify correct ordering</li>
+</ul>
 
 
 
@@ -1294,7 +2268,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 8, 2023 16:32:44 UTC"><span class="timeago" datetime="2023-08-08T16:32:44+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 8, 2023 16:32:44 UTC">2023-08-08</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 13, 2025 16:19:07 UTC"><span class="timeago" datetime="2025-12-13T16:19:07+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 13, 2025 16:19:07 UTC">2025-12-13</span>
   </span>
 
     
