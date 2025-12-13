@@ -17,8 +17,6 @@ type CircularReferenceError struct {
 // Error implements the error interface.
 func (e CircularReferenceError) Error() string {
 	if len(e.CyclePath) > 0 {
-		pathStr := ""
-
 		var pathStrSb20 strings.Builder
 
 		for i, name := range e.CyclePath {
@@ -29,9 +27,7 @@ func (e CircularReferenceError) Error() string {
 			pathStrSb20.WriteString(name)
 		}
 
-		pathStr += pathStrSb20.String()
-
-		return "circular reference detected: " + pathStr
+		return "circular reference detected: " + pathStrSb20.String()
 	}
 
 	return "circular reference detected: " + e.ContainerName
