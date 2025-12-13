@@ -456,6 +456,54 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 	})
 
+	ginkgo.Describe("ResolveContainerIdentifier", func() {
+		ginkgo.It("returns service name when compose service label is present", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service": "web-service",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("web-service"))
+		})
+
+		ginkgo.It("returns container name when compose service label is absent", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"other.label": "value",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when labels are empty", func() {
+			container := MockContainer(WithLabels(map[string]string{}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when labels are nil", func() {
+			container := MockContainer(WithLabels(nil))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns service name when compose service label has value", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service": "api",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("api"))
+		})
+
+		ginkgo.It("handles multiple labels with service name present", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service":     "db-service",
+				"com.docker.compose.project":     "myproject",
+				"com.centurylinklabs.watchtower": "true",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("db-service"))
+		})
+	})
+
 	ginkgo.Describe("No-Pull Configuration", func() {
 		ginkgo.When("no-pull argument is not set", func() {
 			ginkgo.It("returns true when no-pull label is true", func() {

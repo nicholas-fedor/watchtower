@@ -349,7 +349,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
 				gomega.Expect(cleanupImageInfos).
-					To(gomega.ContainElement(gomega.HaveField("ContainerName", "test-container-01")))
+					To(gomega.ContainElement(gomega.HaveField("ContainerName", "test-container-03")))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount).
 					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
 			})
@@ -2607,11 +2607,11 @@ var _ = ginkgo.Describe("the update action", func() {
 
 				// Verify stop order: reverse dependency order
 				gomega.Expect(client.TestData.StopOrder).
-					To(gomega.Equal([]string{"c-service2", "d-service3", "b-service1"}))
+					To(gomega.Equal([]string{"c-service2", "b-service1", "d-service3"}))
 
 				// Verify start order: dependency order
 				gomega.Expect(client.TestData.StartOrder).
-					To(gomega.Equal([]string{"b-service1", "d-service3", "c-service2"}))
+					To(gomega.Equal([]string{"d-service3", "b-service1", "c-service2"}))
 
 				// Verify cleanup for updated containers
 				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(3))

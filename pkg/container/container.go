@@ -442,6 +442,22 @@ func (c Container) Links() []string {
 	return getLinksFromHostConfig(c, clog)
 }
 
+// ResolveContainerIdentifier returns the service name if available, otherwise container name.
+//
+// Parameters:
+//   - c: Container to get identifier for
+//
+// Returns:
+//   - string: Service name if available, otherwise container name
+//     Always returns a non-empty string for valid containers
+func ResolveContainerIdentifier(c types.Container) string {
+	if serviceName := compose.GetServiceName(c.ContainerInfo().Config.Labels); serviceName != "" {
+		return serviceName
+	}
+
+	return c.Name()
+}
+
 // getLinksFromWatchtowerLabel extracts dependency links from the watchtower depends-on label.
 //
 // It parses the com.centurylinklabs.watchtower.depends-on label value,

@@ -1,4 +1,4 @@
-package sorter
+package container
 
 import (
 	"github.com/onsi/ginkgo/v2"

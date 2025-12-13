@@ -112,9 +112,9 @@ func Update(
 	}).Debug("Retrieved containers for update check")
 
 	// Detect circular dependencies and mark affected containers as skipped.
-	cycles := sorter.DetectCycles(containers)
+	cycles := container.DetectCycles(containers)
 	for _, c := range containers {
-		if cycles[sorter.GetContainerIdentifier(c)] {
+		if cycles[container.ResolveContainerIdentifier(c)] {
 			progress.AddSkipped(c, errCircularDependency, params)
 			logrus.Warnf(
 				"Skipping container update (circular dependency): %s (%s)",

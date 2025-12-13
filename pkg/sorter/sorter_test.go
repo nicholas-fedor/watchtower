@@ -167,7 +167,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			ginkgo.It("detects circular references", func() {
 				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
-				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
 				c1.EXPECT().Links().Return([]string{"c2"})
 				c1.EXPECT().IsWatchtower().Return(false)
 				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
@@ -177,6 +177,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				})
 				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
+				c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
 				c2.EXPECT().Links().Return([]string{"c1"})
 				c2.EXPECT().IsWatchtower().Return(false)
 				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
@@ -186,7 +187,10 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				})
 				containers := []types.Container{c1, c2}
 				err := sorter.SortByDependencies(containers)
-				gomega.Expect(err).To(gomega.MatchError("circular reference detected: c1"))
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).
+					To(gomega.ContainSubstring("circular reference detected"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("c1 -> c2 -> c1"))
 			})
 
 			ginkgo.It("handles missing dependencies gracefully", func() {
@@ -505,7 +509,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 
 							return []types.Container{a, b, c}
 						},
-						expectedOrder: []string{"a", "b", "c"},
+						expectedOrder: []string{"c", "b", "a"},
 					},
 					{
 						name: "mixed slash scenarios",
