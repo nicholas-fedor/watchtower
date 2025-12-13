@@ -101,6 +101,12 @@ In most cases, no additional configuration is required. Watchtower automatically
 - Existing Docker links
 - `network_mode: service:container` configurations
 
+!!! Note "Docker Compose Considerations"
+    When using Docker Compose, Watchtower leverages `depends_on` declarations for dependency detection. Dependencies are resolved using service names, not container names. Ensure your `depends_on` references service names correctly.
+
+!!! Warning "Rolling restart is currently not supported when used in combination with linked-containers."
+    This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.
+
 ### Explicit Dependencies
 
 For cases where automatic detection is insufficient, use the Watchtower depends-on label:
@@ -298,11 +304,6 @@ Look for log messages like:
 - "Retrieved links from watchtower depends-on label"
 - "Retrieved links from compose depends-on label"
 - "Completed dependency sort"
-
-#### Docker Compose Service Names
-
-!!! Note
-    When using Docker Compose, dependencies are resolved using service names, not container names. Ensure your `depends_on` references service names correctly.
 
 ### Debugging Commands
 
