@@ -421,11 +421,14 @@ func (c Container) Links() []string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Log all labels present on the container for debugging
-	if c.containerInfo != nil && c.containerInfo.Config != nil &&
-		c.containerInfo.Config.Labels != nil {
-		clog.WithField("labels", c.containerInfo.Config.Labels).Debug("All labels on container")
-	} else {
-		clog.Debug("No labels available on container")
+	// when trace-level logging is enabled.
+	if clog.Logger.IsLevelEnabled(logrus.TraceLevel) {
+		if c.containerInfo != nil && c.containerInfo.Config != nil &&
+			c.containerInfo.Config.Labels != nil {
+			clog.WithField("labels", c.containerInfo.Config.Labels).Trace("All labels on container")
+		} else {
+			clog.Trace("No labels available on container")
+		}
 	}
 
 	// Check watchtower depends-on label first.
