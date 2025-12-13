@@ -465,9 +465,8 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return c.Name()
 	}
 
-	// Extract the service name from the Docker Compose label.
 	if serviceName := compose.GetServiceName(labels); serviceName != "" {
-		// Return container name if not found.
+		// Return service name from Compose label.
 		return serviceName
 	}
 
