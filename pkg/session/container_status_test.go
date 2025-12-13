@@ -258,15 +258,34 @@ func TestContainerStatus_RestartedStateBehavior(t *testing.T) {
 			if got := tt.u.State(); got != RestartedStateString {
 				t.Errorf("ContainerStatus.State() = %v, want %v", got, RestartedStateString)
 			}
-			// Verify other methods work
-			_ = tt.u.ID()
-			_ = tt.u.Name()
-			_ = tt.u.CurrentImageID()
-			_ = tt.u.LatestImageID()
-			_ = tt.u.ImageName()
-			_ = tt.u.Error()
-			_ = tt.u.IsMonitorOnly()
-			_ = tt.u.NewContainerID()
+			// Verify other methods return expected values
+			if got := tt.u.ID(); got != tt.u.containerID {
+				t.Errorf("ContainerStatus.ID() = %v, want %v", got, tt.u.containerID)
+			}
+
+			if got := tt.u.Name(); got != tt.u.containerName {
+				t.Errorf("ContainerStatus.Name() = %v, want %v", got, tt.u.containerName)
+			}
+
+			if got := tt.u.CurrentImageID(); got != tt.u.oldImage {
+				t.Errorf("ContainerStatus.CurrentImageID() = %v, want %v", got, tt.u.oldImage)
+			}
+
+			if got := tt.u.LatestImageID(); got != tt.u.newImage {
+				t.Errorf("ContainerStatus.LatestImageID() = %v, want %v", got, tt.u.newImage)
+			}
+
+			if got := tt.u.ImageName(); got != tt.u.imageName {
+				t.Errorf("ContainerStatus.ImageName() = %v, want %v", got, tt.u.imageName)
+			}
+
+			if got := tt.u.IsMonitorOnly(); got != tt.u.monitorOnly {
+				t.Errorf("ContainerStatus.IsMonitorOnly() = %v, want %v", got, tt.u.monitorOnly)
+			}
+
+			if got := tt.u.NewContainerID(); got != tt.u.newContainerID {
+				t.Errorf("ContainerStatus.NewContainerID() = %v, want %v", got, tt.u.newContainerID)
+			}
 		})
 	}
 }
@@ -431,17 +450,4 @@ func TestContainerStatus_RestartedStateIntegration(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestContainerStatus_RestartedStateSerialization(t *testing.T) {
-	u := &ContainerStatus{
-		containerID:   "cont1",
-		containerName: "my-container",
-		state:         RestartedState,
-	}
-	// Test string representation (State method)
-	if got := u.State(); got != RestartedStateString {
-		t.Errorf("ContainerStatus.State() = %v, want %v", got, RestartedStateString)
-	}
-	// Since no JSON tags, serialization test is limited to State()
 }
