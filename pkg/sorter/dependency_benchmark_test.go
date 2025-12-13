@@ -7,77 +7,9 @@ import (
 	"math/rand"
 	"testing"
 
-	dockerContainerTypes "github.com/docker/docker/api/types/container"
-	dockerImageTypes "github.com/docker/docker/api/types/image"
-
+	"github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
-
-// SimpleContainer implements a minimal Container interface for benchmarking.
-type SimpleContainer struct {
-	name  string
-	id    string
-	links []string
-}
-
-func (c *SimpleContainer) Name() string {
-	return c.name
-}
-
-func (c *SimpleContainer) ID() types.ContainerID {
-	return types.ContainerID(c.id)
-}
-
-func (c *SimpleContainer) Links() []string {
-	return c.links
-}
-
-func (c *SimpleContainer) IsWatchtower() bool {
-	return false
-}
-
-func (c *SimpleContainer) ContainerInfo() *dockerContainerTypes.InspectResponse {
-	return &dockerContainerTypes.InspectResponse{
-		ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{Name: "/" + c.name},
-		Config:            &dockerContainerTypes.Config{Labels: map[string]string{}},
-	}
-}
-
-// Implement remaining required methods with minimal implementations.
-func (c *SimpleContainer) IsRunning() bool { return true }
-
-func (c *SimpleContainer) ImageID() types.ImageID { return types.ImageID("sha256:" + c.id) }
-
-func (c *SimpleContainer) SafeImageID() types.ImageID { return c.ImageID() }
-
-func (c *SimpleContainer) ImageName() string { return "test-image" }
-
-func (c *SimpleContainer) Enabled() (bool, bool)                   { return true, true }
-func (c *SimpleContainer) IsMonitorOnly(_ types.UpdateParams) bool { return false }
-
-func (c *SimpleContainer) Scope() (string, bool) { return "", false }
-func (c *SimpleContainer) ToRestart() bool       { return false }
-
-func (c *SimpleContainer) StopSignal() string                                    { return "SIGTERM" }
-func (c *SimpleContainer) HasImageInfo() bool                                    { return false }
-func (c *SimpleContainer) ImageInfo() *dockerImageTypes.InspectResponse          { return nil }
-func (c *SimpleContainer) GetLifecyclePreCheckCommand() string                   { return "" }
-func (c *SimpleContainer) GetLifecyclePostCheckCommand() string                  { return "" }
-func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string                  { return "" }
-func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string                 { return "" }
-func (c *SimpleContainer) GetLifecycleUID() (int, bool)                          { return 0, false }
-func (c *SimpleContainer) GetLifecycleGID() (int, bool)                          { return 0, false }
-func (c *SimpleContainer) VerifyConfiguration() error                            { return nil }
-func (c *SimpleContainer) SetStale(_ bool)                                       {}
-func (c *SimpleContainer) IsStale() bool                                         { return false }
-func (c *SimpleContainer) IsNoPull(_ types.UpdateParams) bool                    { return false }
-func (c *SimpleContainer) SetLinkedToRestarting(_ bool)                          {}
-func (c *SimpleContainer) IsLinkedToRestarting() bool                            { return false }
-func (c *SimpleContainer) PreUpdateTimeout() int                                 { return 30 }
-func (c *SimpleContainer) PostUpdateTimeout() int                                { return 30 }
-func (c *SimpleContainer) IsRestarting() bool                                    { return false }
-func (c *SimpleContainer) GetCreateConfig() *dockerContainerTypes.Config         { return nil }
-func (c *SimpleContainer) GetCreateHostConfig() *dockerContainerTypes.HostConfig { return nil }
 
 // generateBenchmarkContainers creates containers with realistic dependency patterns.
 func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Container {
@@ -86,10 +18,10 @@ func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Co
 	// Create containers
 	for i := range count {
 		name := fmt.Sprintf("container-%d", i)
-		container := &SimpleContainer{
-			name:  name,
-			id:    fmt.Sprintf("id-%d", i),
-			links: []string{}, // Will be set below
+		container := &mocks.SimpleContainer{
+			ContainerName:  name,
+			ContainerID:    types.ContainerID(fmt.Sprintf("id-%d", i)),
+			ContainerLinks: []string{}, // Will be set below
 		}
 		containers[i] = container
 	}
@@ -97,7 +29,7 @@ func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Co
 	// Add dependencies based on dependency factor
 
 	for i := range count {
-		container := containers[i].(*SimpleContainer)
+		container := containers[i].(*mocks.SimpleContainer)
 		// Each container depends on up to 'dependencyFactor' percentage of previous containers
 		maxDeps := int(float64(i) * dependencyFactor)
 		if maxDeps > 5 { // Cap at 5 dependencies per container for realism
@@ -114,7 +46,7 @@ func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Co
 			}
 		}
 
-		container.links = links
+		container.ContainerLinks = links
 	}
 
 	return containers
@@ -132,10 +64,10 @@ func generateChainDependencies(count int) []types.Container {
 			links = []string{fmt.Sprintf("chain-%d", i-1)}
 		}
 
-		container := &SimpleContainer{
-			name:  name,
-			id:    fmt.Sprintf("chain-id-%d", i),
-			links: links,
+		container := &mocks.SimpleContainer{
+			ContainerName:  name,
+			ContainerID:    types.ContainerID(fmt.Sprintf("chain-id-%d", i)),
+			ContainerLinks: links,
 		}
 
 		containers[i] = container
@@ -149,10 +81,10 @@ func generateDiamondDependencies(levels int) []types.Container {
 	var containers []types.Container
 
 	// Create root
-	root := &SimpleContainer{
-		name:  "diamond-root",
-		id:    "diamond-id-root",
-		links: []string{},
+	root := &mocks.SimpleContainer{
+		ContainerName:  "diamond-root",
+		ContainerID:    "diamond-id-root",
+		ContainerLinks: []string{},
 	}
 	containers = append(containers, root)
 
@@ -174,10 +106,10 @@ func generateDiamondDependencies(levels int) []types.Container {
 				}
 			}
 
-			container := &SimpleContainer{
-				name:  name,
-				id:    fmt.Sprintf("diamond-id-l%d-n%d", level, i),
-				links: links,
+			container := &mocks.SimpleContainer{
+				ContainerName:  name,
+				ContainerID:    types.ContainerID(fmt.Sprintf("diamond-id-l%d-n%d", level, i)),
+				ContainerLinks: links,
 			}
 
 			containers = append(containers, container)
@@ -257,7 +189,7 @@ func BenchmarkDependencySorter(b *testing.B) {
 
 			b.ResetTimer()
 
-			for range b.N {
+			for b.Loop() {
 				ds := DependencySorter{}
 				// Create a copy for each iteration to avoid modifying the original
 				testContainers := make([]types.Container, len(containers))
@@ -295,8 +227,16 @@ func BenchmarkCycleDetection(b *testing.B) {
 		{
 			name: "Cycle_Simple",
 			containers: func() []types.Container {
-				c1 := &SimpleContainer{name: "c1", id: "id1", links: []string{"c2"}}
-				c2 := &SimpleContainer{name: "c2", id: "id2", links: []string{"c1"}}
+				c1 := &mocks.SimpleContainer{
+					ContainerName:  "c1",
+					ContainerID:    "id1",
+					ContainerLinks: []string{"c2"},
+				}
+				c2 := &mocks.SimpleContainer{
+					ContainerName:  "c2",
+					ContainerID:    "id2",
+					ContainerLinks: []string{"c1"},
+				}
 
 				return []types.Container{c1, c2}
 			},
@@ -306,10 +246,26 @@ func BenchmarkCycleDetection(b *testing.B) {
 		{
 			name: "Cycle_Complex",
 			containers: func() []types.Container {
-				c1 := &SimpleContainer{name: "c1", id: "id1", links: []string{"c2"}}
-				c2 := &SimpleContainer{name: "c2", id: "id2", links: []string{"c3"}}
-				c3 := &SimpleContainer{name: "c3", id: "id3", links: []string{"c1"}}
-				c4 := &SimpleContainer{name: "c4", id: "id4", links: []string{}}
+				c1 := &mocks.SimpleContainer{
+					ContainerName:  "c1",
+					ContainerID:    "id1",
+					ContainerLinks: []string{"c2"},
+				}
+				c2 := &mocks.SimpleContainer{
+					ContainerName:  "c2",
+					ContainerID:    "id2",
+					ContainerLinks: []string{"c3"},
+				}
+				c3 := &mocks.SimpleContainer{
+					ContainerName:  "c3",
+					ContainerID:    "id3",
+					ContainerLinks: []string{"c1"},
+				}
+				c4 := &mocks.SimpleContainer{
+					ContainerName:  "c4",
+					ContainerID:    "id4",
+					ContainerLinks: []string{},
+				}
 
 				return []types.Container{c1, c2, c3, c4}
 			},
@@ -324,7 +280,7 @@ func BenchmarkCycleDetection(b *testing.B) {
 
 			b.ResetTimer()
 
-			for range b.N {
+			for b.Loop() {
 				ds := DependencySorter{}
 				testContainers := make([]types.Container, len(containers))
 				copy(testContainers, containers)
@@ -351,7 +307,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 
 		b.ReportAllocs()
 
-		for range b.N {
+		for b.Loop() {
 			ds := DependencySorter{}
 			testContainers := make([]types.Container, len(containers))
 			copy(testContainers, containers)
@@ -369,9 +325,9 @@ func BenchmarkSortStability(b *testing.B) {
 	containers := generateBenchmarkContainers(100, 0.3)
 
 	b.Run("StabilityCheck", func(b *testing.B) {
-		results := make([][]string, b.N)
+		var results [][]string
 
-		for i := range b.N {
+		for b.Loop() {
 			ds := DependencySorter{}
 			testContainers := make([]types.Container, len(containers))
 			copy(testContainers, containers)
@@ -386,11 +342,11 @@ func BenchmarkSortStability(b *testing.B) {
 				names[j] = c.Name()
 			}
 
-			results[i] = names
+			results = append(results, names)
 		}
 
 		// Check stability - all results should be identical
-		for i := 1; i < b.N; i++ {
+		for i := 1; i < len(results); i++ {
 			if len(results[0]) != len(results[i]) {
 				b.Fatalf("Inconsistent result lengths: %d vs %d", len(results[0]), len(results[i]))
 			}
@@ -512,8 +468,8 @@ func parseFuzzDependencyData(data []byte) []types.Container {
 	dependencies := make(map[string][]string)
 	allNodes := make(map[string]bool)
 
-	parts := bytes.Split(data, []byte(","))
-	for _, part := range parts {
+	parts := bytes.SplitSeq(data, []byte(","))
+	for part := range parts {
 		part = bytes.TrimSpace(part)
 		if len(part) == 0 {
 			continue
@@ -551,10 +507,10 @@ func parseFuzzDependencyData(data []byte) []types.Container {
 			links = []string{}
 		}
 
-		container := &SimpleContainer{
-			name:  node,
-			id:    fmt.Sprintf("fuzz-id-%d", i),
-			links: links,
+		container := &mocks.SimpleContainer{
+			ContainerName:  node,
+			ContainerID:    types.ContainerID(fmt.Sprintf("fuzz-id-%d", i)),
+			ContainerLinks: links,
 		}
 		containers = append(containers, container)
 		i++
