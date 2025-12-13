@@ -437,9 +437,8 @@ func linkedContainerMarkedForRestart(links []string, allContainers []types.Conta
 		for _, candidate := range allContainers {
 			if util.NormalizeContainerName(
 				candidate.Name(),
-			) == strings.TrimLeft(
+			) == util.NormalizeContainerName(
 				linkName,
-				"/",
 			) &&
 				candidate.ToRestart() {
 				return linkName
