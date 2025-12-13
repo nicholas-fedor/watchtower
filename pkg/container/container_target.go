@@ -163,7 +163,12 @@ func StartTargetContainer(
 	}
 
 	// Log detailed start message
-	clog.WithField("new_id", createdContainerID.ShortID()).Info("Started new container")
+	message := "Started new container"
+	if sourceContainer.IsLinkedToRestarting() {
+		message = "Started linked container"
+	}
+
+	clog.WithField("new_id", createdContainerID.ShortID()).Info(message)
 
 	return createdContainerID, nil
 }

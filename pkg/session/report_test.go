@@ -320,6 +320,84 @@ func Test_report_Fresh(t *testing.T) {
 	}
 }
 
+func Test_report_Restarted(t *testing.T) {
+	tests := []struct {
+		name string
+		r    *report
+		want []types.ContainerReport
+	}{
+		{
+			name: "empty report",
+			r:    &report{restarted: []types.ContainerReport{}},
+			want: []types.ContainerReport{},
+		},
+		{
+			name: "single restarted container",
+			r: func() *report {
+				mock := mocks.NewMockContainerReport(t)
+				mock.EXPECT().ID().Return(types.ContainerID("cont7"))
+
+				return &report{restarted: []types.ContainerReport{mock}}
+			}(),
+			want: []types.ContainerReport{
+				func() types.ContainerReport {
+					mock := mocks.NewMockContainerReport(t)
+					mock.EXPECT().ID().Return(types.ContainerID("cont7"))
+
+					return mock
+				}(),
+			},
+		},
+		{
+			name: "multiple restarted containers",
+			r: func() *report {
+				mock1 := mocks.NewMockContainerReport(t)
+				mock1.EXPECT().ID().Return(types.ContainerID("cont8"))
+
+				mock2 := mocks.NewMockContainerReport(t)
+				mock2.EXPECT().ID().Return(types.ContainerID("cont9"))
+
+				return &report{restarted: []types.ContainerReport{mock1, mock2}}
+			}(),
+			want: []types.ContainerReport{
+				func() types.ContainerReport {
+					mock := mocks.NewMockContainerReport(t)
+					mock.EXPECT().ID().Return(types.ContainerID("cont8"))
+
+					return mock
+				}(),
+				func() types.ContainerReport {
+					mock := mocks.NewMockContainerReport(t)
+					mock.EXPECT().ID().Return(types.ContainerID("cont9"))
+
+					return mock
+				}(),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.r.Restarted()
+			if len(got) != len(tt.want) {
+				t.Errorf("report.Restarted() length = %d, want %d", len(got), len(tt.want))
+
+				return
+			}
+
+			for i := range got {
+				if got[i].ID() != tt.want[i].ID() {
+					t.Errorf(
+						"report.Restarted()[%d].ID() = %v, want %v",
+						i,
+						got[i].ID(),
+						tt.want[i].ID(),
+					)
+				}
+			}
+		})
+	}
+}
+
 func Test_report_All(t *testing.T) {
 	tests := []struct {
 		name string
@@ -347,6 +425,27 @@ func Test_report_All(t *testing.T) {
 				}
 			}(),
 			want: []string{"cont1", "cont2"},
+		},
+		{
+			name: "containers with restarted priority",
+			r: func() *report {
+				mock1 := mocks.NewMockContainerReport(t)
+				mock1.EXPECT().ID().Return(types.ContainerID("cont1")).Times(0)
+
+				mock2 := mocks.NewMockContainerReport(t)
+				mock2.EXPECT().ID().Return(types.ContainerID("cont2")).Times(0)
+
+				mock3 := mocks.NewMockContainerReport(t)
+				mock3.EXPECT().ID().Return(types.ContainerID("cont3")).Times(0)
+
+				return &report{
+					updated:   []types.ContainerReport{mock1},
+					restarted: []types.ContainerReport{mock2},
+					failed:    []types.ContainerReport{mock3},
+					scanned:   []types.ContainerReport{mock1, mock2, mock3},
+				}
+			}(),
+			want: []string{"cont1", "cont2", "cont3"}, // updated first, then restarted, then failed
 		},
 	}
 	for _, tt := range tests {
@@ -384,12 +483,13 @@ func TestNewReport(t *testing.T) {
 			name: "empty progress",
 			args: args{progress: Progress{}},
 			want: &report{
-				scanned: []types.ContainerReport{},
-				updated: []types.ContainerReport{},
-				failed:  []types.ContainerReport{},
-				skipped: []types.ContainerReport{},
-				stale:   []types.ContainerReport{},
-				fresh:   []types.ContainerReport{},
+				scanned:   []types.ContainerReport{},
+				updated:   []types.ContainerReport{},
+				failed:    []types.ContainerReport{},
+				skipped:   []types.ContainerReport{},
+				stale:     []types.ContainerReport{},
+				fresh:     []types.ContainerReport{},
+				restarted: []types.ContainerReport{},
 			},
 		},
 		{
@@ -526,6 +626,7 @@ func TestNewReport(t *testing.T) {
 						imageName:     "image4:latest",
 					},
 				},
+				restarted: []types.ContainerReport{},
 			},
 		},
 		{
@@ -566,7 +667,8 @@ func TestNewReport(t *testing.T) {
 						imageName:     "image6:latest",
 					},
 				},
-				fresh: []types.ContainerReport{},
+				fresh:     []types.ContainerReport{},
+				restarted: []types.ContainerReport{},
 			},
 		},
 		{
@@ -607,7 +709,116 @@ func TestNewReport(t *testing.T) {
 						imageName:     "image7:latest",
 					},
 				},
-				fresh: []types.ContainerReport{},
+				fresh:     []types.ContainerReport{},
+				restarted: []types.ContainerReport{},
+			},
+		},
+		{
+			name: "restarted container",
+			args: args{
+				progress: Progress{
+					"cont8": &ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont8",
+						containerName: "container8",
+						oldImage:      "img1",
+						newImage:      "img1",
+						imageName:     "image8:latest",
+					},
+				},
+			},
+			want: &report{
+				scanned: []types.ContainerReport{
+					&ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont8",
+						containerName: "container8",
+						oldImage:      "img1",
+						newImage:      "img1",
+						imageName:     "image8:latest",
+					},
+				},
+				updated: []types.ContainerReport{},
+				failed:  []types.ContainerReport{},
+				skipped: []types.ContainerReport{},
+				stale:   []types.ContainerReport{},
+				fresh:   []types.ContainerReport{},
+				restarted: []types.ContainerReport{
+					&ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont8",
+						containerName: "container8",
+						oldImage:      "img1",
+						newImage:      "img1",
+						imageName:     "image8:latest",
+					},
+				},
+			},
+		},
+		{
+			name: "multiple restarted containers",
+			args: args{
+				progress: Progress{
+					"cont9": &ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont9",
+						containerName: "container9",
+						oldImage:      "img1",
+						newImage:      "img1",
+						imageName:     "image9:latest",
+					},
+					"cont10": &ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont10",
+						containerName: "container10",
+						oldImage:      "img2",
+						newImage:      "img2",
+						imageName:     "image10:latest",
+					},
+				},
+			},
+			want: &report{
+				scanned: []types.ContainerReport{
+					&ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont10",
+						containerName: "container10",
+						oldImage:      "img2",
+						newImage:      "img2",
+						imageName:     "image10:latest",
+					},
+					&ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont9",
+						containerName: "container9",
+						oldImage:      "img1",
+						newImage:      "img1",
+						imageName:     "image9:latest",
+					},
+				},
+				updated: []types.ContainerReport{},
+				failed:  []types.ContainerReport{},
+				skipped: []types.ContainerReport{},
+				stale:   []types.ContainerReport{},
+				fresh:   []types.ContainerReport{},
+				restarted: []types.ContainerReport{
+					&ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont10",
+						containerName: "container10",
+						oldImage:      "img2",
+						newImage:      "img2",
+						imageName:     "image10:latest",
+					},
+					&ContainerStatus{
+						state:         RestartedState,
+						containerID:   "cont9",
+						containerName: "container9",
+						oldImage:      "img1",
+						newImage:      "img1",
+						imageName:     "image9:latest",
+					},
+				},
 			},
 		},
 	}
@@ -751,6 +962,66 @@ func Test_categorizeContainer(t *testing.T) {
 						oldImage:    "img1",
 						newImage:    "img2",
 						containerID: "cont3",
+					},
+				},
+			},
+		},
+		{
+			name: "restarted container",
+			args: args{
+				r: &report{},
+				update: &ContainerStatus{
+					state:       RestartedState,
+					oldImage:    "img1",
+					newImage:    "img1",
+					containerID: "cont4",
+				},
+			},
+			want: &report{
+				scanned: []types.ContainerReport{
+					&ContainerStatus{
+						state:       RestartedState,
+						oldImage:    "img1",
+						newImage:    "img1",
+						containerID: "cont4",
+					},
+				},
+				restarted: []types.ContainerReport{
+					&ContainerStatus{
+						state:       RestartedState,
+						oldImage:    "img1",
+						newImage:    "img1",
+						containerID: "cont4",
+					},
+				},
+			},
+		},
+		{
+			name: "restarted container with different images",
+			args: args{
+				r: &report{},
+				update: &ContainerStatus{
+					state:       RestartedState,
+					oldImage:    "img1",
+					newImage:    "img2",
+					containerID: "cont5",
+				},
+			},
+			want: &report{
+				scanned: []types.ContainerReport{
+					&ContainerStatus{
+						state:       RestartedState,
+						oldImage:    "img1",
+						newImage:    "img2",
+						containerID: "cont5",
+					},
+				},
+				restarted: []types.ContainerReport{
+					&ContainerStatus{
+						state:       RestartedState,
+						oldImage:    "img1",
+						newImage:    "img2",
+						containerID: "cont5",
 					},
 				},
 			},

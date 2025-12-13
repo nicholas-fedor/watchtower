@@ -59,12 +59,17 @@ var _ = ginkgo.Describe("the metrics API", func() {
 
 	ginkgo.It("should serve metrics", func() {
 		gomega.Expect(tryGetMetrics()).
-			To(gomega.HaveKeyWithValue("watchtower_containers_updated", "0"))
+			To(gomega.SatisfyAll(
+				gomega.HaveKeyWithValue("watchtower_containers_updated", "0"),
+				gomega.HaveKeyWithValue("watchtower_containers_restarted", "0"),
+				gomega.HaveKeyWithValue("watchtower_containers_restarted_total", "0"),
+			))
 
 		metric := &metrics.Metric{
-			Scanned: 4,
-			Updated: 3,
-			Failed:  1,
+			Scanned:   4,
+			Updated:   3,
+			Failed:    1,
+			Restarted: 2,
 		}
 
 		metrics.Default().RegisterScan(metric)
@@ -74,8 +79,27 @@ var _ = ginkgo.Describe("the metrics API", func() {
 			gomega.HaveKeyWithValue("watchtower_containers_updated", "3"),
 			gomega.HaveKeyWithValue("watchtower_containers_failed", "1"),
 			gomega.HaveKeyWithValue("watchtower_containers_scanned", "4"),
+			gomega.HaveKeyWithValue("watchtower_containers_restarted", "2"),
+			gomega.HaveKeyWithValue("watchtower_containers_restarted_total", "2"),
 			gomega.HaveKeyWithValue("watchtower_scans_total", "1"),
 			gomega.HaveKeyWithValue("watchtower_scans_skipped_total", "0"),
+		))
+
+		// Register another scan with restarted containers to test total accumulation
+		metric2 := &metrics.Metric{
+			Scanned:   2,
+			Updated:   1,
+			Failed:    0,
+			Restarted: 1,
+		}
+
+		metrics.Default().RegisterScan(metric2)
+		gomega.Eventually(metrics.Default().QueueIsEmpty).Should(gomega.BeTrue())
+
+		gomega.Eventually(tryGetMetrics).Should(gomega.SatisfyAll(
+			gomega.HaveKeyWithValue("watchtower_containers_restarted", "1"),
+			gomega.HaveKeyWithValue("watchtower_containers_restarted_total", "3"),
+			gomega.HaveKeyWithValue("watchtower_scans_total", "2"),
 		))
 
 		for range 3 {
@@ -84,7 +108,7 @@ var _ = ginkgo.Describe("the metrics API", func() {
 		gomega.Eventually(metrics.Default().QueueIsEmpty).Should(gomega.BeTrue())
 
 		gomega.Eventually(tryGetMetrics).Should(gomega.SatisfyAll(
-			gomega.HaveKeyWithValue("watchtower_scans_total", "4"),
+			gomega.HaveKeyWithValue("watchtower_scans_total", "5"),
 			gomega.HaveKeyWithValue("watchtower_scans_skipped_total", "3"),
 		))
 	})

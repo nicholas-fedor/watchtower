@@ -10,7 +10,8 @@ var commonTemplates = map[string]string{
 	// "default-legacy" template formats individual event entries in a legacy log style.
 	// It iterates over .Entries, checking each entry's Message to format specific container lifecycle events.
 	// Handles messages: "Found new image" (new image available), "Stopping container" (stopping old container),
-	// "Started new container" (new container started), "Removing image" (image cleanup completed), "Container updated" (update completed).
+	// "Started new container" (new container started), "Stopping linked container" (stopping linked container),
+	// "Started linked container" (linked container started), "Removing image" (image cleanup completed), "Container updated" (update completed).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
 	"default-legacy": `
@@ -27,6 +28,10 @@ var commonTemplates = map[string]string{
     Stopped stale container: {{index $e.Data "container"}} ({{with (index $e.Data "id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Started new container" -}}
     Started new container: {{index $e.Data "container"}} ({{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Stopping linked container" -}}
+    Stopped linked container: {{index $e.Data "container"}} ({{with (index $e.Data "id")}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Started linked container" -}}
+    Started linked container: {{index $e.Data "container"}} ({{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Cleaned up old image: {{with (index $e.Data "image_name")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Container updated" -}}
@@ -45,20 +50,25 @@ var commonTemplates = map[string]string{
 	// "default" template provides a human-readable summary report of container update operations.
 	// If .Report exists, displays counts of scanned/updated/failed containers, then lists details for each category.
 	// Updated containers show name, image, and old/new image IDs.
+	// Restarted containers show name, image, and state.
 	// Fresh containers (no update needed) show name, image, and state.
 	// Skipped containers show name, image, state, and error reason.
 	// Failed containers show name, image, state, and error details.
 	// If no .Report, falls back to listing all .Entries messages (one per line).
-	// Expects .Report with Scanned, Updated, Failed, Fresh, Skipped slices of containers.
+	// Expects .Report with Scanned, Updated, Restarted, Failed, Fresh, Skipped slices of containers.
 	// Each container has Name, ImageName, State, Error, CurrentImageID, LatestImageID fields.
 	`default`: `
 {{- if .Report -}}
   {{- /* Use report summary data */ -}}
   {{- with .Report -}}
-    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
       {{- /* List successfully updated containers */ -}}
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+      {{- end -}}
+      {{- /* List restarted containers */ -}}
+      {{- range .Restarted}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
       {{- end -}}
       {{- /* List fresh containers (no update needed) */ -}}
       {{- range .Fresh}}
@@ -82,6 +92,7 @@ var commonTemplates = map[string]string{
 	// Iterates over all containers in .Report.All, showing name, image, state, and error (if any) per line.
 	// If no containers matched the filter, outputs "no containers matched filter".
 	// Expects .Report.All []Container slice with Name, ImageName, State, Error fields.
+	// States include: Updated, Restarted, Fresh, Skipped, Failed.
 	`porcelain.v1.summary-no-log`: `
 {{- if .Report -}}
   {{- /* Iterate over all containers */ -}}

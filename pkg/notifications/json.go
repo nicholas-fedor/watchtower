@@ -55,12 +55,13 @@ func (d Data) MarshalJSON() ([]byte, error) {
 			Debug("Including report in JSON")
 
 		report = jsonMap{
-			"scanned": marshalReports(d.Report.Scanned()),
-			"updated": marshalReports(d.Report.Updated()),
-			"failed":  marshalReports(d.Report.Failed()),
-			"skipped": marshalReports(d.Report.Skipped()),
-			"stale":   marshalReports(d.Report.Stale()),
-			"fresh":   marshalReports(d.Report.Fresh()),
+			"scanned":   marshalReports(d.Report.Scanned()),
+			"updated":   marshalReports(d.Report.Updated()),
+			"restarted": marshalReports(d.Report.Restarted()),
+			"failed":    marshalReports(d.Report.Failed()),
+			"skipped":   marshalReports(d.Report.Skipped()),
+			"stale":     marshalReports(d.Report.Stale()),
+			"fresh":     marshalReports(d.Report.Fresh()),
 		}
 	}
 

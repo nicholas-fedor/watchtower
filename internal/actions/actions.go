@@ -23,6 +23,10 @@ const (
 	StoppingContainerMessage = "Stopping container"
 	// StartedNewContainerMessage is the message logged when a new container is started after update.
 	StartedNewContainerMessage = "Started new container"
+	// StoppingLinkedContainerMessage is the message logged when stopping a linked container for restart.
+	StoppingLinkedContainerMessage = "Stopping linked container"
+	// StartedLinkedContainerMessage is the message logged when a linked container is started after restart.
+	StartedLinkedContainerMessage = "Started linked container"
 	// UpdateSkippedMessage is the message logged when an update is skipped in monitor-only mode.
 	UpdateSkippedMessage = "Update available but skipped (monitor-only mode)"
 	// ContainerRemainsRunningMessage is the message logged when a container remains running in monitor-only mode.
@@ -484,7 +488,26 @@ func sendSplitNotifications(
 	// This map is scoped to the function to ensure tracking is per-notification-session.
 	notified := make(map[string]bool)
 
+	logrus.WithFields(logrus.Fields{
+		"updated_count":   len(result.Updated()),
+		"restarted_count": len(result.Restarted()),
+		"stale_count":     len(result.Stale()),
+		"failed_count":    len(result.Failed()),
+		"skipped_count":   len(result.Skipped()),
+		"fresh_count":     len(result.Fresh()),
+		"scanned_count":   len(result.Scanned()),
+	}).Debug("Split notifications: container counts by category")
+
 	if notificationReport {
+		// Log updated containers for debugging
+		updatedNames := make([]string, 0, len(result.Updated()))
+		for _, c := range result.Updated() {
+			updatedNames = append(updatedNames, c.Name())
+		}
+
+		logrus.WithField("updated_containers", updatedNames).
+			Debug("Split notifications: sending report notifications for updated containers")
+
 		// Send individual report notifications for each updated container
 		for _, updatedContainer := range result.Updated() {
 			// Skip nil container reports
@@ -545,6 +568,14 @@ func sendSplitNotifications(
 			}
 		}
 	} else {
+		// Log updated containers for debugging
+		updatedNames := make([]string, 0, len(result.Updated()))
+		for _, c := range result.Updated() {
+			updatedNames = append(updatedNames, c.Name())
+		}
+
+		logrus.WithField("updated_containers", updatedNames).Debug("Split notifications: sending filtered entry notifications for updated containers")
+
 		// Send individual filtered entry notifications for each updated container
 		for _, updatedContainer := range result.Updated() {
 			// Skip nil container reports
@@ -579,6 +610,67 @@ func sendSplitNotifications(
 
 			// Add cleanup entries for this container
 			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, updatedContainer.Name())
+			entries = append(entries, containerCleanupEntries...)
+
+			notifier.SendFilteredEntries(entries, singleContainerReport)
+
+			notified[containerID] = true
+		}
+
+		// Send individual filtered entry notifications for each restarted container
+		for _, restartedContainer := range result.Restarted() {
+			// Skip nil container reports
+			if restartedContainer == nil {
+				logrus.Debug("Encountered nil restarted container report, skipping")
+
+				continue
+			}
+
+			// Skip containers with empty names
+			if strings.TrimSpace(restartedContainer.Name()) == "" {
+				logrus.WithField("container_id", restartedContainer.ID().ShortID()).Debug("Encountered restarted container with empty name, skipping notification")
+
+				continue
+			}
+
+			containerID := string(restartedContainer.ID())
+			if notified[containerID] {
+				// Skip notification if already sent for this container ID
+				continue
+			}
+
+			logrus.WithFields(logrus.Fields{
+				"container": restartedContainer.Name(),
+				"image":     restartedContainer.ImageName(),
+			}).Debug("Sending individual notification for restarted container")
+
+			singleContainerReport := buildSingleContainerReport(restartedContainer, result)
+
+			// Create log entries for container restart events (similar to update but without "Found new image")
+			entries := []*logrus.Entry{
+				{
+					Level:   logrus.InfoLevel,
+					Message: StoppingLinkedContainerMessage,
+					Data: logrus.Fields{
+						"container": restartedContainer.Name(),
+						"id":        restartedContainer.ID().ShortID(),
+						"old_id":    restartedContainer.CurrentImageID().ShortID(),
+					},
+					Time: time.Now(),
+				},
+				{
+					Level:   logrus.InfoLevel,
+					Message: StartedLinkedContainerMessage,
+					Data: logrus.Fields{
+						"container": restartedContainer.Name(),
+						"new_id":    restartedContainer.NewContainerID().ShortID(),
+					},
+					Time: time.Now(),
+				},
+			}
+
+			// Add cleanup entries for this container
+			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, restartedContainer.Name())
 			entries = append(entries, containerCleanupEntries...)
 
 			notifier.SendFilteredEntries(entries, singleContainerReport)

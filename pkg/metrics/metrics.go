@@ -16,22 +16,25 @@ var metrics *Metrics
 
 // Metric holds data points from a Watchtower scan.
 type Metric struct {
-	Scanned int // Number of containers scanned.
-	Updated int // Number of containers updated (excludes stale).
-	Failed  int // Number of containers failed.
+	Scanned   int // Number of containers scanned.
+	Updated   int // Number of containers updated (excludes stale).
+	Failed    int // Number of containers failed.
+	Restarted int // Number of containers restarted due to linked dependencies.
 }
 
 // Metrics handles processing and exposing scan metrics.
 type Metrics struct {
-	channel      chan *Metric       // Channel for queuing metrics.
-	scanned      prometheus.Gauge   // Gauge for scanned containers.
-	updated      prometheus.Gauge   // Gauge for updated containers.
-	failed       prometheus.Gauge   // Gauge for failed containers.
-	total        prometheus.Counter // Counter for total scans.
-	skipped      prometheus.Counter // Counter for skipped scans.
-	dropped      prometheus.Counter // Counter for dropped metrics.
-	stopCh       chan struct{}      // Channel for shutdown signaling.
-	shutdownOnce sync.Once          // Ensures shutdown is called only once.
+	channel        chan *Metric       // Channel for queuing metrics.
+	scanned        prometheus.Gauge   // Gauge for scanned containers.
+	updated        prometheus.Gauge   // Gauge for updated containers.
+	failed         prometheus.Gauge   // Gauge for failed containers.
+	restarted      prometheus.Gauge   // Gauge for restarted containers.
+	restartedTotal prometheus.Counter // Counter for total restarted containers.
+	total          prometheus.Counter // Counter for total scans.
+	skipped        prometheus.Counter // Counter for skipped scans.
+	dropped        prometheus.Counter // Counter for dropped metrics.
+	stopCh         chan struct{}      // Channel for shutdown signaling.
+	shutdownOnce   sync.Once          // Ensures shutdown is called only once.
 }
 
 // NewWithRegistry creates a new Metrics handler with a custom Prometheus registry.
@@ -59,6 +62,14 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 			Name: "watchtower_containers_failed",
 			Help: "Number of containers where update failed during the last scan",
 		}),
+		restarted: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_containers_restarted",
+			Help: "Number of containers restarted due to linked dependencies during the last scan",
+		}),
+		restartedTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "watchtower_containers_restarted_total",
+			Help: "Total number of containers restarted due to linked dependencies",
+		}),
 		total: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "watchtower_scans_total",
 			Help: "Number of scans since the watchtower started",
@@ -81,6 +92,8 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		metrics.scanned,
 		metrics.updated,
 		metrics.failed,
+		metrics.restarted,
+		metrics.restartedTotal,
 		metrics.total,
 		metrics.skipped,
 		metrics.dropped,
@@ -109,9 +122,10 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 //   - *Metric: New metric instance.
 func NewMetric(report types.Report) *Metric {
 	return &Metric{
-		Scanned: len(report.Scanned()),
-		Updated: len(report.Updated()), // Only count actually updated containers.
-		Failed:  len(report.Failed()),
+		Scanned:   len(report.Scanned()),
+		Updated:   len(report.Updated()), // Only count actually updated containers.
+		Failed:    len(report.Failed()),
+		Restarted: len(report.Restarted()),
 	}
 }
 
@@ -191,6 +205,7 @@ func (m *Metrics) HandleUpdate() {
 				m.scanned.Set(0)
 				m.updated.Set(0)
 				m.failed.Set(0)
+				m.restarted.Set(0)
 
 				continue
 			}
@@ -199,6 +214,8 @@ func (m *Metrics) HandleUpdate() {
 			m.scanned.Set(float64(change.Scanned))
 			m.updated.Set(float64(change.Updated))
 			m.failed.Set(float64(change.Failed))
+			m.restarted.Set(float64(change.Restarted))
+			m.restartedTotal.Add(float64(change.Restarted))
 		case <-m.stopCh:
 			return
 		}

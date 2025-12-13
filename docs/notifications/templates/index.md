@@ -95,12 +95,15 @@ When `--notification-report` is set, the template processes a `notifications.Dat
 ```go title="Default Report Template"
 {{- if .Report -}}
   {{- with .Report -}}
-    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-    {{- if ( or .Updated .Failed ) -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+    {{- if ( or .Updated .Restarted .Failed ) -}}
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
       {{- end -}}
       {{- range .Fresh}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
+      {{- end -}}
+      {{- range .Restarted}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
       {{- end -}}
       {{- range .Skipped}}
@@ -133,12 +136,15 @@ Logs:
       -e WATCHTOWER_NOTIFICATION_TEMPLATE="\
     {{- if .Report -}}
       {{- with .Report -}}
-    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-    {{- if ( or .Updated .Failed ) -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+    {{- if ( or .Updated .Restarted .Failed ) -}}
           {{- range .Updated -}}
     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
           {{- end -}}
           {{- range .Fresh -}}
+    - {{.Name}} ({{.ImageName}}): {{.State}}
+          {{- end -}}
+          {{- range .Restarted -}}
     - {{.Name}} ({{.ImageName}}): {{.State}}
           {{- end -}}
           {{- range .Skipped -}}
@@ -175,12 +181,15 @@ Logs:
           WATCHTOWER_NOTIFICATION_TEMPLATE: |
             {{- if .Report -}}
               {{- with .Report -}}
-            {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-            {{- if ( or .Updated .Failed ) -}}
+            {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+            {{- if ( or .Updated .Restarted .Failed ) -}}
                 {{- range .Updated -}}
             - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
                 {{- end -}}
                 {{- range .Fresh -}}
+            - {{.Name}} ({{.ImageName}}): {{.State}}
+                {{- end -}}
+                {{- range .Restarted -}}
             - {{.Name}} ({{.ImageName}}): {{.State}}
                 {{- end -}}
                 {{- range .Skipped -}}
@@ -199,11 +208,12 @@ Logs:
             {{- end -}}
     ```
 <!-- markdownlint-restore -->
-Example output for a session with one updated container and one error log:
+Example output for a session with one updated container, one restarted container, and one error log:
 
 ```text
-5 Scanned, 1 Updated, 0 Failed
+5 Scanned, 1 Updated, 1 Restarted, 0 Failed
 - /container (repo/image:latest): abcdef12 updated to 34567890
+- /restarted-container (repo/image:latest): Restarted
 
 Logs:
 2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.

@@ -102,6 +102,8 @@ func (p *PreviewData) AddFromState(state State) {
 		p.report.failed = append(p.report.failed, status)
 	case SkippedState:
 		p.report.skipped = append(p.report.skipped, status)
+	case RestartedState:
+		p.report.restarted = append(p.report.restarted, status)
 	case StaleState:
 		p.report.stale = append(p.report.stale, status)
 	case FreshState:

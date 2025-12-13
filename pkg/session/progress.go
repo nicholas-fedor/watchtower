@@ -122,6 +122,37 @@ func (m Progress) MarkForUpdate(containerID types.ContainerID) {
 	}).Debug("Marked container for update")
 }
 
+// MarkRestarted sets a container’s state to restarted.
+//
+// Parameters:
+//   - containerID: ID of container to mark.
+func (m Progress) MarkRestarted(containerID types.ContainerID) {
+	update := m[containerID]
+	update.state = RestartedState
+	logrus.WithFields(logrus.Fields{
+		"container_id": containerID.ShortID(),
+		"name":         update.Name(),
+	}).Debug("Marked container as restarted")
+}
+
+// Restarted returns all containers marked as restarted.
+//
+// Returns:
+//   - []types.ContainerReport: List of restarted containers.
+func (m Progress) Restarted() []types.ContainerReport {
+	var restarted []types.ContainerReport
+
+	for _, update := range m {
+		if update.state == RestartedState {
+			restarted = append(restarted, update)
+		}
+	}
+
+	logrus.WithField("count", len(restarted)).Debug("Retrieved restarted containers")
+
+	return restarted
+}
+
 // Report generates a report from the progress data.
 //
 // Returns:

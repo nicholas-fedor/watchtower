@@ -6,17 +6,30 @@ import (
 
 // State enum values.
 const (
-	UnknownState State = iota // Uninitialized state.
-	SkippedState              // Container skipped.
-	ScannedState              // Container scanned.
-	UpdatedState              // Container updated.
-	FailedState               // Container update failed.
-	FreshState                // Container is fresh.
-	StaleState                // Container is stale.
+	UnknownState   State = iota // Uninitialized state.
+	SkippedState                // Container skipped.
+	ScannedState                // Container scanned.
+	UpdatedState                // Container updated.
+	FailedState                 // Container update failed.
+	FreshState                  // Container is fresh.
+	StaleState                  // Container is stale.
+	RestartedState              // Container restarted (linked dependency).
 )
 
 // State indicates what the current state is of the container.
 type State int
+
+// State string constants.
+const (
+	UnknownStateString   = "Unknown"
+	SkippedStateString   = "Skipped"
+	ScannedStateString   = "Scanned"
+	UpdatedStateString   = "Updated"
+	FailedStateString    = "Failed"
+	FreshStateString     = "Fresh"
+	StaleStateString     = "Stale"
+	RestartedStateString = "Restarted"
+)
 
 // ContainerStatus holds a container’s state during a session.
 //
@@ -92,21 +105,23 @@ func (u *ContainerStatus) Error() string {
 func (u *ContainerStatus) State() string {
 	switch u.state {
 	case UnknownState:
-		return "Unknown" // Uninitialized state.
+		return UnknownStateString // Uninitialized state.
 	case SkippedState:
-		return "Skipped"
+		return SkippedStateString
 	case ScannedState:
-		return "Scanned"
+		return ScannedStateString
 	case UpdatedState:
-		return "Updated"
+		return UpdatedStateString
 	case FailedState:
-		return "Failed"
+		return FailedStateString
 	case FreshState:
-		return "Fresh"
+		return FreshStateString
 	case StaleState:
-		return "Stale"
+		return StaleStateString
+	case RestartedState:
+		return RestartedStateString
 	default:
-		return "Unknown" // Fallback for unexpected values.
+		return UnknownStateString // Fallback for unexpected values.
 	}
 }
 

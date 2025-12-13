@@ -194,10 +194,15 @@ func StopSourceContainer(
 		}
 
 		// Log the stop attempt with the signal and configured timeout for clarity.
+		message := "Stopping container"
+		if sourceContainer.IsLinkedToRestarting() {
+			message = "Stopping linked container"
+		}
+
 		clog.WithFields(logrus.Fields{
 			"signal":  signal,
 			"timeout": timeout,
-		}).Info("Stopping container")
+		}).Info(message)
 
 		// Record the start time to measure elapsed duration for the stop operation.
 		startTime := time.Now()

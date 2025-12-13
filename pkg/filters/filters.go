@@ -262,13 +262,13 @@ func matchesName(containerName, pattern string) bool {
 	}
 
 	// Try regex match (anchored to match whole string).
-	re, err := regexp.Compile("^" + pattern + "$")
+	regex, err := regexp.Compile("^" + pattern + "$")
 	if err != nil {
 		// Treat invalid regex as literal string (exact match already checked above).
 		return false
 	}
 
-	return re.MatchString(containerName)
+	return regex.MatchString(containerName)
 }
 
 // matchImageAndTag checks if a container's image matches a target image, including optional tag.

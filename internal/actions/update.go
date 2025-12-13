@@ -213,6 +213,11 @@ func Update(
 				watchtowerPullFailed = true
 			}
 		} else {
+			// For fresh containers, set newestImage to current image ID for proper categorization
+			if !stale {
+				newestImage = sourceContainer.ImageID()
+			}
+
 			// Log successful staleness check and add to scanned containers.
 			clog.WithFields(logrus.Fields{
 				"stale":        stale,
@@ -626,6 +631,10 @@ func performRollingRestart(
 				if progress != nil {
 					if status, exists := (*progress)[c.ID()]; exists {
 						status.SetNewContainerID(newContainerID)
+						// Mark as restarted if not stale (not updated)
+						if !c.IsStale() {
+							progress.MarkRestarted(c.ID())
+						}
 					}
 				}
 
@@ -724,6 +733,8 @@ func stopStaleContainer(
 	if !container.ToRestart() {
 		return nil
 	}
+
+	logrus.WithFields(fields).Debug("Stopping container for restart")
 
 	// Verify configuration for linked containers to ensure restart compatibility.
 	if container.IsLinkedToRestarting() {
@@ -827,6 +838,10 @@ func restartContainersInSortedOrder(
 				if progress != nil {
 					if status, exists := (*progress)[c.ID()]; exists {
 						status.SetNewContainerID(newContainerID)
+						// Mark as restarted if not stale (not updated)
+						if !c.IsStale() {
+							progress.MarkRestarted(c.ID())
+						}
 					}
 				}
 
@@ -935,6 +950,8 @@ func restartStaleContainer(
 
 	// Start the new container unless restarts are disabled (but always start for Watchtower).
 	if !params.NoRestart || container.IsWatchtower() {
+		logrus.WithFields(fields).Debug("Starting container after update/restart")
+
 		var err error
 
 		newContainerID, err = client.StartContainer(container)
