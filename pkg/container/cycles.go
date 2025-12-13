@@ -34,7 +34,7 @@ import (
 // - colors: State map for three-color algorithm (0=white, 1=gray, 2=black)
 // - cycles: Result map marking containers involved in cycles (true = cyclic)
 // - path: Current DFS path for cycle reconstruction when back edges are found.
-type CycleDetector struct {
+type cycleDetector struct {
 	graph  map[string][]string
 	colors map[string]int // 0: white, 1: gray, 2: black
 	cycles map[string]bool
@@ -67,7 +67,7 @@ type CycleDetector struct {
 //
 // Parameters:
 //   - node: The container name to start DFS traversal from. Must exist in the graph.
-func (cd *CycleDetector) dfs(node string) {
+func (cd *cycleDetector) dfs(node string) {
 	// Step 1: Mark node as visiting (gray) and add to current exploration path
 	// This indicates we're actively exploring this node's dependencies
 	cd.colors[node] = 1 // gray
@@ -157,7 +157,7 @@ func (cd *CycleDetector) dfs(node string) {
 func DetectCycles(containers []types.Container) map[string]bool {
 	// Initialize cycle detector with empty data structures
 	// All containers start as white (unvisited) and no cycles detected yet
-	cycleDetector := &CycleDetector{
+	cycleDetector := &cycleDetector{
 		graph:  make(map[string][]string), // Adjacency list: container -> its dependencies
 		colors: make(map[string]int),      // Node states: 0=white, 1=gray, 2=black
 		cycles: make(map[string]bool),     // Result: containers involved in cycles
