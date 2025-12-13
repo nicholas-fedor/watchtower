@@ -49,7 +49,8 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				})
 				c2.EXPECT().Name().Return("c2")
 				containers := []types.Container{c3, c1, c2}
-				sorter.SortByCreated(containers)
+				err := sorter.SortByCreated(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(containers[0].Name()).To(gomega.Equal("c1"))
 				gomega.Expect(containers[1].Name()).To(gomega.Equal("c2"))
 				gomega.Expect(containers[2].Name()).To(gomega.Equal("c3"))
@@ -80,14 +81,17 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c2.EXPECT().Name().Return("c2").Maybe()
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
 				containers := []types.Container{c1, c2}
-				sorter.SortByCreated(containers)
-				// Invalid date uses current time, order may vary; check stability
-				gomega.Expect(containers).To(gomega.HaveLen(2))
+				err := sorter.SortByCreated(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				// Invalid date uses far future time, so c1 (far future) should come after c2 (now)
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("c2"))
+				gomega.Expect(containers[1].Name()).To(gomega.Equal("c1"))
 			})
 
 			ginkgo.It("handles empty list", func() {
 				containers := []types.Container{}
-				sorter.SortByCreated(containers)
+				err := sorter.SortByCreated(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.BeEmpty())
 			})
 		})
