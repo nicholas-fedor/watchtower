@@ -163,6 +163,16 @@ func DetectCycles(containers []types.Container) map[string]bool {
 		path:   []string{},                // Current DFS path for cycle reconstruction
 	}
 
+	// Build alias map to handle namespace mismatches
+	// Maps raw container names, link name forms, and resolved identifiers to canonical IDs
+	aliasMap := make(map[string]string)
+
+	for _, c := range containers {
+		canonical := ResolveContainerIdentifier(c)
+		aliasMap[c.Name()] = canonical
+		aliasMap[canonical] = canonical
+	}
+
 	// Phase 1: Build the dependency graph from container relationships
 	// Convert container objects into a directed graph where edges represent dependencies
 	for _, c := range containers {
@@ -173,8 +183,17 @@ func DetectCycles(containers []types.Container) map[string]bool {
 		// c.Links() already returns normalized container names
 		links := c.Links()
 
-		// Add container to graph with its dependencies
-		cycleDetector.graph[name] = links
+		// Translate each link target through the alias map to ensure canonical IDs
+		canonicalLinks := make([]string, 0, len(links))
+		for _, link := range links {
+			if canonical, exists := aliasMap[link]; exists {
+				canonicalLinks = append(canonicalLinks, canonical)
+			}
+			// Skip unmapped link targets - prevents namespace mismatch
+		}
+
+		// Add container to graph with its canonical dependencies
+		cycleDetector.graph[name] = canonicalLinks
 
 		// Initialize container as unvisited (white) in the coloring algorithm
 		cycleDetector.colors[name] = 0
