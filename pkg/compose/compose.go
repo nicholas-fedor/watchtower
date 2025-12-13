@@ -45,13 +45,12 @@ func ParseDependsOnLabel(labelValue string) []string {
 		clog.WithField("parsing_dep", dep).Debug("Parsing individual dependency")
 		// Parse colon-separated format: service:condition:required
 		parts := strings.Split(dep, ":")
-		if len(parts) >= 1 {
-			serviceName := strings.TrimSpace(parts[0])
-			if serviceName != "" {
-				clog.WithField("parsed_service", serviceName).
-					Debug("Added parsed service to dependencies")
-				services = append(services, serviceName)
-			}
+
+		serviceName := strings.TrimSpace(parts[0])
+		if serviceName != "" {
+			clog.WithField("parsed_service", serviceName).
+				Debug("Added parsed service to dependencies")
+			services = append(services, serviceName)
 		}
 	}
 
