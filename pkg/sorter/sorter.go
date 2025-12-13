@@ -15,13 +15,11 @@ type Sorter interface {
 //   - containers: Slice to sort in place.
 //
 // Returns:
-//   - error: Always nil.
+//   - error: Always nil, propagated from sorter.Sort.
 func SortByCreated(containers []types.Container) error {
 	sorter := TimeSorter{}
 
-	_ = sorter.Sort(containers)
-
-	return nil
+	return sorter.Sort(containers)
 }
 
 // SortByDependencies sorts containers in place by dependencies.
