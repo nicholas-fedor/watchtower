@@ -444,18 +444,21 @@ var _ = ginkgo.Describe("Container", func() {
 					))
 				})
 
-				ginkgo.It("takes precedence over compose depends-on label", func() {
-					container = MockContainer(WithLabels(map[string]string{
-						"com.docker.compose.depends_on":             "postgres",
-						"com.centurylinklabs.watchtower.depends-on": "redis",
-					}))
-					links := container.Links()
-					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/redis"),
-						gomega.Not(gomega.ContainElement("/postgres")),
-						gomega.HaveLen(1),
-					))
-				})
+				ginkgo.It(
+					"watchtower depends-on label takes precedence over compose depends_on",
+					func() {
+						container = MockContainer(WithLabels(map[string]string{
+							"com.docker.compose.depends_on":             "postgres",
+							"com.centurylinklabs.watchtower.depends-on": "redis",
+						}))
+						links := container.Links()
+						gomega.Expect(links).To(gomega.SatisfyAll(
+							gomega.ContainElement("/redis"),
+							gomega.Not(gomega.ContainElement("/postgres")),
+							gomega.HaveLen(1),
+						))
+					},
+				)
 
 				ginkgo.It("returns empty links for blank compose depends-on label", func() {
 					container = MockContainer(WithLabels(map[string]string{
