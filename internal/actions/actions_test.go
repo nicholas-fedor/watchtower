@@ -548,8 +548,8 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).
-					To(gomega.Equal(2))
-				// Both containers were updated, but only one notification sent
+					To(gomega.Equal(1))
+				// Only the valid container was updated, the empty name container was skipped due to invalid image
 
 				notifier.AssertExpectations(ginkgo.GinkgoT())
 			})

@@ -471,9 +471,11 @@ func parseReference(
 
 // isPinned checks if a container’s image is pinned by a digest reference.
 //
-// It selects a valid image name from ImageName(), Config.Image, or a fallback (imageInfo.ID or container name),
-// parsing it to detect digest-based references (e.g., @sha256:...). If pinned, it marks the container as scanned
-// in the progress report to skip updates, preserving immutability.
+// It selects a valid image name from ImageName(), Config.Image,
+// or a fallback (imageInfo.ID or container name),
+// parsing it to detect digest-based references (e.g., @sha256:...).
+// If pinned, it marks the container as scanned in the progress report
+// to skip updates, preserving immutability.
 //
 // Parameters:
 //   - container: The container to check for a pinned image.
@@ -503,13 +505,18 @@ func isPinned(
 	if isInvalidImageName(imageName) {
 		clog.WithField("invalid_image", imageName).Debug("Invalid ImageName detected")
 
-		if configImage != "" {
+		if configImage != "" && !isInvalidImageName(configImage) {
 			imageName = configImage
 			clog.WithField("config_image", configImage).Debug("Using Config.Image as fallback")
 		} else {
 			imageName = fallbackImage
 			clog.WithField("fallback_image", fallbackImage).Debug("Using derived fallback image")
 		}
+	}
+
+	// If the final imageName is still invalid, skip the container.
+	if isInvalidImageName(imageName) {
+		return false, errInvalidImageReference
 	}
 
 	// Parse the selected image name to check for a digest-based reference.
@@ -537,17 +544,8 @@ func isPinned(
 }
 
 // getFallbackImage derives a fallback image name from container info.
-// Uses sanitized imageInfo.ID if it contains a tag, otherwise uses sanitized container name with ":latest".
+// Uses the container name with ":latest" as the fallback image.
 func getFallbackImage(container types.Container) string {
-	if container.HasImageInfo() {
-		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
-		if !strings.Contains(fallback, ":") {
-			return container.Name() + ":latest"
-		}
-
-		return fallback
-	}
-
 	return container.Name() + ":latest"
 }
 

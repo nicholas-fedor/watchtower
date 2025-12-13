@@ -101,7 +101,13 @@ func createDependencyChain(names []string) []types.Container {
 	containers := make([]types.Container, len(names))
 	for i := range names {
 		name := names[i]
-		image := "image-" + name[10:] + ":latest"
+
+		suffix := name
+		if len(name) > 10 {
+			suffix = name[10:]
+		}
+
+		image := "image-" + suffix + ":latest"
 
 		labels := make(map[string]string)
 		if i < len(names)-1 {
@@ -1281,7 +1287,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			},
 		)
 
-		ginkgo.It("should skip invalid image references with error", func() {
+		ginkgo.It("should process invalid image references with fallback", func() {
 			count := 0
 			client = &mocks.MockClient{
 				TestData: &mocks.TestData{
@@ -1301,18 +1307,14 @@ var _ = ginkgo.Describe("the update action", func() {
 			}
 			report, cleanupImageInfos, err := actions.Update(client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(report.Skipped()).
-				To(gomega.HaveLen(1), "Invalid container should be skipped")
 			gomega.Expect(report.Scanned()).
-				To(gomega.BeEmpty(), "Invalid container should not be scanned")
+				To(gomega.HaveLen(1), "Invalid container should be scanned with fallback")
 			gomega.Expect(report.Updated()).
-				To(gomega.BeEmpty(), "Invalid container should not be updated")
+				To(gomega.HaveLen(1), "Invalid container should be updated with valid fallback")
 			gomega.Expect(cleanupImageInfos).
-				To(gomega.BeEmpty(), "No image IDs should be collected")
-			gomega.Expect(client.TestData.TriedToRemoveImageCount).
-				To(gomega.Equal(0), "RemoveImageByID should not be called")
+				To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID(":latest"))))
 			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(0), "IsContainerStale should not be called")
+				To(gomega.Equal(1), "IsContainerStale should be called")
 		})
 
 		ginkgo.It(
