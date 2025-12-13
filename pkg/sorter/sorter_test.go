@@ -323,6 +323,48 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					return c
 				}
 
+				makeSimpleChainContainers := func(t ginkgo.GinkgoTInterface) []types.Container {
+					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
+					b := newMockContainer(t, "b", "id-b", []string{"/c"}, map[string]string{})
+					a := newMockContainer(t, "a", "id-a", []string{"/b"}, map[string]string{})
+
+					return []types.Container{c, b, a}
+				}
+
+				makeMultipleDepsContainers := func(t ginkgo.GinkgoTInterface) []types.Container {
+					d := newMockContainer(t, "d", "id-d", nil, map[string]string{})
+					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
+					b := newMockContainer(t, "b", "id-b", []string{"/d"}, map[string]string{})
+					a := newMockContainer(t, "a", "id-a", []string{"/b", "/c"}, map[string]string{})
+
+					return []types.Container{d, c, b, a}
+				}
+
+				makeDiamondContainers := func(t ginkgo.GinkgoTInterface) []types.Container {
+					d := newMockContainer(t, "d", "id-d", nil, map[string]string{})
+					b := newMockContainer(t, "b", "id-b", []string{"/d"}, map[string]string{})
+					c := newMockContainer(t, "c", "id-c", []string{"/d"}, map[string]string{})
+					a := newMockContainer(t, "a", "id-a", []string{"/b", "/c"}, map[string]string{})
+
+					return []types.Container{d, b, c, a}
+				}
+
+				makeNoDepsContainers := func(t ginkgo.GinkgoTInterface) []types.Container {
+					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
+					b := newMockContainer(t, "b", "id-b", nil, map[string]string{})
+					a := newMockContainer(t, "a", "id-a", nil, map[string]string{})
+
+					return []types.Container{c, b, a}
+				}
+
+				makeMixedSlashContainers := func(t ginkgo.GinkgoTInterface) []types.Container {
+					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
+					b := newMockContainer(t, "b", "id-b", []string{"c"}, map[string]string{})
+					a := newMockContainer(t, "a", "id-a", []string{"/b"}, map[string]string{})
+
+					return []types.Container{c, b, a}
+				}
+
 				testCases := []struct {
 					name          string
 					containers    func() []types.Container
@@ -331,101 +373,21 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					{
 						name: "simple chain with slashes",
 						containers: func() []types.Container {
-							c := newMockContainer(
-								ginkgo.GinkgoT(),
-								"c",
-								"id-c",
-								nil,
-								map[string]string{},
-							)
-							b := newMockContainer(
-								ginkgo.GinkgoT(),
-								"b",
-								"id-b",
-								[]string{"/c"},
-								map[string]string{},
-							)
-							a := newMockContainer(
-								ginkgo.GinkgoT(),
-								"a",
-								"id-a",
-								[]string{"/b"},
-								map[string]string{},
-							)
-
-							return []types.Container{c, b, a}
+							return makeSimpleChainContainers(ginkgo.GinkgoT())
 						},
 						expectedOrder: []string{"c", "b", "a"},
 					},
 					{
 						name: "multiple dependencies with slashes",
 						containers: func() []types.Container {
-							d := newMockContainer(
-								ginkgo.GinkgoT(),
-								"d",
-								"id-d",
-								nil,
-								map[string]string{},
-							)
-							c := newMockContainer(
-								ginkgo.GinkgoT(),
-								"c",
-								"id-c",
-								nil,
-								map[string]string{},
-							)
-							b := newMockContainer(
-								ginkgo.GinkgoT(),
-								"b",
-								"id-b",
-								[]string{"/d"},
-								map[string]string{},
-							)
-							a := newMockContainer(
-								ginkgo.GinkgoT(),
-								"a",
-								"id-a",
-								[]string{"/b", "/c"},
-								map[string]string{},
-							)
-
-							return []types.Container{d, c, b, a}
+							return makeMultipleDepsContainers(ginkgo.GinkgoT())
 						},
 						expectedOrder: []string{"d", "c", "b", "a"},
 					},
 					{
 						name: "diamond dependency graph",
 						containers: func() []types.Container {
-							d := newMockContainer(
-								ginkgo.GinkgoT(),
-								"d",
-								"id-d",
-								nil,
-								map[string]string{},
-							)
-							b := newMockContainer(
-								ginkgo.GinkgoT(),
-								"b",
-								"id-b",
-								[]string{"/d"},
-								map[string]string{},
-							)
-							c := newMockContainer(
-								ginkgo.GinkgoT(),
-								"c",
-								"id-c",
-								[]string{"/d"},
-								map[string]string{},
-							)
-							a := newMockContainer(
-								ginkgo.GinkgoT(),
-								"a",
-								"id-a",
-								[]string{"/b", "/c"},
-								map[string]string{},
-							)
-
-							return []types.Container{d, b, c, a}
+							return makeDiamondContainers(ginkgo.GinkgoT())
 						},
 						expectedOrder: []string{
 							"d",
@@ -437,58 +399,14 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					{
 						name: "no dependencies",
 						containers: func() []types.Container {
-							a := newMockContainer(
-								ginkgo.GinkgoT(),
-								"a",
-								"id-a",
-								nil,
-								map[string]string{},
-							)
-							b := newMockContainer(
-								ginkgo.GinkgoT(),
-								"b",
-								"id-b",
-								nil,
-								map[string]string{},
-							)
-							c := newMockContainer(
-								ginkgo.GinkgoT(),
-								"c",
-								"id-c",
-								nil,
-								map[string]string{},
-							)
-
-							return []types.Container{a, b, c}
+							return makeNoDepsContainers(ginkgo.GinkgoT())
 						},
 						expectedOrder: []string{"c", "b", "a"},
 					},
 					{
 						name: "mixed slash scenarios",
 						containers: func() []types.Container {
-							c := newMockContainer(
-								ginkgo.GinkgoT(),
-								"c",
-								"id-c",
-								nil,
-								map[string]string{},
-							)
-							b := newMockContainer(
-								ginkgo.GinkgoT(),
-								"b",
-								"id-b",
-								[]string{"c"},
-								map[string]string{},
-							)
-							a := newMockContainer(
-								ginkgo.GinkgoT(),
-								"a",
-								"id-a",
-								[]string{"/b"},
-								map[string]string{},
-							)
-
-							return []types.Container{c, b, a}
+							return makeMixedSlashContainers(ginkgo.GinkgoT())
 						},
 						expectedOrder: []string{"c", "b", "a"},
 					},
