@@ -345,18 +345,13 @@ func Update(
 		// Sort by dependencies
 		err = sorter.SortByDependencies(allContainersToRestart)
 		if err != nil {
-			if errors.Is(err, sorter.ErrCircularReference) {
-				// Log warning for circular dependency and proceed without sorting.
-				logrus.WithError(err).Warn("Circular dependency detected, proceeding without dependency sorting for restart")
-			} else {
-				logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
+			logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
 
-				return nil, []types.CleanedImageInfo{}, fmt.Errorf(
-					"%w: %w",
-					errSortDependenciesFailed,
-					err,
-				)
-			}
+			return nil, []types.CleanedImageInfo{}, fmt.Errorf(
+				"%w: %w",
+				errSortDependenciesFailed,
+				err,
+			)
 		}
 
 		// Stop and restart containers in batches, respecting dependency order.

@@ -196,6 +196,7 @@ func DetectCycles(containers []types.Container) map[string]bool {
 				filtered = append(filtered, neighbor)
 			}
 		}
+
 		cycleDetector.graph[name] = filtered
 	}
 
