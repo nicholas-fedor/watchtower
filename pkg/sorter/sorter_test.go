@@ -308,6 +308,21 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			})
 
 			ginkgo.It("handles chained dependencies with slash-prefixed links", func() {
+				newMockContainer := func(t ginkgo.GinkgoTInterface, name string, id string, links []string, labels map[string]string) types.Container {
+					c := mocks.NewMockContainer(t)
+					c.EXPECT().Name().Return(name)
+					c.EXPECT().ID().Return(types.ContainerID(id))
+					c.EXPECT().Links().Return(links)
+					c.EXPECT().IsWatchtower().Return(false)
+					c.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
+						Config: &dockerContainerTypes.Config{
+							Labels: labels,
+						},
+					})
+
+					return c
+				}
+
 				testCases := []struct {
 					name          string
 					containers    func() []types.Container
@@ -316,39 +331,27 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					{
 						name: "simple chain with slashes",
 						containers: func() []types.Container {
-							c := mocks.NewMockContainer(ginkgo.GinkgoT())
-							c.EXPECT().Name().Return("c")
-							c.EXPECT().ID().Return(types.ContainerID("id-c"))
-							c.EXPECT().Links().Return([]string(nil))
-							c.EXPECT().IsWatchtower().Return(false)
-							c.EXPECT().ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							b := mocks.NewMockContainer(ginkgo.GinkgoT())
-							b.EXPECT().Name().Return("b")
-							b.EXPECT().ID().Return(types.ContainerID("id-b"))
-							b.EXPECT().Links().Return([]string{"/c"})
-							b.EXPECT().IsWatchtower().Return(false)
-							b.EXPECT().ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							a := mocks.NewMockContainer(ginkgo.GinkgoT())
-							a.EXPECT().Name().Return("a")
-							a.EXPECT().ID().Return(types.ContainerID("id-a"))
-							a.EXPECT().Links().Return([]string{"/b"})
-							a.EXPECT().IsWatchtower().Return(false)
-							a.EXPECT().ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
+							c := newMockContainer(
+								ginkgo.GinkgoT(),
+								"c",
+								"id-c",
+								nil,
+								map[string]string{},
+							)
+							b := newMockContainer(
+								ginkgo.GinkgoT(),
+								"b",
+								"id-b",
+								[]string{"/c"},
+								map[string]string{},
+							)
+							a := newMockContainer(
+								ginkgo.GinkgoT(),
+								"a",
+								"id-a",
+								[]string{"/b"},
+								map[string]string{},
+							)
 
 							return []types.Container{c, b, a}
 						},
@@ -357,54 +360,34 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					{
 						name: "multiple dependencies with slashes",
 						containers: func() []types.Container {
-							d := mocks.NewMockContainer(ginkgo.GinkgoT())
-							d.EXPECT().Name().Return("d")
-							d.EXPECT().ID().Return(types.ContainerID("id-d"))
-							d.EXPECT().Links().Return([]string(nil))
-							d.EXPECT().IsWatchtower().Return(false)
-							d.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							c := mocks.NewMockContainer(ginkgo.GinkgoT())
-							c.EXPECT().Name().Return("c")
-							c.EXPECT().ID().Return(types.ContainerID("id-c"))
-							c.EXPECT().Links().Return([]string(nil))
-							c.EXPECT().IsWatchtower().Return(false)
-							c.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							b := mocks.NewMockContainer(ginkgo.GinkgoT())
-							b.EXPECT().Name().Return("b")
-							b.EXPECT().ID().Return(types.ContainerID("id-b"))
-							b.EXPECT().Links().Return([]string{"/d"})
-							b.EXPECT().IsWatchtower().Return(false)
-							b.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							a := mocks.NewMockContainer(ginkgo.GinkgoT())
-							a.EXPECT().Name().Return("a")
-							a.EXPECT().ID().Return(types.ContainerID("id-a"))
-							a.EXPECT().Links().Return([]string{"/b", "/c"})
-							a.EXPECT().IsWatchtower().Return(false)
-							a.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
+							d := newMockContainer(
+								ginkgo.GinkgoT(),
+								"d",
+								"id-d",
+								nil,
+								map[string]string{},
+							)
+							c := newMockContainer(
+								ginkgo.GinkgoT(),
+								"c",
+								"id-c",
+								nil,
+								map[string]string{},
+							)
+							b := newMockContainer(
+								ginkgo.GinkgoT(),
+								"b",
+								"id-b",
+								[]string{"/d"},
+								map[string]string{},
+							)
+							a := newMockContainer(
+								ginkgo.GinkgoT(),
+								"a",
+								"id-a",
+								[]string{"/b", "/c"},
+								map[string]string{},
+							)
 
 							return []types.Container{d, c, b, a}
 						},
@@ -413,54 +396,34 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					{
 						name: "diamond dependency graph",
 						containers: func() []types.Container {
-							d := mocks.NewMockContainer(ginkgo.GinkgoT())
-							d.EXPECT().Name().Return("d")
-							d.EXPECT().ID().Return(types.ContainerID("id-d"))
-							d.EXPECT().Links().Return([]string(nil))
-							d.EXPECT().IsWatchtower().Return(false)
-							d.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							b := mocks.NewMockContainer(ginkgo.GinkgoT())
-							b.EXPECT().Name().Return("b")
-							b.EXPECT().ID().Return(types.ContainerID("id-b"))
-							b.EXPECT().Links().Return([]string{"/d"})
-							b.EXPECT().IsWatchtower().Return(false)
-							b.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							c := mocks.NewMockContainer(ginkgo.GinkgoT())
-							c.EXPECT().Name().Return("c")
-							c.EXPECT().ID().Return(types.ContainerID("id-c"))
-							c.EXPECT().Links().Return([]string{"/d"})
-							c.EXPECT().IsWatchtower().Return(false)
-							c.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							a := mocks.NewMockContainer(ginkgo.GinkgoT())
-							a.EXPECT().Name().Return("a")
-							a.EXPECT().ID().Return(types.ContainerID("id-a"))
-							a.EXPECT().Links().Return([]string{"/b", "/c"})
-							a.EXPECT().IsWatchtower().Return(false)
-							a.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
+							d := newMockContainer(
+								ginkgo.GinkgoT(),
+								"d",
+								"id-d",
+								nil,
+								map[string]string{},
+							)
+							b := newMockContainer(
+								ginkgo.GinkgoT(),
+								"b",
+								"id-b",
+								[]string{"/d"},
+								map[string]string{},
+							)
+							c := newMockContainer(
+								ginkgo.GinkgoT(),
+								"c",
+								"id-c",
+								[]string{"/d"},
+								map[string]string{},
+							)
+							a := newMockContainer(
+								ginkgo.GinkgoT(),
+								"a",
+								"id-a",
+								[]string{"/b", "/c"},
+								map[string]string{},
+							)
 
 							return []types.Container{d, b, c, a}
 						},
@@ -474,42 +437,27 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					{
 						name: "no dependencies",
 						containers: func() []types.Container {
-							a := mocks.NewMockContainer(ginkgo.GinkgoT())
-							a.EXPECT().Name().Return("a")
-							a.EXPECT().ID().Return(types.ContainerID("id-a"))
-							a.EXPECT().Links().Return([]string(nil))
-							a.EXPECT().IsWatchtower().Return(false)
-							a.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							b := mocks.NewMockContainer(ginkgo.GinkgoT())
-							b.EXPECT().Name().Return("b")
-							b.EXPECT().ID().Return(types.ContainerID("id-b"))
-							b.EXPECT().Links().Return([]string(nil))
-							b.EXPECT().IsWatchtower().Return(false)
-							b.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							c := mocks.NewMockContainer(ginkgo.GinkgoT())
-							c.EXPECT().Name().Return("c")
-							c.EXPECT().ID().Return(types.ContainerID("id-c"))
-							c.EXPECT().Links().Return([]string(nil))
-							c.EXPECT().IsWatchtower().Return(false)
-							c.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
+							a := newMockContainer(
+								ginkgo.GinkgoT(),
+								"a",
+								"id-a",
+								nil,
+								map[string]string{},
+							)
+							b := newMockContainer(
+								ginkgo.GinkgoT(),
+								"b",
+								"id-b",
+								nil,
+								map[string]string{},
+							)
+							c := newMockContainer(
+								ginkgo.GinkgoT(),
+								"c",
+								"id-c",
+								nil,
+								map[string]string{},
+							)
 
 							return []types.Container{a, b, c}
 						},
@@ -518,42 +466,27 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					{
 						name: "mixed slash scenarios",
 						containers: func() []types.Container {
-							c := mocks.NewMockContainer(ginkgo.GinkgoT())
-							c.EXPECT().Name().Return("c")
-							c.EXPECT().ID().Return(types.ContainerID("id-c"))
-							c.EXPECT().Links().Return([]string(nil))
-							c.EXPECT().IsWatchtower().Return(false)
-							c.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							b := mocks.NewMockContainer(ginkgo.GinkgoT())
-							b.EXPECT().Name().Return("b")
-							b.EXPECT().ID().Return(types.ContainerID("id-b"))
-							b.EXPECT().Links().Return([]string{"c"})
-							b.EXPECT().IsWatchtower().Return(false)
-							b.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
-							a := mocks.NewMockContainer(ginkgo.GinkgoT())
-							a.EXPECT().Name().Return("a")
-							a.EXPECT().ID().Return(types.ContainerID("id-a"))
-							a.EXPECT().Links().Return([]string{"/b"})
-							a.EXPECT().IsWatchtower().Return(false)
-							a.EXPECT().
-								ContainerInfo().
-								Return(&dockerContainerTypes.InspectResponse{
-									Config: &dockerContainerTypes.Config{
-										Labels: map[string]string{},
-									},
-								})
+							c := newMockContainer(
+								ginkgo.GinkgoT(),
+								"c",
+								"id-c",
+								nil,
+								map[string]string{},
+							)
+							b := newMockContainer(
+								ginkgo.GinkgoT(),
+								"b",
+								"id-b",
+								[]string{"c"},
+								map[string]string{},
+							)
+							a := newMockContainer(
+								ginkgo.GinkgoT(),
+								"a",
+								"id-a",
+								[]string{"/b"},
+								map[string]string{},
+							)
 
 							return []types.Container{c, b, a}
 						},
