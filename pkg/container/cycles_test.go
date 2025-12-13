@@ -10,13 +10,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
-var _ = ginkgo.Describe("CycleDetector", func() {
-	// dfs method is tested indirectly through DetectCycles tests
-	ginkgo.It("dfs is covered by DetectCycles tests", func() {
-		gomega.Expect(true).To(gomega.BeTrue())
-	})
-})
-
 var _ = ginkgo.Describe("DetectCycles", func() {
 	ginkgo.It("should return empty map for acyclic graphs", func() {
 		c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
