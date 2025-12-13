@@ -21,6 +21,94 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// mockContainer is a minimal mock implementation of types.Container for testing ResolveContainerIdentifier.
+type mockContainer struct {
+	name string
+	info *dockerContainerType.InspectResponse
+}
+
+func (m mockContainer) ContainerInfo() *dockerContainerType.InspectResponse { return m.info }
+func (m mockContainer) Name() string                                        { return m.name }
+
+func (m mockContainer) ID() types.ContainerID { panic("not implemented") }
+
+func (m mockContainer) IsRunning() bool { panic("not implemented") }
+
+func (m mockContainer) ImageID() types.ImageID { panic("not implemented") }
+
+func (m mockContainer) SafeImageID() types.ImageID { panic("not implemented") }
+
+func (m mockContainer) ImageName() string { panic("not implemented") }
+
+func (m mockContainer) Enabled() (bool, bool) { panic("not implemented") }
+
+func (m mockContainer) IsMonitorOnly(
+	_ types.UpdateParams,
+) bool {
+	panic("not implemented")
+}
+
+func (m mockContainer) Scope() (string, bool) { panic("not implemented") }
+
+func (m mockContainer) Links() []string { panic("not implemented") }
+
+func (m mockContainer) ToRestart() bool { panic("not implemented") }
+
+func (m mockContainer) IsWatchtower() bool { panic("not implemented") }
+
+func (m mockContainer) StopSignal() string { panic("not implemented") }
+
+func (m mockContainer) HasImageInfo() bool { panic("not implemented") }
+
+func (m mockContainer) ImageInfo() *dockerImageType.InspectResponse { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePreCheckCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePostCheckCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePreUpdateCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecyclePostUpdateCommand() string { panic("not implemented") }
+
+func (m mockContainer) GetLifecycleUID() (int, bool) { panic("not implemented") }
+
+func (m mockContainer) GetLifecycleGID() (int, bool) { panic("not implemented") }
+
+func (m mockContainer) VerifyConfiguration() error { panic("not implemented") }
+
+func (m mockContainer) SetStale(
+	_ bool,
+) {
+	panic("not implemented")
+}
+
+func (m mockContainer) IsStale() bool { panic("not implemented") }
+
+func (m mockContainer) IsNoPull(
+	_ types.UpdateParams,
+) bool {
+	panic("not implemented")
+}
+
+func (m mockContainer) SetLinkedToRestarting(
+	_ bool,
+) {
+	panic("not implemented")
+}
+
+func (m mockContainer) IsLinkedToRestarting() bool { panic("not implemented") }
+
+func (m mockContainer) PreUpdateTimeout() int { panic("not implemented") }
+
+func (m mockContainer) PostUpdateTimeout() int { panic("not implemented") }
+
+func (m mockContainer) IsRestarting() bool { panic("not implemented") }
+
+func (m mockContainer) GetCreateConfig() *dockerContainerType.Config { panic("not implemented") }
+func (m mockContainer) GetCreateHostConfig() *dockerContainerType.HostConfig {
+	panic("not implemented")
+}
+
 var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Configuration Validation", func() {
 		ginkgo.It("returns an error when image info is nil", func() {
@@ -501,6 +589,19 @@ var _ = ginkgo.Describe("Container", func() {
 			}))
 			identifier := ResolveContainerIdentifier(container)
 			gomega.Expect(identifier).To(gomega.Equal("db-service"))
+		})
+
+		ginkgo.It("returns container name when ContainerInfo returns nil", func() {
+			container := mockContainer{name: "test-watchtower", info: nil}
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when ContainerInfo.Config is nil", func() {
+			container := MockContainer(WithLabels(map[string]string{}))
+			container.containerInfo.Config = nil
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
 		})
 	})
 

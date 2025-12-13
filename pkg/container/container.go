@@ -445,7 +445,8 @@ func (c Container) Links() []string {
 	return getLinksFromHostConfig(c, clog)
 }
 
-// ResolveContainerIdentifier returns the service name if available, otherwise container name.
+// ResolveContainerIdentifier returns the service name if available,
+// otherwise container name.
 //
 // Parameters:
 //   - c: Container to get identifier for
@@ -454,14 +455,38 @@ func (c Container) Links() []string {
 //   - string: Service name if available, otherwise container name
 //     Always returns a non-empty string for valid containers
 func ResolveContainerIdentifier(c types.Container) string {
-	if serviceName := compose.GetServiceName(c.ContainerInfo().Config.Labels); serviceName != "" {
+	// Get the container information.
+	info := c.ContainerInfo()
+	// Return container name if nil.
+	if info == nil {
+		return c.Name()
+	}
+
+	// Get the container configuration
+	cfg := info.Config
+	// Return container name if nil.
+	if cfg == nil {
+		return c.Name()
+	}
+
+	// Get the container labels
+	labels := cfg.Labels
+	// Return container name if empty.
+	if len(labels) == 0 {
+		return c.Name()
+	}
+
+	// Extract the service name from the Docker Compose label.
+	if serviceName := compose.GetServiceName(labels); serviceName != "" {
+		// Return container name if not found.
 		return serviceName
 	}
 
 	return c.Name()
 }
 
-// getLinksFromWatchtowerLabel extracts dependency links from the watchtower depends-on label.
+// getLinksFromWatchtowerLabel extracts dependency links from the
+// watchtower depends-on label.
 //
 // It parses the com.centurylinklabs.watchtower.depends-on label value,
 // splitting on commas and ensuring each link has a leading slash.
@@ -501,7 +526,8 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 	return links
 }
 
-// getLinksFromComposeLabel extracts dependency links from the Docker Compose depends-on label.
+// getLinksFromComposeLabel extracts dependency links from the
+// Docker Compose depends-on label.
 //
 // It parses the com.docker.compose.depends_on label value using the compose package,
 // and ensures each service name has a leading slash.
