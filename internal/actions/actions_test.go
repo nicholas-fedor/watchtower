@@ -709,7 +709,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			ginkgo.It(
 				"should send notifications for restarted containers due to linked dependencies",
 				func() {
-					dependencyContainerName := "dependency-container"
 					linkedContainerName := "linked-container"
 
 					client = actionMocks.CreateMockClient(
@@ -815,7 +814,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			)
 
 			ginkgo.It("should send notifications for multiple restarted containers", func() {
-				dependencyContainerName := "dependency-container"
 				linkedContainer1Name := "linked-container-1"
 				linkedContainer2Name := "linked-container-2"
 
