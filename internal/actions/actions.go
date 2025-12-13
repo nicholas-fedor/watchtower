@@ -562,6 +562,35 @@ func sendSplitNotifications(
 			notified[containerID] = true
 		}
 
+		// Send individual report notifications for each restarted container
+		for _, restartedContainer := range result.Restarted() {
+			// Skip nil container reports
+			if restartedContainer == nil {
+				logrus.Debug("Encountered nil restarted container report, skipping")
+
+				continue
+			}
+
+			// Skip containers with empty names
+			if strings.TrimSpace(restartedContainer.Name()) == "" {
+				logrus.WithField("container_id", restartedContainer.ID().ShortID()).
+					Debug("Encountered restarted container with empty name, skipping notification")
+
+				continue
+			}
+
+			containerID := string(restartedContainer.ID())
+			if notified[containerID] {
+				// Skip notification if already sent for this container ID
+				continue
+			}
+
+			singleContainerReport := buildSingleRestartedContainerReport(restartedContainer, result)
+			notifier.SendNotification(singleContainerReport)
+
+			notified[containerID] = true
+		}
+
 		// Send notifications for monitor-only containers when notificationReport is true
 		for _, staleContainer := range result.Stale() {
 			// Skip nil container reports

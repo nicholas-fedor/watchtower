@@ -25,6 +25,7 @@ const (
 	duplicateTestName        = "duplicate-test"
 	monitorOnlyContainerName = "monitor-only-container"
 	duplicateContainerName   = "duplicate-container"
+	dependencyContainerName  = "dependency-container"
 )
 
 var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
@@ -941,6 +942,107 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					// two linked containers restarted
 
 				notifier.AssertExpectations(ginkgo.GinkgoT())
+			})
+
+			ginkgo.Context("notification splitting in report mode", func() {
+				ginkgo.It("should send report notifications for restarted containers", func() {
+					restartedContainerName := "restarted-container"
+
+					client = actionMocks.CreateMockClient(
+						&actionMocks.TestData{
+							Containers: []types.Container{
+								actionMocks.CreateMockContainerWithConfig(
+									dependencyContainerName,
+									dependencyContainerName,
+									"image:v1.0",
+									true,
+									false,
+									time.Now().Add(-time.Hour),
+									&container.Config{},
+								),
+								actionMocks.CreateMockContainerWithConfig(
+									restartedContainerName,
+									restartedContainerName,
+									"image:v2.0",
+									true,
+									false,
+									time.Now(), // Fresh, will be restarted due to dependency
+									&container.Config{
+										Labels: map[string]string{
+											"com.centurylinklabs.watchtower.depends-on": dependencyContainerName,
+										},
+									},
+								),
+							},
+							Staleness: map[string]bool{
+								dependencyContainerName: true,  // Will be updated
+								restartedContainerName:  false, // Will be restarted due to dependency
+							},
+						},
+						false,
+						false,
+					)
+
+					notifier.EXPECT().StartNotification(true).Return()
+
+					// Expect report notification for the updated dependency container
+					notifier.EXPECT().
+						SendNotification(mock.MatchedBy(func(report types.Report) bool {
+							// Check that the report contains the updated container
+							updated := report.Updated()
+							if len(updated) != 1 || updated[0].Name() != dependencyContainerName {
+								return false
+							}
+
+							return true
+						})).
+						Return()
+
+					// Expect report notification for the restarted container
+					notifier.EXPECT().
+						SendNotification(mock.MatchedBy(func(report types.Report) bool {
+							// Check that the report contains the restarted container
+							restarted := report.Restarted()
+							if len(restarted) != 1 ||
+								restarted[0].Name() != restartedContainerName {
+								return false
+							}
+
+							return true
+						})).
+						Return()
+
+					params := actions.RunUpdatesWithNotificationsParams{
+						Client:                       client,
+						Notifier:                     notifier,
+						NotificationSplitByContainer: true,
+						NotificationReport:           true, // Report mode
+						Filter:                       filter,
+						Cleanup:                      false,
+						NoRestart:                    false,
+						MonitorOnly:                  false,
+						LifecycleHooks:               false,
+						RollingRestart:               false,
+						LabelPrecedence:              false,
+						NoPull:                       false,
+						Timeout:                      time.Minute,
+						LifecycleUID:                 1000,
+						LifecycleGID:                 1001,
+						CPUCopyMode:                  "auto",
+						PullFailureDelay:             time.Duration(0),
+					}
+					metric := actions.RunUpdatesWithNotifications(params)
+
+					gomega.Expect(metric).NotTo(gomega.BeNil())
+					gomega.Expect(metric.Updated).
+						To(gomega.Equal(1))
+						// dependency-container updated
+					gomega.Expect(metric.Restarted).
+						To(gomega.Equal(1))
+						// restarted-container restarted
+
+					notifier.AssertExpectations(ginkgo.GinkgoT())
+				})
 			})
 		})
 	})
