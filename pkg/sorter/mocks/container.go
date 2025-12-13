@@ -101,7 +101,7 @@ func (c *SimpleContainer) SetLinkedToRestarting(_ bool)                         
 func (c *SimpleContainer) IsLinkedToRestarting() bool                            { return false }
 func (c *SimpleContainer) PreUpdateTimeout() int {
 	if c.ContainerInfoField != nil {
-		return 0
+		return 0 // Return 0 to disable timeout when using custom ContainerInfo
 	}
 	return 30
 }
