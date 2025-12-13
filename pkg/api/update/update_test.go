@@ -240,8 +240,11 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				req = httptest.NewRequest(http.MethodPost, "/v1/update", nil)
 
 				handler.Handle(faultyWriter, req)
-				gomega.Expect(faultyWriter.statusCode).
+				// Verify that StatusInternalServerError was attempted to be set
+				gomega.Expect(faultyWriter.lastStatusCode).
 					To(gomega.Equal(http.StatusInternalServerError))
+				// Verify that writing was attempted (but failed)
+				gomega.Expect(faultyWriter.written).To(gomega.BeTrue())
 			},
 		)
 
@@ -404,17 +407,34 @@ func (f *faultyReadCloser) Close() error               { return nil }
 
 // faultyResponseWriter simulates a response writer that fails on Write.
 type faultyResponseWriter struct {
-	statusCode int
+	statusCode     int
+	header         http.Header
+	written        bool
+	lastStatusCode int // Track the last status code that was attempted
 }
 
 func (f *faultyResponseWriter) Header() http.Header {
-	return make(http.Header)
+	if f.header == nil {
+		f.header = make(http.Header)
+	}
+
+	return f.header
 }
 
 func (f *faultyResponseWriter) Write(_ []byte) (int, error) {
+	if !f.written && f.statusCode == 0 {
+		f.statusCode = http.StatusOK
+	}
+
+	f.written = true
+
 	return 0, errors.New("write error")
 }
 
 func (f *faultyResponseWriter) WriteHeader(statusCode int) {
-	f.statusCode = statusCode
+	f.lastStatusCode = statusCode
+	if !f.written {
+		f.statusCode = statusCode
+	}
+	// Ignore subsequent calls to WriteHeader after writing has started
 }
