@@ -118,51 +118,10 @@ func (ds DependencySorter) Sort(containers []types.Container) error {
 //     Error includes container name and cycle path for debugging.
 func sortByDependencies(containers []types.Container) ([]types.Container, error) {
 	// Phase 1: Build the dependency graph data structures
-	// - containerMap: Maps normalized container identifiers to container objects for O(1) lookup
-	// - indegree: Tracks number of incoming dependencies for each container (nodes with indegree 0 have no dependencies)
-	// - adjacency: Lists containers that depend on each container (outgoing edges)
-	// Normalization ensures consistent handling of Docker Compose service names vs container names
-	containerMap := make(map[string]types.Container)
-	indegree := make(map[string]int)
-	adjacency := make(map[string][]string)
-
-	// Initialize all containers in the maps with zero indegree
-	for _, c := range containers {
-		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
-		containerMap[identifier] = c
-		indegree[identifier] = 0
-	}
-
-	// Build the graph by processing container links (dependencies)
-	// For each container, increment its indegree for each link it has to an existing container
-	// Add reverse edges in adjacency list: link target -> dependent container
-	for _, c := range containers {
-		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
-		for _, link := range c.Links() {
-			normalizedLink := util.NormalizeContainerName(link)
-			if _, exists := containerMap[normalizedLink]; exists {
-				// This container depends on the linked container, so increment its indegree
-				indegree[identifier]++
-				// The linked container has this container as a dependent
-				adjacency[normalizedLink] = append(adjacency[normalizedLink], identifier)
-			}
-		}
-	}
+	containerMap, indegree, adjacency := buildDependencyGraph(containers)
 
 	// Phase 2: Initialize processing queue with containers that have no dependencies
-	// These are the starting points for topological sorting - containers that can be updated first
-	var queue []string
-
-	for identifier, deg := range indegree {
-		if deg == 0 {
-			queue = append(queue, identifier)
-		}
-	}
-
-	// Sort queue in reverse alphabetical order to ensure deterministic ordering
-	// when multiple containers have zero indegree. This provides consistent,
-	// reproducible sorting order for containers with no dependencies.
-	sort.Sort(sort.Reverse(sort.StringSlice(queue)))
+	queue := initializeQueue(indegree)
 
 	// Phase 3: Process the queue using Kahn's algorithm
 	// While there are containers with no remaining dependencies:
@@ -193,8 +152,110 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 	}
 
 	// Phase 4: Cycle detection
-	// If not all containers were processed, there must be a cycle in the dependency graph
-	// This happens when containers have circular dependencies that prevent topological ordering
+	if err := detectAndReportCycle(sorted, containers, containerMap, adjacency); err != nil {
+		return nil, err
+	}
+
+	return sorted, nil
+}
+
+// buildDependencyGraph constructs the dependency graph data structures for topological sorting.
+//
+// This function builds three key data structures:
+// - containerMap: Maps normalized container identifiers to container objects for O(1) lookup
+// - indegree: Tracks number of incoming dependencies for each container (nodes with indegree 0 have no dependencies)
+// - adjacency: Lists containers that depend on each container (outgoing edges)
+//
+// Normalization ensures consistent handling of Docker Compose service names vs container names.
+//
+// Parameters:
+//   - containers: List of containers to build graph for.
+//
+// Returns:
+//   - map[string]types.Container: Container lookup map
+//   - map[string]int: Indegree count for each container
+//   - map[string][]string: Adjacency list (container -> dependents)
+func buildDependencyGraph(
+	containers []types.Container,
+) (map[string]types.Container, map[string]int, map[string][]string) {
+	containerMap := make(map[string]types.Container)
+	indegree := make(map[string]int)
+	adjacency := make(map[string][]string)
+
+	// Initialize all containers in the maps with zero indegree
+	for _, c := range containers {
+		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		containerMap[identifier] = c
+		indegree[identifier] = 0
+	}
+
+	// Build the graph by processing container links (dependencies)
+	// For each container, increment its indegree for each link it has to an existing container
+	// Add reverse edges in adjacency list: link target -> dependent container
+	for _, c := range containers {
+		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		for _, link := range c.Links() {
+			normalizedLink := util.NormalizeContainerName(link)
+			if _, exists := containerMap[normalizedLink]; exists {
+				// This container depends on the linked container, so increment its indegree
+				indegree[identifier]++
+				// The linked container has this container as a dependent
+				adjacency[normalizedLink] = append(adjacency[normalizedLink], identifier)
+			}
+		}
+	}
+
+	return containerMap, indegree, adjacency
+}
+
+// initializeQueue creates the initial processing queue for Kahn's algorithm.
+//
+// This function identifies all containers with no dependencies (indegree 0) and
+// sorts them in reverse alphabetical order to ensure deterministic ordering
+// when multiple containers have zero indegree. This provides consistent,
+// reproducible sorting order for containers with no dependencies.
+//
+// Parameters:
+//   - indegree: Map of container identifiers to their indegree count.
+//
+// Returns:
+//   - []string: Sorted queue of container identifiers with zero indegree.
+func initializeQueue(indegree map[string]int) []string {
+	var queue []string
+
+	for identifier, deg := range indegree {
+		if deg == 0 {
+			queue = append(queue, identifier)
+		}
+	}
+
+	// Sort queue in reverse alphabetical order to ensure deterministic ordering
+	sort.Sort(sort.Reverse(sort.StringSlice(queue)))
+
+	return queue
+}
+
+// detectAndReportCycle checks for circular dependencies and reports detailed error information.
+//
+// This function implements cycle detection for Kahn's algorithm. If not all containers
+// were processed during topological sorting, there must be a cycle in the dependency graph.
+// It identifies unprocessed containers, selects the first one, and uses DFS to find
+// the actual cycle path for detailed error reporting.
+//
+// Parameters:
+//   - sorted: List of successfully sorted containers
+//   - containers: Original list of all containers
+//   - containerMap: Map of container identifiers to container objects
+//   - adjacency: Graph adjacency list (container -> dependents)
+//
+// Returns:
+//   - error: CircularReferenceError if cycle detected, nil otherwise
+func detectAndReportCycle(
+	sorted []types.Container,
+	containers []types.Container,
+	containerMap map[string]types.Container,
+	adjacency map[string][]string,
+) error {
 	if len(sorted) != len(containers) {
 		// Identify which containers were not processed (part of cycles)
 		processed := make(map[string]bool)
@@ -232,10 +293,10 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 		}).Debug("Detected circular reference in dependency graph")
 
 		// Return detailed error with cycle information for debugging
-		return nil, CircularReferenceError{ContainerName: cycleContainer, CyclePath: cyclePath}
+		return CircularReferenceError{ContainerName: cycleContainer, CyclePath: cyclePath}
 	}
 
-	return sorted, nil
+	return nil
 }
 
 // findCyclePath performs DFS to find a cycle path starting from the given node.
