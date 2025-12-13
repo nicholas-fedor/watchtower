@@ -392,6 +392,7 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 			continue // Skip already marked containers.
 		}
 
+		// c.Links() already returns normalized container names
 		links := c.Links()
 		logrus.WithFields(logrus.Fields{
 			"container": c.Name(),
@@ -425,11 +426,7 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 func linkedContainerMarkedForRestart(links []string, allContainers []types.Container) string {
 	for _, linkName := range links {
 		for _, candidate := range allContainers {
-			if util.NormalizeContainerName(
-				candidate.Name(),
-			) == util.NormalizeContainerName(
-				linkName,
-			) &&
+			if candidate.Name() == linkName &&
 				candidate.ToRestart() {
 				return linkName
 			}
@@ -545,13 +542,13 @@ func getFallbackImage(container types.Container) string {
 	if container.HasImageInfo() {
 		fallback := strings.TrimPrefix(container.ImageInfo().ID, "sha256:")
 		if !strings.Contains(fallback, ":") {
-			return util.NormalizeContainerName(container.Name()) + ":latest"
+			return container.Name() + ":latest"
 		}
 
 		return fallback
 	}
 
-	return util.NormalizeContainerName(container.Name()) + ":latest"
+	return container.Name() + ":latest"
 }
 
 // isInvalidImageName checks if an image name is invalid.

@@ -21,6 +21,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Constants for container operations.
+const (
+	linkPartsCount = 2 // Number of parts expected in a link (name:alias)
+)
+
 // Operations defines the minimal interface for container operations in Watchtower.
 type Operations interface {
 	ContainerCreate(
@@ -52,11 +57,6 @@ type Operations interface {
 	) error
 }
 
-// Constants for container operations.
-const (
-	linkPartsCount = 2 // Number of parts expected in a link (name:alias)
-)
-
 // Container represents a running Docker container managed by Watchtower.
 //
 // It implements the types.Container interface, storing state and metadata
@@ -67,6 +67,7 @@ type Container struct {
 	LinkedToRestarting bool                                 // Indicates if linked to a restarting container
 	Stale              bool                                 // Marks the container as having an outdated image
 	OldImageID         types.ImageID                        // Stores the image ID before update for cleanup tracking
+	normalizedName     string                               // Cached normalized container name
 	containerInfo      *dockerContainerType.InspectResponse // Docker container metadata
 	imageInfo          *dockerImageType.InspectResponse     // Docker image metadata
 }
@@ -88,6 +89,7 @@ func NewContainer(
 		LinkedToRestarting: false,
 		Stale:              false,
 		OldImageID:         "",
+		normalizedName:     util.NormalizeContainerName(containerInfo.Name),
 		containerInfo:      containerInfo,
 		imageInfo:          imageInfo,
 	}
@@ -176,12 +178,12 @@ func (c Container) IsRestarting() bool {
 	return c.containerInfo.State.Restarting
 }
 
-// Name returns the name of the container.
+// Name returns the normalized name of the container.
 //
 // Returns:
-//   - string: Container name.
+//   - string: Normalized container name.
 func (c Container) Name() string {
-	return strings.TrimPrefix(c.containerInfo.Name, "/")
+	return c.normalizedName
 }
 
 // ImageID returns the ID of the container’s image.
@@ -354,15 +356,23 @@ func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
 	// Adjust link format for each entry.
 	for i, link := range hostConfig.Links {
 		if !strings.Contains(link, ":") {
-			clog.WithField("link", link).Warn("Invalid link format, expected 'name:alias'")
+			clog.WithField("link", link).Error("Invalid link format, expected 'name:alias'")
 
 			continue // Skip invalid links
 		}
 
 		parts := strings.SplitN(link, ":", linkPartsCount)
-		name := parts[0]
-		alias := strings.TrimPrefix(parts[1], "/") // Remove leading slash if present.
-		hostConfig.Links[i] = fmt.Sprintf("%s:/%s", name, alias)
+		if len(parts) != linkPartsCount {
+			clog.WithField("link", link).
+				Error("Invalid link format, expected exactly one colon separator")
+
+			continue // Skip invalid links
+		}
+
+		normalizedName := util.NormalizeContainerName(parts[0])
+		// Aliases are simple names for linking, not container identifiers, so use as-is
+		alias := parts[1]
+		hostConfig.Links[i] = fmt.Sprintf("%s:%s", normalizedName, alias)
 		clog.WithField("link", hostConfig.Links[i]).Debug("Adjusted link for host config")
 	}
 
@@ -477,7 +487,7 @@ func ResolveContainerIdentifier(c types.Container) string {
 // watchtower depends-on label.
 //
 // It parses the com.centurylinklabs.watchtower.depends-on label value,
-// splitting on commas and ensuring each link has a leading slash.
+// splitting on commas and normalizing each container name.
 //
 // Parameters:
 //   - c: Container instance
@@ -493,32 +503,29 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 
 	// Pre-allocate slice based on comma-separated values
 	parts := strings.Split(dependsOnLabelValue, ",")
-	links := make([]string, 0, len(parts))
+	normalizedLinks := make([]string, 0, len(parts))
 
-	for _, link := range parts {
-		link = strings.TrimSpace(link)
-		if link == "" {
+	for _, normalizedLink := range parts {
+		normalizedLink = strings.TrimSpace(normalizedLink)
+		if normalizedLink == "" {
 			continue
 		}
-		// Add leading slash if missing.
-		if !strings.HasPrefix(link, "/") {
-			link = "/" + link
-		}
 
-		links = append(links, link)
+		normalizedLink = util.NormalizeContainerName(normalizedLink)
+		normalizedLinks = append(normalizedLinks, normalizedLink)
 	}
 
 	clog.WithField("depends_on", dependsOnLabelValue).
 		Debug("Retrieved links from watchtower depends-on label")
 
-	return links
+	return normalizedLinks
 }
 
 // getLinksFromComposeLabel extracts dependency links from the
 // Docker Compose depends-on label.
 //
 // It parses the com.docker.compose.depends_on label value using the compose package,
-// and ensures each service name has a leading slash.
+// and normalizes each service name.
 //
 // Parameters:
 //   - c: Container instance
@@ -542,25 +549,21 @@ func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
 
 	services := compose.ParseDependsOnLabel(composeDependsOnLabelValue)
 
-	links := make([]string, 0, len(services))
+	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
-		if !strings.HasPrefix(service, "/") {
-			service = "/" + service
-		}
-
-		links = append(links, service)
+		normalizedLinks = append(normalizedLinks, util.NormalizeContainerName(service))
 	}
 
-	if len(links) == 0 {
+	if len(normalizedLinks) == 0 {
 		return nil
 	}
 
 	clog.WithFields(logrus.Fields{
 		"compose_depends_on": composeDependsOnLabelValue,
-		"parsed_links":       links,
+		"parsed_links":       normalizedLinks,
 	}).Debug("Retrieved links from compose depends-on label")
 
-	return links
+	return normalizedLinks
 }
 
 // getLinksFromHostConfig extracts dependency links from Docker HostConfig.
@@ -586,19 +589,37 @@ func getLinksFromHostConfig(c Container, clog *logrus.Entry) []string {
 		capacity++
 	}
 
-	links := make([]string, 0, capacity)
+	normalizedLinks := make([]string, 0, capacity)
 
 	for _, link := range c.containerInfo.HostConfig.Links {
-		name := strings.Split(link, ":")[0]
-		links = append(links, name)
+		if !strings.Contains(link, ":") {
+			clog.WithField("link", link).
+				Warn("Invalid link format in host config, expected 'name:alias'")
+
+			continue
+		}
+
+		parts := strings.SplitN(link, ":", linkPartsCount)
+		if len(parts) < 1 || parts[0] == "" {
+			clog.WithField("link", link).
+				Warn("Invalid link format in host config, missing container name")
+
+			continue
+		}
+
+		normalizedName := util.NormalizeContainerName(parts[0])
+		normalizedLinks = append(normalizedLinks, normalizedName)
 	}
 
 	// Add network dependency.
 	if networkMode.IsContainer() {
-		links = append(links, networkMode.ConnectedContainer())
+		normalizedLinks = append(
+			normalizedLinks,
+			util.NormalizeContainerName(networkMode.ConnectedContainer()),
+		)
 	}
 
-	clog.WithField("links", links).Debug("Retrieved links from host config")
+	clog.WithField("links", normalizedLinks).Debug("Retrieved links from host config")
 
-	return links
+	return normalizedLinks
 }

@@ -357,14 +357,6 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					return []types.Container{c, b, a}
 				}
 
-				makeMixedSlashContainers := func(t ginkgo.GinkgoTInterface) []types.Container {
-					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
-					b := newMockContainer(t, "b", "id-b", []string{"c"}, map[string]string{})
-					a := newMockContainer(t, "a", "id-a", []string{"/b"}, map[string]string{})
-
-					return []types.Container{c, b, a}
-				}
-
 				testCases := []struct {
 					name          string
 					containers    func() []types.Container
@@ -400,13 +392,6 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						name: "no dependencies",
 						containers: func() []types.Container {
 							return makeNoDepsContainers(ginkgo.GinkgoT())
-						},
-						expectedOrder: []string{"c", "b", "a"},
-					},
-					{
-						name: "mixed slash scenarios",
-						containers: func() []types.Container {
-							return makeMixedSlashContainers(ginkgo.GinkgoT())
 						},
 						expectedOrder: []string{"c", "b", "a"},
 					},

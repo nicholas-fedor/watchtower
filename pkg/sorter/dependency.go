@@ -167,6 +167,7 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 // - adjacency: Lists containers that depend on each container (outgoing edges)
 //
 // Normalization ensures consistent handling of Docker Compose service names vs container names.
+// Container links from c.Links() are already normalized.
 //
 // Parameters:
 //   - containers: List of containers to build graph for.
@@ -184,23 +185,23 @@ func buildDependencyGraph(
 
 	// Initialize all containers in the maps with zero indegree
 	for _, c := range containers {
-		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
-		containerMap[identifier] = c
-		indegree[identifier] = 0
+		normalizedIdentifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		containerMap[normalizedIdentifier] = c
+		indegree[normalizedIdentifier] = 0
 	}
 
 	// Build the graph by processing container links (dependencies)
 	// For each container, increment its indegree for each link it has to an existing container
 	// Add reverse edges in adjacency list: link target -> dependent container
 	for _, c := range containers {
-		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
-		for _, link := range c.Links() {
-			normalizedLink := util.NormalizeContainerName(link)
+		normalizedIdentifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		// c.Links() already returns normalized container names
+		for _, normalizedLink := range c.Links() {
 			if _, exists := containerMap[normalizedLink]; exists {
 				// This container depends on the linked container, so increment its indegree
-				indegree[identifier]++
+				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
-				adjacency[normalizedLink] = append(adjacency[normalizedLink], identifier)
+				adjacency[normalizedLink] = append(adjacency[normalizedLink], normalizedIdentifier)
 			}
 		}
 	}
@@ -261,8 +262,10 @@ func detectAndReportCycle(
 		processed := make(map[string]bool)
 
 		for _, c := range sorted {
-			id := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
-			processed[id] = true
+			normalizedIdentifier := util.NormalizeContainerName(
+				container.ResolveContainerIdentifier(c),
+			)
+			processed[normalizedIdentifier] = true
 		}
 
 		var unprocessed []string

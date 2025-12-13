@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("CheckForSanity", func() {
 				"container1",
 				"image:latest",
 				time.Now(),
-				[]string{"container2"},
+				[]string{"container2:alias"},
 				mocks.CreateMockImageInfo("image:latest"),
 			)
 

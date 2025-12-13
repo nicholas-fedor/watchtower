@@ -7,6 +7,7 @@ import (
 	dockerContainerTypes "github.com/docker/docker/api/types/container"
 	dockerImageTypes "github.com/docker/docker/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -19,7 +20,7 @@ type SimpleContainer struct {
 }
 
 func (c *SimpleContainer) Name() string {
-	return c.ContainerName
+	return util.NormalizeContainerName(c.ContainerName)
 }
 
 func (c *SimpleContainer) ID() types.ContainerID {
@@ -38,8 +39,13 @@ func (c *SimpleContainer) ContainerInfo() *dockerContainerTypes.InspectResponse 
 	if c.ContainerInfoField != nil {
 		return c.ContainerInfoField
 	}
+	name := c.ContainerName
+	if !strings.HasPrefix(name, "/") {
+		name = "/" + name
+	}
+	// Ensure Name includes leading "/" to match Docker API behavior
 	return &dockerContainerTypes.InspectResponse{
-		ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{Name: "/" + c.ContainerName},
+		ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{Name: name},
 		Config:            &dockerContainerTypes.Config{Labels: map[string]string{}},
 	}
 }
@@ -85,26 +91,27 @@ func (c *SimpleContainer) StopSignal() string {
 	}
 	return "SIGTERM"
 }
-func (c *SimpleContainer) HasImageInfo() bool                                    { return false }
-func (c *SimpleContainer) ImageInfo() *dockerImageTypes.InspectResponse          { return nil }
-func (c *SimpleContainer) GetLifecyclePreCheckCommand() string                   { return "" }
-func (c *SimpleContainer) GetLifecyclePostCheckCommand() string                  { return "" }
-func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string                  { return "" }
-func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string                 { return "" }
-func (c *SimpleContainer) GetLifecycleUID() (int, bool)                          { return 0, false }
-func (c *SimpleContainer) GetLifecycleGID() (int, bool)                          { return 0, false }
-func (c *SimpleContainer) VerifyConfiguration() error                            { return nil }
-func (c *SimpleContainer) SetStale(_ bool)                                       {}
-func (c *SimpleContainer) IsStale() bool                                         { return false }
-func (c *SimpleContainer) IsNoPull(_ types.UpdateParams) bool                    { return false }
-func (c *SimpleContainer) SetLinkedToRestarting(_ bool)                          {}
-func (c *SimpleContainer) IsLinkedToRestarting() bool                            { return false }
+func (c *SimpleContainer) HasImageInfo() bool                           { return false }
+func (c *SimpleContainer) ImageInfo() *dockerImageTypes.InspectResponse { return nil }
+func (c *SimpleContainer) GetLifecyclePreCheckCommand() string          { return "" }
+func (c *SimpleContainer) GetLifecyclePostCheckCommand() string         { return "" }
+func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string         { return "" }
+func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string        { return "" }
+func (c *SimpleContainer) GetLifecycleUID() (int, bool)                 { return 0, false }
+func (c *SimpleContainer) GetLifecycleGID() (int, bool)                 { return 0, false }
+func (c *SimpleContainer) VerifyConfiguration() error                   { return nil }
+func (c *SimpleContainer) SetStale(_ bool)                              {}
+func (c *SimpleContainer) IsStale() bool                                { return false }
+func (c *SimpleContainer) IsNoPull(_ types.UpdateParams) bool           { return false }
+func (c *SimpleContainer) SetLinkedToRestarting(_ bool)                 {}
+func (c *SimpleContainer) IsLinkedToRestarting() bool                   { return false }
 func (c *SimpleContainer) PreUpdateTimeout() int {
 	if c.ContainerInfoField != nil {
 		return 0 // Return 0 to disable timeout when using custom ContainerInfo
 	}
 	return 30
 }
+
 func (c *SimpleContainer) PostUpdateTimeout() int {
 	if c.ContainerInfoField != nil {
 		return 0
@@ -114,4 +121,3 @@ func (c *SimpleContainer) PostUpdateTimeout() int {
 func (c *SimpleContainer) IsRestarting() bool                                    { return false }
 func (c *SimpleContainer) GetCreateConfig() *dockerContainerTypes.Config         { return nil }
 func (c *SimpleContainer) GetCreateHostConfig() *dockerContainerTypes.HostConfig { return nil }
-

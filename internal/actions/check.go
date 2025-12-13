@@ -47,6 +47,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 
 	// Check each container for links, which are incompatible with rolling restarts.
 	for _, c := range containers {
+		// c.Links() already returns normalized container names
 		if links := c.Links(); len(links) > 0 {
 			logrus.WithFields(logrus.Fields{
 				"container": c.Name(),

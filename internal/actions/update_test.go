@@ -493,7 +493,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								time.Now()),
 							mocks.CreateMockContainerWithConfig(
 								"test-container-02",
-								"test-container-02",
+								"/test-container-02",
 								"fake-image2:latest",
 								false,
 								false,

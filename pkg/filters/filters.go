@@ -8,7 +8,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -95,7 +94,7 @@ func FilterByNames(names []string, baseFilter types.Filter) types.Filter {
 
 					return baseFilter(c)
 				}
-			} else if util.NormalizeContainerName(name) == util.NormalizeContainerName(c.Name()) {
+			} else if name == c.Name() {
 				clog.Debug("Matched container by exact name")
 
 				return baseFilter(c)
@@ -153,7 +152,7 @@ func FilterByDisableNames(disableNames []string, baseFilter types.Filter) types.
 
 					return false
 				}
-			} else if util.NormalizeContainerName(name) == util.NormalizeContainerName(c.Name()) {
+			} else if name == c.Name() {
 				clog.Debug("Container excluded by disable name")
 
 				return false

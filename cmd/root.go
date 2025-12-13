@@ -26,6 +26,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
@@ -273,7 +274,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Set additional configuration flags that control update behavior and scope.
 	enableLabel, _ = flagsSet.GetBool("label-enable")
+
 	disableContainers, _ = flagsSet.GetStringSlice("disable-containers")
+	for i := range disableContainers {
+		disableContainers[i] = util.NormalizeContainerName(disableContainers[i])
+	}
+
 	lifecycleHooks, _ = flagsSet.GetBool("enable-lifecycle-hooks")
 	rollingRestart, _ = flagsSet.GetBool("rolling-restart")
 	scope, _ = flagsSet.GetString("scope")
@@ -346,6 +352,10 @@ func preRun(cmd *cobra.Command, _ []string) {
 //   - c: The cobra.Command instance being executed, providing access to parsed flags.
 //   - names: A slice of container names provided as positional arguments, used for filtering.
 func run(c *cobra.Command, names []string) {
+	for i := range names {
+		names[i] = util.NormalizeContainerName(names[i])
+	}
+
 	logrus.WithField("positional_args", names).
 		Debug("Received positional arguments for container filtering")
 	// Attempt to derive the operational scope from the current container's scope label

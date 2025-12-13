@@ -1,7 +1,6 @@
 package container
 
 import (
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -171,17 +170,11 @@ func DetectCycles(containers []types.Container) map[string]bool {
 		name := ResolveContainerIdentifier(c)
 
 		// Get all dependencies (links) for this container
+		// c.Links() already returns normalized container names
 		links := c.Links()
 
-		// Normalize dependency names to handle service names vs container names consistently
-		// This ensures "web" and "/web" are treated as the same container
-		normalizedLinks := make([]string, len(links))
-		for i, link := range links {
-			normalizedLinks[i] = util.NormalizeContainerName(link)
-		}
-
-		// Add container to graph with its normalized dependencies
-		cycleDetector.graph[name] = normalizedLinks
+		// Add container to graph with its dependencies
+		cycleDetector.graph[name] = links
 
 		// Initialize container as unvisited (white) in the coloring algorithm
 		cycleDetector.colors[name] = 0

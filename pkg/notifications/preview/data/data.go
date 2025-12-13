@@ -181,7 +181,7 @@ func (p *PreviewData) randomEntry(arr []string) string {
 func (p *PreviewData) generateName() string {
 	index := p.containerCount
 	if index < len(containerNames) {
-		return "/" + containerNames[index] // Use base name
+		return containerNames[index] // Use base name
 	}
 
 	suffix := index / len(
@@ -189,7 +189,7 @@ func (p *PreviewData) generateName() string {
 	) // Calculate suffix for uniqueness
 	index %= len(containerNames) // Wrap around array
 
-	return "/" + containerNames[index] + strconv.FormatInt(int64(suffix), 10) // Append suffix
+	return containerNames[index] + strconv.FormatInt(int64(suffix), 10) // Append suffix
 }
 
 // generateImageName creates an image name based on a container name.

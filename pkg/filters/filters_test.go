@@ -103,7 +103,7 @@ func TestFilterByNamesLeadingSlashScenarios(t *testing.T) {
 	assert.NotNil(t, filter)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("test")
+	container.On("Name").Return("/test")
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
@@ -120,7 +120,7 @@ func TestFilterByNamesLeadingSlashScenarios(t *testing.T) {
 
 	// Should match /container2 with container2
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("container2")
+	container.On("Name").Return("/container2")
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
@@ -299,7 +299,7 @@ func TestFilterByDisableNamesLeadingSlashScenarios(t *testing.T) {
 	t.Parallel()
 
 	// Test container with leading slash excluded by filter without slash
-	disableNames := []string{"excluded"}
+	disableNames := []string{"/excluded"}
 	filter := FilterByDisableNames(disableNames, NoFilter)
 	assert.NotNil(t, filter)
 
@@ -314,16 +314,16 @@ func TestFilterByDisableNamesLeadingSlashScenarios(t *testing.T) {
 	assert.NotNil(t, filter)
 
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("excluded")
+	container.On("Name").Return("/excluded")
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	// Test multiple containers with mixed leading slash scenarios
-	disableNames = []string{"container1", "/container2", "container3"}
+	disableNames = []string{"/container1", "/container2", "/container3"}
 	filter = FilterByDisableNames(disableNames, NoFilter)
 	assert.NotNil(t, filter)
 
-	// Should exclude /container1 (matches container1)
+	// Should exclude /container1 (matches /container1)
 	container = new(mocks.FilterableContainer)
 	container.On("Name").Return("/container1")
 	assert.False(t, filter(container))
@@ -331,11 +331,11 @@ func TestFilterByDisableNamesLeadingSlashScenarios(t *testing.T) {
 
 	// Should exclude container2 (matches /container2)
 	container = new(mocks.FilterableContainer)
-	container.On("Name").Return("container2")
+	container.On("Name").Return("/container2")
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
-	// Should exclude /container3 (matches container3)
+	// Should exclude /container3 (matches /container3)
 	container = new(mocks.FilterableContainer)
 	container.On("Name").Return("/container3")
 	assert.False(t, filter(container))

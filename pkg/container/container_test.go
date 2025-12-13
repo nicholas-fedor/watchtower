@@ -18,6 +18,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -404,7 +405,7 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("postgres"),
 						gomega.HaveLen(1),
 					))
 				})
@@ -415,8 +416,8 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 						gomega.HaveLen(2),
 					))
 				})
@@ -427,20 +428,20 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 						gomega.HaveLen(2),
 					))
 				})
 
 				ginkgo.It("normalizes container names with slashes", func() {
 					container = MockContainer(WithLabels(map[string]string{
-						"com.docker.compose.depends_on": "/postgres,redis",
+						compose.ComposeDependsOnLabel: "/postgres,/redis",
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 					))
 				})
 
@@ -453,8 +454,8 @@ var _ = ginkgo.Describe("Container", func() {
 						}))
 						links := container.Links()
 						gomega.Expect(links).To(gomega.SatisfyAll(
-							gomega.ContainElement("/redis"),
-							gomega.Not(gomega.ContainElement("/postgres")),
+							gomega.ContainElement("redis"),
+							gomega.Not(gomega.ContainElement("postgres")),
 							gomega.HaveLen(1),
 						))
 					},
@@ -473,8 +474,8 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 						gomega.HaveLen(2),
 					))
 				})
@@ -487,7 +488,7 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("postgres"),
 						gomega.HaveLen(1),
 					))
 				})
@@ -498,20 +499,20 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 						gomega.HaveLen(2),
 					))
 				})
 
 				ginkgo.It("normalizes container names with slashes", func() {
 					container = MockContainer(WithLabels(map[string]string{
-						"com.centurylinklabs.watchtower.depends-on": "/postgres,redis",
+						"com.centurylinklabs.watchtower.depends-on": "/postgres,/redis",
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 					))
 				})
 
@@ -1214,7 +1215,7 @@ var _ = ginkgo.Describe("Container", func() {
 			inspectResponse := dockerContainerType.InspectResponse{
 				ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
 					ID:         containerID,
-					Name:       "/" + containerName,
+					Name:       containerName,
 					HostConfig: mockContainer.GetCreateHostConfig(),
 					State:      &dockerContainerType.State{Running: true},
 				},
@@ -1306,7 +1307,7 @@ var _ = ginkgo.Describe("Container", func() {
 				inspectResponse := dockerContainerType.InspectResponse{
 					ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
 						ID:         containerID,
-						Name:       "/" + containerName,
+						Name:       containerName,
 						HostConfig: mockContainer.GetCreateHostConfig(),
 						State:      &dockerContainerType.State{Running: true},
 					},
