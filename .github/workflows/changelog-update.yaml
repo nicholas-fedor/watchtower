@@ -30,7 +30,7 @@ jobs:
           git_commit_gpgsign: true
 
       - name: Generate Changelog
-        uses: orhun/git-cliff-action@d77b37db2e3f7398432d34b72a12aa3e2ba87e51 # v4
+        uses: orhun/git-cliff-action@e16f179f0be49ecdfe63753837f20b9531642772 # v4
         with:
           config: cliff.toml
           args: --verbose
