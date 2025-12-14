@@ -111,7 +111,7 @@ func (api *API) RegisterHandler(path string, handler http.Handler) {
 }
 
 // Start launches the API server over HTTP, requiring a non-empty token.
-func (api *API) Start(ctx context.Context, block bool) error {
+func (api *API) Start(ctx context.Context, block bool, noStartupMessage bool) error {
 	if !api.hasHandlers {
 		logrus.WithField("addr", api.Addr).Debug("No handlers registered, skipping API start")
 
@@ -142,7 +142,9 @@ func (api *API) Start(ctx context.Context, block bool) error {
 		}
 	}
 
-	logrus.WithField("addr", api.Addr).Info("Starting HTTP API server")
+	if !noStartupMessage {
+		logrus.WithField("addr", api.Addr).Info("Starting HTTP API server")
+	}
 
 	if block {
 		return RunHTTPServer(ctx, server)

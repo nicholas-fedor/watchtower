@@ -44,6 +44,7 @@ func GetAPIAddr(host, port string) string {
 //   - enableUpdateAPI: Enables the HTTP update API endpoint.
 //   - enableMetricsAPI: Enables the HTTP metrics API endpoint.
 //   - unblockHTTPAPI: Allows periodic polling alongside the HTTP API.
+//   - noStartupMessage: Suppresses startup messages if true.
 //   - filter: The types.Filter determining which containers are targeted for updates.
 //   - command: The cobra.Command instance representing the executed command.
 //   - filterDesc: A human-readable description of the applied filter.
@@ -63,7 +64,7 @@ func GetAPIAddr(host, port string) string {
 func SetupAndStartAPI(
 	ctx context.Context,
 	apiHost, apiPort, apiToken string,
-	enableUpdateAPI, enableMetricsAPI, unblockHTTPAPI bool,
+	enableUpdateAPI, enableMetricsAPI, unblockHTTPAPI, noStartupMessage bool,
 	filter types.Filter,
 	command *cobra.Command,
 	filterDesc string,
@@ -125,7 +126,7 @@ func SetupAndStartAPI(
 	}
 
 	// Start the API server, logging errors unless it's a clean shutdown.
-	if err := httpAPI.Start(ctx, enableUpdateAPI && !unblockHTTPAPI); err != nil &&
+	if err := httpAPI.Start(ctx, enableUpdateAPI && !unblockHTTPAPI, noStartupMessage); err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
 		logrus.WithError(err).Error("Failed to start API")
 

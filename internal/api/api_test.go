@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			err := apiPkg.SetupAndStartAPI(
 				timeoutCtx,
 				"", "0", "test-token",
-				true, false, false,
+				true, false, false, false,
 				filters.NoFilter,
 				cmd,
 				"test filter",
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			err := apiPkg.SetupAndStartAPI(
 				timeoutCtx,
 				"", "0", "test-token",
-				true, true, false,
+				true, true, false, false,
 				filters.NoFilter,
 				cmd,
 				"test filter",
@@ -195,7 +195,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			err := apiPkg.SetupAndStartAPI(
 				ctx,
 				"", "0", "test-token",
-				false, false, false,
+				false, false, false, false,
 				filters.NoFilter,
 				cmd,
 				"test filter",

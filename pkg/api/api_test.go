@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("API", func() {
 
 		ginkgo.It("should skip starting the server when no handlers are registered", func() {
 			apiInstance := api.New(testToken, ":8080")
-			err := apiInstance.Start(context.Background(), true)
+			err := apiInstance.Start(context.Background(), true, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(logBuffer.String, 100*time.Millisecond).
 				Should(gomega.ContainSubstring("No handlers registered, skipping API start"))
@@ -109,7 +109,7 @@ var _ = ginkgo.Describe("API", func() {
 			originalExit := logrus.StandardLogger().ExitFunc
 			logrus.StandardLogger().ExitFunc = func(int) { panic("fatal exit") }
 			defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-			gomega.Expect(func() { _ = emptyTokenAPI.Start(context.Background(), true) }).
+			gomega.Expect(func() { _ = emptyTokenAPI.Start(context.Background(), true, false) }).
 				To(gomega.Panic())
 			gomega.Expect(logOutput).
 				To(gomega.ContainSubstring("API token is empty or unset"))
@@ -134,7 +134,7 @@ var _ = ginkgo.Describe("API", func() {
 			errChan := make(chan error, 1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
-				errChan <- apiInstance.Start(ctx, true)
+				errChan <- apiInstance.Start(ctx, true, false)
 			}()
 
 			gomega.Eventually(func() error {
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("API", func() {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			err = apiInstance.Start(ctx, false)
+			err = apiInstance.Start(ctx, false, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() error {
@@ -254,7 +254,7 @@ var _ = ginkgo.Describe("API", func() {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			err := apiInstance.Start(ctx, false)
+			err := apiInstance.Start(ctx, false, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(logBuffer.String, 1*time.Second, 50*time.Millisecond).Should(
@@ -291,7 +291,7 @@ var _ = ginkgo.Describe("API", func() {
 			errChan := make(chan error, 1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
-				errChan <- apiInstance.Start(context.Background(), true)
+				errChan <- apiInstance.Start(context.Background(), true, false)
 			}()
 
 			select {
@@ -325,7 +325,7 @@ var _ = ginkgo.Describe("API", func() {
 			errChan := make(chan error, 1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
-				errChan <- apiInstance.Start(ctx, true)
+				errChan <- apiInstance.Start(ctx, true, false)
 			}()
 
 			select {
@@ -403,7 +403,7 @@ var _ = ginkgo.Describe("API", func() {
 			errChan := make(chan error, 1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
-				errChan <- apiInstance.Start(ctx, true)
+				errChan <- apiInstance.Start(ctx, true, false)
 			}()
 
 			gomega.Eventually(func() error {
