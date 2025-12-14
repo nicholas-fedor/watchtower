@@ -39,4 +39,6 @@ type RunConfig struct {
 	APIHost string
 	// APIPort is the port for the HTTP API server, set via the --http-api-port flag (defaults to "8080").
 	APIPort string
+	// NoStartupMessage suppresses startup messages if true, set via the --no-startup-message flag.
+	NoStartupMessage bool
 }

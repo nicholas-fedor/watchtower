@@ -80,6 +80,28 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		gomega.Expect(buffer.String()).To(gomega.BeEmpty())
 	})
 
+	ginkgo.It(
+		"should suppress startup messages including HTTP API when no-startup-message is set",
+		func() {
+			cmd.PersistentFlags().Bool("no-startup-message", true, "")
+			cmd.PersistentFlags().Bool("http-api-update", true, "")
+
+			logging.WriteStartupMessage(
+				cmd,
+				time.Time{},
+				"Watching all containers",
+				"",
+				client,
+				nil,
+				"v1.0.0",
+				nil, // read from flags
+			)
+
+			// Should not log to buffer when suppressed, even with HTTP API enabled
+			gomega.Expect(buffer.String()).To(gomega.BeEmpty())
+		},
+	)
+
 	ginkgo.It("should log scope information when provided", func() {
 		cmd.PersistentFlags().Bool("no-startup-message", false, "")
 		cmd.PersistentFlags().Bool("http-api-update", false, "")

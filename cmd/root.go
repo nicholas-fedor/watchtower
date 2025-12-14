@@ -378,6 +378,7 @@ func run(c *cobra.Command, normalizedNames []string) {
 	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
 	enableMetricsAPI, _ := c.PersistentFlags().GetBool("http-api-metrics")
 	unblockHTTPAPI, _ := c.PersistentFlags().GetBool("http-api-periodic-polls")
+	noStartupMessage, _ := c.PersistentFlags().GetBool("no-startup-message")
 	apiToken, _ := c.PersistentFlags().GetString("http-api-token")
 	healthCheck, _ := c.PersistentFlags().GetBool("health-check")
 
@@ -429,6 +430,7 @@ func run(c *cobra.Command, normalizedNames []string) {
 		EnableUpdateAPI:  enableUpdateAPI,
 		EnableMetricsAPI: enableMetricsAPI,
 		UnblockHTTPAPI:   unblockHTTPAPI,
+		NoStartupMessage: noStartupMessage,
 		APIToken:         apiToken,
 		APIHost:          apiHost,
 		APIPort:          apiPort,
@@ -620,7 +622,7 @@ func runMain(cfg config.RunConfig) int {
 	defer cancel()
 
 	// Configure and start the HTTP API, handling any startup errors.
-	if err := api.SetupAndStartAPI(ctx, cfg.APIHost, cfg.APIPort, cfg.APIToken, cfg.EnableUpdateAPI, cfg.EnableMetricsAPI, cfg.UnblockHTTPAPI, cfg.Filter, cfg.Command, cfg.FilterDesc, updateLock, cleanup, client, notifier, scope, meta.Version, runUpdatesWithNotifications, filters.FilterByImage, metrics.Default, logging.WriteStartupMessage); err != nil {
+	if err := api.SetupAndStartAPI(ctx, cfg.APIHost, cfg.APIPort, cfg.APIToken, cfg.EnableUpdateAPI, cfg.EnableMetricsAPI, cfg.UnblockHTTPAPI, cfg.NoStartupMessage, cfg.Filter, cfg.Command, cfg.FilterDesc, updateLock, cleanup, client, notifier, scope, meta.Version, runUpdatesWithNotifications, filters.FilterByImage, metrics.Default, logging.WriteStartupMessage); err != nil {
 		return 1
 	}
 
