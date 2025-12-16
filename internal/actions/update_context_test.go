@@ -155,7 +155,7 @@ func TestUpdateAction_CancelledContext(t *testing.T) {
 	})
 }
 
-func TestUpdateAction_CancelledContextAfterPartialCompletion(t *testing.T) {
+func TestUpdateAction_CancelledContextBeforeOperations(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Create test data with one stale container
 		testData := getCommonTestData()
@@ -198,12 +198,10 @@ func TestUpdateAction_CancelledContextAfterPartialCompletion(t *testing.T) {
 	})
 }
 
-func TestUpdateAction_TimeoutDuringDependencySorting(t *testing.T) {
+func TestUpdateAction_CancelledContextDependencyScenario(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Create test data with circular dependencies to trigger sorting error
+		// Create test data with dependencies to verify cancellation handling
 		testData := getCommonTestData()
-		// Add circular dependency by marking containers as dependent on each other
-		// This would normally cause a sorting error
 
 		client := mocks.CreateMockClient(testData, false, false)
 
