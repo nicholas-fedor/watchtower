@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action digest to 5d4e8d1 by @renovate[bot] in [#1097](https://github.com/nicholas-fedor/watchtower/pull/1097)
+- Update docker/setup-buildx-action digest to 8d2750c by @renovate[bot] in [#1095](https://github.com/nicholas-fedor/watchtower/pull/1095)
 - Update actions/attest-build-provenance digest to 8835c60 by @renovate[bot] in [#1093](https://github.com/nicholas-fedor/watchtower/pull/1093)
 - Update actions/attest-build-provenance digest to 331a7ac by @renovate[bot] in [#1092](https://github.com/nicholas-fedor/watchtower/pull/1092)
 - Update golangci/golangci-lint-action digest to ef75033 by @renovate[bot] in [#1091](https://github.com/nicholas-fedor/watchtower/pull/1091)
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Enable graceful shutdown with context cancellation by @nicholas-fedor in [#1094](https://github.com/nicholas-fedor/watchtower/pull/1094)
 - Suppress HTTP API server startup message when no-startup-message flag is set by @nicholas-fedor in [#1090](https://github.com/nicholas-fedor/watchtower/pull/1090)
 - Resolve chained dependency handling and add Compose depends_on support by @nicholas-fedor in [#1086](https://github.com/nicholas-fedor/watchtower/pull/1086)
 - Propagate notifications in error logging by @nicholas-fedor in [#1085](https://github.com/nicholas-fedor/watchtower/pull/1085)
