@@ -3,7 +3,11 @@
 package auth_test
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/distribution/reference"
@@ -83,6 +87,18 @@ func FuzzProcessChallenge(f *testing.F) {
 	})
 }
 
+// mockClient is a mock implementation of the Client interface for fuzz testing.
+type mockClient struct {
+	body []byte
+}
+
+func (m *mockClient) Do(_ *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(m.body)),
+	}, nil
+}
+
 // FuzzGetBearerHeader fuzzes the JSON unmarshaling in GetBearerHeader to ensure robust parsing
 // of token responses from registries. It tests various JSON inputs including valid responses,
 // malformed JSON, missing fields, and edge cases to prevent crashes or unexpected behavior.
@@ -116,12 +132,25 @@ func FuzzGetBearerHeader(f *testing.F) {
 		),
 	)
 
-	f.Fuzz(func(_ *testing.T, jsonData []byte) {
+	f.Fuzz(func(t *testing.T, jsonData []byte) {
 		// Attempt to unmarshal the JSON data into a TokenResponse struct
-		// We don't care about the result, just that it doesn't panic or cause undefined behavior
 		var tokenResponse types.TokenResponse
 
 		_ = json.Unmarshal(jsonData, &tokenResponse)
+
+		// Call GetBearerHeader with a mock client that returns the fuzzed JSON data as the response body
+		// to exercise the auth package logic
+		ctx := context.Background()
+
+		imageRef, err := reference.ParseNormalizedNamed("test/image")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		challenge := `bearer realm="https://test.com/token",service="test.com"`
+		registryAuth := ""
+		client := &mockClient{body: jsonData}
+		_, _ = auth.GetBearerHeader(ctx, challenge, imageRef, registryAuth, client)
 	})
 }
 
@@ -162,7 +191,10 @@ func FuzzTransformAuth(f *testing.F) {
 // challenge headers, covering valid challenges, malformed headers, missing fields, and edge cases.
 func FuzzGetAuthURL(f *testing.F) {
 	// Parse a fixed image reference for fuzzing
-	imageRef, _ := reference.ParseNormalizedNamed("ghcr.io/test/image")
+	imageRef, err := reference.ParseNormalizedNamed("ghcr.io/test/image")
+	if err != nil {
+		panic(err)
+	}
 
 	// Seed with valid challenge headers
 	f.Add(
