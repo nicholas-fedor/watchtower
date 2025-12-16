@@ -26,7 +26,7 @@ func TestMetrics(t *testing.T) {
 	ginkgo.RunSpecs(t, "Metrics Suite")
 }
 
-func getWithToken(baseURL string) map[string]string {
+func getWithToken(baseURL string) (map[string]string, error) {
 	req, _ := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodGet,
@@ -37,7 +37,7 @@ func getWithToken(baseURL string) map[string]string {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -54,7 +54,7 @@ func getWithToken(baseURL string) map[string]string {
 		metricMap[parts[0]] = parts[1]
 	}
 
-	return metricMap
+	return metricMap, nil
 }
 
 var _ = ginkgo.Describe("the metrics API", func() {
@@ -79,7 +79,14 @@ var _ = ginkgo.Describe("the metrics API", func() {
 		server.Close()
 	})
 
-	tryGetMetrics := func() map[string]string { return getWithToken(server.URL()) }
+	tryGetMetrics := func() map[string]string {
+		m, err := getWithToken(server.URL())
+		if err != nil {
+			ginkgo.Fail("failed to get metrics: " + err.Error())
+		}
+
+		return m
+	}
 
 	ginkgo.It("should serve metrics", func() {
 		gomega.Expect(tryGetMetrics()).
