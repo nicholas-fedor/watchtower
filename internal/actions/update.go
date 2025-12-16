@@ -2,6 +2,7 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -34,6 +35,7 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 // Containers with pinned images (referenced by digest) are skipped to preserve immutability.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for interacting with Docker API.
 //   - config: UpdateConfig specifying behavior like cleanup, restart, and filtering.
 //
@@ -42,9 +44,17 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 //   - []types.CleanedImageInfo: Slice of cleaned image info to clean up after updates.
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(
+	ctx context.Context,
 	client container.Client,
 	config UpdateConfig,
 ) (types.Report, []types.CleanedImageInfo, error) {
+	// Check for context cancellation early
+	select {
+	case <-ctx.Done():
+		return nil, nil, fmt.Errorf("update cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// Initialize logging for the update process start.
 	logrus.Debug("Starting container update check")
 
@@ -129,6 +139,13 @@ func Update(
 
 	// Iterate through containers to check staleness and prepare for updates or restarts.
 	for i, sourceContainer := range containers {
+		// Check for context cancellation to enable faster shutdown during long update cycles.
+		select {
+		case <-ctx.Done():
+			return progress.Report(), cleanupImageInfos, ctx.Err()
+		default:
+		}
+
 		// Skip containers already processed (e.g., skipped due to circular dependencies).
 		if _, exists := (*progress)[sourceContainer.ID()]; exists {
 			continue
@@ -918,19 +935,10 @@ func restartStaleContainer(
 
 	renamed := false
 	newContainerID := container.ID() // Default to original ID
+
 	// Rename Watchtower containers regardless of NoRestart flag, but skip in run-once mode
 	// as there's no need to avoid conflicts with a continuously running instance.
 	if container.IsWatchtower() && !params.RunOnce {
-		// Check pull success before renaming
-		stale, _, err := client.IsContainerStale(container, params)
-		if err != nil || !stale {
-			logrus.WithFields(fields).
-				WithError(err).
-				Debug("Skipping Watchtower self-update due to pull failure or non-stale image")
-
-			return container.ID(), false, nil // Skip self-update without error
-		}
-
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{

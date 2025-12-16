@@ -14,7 +14,7 @@ import (
 	gomegaTypes "github.com/onsi/gomega/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
-	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -78,7 +78,7 @@ var _ = ginkgo.Describe("the client", func() {
 				imageA := util.GenerateRandomSHA256()
 				imageAParent := util.GenerateRandomSHA256()
 				images := map[string][]string{imageA: {imageAParent}}
-				mockServer.AppendHandlers(mocks.RemoveImageHandler(images))
+				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(images))
 				c := client{api: docker}
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.When("image is not found", func() {
 			ginkgo.It("should return an error", func() {
 				image := util.GenerateRandomSHA256()
-				mockServer.AppendHandlers(mocks.RemoveImageHandler(nil))
+				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(nil))
 				c := client{api: docker}
 				err := c.RemoveImageByID(types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())

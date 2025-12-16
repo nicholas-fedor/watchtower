@@ -38,7 +38,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 		case <-time.After(updateWaitTimeout):
 			logrus.Warn("Timeout waiting for running update to finish, proceeding with shutdown.")
 		case <-ctx.Done():
-			logrus.Debug("Context cancelled, proceeding with shutdown.")
+			logrus.Warn("Context cancelled while waiting for running update.")
 		}
 	} else {
 		logrus.Debug("No update running, lock available.")
@@ -82,7 +82,7 @@ func RunUpgradesOnSchedule(
 	cleanup bool,
 	scheduleSpec string,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
-	runUpdatesWithNotifications func(types.Filter, bool, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool) *metrics.Metric,
 	client container.Client,
 	scope string,
 	notifier types.Notifier,
@@ -105,7 +105,7 @@ func RunUpgradesOnSchedule(
 		case v := <-lock:
 			defer func() { lock <- v }()
 
-			metric := runUpdatesWithNotifications(filter, cleanup, false)
+			metric := runUpdatesWithNotifications(ctx, filter, cleanup, false)
 			metrics.Default().RegisterScan(metric)
 			logrus.Debug("Update operation completed successfully")
 		default:

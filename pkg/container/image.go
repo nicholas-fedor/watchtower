@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerImage "github.com/docker/docker/api/types/image"
 	dockerClient "github.com/docker/docker/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
@@ -272,7 +272,7 @@ func (c imageClient) shouldSkipPull(
 func (c imageClient) performImagePull(
 	ctx context.Context,
 	imageName string,
-	opts dockerImageType.PullOptions,
+	opts dockerImage.PullOptions,
 	fields logrus.Fields,
 ) error {
 	clog := logrus.WithFields(fields)
@@ -320,7 +320,7 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) er
 	items, err := c.api.ImageRemove(
 		context.Background(),
 		string(imageID),
-		dockerImageType.RemoveOptions{
+		dockerImage.RemoveOptions{
 			Force:         true,
 			PruneChildren: true,
 		},

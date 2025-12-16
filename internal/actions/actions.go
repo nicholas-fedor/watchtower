@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -116,11 +117,15 @@ type UpdateConfig struct {
 // summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metrics.Metric {
+func RunUpdatesWithNotifications(
+	ctx context.Context,
+	params RunUpdatesWithNotificationsParams,
+) *metrics.Metric {
 	logrus.Debug("Starting RunUpdatesWithNotifications")
 
 	// Initiate notification batching
@@ -145,7 +150,7 @@ func RunUpdatesWithNotifications(params RunUpdatesWithNotificationsParams) *metr
 	}
 
 	// Execute the container update operation
-	result, cleanupImageInfosPtr, err := executeUpdate(params.Client, updateConfig)
+	result, cleanupImageInfosPtr, err := executeUpdate(ctx, params.Client, updateConfig)
 	// Process update result, return metric on failure
 	if metric := handleUpdateResult(result, err); metric != nil {
 		return metric
@@ -369,6 +374,7 @@ func startNotifications(notifier types.Notifier, notificationSplitByContainer bo
 // and returns them along with any error encountered.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - client: The Docker client instance used for container operations.
 //   - config: The UpdateConfig struct containing all update configuration parameters.
 //
@@ -377,13 +383,14 @@ func startNotifications(notifier types.Notifier, notificationSplitByContainer bo
 //   - []types.CleanedImageInfo: Slice of cleaned image info to be cleaned up.
 //   - error: Any error encountered during the update execution.
 func executeUpdate(
+	ctx context.Context,
 	client container.Client,
 	config UpdateConfig,
 ) (types.Report, []types.CleanedImageInfo, error) {
 	// Log before calling the Update function
 	logrus.Debug("About to call Update function")
 
-	result, cleanupImageInfos, err := Update(client, config)
+	result, cleanupImageInfos, err := Update(ctx, client, config)
 
 	// Log after Update function returns
 	logrus.Debug("Update function returned, about to check cleanup")

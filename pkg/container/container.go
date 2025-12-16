@@ -11,9 +11,9 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
 
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerImageType "github.com/docker/docker/api/types/image"
-	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
@@ -30,26 +30,26 @@ const (
 type Operations interface {
 	ContainerCreate(
 		ctx context.Context,
-		config *dockerContainerType.Config,
-		hostConfig *dockerContainerType.HostConfig,
-		networkingConfig *dockerNetworkType.NetworkingConfig,
+		config *dockerContainer.Config,
+		hostConfig *dockerContainer.HostConfig,
+		networkingConfig *dockerNetwork.NetworkingConfig,
 		platform *ocispec.Platform,
 		containerName string,
-	) (dockerContainerType.CreateResponse, error)
+	) (dockerContainer.CreateResponse, error)
 	ContainerStart(
 		ctx context.Context,
 		containerID string,
-		options dockerContainerType.StartOptions,
+		options dockerContainer.StartOptions,
 	) error
 	ContainerRemove(
 		ctx context.Context,
 		containerID string,
-		options dockerContainerType.RemoveOptions,
+		options dockerContainer.RemoveOptions,
 	) error
 	NetworkConnect(
 		ctx context.Context,
 		networkID, containerID string,
-		config *dockerNetworkType.EndpointSettings,
+		config *dockerNetwork.EndpointSettings,
 	) error
 	ContainerRename(
 		ctx context.Context,
@@ -64,12 +64,12 @@ type Operations interface {
 //
 //nolint:recvcheck // Intentional mix: value receivers for reads, pointer receivers for writes
 type Container struct {
-	LinkedToRestarting bool                                 // Indicates if linked to a restarting container
-	Stale              bool                                 // Marks the container as having an outdated image
-	OldImageID         types.ImageID                        // Stores the image ID before update for cleanup tracking
-	normalizedName     string                               // Cached normalized container name
-	containerInfo      *dockerContainerType.InspectResponse // Docker container metadata
-	imageInfo          *dockerImageType.InspectResponse     // Docker image metadata
+	LinkedToRestarting bool                             // Indicates if linked to a restarting container
+	Stale              bool                             // Marks the container as having an outdated image
+	OldImageID         types.ImageID                    // Stores the image ID before update for cleanup tracking
+	normalizedName     string                           // Cached normalized container name
+	containerInfo      *dockerContainer.InspectResponse // Docker container metadata
+	imageInfo          *dockerImage.InspectResponse     // Docker image metadata
 }
 
 // NewContainer creates a new Container instance with the specified metadata.
@@ -81,8 +81,8 @@ type Container struct {
 // Returns:
 //   - *Container: Initialized container instance.
 func NewContainer(
-	containerInfo *dockerContainerType.InspectResponse,
-	imageInfo *dockerImageType.InspectResponse,
+	containerInfo *dockerContainer.InspectResponse,
+	imageInfo *dockerImage.InspectResponse,
 ) *Container {
 	name := ""
 	if containerInfo != nil {
@@ -150,7 +150,7 @@ func (c Container) ToRestart() bool {
 //
 // Returns:
 //   - *dockerContainerType.InspectResponse: Container metadata.
-func (c Container) ContainerInfo() *dockerContainerType.InspectResponse {
+func (c Container) ContainerInfo() *dockerContainer.InspectResponse {
 	return c.containerInfo
 }
 
@@ -254,7 +254,7 @@ func (c Container) HasImageInfo() bool {
 //
 // Returns:
 //   - *dockerImageType.InspectResponse: Image metadata or nil if unavailable.
-func (c Container) ImageInfo() *dockerImageType.InspectResponse {
+func (c Container) ImageInfo() *dockerImage.InspectResponse {
 	return c.imageInfo
 }
 
@@ -264,7 +264,7 @@ func (c Container) ImageInfo() *dockerImageType.InspectResponse {
 //
 // Returns:
 //   - *dockerContainerType.Config: Configuration for container creation.
-func (c Container) GetCreateConfig() *dockerContainerType.Config {
+func (c Container) GetCreateConfig() *dockerContainer.Config {
 	clog := logrus.WithField("container", c.Name())
 	config := c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
@@ -352,7 +352,7 @@ func (c Container) GetCreateConfig() *dockerContainerType.Config {
 //
 // Returns:
 //   - *dockerContainerType.HostConfig: Host configuration for container creation.
-func (c Container) GetCreateHostConfig() *dockerContainerType.HostConfig {
+func (c Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	clog := logrus.WithField("container", c.Name())
 
 	hostConfig := c.containerInfo.HostConfig

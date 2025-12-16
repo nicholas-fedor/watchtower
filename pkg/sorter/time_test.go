@@ -6,10 +6,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	dockerContainerTypes "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 var _ = ginkgo.Describe("TimeSorter", func() {
@@ -18,34 +18,34 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 			now := time.Now()
 			ts := TimeSorter{}
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					Created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano),
 				},
-				Config: &dockerContainerTypes.Config{
+				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
 			})
 			c1.EXPECT().Name().Return("c1")
 
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					Created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
 				},
-				Config: &dockerContainerTypes.Config{
+				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
 			})
 			c2.EXPECT().Name().Return("c2")
 
-			c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c3.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					Created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
 				},
-				Config: &dockerContainerTypes.Config{
+				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
 			})
@@ -65,24 +65,24 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 				now := time.Now()
 				ts := TimeSorter{}
 
-				c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-				c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-					ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Created: "invalid-date",
 					},
-					Config: &dockerContainerTypes.Config{
+					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
 				})
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
 
-				c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-				c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-					ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Created: now.Format(time.RFC3339Nano),
 					},
-					Config: &dockerContainerTypes.Config{
+					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
 				})
@@ -107,12 +107,12 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 
 		ginkgo.It("should handle single container", func() {
 			ts := TimeSorter{}
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					Created: time.Now().Format(time.RFC3339Nano),
 				},
-				Config: &dockerContainerTypes.Config{
+				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
 			}).Maybe()
@@ -129,23 +129,23 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 			now := time.Now()
 			ts := TimeSorter{}
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					Created: now.Format(time.RFC3339Nano),
 				},
-				Config: &dockerContainerTypes.Config{
+				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
 			})
 			c1.EXPECT().Name().Return("c1").Maybe()
 
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2.EXPECT().ContainerInfo().Return(&dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					Created: now.Format(time.RFC3339Nano),
 				},
-				Config: &dockerContainerTypes.Config{
+				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
 			})
@@ -168,15 +168,15 @@ var _ = ginkgo.Describe("byCreated", func() {
 		})
 
 		ginkgo.It("should return length of slice with one element", func() {
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			bc := byCreated{containers: []types.Container{c1}}
 			gomega.Expect(bc.Len()).To(gomega.Equal(1))
 		})
 
 		ginkgo.It("should return length of slice with multiple elements", func() {
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			bc := byCreated{containers: []types.Container{c1, c2, c3}}
 			gomega.Expect(bc.Len()).To(gomega.Equal(3))
 		})
@@ -184,11 +184,11 @@ var _ = ginkgo.Describe("byCreated", func() {
 
 	ginkgo.Describe("Swap", func() {
 		ginkgo.It("should swap elements at different indices", func() {
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
-			c3 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c3.EXPECT().Name().Return("c3")
 
 			bc := byCreated{
@@ -202,9 +202,9 @@ var _ = ginkgo.Describe("byCreated", func() {
 		})
 
 		ginkgo.It("should swap adjacent elements", func() {
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 
 			bc := byCreated{containers: []types.Container{c1, c2}, parsedTimes: []time.Time{{}, {}}}
@@ -214,7 +214,7 @@ var _ = ginkgo.Describe("byCreated", func() {
 		})
 
 		ginkgo.It("should handle swapping same index", func() {
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
 
 			bc := byCreated{containers: []types.Container{c1}, parsedTimes: []time.Time{{}}}
@@ -227,8 +227,8 @@ var _ = ginkgo.Describe("byCreated", func() {
 		ginkgo.It("should return true when i is created before j", func() {
 			now := time.Now()
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 
 			bc := byCreated{
 				containers:  []types.Container{c1, c2},
@@ -240,8 +240,8 @@ var _ = ginkgo.Describe("byCreated", func() {
 		ginkgo.It("should return false when i is created after j", func() {
 			now := time.Now()
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 
 			bc := byCreated{
 				containers:  []types.Container{c1, c2},
@@ -253,8 +253,8 @@ var _ = ginkgo.Describe("byCreated", func() {
 		ginkgo.It("should return false when creation times are equal", func() {
 			now := time.Now()
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 
 			bc := byCreated{
 				containers:  []types.Container{c1, c2},
@@ -267,8 +267,8 @@ var _ = ginkgo.Describe("byCreated", func() {
 			now := time.Now()
 			farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 
 			bc := byCreated{
 				containers:  []types.Container{c1, c2},
@@ -282,8 +282,8 @@ var _ = ginkgo.Describe("byCreated", func() {
 			now := time.Now()
 			farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 
 			bc := byCreated{
 				containers:  []types.Container{c1, c2},
@@ -296,8 +296,8 @@ var _ = ginkgo.Describe("byCreated", func() {
 		ginkgo.It("should handle both invalid timestamps by using far future time", func() {
 			farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
-			c1 := mocks.NewMockContainer(ginkgo.GinkgoT())
-			c2 := mocks.NewMockContainer(ginkgo.GinkgoT())
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 
 			bc := byCreated{
 				containers:  []types.Container{c1, c2},

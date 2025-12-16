@@ -3,8 +3,11 @@
 package notifications
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"testing"
+	"testing/synctest"
 	"text/template"
 	"time"
 
@@ -15,7 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
@@ -51,7 +54,7 @@ var mockDataMultipleEntries = Data{
 
 var mockDataAllFresh = Data{
 	Entries: []*logrus.Entry{},
-	Report:  mocks.CreateMockProgressReport(session.FreshState),
+	Report:  mockActions.CreateMockProgressReport(session.FreshState),
 }
 
 // mockDataFromStates generates mock notification data with specified container states.
@@ -62,7 +65,7 @@ func mockDataFromStates(states ...session.State) Data {
 
 	return Data{
 		Entries: legacyMockData.Entries,
-		Report:  mocks.CreateMockProgressReport(states...),
+		Report:  mockActions.CreateMockProgressReport(states...),
 		StaticData: StaticData{
 			Title: GetTitle(hostname, prefix),
 			Host:  hostname,
@@ -415,23 +418,6 @@ Turns out everything is on fire
 		})
 	})
 
-	ginkgo.When("sending notifications", func() {
-		ginkgo.It("SlowNotificationNotSent", func() {
-			_, blockingRouter := sendNotificationsWithBlockingRouter(true)
-
-			gomega.Eventually(blockingRouter.sent).Should(gomega.Not(gomega.Receive()))
-		})
-
-		ginkgo.It("SlowNotificationSent", func() {
-			shoutrrr, blockingRouter := sendNotificationsWithBlockingRouter(true)
-
-			blockingRouter.unlock <- true
-			shoutrrr.Close()
-
-			gomega.Eventually(blockingRouter.sent).Should(gomega.Receive(gomega.BeTrue()))
-		})
-	})
-
 	ginkgo.When("sending notifications with error handling", func() {
 		ginkgo.It("should handle index guard when errs length exceeds URLs length", func() {
 			mockRouter := &mockRouter{
@@ -692,6 +678,197 @@ Turns out everything is on fire
 	})
 })
 
+func TestSlowNotificationNotSent(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Wait for all goroutines to be blocked
+		synctest.Wait()
+
+		// The notification should not be sent because the router is blocked
+		select {
+		case <-blockingRouter.sent:
+			t.Fatal("expected notification not to be sent")
+		default:
+			// Good, channel is empty
+		}
+
+		// Cancel to clean up goroutines
+		shoutrrr.cancel()
+		// Wait for sendNotifications to exit
+		<-shoutrrr.done
+	})
+}
+
+func TestSlowNotificationSent(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unlock the router
+		blockingRouter.unlock <- true
+
+		// Wait for the notification to be sent
+		synctest.Wait()
+
+		// The notification should be sent
+		select {
+		case sent := <-blockingRouter.sent:
+			if !sent {
+				t.Fatal("expected notification to be sent")
+			}
+		default:
+			t.Fatal("expected notification to be sent")
+		}
+
+		// Cancel to clean up
+		shoutrrr.cancel()
+		// Wait for goroutine to exit
+		<-shoutrrr.done
+	})
+}
+
+func TestGracefulTerminationNotificationGoroutine(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Set up logging like Ginkgo does
+		logBuffer := gbytes.NewBuffer()
+		logrus.SetOutput(logBuffer)
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableColors:    true,
+			DisableTimestamp: true,
+		})
+
+		shoutrrr := createNotifier(
+			[]string{"logger://"},
+			allButTrace,
+			"",
+			true,
+			StaticData{},
+			true, // stdout
+			time.Duration(0),
+		)
+
+		// Start the notification goroutine manually
+		go sendNotifications(shoutrrr)
+
+		// Cancel the context directly while goroutine is waiting in select
+		shoutrrr.cancel()
+
+		// Wait for the goroutine to finish (done channel should be signaled)
+		synctest.Wait()
+
+		// Verify done channel received
+		select {
+		case <-shoutrrr.done:
+			// Good
+		default:
+			t.Fatal("expected done channel to be signaled")
+		}
+	})
+}
+
+func TestGracefulTerminationDuringMessageProcessing(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Set up logging
+		logBuffer := gbytes.NewBuffer()
+		logrus.SetOutput(logBuffer)
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableColors:    true,
+			DisableTimestamp: true,
+		})
+
+		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Unlock the router to allow the message processing to complete
+		blockingRouter.unlock <- true
+
+		// Wait for the notification to be sent
+		synctest.Wait()
+
+		// Verify that the message was sent
+		select {
+		case sent := <-blockingRouter.sent:
+			if !sent {
+				t.Fatal("expected message to be sent")
+			}
+		default:
+			t.Fatal("expected message to be sent")
+		}
+
+		// Cancel context to test graceful termination
+		shoutrrr.cancel()
+
+		// Wait for goroutine to finish
+		synctest.Wait()
+
+		// Verify done channel signaled
+		select {
+		case <-shoutrrr.done:
+			// Good
+		default:
+			t.Fatal("expected done channel to be signaled")
+		}
+	})
+}
+
+func TestContextCancellationIndependentOfStopChannel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Set up logging
+		logBuffer := gbytes.NewBuffer()
+		logrus.SetOutput(logBuffer)
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableColors:    true,
+			DisableTimestamp: true,
+		})
+
+		shoutrrr := createNotifier(
+			[]string{"logger://"},
+			allButTrace,
+			"",
+			true,
+			StaticData{},
+			true, // stdout
+			time.Duration(0),
+		)
+
+		// Start the notification goroutine manually
+		go sendNotifications(shoutrrr)
+
+		// Test that context cancellation works without closing stop channel
+		shoutrrr.cancel()
+
+		// Wait for goroutine to finish via done channel
+		synctest.Wait()
+
+		// Verify done channel received
+		select {
+		case <-shoutrrr.done:
+			// Good
+		default:
+			t.Fatal("expected done channel to be signaled")
+		}
+
+		// Verify stop channel is still open (not closed by context cancellation)
+		select {
+		case <-shoutrrr.stop:
+			t.Fatal("stop channel should not be closed by context cancellation")
+		default:
+			// Good, stop channel is still open
+		}
+	})
+}
+
 // mockRouter implements the router interface for testing error scenarios.
 type mockRouter struct {
 	sendErrors []error
@@ -706,26 +883,38 @@ func (m *mockRouter) Send(_ string, _ *types.Params) []error {
 type blockingRouter struct {
 	unlock chan bool
 	sent   chan bool
+	ctx    context.Context //nolint:containedctx
 }
 
 func (b blockingRouter) Send(_ string, _ *types.Params) []error {
-	<-b.unlock
-
-	b.sent <- true
+	select {
+	case <-b.unlock:
+		b.sent <- true
+	case <-b.ctx.Done():
+		// Cancelled, don't send
+	}
 
 	return nil
 }
 
 // sendNotificationsWithBlockingRouter creates a notifier with a blocking router for testing.
 // It queues a message and returns the notifier and router to verify notification delays.
-func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *blockingRouter) {
+func sendNotificationsWithBlockingRouter() (*shoutrrrTypeNotifier, *blockingRouter, error) {
+	legacy := true
+	ctx, cancel := context.WithCancel(context.Background())
+
 	router := &blockingRouter{
 		unlock: make(chan bool, 1),
 		sent:   make(chan bool, 1),
+		ctx:    ctx,
 	}
 
 	tpl, err := getShoutrrrTemplate("", legacy)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	if err != nil {
+		cancel()
+
+		return nil, nil, err
+	}
 
 	shoutrrr := &shoutrrrTypeNotifier{
 		template:       tpl,
@@ -734,6 +923,8 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 		Router:         router,
 		legacyTemplate: legacy,
 		params:         &types.Params{},
+		ctx:            ctx,
+		cancel:         cancel,
 		delay:          time.Duration(0),
 	}
 
@@ -747,7 +938,7 @@ func sendNotificationsWithBlockingRouter(legacy bool) (*shoutrrrTypeNotifier, *b
 	_ = shoutrrr.Fire(entry)
 	shoutrrr.SendNotification(nil)
 
-	return shoutrrr, router
+	return shoutrrr, router, nil
 }
 
 // createNotifierWithTemplate creates a notifier with a specified template for testing.

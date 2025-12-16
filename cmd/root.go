@@ -166,12 +166,13 @@ var (
 	// summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
 	//
 	// Parameters:
+	//   - ctx: Context for cancellation and timeouts.
 	//   - filter: The types.Filter determining which containers are targeted for updates.
 	//   - cleanup: Boolean indicating whether to remove old images after updates.
 	//
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-	runUpdatesWithNotifications = func(filter types.Filter, cleanup bool, runOnce bool) *metrics.Metric {
+	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, cleanup bool, runOnce bool) *metrics.Metric {
 		params := actions.RunUpdatesWithNotificationsParams{
 			Client:                       client,
 			Notifier:                     notifier,
@@ -193,9 +194,11 @@ var (
 			RunOnce:                      runOnce,
 		}
 
-		return actions.RunUpdatesWithNotifications(params)
+		return actions.RunUpdatesWithNotifications(ctx, params)
 	}
 )
+
+var sleepFunc = time.Sleep
 
 // NewRootCommand creates and configures the root command for the Watchtower CLI.
 //
@@ -563,7 +566,12 @@ func runMain(cfg config.RunConfig) int {
 			meta.Version,
 			nil, // read from flags
 		)
-		metric := runUpdatesWithNotifications(cfg.Filter, cleanup, cfg.RunOnce)
+		metric := runUpdatesWithNotifications(
+			context.Background(),
+			cfg.Filter,
+			cleanup,
+			cfg.RunOnce,
+		)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
 
@@ -633,8 +641,8 @@ func runMain(cfg config.RunConfig) int {
 		return 1
 	}
 
-	// Default to failure if execution completes unexpectedly.
-	return 1
+	// Default to success if execution completes without errors.
+	return 0
 }
 
 // logNotify logs an error message and ensures notifications are sent before returning control.
@@ -663,5 +671,5 @@ func awaitDockerClient() {
 	logrus.Debug(
 		"Sleeping for a second to ensure the docker api client has been properly initialized.",
 	)
-	time.Sleep(1 * time.Second)
+	sleepFunc(1 * time.Second)
 }

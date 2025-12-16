@@ -4,6 +4,7 @@ package notifications
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"net/url"
@@ -66,6 +67,9 @@ type shoutrrrTypeNotifier struct {
 	legacyTemplate bool                  // Use legacy log-only template if true.
 	params         *shoutrrrTypes.Params // Notification parameters.
 	data           StaticData            // Static notification data.
+	//nolint:containedctx
+	ctx    context.Context    // Context for cancellation.
+	cancel context.CancelFunc // Cancel function for the context.
 	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
 	receiving atomic.Bool   // Tracks if receiving logs.
 	delay     time.Duration // Delay between sends.
@@ -176,6 +180,9 @@ func createNotifier(
 		params.SetTitle(data.Title)
 	}
 
+	// Create context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &shoutrrrTypeNotifier{
 		Urls:   urls,   // Notification service URLs.
 		Router: router, // Router for sending messages.
@@ -195,6 +202,8 @@ func createNotifier(
 		legacyTemplate: legacy,                                           // Use legacy log-only template if true.
 		data:           data,                                             // Static notification data.
 		params:         params,                                           // Notification parameters.
+		ctx:            ctx,                                              // Context for cancellation.
+		cancel:         cancel,                                           // Cancel function for the context.
 		delay:          delay,                                            // Delay between sends.
 		entries:        make([]*logrus.Entry, 0, initialEntriesCapacity), // Queued log entries.
 	}
@@ -329,9 +338,11 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				"notification_type": shoutrrrType,
 			}).Trace("Calling Router.Send with message")
 
-			errs := notifier.Router.Send(msg, notifier.params)
+			if !notifier.sendWithCancellation(msg) {
+				LocalLog.Debug("Context cancelled during message send")
 
-			processSendErrors(notifier, errs)
+				return
+			}
 		case <-notifier.stop:
 			// Shutdown mode: drain all remaining messages from the channel
 			LocalLog.Debug("Shutdown signal received, draining remaining messages without delay")
@@ -366,9 +377,11 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 						"notification_type": shoutrrrType,
 					}).Trace("Calling Router.Send with message during shutdown")
 
-					errs := notifier.Router.Send(msg, notifier.params)
+					if !notifier.sendWithCancellation(msg) {
+						LocalLog.Debug("Context cancelled during shutdown message send")
 
-					processSendErrors(notifier, errs)
+						return
+					}
 				default:
 					// Channel is empty, all messages drained
 					LocalLog.Debug("All remaining messages drained during shutdown")
@@ -376,7 +389,36 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					return
 				}
 			}
+		case <-notifier.ctx.Done():
+			// Context cancelled
+			LocalLog.Debug("Context cancelled, stopping notification goroutine")
+
+			return
 		}
+	}
+}
+
+// sendWithCancellation sends a message with context cancellation support.
+//
+// Parameters:
+//   - msg: Message to send.
+//
+// Returns:
+//   - bool: True if sent successfully, false if cancelled.
+func (n *shoutrrrTypeNotifier) sendWithCancellation(msg string) bool {
+	sendCh := make(chan []error, 1)
+
+	go func() {
+		sendCh <- n.Router.Send(msg, n.params)
+	}()
+
+	select {
+	case errs := <-sendCh:
+		processSendErrors(n, errs)
+
+		return true
+	case <-n.ctx.Done():
+		return false
 	}
 }
 
@@ -585,6 +627,8 @@ func (n *shoutrrrTypeNotifier) Close() {
 
 			<-n.done
 		}
+
+		n.cancel()
 	})
 }
 

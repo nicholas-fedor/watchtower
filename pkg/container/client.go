@@ -155,7 +155,7 @@ type ClientOptions struct {
 //   - opts: Options to customize container management behavior.
 //
 // Returns:
-//   - Client: Initialized client instance (panics on failure).
+//   - Client: Initialized client instance (exits on failure).
 func NewClient(opts ClientOptions) Client {
 	ctx := context.Background()
 

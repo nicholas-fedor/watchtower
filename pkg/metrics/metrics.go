@@ -3,6 +3,7 @@
 package metrics
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -35,6 +36,9 @@ type Metrics struct {
 	dropped        prometheus.Counter // Counter for dropped metrics.
 	stopCh         chan struct{}      // Channel for shutdown signaling.
 	shutdownOnce   sync.Once          // Ensures shutdown is called only once.
+	//nolint:containedctx
+	ctx    context.Context    // Context for cancellation.
+	cancel context.CancelFunc // Cancel function for the context.
 }
 
 // NewWithRegistry creates a new Metrics handler with a custom Prometheus registry.
@@ -47,6 +51,9 @@ type Metrics struct {
 func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 	// channelBufferSize sets the metrics channel capacity.
 	const channelBufferSize = 10
+
+	// Create context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Initialize metrics with Prometheus gauges and counters.
 	metrics := &Metrics{
@@ -84,6 +91,8 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		}),
 		channel: make(chan *Metric, channelBufferSize),
 		stopCh:  make(chan struct{}),
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 
 	// Register the metrics with the provided registry.
@@ -184,11 +193,12 @@ func (m *Metrics) RegisterScan(metric *Metric) {
 }
 
 // Shutdown gracefully stops the metrics processing goroutine.
-// It closes the stopCh channel to signal the goroutine to exit.
+// It closes the stopCh channel and cancels the context to signal the goroutine to exit.
 // This method is idempotent and can be called multiple times safely.
 func (m *Metrics) Shutdown() {
 	m.shutdownOnce.Do(func() {
 		close(m.stopCh)
+		m.cancel()
 	})
 }
 
@@ -221,6 +231,8 @@ func (m *Metrics) HandleUpdate() {
 			m.restarted.Set(float64(change.Restarted))
 			m.restartedTotal.Add(float64(change.Restarted))
 		case <-m.stopCh:
+			return
+		case <-m.ctx.Done():
 			return
 		}
 	}

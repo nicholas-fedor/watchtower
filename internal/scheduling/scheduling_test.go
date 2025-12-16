@@ -2,14 +2,14 @@ package scheduling_test
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	"github.com/spf13/cobra"
 
-	actionMocks "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
@@ -17,194 +17,215 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// TestScheduling runs the Ginkgo test suite for the internal scheduling package.
-func TestScheduling(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Internal Scheduling Suite")
-}
-
-var _ = ginkgo.Describe("WaitForRunningUpdate", func() {
-	ginkgo.It("should return immediately when no update is running", func() {
-		ctx := context.Background()
-		lock := make(chan bool, 1)
-		lock <- true // lock is available
-
-		start := time.Now()
-		scheduling.WaitForRunningUpdate(ctx, lock)
-		elapsed := time.Since(start)
-
-		gomega.Expect(elapsed).To(gomega.BeNumerically("<", 10*time.Millisecond))
-	})
-
-	ginkgo.It("should wait for running update to complete", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+func TestWaitForRunningUpdate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		lock := make(chan bool, 1) // lock is taken (no value in channel)
 
 		start := time.Now()
-		scheduling.WaitForRunningUpdate(ctx, lock)
-		elapsed := time.Since(start)
+		done := make(chan struct{})
 
-		// Should have waited for the timeout
-		gomega.Expect(elapsed).To(gomega.BeNumerically(">=", 40*time.Millisecond))
+		go func() {
+			scheduling.WaitForRunningUpdate(ctx, lock)
+
+			elapsed := time.Since(start)
+			// Should have waited for the timeout
+			if elapsed < 40*time.Millisecond {
+				t.Errorf("expected elapsed >= 40ms, got %v", elapsed)
+			}
+
+			close(done)
+		}()
+
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			cancel()
+		}()
+
+		synctest.Wait()
+		<-done
 	})
-})
+}
 
-var _ = ginkgo.Describe("RunUpgradesOnSchedule", func() {
-	var (
-		cmd    *cobra.Command
-		client actionMocks.MockClient
+func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
+	cmd := &cobra.Command{}
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+	ctx := t.Context()
+
+	cmd.Flags().Bool("update-on-start", false, "")
+
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+
+	// Use timeout to avoid hanging
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	defer timeoutCancel()
+
+	err := scheduling.RunUpgradesOnSchedule(
+		timeoutCtx,
+		cmd,
+		filters.NoFilter,
+		"test filter",
+		nil,   // no lock
+		false, // cleanup
+		"",    // empty schedule
+		writeStartupMessage,
+		runUpdatesWithNotifications,
+		client,
+		"",  // scope
+		nil, // no notifier
+		"v1.0.0",
+		false, // updateOnStart
+		false, // skipFirstRun
 	)
+	// Should complete without error when context times out (clean cancellation)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+}
 
-	ginkgo.BeforeEach(func() {
-		cmd = &cobra.Command{}
-		client = actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
-	})
+func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
+	cmd := &cobra.Command{}
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
-	ginkgo.It("should handle empty schedule spec", func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	ctx := t.Context()
 
-		cmd.Flags().Bool("update-on-start", false, "")
+	cmd.PersistentFlags().Bool("update-on-start", true, "")
 
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-		}
+	updateCalled := false
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		updateCalled = true
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
 
-		// Use timeout to avoid hanging
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
-		defer timeoutCancel()
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
-		err := scheduling.RunUpgradesOnSchedule(
-			timeoutCtx,
-			cmd,
-			filters.NoFilter,
-			"test filter",
-			nil,   // no lock
-			false, // cleanup
-			"",    // empty schedule
-			writeStartupMessage,
-			runUpdatesWithNotifications,
-			client,
-			"",  // scope
-			nil, // no notifier
-			"v1.0.0",
-			false, // updateOnStart
-			false, // skipFirstRun
-		)
+	// Use timeout to avoid hanging
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	defer timeoutCancel()
 
-		// Should complete without error when context times out (clean cancellation)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	})
+	err := scheduling.RunUpgradesOnSchedule(
+		timeoutCtx,
+		cmd,
+		filters.NoFilter,
+		"test filter",
+		nil,
+		false,
+		"", // no schedule
+		writeStartupMessage,
+		runUpdatesWithNotifications,
+		client,
+		"",
+		nil,
+		"v1.0.0",
+		true,  // updateOnStart
+		false, // skipFirstRun
+	)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 
-	ginkgo.It("should handle invalid cron spec", func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	if !updateCalled {
+		t.Error("expected updateCalled to be true")
+	}
+}
 
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-			return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
-		}
+func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
+	ctx := context.Background()
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	lock := make(chan bool, 1)
+	lock <- true // lock is available
 
-		err := scheduling.RunUpgradesOnSchedule(
-			ctx,
-			cmd,
-			filters.NoFilter,
-			"test filter",
-			nil,
-			false,
-			"invalid cron spec",
-			writeStartupMessage,
-			runUpdatesWithNotifications,
-			client,
-			"",
-			nil,
-			"v1.0.0",
-			false, // updateOnStart
-			false, // skipFirstRun
-		)
+	start := time.Now()
 
-		gomega.Expect(err).To(gomega.HaveOccurred())
-		gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to schedule updates"))
-	})
+	scheduling.WaitForRunningUpdate(ctx, lock)
 
-	ginkgo.It("should trigger update on start when enabled", func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	elapsed := time.Since(start)
 
-		cmd.PersistentFlags().Bool("update-on-start", true, "")
+	if elapsed >= 10*time.Millisecond {
+		t.Errorf("expected elapsed < 10ms, got %v", elapsed)
+	}
+}
 
-		updateCalled := false
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-			updateCalled = true
+func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
+	cmd := &cobra.Command{}
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
-			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-		}
+	ctx := t.Context()
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
+	}
 
-		// Use timeout to avoid hanging
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
-		defer timeoutCancel()
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
-		err := scheduling.RunUpgradesOnSchedule(
-			timeoutCtx,
-			cmd,
-			filters.NoFilter,
-			"test filter",
-			nil,
-			false,
-			"", // no schedule
-			writeStartupMessage,
-			runUpdatesWithNotifications,
-			client,
-			"",
-			nil,
-			"v1.0.0",
-			true,  // updateOnStart
-			false, // skipFirstRun
-		)
+	err := scheduling.RunUpgradesOnSchedule(
+		ctx,
+		cmd,
+		filters.NoFilter,
+		"test filter",
+		nil,
+		false,
+		"invalid cron spec",
+		writeStartupMessage,
+		runUpdatesWithNotifications,
+		client,
+		"",
+		nil,
+		"v1.0.0",
+		false, // updateOnStart
+		false, // skipFirstRun
+	)
+	if err == nil {
+		t.Error("expected error")
+	}
 
-		gomega.Expect(err).NotTo(gomega.HaveOccurred()) // clean timeout
-		gomega.Expect(updateCalled).To(gomega.BeTrue())
-	})
+	if err != nil && !strings.Contains(err.Error(), "failed to schedule updates") {
+		t.Errorf("expected error to contain 'failed to schedule updates', got %v", err)
+	}
+}
 
-	ginkgo.It("should handle context cancellation", func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
+	cmd := &cobra.Command{}
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
-		runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-			return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
-		}
+	ctx := t.Context()
 
-		writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
+	}
 
-		// Cancel immediately
-		cancelledCtx, cancelFunc := context.WithCancel(ctx)
-		cancelFunc()
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
-		err := scheduling.RunUpgradesOnSchedule(
-			cancelledCtx,
-			cmd,
-			filters.NoFilter,
-			"test filter",
-			nil,
-			false,
-			"",
-			writeStartupMessage,
-			runUpdatesWithNotifications,
-			client,
-			"",
-			nil,
-			"v1.0.0",
-			false, // updateOnStart
-			false, // skipFirstRun
-		)
+	// Cancel immediately
+	cancelledCtx, cancelFunc := context.WithCancel(ctx)
+	cancelFunc()
 
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	})
-})
+	err := scheduling.RunUpgradesOnSchedule(
+		cancelledCtx,
+		cmd,
+		filters.NoFilter,
+		"test filter",
+		nil,
+		false,
+		"",
+		writeStartupMessage,
+		runUpdatesWithNotifications,
+		client,
+		"",
+		nil,
+		"v1.0.0",
+		false, // updateOnStart
+		false, // skipFirstRun
+	)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+}

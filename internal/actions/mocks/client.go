@@ -2,6 +2,7 @@
 package mocks
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -19,6 +20,7 @@ type MockClient struct {
 	pullImages    bool
 	removeVolumes bool
 	Stopped       map[string]bool // Track stopped containers by ID.
+	ctx           context.Context // Context for cancellation simulation
 }
 
 // TestData holds configuration data for MockClient’s test behavior.
@@ -55,17 +57,35 @@ func (testdata *TestData) TriedToRemoveImage() bool {
 // It initializes the client with provided test data, pull and volume removal flags,
 // and an empty map for tracking stopped containers.
 func CreateMockClient(data *TestData, pullImages bool, removeVolumes bool) MockClient {
+	return CreateMockClientWithContext(context.Background(), data, pullImages, removeVolumes)
+}
+
+// CreateMockClientWithContext constructs a new MockClient instance with context for testing.
+// It initializes the client with provided context, test data, pull and volume removal flags,
+// and an empty map for tracking stopped containers.
+func CreateMockClientWithContext(ctx context.Context, data *TestData, pullImages bool, removeVolumes bool) MockClient {
 	return MockClient{
 		TestData:      data,
 		pullImages:    pullImages,
 		removeVolumes: removeVolumes,
 		Stopped:       make(map[string]bool),
+		ctx:           ctx,
 	}
 }
 
 // ListContainers returns the preconfigured list of containers from TestData, applying the provided filter.
 // If the filter is nil, all containers are returned.
 func (client MockClient) ListContainers(filter types.Filter) ([]types.Container, error) {
+	// Simulate mid-operation delay for context cancellation testing
+	time.Sleep(1 * time.Millisecond)
+	if client.ctx != nil {
+		select {
+		case <-client.ctx.Done():
+			return nil, client.ctx.Err()
+		default:
+		}
+	}
+
 	if client.TestData.ListContainersError != nil {
 		return nil, client.TestData.ListContainersError
 	}
@@ -92,6 +112,17 @@ func (client MockClient) ListAllContainers() ([]types.Container, error) {
 // and returns nil for simplicity.
 func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount++
+
+	// Simulate mid-operation delay for context cancellation testing
+	time.Sleep(1 * time.Millisecond)
+	if client.ctx != nil {
+		select {
+		case <-client.ctx.Done():
+			return client.ctx.Err()
+		default:
+		}
+	}
+
 	if client.TestData.StopContainerError != nil &&
 		client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
 		return client.TestData.StopContainerError
@@ -191,6 +222,16 @@ func (client MockClient) IsContainerStale(
 	_ types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	client.TestData.IsContainerStaleCount++
+
+	// Simulate mid-operation delay for context cancellation testing
+	time.Sleep(1 * time.Millisecond)
+	if client.ctx != nil {
+		select {
+		case <-client.ctx.Done():
+			return false, "", client.ctx.Err()
+		default:
+		}
+	}
 
 	// Return configured error if set (for testing error conditions)
 	if client.TestData.IsContainerStaleError != nil {

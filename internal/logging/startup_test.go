@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	actionMocks "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 )
 
@@ -23,13 +23,13 @@ func TestStartupLogging(t *testing.T) {
 var _ = ginkgo.Describe("WriteStartupMessage", func() {
 	var (
 		cmd    *cobra.Command
-		client actionMocks.MockClient
+		client mockActions.MockClient
 		buffer *bytes.Buffer
 	)
 
 	ginkgo.BeforeEach(func() {
 		cmd = &cobra.Command{}
-		client = actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
+		client = mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 		buffer = &bytes.Buffer{}
 		logrus.SetOutput(buffer)
 	})

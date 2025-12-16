@@ -1,12 +1,14 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
@@ -27,7 +29,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
@@ -62,7 +64,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
@@ -121,7 +123,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{},
+						&dockerContainer.Config{},
 					),
 				},
 				Staleness: map[string]bool{
@@ -134,7 +136,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -151,7 +153,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
 		gomega.Expect(err).To(gomega.HaveOccurred())
 		gomega.Expect(report).To(gomega.BeNil())
 		gomega.Expect(cleanupInfos).To(gomega.BeNil())
@@ -168,7 +170,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{},
+						&dockerContainer.Config{},
 					),
 				},
 				Staleness: map[string]bool{
@@ -181,7 +183,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -199,7 +201,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
@@ -216,7 +218,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			Filter:  filters.NoFilter,
 			RunOnce: true,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -235,7 +237,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
@@ -251,7 +253,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
