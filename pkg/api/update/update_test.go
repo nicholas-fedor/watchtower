@@ -388,9 +388,10 @@ func TestQueueConcurrentRequests(t *testing.T) {
 		customLock := make(chan bool, 1)
 		customLock <- true
 
-		called := 0
+		var called atomic.Int32
+
 		handler := update.New(func(_ []string) *metrics.Metric {
-			called++
+			called.Add(1)
 
 			time.Sleep(50 * time.Millisecond) // Short delay to simulate work.
 
@@ -432,8 +433,8 @@ func TestQueueConcurrentRequests(t *testing.T) {
 		}
 
 		// Both should have been called sequentially.
-		if called != 2 {
-			t.Errorf("expected 2 calls, got %d", called)
+		if called.Load() != 2 {
+			t.Errorf("expected 2 calls, got %d", called.Load())
 		}
 	})
 }
