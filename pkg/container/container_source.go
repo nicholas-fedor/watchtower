@@ -10,9 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerFiltersType "github.com/docker/docker/api/types/filters"
-	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerFilters "github.com/docker/docker/api/types/filters"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 	dockerAPIVersion "github.com/docker/docker/api/types/versions"
 	dockerClient "github.com/docker/docker/client"
 
@@ -60,7 +60,7 @@ func ListSourceContainers(
 	filterArgs := buildListFilterArgs(opts, isPodman)
 
 	// Fetch containers with applied filters.
-	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{Filters: filterArgs})
+	containers, err := api.ContainerList(ctx, dockerContainer.ListOptions{Filters: filterArgs})
 	if err != nil {
 		if strings.Contains(err.Error(), "page not found") {
 			clog.WithFields(logrus.Fields{
@@ -135,7 +135,7 @@ func GetSourceContainer(
 				"network_container": netContainerID,
 			}).Warn("Unable to resolve network container")
 		} else {
-			containerInfo.HostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + parentContainer.Name)
+			containerInfo.HostConfig.NetworkMode = dockerContainer.NetworkMode("container:" + parentContainer.Name)
 			clog.WithFields(logrus.Fields{
 				"container":         util.NormalizeContainerName(containerInfo.Name),
 				"network_container": util.NormalizeContainerName(parentContainer.Name),
@@ -212,7 +212,7 @@ func StopSourceContainer(
 
 		// Call the Docker API's StopContainer with the stop signal and timeout in seconds.
 		// The API sends the signal (SIGTERM or custom), waits for the timeout, and sends SIGKILL if needed.
-		err := api.ContainerStop(ctx, string(sourceContainer.ID()), dockerContainerType.StopOptions{
+		err := api.ContainerStop(ctx, string(sourceContainer.ID()), dockerContainer.StopOptions{
 			Signal:  signal,
 			Timeout: &timeoutSeconds,
 		})
@@ -245,7 +245,7 @@ func StopSourceContainer(
 
 	// Call the Docker API's ContainerRemove to delete the container, forcing termination of any
 	// lingering processes (via SIGKILL if needed) and removing volumes if specified.
-	err := api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainerType.RemoveOptions{
+	err := api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainer.RemoveOptions{
 		Force:         true,          // Ensure any lingering processes are terminated before removal.
 		RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
 	})
@@ -282,8 +282,8 @@ func StopSourceContainer(
 //
 // Returns:
 //   - dockerFiltersType.Args: Arguments for filtering Docker containers
-func buildListFilterArgs(opts ClientOptions, isPodman bool) dockerFiltersType.Args {
-	filterArgs := dockerFiltersType.NewArgs()
+func buildListFilterArgs(opts ClientOptions, isPodman bool) dockerFilters.Args {
+	filterArgs := dockerFilters.NewArgs()
 
 	filterArgs.Add("status", "running")
 
@@ -313,7 +313,7 @@ func buildListFilterArgs(opts ClientOptions, isPodman bool) dockerFiltersType.Ar
 func getNetworkConfig(
 	sourceContainer types.Container,
 	clientVersion string,
-) *dockerNetworkType.NetworkingConfig {
+) *dockerNetwork.NetworkingConfig {
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"id":        sourceContainer.ID().ShortID(),
@@ -371,9 +371,9 @@ func getNetworkConfig(
 //
 // Returns:
 //   - *dockerNetworkType.NetworkingConfig: Empty configuration with initialized EndpointsConfig.
-func newEmptyNetworkConfig() *dockerNetworkType.NetworkingConfig {
-	return &dockerNetworkType.NetworkingConfig{
-		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
+func newEmptyNetworkConfig() *dockerNetwork.NetworkingConfig {
+	return &dockerNetwork.NetworkingConfig{
+		EndpointsConfig: make(map[string]*dockerNetwork.EndpointSettings),
 	}
 }
 
@@ -390,11 +390,11 @@ func newEmptyNetworkConfig() *dockerNetworkType.NetworkingConfig {
 // Returns:
 //   - *dockerNetworkType.EndpointSettings: Sanitized endpoint settings.
 func processEndpoint(
-	sourceEndpoint *dockerNetworkType.EndpointSettings,
+	sourceEndpoint *dockerNetwork.EndpointSettings,
 	containerID types.ContainerID,
 	clientVersion string,
 	isHostNetwork bool,
-) *dockerNetworkType.EndpointSettings {
+) *dockerNetwork.EndpointSettings {
 	clog := logrus.WithFields(logrus.Fields{
 		"container": containerID.ShortID(),
 		"version":   clientVersion,
@@ -420,7 +420,7 @@ func processEndpoint(
 
 	// Copy IPAM config if present and not in host mode.
 	if sourceEndpoint.IPAMConfig != nil && !isHostNetwork {
-		targetEndpoint.IPAMConfig = &dockerNetworkType.EndpointIPAMConfig{
+		targetEndpoint.IPAMConfig = &dockerNetwork.EndpointIPAMConfig{
 			IPv4Address:  sourceEndpoint.IPAMConfig.IPv4Address,
 			IPv6Address:  sourceEndpoint.IPAMConfig.IPv6Address,
 			LinkLocalIPs: sourceEndpoint.IPAMConfig.LinkLocalIPs,
@@ -470,7 +470,7 @@ func processEndpoint(
 //     or host mode, or missing MAC addresses in running containers with modern APIs. Returns nil
 //     for non-critical cases, such as non-running containers or expected absence of MAC addresses.
 func validateMacAddresses(
-	config *dockerNetworkType.NetworkingConfig,
+	config *dockerNetwork.NetworkingConfig,
 	containerID types.ContainerID,
 	clientVersion string,
 	isHostNetwork bool,
@@ -593,7 +593,7 @@ func filterAliases(aliases []string, shortID string) []string {
 //   - minSupportedVersion: Minimum API version for MAC preservation.
 //   - isHostNetwork: Whether the container uses host network mode.
 func debugLogMacAddress(
-	networkConfig *dockerNetworkType.NetworkingConfig,
+	networkConfig *dockerNetwork.NetworkingConfig,
 	containerID types.ContainerID,
 	clientVersion string,
 	minSupportedVersion string,

@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
+	mockSorter "github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -16,7 +16,7 @@ func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Co
 	// Create containers
 	for i := range count {
 		name := fmt.Sprintf("container-%d", i)
-		container := &mocks.SimpleContainer{
+		container := &mockSorter.SimpleContainer{
 			ContainerName:  name,
 			ContainerID:    types.ContainerID(fmt.Sprintf("id-%d", i)),
 			ContainerLinks: []string{}, // Will be set below
@@ -27,7 +27,7 @@ func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Co
 	// Add dependencies based on dependency factor
 
 	for i := range count {
-		container := containers[i].(*mocks.SimpleContainer)
+		container := containers[i].(*mockSorter.SimpleContainer)
 		// Each container depends on up to 'dependencyFactor' percentage of previous containers
 		maxDeps := int(float64(i) * dependencyFactor)
 		if maxDeps > 5 { // Cap at 5 dependencies per container for realism
@@ -62,7 +62,7 @@ func generateChainDependencies(count int) []types.Container {
 			links = []string{fmt.Sprintf("chain-%d", i-1)}
 		}
 
-		container := &mocks.SimpleContainer{
+		container := &mockSorter.SimpleContainer{
 			ContainerName:  name,
 			ContainerID:    types.ContainerID(fmt.Sprintf("chain-id-%d", i)),
 			ContainerLinks: links,
@@ -79,7 +79,7 @@ func generateDiamondDependencies(levels int) []types.Container {
 	var containers []types.Container
 
 	// Create root
-	root := &mocks.SimpleContainer{
+	root := &mockSorter.SimpleContainer{
 		ContainerName:  "diamond-root",
 		ContainerID:    "diamond-id-root",
 		ContainerLinks: []string{},
@@ -104,7 +104,7 @@ func generateDiamondDependencies(levels int) []types.Container {
 				}
 			}
 
-			container := &mocks.SimpleContainer{
+			container := &mockSorter.SimpleContainer{
 				ContainerName:  name,
 				ContainerID:    types.ContainerID(fmt.Sprintf("diamond-id-l%d-n%d", level, i)),
 				ContainerLinks: links,
@@ -225,12 +225,12 @@ func BenchmarkCycleDetection(b *testing.B) {
 		{
 			name: "Cycle_Simple",
 			containers: func() []types.Container {
-				c1 := &mocks.SimpleContainer{
+				c1 := &mockSorter.SimpleContainer{
 					ContainerName:  "c1",
 					ContainerID:    "id1",
 					ContainerLinks: []string{"c2"},
 				}
-				c2 := &mocks.SimpleContainer{
+				c2 := &mockSorter.SimpleContainer{
 					ContainerName:  "c2",
 					ContainerID:    "id2",
 					ContainerLinks: []string{"c1"},
@@ -244,22 +244,22 @@ func BenchmarkCycleDetection(b *testing.B) {
 		{
 			name: "Cycle_Complex",
 			containers: func() []types.Container {
-				c1 := &mocks.SimpleContainer{
+				c1 := &mockSorter.SimpleContainer{
 					ContainerName:  "c1",
 					ContainerID:    "id1",
 					ContainerLinks: []string{"c2"},
 				}
-				c2 := &mocks.SimpleContainer{
+				c2 := &mockSorter.SimpleContainer{
 					ContainerName:  "c2",
 					ContainerID:    "id2",
 					ContainerLinks: []string{"c3"},
 				}
-				c3 := &mocks.SimpleContainer{
+				c3 := &mockSorter.SimpleContainer{
 					ContainerName:  "c3",
 					ContainerID:    "id3",
 					ContainerLinks: []string{"c1"},
 				}
-				c4 := &mocks.SimpleContainer{
+				c4 := &mockSorter.SimpleContainer{
 					ContainerName:  "c4",
 					ContainerID:    "id4",
 					ContainerLinks: []string{},

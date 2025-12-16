@@ -3,45 +3,45 @@ package types
 import (
 	"strings"
 
-	dockerContainerTypes "github.com/docker/docker/api/types/container"
-	dockerImageTypes "github.com/docker/docker/api/types/image"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
 )
 
 // Container defines a docker container’s interface in Watchtower.
 type Container interface {
-	ContainerInfo() *dockerContainerTypes.InspectResponse  // Container metadata.
-	ID() ContainerID                                       // Container ID.
-	IsRunning() bool                                       // Check if running.
-	Name() string                                          // Container name.
-	ImageID() ImageID                                      // Current image ID.
-	SafeImageID() ImageID                                  // Current image ID or empty if nil.
-	ImageName() string                                     // Image name with tag.
-	Enabled() (bool, bool)                                 // Enabled status and presence.
-	IsMonitorOnly(params UpdateParams) bool                // Monitor-only check.
-	Scope() (string, bool)                                 // Scope value and presence.
-	Links() []string                                       // Dependency links.
-	ToRestart() bool                                       // Needs restart check.
-	IsWatchtower() bool                                    // Watchtower instance check.
-	StopSignal() string                                    // Custom stop signal.
-	HasImageInfo() bool                                    // Image metadata presence.
-	ImageInfo() *dockerImageTypes.InspectResponse          // Image metadata.
-	GetLifecyclePreCheckCommand() string                   // Pre-check command.
-	GetLifecyclePostCheckCommand() string                  // Post-check command.
-	GetLifecyclePreUpdateCommand() string                  // Pre-update command.
-	GetLifecyclePostUpdateCommand() string                 // Post-update command.
-	GetLifecycleUID() (int, bool)                          // UID for lifecycle hooks, with presence.
-	GetLifecycleGID() (int, bool)                          // GID for lifecycle hooks, with presence.
-	VerifyConfiguration() error                            // Config validation.
-	SetStale(status bool)                                  // Set stale status.
-	IsStale() bool                                         // Stale status check.
-	IsNoPull(params UpdateParams) bool                     // No-pull check.
-	SetLinkedToRestarting(status bool)                     // Set linked-to-restarting status.
-	IsLinkedToRestarting() bool                            // Linked-to-restarting check.
-	PreUpdateTimeout() int                                 // Pre-update timeout.
-	PostUpdateTimeout() int                                // Post-update timeout.
-	IsRestarting() bool                                    // Restarting status check.
-	GetCreateConfig() *dockerContainerTypes.Config         // Creation config.
-	GetCreateHostConfig() *dockerContainerTypes.HostConfig // Host creation config.
+	ContainerInfo() *dockerContainer.InspectResponse  // Container metadata.
+	ID() ContainerID                                  // Container ID.
+	IsRunning() bool                                  // Check if running.
+	Name() string                                     // Container name.
+	ImageID() ImageID                                 // Current image ID.
+	SafeImageID() ImageID                             // Current image ID or empty if nil.
+	ImageName() string                                // Image name with tag.
+	Enabled() (bool, bool)                            // Enabled status and presence.
+	IsMonitorOnly(params UpdateParams) bool           // Monitor-only check.
+	Scope() (string, bool)                            // Scope value and presence.
+	Links() []string                                  // Dependency links.
+	ToRestart() bool                                  // Needs restart check.
+	IsWatchtower() bool                               // Watchtower instance check.
+	StopSignal() string                               // Custom stop signal.
+	HasImageInfo() bool                               // Image metadata presence.
+	ImageInfo() *dockerImage.InspectResponse          // Image metadata.
+	GetLifecyclePreCheckCommand() string              // Pre-check command.
+	GetLifecyclePostCheckCommand() string             // Post-check command.
+	GetLifecyclePreUpdateCommand() string             // Pre-update command.
+	GetLifecyclePostUpdateCommand() string            // Post-update command.
+	GetLifecycleUID() (int, bool)                     // UID for lifecycle hooks, with presence.
+	GetLifecycleGID() (int, bool)                     // GID for lifecycle hooks, with presence.
+	VerifyConfiguration() error                       // Config validation.
+	SetStale(status bool)                             // Set stale status.
+	IsStale() bool                                    // Stale status check.
+	IsNoPull(params UpdateParams) bool                // No-pull check.
+	SetLinkedToRestarting(status bool)                // Set linked-to-restarting status.
+	IsLinkedToRestarting() bool                       // Linked-to-restarting check.
+	PreUpdateTimeout() int                            // Pre-update timeout.
+	PostUpdateTimeout() int                           // Post-update timeout.
+	IsRestarting() bool                               // Restarting status check.
+	GetCreateConfig() *dockerContainer.Config         // Creation config.
+	GetCreateHostConfig() *dockerContainer.HostConfig // Host creation config.
 }
 
 // ImageID is a hash string for a container image.

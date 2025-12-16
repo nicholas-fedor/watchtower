@@ -10,107 +10,18 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerImageType "github.com/docker/docker/api/types/image"
-	dockerMountType "github.com/docker/docker/api/types/mount"
-	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
+	dockerMount "github.com/docker/docker/api/types/mount"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
-
-// mockContainer is a minimal mock implementation of types.Container for testing ResolveContainerIdentifier.
-type mockContainer struct {
-	name string
-	info *dockerContainerType.InspectResponse
-}
-
-var _ types.Container = mockContainer{}
-
-func (m mockContainer) ContainerInfo() *dockerContainerType.InspectResponse { return m.info }
-func (m mockContainer) Name() string                                        { return m.name }
-
-func (m mockContainer) ID() types.ContainerID { panic("not implemented") }
-
-func (m mockContainer) IsRunning() bool { panic("not implemented") }
-
-func (m mockContainer) ImageID() types.ImageID { panic("not implemented") }
-
-func (m mockContainer) SafeImageID() types.ImageID { panic("not implemented") }
-
-func (m mockContainer) ImageName() string { panic("not implemented") }
-
-func (m mockContainer) Enabled() (bool, bool) { panic("not implemented") }
-
-func (m mockContainer) IsMonitorOnly(
-	_ types.UpdateParams,
-) bool {
-	panic("not implemented")
-}
-
-func (m mockContainer) Scope() (string, bool) { panic("not implemented") }
-
-func (m mockContainer) Links() []string { panic("not implemented") }
-
-func (m mockContainer) ToRestart() bool { panic("not implemented") }
-
-func (m mockContainer) IsWatchtower() bool { panic("not implemented") }
-
-func (m mockContainer) StopSignal() string { panic("not implemented") }
-
-func (m mockContainer) HasImageInfo() bool { panic("not implemented") }
-
-func (m mockContainer) ImageInfo() *dockerImageType.InspectResponse { panic("not implemented") }
-
-func (m mockContainer) GetLifecyclePreCheckCommand() string { panic("not implemented") }
-
-func (m mockContainer) GetLifecyclePostCheckCommand() string { panic("not implemented") }
-
-func (m mockContainer) GetLifecyclePreUpdateCommand() string { panic("not implemented") }
-
-func (m mockContainer) GetLifecyclePostUpdateCommand() string { panic("not implemented") }
-
-func (m mockContainer) GetLifecycleUID() (int, bool) { panic("not implemented") }
-
-func (m mockContainer) GetLifecycleGID() (int, bool) { panic("not implemented") }
-
-func (m mockContainer) VerifyConfiguration() error { panic("not implemented") }
-
-func (m mockContainer) SetStale(
-	_ bool,
-) {
-	panic("not implemented")
-}
-
-func (m mockContainer) IsStale() bool { panic("not implemented") }
-
-func (m mockContainer) IsNoPull(
-	_ types.UpdateParams,
-) bool {
-	panic("not implemented")
-}
-
-func (m mockContainer) SetLinkedToRestarting(
-	_ bool,
-) {
-	panic("not implemented")
-}
-
-func (m mockContainer) IsLinkedToRestarting() bool { panic("not implemented") }
-
-func (m mockContainer) PreUpdateTimeout() int { panic("not implemented") }
-
-func (m mockContainer) PostUpdateTimeout() int { panic("not implemented") }
-
-func (m mockContainer) IsRestarting() bool { panic("not implemented") }
-
-func (m mockContainer) GetCreateConfig() *dockerContainerType.Config { panic("not implemented") }
-func (m mockContainer) GetCreateHostConfig() *dockerContainerType.HostConfig {
-	panic("not implemented")
-}
 
 var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Configuration Validation", func() {
@@ -167,7 +78,7 @@ var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Create Configuration", func() {
 		ginkgo.Context("when container and image healthcheck configs are identical", func() {
 			ginkgo.It("returns an empty healthcheck config", func() {
-				tests := []dockerContainerType.HealthConfig{
+				tests := []dockerContainer.HealthConfig{
 					{Test: []string{"/usr/bin/sleep", "1s"}},
 					{Timeout: 30},
 					{StartPeriod: 30},
@@ -179,21 +90,21 @@ var _ = ginkgo.Describe("Container", func() {
 						WithImageHealthcheck(healthConfig),
 					)
 					gomega.Expect(c.GetCreateConfig().Healthcheck).
-						To(gomega.Equal(&dockerContainerType.HealthConfig{}))
+						To(gomega.Equal(&dockerContainer.HealthConfig{}))
 				}
 			})
 		})
 
 		ginkgo.It("returns container healthcheck when configs differ", func() {
 			c := MockContainer(
-				WithHealthcheck(dockerContainerType.HealthConfig{
+				WithHealthcheck(dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
 					StartPeriod: 10,
 					Retries:     2,
 				}),
-				WithImageHealthcheck(dockerContainerType.HealthConfig{
+				WithImageHealthcheck(dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "10s"},
 					Interval:    10,
 					Timeout:     60,
@@ -202,7 +113,7 @@ var _ = ginkgo.Describe("Container", func() {
 				}),
 			)
 			gomega.Expect(c.GetCreateConfig().Healthcheck).
-				To(gomega.Equal(&dockerContainerType.HealthConfig{
+				To(gomega.Equal(&dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
@@ -212,7 +123,7 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.It("handles empty container healthcheck config without panic", func() {
-			c := MockContainer(WithImageHealthcheck(dockerContainerType.HealthConfig{
+			c := MockContainer(WithImageHealthcheck(dockerContainer.HealthConfig{
 				Test:        []string{"/usr/bin/sleep", "10s"},
 				Interval:    10,
 				Timeout:     60,
@@ -223,7 +134,7 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.It("handles empty image healthcheck config without panic", func() {
-			c := MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
+			c := MockContainer(WithHealthcheck(dockerContainer.HealthConfig{
 				Test:        []string{"/usr/bin/sleep", "1s"},
 				Interval:    30,
 				Timeout:     30,
@@ -231,7 +142,7 @@ var _ = ginkgo.Describe("Container", func() {
 				Retries:     2,
 			}))
 			gomega.Expect(c.GetCreateConfig().Healthcheck).
-				To(gomega.Equal(&dockerContainerType.HealthConfig{
+				To(gomega.Equal(&dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
@@ -598,7 +509,9 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.It("returns container name when ContainerInfo returns nil", func() {
-			container := mockContainer{name: "test-watchtower", info: nil}
+			container := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			container.EXPECT().ContainerInfo().Return(nil)
+			container.EXPECT().Name().Return("test-watchtower")
 			identifier := ResolveContainerIdentifier(container)
 			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
 		})
@@ -688,8 +601,8 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("preserves IP and MAC addresses for running containers", func() {
 				container := MockContainer(
 					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"bridge": {
 							IPAddress:  "172.17.0.2",
 							MacAddress: "02:42:ac:11:00:02",
@@ -714,8 +627,8 @@ var _ = ginkgo.Describe("Container", func() {
 				logrus.SetLevel(logrus.DebugLevel)
 				container := MockContainer(
 					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"bridge": {
 							IPAddress:  "172.17.0.2",
 							MacAddress: "",
@@ -741,9 +654,9 @@ var _ = ginkgo.Describe("Container", func() {
 					container := MockContainer(
 						WithNetworkMode("bridge"),
 						WithContainerState(
-							dockerContainerType.State{Running: false, Status: "created"},
+							dockerContainer.State{Running: false, Status: "created"},
 						),
-						WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								IPAddress:  "",
 								MacAddress: "",
@@ -766,9 +679,9 @@ var _ = ginkgo.Describe("Container", func() {
 					container := MockContainer(
 						WithNetworkMode("bridge"),
 						WithContainerState(
-							dockerContainerType.State{Running: false, Status: "exited"},
+							dockerContainer.State{Running: false, Status: "exited"},
 						),
-						WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								IPAddress:  "",
 								MacAddress: "",
@@ -793,8 +706,8 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("includes host endpoint with no aliases or DNS names", func() {
 				container := MockContainer(
 					WithNetworkMode("host"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"host": {
 							IPAddress:  "",
 							MacAddress: "",
@@ -824,14 +737,14 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(endpoint.IPAddress).To(gomega.BeEmpty())
 				gomega.Expect(endpoint.MacAddress).To(gomega.BeEmpty())
 				gomega.Expect(container.containerInfo.HostConfig.NetworkMode).To(gomega.Equal(
-					dockerContainerType.NetworkMode("host")))
+					dockerContainer.NetworkMode("host")))
 			})
 
 			ginkgo.It("clears non-empty aliases and DNS names", func() {
 				container := MockContainer(
 					WithNetworkMode("host"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"host": {
 							IPAddress:  "192.168.1.1",
 							MacAddress: "02:42:ac:11:00:02",
@@ -857,8 +770,8 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("logs no MAC address for host mode in debugLogMacAddress", func() {
 				container := MockContainer(
 					WithNetworkMode("host"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"host": {
 							IPAddress:  "",
 							MacAddress: "",
@@ -885,8 +798,8 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("clears MAC address and DNS names", func() {
 				container := MockContainer(
 					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"bridge": {
 							IPAddress:  "172.17.0.2",
 							MacAddress: "02:42:ac:11:00:02",
@@ -912,8 +825,8 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("logs no MAC address in debugLogMacAddress", func() {
 				container := MockContainer(
 					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"bridge": {
 							IPAddress:  "172.17.0.2",
 							MacAddress: "02:42:ac:11:00:02",
@@ -945,7 +858,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container := MockContainer(
 						WithNetworkMode("bridge"),
 						WithContainerState(
-							dockerContainerType.State{Running: true, Status: "running"},
+							dockerContainer.State{Running: true, Status: "running"},
 						),
 						WithNetworks("network1", "network2"),
 						WithImageName("test-image:latest"),
@@ -979,9 +892,9 @@ var _ = ginkgo.Describe("Container", func() {
 					container := MockContainer(
 						WithNetworkMode("bridge"),
 						WithContainerState(
-							dockerContainerType.State{Running: true, Status: "running"},
+							dockerContainer.State{Running: true, Status: "running"},
 						),
-						WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"network1": {
 								NetworkID:  "network_network1_id",
 								IPAddress:  "172.17.0.2",
@@ -1029,8 +942,8 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("returns empty config when network settings are empty", func() {
 				container := MockContainer(
 					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{}),
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{}),
 					WithImageName("test-image:latest"),
 				)
 
@@ -1046,9 +959,9 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("returns empty config when network settings are nil", func() {
 				container := MockContainer(
 					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 					WithImageName("test-image:latest"),
-					func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.NetworkSettings = nil
 					},
 				)
@@ -1077,14 +990,14 @@ var _ = ginkgo.Describe("Container", func() {
 				logrus.SetLevel(logrus.DebugLevel)
 				container := MockContainer(
 					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						"bridge": {MacAddress: ""},
 					}),
 				)
 
-				config := &dockerNetworkType.NetworkingConfig{
-					EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
+				config := &dockerNetwork.NetworkingConfig{
+					EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 						"bridge": {MacAddress: ""},
 					},
 				}
@@ -1101,14 +1014,14 @@ var _ = ginkgo.Describe("Container", func() {
 			logrus.SetLevel(logrus.DebugLevel)
 			container := MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: false, Status: "created"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+				WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
+				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {MacAddress: ""},
 				}),
 			)
 
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
+			config := &dockerNetwork.NetworkingConfig{
+				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {MacAddress: ""},
 				},
 			}
@@ -1124,14 +1037,14 @@ var _ = ginkgo.Describe("Container", func() {
 			logrus.SetLevel(logrus.DebugLevel)
 			container := MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: false, Status: "exited"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+				WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
+				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {MacAddress: ""},
 				}),
 			)
 
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
+			config := &dockerNetwork.NetworkingConfig{
+				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {MacAddress: ""},
 				},
 			}
@@ -1147,14 +1060,14 @@ var _ = ginkgo.Describe("Container", func() {
 			logrus.SetLevel(logrus.DebugLevel)
 			container := MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {MacAddress: "02:42:ac:11:00:02"},
 				}),
 			)
 
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
+			config := &dockerNetwork.NetworkingConfig{
+				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {MacAddress: "02:42:ac:11:00:02"},
 				},
 			}
@@ -1171,13 +1084,13 @@ var _ = ginkgo.Describe("Container", func() {
 			logrus.SetLevel(logrus.DebugLevel)
 			container := MockContainer(
 				WithNetworkMode("bridge"),
-				func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					c.State = nil
 				},
 			)
 
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
+			config := &dockerNetwork.NetworkingConfig{
+				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {MacAddress: ""},
 				},
 			}
@@ -1201,9 +1114,9 @@ var _ = ginkgo.Describe("Container", func() {
 
 		// WithMemorySwappiness configures the container's MemorySwappiness value.
 		WithMemorySwappiness := func(swappiness int64) MockContainerUpdate {
-			return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+			return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 				if c.HostConfig == nil {
-					c.HostConfig = &dockerContainerType.HostConfig{}
+					c.HostConfig = &dockerContainer.HostConfig{}
 				}
 				c.HostConfig.MemorySwappiness = &swappiness
 			}
@@ -1214,14 +1127,14 @@ var _ = ginkgo.Describe("Container", func() {
 			logrus.SetOutput(logOutput)
 			logrus.SetLevel(logrus.DebugLevel)
 			mockContainer = MockContainer(WithMemorySwappiness(defaultMemorySwappiness))
-			inspectResponse := dockerContainerType.InspectResponse{
-				ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+			inspectResponse := dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					ID:         containerID,
 					Name:       containerName,
 					HostConfig: mockContainer.GetCreateHostConfig(),
-					State:      &dockerContainerType.State{Running: true},
+					State:      &dockerContainer.State{Running: true},
 				},
-				Config: &dockerContainerType.Config{},
+				Config: &dockerContainer.Config{},
 			}
 			mockContainer.containerInfo = &inspectResponse
 		})
@@ -1279,9 +1192,9 @@ var _ = ginkgo.Describe("Container", func() {
 
 			// WithCPUSettings configures the container's CPU settings.
 			WithCPUSettings := func(nanoCPUs int64, cpuShares int64, cpuQuota int64, cpuPeriod int64, cpusetCpus string, cpusetMems string) MockContainerUpdate {
-				return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+				return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					if c.HostConfig == nil {
-						c.HostConfig = &dockerContainerType.HostConfig{}
+						c.HostConfig = &dockerContainer.HostConfig{}
 					}
 					c.HostConfig.NanoCPUs = nanoCPUs
 					c.HostConfig.CPUShares = cpuShares
@@ -1306,14 +1219,14 @@ var _ = ginkgo.Describe("Container", func() {
 						defaultCpusetMems,
 					),
 				)
-				inspectResponse := dockerContainerType.InspectResponse{
-					ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+				inspectResponse := dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						ID:         containerID,
 						Name:       containerName,
 						HostConfig: mockContainer.GetCreateHostConfig(),
-						State:      &dockerContainerType.State{Running: true},
+						State:      &dockerContainer.State{Running: true},
 					},
-					Config: &dockerContainerType.Config{},
+					Config: &dockerContainer.Config{},
 				}
 				mockContainer.containerInfo = &inspectResponse
 			})
@@ -1435,22 +1348,22 @@ var _ = ginkgo.Describe("Container", func() {
 
 	ginkgo.Describe("Host Config Creation", func() {
 		ginkgo.It("preserves volume mount subpath in host config", func() {
-			volumeMount := dockerMountType.Mount{
-				Type:   dockerMountType.TypeVolume,
+			volumeMount := dockerMount.Mount{
+				Type:   dockerMount.TypeVolume,
 				Source: "test_volume",
 				Target: "/config/nest",
-				VolumeOptions: &dockerMountType.VolumeOptions{
+				VolumeOptions: &dockerMount.VolumeOptions{
 					Subpath: "ha/nest",
 				},
 			}
 
-			container := MockContainer(WithMounts([]dockerMountType.Mount{volumeMount}))
+			container := MockContainer(WithMounts([]dockerMount.Mount{volumeMount}))
 			hostConfig := container.GetCreateHostConfig()
 
 			gomega.Expect(hostConfig.Mounts).To(gomega.HaveLen(1), "Expected exactly one mount")
 			mount := hostConfig.Mounts[0]
 			gomega.Expect(mount.Type).
-				To(gomega.Equal(dockerMountType.TypeVolume), "Mount type should be volume")
+				To(gomega.Equal(dockerMount.TypeVolume), "Mount type should be volume")
 			gomega.Expect(mount.Source).To(gomega.Equal("test_volume"), "Mount source should match")
 			gomega.Expect(mount.Target).
 				To(gomega.Equal("/config/nest"), "Mount target should match")
@@ -1467,7 +1380,7 @@ var _ = ginkgo.Describe("Container", func() {
 			logOutput               *bytes.Buffer
 			client                  *MockClient
 			container               *Container
-			networkConfig           *dockerNetworkType.NetworkingConfig
+			networkConfig           *dockerNetwork.NetworkingConfig
 			defaultMemorySwappiness int64 = 60
 		)
 
@@ -1479,8 +1392,8 @@ var _ = ginkgo.Describe("Container", func() {
 			client = &MockClient{}
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						NetworkID:  "network_bridge_id",
 						IPAddress:  "172.17.0.2",
@@ -1488,9 +1401,9 @@ var _ = ginkgo.Describe("Container", func() {
 						Aliases:    []string{"test-watchtower"},
 					},
 				}),
-				func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					if c.HostConfig == nil {
-						c.HostConfig = &dockerContainerType.HostConfig{}
+						c.HostConfig = &dockerContainer.HostConfig{}
 					}
 					c.HostConfig.MemorySwappiness = &defaultMemorySwappiness
 				},
@@ -1554,8 +1467,8 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("handles ContainerCreate failure", func() {
 			createErr := errors.New("create failed")
-			client.createFunc = func(_ context.Context, _ *dockerContainerType.Config, _ *dockerContainerType.HostConfig, _ *dockerNetworkType.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainerType.CreateResponse, error) {
-				return dockerContainerType.CreateResponse{}, createErr
+			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainer.CreateResponse, error) {
+				return dockerContainer.CreateResponse{}, createErr
 			}
 			newID, err := StartTargetContainer(
 				client,
@@ -1596,7 +1509,7 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.It("skips starting stopped container when reviveStopped is false", func() {
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: false, Status: "exited"}),
+				WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
 			)
 			networkConfig = getNetworkConfig(container, "1.44")
 			newID, err := StartTargetContainer(
@@ -1618,7 +1531,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("handles ContainerStart failure", func() {
 			startErr := errors.New("start failed")
-			client.startFunc = func(_ context.Context, _ string, _ dockerContainerType.StartOptions) error {
+			client.startFunc = func(_ context.Context, _ string, _ dockerContainer.StartOptions) error {
 				return startErr
 			}
 			newID, err := StartTargetContainer(
@@ -1661,7 +1574,7 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.It("attaches multiple networks for legacy API and handles success", func() {
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 				WithNetworks("network1", "network2"),
 			)
 			networkConfig = getNetworkConfig(container, "1.23")
@@ -1689,15 +1602,15 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.It("attaches multiple networks for legacy API and handles failure", func() {
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 				WithNetworks("network1", "network2"),
 			)
 			networkConfig = getNetworkConfig(container, "1.23")
 			connectErr := errors.New("network connect failed")
-			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetworkType.EndpointSettings) error {
+			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) error {
 				return connectErr
 			}
-			client.removeFunc = func(_ context.Context, _ string, _ dockerContainerType.RemoveOptions) error {
+			client.removeFunc = func(_ context.Context, _ string, _ dockerContainer.RemoveOptions) error {
 				return nil
 			}
 			newID, err := StartTargetContainer(

@@ -23,9 +23,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerImage "github.com/docker/docker/api/types/image"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("Digests", func() {
 	mockInvalidDigest := "invalid-digest" // Malformed digest for testing
 
 	// Mock containers for testing
-	mockContainer := mocks.CreateMockContainerWithDigest(
+	mockContainer := mockActions.CreateMockContainerWithDigest(
 		mockID,
 		mockName,
 		mockImage,
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("Digests", func() {
 		mockDigest,
 	)
 
-	mockContainerNoImage := mocks.CreateMockContainerWithImageInfoP(
+	mockContainerNoImage := mockActions.CreateMockContainerWithImageInfoP(
 		mockID,
 		mockName,
 		mockImage,
@@ -154,12 +154,12 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerEmptyDigests := mocks.CreateMockContainerWithImageInfoP(
+			mockContainerEmptyDigests := mockActions.CreateMockContainerWithImageInfoP(
 				mockID,
 				mockName,
 				mockImageRef,
 				mockCreated,
-				&dockerImageType.InspectResponse{RepoDigests: []string{}},
+				&dockerImage.InspectResponse{RepoDigests: []string{}},
 			)
 
 			server.AppendHandlers(
@@ -225,7 +225,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -292,7 +292,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should return an error if the registry isn't available", func() {
 			mockImageRef := "unreachable.local/test/image:latest"
-			mockContainerUnreachable := mocks.CreateMockContainerWithDigest(
+			mockContainerUnreachable := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -323,7 +323,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			// Use an invalid reference to trigger an error; GetToken fails before BuildManifestURL
 			mockImageRef := "example.com/test/image:" // Missing tag, invalid format
-			mockContainerInvalidImage := mocks.CreateMockContainerWithDigest(
+			mockContainerInvalidImage := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -343,7 +343,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			// Use an invalid reference; GetToken fails before request creation
 			mockImageRef := "example.com/test/image:latest\x00invalid"
-			mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
+			mockContainerInvalidURL := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -366,7 +366,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -436,7 +436,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -504,7 +504,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithInvalidDigest := mocks.CreateMockContainerWithDigest(
+			mockContainerWithInvalidDigest := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -583,7 +583,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -634,7 +634,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -689,7 +689,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -742,7 +742,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainer := mocks.CreateMockContainerWithDigest(
+			mockContainer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -815,7 +815,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -891,7 +891,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -958,7 +958,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1026,7 +1026,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1225,7 +1225,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			}
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1295,7 +1295,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1362,7 +1362,7 @@ var _ = ginkgo.Describe("Digests", func() {
 		ginkgo.It("should return an error if GetToken fails", func() {
 			defer ginkgo.GinkgoRecover()
 			mockImageRef := "unreachable.local/test/image:latest"
-			mockContainerUnreachable := mocks.CreateMockContainerWithDigest(
+			mockContainerUnreachable := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1382,7 +1382,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			// Use an invalid reference; GetToken fails before BuildManifestURL
 			mockImageRef := "example.com/test/image:" // Missing tag, invalid format
-			mockContainerInvalidImage := mocks.CreateMockContainerWithDigest(
+			mockContainerInvalidImage := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1402,7 +1402,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer ginkgo.GinkgoRecover()
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest\x00invalid"
-			mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
+			mockContainerInvalidURL := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1442,7 +1442,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1507,7 +1507,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1573,7 +1573,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1637,7 +1637,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1702,7 +1702,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1770,7 +1770,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1813,7 +1813,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1883,7 +1883,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -1950,7 +1950,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -2017,7 +2017,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -2082,7 +2082,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -2176,7 +2176,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			redirectAddr := redirectServer.Addr()
 			// Use actual redirect server address
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -2246,7 +2246,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			serverAddr := server.Addr()
 			redirectAddr := redirectServer.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -2314,7 +2314,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			serverAddr := server.Addr()
 			mockImageRef := serverAddr + "/test/image:latest"
-			mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+			mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 				mockID,
 				mockName,
 				mockImageRef,
@@ -2375,7 +2375,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 				serverAddr := httpServer.Addr()
 				mockImageRef := serverAddr + "/test/image:latest"
-				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
 					mockImageRef,
@@ -2409,7 +2409,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				defer ginkgo.GinkgoRecover()
 				// Create a mock container with invalid image reference
 				// This should cause manifest.BuildManifestURL to fail
-				mockContainerInvalid := mocks.CreateMockContainerWithDigest(
+				mockContainerInvalid := mockActions.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
 					"example.com/test/image:", // Missing tag, invalid format
@@ -2427,7 +2427,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			ginkgo.It("should handle URL parsing failure", func() {
 				defer ginkgo.GinkgoRecover()
-				mockContainerInvalidURL := mocks.CreateMockContainerWithDigest(
+				mockContainerInvalidURL := mockActions.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
 					"http://invalid url with spaces/test/image:latest", // Invalid URL
@@ -2449,7 +2449,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 				serverAddr := server.Addr()
 				mockImageRef := serverAddr + "/test/image:latest"
-				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
 					mockImageRef,
@@ -2519,7 +2519,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 				serverAddr := server.Addr()
 				mockImageRef := serverAddr + "/test/image:latest"
-				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
 					mockImageRef,
@@ -2595,7 +2595,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 				serverAddr := server.Addr()
 				mockImageRef := serverAddr + "/test/image:latest"
-				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
 					mockImageRef,
@@ -2671,7 +2671,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 				serverAddr := server.Addr()
 				mockImageRef := serverAddr + "/test/image:latest"
-				mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+				mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 					mockID,
 					mockName,
 					mockImageRef,
@@ -2752,7 +2752,7 @@ var _ = ginkgo.Describe("Digests", func() {
 					redirectAddr := redirectServer.Addr()
 					// Use lscr.io image name to trigger special handling
 					mockImageRef := serverAddr + "/lscr.io/test/image:latest"
-					mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+					mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 						mockID,
 						mockName,
 						mockImageRef,
@@ -2862,7 +2862,7 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 		go startMockSlowServer(srvConn, mockDigestHash)
 
 		mockImageRef := "test/test/image:latest"
-		mockContainerWithServer := mocks.CreateMockContainerWithDigest(
+		mockContainerWithServer := mockActions.CreateMockContainerWithDigest(
 			mockID,
 			mockName,
 			mockImageRef,

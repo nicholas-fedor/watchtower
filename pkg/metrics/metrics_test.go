@@ -15,7 +15,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestNewMetric(t *testing.T) {
@@ -32,7 +32,7 @@ func TestNewMetric(t *testing.T) {
 			name: "empty report",
 			args: args{
 				report: func() types.Report {
-					mock := mocks.NewMockReport(t)
+					mock := mockTypes.NewMockReport(t)
 					mock.EXPECT().Scanned().Return([]types.ContainerReport{})
 					mock.EXPECT().Updated().Return([]types.ContainerReport{})
 					mock.EXPECT().Failed().Return([]types.ContainerReport{})
@@ -52,7 +52,7 @@ func TestNewMetric(t *testing.T) {
 			name: "mixed report",
 			args: args{
 				report: func() types.Report {
-					mock := mocks.NewMockReport(t)
+					mock := mockTypes.NewMockReport(t)
 					mock.EXPECT().Scanned().Return(make([]types.ContainerReport, 3))
 					mock.EXPECT().Updated().Return(make([]types.ContainerReport, 1))
 					mock.EXPECT().Failed().Return(make([]types.ContainerReport, 1))
@@ -72,7 +72,7 @@ func TestNewMetric(t *testing.T) {
 			name: "only restarted containers",
 			args: args{
 				report: func() types.Report {
-					mock := mocks.NewMockReport(t)
+					mock := mockTypes.NewMockReport(t)
 					mock.EXPECT().Scanned().Return(make([]types.ContainerReport, 5))
 					mock.EXPECT().Updated().Return([]types.ContainerReport{})
 					mock.EXPECT().Failed().Return([]types.ContainerReport{})
@@ -92,7 +92,7 @@ func TestNewMetric(t *testing.T) {
 			name: "restarted with failures",
 			args: args{
 				report: func() types.Report {
-					mock := mocks.NewMockReport(t)
+					mock := mockTypes.NewMockReport(t)
 					mock.EXPECT().Scanned().Return(make([]types.ContainerReport, 10))
 					mock.EXPECT().Updated().Return(make([]types.ContainerReport, 3))
 					mock.EXPECT().Failed().Return(make([]types.ContainerReport, 2))
@@ -136,7 +136,7 @@ func TestNewMetric_ErrorHandling(t *testing.T) {
 		{
 			name: "report with nil slices",
 			report: func() types.Report {
-				mock := mocks.NewMockReport(t)
+				mock := mockTypes.NewMockReport(t)
 				mock.EXPECT().Scanned().Return(nil)
 				mock.EXPECT().Updated().Return(nil)
 				mock.EXPECT().Failed().Return(nil)

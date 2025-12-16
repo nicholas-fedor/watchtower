@@ -8,8 +8,9 @@ import (
 	"fmt"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/image"
 	"github.com/sirupsen/logrus"
+
+	dockerImage "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -31,7 +32,7 @@ var (
 // Returns:
 //   - image.PullOptions: Configured pull options if successful.
 //   - error: Non-nil if auth retrieval fails, nil on success.
-func GetPullOptions(imageName string) (image.PullOptions, error) {
+func GetPullOptions(imageName string) (dockerImage.PullOptions, error) {
 	// Set up logging fields for consistent tracking.
 	fields := logrus.Fields{
 		"image": imageName,
@@ -44,14 +45,14 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get authentication credentials")
 
-		return image.PullOptions{}, fmt.Errorf("%w: %w", errFailedGetAuth, err)
+		return dockerImage.PullOptions{}, fmt.Errorf("%w: %w", errFailedGetAuth, err)
 	}
 
 	// Return empty options if no auth is available.
 	if registryCredentials == "" {
 		logrus.WithFields(fields).Debug("No authentication credentials retrieved")
 
-		return image.PullOptions{}, nil
+		return dockerImage.PullOptions{}, nil
 	}
 
 	// Log auth details only in trace mode to protect sensitive data.
@@ -62,7 +63,7 @@ func GetPullOptions(imageName string) (image.PullOptions, error) {
 	}
 
 	// Configure pull options with auth and a default privilege handler.
-	pullOptions := image.PullOptions{
+	pullOptions := dockerImage.PullOptions{
 		RegistryAuth:  registryCredentials,
 		PrivilegeFunc: DefaultAuthHandler,
 	}

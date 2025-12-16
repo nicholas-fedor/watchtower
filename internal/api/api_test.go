@@ -10,14 +10,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 
-	actionMocks "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	apiPkg "github.com/nicholas-fedor/watchtower/internal/api"
-	apiMocks "github.com/nicholas-fedor/watchtower/pkg/api/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/api"
+	mockAPI "github.com/nicholas-fedor/watchtower/pkg/api/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typeMocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestAPI runs the Ginkgo test suite for the internal API package.
@@ -28,17 +28,17 @@ func TestAPI(t *testing.T) {
 
 var _ = ginkgo.Describe("GetAPIAddr", func() {
 	ginkgo.It("should format address without brackets for non-IPv6", func() {
-		addr := apiPkg.GetAPIAddr("localhost", "8080")
+		addr := api.GetAPIAddr("localhost", "8080")
 		gomega.Expect(addr).To(gomega.Equal("localhost:8080"))
 	})
 
 	ginkgo.It("should format address with brackets for IPv6", func() {
-		addr := apiPkg.GetAPIAddr("::1", "8080")
+		addr := api.GetAPIAddr("::1", "8080")
 		gomega.Expect(addr).To(gomega.Equal("[::1]:8080"))
 	})
 
 	ginkgo.It("should handle empty host", func() {
-		addr := apiPkg.GetAPIAddr("", "8080")
+		addr := api.GetAPIAddr("", "8080")
 		gomega.Expect(addr).To(gomega.Equal(":8080"))
 	})
 })
@@ -46,12 +46,12 @@ var _ = ginkgo.Describe("GetAPIAddr", func() {
 var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 	var (
 		cmd    *cobra.Command
-		client actionMocks.MockClient
+		client mockActions.MockClient
 	)
 
 	ginkgo.BeforeEach(func() {
 		cmd = &cobra.Command{}
-		client = actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
+		client = mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 	})
 
 	ginkgo.When("update API is enabled", func() {
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			cmd.Flags().String("http-api-port", "8080", "")
 			cmd.Flags().String("http-api-token", "test-token", "")
 
-			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock the runUpdatesWithNotifications function
 			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			errChan := make(chan error, 1)
 
 			// Create mock HTTP server to avoid binding to real ports
-			mockServer := apiMocks.NewMockHTTPServer(ginkgo.GinkgoT())
+			mockServer := mockAPI.NewMockHTTPServer(ginkgo.GinkgoT())
 			mockServer.EXPECT().ListenAndServe().RunAndReturn(func() error {
 				done <- true
 				<-ctx.Done()
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			mockServer.EXPECT().Shutdown(mock.Anything).Return(nil)
 
 			go func() {
-				errChan <- apiPkg.SetupAndStartAPI(
+				errChan <- api.SetupAndStartAPI(
 					ctx,
 					"", "0", "test-token",
 					true, false, false, false,
@@ -139,7 +139,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			cmd.Flags().String("http-api-port", "8080", "")
 			cmd.Flags().String("http-api-token", "test-token", "")
 
-			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock functions
 			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
@@ -155,7 +155,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			errChan := make(chan error, 1)
 
 			// Create mock HTTP server to avoid binding to real ports
-			mockServer := apiMocks.NewMockHTTPServer(ginkgo.GinkgoT())
+			mockServer := mockAPI.NewMockHTTPServer(ginkgo.GinkgoT())
 			mockServer.EXPECT().ListenAndServe().RunAndReturn(func() error {
 				done <- true
 				<-ctx.Done()
@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			mockServer.EXPECT().Shutdown(mock.Anything).Return(nil)
 
 			go func() {
-				errChan <- apiPkg.SetupAndStartAPI(
+				errChan <- api.SetupAndStartAPI(
 					ctx,
 					"", "0", "test-token",
 					true, true, false, false,
@@ -212,7 +212,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			cmd.Flags().String("http-api-port", "8080", "")
 			cmd.Flags().String("http-api-token", "test-token", "")
 
-			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 
 			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
@@ -223,7 +223,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			defaultMetrics := metrics.Default
 			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
-			err := apiPkg.SetupAndStartAPI(
+			err := api.SetupAndStartAPI(
 				ctx,
 				"", "0", "test-token",
 				false, false, false, false,

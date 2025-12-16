@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
 )
 
@@ -133,7 +133,12 @@ func FuzzBuildManifestURL(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, imageRef, hostOverride string) {
 		// Create a mock container with the fuzzed image reference
-		mockContainer := mocks.CreateMockContainer("mock-id", "mock-name", imageRef, time.Now())
+		mockContainer := mockActions.CreateMockContainer(
+			"mock-id",
+			"mock-name",
+			imageRef,
+			time.Now(),
+		)
 
 		// Ensure WATCHTOWER_REGISTRY_TLS_SKIP is set to false for https scheme
 		t.Setenv("WATCHTOWER_REGISTRY_TLS_SKIP", "false")

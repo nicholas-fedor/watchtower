@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	pkgApi "github.com/nicholas-fedor/watchtower/pkg/api"
+	"github.com/nicholas-fedor/watchtower/pkg/api"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -78,17 +78,17 @@ func SetupAndStartAPI(
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
-	server ...pkgApi.HTTPServer,
+	server ...api.HTTPServer,
 ) error {
 	// Get the formatted HTTP api address string.
 	address := GetAPIAddr(apiHost, apiPort)
 
 	// Initialize the HTTP API with the configured authentication token and address.
-	var httpAPI *pkgApi.API
+	var httpAPI *api.API
 	if len(server) > 0 {
-		httpAPI = pkgApi.New(apiToken, address, server[0])
+		httpAPI = api.New(apiToken, address, server[0])
 	} else {
-		httpAPI = pkgApi.New(apiToken, address)
+		httpAPI = api.New(apiToken, address)
 	}
 
 	// Register the update API endpoint if enabled, linking it to the update handler.

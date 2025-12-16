@@ -7,8 +7,8 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
 
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -37,7 +37,7 @@ import (
 func StartTargetContainer(
 	api Operations,
 	sourceContainer types.Container,
-	networkConfig *dockerNetworkType.NetworkingConfig,
+	networkConfig *dockerNetwork.NetworkingConfig,
 	reviveStopped bool,
 	clientVersion string,
 	minSupportedVersion string,
@@ -123,7 +123,7 @@ func StartTargetContainer(
 	if err := api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name()); err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 		// Clean up the created container to avoid orphaned resources
-		if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainerType.RemoveOptions{Force: true}); rmErr != nil {
+		if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainer.RemoveOptions{Force: true}); rmErr != nil {
 			clog.WithError(rmErr).Warn("Failed to clean up container after rename error")
 		}
 
@@ -134,7 +134,7 @@ func StartTargetContainer(
 	if versions.LessThan(clientVersion, "1.44") && len(networkConfig.EndpointsConfig) > 1 {
 		if err := attachNetworks(ctx, api, createdContainer.ID, networkConfig, createNetworkConfig, clog); err != nil {
 			// Clean up the created container to avoid orphaned resources.
-			if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainerType.RemoveOptions{Force: true}); rmErr != nil {
+			if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainer.RemoveOptions{Force: true}); rmErr != nil {
 				clog.WithError(rmErr).
 					Warn("Failed to clean up container after network attachment error")
 			}
@@ -154,7 +154,7 @@ func StartTargetContainer(
 	// Start the newly created container.
 	clog.WithField("new_id", createdContainerID).Debug("Starting new container")
 
-	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainerType.StartOptions{}); err != nil {
+	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainer.StartOptions{}); err != nil {
 		clog.WithError(err).
 			WithField("new_id", createdContainerID).
 			Debug("Failed to start new container")
@@ -192,8 +192,8 @@ func attachNetworks(
 	ctx context.Context,
 	api Operations,
 	containerID string,
-	networkConfig *dockerNetworkType.NetworkingConfig,
-	initialNetworkConfig *dockerNetworkType.NetworkingConfig,
+	networkConfig *dockerNetwork.NetworkingConfig,
+	initialNetworkConfig *dockerNetwork.NetworkingConfig,
 	clog *logrus.Entry,
 ) error {
 	// Identify the initial network used during creation to skip it.
@@ -264,7 +264,7 @@ func RenameTargetContainer(
 // It handles Podman compatibility by filtering NanoCpus when necessary.
 // Modes: "auto" (detect Podman and filter), "full" (copy all), "none" (strip all).
 func handleCPUSettings(
-	hostConfig *dockerContainerType.HostConfig,
+	hostConfig *dockerContainer.HostConfig,
 	cpuCopyMode string,
 	isPodman bool,
 	clog *logrus.Entry,

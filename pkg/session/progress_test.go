@@ -6,10 +6,10 @@ import (
 	"sync"
 	"testing"
 
-	mockPkg "github.com/stretchr/testify/mock"
+	testifyMock "github.com/stretchr/testify/mock"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestUpdateFromContainer(t *testing.T) {
@@ -29,13 +29,13 @@ func TestUpdateFromContainer(t *testing.T) {
 			name: "basic container update",
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(false)
 
 					return mock
@@ -59,13 +59,13 @@ func TestUpdateFromContainer(t *testing.T) {
 			name: "empty container fields",
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID(""))
 					mock.EXPECT().SafeImageID().Return(types.ImageID(""))
 					mock.EXPECT().Name().Return("")
 					mock.EXPECT().ImageName().Return("")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(false)
 
 					return mock
@@ -89,13 +89,13 @@ func TestUpdateFromContainer(t *testing.T) {
 			name: "monitor-only container",
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
 					mock.EXPECT().Name().Return("container3")
 					mock.EXPECT().ImageName().Return("image3:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(true)
 
 					return mock
@@ -119,13 +119,13 @@ func TestUpdateFromContainer(t *testing.T) {
 			name: "empty monitor-only container",
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID(""))
 					mock.EXPECT().SafeImageID().Return(types.ImageID(""))
 					mock.EXPECT().Name().Return("")
 					mock.EXPECT().ImageName().Return("")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(true)
 
 					return mock
@@ -195,13 +195,13 @@ func TestProgress_AddSkipped(t *testing.T) {
 			m:    Progress{},
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(false)
 
 					return mock
@@ -227,13 +227,13 @@ func TestProgress_AddSkipped(t *testing.T) {
 			m:    Progress{},
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(false)
 
 					return mock
@@ -259,13 +259,13 @@ func TestProgress_AddSkipped(t *testing.T) {
 			m:    Progress{},
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
 					mock.EXPECT().Name().Return("container3")
 					mock.EXPECT().ImageName().Return("image3:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(true)
 
 					return mock
@@ -345,13 +345,13 @@ func TestProgress_AddScanned(t *testing.T) {
 			m:    Progress{},
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(false)
 
 					return mock
@@ -377,13 +377,13 @@ func TestProgress_AddScanned(t *testing.T) {
 			m:    Progress{},
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(false)
 
 					return mock
@@ -409,13 +409,13 @@ func TestProgress_AddScanned(t *testing.T) {
 			m:    Progress{},
 			args: args{
 				cont: func() types.Container {
-					mock := mocks.NewMockContainer(t)
+					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
 					mock.EXPECT().Name().Return("container3")
 					mock.EXPECT().ImageName().Return("image3:latest")
 					mock.EXPECT().
-						IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+						IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 						Return(true)
 
 					return mock
@@ -997,13 +997,13 @@ func TestProgress_MarkRestarted_AddSkipped_Integration(t *testing.T) {
 	}
 
 	// Then add as skipped (this should overwrite)
-	mock := mocks.NewMockContainer(t)
+	mock := mockTypes.NewMockContainer(t)
 	mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 	mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
 	mock.EXPECT().Name().Return("container1")
 	mock.EXPECT().ImageName().Return("image1:latest")
 	mock.EXPECT().
-		IsMonitorOnly(mockPkg.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+		IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 		Return(false)
 
 	m.AddSkipped(mock, errors.New("skipped after restart"), types.UpdateParams{})

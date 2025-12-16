@@ -7,7 +7,7 @@ import (
 
 	dockerImageType "github.com/docker/docker/api/types/image"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -64,7 +64,7 @@ func createMockContainerForFuzz(imageRef string) types.Container {
 	mockName := "fuzz-mock-container"
 	mockCreated := time.Now()
 
-	return mocks.CreateMockContainerWithImageInfo(
+	return mockActions.CreateMockContainerWithImageInfo(
 		mockID,
 		mockName,
 		imageRef,

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
+	mockSorter "github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -152,7 +152,7 @@ func parseFuzzDependencyData(data []byte) []types.Container {
 			links = []string{}
 		}
 
-		container := &mocks.SimpleContainer{
+		container := &mockSorter.SimpleContainer{
 			ContainerName:  node,
 			ContainerID:    types.ContainerID(fmt.Sprintf("fuzz-id-%d", i)),
 			ContainerLinks: links,

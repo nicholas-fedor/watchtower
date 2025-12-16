@@ -18,7 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
@@ -54,7 +54,7 @@ var mockDataMultipleEntries = Data{
 
 var mockDataAllFresh = Data{
 	Entries: []*logrus.Entry{},
-	Report:  mocks.CreateMockProgressReport(session.FreshState),
+	Report:  mockActions.CreateMockProgressReport(session.FreshState),
 }
 
 // mockDataFromStates generates mock notification data with specified container states.
@@ -65,7 +65,7 @@ func mockDataFromStates(states ...session.State) Data {
 
 	return Data{
 		Entries: legacyMockData.Entries,
-		Report:  mocks.CreateMockProgressReport(states...),
+		Report:  mockActions.CreateMockProgressReport(states...),
 		StaticData: StaticData{
 			Title: GetTitle(hostname, prefix),
 			Host:  hostname,

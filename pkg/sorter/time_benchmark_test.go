@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	dockerContainerTypes "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/docker/docker/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
+	mockSorter "github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -22,12 +22,12 @@ func BenchmarkTimeSorterSort(b *testing.B) {
 			created = "invalid-timestamp"
 		}
 
-		containers[i] = &mocks.SimpleContainer{
-			ContainerInfoField: &dockerContainerTypes.InspectResponse{
-				ContainerJSONBase: &dockerContainerTypes.ContainerJSONBase{
+		containers[i] = &mockSorter.SimpleContainer{
+			ContainerInfoField: &dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					Created: created,
 				},
-				Config: &dockerContainerTypes.Config{},
+				Config: &dockerContainer.Config{},
 			},
 			ContainerName: fmt.Sprintf("container-%d", i),
 			ContainerID:   types.ContainerID(fmt.Sprintf("id-%d", i)),

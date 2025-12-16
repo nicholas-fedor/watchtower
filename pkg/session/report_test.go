@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func Test_report_Scanned(t *testing.T) {
@@ -22,14 +22,14 @@ func Test_report_Scanned(t *testing.T) {
 		{
 			name: "single scanned container",
 			r: func() *report {
-				mock := mocks.NewMockContainerReport(t)
+				mock := mockTypes.NewMockContainerReport(t)
 				mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 				// Only expect ID() since that's all we check
 				return &report{scanned: []types.ContainerReport{mock}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 
 					return mock
@@ -74,14 +74,14 @@ func Test_report_Updated(t *testing.T) {
 		{
 			name: "single updated container",
 			r: func() *report {
-				mock := mocks.NewMockContainerReport(t)
+				mock := mockTypes.NewMockContainerReport(t)
 				mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 
 				return &report{updated: []types.ContainerReport{mock}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 
 					return mock
@@ -126,14 +126,14 @@ func Test_report_Failed(t *testing.T) {
 		{
 			name: "single failed container",
 			r: func() *report {
-				mock := mocks.NewMockContainerReport(t)
+				mock := mockTypes.NewMockContainerReport(t)
 				mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 
 				return &report{failed: []types.ContainerReport{mock}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 
 					return mock
@@ -178,14 +178,14 @@ func Test_report_Skipped(t *testing.T) {
 		{
 			name: "single skipped container",
 			r: func() *report {
-				mock := mocks.NewMockContainerReport(t)
+				mock := mockTypes.NewMockContainerReport(t)
 				mock.EXPECT().ID().Return(types.ContainerID("cont4"))
 
 				return &report{skipped: []types.ContainerReport{mock}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont4"))
 
 					return mock
@@ -230,14 +230,14 @@ func Test_report_Stale(t *testing.T) {
 		{
 			name: "single stale container",
 			r: func() *report {
-				mock := mocks.NewMockContainerReport(t)
+				mock := mockTypes.NewMockContainerReport(t)
 				mock.EXPECT().ID().Return(types.ContainerID("cont5"))
 
 				return &report{stale: []types.ContainerReport{mock}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont5"))
 
 					return mock
@@ -282,14 +282,14 @@ func Test_report_Fresh(t *testing.T) {
 		{
 			name: "single fresh container",
 			r: func() *report {
-				mock := mocks.NewMockContainerReport(t)
+				mock := mockTypes.NewMockContainerReport(t)
 				mock.EXPECT().ID().Return(types.ContainerID("cont6"))
 
 				return &report{fresh: []types.ContainerReport{mock}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont6"))
 
 					return mock
@@ -334,14 +334,14 @@ func Test_report_Restarted(t *testing.T) {
 		{
 			name: "single restarted container",
 			r: func() *report {
-				mock := mocks.NewMockContainerReport(t)
+				mock := mockTypes.NewMockContainerReport(t)
 				mock.EXPECT().ID().Return(types.ContainerID("cont7"))
 
 				return &report{restarted: []types.ContainerReport{mock}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont7"))
 
 					return mock
@@ -351,23 +351,23 @@ func Test_report_Restarted(t *testing.T) {
 		{
 			name: "multiple restarted containers",
 			r: func() *report {
-				mock1 := mocks.NewMockContainerReport(t)
+				mock1 := mockTypes.NewMockContainerReport(t)
 				mock1.EXPECT().ID().Return(types.ContainerID("cont8"))
 
-				mock2 := mocks.NewMockContainerReport(t)
+				mock2 := mockTypes.NewMockContainerReport(t)
 				mock2.EXPECT().ID().Return(types.ContainerID("cont9"))
 
 				return &report{restarted: []types.ContainerReport{mock1, mock2}}
 			}(),
 			want: []types.ContainerReport{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont8"))
 
 					return mock
 				}(),
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont9"))
 
 					return mock
@@ -412,11 +412,11 @@ func Test_report_All(t *testing.T) {
 		{
 			name: "mixed containers with deduplication",
 			r: func() *report {
-				mock1 := mocks.NewMockContainerReport(t)
+				mock1 := mockTypes.NewMockContainerReport(t)
 				// No strict expectation; allow calls without failing if unmet
 				mock1.EXPECT().ID().Return(types.ContainerID("cont1")).Times(0)
 
-				mock2 := mocks.NewMockContainerReport(t)
+				mock2 := mockTypes.NewMockContainerReport(t)
 				mock2.EXPECT().ID().Return(types.ContainerID("cont2")).Times(0)
 
 				return &report{
@@ -429,13 +429,13 @@ func Test_report_All(t *testing.T) {
 		{
 			name: "containers with restarted priority",
 			r: func() *report {
-				mock1 := mocks.NewMockContainerReport(t)
+				mock1 := mockTypes.NewMockContainerReport(t)
 				mock1.EXPECT().ID().Return(types.ContainerID("cont1")).Times(0)
 
-				mock2 := mocks.NewMockContainerReport(t)
+				mock2 := mockTypes.NewMockContainerReport(t)
 				mock2.EXPECT().ID().Return(types.ContainerID("cont2")).Times(0)
 
-				mock3 := mocks.NewMockContainerReport(t)
+				mock3 := mockTypes.NewMockContainerReport(t)
 				mock3.EXPECT().ID().Return(types.ContainerID("cont3")).Times(0)
 
 				return &report{
@@ -1117,8 +1117,8 @@ func Test_SortableContainers_Len(t *testing.T) {
 		{
 			name: "two elements",
 			s: SortableContainers{
-				mocks.NewMockContainerReport(t),
-				mocks.NewMockContainerReport(t),
+				mockTypes.NewMockContainerReport(t),
+				mockTypes.NewMockContainerReport(t),
 			},
 			want: 2,
 		},
@@ -1148,13 +1148,13 @@ func Test_SortableContainers_Less(t *testing.T) {
 			name: "lower ID first",
 			s: SortableContainers{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 
 					return mock
 				}(),
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 
 					return mock
@@ -1167,13 +1167,13 @@ func Test_SortableContainers_Less(t *testing.T) {
 			name: "higher ID first",
 			s: SortableContainers{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 
 					return mock
 				}(),
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 
 					return mock
@@ -1208,14 +1208,14 @@ func Test_SortableContainers_Swap(t *testing.T) {
 			name: "swap first and second",
 			s: SortableContainers{
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					// Expect 1 call in the comparison loop after swap
 					mock.EXPECT().ID().Return(types.ContainerID("cont1")).Times(1)
 
 					return mock
 				}(),
 				func() types.ContainerReport {
-					mock := mocks.NewMockContainerReport(t)
+					mock := mockTypes.NewMockContainerReport(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2")).Times(1)
 
 					return mock

@@ -18,14 +18,14 @@ import (
 	"time"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	dockerContainerType "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -99,14 +99,14 @@ func (m mockContainer) Enabled() (bool, bool) {
 // ContainerInfo returns a pointer to a containertypes.InspectResponse, which contains
 // detailed container metadata. For these tests, it returns nil since the auth package
 // does not require this information, satisfying the interface with a minimal stub.
-func (m mockContainer) ContainerInfo() *dockerContainerType.InspectResponse {
+func (m mockContainer) ContainerInfo() *dockerContainer.InspectResponse {
 	return nil // Minimal stub, not used in these tests
 }
 
 // GetCreateConfig returns a pointer to a containertypes.Config, representing the
 // container’s creation configuration. This method satisfies the types.Container interface,
 // returning nil as a minimal stub since the auth package does not use this data in these tests.
-func (m mockContainer) GetCreateConfig() *dockerContainerType.Config {
+func (m mockContainer) GetCreateConfig() *dockerContainer.Config {
 	return nil // Minimal stub, not used in these tests
 }
 
@@ -114,7 +114,7 @@ func (m mockContainer) GetCreateConfig() *dockerContainerType.Config {
 // container’s host-specific creation configuration (e.g., port bindings, network settings).
 // This method satisfies the types.Container interface, returning nil as a minimal stub since
 // the auth package does not use this data in these authentication-focused tests.
-func (m mockContainer) GetCreateHostConfig() *dockerContainerType.HostConfig {
+func (m mockContainer) GetCreateHostConfig() *dockerContainer.HostConfig {
 	return nil // Minimal stub, not used in these tests
 }
 
@@ -223,7 +223,7 @@ func (m mockContainer) HasImageInfo() bool {
 // ImageInfo returns a pointer to an image.InspectResponse, providing image-specific metadata.
 // This method satisfies the types.Container interface, returning nil as a minimal stub
 // since the auth package does not use this data in these authentication-focused tests.
-func (m mockContainer) ImageInfo() *image.InspectResponse {
+func (m mockContainer) ImageInfo() *dockerImage.InspectResponse {
 	return nil // Minimal stub, not used in these tests
 }
 

@@ -27,10 +27,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
-	containerMock "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typeMock "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 const testFilterDesc = "test filter"
@@ -45,7 +45,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 		name              string
 		initialScope      string
 		hostname          string
-		mockSetup         func(*containerMock.MockClient, *typeMock.MockContainer)
+		mockSetup         func(*mockContainer.MockClient, *mockTypes.MockContainer)
 		expectedScope     string
 		expectedError     bool
 		expectedErrorType error
@@ -54,7 +54,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:              "scope already set - should return nil without derivation",
 			initialScope:      "preset",
 			hostname:          "test-container",
-			mockSetup:         func(*containerMock.MockClient, *typeMock.MockContainer) {},
+			mockSetup:         func(*mockContainer.MockClient, *mockTypes.MockContainer) {},
 			expectedScope:     "preset",
 			expectedError:     false,
 			expectedErrorType: nil,
@@ -63,7 +63,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:              "no hostname - should return error",
 			initialScope:      "",
 			hostname:          "",
-			mockSetup:         func(*containerMock.MockClient, *typeMock.MockContainer) {},
+			mockSetup:         func(*mockContainer.MockClient, *mockTypes.MockContainer) {},
 			expectedScope:     "",
 			expectedError:     true,
 			expectedErrorType: ErrContainerIDNotFound,
@@ -72,7 +72,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "container lookup fails - should return error",
 			initialScope: "",
 			hostname:     "test-container",
-			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
 				client.EXPECT().ListAllContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -90,7 +90,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "container has no scope label - should return nil",
 			initialScope: "",
 			hostname:     "test-container",
-			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
 				client.EXPECT().ListAllContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -109,7 +109,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "container has empty scope label - should return nil",
 			initialScope: "",
 			hostname:     "test-container",
-			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
 				client.EXPECT().ListAllContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -128,7 +128,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "container has valid scope label - should set scope and return nil",
 			initialScope: "",
 			hostname:     "test-container",
-			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
 				client.EXPECT().ListAllContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -147,7 +147,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "custom hostname with special characters - should work",
 			initialScope: "",
 			hostname:     "my_app.container-123",
-			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
 				client.EXPECT().ListAllContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -166,7 +166,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "custom hostname from Docker Compose - should derive scope",
 			initialScope: "",
 			hostname:     "watchtower_watchtower_1",
-			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
 				client.EXPECT().ListAllContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -185,7 +185,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			name:         "custom hostname lookup fails - should return error",
 			initialScope: "",
 			hostname:     "nonexistent-container",
-			mockSetup: func(client *containerMock.MockClient, container *typeMock.MockContainer) {
+			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
 				client.EXPECT().ListAllContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -210,8 +210,8 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			t.Setenv("HOSTNAME", tt.hostname)
 
 			// Create mocks
-			mockClient := containerMock.NewMockClient(t)
-			mockContainer := typeMock.NewMockContainer(t)
+			mockClient := mockContainer.NewMockClient(t)
+			mockContainer := mockTypes.NewMockContainer(t)
 
 			// Set up mock expectations
 			tt.mockSetup(mockClient, mockContainer)
@@ -259,8 +259,8 @@ func TestDeriveScopeFromContainer_Logging(t *testing.T) {
 	scope = ""
 
 	// Create mocks
-	mockClient := containerMock.NewMockClient(t)
-	mockContainer := typeMock.NewMockContainer(t)
+	mockClient := mockContainer.NewMockClient(t)
+	mockContainer := mockTypes.NewMockContainer(t)
 
 	// Set up successful derivation
 	mockClient.On("ListAllContainers").Return([]types.Container{mockContainer}, nil)

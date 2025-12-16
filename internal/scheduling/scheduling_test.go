@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	actionMocks "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
@@ -51,7 +51,7 @@ func TestWaitForRunningUpdate(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
 
@@ -92,7 +92,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
 
@@ -156,7 +156,7 @@ func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
 
@@ -194,7 +194,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
 
