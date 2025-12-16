@@ -28,10 +28,9 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.It("should process tagged images and update if stale", func() {
-			count := 0
 			client = &mocks.MockClient{
 				TestData: &mocks.TestData{
-					IsContainerStaleCount: count,
+					IsContainerStaleCount: 0,
 					Containers: []types.Container{
 						mocks.CreateMockContainer(
 							"tagged-container",
@@ -58,10 +57,9 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.It("should process untagged images and update if stale", func() {
-			count := 0
 			client = &mocks.MockClient{
 				TestData: &mocks.TestData{
-					IsContainerStaleCount: count,
+					IsContainerStaleCount: 0,
 					Containers: []types.Container{
 						mocks.CreateMockContainer(
 							"untagged-container",
@@ -88,10 +86,9 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.It("should skip pinned containers and not collect image IDs", func() {
-			count := 0
 			client = &mocks.MockClient{
 				TestData: &mocks.TestData{
-					IsContainerStaleCount: count,
+					IsContainerStaleCount: 0,
 					Containers: []types.Container{
 						mocks.CreateMockContainer(
 							"pinned-container",
@@ -123,10 +120,9 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.It(
 			"should skip pinned containers with tag and digest and not collect image IDs",
 			func() {
-				count := 0
 				client = &mocks.MockClient{
 					TestData: &mocks.TestData{
-						IsContainerStaleCount: count,
+						IsContainerStaleCount: 0,
 						Containers: []types.Container{
 							mocks.CreateMockContainer(
 								"pinned-tagged-container",
@@ -161,10 +157,9 @@ var _ = ginkgo.Describe("the update action", func() {
 		)
 
 		ginkgo.It("should process invalid image references with fallback", func() {
-			count := 0
 			client = &mocks.MockClient{
 				TestData: &mocks.TestData{
-					IsContainerStaleCount: count,
+					IsContainerStaleCount: 0,
 					Containers: []types.Container{
 						mocks.CreateMockContainer(
 							"invalid-container",
@@ -193,10 +188,9 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.It(
 			"should skip containers with missing Config.Image and imageInfo.ID with error",
 			func() {
-				count := 0
 				client = &mocks.MockClient{
 					TestData: &mocks.TestData{
-						IsContainerStaleCount: count,
+						IsContainerStaleCount: 0,
 						Containers: []types.Container{
 							mocks.CreateMockContainerWithImageInfoP(
 								"edge-container",
@@ -233,11 +227,14 @@ var _ = ginkgo.Describe("the update action", func() {
 			},
 		)
 
+		// This test differs from the previous one ("should process invalid image references with fallback")
+		// in that the container name "InvalidContainer" contains uppercase characters, making the fallback
+		// image "InvalidContainer:latest" invalid since Docker image names must be lowercase.
+		// In contrast, "invalid-container:latest" is valid.
 		ginkgo.It("should skip containers with invalid fallback image reference", func() {
-			count := 0
 			client = &mocks.MockClient{
 				TestData: &mocks.TestData{
-					IsContainerStaleCount: count,
+					IsContainerStaleCount: 0,
 					Containers: []types.Container{
 						mocks.CreateMockContainer(
 							"InvalidContainer",
