@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
 )
@@ -155,14 +153,12 @@ func FuzzBuildManifestURL(f *testing.F) {
 	f.Add("lscr.io/test/image:latest", "") // Special case for lscr.io
 	f.Add("registry.example.com/image", "overridden.host")
 
-	f.Fuzz(func(_ *testing.T, imageRef, hostOverride string) {
+	f.Fuzz(func(t *testing.T, imageRef, hostOverride string) {
 		// Create a mock container with the fuzzed image reference
 		mockContainer := mocks.CreateMockContainer("mock-id", "mock-name", imageRef, time.Now())
 
 		// Ensure WATCHTOWER_REGISTRY_TLS_SKIP is set to false for https scheme
-		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
-
-		defer viper.Reset()
+		t.Setenv("WATCHTOWER_REGISTRY_TLS_SKIP", "false")
 
 		// Call buildManifestURL; we don't care about the result, just that it doesn't panic
 		_, _, _, _ = digest.BuildManifestURL(mockContainer, hostOverride)
