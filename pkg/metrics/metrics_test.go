@@ -268,13 +268,6 @@ func TestMetrics_StateTransitions(t *testing.T) {
 			},
 		}
 
-		done := make(chan struct{})
-
-		go func() {
-			m.HandleUpdate()
-			close(done)
-		}()
-
 		for _, tt := range tests {
 			m.Register(tt.initialMetric)
 
@@ -309,12 +302,41 @@ func TestMetrics_StateTransitions(t *testing.T) {
 		// Wait for shutdown
 		synctest.Wait()
 
-		// Check if done is closed
-		select {
-		case <-done:
-			// good
-		default:
-			t.Fatal("HandleUpdate did not shutdown")
+		// Assert metrics stopped: register a metric after shutdown and verify gauges don't change
+		// The last registered metric was {Scanned: 8, Updated: 3, Failed: 0, Restarted: 5}
+		testMetricAfterShutdown := &Metric{Scanned: 10, Updated: 5, Failed: 2, Restarted: 7}
+		m.Register(testMetricAfterShutdown)
+		synctest.Wait()
+
+		// Gather metrics again
+		metricFamiliesAfter, err := registry.Gather()
+		if err != nil {
+			t.Fatalf("Failed to gather metrics after shutdown: %v", err)
+		}
+
+		// Check that gauges haven't changed (meaning the metric wasn't processed)
+		expectedAfterShutdown := map[string]float64{
+			"watchtower_containers_scanned":   8,
+			"watchtower_containers_updated":   3,
+			"watchtower_containers_failed":    0,
+			"watchtower_containers_restarted": 5,
+		}
+		for _, mf := range metricFamiliesAfter {
+			if expectedValue, exists := expectedAfterShutdown[*mf.Name]; exists {
+				if len(mf.Metric) == 0 {
+					continue
+				}
+
+				actualValue := *mf.Metric[0].Gauge.Value
+				if actualValue != expectedValue {
+					t.Errorf(
+						"Metric %s changed after shutdown: got %v, want %v",
+						*mf.Name,
+						actualValue,
+						expectedValue,
+					)
+				}
+			}
 		}
 	})
 }
@@ -388,13 +410,6 @@ func TestMetrics_PriorityOrdering(t *testing.T) {
 			{Scanned: 1, Updated: 1, Failed: 0, Restarted: 0},
 		}
 
-		done := make(chan struct{})
-
-		go func() {
-			m.HandleUpdate()
-			close(done)
-		}()
-
 		// Register metrics in sequence
 		for _, metric := range metrics {
 			m.Register(metric)
@@ -444,12 +459,41 @@ func TestMetrics_PriorityOrdering(t *testing.T) {
 		// Wait for shutdown
 		synctest.Wait()
 
-		// Check if done is closed
-		select {
-		case <-done:
-			// good
-		default:
-			t.Fatal("HandleUpdate did not shutdown")
+		// Assert metrics stopped: register a metric after shutdown and verify gauges don't change
+		// The last registered metric was {Scanned: 1, Updated: 1, Failed: 0, Restarted: 0}
+		testMetricAfterShutdown := &Metric{Scanned: 10, Updated: 5, Failed: 2, Restarted: 7}
+		m.Register(testMetricAfterShutdown)
+		synctest.Wait()
+
+		// Gather metrics again
+		metricFamiliesAfter, err := registry.Gather()
+		if err != nil {
+			t.Fatalf("Failed to gather metrics after shutdown: %v", err)
+		}
+
+		// Check that gauges haven't changed (meaning the metric wasn't processed)
+		expectedAfterShutdown := map[string]float64{
+			"watchtower_containers_scanned":   1,
+			"watchtower_containers_updated":   1,
+			"watchtower_containers_failed":    0,
+			"watchtower_containers_restarted": 0,
+		}
+		for _, mf := range metricFamiliesAfter {
+			if expectedValue, exists := expectedAfterShutdown[*mf.Name]; exists {
+				if len(mf.Metric) == 0 {
+					continue
+				}
+
+				actualValue := *mf.Metric[0].Gauge.Value
+				if actualValue != expectedValue {
+					t.Errorf(
+						"Metric %s changed after shutdown: got %v, want %v",
+						*mf.Name,
+						actualValue,
+						expectedValue,
+					)
+				}
+			}
 		}
 	})
 }
@@ -562,13 +606,6 @@ func TestMetrics_IntegrationWithOtherTypes(t *testing.T) {
 			Restarted: 3,
 		}
 
-		done := make(chan struct{})
-
-		go func() {
-			m.HandleUpdate()
-			close(done)
-		}()
-
 		// Register the comprehensive metric
 		m.Register(testMetric)
 		synctest.Wait()
@@ -626,12 +663,41 @@ func TestMetrics_IntegrationWithOtherTypes(t *testing.T) {
 		// Wait for shutdown
 		synctest.Wait()
 
-		// Check if done is closed
-		select {
-		case <-done:
-			// good
-		default:
-			t.Fatal("HandleUpdate did not shutdown")
+		// Assert metrics stopped: register a metric after shutdown and verify gauges don't change
+		// The last registered metric was {Scanned: 5, Updated: 1, Failed: 0, Restarted: 2}
+		testMetricAfterShutdown := &Metric{Scanned: 10, Updated: 5, Failed: 2, Restarted: 7}
+		m.Register(testMetricAfterShutdown)
+		synctest.Wait()
+
+		// Gather metrics again
+		metricFamiliesAfter, err := registry.Gather()
+		if err != nil {
+			t.Fatalf("Failed to gather metrics after shutdown: %v", err)
+		}
+
+		// Check that gauges haven't changed (meaning the metric wasn't processed)
+		expectedAfterShutdown := map[string]float64{
+			"watchtower_containers_scanned":   5,
+			"watchtower_containers_updated":   1,
+			"watchtower_containers_failed":    0,
+			"watchtower_containers_restarted": 2,
+		}
+		for _, mf := range metricFamiliesAfter {
+			if expectedValue, exists := expectedAfterShutdown[*mf.Name]; exists {
+				if len(mf.Metric) == 0 {
+					continue
+				}
+
+				actualValue := *mf.Metric[0].Gauge.Value
+				if actualValue != expectedValue {
+					t.Errorf(
+						"Metric %s changed after shutdown: got %v, want %v",
+						*mf.Name,
+						actualValue,
+						expectedValue,
+					)
+				}
+			}
 		}
 	})
 }
@@ -724,13 +790,6 @@ func TestMetrics_RaceConditions(t *testing.T) {
 
 		t.Cleanup(func() { m.Shutdown() })
 
-		done := make(chan struct{})
-
-		go func() {
-			m.HandleUpdate()
-			close(done)
-		}()
-
 		// Test concurrent registration of metrics with restarted containers
 		const (
 			numGoroutines       = 10
@@ -767,25 +826,35 @@ func TestMetrics_RaceConditions(t *testing.T) {
 			t.Fatalf("Failed to gather metrics after concurrent operations: %v", err)
 		}
 
-		// Check that scans_total counter was incremented (at least once per registered metric)
-		var totalScans float64
+		// Check that scans_total counter was incremented (at least once per registered metric, accounting for drops)
+		var (
+			totalScans   float64
+			totalDropped float64
+		)
 
 		for _, mf := range metricFamilies {
-			if *mf.Name == "watchtower_scans_total" {
+			switch *mf.Name {
+			case "watchtower_scans_total":
 				if len(mf.Metric) > 0 && mf.Metric[0].Counter != nil {
 					totalScans = *mf.Metric[0].Counter.Value
 				}
-
-				break
+			case "watchtower_metrics_dropped_total":
+				if len(mf.Metric) > 0 && mf.Metric[0].Counter != nil {
+					totalDropped = *mf.Metric[0].Counter.Value
+				}
 			}
 		}
 
-		expectedMinScans := float64(numGoroutines * metricsPerGoroutine)
-		if totalScans < expectedMinScans {
+		expectedMinProcessed := float64(numGoroutines * metricsPerGoroutine)
+
+		totalProcessed := totalScans + totalDropped
+		if totalProcessed < expectedMinProcessed {
 			t.Errorf(
-				"Expected at least %v total scans after concurrent operations, got %v",
-				expectedMinScans,
+				"Expected at least %v total metrics processed (scans + dropped) after concurrent operations, got %v (scans: %v, dropped: %v)",
+				expectedMinProcessed,
+				totalProcessed,
 				totalScans,
+				totalDropped,
 			)
 		}
 
@@ -795,12 +864,36 @@ func TestMetrics_RaceConditions(t *testing.T) {
 		// Wait for shutdown
 		synctest.Wait()
 
-		// Check if done is closed
-		select {
-		case <-done:
-			// good
-		default:
-			t.Fatal("HandleUpdate did not shutdown")
+		// Assert metrics stopped: register a metric after shutdown and verify scans_total doesn't increase
+		testMetricAfterShutdown := &Metric{Scanned: 10, Updated: 5, Failed: 2, Restarted: 7}
+		m.Register(testMetricAfterShutdown)
+		synctest.Wait()
+
+		// Gather metrics again
+		metricFamiliesAfter, err := registry.Gather()
+		if err != nil {
+			t.Fatalf("Failed to gather metrics after shutdown: %v", err)
+		}
+
+		// Check that scans_total hasn't increased (meaning the metric wasn't processed)
+		var totalScansAfter float64
+
+		for _, mf := range metricFamiliesAfter {
+			if *mf.Name == "watchtower_scans_total" {
+				if len(mf.Metric) > 0 && mf.Metric[0].Counter != nil {
+					totalScansAfter = *mf.Metric[0].Counter.Value
+				}
+
+				break
+			}
+		}
+
+		if totalScansAfter != totalScans {
+			t.Errorf(
+				"scans_total changed after shutdown: got %v, want %v",
+				totalScansAfter,
+				totalScans,
+			)
 		}
 	})
 }
@@ -911,13 +1004,6 @@ func TestMetrics_RestartedWithPartialFailures(t *testing.T) {
 			},
 		}
 
-		done := make(chan struct{})
-
-		go func() {
-			m.HandleUpdate()
-			close(done)
-		}()
-
 		for _, tc := range testCases {
 			m.Register(tc.metric)
 			synctest.Wait()
@@ -954,12 +1040,41 @@ func TestMetrics_RestartedWithPartialFailures(t *testing.T) {
 		// Wait for shutdown
 		synctest.Wait()
 
-		// Check if done is closed
-		select {
-		case <-done:
-			// good
-		default:
-			t.Fatal("HandleUpdate did not shutdown")
+		// Assert metrics stopped: register a metric after shutdown and verify gauges don't change
+		// The last registered metric was {Scanned: 6, Updated: 4, Failed: 0, Restarted: 2}
+		testMetricAfterShutdown := &Metric{Scanned: 10, Updated: 5, Failed: 2, Restarted: 7}
+		m.Register(testMetricAfterShutdown)
+		synctest.Wait()
+
+		// Gather metrics again
+		metricFamiliesAfter, err := registry.Gather()
+		if err != nil {
+			t.Fatalf("Failed to gather metrics after shutdown: %v", err)
+		}
+
+		// Check that gauges haven't changed (meaning the metric wasn't processed)
+		expectedAfterShutdown := map[string]float64{
+			"watchtower_containers_scanned":   6,
+			"watchtower_containers_updated":   4,
+			"watchtower_containers_failed":    0,
+			"watchtower_containers_restarted": 2,
+		}
+		for _, mf := range metricFamiliesAfter {
+			if expectedValue, exists := expectedAfterShutdown[*mf.Name]; exists {
+				if len(mf.Metric) == 0 {
+					continue
+				}
+
+				actualValue := *mf.Metric[0].Gauge.Value
+				if actualValue != expectedValue {
+					t.Errorf(
+						"Metric %s changed after shutdown: got %v, want %v",
+						*mf.Name,
+						actualValue,
+						expectedValue,
+					)
+				}
+			}
 		}
 	})
 }
