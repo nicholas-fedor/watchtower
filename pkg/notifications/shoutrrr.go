@@ -625,6 +625,8 @@ func (n *shoutrrrTypeNotifier) Close() {
 
 			<-n.done
 		}
+
+		n.cancel()
 	})
 }
 
