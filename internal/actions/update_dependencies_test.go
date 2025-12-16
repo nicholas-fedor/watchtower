@@ -271,7 +271,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -299,7 +299,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -372,7 +372,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 				)
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
@@ -433,7 +433,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -480,7 +480,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
@@ -575,7 +575,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -622,7 +622,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -667,7 +667,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -777,7 +777,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -840,7 +840,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
@@ -968,7 +968,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{
 						Cleanup:        true,
@@ -1032,7 +1032,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -1089,7 +1089,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -1247,7 +1247,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
@@ -1345,7 +1345,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
 			)
@@ -1435,7 +1435,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -1472,7 +1472,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client := mocks.CreateMockClient(testData, false, false)
 
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)

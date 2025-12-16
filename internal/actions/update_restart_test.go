@@ -45,7 +45,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{
 					Cleanup:     true,
@@ -133,7 +133,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 				)
@@ -213,7 +213,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, _, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -281,7 +281,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					)
 
 					report, _, err := actions.Update(
-						context.TODO(),
+						context.Background(),
 						client,
 						actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 					)
@@ -340,7 +340,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, _, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -400,7 +400,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, _, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -467,7 +467,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, _, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -507,7 +507,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			report, _, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
 			)
@@ -864,7 +864,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 					// Run Update with rolling restart
 					report, cleanupImageInfos, err := actions.Update(
-						context.TODO(),
+						context.Background(),
 						client,
 						actions.UpdateConfig{
 							Cleanup:        true,
@@ -935,7 +935,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					// Measure performance of rolling restart
 					startTime := time.Now()
 					report, _, err := actions.Update(
-						context.TODO(),
+						context.Background(),
 						client,
 						actions.UpdateConfig{
 							Cleanup:        true,
@@ -1016,7 +1016,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 				// Run Update to test restart ordering
 				report, _, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{
 						Cleanup:     true,
@@ -1096,7 +1096,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 				// Run Update
 				report, cleanupImageInfos, err := actions.Update(
-					context.TODO(),
+					context.Background(),
 					client,
 					actions.UpdateConfig{
 						Cleanup:     true,

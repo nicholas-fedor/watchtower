@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 			)
 			report, cleanupImageInfos, err := actions.Update(
-				context.TODO(),
+				context.Background(),
 				client,
 				actions.UpdateConfig{
 					Cleanup:          true,
@@ -283,7 +283,7 @@ func TestSafeguardDelay(t *testing.T) {
 
 		startTime := time.Now()
 		report, cleanupImageInfos, err := actions.Update(
-			context.TODO(),
+			context.Background(),
 			client,
 			actions.UpdateConfig{
 				Cleanup:          true,

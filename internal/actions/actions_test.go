@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+			metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 		})
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+			metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+					metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -329,7 +329,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+				metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(3))
@@ -378,7 +378,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+				metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -454,7 +454,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+				metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).
@@ -525,7 +525,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+				metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(1))
@@ -604,7 +604,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+					metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -708,7 +708,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+					metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -840,7 +840,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+				metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(1)) // dependency-container updated
@@ -938,7 +938,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+					metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -990,7 +990,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+			metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 			// CleanupImages is called internally by Update, so we check that cleanupImageIDs is processed
@@ -1034,7 +1034,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+			metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 			gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 			gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -1085,7 +1085,7 @@ func TestNotificationBatching(t *testing.T) {
 			CPUCopyMode:                  "auto",
 			PullFailureDelay:             time.Duration(0),
 		}
-		metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+		metric := actions.RunUpdatesWithNotifications(context.Background(), params)
 
 		// Allow time for async notification to complete
 		synctest.Wait()
