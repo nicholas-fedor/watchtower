@@ -7,12 +7,13 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -20,17 +21,17 @@ import (
 var _ = ginkgo.Describe("Watchtower container handling", func() {
 	ginkgo.When("updating a Watchtower container", func() {
 		ginkgo.It("should rename and start a new container without cleanup", func() {
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
 							"watchtower:latest",
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -70,17 +71,17 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 		})
 
 		ginkgo.It("should skip rename with no-restart for Watchtower", func() {
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
 							"watchtower:latest",
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":              "true",
 									"com.centurylinklabs.watchtower.monitor-only": "true",
@@ -113,17 +114,17 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 		})
 
 		ginkgo.It("should not rename Watchtower container in run-once mode", func() {
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
 							"watchtower:latest",
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -157,30 +158,30 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 		})
 
 		ginkgo.It("should not clean up unscoped instances when scope is specified", func() {
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"watchtower-scoped",
 							"/watchtower-scoped",
 							"watchtower:latest",
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "prod",
 								},
 							}),
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"watchtower-unscoped",
 							"/watchtower-unscoped",
 							"watchtower:old",
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -208,27 +209,27 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 		})
 
 		ginkgo.It("should skip cleanup for shared image", func() {
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"old",
 							"/watchtower",
 							"watchtower:latest",
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
 							}),
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"new",
 							"/watchtower",
 							"watchtower:latest",
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
 							}),
 					},
@@ -254,17 +255,17 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 
 func TestSafeguardDelay(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		client := mocks.CreateMockClient(
-			&mocks.TestData{
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
 				Containers: []types.Container{
-					mocks.CreateMockContainerWithConfig(
+					mockActions.CreateMockContainerWithConfig(
 						"watchtower",
 						"/watchtower",
 						"watchtower:latest",
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},

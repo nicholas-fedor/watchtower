@@ -4,14 +4,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -27,8 +28,8 @@ var _ = ginkgo.Describe("the actions package", func() {
 	ginkgo.Describe("the check prerequisites method", func() {
 		ginkgo.When("given an empty array", func() {
 			ginkgo.It("should not do anything", func() {
-				mockClient := mocks.CreateMockClient(
-					&mocks.TestData{},
+				mockClient := mockActions.CreateMockClient(
+					&mockActions.TestData{},
 					false,
 					false,
 				)
@@ -47,17 +48,17 @@ var _ = ginkgo.Describe("the actions package", func() {
 		})
 		ginkgo.When("given an array of one", func() {
 			ginkgo.It("should not do anything", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container",
 								"test-container",
 								"watchtower",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -83,34 +84,34 @@ var _ = ginkgo.Describe("the actions package", func() {
 			})
 		})
 		ginkgo.When("given multiple containers", func() {
-			var client mocks.MockClient
+			var client mockActions.MockClient
 			ginkgo.BeforeEach(func() {
-				client = mocks.CreateMockClient(
-					&mocks.TestData{
+				client = mockActions.CreateMockClient(
+					&mockActions.TestData{
 						NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-01",
 								"test-container-01",
 								"watchtower:old",
 								true,
 								false,
 								time.Now().AddDate(0, 0, -1),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
 									ExposedPorts: map[nat.Port]struct{}{},
 								},
 							),
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
 								"watchtower:latest",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -164,32 +165,32 @@ var _ = ginkgo.Describe("the actions package", func() {
 			})
 		})
 		ginkgo.When("simulating a self-update with excess Watchtower instances", func() {
-			var client mocks.MockClient
+			var client mockActions.MockClient
 			ginkgo.BeforeEach(func() {
-				client = mocks.CreateMockClient(
-					&mocks.TestData{
+				client = mockActions.CreateMockClient(
+					&mockActions.TestData{
 						NameOfContainerToKeep: "test-container-new",
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-old",
 								"test-container-old",
 								"watchtower:1.11.0",
 								true,
 								false,
 								time.Now().AddDate(0, 0, -1),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
 								}),
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-new",
 								"test-container-new",
 								"watchtower:1.11.1",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -225,20 +226,20 @@ var _ = ginkgo.Describe("the actions package", func() {
 		})
 
 		ginkgo.When("unscoped and scoped instances coexist", func() {
-			var client mocks.MockClient
+			var client mockActions.MockClient
 			ginkgo.BeforeEach(func() {
-				client = mocks.CreateMockClient(
-					&mocks.TestData{
+				client = mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
 							// Unscoped Watchtower (older)
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"unscoped-old",
 								"/unscoped-old",
 								"watchtower:old",
 								true,
 								false,
 								time.Now().AddDate(0, 0, -1),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -246,14 +247,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 								},
 							),
 							// Scoped Watchtower (should be ignored by unscoped cleanup)
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"scoped-new",
 								"/scoped-new",
 								"watchtower:new",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower":       "true",
 										"com.centurylinklabs.watchtower.scope": "prod",
@@ -262,14 +263,14 @@ var _ = ginkgo.Describe("the actions package", func() {
 								},
 							),
 							// Unscoped Watchtower (newer)
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"unscoped-new",
 								"/unscoped-new",
 								"watchtower:latest",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},

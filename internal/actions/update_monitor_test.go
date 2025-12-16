@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -17,23 +18,23 @@ var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("watchtower has been instructed to monitor only", func() {
 		ginkgo.When("certain containers are set to monitor only", func() {
 			ginkgo.It("should not update those containers and collect no image IDs", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						NameOfContainerToKeep: "test-container-02",
 						Containers: []types.Container{
-							mocks.CreateMockContainer(
+							mockActions.CreateMockContainer(
 								"test-container-01",
 								"test-container-01",
 								"fake-image1:latest",
 								time.Now()),
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-02",
 								"/test-container-02",
 								"fake-image2:latest",
 								false,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.monitor-only": "true",
 									},
@@ -64,15 +65,15 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("monitor only is set globally", func() {
 			ginkgo.It("should not update any containers and collect no image IDs", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainer(
+							mockActions.CreateMockContainer(
 								"test-container-01",
 								"test-container-01",
 								"fake-image:latest",
 								time.Now()),
-							mocks.CreateMockContainer(
+							mockActions.CreateMockContainer(
 								"test-container-02",
 								"test-container-02",
 								"fake-image:latest",
@@ -100,17 +101,17 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			ginkgo.When("watchtower has been instructed to have label take precedence", func() {
 				ginkgo.It("it should update containers when monitor only is set to false", func() {
-					client := mocks.CreateMockClient(
-						&mocks.TestData{
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
 							Containers: []types.Container{
-								mocks.CreateMockContainerWithConfig(
+								mockActions.CreateMockContainerWithConfig(
 									"test-container-02",
 									"test-container-02",
 									"fake-image2:latest",
 									false,
 									false,
 									time.Now(),
-									&container.Config{
+									&dockerContainer.Config{
 										Labels: map[string]string{
 											"com.centurylinklabs.watchtower.monitor-only": "false",
 										},
@@ -145,17 +146,17 @@ var _ = ginkgo.Describe("the update action", func() {
 				ginkgo.It(
 					"it should not update containers when monitor only is set to true",
 					func() {
-						client := mocks.CreateMockClient(
-							&mocks.TestData{
+						client := mockActions.CreateMockClient(
+							&mockActions.TestData{
 								Containers: []types.Container{
-									mocks.CreateMockContainerWithConfig(
+									mockActions.CreateMockContainerWithConfig(
 										"test-container-02",
 										"test-container-02",
 										"fake-image2:latest",
 										false,
 										false,
 										time.Now(),
-										&container.Config{
+										&dockerContainer.Config{
 											Labels: map[string]string{
 												"com.centurylinklabs.watchtower.monitor-only": "true",
 											},
@@ -187,10 +188,10 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				ginkgo.It("it should not update containers when monitor only is not set", func() {
-					client := mocks.CreateMockClient(
-						&mocks.TestData{
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
 							Containers: []types.Container{
-								mocks.CreateMockContainer(
+								mockActions.CreateMockContainer(
 									"test-container-01",
 									"test-container-01",
 									"fake-image:latest",

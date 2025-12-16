@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -48,8 +48,8 @@ func CreateMockContainer(id string, name string, image string, created time.Time
 
 // CreateMockImageInfo returns a mock image info struct based on the passed image.
 // It provides a minimal image representation for testing purposes.
-func CreateMockImageInfo(mockImage string) *image.InspectResponse {
-	return &image.InspectResponse{
+func CreateMockImageInfo(mockImage string) *dockerImage.InspectResponse {
+	return &dockerImage.InspectResponse{
 		ID: mockImage,
 		RepoDigests: []string{
 			fmt.Sprintf(
@@ -68,7 +68,7 @@ func CreateMockContainerWithImageInfo(
 	name string,
 	image string,
 	created time.Time,
-	imageInfo image.InspectResponse,
+	imageInfo dockerImage.InspectResponse,
 ) types.Container {
 	return CreateMockContainerWithImageInfoP(id, name, image, created, &imageInfo)
 }
@@ -80,7 +80,7 @@ func CreateMockContainerWithImageInfoP(
 	name string,
 	image string,
 	created time.Time,
-	imageInfo *image.InspectResponse,
+	imageInfo *dockerImage.InspectResponse,
 ) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -183,7 +183,7 @@ func CreateMockContainerWithLinks(
 	image string,
 	created time.Time,
 	links []string,
-	imageInfo *image.InspectResponse,
+	imageInfo *dockerImage.InspectResponse,
 ) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -20,17 +21,17 @@ import (
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("restarting stale Watchtower containers in non-rolling mode", func() {
 		ginkgo.It("should restart stale Watchtower containers even if stop is skipped", func() {
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{
-						mocks.CreateMockContainerWithConfig(
+						mockActions.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
 							"watchtower:latest",
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -74,49 +75,49 @@ var _ = ginkgo.Describe("the update action", func() {
 			"should restart all containers depending on the same base dependency when it updates",
 			func() {
 				// Create a base container that will be updated
-				baseContainer := mocks.CreateMockContainerWithConfig(
+				baseContainer := mockActions.CreateMockContainerWithConfig(
 					"stale-container",
 					"/stale-container",
 					"stale-image:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1), // Make it stale
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
 				// Create two containers that depend on the base
-				restartContainer1 := mocks.CreateMockContainerWithConfig(
+				restartContainer1 := mockActions.CreateMockContainerWithConfig(
 					"restart-container-1",
 					"/restart-container-1",
 					"restart-image1:latest",
 					true,
 					false,
 					time.Now(), // Not stale
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "stale-container",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				restartContainer2 := mocks.CreateMockContainerWithConfig(
+				restartContainer2 := mockActions.CreateMockContainerWithConfig(
 					"restart-container-2",
 					"/restart-container-2",
 					"restart-image2:latest",
 					true,
 					false,
 					time.Now(), // Not stale
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "stale-container",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
 							baseContainer,
 							restartContainer1,
@@ -157,46 +158,46 @@ var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("testing container categorization logic for restarted containers", func() {
 		ginkgo.It("should correctly categorize containers as updated, restarted, or fresh", func() {
 			// Create containers with different states
-			updatedContainer := mocks.CreateMockContainerWithConfig(
+			updatedContainer := mockActions.CreateMockContainerWithConfig(
 				"updated-container",
 				"/updated-container",
 				"updated-image:latest",
 				true,
 				false,
 				time.Now().AddDate(0, 0, -1), // stale
-				&container.Config{
+				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			restartedContainer := mocks.CreateMockContainerWithConfig(
+			restartedContainer := mockActions.CreateMockContainerWithConfig(
 				"restarted-container",
 				"/restarted-container",
 				"restart-image:latest",
 				true,
 				false,
 				time.Now(), // fresh
-				&container.Config{
+				&dockerContainer.Config{
 					Labels: map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "updated-container",
 					},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			freshContainer := mocks.CreateMockContainerWithConfig(
+			freshContainer := mockActions.CreateMockContainerWithConfig(
 				"fresh-container",
 				"/fresh-container",
 				"fresh-image:latest",
 				true,
 				false,
 				time.Now(), // fresh
-				&container.Config{
+				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{
 						updatedContainer,
 						restartedContainer,
@@ -242,34 +243,34 @@ var _ = ginkgo.Describe("the update action", func() {
 				func() {
 					// This test would require mocking the notification system
 					// For now, we'll test the report generation which feeds into notifications
-					updatedContainer := mocks.CreateMockContainerWithConfig(
+					updatedContainer := mockActions.CreateMockContainerWithConfig(
 						"updated-container",
 						"/updated-container",
 						"updated-image:latest",
 						true,
 						false,
 						time.Now().AddDate(0, 0, -1),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels:       map[string]string{},
 							ExposedPorts: map[nat.Port]struct{}{},
 						})
 
-					restartedContainer := mocks.CreateMockContainerWithConfig(
+					restartedContainer := mockActions.CreateMockContainerWithConfig(
 						"restarted-container",
 						"/restarted-container",
 						"restart-image:latest",
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower.depends-on": "updated-container",
 							},
 							ExposedPorts: map[nat.Port]struct{}{},
 						})
 
-					client := mocks.CreateMockClient(
-						&mocks.TestData{
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
 							Containers: []types.Container{updatedContainer, restartedContainer},
 							Staleness: map[string]bool{
 								"updated-container":   true,
@@ -301,34 +302,34 @@ var _ = ginkgo.Describe("the update action", func() {
 
 	ginkgo.When("testing metrics collection for restarted containers", func() {
 		ginkgo.It("should include restarted containers in metrics", func() {
-			updatedContainer := mocks.CreateMockContainerWithConfig(
+			updatedContainer := mockActions.CreateMockContainerWithConfig(
 				"updated-container",
 				"/updated-container",
 				"updated-image:latest",
 				true,
 				false,
 				time.Now().AddDate(0, 0, -1),
-				&container.Config{
+				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			restartedContainer := mocks.CreateMockContainerWithConfig(
+			restartedContainer := mockActions.CreateMockContainerWithConfig(
 				"restarted-container",
 				"/restarted-container",
 				"restart-image:latest",
 				true,
 				false,
 				time.Now(),
-				&container.Config{
+				&dockerContainer.Config{
 					Labels: map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "updated-container",
 					},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{updatedContainer, restartedContainer},
 					Staleness: map[string]bool{
 						"updated-container":   true,
@@ -361,34 +362,34 @@ var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("testing edge cases with restarted containers", func() {
 		ginkgo.It("should handle containers that become stale after dependency restart", func() {
 			// Create a scenario where a dependent becomes stale independently
-			dependency := mocks.CreateMockContainerWithConfig(
+			dependency := mockActions.CreateMockContainerWithConfig(
 				"dependency",
 				"/dependency",
 				"dep-image:latest",
 				true,
 				false,
 				time.Now().AddDate(0, 0, -1), // stale
-				&container.Config{
+				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			dependent := mocks.CreateMockContainerWithConfig(
+			dependent := mockActions.CreateMockContainerWithConfig(
 				"dependent",
 				"/dependent",
 				"dep-image:latest",
 				true,
 				false,
 				time.Now().AddDate(0, 0, -1), // also stale
-				&container.Config{
+				&dockerContainer.Config{
 					Labels: map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "dependency",
 					},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{dependency, dependent},
 					Staleness: map[string]bool{
 						"dependency": true,
@@ -413,48 +414,48 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.It("should handle mixed dependency chains with multiple restart levels", func() {
 			// A -> B -> C where A and C are stale, B is fresh
-			containerC := mocks.CreateMockContainerWithConfig(
+			containerC := mockActions.CreateMockContainerWithConfig(
 				"container-c",
 				"/container-c",
 				"image-c:latest",
 				true,
 				false,
 				time.Now().AddDate(0, 0, -1), // stale
-				&container.Config{
+				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			containerB := mocks.CreateMockContainerWithConfig(
+			containerB := mockActions.CreateMockContainerWithConfig(
 				"container-b",
 				"/container-b",
 				"image-b:latest",
 				true,
 				false,
 				time.Now(), // fresh
-				&container.Config{
+				&dockerContainer.Config{
 					Labels: map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "container-c",
 					},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			containerA := mocks.CreateMockContainerWithConfig(
+			containerA := mockActions.CreateMockContainerWithConfig(
 				"container-a",
 				"/container-a",
 				"image-a:latest",
 				true,
 				false,
 				time.Now().AddDate(0, 0, -1), // stale
-				&container.Config{
+				&dockerContainer.Config{
 					Labels: map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "container-b",
 					},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
 
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{containerC, containerB, containerA},
 					Staleness: map[string]bool{
 						"container-c": true,
@@ -480,14 +481,14 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.It("should handle containers with no dependencies that are restarted", func() {
 			// Test a container that gets restarted for reasons other than dependencies
 			// This is harder to test directly, but we can verify the logic handles it
-			container := mocks.CreateMockContainerWithConfig(
+			container := mockActions.CreateMockContainerWithConfig(
 				"standalone-container",
 				"/standalone-container",
 				"standalone-image:latest",
 				true,
 				false,
 				time.Now(),
-				&container.Config{
+				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: map[nat.Port]struct{}{},
 				})
@@ -495,8 +496,8 @@ var _ = ginkgo.Describe("the update action", func() {
 			// Manually set it to restart (simulating some other restart condition)
 			container.SetLinkedToRestarting(true)
 
-			client := mocks.CreateMockClient(
-				&mocks.TestData{
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
 					Containers: []types.Container{container},
 					Staleness: map[string]bool{
 						"standalone-container": false,
@@ -525,28 +526,28 @@ var _ = ginkgo.Describe("the update action", func() {
 				"should handle error handling in dependency resolution for restarted containers",
 				func() {
 					// Create containers with invalid dependency references
-					containerA := mocks.CreateMockContainerWithConfig(
+					containerA := mockActions.CreateMockContainerWithConfig(
 						"container-a",
 						"/container-a",
 						"image-a:latest",
 						true,
 						false,
 						time.Now().AddDate(0, 0, -1),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower.depends-on": "non-existent-container",
 							},
 							ExposedPorts: map[nat.Port]struct{}{},
 						})
 
-					containerB := mocks.CreateMockContainerWithConfig(
+					containerB := mockActions.CreateMockContainerWithConfig(
 						"container-b",
 						"/container-b",
 						"image-b:latest",
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels:       map[string]string{},
 							ExposedPorts: map[nat.Port]struct{}{},
 						})
@@ -568,54 +569,54 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			ginkgo.It("should handle state transitions during complex restart chains", func() {
 				// Create a complex chain: A -> B -> C -> D
-				containerD := mocks.CreateMockContainerWithConfig(
+				containerD := mockActions.CreateMockContainerWithConfig(
 					"container-d",
 					"/container-d",
 					"image-d:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerC := mocks.CreateMockContainerWithConfig(
+				containerC := mockActions.CreateMockContainerWithConfig(
 					"container-c",
 					"/container-c",
 					"image-c:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "container-d",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerB := mocks.CreateMockContainerWithConfig(
+				containerB := mockActions.CreateMockContainerWithConfig(
 					"container-b",
 					"/container-b",
 					"image-b:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "container-c",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerA := mocks.CreateMockContainerWithConfig(
+				containerA := mockActions.CreateMockContainerWithConfig(
 					"container-a",
 					"/container-a",
 					"image-a:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "container-b",
 						},
@@ -644,54 +645,54 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			ginkgo.It("should handle priority ordering in restart sequences", func() {
 				// Create containers with multiple dependencies
-				base := mocks.CreateMockContainerWithConfig(
+				base := mockActions.CreateMockContainerWithConfig(
 					"base",
 					"/base",
 					"base:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				dep1 := mocks.CreateMockContainerWithConfig(
+				dep1 := mockActions.CreateMockContainerWithConfig(
 					"dep1",
 					"/dep1",
 					"dep1:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "base",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				dep2 := mocks.CreateMockContainerWithConfig(
+				dep2 := mockActions.CreateMockContainerWithConfig(
 					"dep2",
 					"/dep2",
 					"dep2:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "base",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				dep3 := mocks.CreateMockContainerWithConfig(
+				dep3 := mockActions.CreateMockContainerWithConfig(
 					"dep3",
 					"/dep3",
 					"dep3:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "dep1,dep2",
 						},
@@ -716,28 +717,28 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			ginkgo.It("should handle restarted containers with circular dependencies", func() {
 				// Create circular dependency: A -> B -> A
-				containerA := mocks.CreateMockContainerWithConfig(
+				containerA := mockActions.CreateMockContainerWithConfig(
 					"container-a",
 					"/container-a",
 					"image-a:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "container-b",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerB := mocks.CreateMockContainerWithConfig(
+				containerB := mockActions.CreateMockContainerWithConfig(
 					"container-b",
 					"/container-b",
 					"image-b:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "container-a",
 						},
@@ -760,40 +761,40 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			ginkgo.It("should handle restarted containers with mixed update types", func() {
 				// Create containers with different update scenarios
-				staleNoDeps := mocks.CreateMockContainerWithConfig(
+				staleNoDeps := mockActions.CreateMockContainerWithConfig(
 					"stale-no-deps",
 					"/stale-no-deps",
 					"stale:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				freshWithDeps := mocks.CreateMockContainerWithConfig(
+				freshWithDeps := mockActions.CreateMockContainerWithConfig(
 					"fresh-with-deps",
 					"/fresh-with-deps",
 					"fresh:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "stale-no-deps",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				staleWithDeps := mocks.CreateMockContainerWithConfig(
+				staleWithDeps := mockActions.CreateMockContainerWithConfig(
 					"stale-with-deps",
 					"/stale-with-deps",
 					"stale-deps:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "stale-no-deps",
 						},
@@ -824,34 +825,34 @@ var _ = ginkgo.Describe("the update action", func() {
 				"should handle integration with filtering and restarted containers in rolling mode",
 				func() {
 					// Create containers with dependency for rolling restart
-					staleContainer := mocks.CreateMockContainerWithConfig(
+					staleContainer := mockActions.CreateMockContainerWithConfig(
 						"stale-container",
 						"/stale-container",
 						"stale:latest",
 						true,
 						false,
 						time.Now().AddDate(0, 0, -1),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels:       map[string]string{},
 							ExposedPorts: map[nat.Port]struct{}{},
 						})
 
-					restartContainer := mocks.CreateMockContainerWithConfig(
+					restartContainer := mockActions.CreateMockContainerWithConfig(
 						"restart-container",
 						"/restart-container",
 						"restart:latest",
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower.depends-on": "stale-container",
 							},
 							ExposedPorts: map[nat.Port]struct{}{},
 						})
 
-					client := mocks.CreateMockClient(
-						&mocks.TestData{
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
 							Containers: []types.Container{staleContainer, restartContainer},
 							Staleness: map[string]bool{
 								"stale-container":   true,
@@ -902,21 +903,21 @@ var _ = ginkgo.Describe("the update action", func() {
 							)
 						}
 
-						containers[i] = mocks.CreateMockContainerWithConfig(
+						containers[i] = mockActions.CreateMockContainerWithConfig(
 							name,
 							"/"+name,
 							image,
 							true,
 							false,
 							time.Now().AddDate(0, 0, -1), // Make all stale
-							&container.Config{
+							&dockerContainer.Config{
 								Labels:       labels,
 								ExposedPorts: map[nat.Port]struct{}{},
 							})
 					}
 
-					client := mocks.CreateMockClient(
-						&mocks.TestData{
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
 							Containers: containers,
 						},
 						false,
@@ -959,48 +960,48 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.When("testing restart ordering functionality", func() {
 			ginkgo.It("should handle priority ordering in restart sequences", func() {
 				// Create containers with specific dependency order: A -> B -> C
-				containerC := mocks.CreateMockContainerWithConfig(
+				containerC := mockActions.CreateMockContainerWithConfig(
 					"priority-c",
 					"/priority-c",
 					"priority-c:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerB := mocks.CreateMockContainerWithConfig(
+				containerB := mockActions.CreateMockContainerWithConfig(
 					"priority-b",
 					"/priority-b",
 					"priority-b:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "priority-c",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerA := mocks.CreateMockContainerWithConfig(
+				containerA := mockActions.CreateMockContainerWithConfig(
 					"priority-a",
 					"/priority-a",
 					"priority-a:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "priority-b",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{containerA, containerB, containerC},
 						Staleness: map[string]bool{
 							"priority-c": true,
@@ -1037,48 +1038,48 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			ginkgo.It("should handle mixed update types in restart sequences", func() {
 				// Create mix of stale (updated) and fresh (restarted) containers
-				staleContainer := mocks.CreateMockContainerWithConfig(
+				staleContainer := mockActions.CreateMockContainerWithConfig(
 					"mixed-stale",
 					"/mixed-stale",
 					"mixed-stale:latest",
 					true,
 					false,
 					time.Now().AddDate(0, 0, -1),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				restartContainer1 := mocks.CreateMockContainerWithConfig(
+				restartContainer1 := mockActions.CreateMockContainerWithConfig(
 					"mixed-restart-1",
 					"/mixed-restart-1",
 					"mixed-restart1:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "mixed-stale",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				restartContainer2 := mocks.CreateMockContainerWithConfig(
+				restartContainer2 := mockActions.CreateMockContainerWithConfig(
 					"mixed-restart-2",
 					"/mixed-restart-2",
 					"mixed-restart2:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "mixed-stale",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
 							staleContainer,
 							restartContainer1,

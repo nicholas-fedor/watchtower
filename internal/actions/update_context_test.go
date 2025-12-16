@@ -11,14 +11,14 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("handling context cancellation and timeout scenarios", func() {
 		ginkgo.It("should handle context cancellation during container listing", func() {
-			client := mocks.CreateMockClient(getCommonTestData(), false, false)
+			client := mockActions.CreateMockClient(getCommonTestData(), false, false)
 			// Simulate ListContainers error by setting it
 			client.TestData.ListContainersError = context.Canceled
 
@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.It("should handle context cancellation during staleness checking", func() {
-			client := mocks.CreateMockClient(getCommonTestData(), false, false)
+			client := mockActions.CreateMockClient(getCommonTestData(), false, false)
 			// Simulate IsContainerStale error
 			client.TestData.IsContainerStaleError = context.Canceled
 
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-03": true,
 				}
 
-				client := mocks.CreateMockClient(testData, false, false)
+				client := mockActions.CreateMockClient(testData, false, false)
 				// Simulate StopContainer failure for some containers
 				client.TestData.StopContainerError = context.Canceled
 				client.TestData.StopContainerFailCount = 1 // Fail the first stop attempt
@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 func TestUpdateAction_HandleTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		client := mocks.CreateMockClient(getCommonTestData(), false, false)
+		client := mockActions.CreateMockClient(getCommonTestData(), false, false)
 		pastDeadline := time.Now().Add(-time.Second)
 
 		ctx, cancel := context.WithDeadline(context.Background(), pastDeadline)
@@ -126,7 +126,7 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 
 func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		client := mocks.CreateMockClient(getCommonTestData(), false, false)
+		client := mockActions.CreateMockClient(getCommonTestData(), false, false)
 		cancelledCtx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel the context immediately
 
@@ -159,7 +159,7 @@ func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		client := mocks.CreateMockClientWithContext(ctx, getCommonTestData(), false, false)
+		client := mockActions.CreateMockClientWithContext(ctx, getCommonTestData(), false, false)
 
 		// Start update in a goroutine
 		done := make(chan struct{})

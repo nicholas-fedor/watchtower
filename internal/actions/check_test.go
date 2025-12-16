@@ -4,9 +4,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
@@ -101,7 +102,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -139,7 +140,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 								true,
 								false,
 								time.Now().Add(-time.Hour),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -152,7 +153,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -192,7 +193,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "prod",
@@ -206,7 +207,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -242,7 +243,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "prod",
@@ -256,7 +257,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "prod",
@@ -270,7 +271,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "dev",
@@ -310,7 +311,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "prod",
@@ -324,7 +325,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "dev",
@@ -363,7 +364,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -376,7 +377,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -434,7 +435,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -447,7 +448,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -487,7 +488,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now().Add(-2*time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -500,7 +501,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -513,7 +514,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -559,7 +560,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 								true,
 								false,
 								time.Now().Add(-time.Hour),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -572,7 +573,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
@@ -609,7 +610,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now().Add(-time.Hour),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
@@ -622,7 +623,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 							true,
 							false,
 							time.Now(),
-							&container.Config{
+							&dockerContainer.Config{
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},

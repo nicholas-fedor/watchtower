@@ -5,9 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
@@ -28,7 +29,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
@@ -63,7 +64,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
@@ -122,7 +123,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{},
+						&dockerContainer.Config{},
 					),
 				},
 				Staleness: map[string]bool{
@@ -169,7 +170,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{},
+						&dockerContainer.Config{},
 					),
 				},
 				Staleness: map[string]bool{
@@ -200,7 +201,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
@@ -236,7 +237,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						true,
 						false,
 						time.Now(),
-						&container.Config{
+						&dockerContainer.Config{
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},

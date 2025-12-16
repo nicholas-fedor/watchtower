@@ -3,29 +3,30 @@ package actions_test
 import (
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-connections/nat"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
+
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-func getCommonTestData() *mocks.TestData {
-	return &mocks.TestData{
+func getCommonTestData() *mockActions.TestData {
+	return &mockActions.TestData{
 		NameOfContainerToKeep: "",
 		Containers: []types.Container{
-			mocks.CreateMockContainer(
+			mockActions.CreateMockContainer(
 				"test-container-01",
 				"test-container-01",
 				"fake-image:latest",
 				time.Now().AddDate(0, 0, -1)),
-			mocks.CreateMockContainer(
+			mockActions.CreateMockContainer(
 				"test-container-02",
 				"test-container-02",
 				"fake-image:latest",
 				time.Now()),
-			mocks.CreateMockContainer(
+			mockActions.CreateMockContainer(
 				"test-container-03",
 				"test-container-03",
 				"fake-image:latest",
@@ -34,19 +35,19 @@ func getCommonTestData() *mocks.TestData {
 	}
 }
 
-func getLinkedTestData(withImageInfo bool) *mocks.TestData {
-	staleContainer := mocks.CreateMockContainer(
+func getLinkedTestData(withImageInfo bool) *mockActions.TestData {
+	staleContainer := mockActions.CreateMockContainer(
 		"test-container-01",
 		"/test-container-01",
 		"fake-image1:latest",
 		time.Now().AddDate(0, 0, -1))
 
-	var imageInfo *image.InspectResponse
+	var imageInfo *dockerImage.InspectResponse
 	if withImageInfo {
-		imageInfo = mocks.CreateMockImageInfo("test-container-02")
+		imageInfo = mockActions.CreateMockImageInfo("test-container-02")
 	}
 
-	linkingContainer := mocks.CreateMockContainerWithLinks(
+	linkingContainer := mockActions.CreateMockContainerWithLinks(
 		"test-container-02",
 		"/test-container-02",
 		"fake-image2:latest",
@@ -54,7 +55,7 @@ func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 		[]string{staleContainer.Name()},
 		imageInfo)
 
-	return &mocks.TestData{
+	return &mockActions.TestData{
 		Staleness: map[string]bool{linkingContainer.Name(): false},
 		Containers: []types.Container{
 			staleContainer,
@@ -63,21 +64,21 @@ func getLinkedTestData(withImageInfo bool) *mocks.TestData {
 	}
 }
 
-func getNetworkModeTestData() *mocks.TestData {
-	staleContainer := mocks.CreateMockContainer(
+func getNetworkModeTestData() *mockActions.TestData {
+	staleContainer := mockActions.CreateMockContainer(
 		"network-dependency",
 		"/network-dependency",
 		"fake-image:latest",
 		time.Now().AddDate(0, 0, -1))
 
-	dependentContainer := mocks.CreateMockContainerWithConfig(
+	dependentContainer := mockActions.CreateMockContainerWithConfig(
 		"network-dependent",
 		"/network-dependent",
 		"fake-image2:latest",
 		true,
 		false,
 		time.Now(),
-		&container.Config{
+		&dockerContainer.Config{
 			Image:        "fake-image2:latest",
 			Labels:       make(map[string]string),
 			ExposedPorts: map[nat.Port]struct{}{},
@@ -86,22 +87,22 @@ func getNetworkModeTestData() *mocks.TestData {
 	// Set network mode to container:network-dependency
 	dependentContainer.ContainerInfo().HostConfig.NetworkMode = "container:network-dependency"
 
-	return &mocks.TestData{
+	return &mockActions.TestData{
 		Staleness:  map[string]bool{staleContainer.Name(): true, dependentContainer.Name(): false},
 		Containers: []types.Container{staleContainer, dependentContainer},
 	}
 }
 
-func getComposeTestData() *mocks.TestData {
+func getComposeTestData() *mockActions.TestData {
 	// Create a database container with service name "db" but container name "myproject_db_1"
-	dbContainer := mocks.CreateMockContainerWithConfig(
+	dbContainer := mockActions.CreateMockContainerWithConfig(
 		"myproject_db_1",
 		"/myproject_db_1",
 		"postgres:latest",
 		true,
 		false,
 		time.Now().AddDate(0, 0, -1),
-		&container.Config{
+		&dockerContainer.Config{
 			Image: "postgres:latest",
 			Labels: map[string]string{
 				"com.docker.compose.service": "db",
@@ -111,14 +112,14 @@ func getComposeTestData() *mocks.TestData {
 
 	// Create a web container with service name "web" but container name "myproject_web_1"
 	// that depends on "db"
-	webContainer := mocks.CreateMockContainerWithConfig(
+	webContainer := mockActions.CreateMockContainerWithConfig(
 		"myproject_web_1",
 		"/myproject_web_1",
 		"web:latest",
 		true,
 		false,
 		time.Now(),
-		&container.Config{
+		&dockerContainer.Config{
 			Image: "web:latest",
 			Labels: map[string]string{
 				"com.docker.compose.service":    "web",
@@ -127,23 +128,23 @@ func getComposeTestData() *mocks.TestData {
 			ExposedPorts: map[nat.Port]struct{}{},
 		})
 
-	return &mocks.TestData{
+	return &mockActions.TestData{
 		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
 		Containers: []types.Container{dbContainer, webContainer},
 	}
 }
 
-func getComposeMultiHopTestData() *mocks.TestData {
+func getComposeMultiHopTestData() *mockActions.TestData {
 	// Create containers for a chain: cache -> db -> app
 	// depends on db, db depends on cache
-	cacheContainer := mocks.CreateMockContainerWithConfig(
+	cacheContainer := mockActions.CreateMockContainerWithConfig(
 		"myproject_cache_1",
 		"/myproject_cache_1",
 		"redis:latest",
 		true,
 		false,
 		time.Now().AddDate(0, 0, -1),
-		&container.Config{
+		&dockerContainer.Config{
 			Image: "redis:latest",
 			Labels: map[string]string{
 				"com.docker.compose.service": "cache",
@@ -151,14 +152,14 @@ func getComposeMultiHopTestData() *mocks.TestData {
 			ExposedPorts: map[nat.Port]struct{}{},
 		})
 
-	dbContainer := mocks.CreateMockContainerWithConfig(
+	dbContainer := mockActions.CreateMockContainerWithConfig(
 		"myproject_db_1",
 		"/myproject_db_1",
 		"postgres:latest",
 		true,
 		false,
 		time.Now(),
-		&container.Config{
+		&dockerContainer.Config{
 			Image: "postgres:latest",
 			Labels: map[string]string{
 				"com.docker.compose.service":    "db",
@@ -167,14 +168,14 @@ func getComposeMultiHopTestData() *mocks.TestData {
 			ExposedPorts: map[nat.Port]struct{}{},
 		})
 
-	appContainer := mocks.CreateMockContainerWithConfig(
+	appContainer := mockActions.CreateMockContainerWithConfig(
 		"myproject_app_1",
 		"/myproject_app_1",
 		"app:latest",
 		true,
 		false,
 		time.Now(),
-		&container.Config{
+		&dockerContainer.Config{
 			Image: "app:latest",
 			Labels: map[string]string{
 				"com.docker.compose.service":    "app",
@@ -183,7 +184,7 @@ func getComposeMultiHopTestData() *mocks.TestData {
 			ExposedPorts: map[nat.Port]struct{}{},
 		})
 
-	return &mocks.TestData{
+	return &mockActions.TestData{
 		Staleness: map[string]bool{
 			cacheContainer.Name(): true,
 			dbContainer.Name():    false,
@@ -210,14 +211,14 @@ func createDependencyChain(names []string) []types.Container {
 			labels["com.centurylinklabs.watchtower.depends-on"] = names[i+1]
 		}
 
-		containers[i] = mocks.CreateMockContainerWithConfig(
+		containers[i] = mockActions.CreateMockContainerWithConfig(
 			name,
 			"/"+name,
 			image,
 			true,
 			false,
 			time.Now().AddDate(0, 0, -1),
-			&container.Config{
+			&dockerContainer.Config{
 				Labels:       labels,
 				ExposedPorts: map[nat.Port]struct{}{},
 			})

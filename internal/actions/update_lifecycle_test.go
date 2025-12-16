@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	dockerContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -18,17 +19,17 @@ var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("watchtower has been instructed to run lifecycle hooks", func() {
 		ginkgo.When("pre-update script returns 1", func() {
 			ginkgo.It("should not update those containers and collect no image IDs", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
 								"fake-image2:latest",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
@@ -62,17 +63,17 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("lifecycle UID and GID are specified", func() {
 			ginkgo.It("should pass UID and GID to lifecycle hook execution", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-uid-gid",
 								"test-container-uid-gid",
 								"fake-image:latest",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update": "/PreUpdateReturn0.sh",
 									},
@@ -109,17 +110,17 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("preupdate script returns 75", func() {
 			ginkgo.It("should not update those containers and collect no image IDs", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
 								"fake-image2:latest",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn75.sh",
@@ -153,17 +154,17 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("preupdate script returns 0", func() {
 			ginkgo.It("should update those containers and collect image IDs", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
 								"fake-image2:latest",
 								true,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn0.sh",
@@ -199,28 +200,28 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("container is linked to restarting containers", func() {
 			ginkgo.It("should be marked for restart and collect image IDs", func() {
-				provider := mocks.CreateMockContainerWithConfig(
+				provider := mockActions.CreateMockContainerWithConfig(
 					"test-container-provider",
 					"/test-container-provider",
 					"fake-image2:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
 				provider.SetStale(true)
 
-				consumer := mocks.CreateMockContainerWithConfig(
+				consumer := mockActions.CreateMockContainerWithConfig(
 					"test-container-consumer",
 					"/test-container-consumer",
 					"fake-image3:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "test-container-provider",
 						},
@@ -284,40 +285,40 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 			ginkgo.It("should propagate restart through chained dependencies", func() {
 				// Create a transitive dependency chain: A depends on B, B depends on C
-				containerC := mocks.CreateMockContainerWithConfig(
+				containerC := mockActions.CreateMockContainerWithConfig(
 					"test-container-c",
 					"/test-container-c",
 					"fake-image-c:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerB := mocks.CreateMockContainerWithConfig(
+				containerB := mockActions.CreateMockContainerWithConfig(
 					"test-container-b",
 					"/test-container-b",
 					"fake-image-b:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "test-container-c",
 						},
 						ExposedPorts: map[nat.Port]struct{}{},
 					})
 
-				containerA := mocks.CreateMockContainerWithConfig(
+				containerA := mockActions.CreateMockContainerWithConfig(
 					"test-container-a",
 					"/test-container-a",
 					"fake-image-a:latest",
 					true,
 					false,
 					time.Now(),
-					&container.Config{
+					&dockerContainer.Config{
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "test-container-b",
 						},
@@ -348,17 +349,17 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("container is not running", func() {
 			ginkgo.It("should skip running preupdate and collect image IDs", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
 								"fake-image2:latest",
 								false,
 								false,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
@@ -394,17 +395,17 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.When("container is restarting", func() {
 			ginkgo.It("should skip running preupdate and collect image IDs", func() {
-				client := mocks.CreateMockClient(
-					&mocks.TestData{
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
 						Containers: []types.Container{
-							mocks.CreateMockContainerWithConfig(
+							mockActions.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
 								"fake-image2:latest",
 								false,
 								true,
 								time.Now(),
-								&container.Config{
+								&dockerContainer.Config{
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
