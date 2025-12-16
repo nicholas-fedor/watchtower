@@ -139,6 +139,13 @@ func Update(
 
 	// Iterate through containers to check staleness and prepare for updates or restarts.
 	for i, sourceContainer := range containers {
+		// Check for context cancellation to enable faster shutdown during long update cycles.
+		select {
+		case <-ctx.Done():
+			return progress.Report(), cleanupImageInfos, ctx.Err()
+		default:
+		}
+
 		// Skip containers already processed (e.g., skipped due to circular dependencies).
 		if _, exists := (*progress)[sourceContainer.ID()]; exists {
 			continue
@@ -928,6 +935,7 @@ func restartStaleContainer(
 
 	renamed := false
 	newContainerID := container.ID() // Default to original ID
+
 	// Rename Watchtower containers regardless of NoRestart flag, but skip in run-once mode
 	// as there's no need to avoid conflicts with a continuously running instance.
 	if container.IsWatchtower() && !params.RunOnce {
