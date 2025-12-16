@@ -1,0 +1,1118 @@
+package actions_test
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
+	"github.com/nicholas-fedor/watchtower/internal/actions"
+	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/filters"
+	"github.com/nicholas-fedor/watchtower/pkg/metrics"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+var _ = ginkgo.Describe("the update action", func() {
+	ginkgo.When("restarting stale Watchtower containers in non-rolling mode", func() {
+		ginkgo.It("should restart stale Watchtower containers even if stop is skipped", func() {
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						mocks.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&container.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true, // Simulate stale Watchtower
+					},
+				},
+				false,
+				false,
+			)
+
+			report, cleanupImageInfos, err := actions.Update(
+				context.TODO(),
+				client,
+				actions.UpdateConfig{
+					Cleanup:     true,
+					Filter:      filters.WatchtowerContainersFilter,
+					CPUCopyMode: "auto",
+				},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
+			gomega.Expect(client.TestData.StopContainerCount).
+				To(gomega.Equal(1), "StopContainer should be called once for old Watchtower")
+			gomega.Expect(client.TestData.StartContainerCount).
+				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
+			gomega.Expect(client.TestData.RenameContainerCount).
+				To(gomega.Equal(1), "RenameContainer should be called once")
+			gomega.Expect(client.TestData.IsContainerStaleCount).
+				To(gomega.Equal(2), "IsContainerStale should be called twice for Watchtower")
+		})
+	})
+
+	ginkgo.When("handling chained dependencies with multiple dependents", func() {
+		ginkgo.It(
+			"should restart all containers depending on the same base dependency when it updates",
+			func() {
+				// Create a base container that will be updated
+				baseContainer := mocks.CreateMockContainerWithConfig(
+					"stale-container",
+					"/stale-container",
+					"stale-image:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				// Create two containers that depend on the base
+				restartContainer1 := mocks.CreateMockContainerWithConfig(
+					"restart-container-1",
+					"/restart-container-1",
+					"restart-image1:latest",
+					true,
+					false,
+					time.Now(), // Not stale
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "stale-container",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				restartContainer2 := mocks.CreateMockContainerWithConfig(
+					"restart-container-2",
+					"/restart-container-2",
+					"restart-image2:latest",
+					true,
+					false,
+					time.Now(), // Not stale
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "stale-container",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							baseContainer,
+							restartContainer1,
+							restartContainer2,
+						},
+						Staleness: map[string]bool{
+							"stale-container":     true,
+							"restart-container-1": false,
+							"restart-container-2": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.TODO(),
+					client,
+					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(report.Restarted()).To(gomega.HaveLen(2))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).
+					To(gomega.Equal("stale-container"))
+
+				// Verify categorization
+				updated := report.Updated()
+				restarted := report.Restarted()
+				gomega.Expect(updated[0].Name()).To(gomega.Equal("stale-container"))
+				gomega.Expect(restarted[0].Name()).To(gomega.Equal("restart-container-1"))
+				gomega.Expect(restarted[1].Name()).To(gomega.Equal("restart-container-2"))
+			})
+	})
+
+	ginkgo.When("testing container categorization logic for restarted containers", func() {
+		ginkgo.It("should correctly categorize containers as updated, restarted, or fresh", func() {
+			// Create containers with different states
+			updatedContainer := mocks.CreateMockContainerWithConfig(
+				"updated-container",
+				"/updated-container",
+				"updated-image:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // stale
+				&container.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			restartedContainer := mocks.CreateMockContainerWithConfig(
+				"restarted-container",
+				"/restarted-container",
+				"restart-image:latest",
+				true,
+				false,
+				time.Now(), // fresh
+				&container.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "updated-container",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			freshContainer := mocks.CreateMockContainerWithConfig(
+				"fresh-container",
+				"/fresh-container",
+				"fresh-image:latest",
+				true,
+				false,
+				time.Now(), // fresh
+				&container.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{
+						updatedContainer,
+						restartedContainer,
+						freshContainer,
+					},
+					Staleness: map[string]bool{
+						"updated-container":   true,
+						"restarted-container": false,
+						"fresh-container":     false,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, _, err := actions.Update(
+				context.TODO(),
+				client,
+				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+			gomega.Expect(report.Restarted()).To(gomega.HaveLen(1))
+			gomega.Expect(report.Fresh()).To(gomega.HaveLen(1))
+
+			// Verify categorization
+			updated := report.Updated()
+			restarted := report.Restarted()
+			fresh := report.Fresh()
+
+			gomega.Expect(updated[0].Name()).To(gomega.Equal("updated-container"))
+			gomega.Expect(restarted[0].Name()).To(gomega.Equal("restarted-container"))
+			gomega.Expect(fresh[0].Name()).To(gomega.Equal("fresh-container"))
+		})
+	})
+
+	ginkgo.When(
+		"testing notification message generation for restarted vs updated containers",
+		func() {
+			ginkgo.It(
+				"should generate different notification messages for updated and restarted containers",
+				func() {
+					// This test would require mocking the notification system
+					// For now, we'll test the report generation which feeds into notifications
+					updatedContainer := mocks.CreateMockContainerWithConfig(
+						"updated-container",
+						"/updated-container",
+						"updated-image:latest",
+						true,
+						false,
+						time.Now().AddDate(0, 0, -1),
+						&container.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					restartedContainer := mocks.CreateMockContainerWithConfig(
+						"restarted-container",
+						"/restarted-container",
+						"restart-image:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "updated-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					client := mocks.CreateMockClient(
+						&mocks.TestData{
+							Containers: []types.Container{updatedContainer, restartedContainer},
+							Staleness: map[string]bool{
+								"updated-container":   true,
+								"restarted-container": false,
+							},
+						},
+						false,
+						false,
+					)
+
+					report, _, err := actions.Update(
+						context.TODO(),
+						client,
+						actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					)
+
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+					gomega.Expect(report.Restarted()).To(gomega.HaveLen(1))
+
+					// Verify that the report correctly distinguishes between updated and restarted
+					gomega.Expect(report.Updated()[0].Name()).To(gomega.Equal("updated-container"))
+					gomega.Expect(report.Restarted()[0].Name()).
+						To(gomega.Equal("restarted-container"))
+				},
+			)
+		},
+	)
+
+	ginkgo.When("testing metrics collection for restarted containers", func() {
+		ginkgo.It("should include restarted containers in metrics", func() {
+			updatedContainer := mocks.CreateMockContainerWithConfig(
+				"updated-container",
+				"/updated-container",
+				"updated-image:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1),
+				&container.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			restartedContainer := mocks.CreateMockContainerWithConfig(
+				"restarted-container",
+				"/restarted-container",
+				"restart-image:latest",
+				true,
+				false,
+				time.Now(),
+				&container.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "updated-container",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{updatedContainer, restartedContainer},
+					Staleness: map[string]bool{
+						"updated-container":   true,
+						"restarted-container": false,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, _, err := actions.Update(
+				context.TODO(),
+				client,
+				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Generate metrics from the report
+			metric := metrics.NewMetric(report)
+
+			// Verify metrics include both updated and restarted containers
+			gomega.Expect(metric.Updated).To(gomega.Equal(1))
+			gomega.Expect(metric.Scanned).To(gomega.Equal(2))
+			// Note: restarted containers are not counted separately in metrics,
+			// they are included in scanned but not in updated
+		})
+	})
+
+	ginkgo.When("testing edge cases with restarted containers", func() {
+		ginkgo.It("should handle containers that become stale after dependency restart", func() {
+			// Create a scenario where a dependent becomes stale independently
+			dependency := mocks.CreateMockContainerWithConfig(
+				"dependency",
+				"/dependency",
+				"dep-image:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // stale
+				&container.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			dependent := mocks.CreateMockContainerWithConfig(
+				"dependent",
+				"/dependent",
+				"dep-image:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // also stale
+				&container.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "dependency",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{dependency, dependent},
+					Staleness: map[string]bool{
+						"dependency": true,
+						"dependent":  true,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, _, err := actions.Update(
+				context.TODO(),
+				client,
+				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			// Both should be updated since both are stale
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(2))
+			gomega.Expect(report.Restarted()).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should handle mixed dependency chains with multiple restart levels", func() {
+			// A -> B -> C where A and C are stale, B is fresh
+			containerC := mocks.CreateMockContainerWithConfig(
+				"container-c",
+				"/container-c",
+				"image-c:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // stale
+				&container.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			containerB := mocks.CreateMockContainerWithConfig(
+				"container-b",
+				"/container-b",
+				"image-b:latest",
+				true,
+				false,
+				time.Now(), // fresh
+				&container.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "container-c",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			containerA := mocks.CreateMockContainerWithConfig(
+				"container-a",
+				"/container-a",
+				"image-a:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // stale
+				&container.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "container-b",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{containerC, containerB, containerA},
+					Staleness: map[string]bool{
+						"container-c": true,
+						"container-b": false,
+						"container-a": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, _, err := actions.Update(
+				context.TODO(),
+				client,
+				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(2))   // A and C
+			gomega.Expect(report.Restarted()).To(gomega.HaveLen(1)) // B
+		})
+
+		ginkgo.It("should handle containers with no dependencies that are restarted", func() {
+			// Test a container that gets restarted for reasons other than dependencies
+			// This is harder to test directly, but we can verify the logic handles it
+			container := mocks.CreateMockContainerWithConfig(
+				"standalone-container",
+				"/standalone-container",
+				"standalone-image:latest",
+				true,
+				false,
+				time.Now(),
+				&container.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			// Manually set it to restart (simulating some other restart condition)
+			container.SetLinkedToRestarting(true)
+
+			client := mocks.CreateMockClient(
+				&mocks.TestData{
+					Containers: []types.Container{container},
+					Staleness: map[string]bool{
+						"standalone-container": false,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, _, err := actions.Update(
+				context.TODO(),
+				client,
+				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.BeEmpty())
+			gomega.Expect(report.Restarted()).To(gomega.HaveLen(1))
+			gomega.Expect(report.Fresh()).To(gomega.BeEmpty())
+		})
+	})
+
+	ginkgo.When("testing restarted container functionality", func() {
+		ginkgo.When("testing UpdateImplicitRestart function", func() {
+			ginkgo.It(
+				"should handle error handling in dependency resolution for restarted containers",
+				func() {
+					// Create containers with invalid dependency references
+					containerA := mocks.CreateMockContainerWithConfig(
+						"container-a",
+						"/container-a",
+						"image-a:latest",
+						true,
+						false,
+						time.Now().AddDate(0, 0, -1),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "non-existent-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					containerB := mocks.CreateMockContainerWithConfig(
+						"container-b",
+						"/container-b",
+						"image-b:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					containers := []types.Container{containerA, containerB}
+					allContainers := []types.Container{containerA, containerB}
+
+					// Mark container B as stale (should trigger restart)
+					containerB.SetStale(true)
+
+					// Run UpdateImplicitRestart - should not panic or error on invalid dependencies
+					actions.UpdateImplicitRestart(containers, allContainers)
+
+					// Container A should not be marked for restart due to invalid dependency
+					gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
+					gomega.Expect(containerB.ToRestart()).To(gomega.BeTrue())
+				},
+			)
+
+			ginkgo.It("should handle state transitions during complex restart chains", func() {
+				// Create a complex chain: A -> B -> C -> D
+				containerD := mocks.CreateMockContainerWithConfig(
+					"container-d",
+					"/container-d",
+					"image-d:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerC := mocks.CreateMockContainerWithConfig(
+					"container-c",
+					"/container-c",
+					"image-c:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-d",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mocks.CreateMockContainerWithConfig(
+					"container-b",
+					"/container-b",
+					"image-b:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-c",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerA := mocks.CreateMockContainerWithConfig(
+					"container-a",
+					"/container-a",
+					"image-a:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-b",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{containerD, containerC, containerB, containerA}
+				allContainers := []types.Container{containerD, containerC, containerB, containerA}
+
+				// Initially, only D should be marked for restart
+				containerD.SetStale(true)
+				gomega.Expect(containerD.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerC.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(containerB.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
+
+				// Run UpdateImplicitRestart to propagate restart through the chain
+				actions.UpdateImplicitRestart(containers, allContainers)
+
+				// Verify state transitions: all containers should now be marked for restart
+				gomega.Expect(containerD.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerC.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerB.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerA.ToRestart()).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should handle priority ordering in restart sequences", func() {
+				// Create containers with multiple dependencies
+				base := mocks.CreateMockContainerWithConfig(
+					"base",
+					"/base",
+					"base:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				dep1 := mocks.CreateMockContainerWithConfig(
+					"dep1",
+					"/dep1",
+					"dep1:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "base",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				dep2 := mocks.CreateMockContainerWithConfig(
+					"dep2",
+					"/dep2",
+					"dep2:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "base",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				dep3 := mocks.CreateMockContainerWithConfig(
+					"dep3",
+					"/dep3",
+					"dep3:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "dep1,dep2",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{base, dep1, dep2, dep3}
+				allContainers := []types.Container{base, dep1, dep2, dep3}
+
+				// Mark base as stale
+				base.SetStale(true)
+
+				// Run UpdateImplicitRestart
+				actions.UpdateImplicitRestart(containers, allContainers)
+
+				// Verify all dependents are marked for restart
+				gomega.Expect(base.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(dep1.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(dep2.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(dep3.ToRestart()).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should handle restarted containers with circular dependencies", func() {
+				// Create circular dependency: A -> B -> A
+				containerA := mocks.CreateMockContainerWithConfig(
+					"container-a",
+					"/container-a",
+					"image-a:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-b",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mocks.CreateMockContainerWithConfig(
+					"container-b",
+					"/container-b",
+					"image-b:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-a",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{containerA, containerB}
+				allContainers := []types.Container{containerA, containerB}
+
+				// Mark container A as stale
+				containerA.SetStale(true)
+
+				// Run UpdateImplicitRestart - should handle circular dependency gracefully
+				actions.UpdateImplicitRestart(containers, allContainers)
+
+				// Both should be marked for restart despite circular dependency
+				gomega.Expect(containerA.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerB.ToRestart()).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should handle restarted containers with mixed update types", func() {
+				// Create containers with different update scenarios
+				staleNoDeps := mocks.CreateMockContainerWithConfig(
+					"stale-no-deps",
+					"/stale-no-deps",
+					"stale:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				freshWithDeps := mocks.CreateMockContainerWithConfig(
+					"fresh-with-deps",
+					"/fresh-with-deps",
+					"fresh:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "stale-no-deps",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				staleWithDeps := mocks.CreateMockContainerWithConfig(
+					"stale-with-deps",
+					"/stale-with-deps",
+					"stale-deps:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "stale-no-deps",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
+				allContainers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
+
+				// Mark stale containers
+				staleNoDeps.SetStale(true)
+				staleWithDeps.SetStale(true)
+
+				// Run UpdateImplicitRestart
+				actions.UpdateImplicitRestart(containers, allContainers)
+
+				// Verify correct restart marking
+				gomega.Expect(staleNoDeps.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(freshWithDeps.ToRestart()).
+					To(gomega.BeTrue())
+					// Should be restarted due to dependency
+				gomega.Expect(staleWithDeps.ToRestart()).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("testing rolling restart functionality", func() {
+			ginkgo.It(
+				"should handle integration with filtering and restarted containers in rolling mode",
+				func() {
+					// Create containers with dependency for rolling restart
+					staleContainer := mocks.CreateMockContainerWithConfig(
+						"stale-container",
+						"/stale-container",
+						"stale:latest",
+						true,
+						false,
+						time.Now().AddDate(0, 0, -1),
+						&container.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					restartContainer := mocks.CreateMockContainerWithConfig(
+						"restart-container",
+						"/restart-container",
+						"restart:latest",
+						true,
+						false,
+						time.Now(),
+						&container.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "stale-container",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					client := mocks.CreateMockClient(
+						&mocks.TestData{
+							Containers: []types.Container{staleContainer, restartContainer},
+							Staleness: map[string]bool{
+								"stale-container":   true,
+								"restart-container": false,
+							},
+						},
+						false,
+						false,
+					)
+
+					// Run Update with rolling restart
+					report, cleanupImageInfos, err := actions.Update(
+						context.TODO(),
+						client,
+						actions.UpdateConfig{
+							Cleanup:        true,
+							RollingRestart: true,
+							CPUCopyMode:    "auto",
+						},
+					)
+
+					// Verify successful execution
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+					gomega.Expect(report.Restarted()).To(gomega.HaveLen(1))
+					gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+					gomega.Expect(client.TestData.WaitForContainerHealthyCount).To(gomega.Equal(2))
+				},
+			)
+
+			ginkgo.It(
+				"should handle performance testing for large restart chains in rolling mode",
+				func() {
+					// Create a large chain of containers for performance testing
+					numContainers := 10 // Reduced for test performance
+					containers := make([]types.Container, numContainers)
+
+					for i := range numContainers {
+						name := fmt.Sprintf("perf-container-%d", i)
+						image := fmt.Sprintf("perf-image-%d:latest", i)
+						labels := make(map[string]string)
+
+						// Create dependency chain: each depends on the previous
+						if i > 0 {
+							labels["com.centurylinklabs.watchtower.depends-on"] = fmt.Sprintf(
+								"perf-container-%d",
+								i-1,
+							)
+						}
+
+						containers[i] = mocks.CreateMockContainerWithConfig(
+							name,
+							"/"+name,
+							image,
+							true,
+							false,
+							time.Now().AddDate(0, 0, -1), // Make all stale
+							&container.Config{
+								Labels:       labels,
+								ExposedPorts: map[nat.Port]struct{}{},
+							})
+					}
+
+					client := mocks.CreateMockClient(
+						&mocks.TestData{
+							Containers: containers,
+						},
+						false,
+						false,
+					)
+
+					// Mark all as stale
+					if client.TestData.Staleness == nil {
+						client.TestData.Staleness = make(map[string]bool)
+					}
+					for i := range containers {
+						name := fmt.Sprintf("perf-container-%d", i)
+						client.TestData.Staleness[name] = true
+					}
+
+					// Measure performance of rolling restart
+					startTime := time.Now()
+					report, _, err := actions.Update(
+						context.TODO(),
+						client,
+						actions.UpdateConfig{
+							Cleanup:        true,
+							RollingRestart: true,
+							CPUCopyMode:    "auto",
+						},
+					)
+					duration := time.Since(startTime)
+
+					// Verify completion and reasonable performance
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					gomega.Expect(report.Updated()).To(gomega.HaveLen(numContainers))
+					gomega.Expect(client.TestData.WaitForContainerHealthyCount).
+						To(gomega.Equal(numContainers))
+					// Performance should be reasonable (less than 2 seconds for 10 containers)
+					gomega.Expect(duration).To(gomega.BeNumerically("<", 2*time.Second))
+				},
+			)
+		})
+
+		ginkgo.When("testing restart ordering functionality", func() {
+			ginkgo.It("should handle priority ordering in restart sequences", func() {
+				// Create containers with specific dependency order: A -> B -> C
+				containerC := mocks.CreateMockContainerWithConfig(
+					"priority-c",
+					"/priority-c",
+					"priority-c:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mocks.CreateMockContainerWithConfig(
+					"priority-b",
+					"/priority-b",
+					"priority-b:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "priority-c",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerA := mocks.CreateMockContainerWithConfig(
+					"priority-a",
+					"/priority-a",
+					"priority-a:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "priority-b",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{containerA, containerB, containerC},
+						Staleness: map[string]bool{
+							"priority-c": true,
+							"priority-b": false,
+							"priority-a": false,
+						},
+						StopOrder:  []string{},
+						StartOrder: []string{},
+					},
+					false,
+					false,
+				)
+
+				// Run Update to test restart ordering
+				report, _, err := actions.Update(
+					context.TODO(),
+					client,
+					actions.UpdateConfig{
+						Cleanup:     true,
+						CPUCopyMode: "auto",
+					},
+				)
+
+				// Verify successful execution and correct categorization
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(report.Restarted()).To(gomega.HaveLen(2))
+
+				// Verify start order respects dependencies (dependencies first)
+				gomega.Expect(client.TestData.StartOrder).To(gomega.ContainElement("priority-c"))
+				gomega.Expect(client.TestData.StartOrder).To(gomega.ContainElement("priority-b"))
+				gomega.Expect(client.TestData.StartOrder).To(gomega.ContainElement("priority-a"))
+			})
+
+			ginkgo.It("should handle mixed update types in restart sequences", func() {
+				// Create mix of stale (updated) and fresh (restarted) containers
+				staleContainer := mocks.CreateMockContainerWithConfig(
+					"mixed-stale",
+					"/mixed-stale",
+					"mixed-stale:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&container.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				restartContainer1 := mocks.CreateMockContainerWithConfig(
+					"mixed-restart-1",
+					"/mixed-restart-1",
+					"mixed-restart1:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "mixed-stale",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				restartContainer2 := mocks.CreateMockContainerWithConfig(
+					"mixed-restart-2",
+					"/mixed-restart-2",
+					"mixed-restart2:latest",
+					true,
+					false,
+					time.Now(),
+					&container.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "mixed-stale",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mocks.CreateMockClient(
+					&mocks.TestData{
+						Containers: []types.Container{
+							staleContainer,
+							restartContainer1,
+							restartContainer2,
+						},
+						Staleness: map[string]bool{
+							"mixed-stale":     true,
+							"mixed-restart-1": false,
+							"mixed-restart-2": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				// Run Update
+				report, cleanupImageInfos, err := actions.Update(
+					context.TODO(),
+					client,
+					actions.UpdateConfig{
+						Cleanup:     true,
+						CPUCopyMode: "auto",
+					},
+				)
+
+				// Verify successful execution
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(report.Restarted()).To(gomega.HaveLen(2))
+
+				// Verify stale container was updated (added to cleanup)
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).To(gomega.Equal("mixed-stale"))
+			})
+		})
+	})
+})

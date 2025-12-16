@@ -978,5 +978,3 @@ func getTemplatedResult(tplString string, legacy bool, data Data) string {
 
 	return msg
 }
-
-
