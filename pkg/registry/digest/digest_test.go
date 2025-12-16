@@ -34,10 +34,9 @@ import (
 )
 
 const (
-	httpScheme          = "http"
-	httpsScheme         = "https"
-	mockDigestHashValue = "sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"
-	mockDigestHash      = mockDigestHashValue
+	httpScheme     = "http"
+	httpsScheme    = "https"
+	mockDigestHash = "sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"
 )
 
 var (
@@ -82,7 +81,7 @@ var _ = ginkgo.Describe("Digests", func() {
 	mockName := "mock-container"
 	mockImage := "ghcr.io/k6io/operator:latest"
 	mockCreated := time.Now()
-	mockDigest := "ghcr.io/k6io/operator@" + mockDigestHashValue
+	mockDigest := "ghcr.io/k6io/operator@" + mockDigestHash
 	mockDifferentDigest := "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 	mockInvalidDigest := "invalid-digest" // Malformed digest for testing
 
@@ -1125,7 +1124,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.It("should match when local digest has multiple @ separators", func() {
 			localDigests := []string{
-				"repo@namespace@" + mockDigestHashValue,
+				"repo@namespace@" + mockDigestHash,
 			}
 			remoteDigest := mockDigestHash
 			result := digestsMatch(localDigests, remoteDigest)
@@ -1148,7 +1147,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 		ginkgo.Describe("NormalizeDigest", func() {
 			ginkgo.It("should trim sha256: prefix from digest", func() {
-				input := mockDigestHashValue
+				input := mockDigestHash
 				expected := "d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"
 				gomega.Expect(digest.NormalizeDigest(input)).To(gomega.Equal(expected))
 			})
@@ -2853,7 +2852,7 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 		mockID := "mock-id"
 		mockName := "mock-container"
 		mockCreated := time.Now()
-		mockDigest := "ghcr.io/k6io/operator@" + mockDigestHashValue
+		mockDigest := "ghcr.io/k6io/operator@" + mockDigestHash
 
 		srvConn, cliConn := net.Pipe()
 		defer srvConn.Close()
@@ -2895,7 +2894,7 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 					time.Sleep(50 * time.Millisecond)
 					srvConn.Write(
 						[]byte(
-							"HTTP/1.1 200 OK\r\nDocker-Content-Digest: " + mockDigestHashValue + "\r\n\r\n",
+							"HTTP/1.1 200 OK\r\nDocker-Content-Digest: " + mockDigestHash + "\r\n\r\n",
 						),
 					)
 				default:
