@@ -252,7 +252,7 @@ func handleBearerAuth(
 	var challengeHost string
 
 	// Parse the WWW-Authenticate header.
-	scope, realm, service, err := processChallenge(wwwAuthHeader, container.ImageName())
+	scope, realm, service, err := ProcessChallenge(wwwAuthHeader, container.ImageName())
 	logrus.WithFields(fields).
 		WithField("realm", realm).
 		WithField("service", service).
@@ -435,7 +435,7 @@ func GetToken(
 	return "", "", redirected, fmt.Errorf("%w: %s", errUnsupportedChallenge, challenge)
 }
 
-// processChallenge parses the WWW-Authenticate header to extract authentication details.
+// ProcessChallenge parses the WWW-Authenticate header to extract authentication details.
 //
 // It supports Bearer authentication, extracting the realm, service, and optional scope for token requests.
 //
@@ -448,7 +448,7 @@ func GetToken(
 //   - string: The realm URL for the token request (e.g., "https://ghcr.io/token").
 //   - string: The service identifier (e.g., "ghcr.io").
 //   - error: Non-nil if parsing fails critically (missing realm or service), nil otherwise.
-func processChallenge(wwwAuthHeader, image string) (string, string, string, error) {
+func ProcessChallenge(wwwAuthHeader, image string) (string, string, string, error) {
 	fields := logrus.Fields{
 		"image":     image,
 		"challenge": wwwAuthHeader,

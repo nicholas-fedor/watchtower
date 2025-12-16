@@ -26,7 +26,7 @@ import (
 // Parameters:
 //   - ctx: The context for cancellation, allowing early shutdown on context timeout.
 //   - lock: The channel used to synchronize updates, ensuring only one runs at a time.
-func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
+func WaitForRunningUpdate(_ context.Context, lock chan bool) {
 	const updateWaitTimeout = 60 * time.Second
 
 	logrus.Debug("Checking lock status before shutdown.")
@@ -37,8 +37,6 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 			logrus.Debug("Lock acquired, update finished.")
 		case <-time.After(updateWaitTimeout):
 			logrus.Warn("Timeout waiting for running update to finish, proceeding with shutdown.")
-		case <-ctx.Done():
-			logrus.Debug("Context cancelled, proceeding with shutdown.")
 		}
 	} else {
 		logrus.Debug("No update running, lock available.")
@@ -82,7 +80,7 @@ func RunUpgradesOnSchedule(
 	cleanup bool,
 	scheduleSpec string,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
-	runUpdatesWithNotifications func(types.Filter, bool, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool) *metrics.Metric,
 	client container.Client,
 	scope string,
 	notifier types.Notifier,
@@ -105,7 +103,7 @@ func RunUpgradesOnSchedule(
 		case v := <-lock:
 			defer func() { lock <- v }()
 
-			metric := runUpdatesWithNotifications(filter, cleanup, false)
+			metric := runUpdatesWithNotifications(ctx, filter, cleanup, false)
 			metrics.Default().RegisterScan(metric)
 			logrus.Debug("Update operation completed successfully")
 		default:

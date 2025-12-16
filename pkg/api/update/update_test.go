@@ -8,12 +8,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
@@ -58,16 +60,14 @@ var _ = ginkgo.Describe("Update Handler", func() {
 	})
 
 	ginkgo.Describe("Handle function", func() {
-		var req *http.Request
-		var rec *httptest.ResponseRecorder
+		var server *ghttp.Server
 
 		ginkgo.BeforeEach(func() {
-			rec = httptest.NewRecorder()
-			req = httptest.NewRequest(
-				http.MethodPost,
-				"/v1/update",
-				bytes.NewBufferString("test body"),
-			)
+			server = ghttp.NewServer()
+		})
+
+		ginkgo.AfterEach(func() {
+			server.Close()
 		})
 
 		ginkgo.It(
@@ -82,12 +82,24 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				}
 				handler = update.New(mockUpdateFn, nil)
 
-				handler.Handle(rec, req)
-				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
-				gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
+				server.AppendHandlers(handler.Handle)
+				resp, err := http.Post(
+					server.URL()+"/v1/update",
+					"application/json",
+					bytes.NewBufferString("test body"),
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				defer resp.Body.Close()
+				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
 				var response map[string]any
-				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+				gomega.Expect(json.NewDecoder(resp.Body).Decode(&response)).To(gomega.Succeed())
+
+				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+				req := server.ReceivedRequests()[0]
+				gomega.Expect(req.Method).To(gomega.Equal(http.MethodPost))
+				gomega.Expect(req.URL.Path).To(gomega.Equal("/v1/update"))
 
 				// Check summary section
 				summary := response["summary"].(map[string]any)
@@ -121,13 +133,25 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				}
 				handler = update.New(mockUpdateFn, nil)
 
-				req.URL.RawQuery = "image=foo/bar,baz/qux"
-				handler.Handle(rec, req)
-				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
-				gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
+				server.AppendHandlers(handler.Handle)
+				resp, err := http.Post(
+					server.URL()+"/v1/update?image=foo/bar,baz/qux",
+					"application/json",
+					bytes.NewBufferString("test body"),
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				defer resp.Body.Close()
+				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
 				var response map[string]any
-				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+				gomega.Expect(json.NewDecoder(resp.Body).Decode(&response)).To(gomega.Succeed())
+
+				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+				req := server.ReceivedRequests()[0]
+				gomega.Expect(req.Method).To(gomega.Equal(http.MethodPost))
+				gomega.Expect(req.URL.Path).To(gomega.Equal("/v1/update"))
+				gomega.Expect(req.URL.RawQuery).To(gomega.Equal("image=foo/bar,baz/qux"))
 
 				// Check summary section
 				summary := response["summary"].(map[string]any)
@@ -149,81 +173,30 @@ var _ = ginkgo.Describe("Update Handler", func() {
 			},
 		)
 
-		ginkgo.It("should queue concurrent requests and process them sequentially", func() {
-			// Use a custom lock to control concurrency.
-			customLock := make(chan bool, 1)
-			customLock <- true
-			called := 0
-			handler = update.New(func(_ []string) *metrics.Metric {
-				called++
-				time.Sleep(50 * time.Millisecond) // Short delay to simulate work.
-
-				return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
-			}, customLock)
-
-			// Start first request in goroutine.
-			go func() {
-				req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
-				rec := httptest.NewRecorder()
-				handler.Handle(rec, req)
-				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
-			}()
-
-			// Wait briefly, then start second request.
-			time.Sleep(10 * time.Millisecond)
-			handler.Handle(rec, req)
-			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
-			gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
-
-			var response map[string]any
-			gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
-
-			// Both should have been called sequentially.
-			gomega.Expect(called).To(gomega.Equal(2))
-		})
-
-		ginkgo.It("should handle concurrent requests correctly", func() {
-			var wg sync.WaitGroup
-			calledCount := 0
-			mockUpdateFn = func(_ []string) *metrics.Metric { // Use _ for unused images parameter.
-				calledCount++
-				time.Sleep(10 * time.Millisecond) // Short delay to simulate work.
-
-				return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
-			}
-			handler = update.New(mockUpdateFn, nil)
-
-			// Simulate 3 concurrent requests.
-			for range 3 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					localRec := httptest.NewRecorder()
-					localReq := httptest.NewRequest(
-						http.MethodPost,
-						"/v1/update",
-						bytes.NewBufferString("test body"),
-					)
-					handler.Handle(localRec, localReq)
-					// All should succeed with 200.
-					gomega.Expect(localRec.Code).To(gomega.Equal(http.StatusOK))
-				}()
-			}
-			wg.Wait()
-			gomega.Expect(calledCount).
-				To(gomega.Equal(3))
-			// All updates execute sequentially due to lock.
-		})
-
 		ginkgo.It("should return 500 Internal Server Error on body read failure", func() {
 			// Simulate read error by using a faulty reader.
 			faultyReader := &faultyReadCloser{err: errors.New("read error")}
-			req.Body = faultyReader
+			server.AppendHandlers(func(w http.ResponseWriter, r *http.Request) {
+				r.Body = faultyReader
+				handler.Handle(w, r)
+			})
 
-			handler.Handle(rec, req)
-			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusInternalServerError))
-			gomega.Expect(rec.Body.String()).
-				To(gomega.ContainSubstring("Failed to read request body"))
+			resp, err := http.Post(
+				server.URL()+"/v1/update",
+				"application/json",
+				bytes.NewBufferString("test body"),
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer resp.Body.Close()
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusInternalServerError))
+			body, err := io.ReadAll(resp.Body)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(string(body)).To(gomega.ContainSubstring("Failed to read request body"))
+
+			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+			req := server.ReceivedRequests()[0]
+			gomega.Expect(req.Method).To(gomega.Equal(http.MethodPost))
+			gomega.Expect(req.URL.Path).To(gomega.Equal("/v1/update"))
 		})
 
 		ginkgo.It(
@@ -236,15 +209,20 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				handler = update.New(mockUpdateFn, nil)
 
 				// Simulate JSON encoding failure by replacing the writer
-				faultyWriter := &faultyResponseWriter{}
-				req = httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+				var faulty *faultyResponseWriter
+				server.AppendHandlers(func(w http.ResponseWriter, r *http.Request) {
+					faulty = &faultyResponseWriter{ResponseWriter: w}
+					handler.Handle(faulty, r)
+				})
 
-				handler.Handle(faultyWriter, req)
+				resp, err := http.Post(server.URL()+"/v1/update", "application/json", nil)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				defer resp.Body.Close()
 				// Verify that StatusInternalServerError was attempted to be set
-				gomega.Expect(faultyWriter.lastStatusCode).
+				gomega.Expect(faulty.lastStatusCode).
 					To(gomega.Equal(http.StatusInternalServerError))
 				// Verify that writing was attempted (but failed)
-				gomega.Expect(faultyWriter.written).To(gomega.BeTrue())
+				gomega.Expect(faulty.written).To(gomega.BeTrue())
 			},
 		)
 
@@ -261,12 +239,19 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				}
 				handler = update.New(mockUpdateFn, nil)
 
-				handler.Handle(rec, req)
-				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
-				gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
+				server.AppendHandlers(handler.Handle)
+				resp, err := http.Post(
+					server.URL()+"/v1/update",
+					"application/json",
+					bytes.NewBufferString("test body"),
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				defer resp.Body.Close()
+				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
 				var response map[string]any
-				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+				gomega.Expect(json.NewDecoder(resp.Body).Decode(&response)).To(gomega.Succeed())
 
 				summary := response["summary"].(map[string]any)
 				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(5)))
@@ -275,6 +260,11 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(2)))
 
 				gomega.Expect(called).To(gomega.BeTrue())
+
+				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+				req := server.ReceivedRequests()[0]
+				gomega.Expect(req.Method).To(gomega.Equal(http.MethodPost))
+				gomega.Expect(req.URL.Path).To(gomega.Equal("/v1/update"))
 			},
 		)
 
@@ -286,11 +276,18 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				}
 				handler = update.New(mockUpdateFn, nil)
 
-				handler.Handle(rec, req)
-				gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
+				server.AppendHandlers(handler.Handle)
+				resp, err := http.Post(
+					server.URL()+"/v1/update",
+					"application/json",
+					bytes.NewBufferString("test body"),
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				defer resp.Body.Close()
+				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 
 				var response map[string]any
-				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+				gomega.Expect(json.NewDecoder(resp.Body).Decode(&response)).To(gomega.Succeed())
 
 				summary := response["summary"].(map[string]any)
 				// Verify all fields are present and correctly ordered in the JSON structure
@@ -304,45 +301,13 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(5)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(2)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(8)))
+
+				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+				req := server.ReceivedRequests()[0]
+				gomega.Expect(req.Method).To(gomega.Equal(http.MethodPost))
+				gomega.Expect(req.URL.Path).To(gomega.Equal("/v1/update"))
 			},
 		)
-
-		ginkgo.It("should handle concurrent requests correctly with restarted containers", func() {
-			var wg sync.WaitGroup
-			calledCount := 0
-			mockUpdateFn = func(_ []string) *metrics.Metric {
-				calledCount++
-				time.Sleep(10 * time.Millisecond) // Simulate work
-
-				return &metrics.Metric{Scanned: 8, Updated: 2, Failed: 0, Restarted: 3}
-			}
-			handler = update.New(mockUpdateFn, nil)
-
-			// Simulate 5 concurrent requests
-			for range 5 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					localRec := httptest.NewRecorder()
-					localReq := httptest.NewRequest(
-						http.MethodPost,
-						"/v1/update",
-						bytes.NewBufferString("test body"),
-					)
-					handler.Handle(localRec, localReq)
-					gomega.Expect(localRec.Code).To(gomega.Equal(http.StatusOK))
-
-					var response map[string]any
-					gomega.Expect(json.Unmarshal(localRec.Body.Bytes(), &response)).
-						To(gomega.Succeed())
-
-					summary := response["summary"].(map[string]any)
-					gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(3)))
-				}()
-			}
-			wg.Wait()
-			gomega.Expect(calledCount).To(gomega.Equal(5))
-		})
 
 		ginkgo.It("should handle restarted containers with large datasets correctly", func() {
 			mockUpdateFn = func(_ []string) *metrics.Metric {
@@ -351,13 +316,21 @@ var _ = ginkgo.Describe("Update Handler", func() {
 			}
 			handler = update.New(mockUpdateFn, nil)
 
-			handler.Handle(rec, req)
-			gomega.Expect(rec.Code).To(gomega.Equal(http.StatusOK))
-			gomega.Expect(rec.Header().Get("Content-Type")).To(gomega.Equal("application/json"))
+			server.AppendHandlers(handler.Handle)
+			resp, err := http.Post(
+				server.URL()+"/v1/update",
+				"application/json",
+				bytes.NewBufferString("test body"),
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			defer resp.Body.Close()
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
 			var response map[string]any
-			gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+			gomega.Expect(json.NewDecoder(resp.Body).Decode(&response)).To(gomega.Succeed())
 
+			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			summary := response["summary"].(map[string]any)
 			gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(1000)))
 			gomega.Expect(summary["updated"]).To(gomega.Equal(float64(200)))
@@ -380,22 +353,220 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				}
 				handler = update.New(mockUpdateFn, nil)
 
-				handler.Handle(rec, req)
-				gomega.Expect(rec.Code).
+				server.AppendHandlers(handler.Handle)
+				resp, err := http.Post(
+					server.URL()+"/v1/update",
+					"application/json",
+					bytes.NewBufferString("test body"),
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				defer resp.Body.Close()
+				gomega.Expect(resp.StatusCode).
 					To(gomega.Equal(http.StatusOK))
 					// Still 200 since no error in processing
 
 				var response map[string]any
-				gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(gomega.Succeed())
+				gomega.Expect(json.NewDecoder(resp.Body).Decode(&response)).To(gomega.Succeed())
 
 				summary := response["summary"].(map[string]any)
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(3)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(2)))
 				// Verify that both failed and restarted are reported correctly
+
+				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+				req := server.ReceivedRequests()[0]
+				gomega.Expect(req.Method).To(gomega.Equal(http.MethodPost))
+				gomega.Expect(req.URL.Path).To(gomega.Equal("/v1/update"))
 			},
 		)
 	})
 })
+
+func TestQueueConcurrentRequests(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Use a custom lock to control concurrency.
+		customLock := make(chan bool, 1)
+		customLock <- true
+
+		called := 0
+		handler := update.New(func(_ []string) *metrics.Metric {
+			called++
+
+			time.Sleep(50 * time.Millisecond) // Short delay to simulate work.
+
+			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
+		}, customLock)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+
+		// Start first request in goroutine.
+		go func() {
+			localReq := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+			localRec := httptest.NewRecorder()
+			handler.Handle(localRec, localReq)
+
+			if localRec.Code != http.StatusOK {
+				t.Errorf("expected status 200, got %d", localRec.Code)
+			}
+		}()
+
+		// Wait briefly, then start second request.
+		time.Sleep(10 * time.Millisecond)
+		handler.Handle(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		if rec.Header().Get("Content-Type") != "application/json" {
+			t.Errorf(
+				"expected Content-Type application/json, got %s",
+				rec.Header().Get("Content-Type"),
+			)
+		}
+
+		var response map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+
+		// Both should have been called sequentially.
+		if called != 2 {
+			t.Errorf("expected 2 calls, got %d", called)
+		}
+	})
+}
+
+func TestHandleConcurrentRequests(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var calledCount atomic.Int32
+
+		mockUpdateFn := func(_ []string) *metrics.Metric { // Use _ for unused images parameter.
+			calledCount.Add(1)
+
+			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
+		}
+
+		customLock := make(chan bool, 10)
+		for range 10 {
+			customLock <- true
+		}
+
+		handler := update.New(mockUpdateFn, customLock)
+
+		// Simulate 3 concurrent requests.
+		for range 3 {
+			go func() {
+				localRec := httptest.NewRecorder()
+				localReq := httptest.NewRequest(
+					http.MethodPost,
+					"/v1/update",
+					bytes.NewBufferString("test body"),
+				)
+				handler.Handle(localRec, localReq)
+				// All should succeed with 200.
+				if localRec.Code != http.StatusOK {
+					t.Errorf("expected status 200, got %d", localRec.Code)
+				}
+			}()
+		}
+
+		synctest.Wait()
+
+		if calledCount.Load() != 3 {
+			t.Errorf("expected 3 calls, got %d", calledCount.Load())
+		}
+		// All updates execute concurrently.
+	})
+}
+
+func TestHandleConcurrentRequestsWithRestarted(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var calledCount atomic.Int32
+
+		mockUpdateFn := func(_ []string) *metrics.Metric {
+			calledCount.Add(1)
+
+			return &metrics.Metric{Scanned: 8, Updated: 2, Failed: 0, Restarted: 3}
+		}
+
+		customLock := make(chan bool, 10)
+		for range 10 {
+			customLock <- true
+		}
+
+		handler := update.New(mockUpdateFn, customLock)
+
+		// Simulate 5 concurrent requests
+		for range 5 {
+			go func() {
+				localRec := httptest.NewRecorder()
+				localReq := httptest.NewRequest(
+					http.MethodPost,
+					"/v1/update",
+					bytes.NewBufferString("test body"),
+				)
+				handler.Handle(localRec, localReq)
+
+				if localRec.Code != http.StatusOK {
+					t.Errorf("expected status 200, got %d", localRec.Code)
+				}
+
+				var response map[string]any
+				if err := json.Unmarshal(localRec.Body.Bytes(), &response); err != nil {
+					t.Errorf("failed to unmarshal response: %v", err)
+				}
+
+				summary := response["summary"].(map[string]any)
+				if summary["restarted"].(float64) != 3 {
+					t.Errorf("expected restarted 3, got %v", summary["restarted"])
+				}
+			}()
+		}
+
+		synctest.Wait()
+
+		if calledCount.Load() != 5 {
+			t.Errorf("expected 5 calls, got %d", calledCount.Load())
+		}
+	})
+}
+
+func TestConcurrentRequests(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		calledCount := 0
+		mockUpdateFn := func(_ []string) *metrics.Metric {
+			calledCount++
+
+			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
+		}
+		handler := update.New(mockUpdateFn, nil)
+
+		// Simulate 3 concurrent requests
+		for range 3 {
+			go func() {
+				localRec := httptest.NewRecorder()
+				localReq := httptest.NewRequest(
+					http.MethodPost,
+					"/v1/update",
+					bytes.NewBufferString("test body"),
+				)
+				handler.Handle(localRec, localReq)
+
+				if localRec.Code != http.StatusOK {
+					t.Errorf("expected status 200, got %d", localRec.Code)
+				}
+			}()
+		}
+
+		synctest.Wait()
+
+		if calledCount != 3 {
+			t.Errorf("expected 3 calls, got %d", calledCount)
+		}
+	})
+}
 
 // faultyReadCloser simulates a body reader that fails.
 type faultyReadCloser struct {
@@ -407,6 +578,7 @@ func (f *faultyReadCloser) Close() error               { return nil }
 
 // faultyResponseWriter simulates a response writer that fails on Write.
 type faultyResponseWriter struct {
+	http.ResponseWriter
 	statusCode     int
 	header         http.Header
 	written        bool
@@ -415,7 +587,7 @@ type faultyResponseWriter struct {
 
 func (f *faultyResponseWriter) Header() http.Header {
 	if f.header == nil {
-		f.header = make(http.Header)
+		f.header = f.ResponseWriter.Header()
 	}
 
 	return f.header
@@ -435,6 +607,7 @@ func (f *faultyResponseWriter) WriteHeader(statusCode int) {
 	f.lastStatusCode = statusCode
 	if !f.written {
 		f.statusCode = statusCode
+		f.ResponseWriter.WriteHeader(statusCode)
 	}
 	// Ignore subsequent calls to WriteHeader after writing has started
 }

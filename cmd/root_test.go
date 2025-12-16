@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -467,22 +468,24 @@ func TestFilterEmpty(t *testing.T) {
 }
 
 func TestAwaitDockerClient(t *testing.T) {
-	// This function just sleeps for 1 second, so we test that it doesn't panic
-	// and completes within a reasonable time
-	start := time.Now()
+	synctest.Test(t, func(t *testing.T) {
+		// This function just sleeps for 1 second, so we test that it doesn't panic
+		// and completes within a reasonable time
+		start := time.Now()
 
-	awaitDockerClient()
+		awaitDockerClient()
 
-	elapsed := time.Since(start)
+		elapsed := time.Since(start)
 
-	// Should take at least 900ms but not more than 3 seconds (to account for CI timing variations)
-	assert.GreaterOrEqual(
-		t,
-		elapsed,
-		900*time.Millisecond,
-		"Should sleep for at least 900 milliseconds",
-	)
-	assert.Less(t, elapsed, 3*time.Second, "Should not sleep for more than 3 seconds")
+		// Should take at least 900ms but not more than 3 seconds (to account for CI timing variations)
+		assert.GreaterOrEqual(
+			t,
+			elapsed,
+			900*time.Millisecond,
+			"Should sleep for at least 900 milliseconds",
+		)
+		assert.Less(t, elapsed, 3*time.Second, "Should not sleep for more than 3 seconds")
+	})
 }
 
 func TestLifecycleFlags(t *testing.T) {
@@ -565,170 +568,174 @@ func TestGetAPIAddr(t *testing.T) {
 // running simultaneously, ensuring only one update executes at a time, mimicking the behavior
 // of updateOnStart and scheduled updates in the main application.
 func TestUpdateLockSerialization(t *testing.T) {
-	// Initialize the update lock channel with the same pattern as in runMain
-	updateLock := make(chan bool, 1)
-	updateLock <- true
+	synctest.Test(t, func(t *testing.T) {
+		// Initialize the update lock channel with the same pattern as in runMain
+		updateLock := make(chan bool, 1)
+		updateLock <- true
 
-	// Atomic counters to track concurrent execution and completion
-	var (
-		running   int32
-		started   int32
-		completed int32
-	)
+		// Atomic counters to track concurrent execution and completion
+		var (
+			running   int32
+			started   int32
+			completed int32
+		)
 
-	// WaitGroup to synchronize test completion
-	var wg sync.WaitGroup
+		// WaitGroup to synchronize test completion
+		var wg sync.WaitGroup
 
-	// Simulate the update function used in runMain and runUpgradesOnSchedule
-	updateFunc := func(id int) {
-		select {
-		case v := <-updateLock:
-			// Acquired lock, perform update
-			defer func() { updateLock <- v }()
+		// Simulate the update function used in runMain and runUpgradesOnSchedule
+		updateFunc := func(id int) {
+			select {
+			case v := <-updateLock:
+				// Acquired lock, perform update
+				defer func() { updateLock <- v }()
 
-			// Track that only one update is running at a time
-			current := atomic.AddInt32(&running, 1)
-			require.Equal(
-				t,
-				int32(1),
-				current,
-				"Only one update should be running at a time, but %d are running",
-				current,
-			)
+				// Track that only one update is running at a time
+				current := atomic.AddInt32(&running, 1)
+				require.Equal(
+					t,
+					int32(1),
+					current,
+					"Only one update should be running at a time, but %d are running",
+					current,
+				)
 
-			atomic.AddInt32(&started, 1)
+				atomic.AddInt32(&started, 1)
 
-			// Simulate update work with a delay
-			time.Sleep(100 * time.Millisecond)
+				// Simulate update work with a delay
+				synctest.Wait()
 
-			atomic.AddInt32(&running, -1)
-			atomic.AddInt32(&completed, 1)
+				atomic.AddInt32(&running, -1)
+				atomic.AddInt32(&completed, 1)
 
-		default:
-			// Lock not available, skip update (same as in the actual code)
-			t.Logf("Update %d skipped due to concurrent update in progress", id)
+			default:
+				// Lock not available, skip update (same as in the actual code)
+				t.Logf("Update %d skipped due to concurrent update in progress", id)
+			}
 		}
-	}
 
-	// Simulate concurrent updateOnStart and scheduled updates
-	numUpdates := 2
-	for i := range numUpdates {
-		wg.Add(1)
+		// Simulate concurrent updateOnStart and scheduled updates
+		numUpdates := 2
+		for i := range numUpdates {
+			wg.Add(1)
 
-		go func(id int) {
-			defer wg.Done()
+			go func(id int) {
+				defer wg.Done()
 
-			updateFunc(id)
-		}(i)
-	}
+				updateFunc(id)
+			}(i)
+		}
 
-	// Wait for all goroutines to complete
-	wg.Wait()
+		// Wait for all goroutines to complete
+		wg.Wait()
 
-	// Verify that only one update executed due to lock serialization
-	assert.Equal(t, int32(1), started, "Only one update should have started due to lock")
-	assert.Equal(t, int32(1), completed, "Only one update should have completed")
-	assert.Equal(t, int32(0), running, "No updates should be running after completion")
+		// Verify that only one update executed due to lock serialization
+		assert.Equal(t, int32(1), started, "Only one update should have started due to lock")
+		assert.Equal(t, int32(1), completed, "Only one update should have completed")
+		assert.Equal(t, int32(0), running, "No updates should be running after completion")
+	})
 }
 
 // TestConcurrentScheduledAndAPIUpdate verifies that API-triggered updates wait for scheduled updates to complete,
 // ensuring proper serialization and preventing race conditions between periodic updates and HTTP API calls.
 func TestConcurrentScheduledAndAPIUpdate(t *testing.T) {
-	// Enable debug logging to see lock acquisition logs
-	originalLevel := logrus.GetLevel()
+	synctest.Test(t, func(t *testing.T) {
+		// Enable debug logging to see lock acquisition logs
+		originalLevel := logrus.GetLevel()
 
-	logrus.SetLevel(logrus.DebugLevel)
-	defer logrus.SetLevel(originalLevel)
+		logrus.SetLevel(logrus.DebugLevel)
+		defer logrus.SetLevel(originalLevel)
 
-	// Initialize the update lock channel with the same pattern as in runMain
-	updateLock := make(chan bool, 1)
-	updateLock <- true
+		// Initialize the update lock channel with the same pattern as in runMain
+		updateLock := make(chan bool, 1)
+		updateLock <- true
 
-	// Channels to signal when each update type starts and completes
-	scheduledStarted := make(chan struct{})
-	scheduledCompleted := make(chan struct{})
-	apiStarted := make(chan struct{})
-	apiCompleted := make(chan struct{})
+		// Channels to signal when each update type starts and completes
+		scheduledStarted := make(chan struct{})
+		scheduledCompleted := make(chan struct{})
+		apiStarted := make(chan struct{})
+		apiCompleted := make(chan struct{})
 
-	// Mock update function for API handler that signals start and completion
-	// Mutex to protect concurrent t.Log calls from race conditions
-	var logMu sync.Mutex
+		// Mock update function for API handler that signals start and completion
+		// Mutex to protect concurrent t.Log calls from race conditions
+		var logMu sync.Mutex
 
-	updateFn := func(_ []string) *metrics.Metric {
-		close(apiStarted)
-		time.Sleep(100 * time.Millisecond) // Simulate API update work
-		close(apiCompleted)
+		updateFn := func(_ []string) *metrics.Metric {
+			close(apiStarted)
+			synctest.Wait() // Simulate API update work
+			close(apiCompleted)
 
-		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-	}
+			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+		}
 
-	// Create the update handler with the shared lock
-	handler := update.New(updateFn, updateLock)
+		// Create the update handler with the shared lock
+		handler := update.New(updateFn, updateLock)
 
-	// Simulate scheduled update (longer duration)
-	go func() {
-		logMu.Lock()
-		t.Log("Scheduled: trying to acquire lock")
-		logMu.Unlock()
+		// Simulate scheduled update (longer duration)
+		go func() {
+			logMu.Lock()
+			t.Log("Scheduled: trying to acquire lock")
+			logMu.Unlock()
 
+			select {
+			case v := <-updateLock:
+				t.Log("Scheduled: acquired lock")
+				close(scheduledStarted)
+				synctest.Wait() // Simulate scheduled update work (longer than API)
+				close(scheduledCompleted)
+				t.Log("Scheduled: releasing lock")
+
+				updateLock <- v
+			default:
+				t.Error("Scheduled update should have acquired the lock")
+			}
+		}()
+
+		// Wait for scheduled update to start
+		<-scheduledStarted
+
+		// Simulate API update request
+		go func() {
+			t.Log("API: creating request")
+
+			req, err := http.NewRequestWithContext(
+				context.Background(),
+				http.MethodPost,
+				"/v1/update",
+				http.NoBody,
+			)
+			if err != nil {
+				t.Errorf("Failed to create request: %v", err)
+
+				return
+			}
+
+			w := httptest.NewRecorder()
+
+			t.Log("API: calling handler.Handle")
+			handler.Handle(w, req)
+			t.Log("API: handler.Handle completed")
+		}()
+
+		// Verify API update has not started yet (should be blocked by lock)
 		select {
-		case v := <-updateLock:
-			t.Log("Scheduled: acquired lock")
-			close(scheduledStarted)
-			time.Sleep(200 * time.Millisecond) // Simulate scheduled update work (longer than API)
-			close(scheduledCompleted)
-			t.Log("Scheduled: releasing lock")
-
-			updateLock <- v
+		case <-apiStarted:
+			t.Error("API update should not have started while scheduled update is running")
 		default:
-			t.Error("Scheduled update should have acquired the lock")
-		}
-	}()
-
-	// Wait for scheduled update to start
-	<-scheduledStarted
-
-	// Simulate API update request
-	go func() {
-		t.Log("API: creating request")
-
-		req, err := http.NewRequestWithContext(
-			context.Background(),
-			http.MethodPost,
-			"/v1/update",
-			http.NoBody,
-		)
-		if err != nil {
-			t.Errorf("Failed to create request: %v", err)
-
-			return
+			// Expected: API is blocked
 		}
 
-		w := httptest.NewRecorder()
+		// Wait for scheduled update to complete
+		<-scheduledCompleted
 
-		t.Log("API: calling handler.Handle")
-		handler.Handle(w, req)
-		t.Log("API: handler.Handle completed")
-	}()
+		// Now API update should start and complete
+		<-apiStarted
+		<-apiCompleted
 
-	// Verify API update has not started yet (should be blocked by lock)
-	select {
-	case <-apiStarted:
-		t.Error("API update should not have started while scheduled update is running")
-	default:
-		// Expected: API is blocked
-	}
-
-	// Wait for scheduled update to complete
-	<-scheduledCompleted
-
-	// Now API update should start and complete
-	<-apiStarted
-	<-apiCompleted
-
-	// Verify the API response is successful
-	// Note: In a real scenario, we'd check the response body, but for this test,
-	// the completion signals are sufficient to verify serialization
+		// Verify the API response is successful
+		// Note: In a real scenario, we'd check the response body, but for this test,
+		// the completion signals are sufficient to verify serialization
+	})
 }
 
 // TestUpdateOnStartTriggersImmediateUpdate verifies that the --update-on-start flag
@@ -746,7 +753,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 
 	// Mock the update function to signal when called
 	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
 		atomic.AddInt32(&updateCallCount, 1)
 
 		select {
@@ -797,7 +804,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 	select {
 	case <-updateCalled:
 		// Expected: update was called
-	case <-time.After(100 * time.Millisecond):
+	default:
 		t.Error("Update function was not called immediately with --update-on-start")
 	}
 
@@ -808,373 +815,386 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 // TestUpdateOnStartIntegratesWithCronScheduling verifies that update-on-start
 // works with cron scheduling without causing duplicate updates.
 func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
-	// Create a command with update-on-start flag enabled and a schedule
-	cmd := &cobra.Command{}
-	flags.RegisterSystemFlags(cmd)
-	err := cmd.ParseFlags(
-		[]string{"--update-on-start", "--schedule", "@every 1h", "--no-startup-message"},
-	)
-	require.NoError(t, err)
+	synctest.Test(t, func(t *testing.T) {
+		// Create a command with update-on-start flag enabled and a schedule
+		cmd := &cobra.Command{}
+		flags.RegisterSystemFlags(cmd)
+		err := cmd.ParseFlags(
+			[]string{"--update-on-start", "--schedule", "@every 1h", "--no-startup-message"},
+		)
+		require.NoError(t, err)
 
-	// Save original scheduleSpec and restore after test
-	originalScheduleSpec := scheduleSpec
+		// Save original scheduleSpec and restore after test
+		originalScheduleSpec := scheduleSpec
 
-	defer func() { scheduleSpec = originalScheduleSpec }()
+		defer func() { scheduleSpec = originalScheduleSpec }()
 
-	scheduleSpec = "@every 1h" // Set the schedule spec that was parsed
+		scheduleSpec = "@every 1h" // Set the schedule spec that was parsed
 
-	// Track update calls
-	updateCallCount := int32(0)
-	updateCalls := make(chan time.Time, 10)
+		// Track update calls
+		updateCallCount := int32(0)
+		updateCalls := make(chan time.Time, 10)
 
-	// Mock the update function
-	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-		callTime := time.Now()
+		// Mock the update function
+		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			callTime := time.Now()
 
-		atomic.AddInt32(&updateCallCount, 1)
+			atomic.AddInt32(&updateCallCount, 1)
 
-		select {
-		case updateCalls <- callTime:
-		default:
+			select {
+			case updateCalls <- callTime:
+			default:
+			}
+
+			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 		}
 
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
+		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
-	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+		// Create a context that allows some time for scheduler to start but not run updates
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
 
-	// Create a context that allows some time for scheduler to start but not run updates
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
+		// Create update lock
+		updateLock := make(chan bool, 1)
+		updateLock <- true
 
-	// Create update lock
-	updateLock := make(chan bool, 1)
-	updateLock <- true
+		// Call runUpgradesOnSchedule
+		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
+		filterDesc := testFilterDesc
 
-	// Call runUpgradesOnSchedule
-	filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
-	filterDesc := testFilterDesc
-
-	startTime := time.Now()
-	err = scheduling.RunUpgradesOnSchedule(
-		ctx,
-		cmd,
-		filter,
-		filterDesc,
-		updateLock,
-		false,
-		"",
-		logging.WriteStartupMessage,
-		runUpdatesWithNotifications,
-		nil,
-		"",
-		nil,
-		"",
-		true,
-		false,
-	)
-
-	// Should not return an error (context cancellation is expected)
-	require.NoError(t, err)
-
-	// Wait a bit for any scheduled calls
-	time.Sleep(50 * time.Millisecond)
-
-	// Verify that at least one update was called (the immediate one)
-	callCount := atomic.LoadInt32(&updateCallCount)
-	assert.GreaterOrEqual(t, callCount, int32(1), "At least one update should have been called")
-
-	// Verify that the first call happened immediately (within 10ms of start)
-	select {
-	case callTime := <-updateCalls:
-		timeSinceStart := callTime.Sub(startTime)
-		assert.Less(
-			t,
-			timeSinceStart,
-			10*time.Millisecond,
-			"First update should happen immediately",
+		startTime := time.Now()
+		err = scheduling.RunUpgradesOnSchedule(
+			ctx,
+			cmd,
+			filter,
+			filterDesc,
+			updateLock,
+			false,
+			"",
+			logging.WriteStartupMessage,
+			runUpdatesWithNotifications,
+			nil,
+			"",
+			nil,
+			"",
+			true,
+			false,
 		)
-	default:
-		t.Error("No update calls were recorded")
-	}
 
-	// Verify no duplicate immediate calls occurred
-	assert.LessOrEqual(
-		t,
-		callCount,
-		int32(2),
-		"Should not have more than 2 update calls in short test period",
-	)
+		// Should not return an error (context cancellation is expected)
+		require.NoError(t, err)
+
+		// Wait a bit for any scheduled calls
+		synctest.Wait()
+
+		// Verify that at least one update was called (the immediate one)
+		callCount := atomic.LoadInt32(&updateCallCount)
+		assert.GreaterOrEqual(t, callCount, int32(1), "At least one update should have been called")
+
+		// Verify that the first call happened immediately (within 10ms of start)
+		select {
+		case callTime := <-updateCalls:
+			timeSinceStart := callTime.Sub(startTime)
+			assert.Less(
+				t,
+				timeSinceStart,
+				10*time.Millisecond,
+				"First update should happen immediately",
+			)
+		default:
+			t.Error("No update calls were recorded")
+		}
+
+		// Verify no duplicate immediate calls occurred
+		assert.LessOrEqual(
+			t,
+			callCount,
+			int32(2),
+			"Should not have more than 2 update calls in short test period",
+		)
+	})
 }
 
 // TestUpdateOnStartLockingBehavior verifies that update-on-start respects the update lock
 // and doesn't run concurrent updates.
 func TestUpdateOnStartLockingBehavior(t *testing.T) {
-	// Create a command with update-on-start flag enabled
-	cmd := &cobra.Command{}
-	flags.RegisterSystemFlags(cmd)
-	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
-	require.NoError(t, err)
+	synctest.Test(t, func(t *testing.T) {
+		// Create a command with update-on-start flag enabled
+		cmd := &cobra.Command{}
+		flags.RegisterSystemFlags(cmd)
+		err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+		require.NoError(t, err)
 
-	// Create update lock that's initially unavailable (simulating another update in progress)
-	updateLock := make(chan bool, 1)
-	// Don't put anything in the lock initially
+		// Create update lock that's initially unavailable (simulating another update in progress)
+		updateLock := make(chan bool, 1)
+		// Don't put anything in the lock initially
 
-	// Track if update function was called
-	updateCalled := make(chan bool, 1)
+		// Track if update function was called
+		updateCalled := make(chan bool, 1)
 
-	// Mock the update function
-	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-		select {
-		case updateCalled <- true:
-		default:
+		// Mock the update function
+		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			select {
+			case updateCalled <- true:
+			default:
+			}
+
+			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 		}
 
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
+		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
-	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+		// Create a short context
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
 
-	// Create a short context
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
+		// Call runUpgradesOnSchedule
+		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
+		filterDesc := testFilterDesc
 
-	// Call runUpgradesOnSchedule
-	filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
-	filterDesc := testFilterDesc
+		err = scheduling.RunUpgradesOnSchedule(
+			ctx,
+			cmd,
+			filter,
+			filterDesc,
+			updateLock,
+			false,
+			"",
+			logging.WriteStartupMessage,
+			runUpdatesWithNotifications,
+			nil,
+			"",
+			nil,
+			"",
+			false,
+			false,
+		)
 
-	err = scheduling.RunUpgradesOnSchedule(
-		ctx,
-		cmd,
-		filter,
-		filterDesc,
-		updateLock,
-		false,
-		"",
-		logging.WriteStartupMessage,
-		runUpdatesWithNotifications,
-		nil,
-		"",
-		nil,
-		"",
-		false,
-		false,
-	)
+		// Should not return an error
+		require.NoError(t, err)
 
-	// Should not return an error
-	require.NoError(t, err)
-
-	// Verify that update was NOT called because lock was unavailable
-	select {
-	case <-updateCalled:
-		t.Error("Update should not have been called when lock is unavailable")
-	case <-time.After(10 * time.Millisecond):
-		// Expected: no update call
-	}
+		// Verify that update was NOT called because lock was unavailable
+		select {
+		case <-updateCalled:
+			t.Error("Update should not have been called when lock is unavailable")
+		default:
+			// Expected: no update call
+		}
+	})
 }
 
 // TestUpdateOnStartSelfUpdateScenario verifies that update-on-start works correctly
 // in self-update scenarios where Watchtower updates itself.
 func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
-	// Create a command with update-on-start flag enabled
-	cmd := &cobra.Command{}
-	flags.RegisterSystemFlags(cmd)
-	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
-	require.NoError(t, err)
+	synctest.Test(t, func(t *testing.T) {
+		// Create a command with update-on-start flag enabled
+		cmd := &cobra.Command{}
+		flags.RegisterSystemFlags(cmd)
+		err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+		require.NoError(t, err)
 
-	updateOnStart, _ := cmd.Flags().GetBool("update-on-start")
+		updateOnStart, _ := cmd.Flags().GetBool("update-on-start")
 
-	// Track update calls
-	updateCalled := make(chan bool, 1)
+		// Track update calls
+		updateCalled := make(chan bool, 1)
 
-	// Mock the update function
-	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-		select {
-		case updateCalled <- true:
-		default:
+		// Mock the update function
+		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			select {
+			case updateCalled <- true:
+			default:
+			}
+
+			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 		}
 
-		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-	}
+		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
-	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+		// Create a short context
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
 
-	// Create a short context
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
+		// Create update lock
+		updateLock := make(chan bool, 1)
+		updateLock <- true
 
-	// Create update lock
-	updateLock := make(chan bool, 1)
-	updateLock <- true
+		// Call runUpgradesOnSchedule with a filter that includes containers
+		filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
+		filterDesc := testFilterDesc
 
-	// Call runUpgradesOnSchedule with a filter that includes containers
-	filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
-	filterDesc := testFilterDesc
+		err = scheduling.RunUpgradesOnSchedule(
+			ctx,
+			cmd,
+			filter,
+			filterDesc,
+			updateLock,
+			false,
+			"",
+			logging.WriteStartupMessage,
+			runUpdatesWithNotifications,
+			nil,
+			"",
+			nil,
+			"",
+			updateOnStart,
+			false,
+		)
 
-	err = scheduling.RunUpgradesOnSchedule(
-		ctx,
-		cmd,
-		filter,
-		filterDesc,
-		updateLock,
-		false,
-		"",
-		logging.WriteStartupMessage,
-		runUpdatesWithNotifications,
-		nil,
-		"",
-		nil,
-		"",
-		updateOnStart,
-		false,
-	)
+		// Should not return an error
+		require.NoError(t, err)
 
-	// Should not return an error
-	require.NoError(t, err)
-
-	// Verify that update was called for self-update scenario
-	select {
-	case <-updateCalled:
-		// Expected: update was called
-	case <-time.After(50 * time.Millisecond):
-		t.Error("Update function was not called in self-update scenario")
-	}
+		// Verify that update was called for self-update scenario
+		select {
+		case <-updateCalled:
+			// Expected: update was called
+		default:
+			t.Error("Update function was not called in self-update scenario")
+		}
+	})
 }
 
 // TestUpdateOnStartMultiInstanceScenario verifies that multiple Watchtower instances
 // with update-on-start don't conflict with each other.
 func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
-	// This test simulates two Watchtower instances both with --update-on-start
-	// They should not conflict due to proper locking
+	synctest.Test(t, func(t *testing.T) {
+		// This test simulates two Watchtower instances both with --update-on-start
+		// They should not conflict due to proper locking
 
-	// Create commands with update-on-start flag enabled
-	cmd1 := &cobra.Command{}
-	flags.RegisterSystemFlags(cmd1)
-	err := cmd1.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
-	require.NoError(t, err)
+		// Create commands with update-on-start flag enabled
+		cmd1 := &cobra.Command{}
+		flags.RegisterSystemFlags(cmd1)
+		err := cmd1.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+		require.NoError(t, err)
 
-	updateOnStart1, _ := cmd1.Flags().GetBool("update-on-start")
+		updateOnStart1, _ := cmd1.Flags().GetBool("update-on-start")
 
-	cmd2 := &cobra.Command{}
-	flags.RegisterSystemFlags(cmd2)
-	err = cmd2.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
-	require.NoError(t, err)
+		cmd2 := &cobra.Command{}
+		flags.RegisterSystemFlags(cmd2)
+		err = cmd2.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+		require.NoError(t, err)
 
-	updateOnStart2, _ := cmd2.Flags().GetBool("update-on-start")
+		updateOnStart2, _ := cmd2.Flags().GetBool("update-on-start")
 
-	// Shared update lock (simulating shared resource)
-	updateLock := make(chan bool, 1)
-	updateLock <- true
+		// Shared update lock (simulating shared resource)
+		updateLock := make(chan bool, 1)
+		updateLock <- true
 
-	// Track update calls from both instances
-	updateCallCount := int32(0)
+		// Track update calls from both instances
+		updateCallCount := int32(0)
 
-	var completed int32
+		var completed int32
 
-	instance1Called := make(chan bool, 1)
-	instance2Called := make(chan bool, 1)
+		instance1Called := make(chan bool, 1)
+		instance2Called := make(chan bool, 1)
 
-	// Mock the update function
-	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-		atomic.AddInt32(&updateCallCount, 1)
-		time.Sleep(50 * time.Millisecond) // Simulate update work
+		// Mock the update function
+		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			atomic.AddInt32(&updateCallCount, 1)
+			synctest.Wait() // Simulate update work
 
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
+			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+		}
 
-	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
-	// Start both instances concurrently
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		defer cancel()
+		// Start both instances concurrently
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
 
-		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
-		filterDesc := "instance1"
+			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
+			filterDesc := "instance1"
 
-		err := scheduling.RunUpgradesOnSchedule(
-			ctx,
-			cmd1,
-			filter,
-			filterDesc,
-			updateLock,
-			false,
-			"",
-			logging.WriteStartupMessage,
-			runUpdatesWithNotifications,
-			nil,
-			"",
-			nil,
-			"",
-			updateOnStart1,
-			false,
+			err := scheduling.RunUpgradesOnSchedule(
+				ctx,
+				cmd1,
+				filter,
+				filterDesc,
+				updateLock,
+				false,
+				"",
+				logging.WriteStartupMessage,
+				runUpdatesWithNotifications,
+				nil,
+				"",
+				nil,
+				"",
+				updateOnStart1,
+				false,
+			)
+			assert.NoError(t, err)
+			atomic.AddInt32(&completed, 1)
+			close(instance1Called)
+		}()
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+
+			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
+			filterDesc := "instance2"
+
+			err := scheduling.RunUpgradesOnSchedule(
+				ctx,
+				cmd2,
+				filter,
+				filterDesc,
+				updateLock,
+				false,
+				"",
+				logging.WriteStartupMessage,
+				runUpdatesWithNotifications,
+				nil,
+				"",
+				nil,
+				"",
+				updateOnStart2,
+				false,
+			)
+			assert.NoError(t, err)
+			atomic.AddInt32(&completed, 1)
+			close(instance2Called)
+		}()
+
+		// Wait for both instances to complete
+		<-instance1Called
+		<-instance2Called
+
+		// Verify that both instances shut down properly
+		assert.Equal(
+			t,
+			int32(2),
+			atomic.LoadInt32(&completed),
+			"Both instances should have shut down properly",
 		)
-		assert.NoError(t, err)
-		atomic.AddInt32(&completed, 1)
-		close(instance1Called)
-	}()
 
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		defer cancel()
-
-		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
-		filterDesc := "instance2"
-
-		err := scheduling.RunUpgradesOnSchedule(
-			ctx,
-			cmd2,
-			filter,
-			filterDesc,
-			updateLock,
-			false,
-			"",
-			logging.WriteStartupMessage,
-			runUpdatesWithNotifications,
-			nil,
-			"",
-			nil,
-			"",
-			updateOnStart2,
-			false,
+		// Verify that only one update occurred due to locking (one instance gets the lock first)
+		callCount := atomic.LoadInt32(&updateCallCount)
+		assert.Equal(
+			t,
+			int32(1),
+			callCount,
+			"Only one update should occur due to lock serialization",
 		)
-		assert.NoError(t, err)
-		atomic.AddInt32(&completed, 1)
-		close(instance2Called)
-	}()
+		// Verify the lock is properly released after the test
+		lockAvailable := false
 
-	// Wait for both instances to complete
-	<-instance1Called
-	<-instance2Called
+		select {
+		case v := <-updateLock:
+			lockAvailable = true
+			// Lock was available, put it back for cleanup
+			updateLock <- v
+		default:
+			// Lock not available
+		}
 
-	// Verify that both instances shut down properly
-	assert.Equal(
-		t,
-		int32(2),
-		atomic.LoadInt32(&completed),
-		"Both instances should have shut down properly",
-	)
-
-	// Verify that only one update occurred due to locking (one instance gets the lock first)
-	callCount := atomic.LoadInt32(&updateCallCount)
-	assert.Equal(t, int32(1), callCount, "Only one update should occur due to lock serialization")
-	// Verify the lock is properly released after the test
-	lockAvailable := false
-
-	select {
-	case v := <-updateLock:
-		lockAvailable = true
-		// Lock was available, put it back for cleanup
-		updateLock <- v
-	default:
-		// Lock not available
-	}
-
-	assert.True(t, lockAvailable, "Lock should be available after test completion")
+		assert.True(t, lockAvailable, "Lock should be available after test completion")
+	})
 }
 
 // TestWaitForRunningUpdate_NoUpdateRunning verifies that waitForRunningUpdate returns immediately
@@ -1197,122 +1217,137 @@ func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 // TestWaitForRunningUpdate_UpdateRunning verifies that waitForRunningUpdate blocks
 // and waits for an update to complete when one is running (lock channel is empty).
 func TestWaitForRunningUpdate_UpdateRunning(t *testing.T) {
-	lock := make(chan bool, 1)
-	// Don't put anything in lock initially - simulating update in progress
+	synctest.Test(t, func(t *testing.T) {
+		lock := make(chan bool, 1)
+		// Don't put anything in lock initially - simulating update in progress
 
-	ctx := context.Background()
-	waitCompleted := make(chan bool, 1)
+		ctx := context.Background()
+		waitCompleted := make(chan bool, 1)
 
-	go func() {
-		scheduling.WaitForRunningUpdate(ctx, lock)
+		go func() {
+			scheduling.WaitForRunningUpdate(ctx, lock)
 
-		waitCompleted <- true
-	}()
+			waitCompleted <- true
+		}()
 
-	// Wait a bit to ensure waitForRunningUpdate is blocking
-	time.Sleep(50 * time.Millisecond)
+		// Wait a bit to ensure waitForRunningUpdate is blocking
+		synctest.Wait()
 
-	// Verify it's still waiting
-	select {
-	case <-waitCompleted:
-		t.Error("waitForRunningUpdate should still be waiting")
-	default:
-		// Expected: still waiting
-	}
+		// Verify it's still waiting
+		select {
+		case <-waitCompleted:
+			t.Error("waitForRunningUpdate should still be waiting")
+		default:
+			// Expected: still waiting
+		}
 
-	// Now complete the "update" by putting value back in lock
-	lock <- true
+		// Now complete the "update" by putting value back in lock
+		lock <- true
 
-	// Wait for waitForRunningUpdate to complete
-	select {
-	case <-waitCompleted:
-		// Expected: completed after lock was released
-	case <-time.After(100 * time.Millisecond):
-		t.Error("waitForRunningUpdate should have completed after lock was released")
-	}
+		// Wait for waitForRunningUpdate to complete
+		synctest.Wait()
+
+		select {
+		case <-waitCompleted:
+			// Expected: completed after lock was released
+		default:
+			t.Error("waitForRunningUpdate should have completed after lock was released")
+		}
+	})
 }
 
 // TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate verifies that runUpgradesOnSchedule
 // waits for any running update to complete before shutting down when receiving a shutdown signal.
 func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
-	// Create a command without scheduling to keep test simple
-	cmd := &cobra.Command{}
-	flags.RegisterSystemFlags(cmd)
-	err := cmd.ParseFlags([]string{"--no-startup-message"})
-	require.NoError(t, err)
+	synctest.Test(t, func(t *testing.T) {
+		// Create a command without scheduling to keep test simple
+		cmd := &cobra.Command{}
+		flags.RegisterSystemFlags(cmd)
+		err := cmd.ParseFlags([]string{"--no-startup-message"})
+		require.NoError(t, err)
 
-	// Create update lock
-	updateLock := make(chan bool, 1)
-	updateLock <- true
+		// Create update lock
+		updateLock := make(chan bool, 1)
+		updateLock <- true
 
-	// Track when shutdown completes
-	shutdownCompleted := make(chan bool, 1)
+		// Track when shutdown completes
+		shutdownCompleted := make(chan bool, 1)
 
-	// Mock runUpdatesWithNotifications to simulate a long-running update
-	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
-		// Signal that we're in the update
-		time.Sleep(100 * time.Millisecond) // Simulate update work
+		// Channels to coordinate the manual update simulation
+		updateStarted := make(chan bool, 1)
+		updateFinished := make(chan bool, 1)
 
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
+		// Mock runUpdatesWithNotifications to simulate a long-running update
+		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			// Signal that we're in the update
+			synctest.Wait() // Simulate update work
 
-	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
-
-	// Create a cancellable context for shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start runUpgradesOnSchedule in a goroutine
-	go func() {
-		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
-		filterDesc := testFilterDesc
-
-		// This should start and wait for context cancellation
-		err := scheduling.RunUpgradesOnSchedule(
-			ctx,
-			cmd,
-			filter,
-			filterDesc,
-			updateLock,
-			false,
-			"",
-			logging.WriteStartupMessage,
-			runUpdatesWithNotifications,
-			nil,
-			"",
-			nil,
-			"",
-			false,
-			false,
-		)
-		assert.NoError(t, err)
-
-		shutdownCompleted <- true
-	}()
-
-	// Start an update manually to simulate one running
-	go func() {
-		select {
-		case v := <-updateLock:
-			defer func() { updateLock <- v }()
-
-			time.Sleep(200 * time.Millisecond) // Longer than the shutdown delay
-		default:
-			// Lock not available
+			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 		}
-	}()
 
-	// Give the update time to start
-	time.Sleep(50 * time.Millisecond)
+		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
-	// Cancel context to trigger shutdown
-	cancel()
+		// Create a cancellable context for shutdown
+		ctx, cancel := context.WithCancel(context.Background())
 
-	// Wait for shutdown to complete
-	select {
-	case <-shutdownCompleted:
-		// Expected: shutdown completed after waiting for update
-	case <-time.After(500 * time.Millisecond):
-		t.Error("Shutdown should have completed after update finished")
-	}
+		// Start runUpgradesOnSchedule in a goroutine
+		go func() {
+			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
+			filterDesc := testFilterDesc
+
+			// This should start and wait for context cancellation
+			err := scheduling.RunUpgradesOnSchedule(
+				ctx,
+				cmd,
+				filter,
+				filterDesc,
+				updateLock,
+				false,
+				"",
+				logging.WriteStartupMessage,
+				runUpdatesWithNotifications,
+				nil,
+				"",
+				nil,
+				"",
+				false,
+				false,
+			)
+			assert.NoError(t, err)
+
+			shutdownCompleted <- true
+		}()
+
+		// Start an update manually to simulate one running
+		go func() {
+			select {
+			case v := <-updateLock:
+				updateStarted <- true
+
+				defer func() {
+					updateLock <- v
+
+					updateFinished <- true
+				}()
+
+				// Simulate longer update work
+				synctest.Wait()
+			default:
+				// Lock not available
+			}
+		}()
+
+		// Wait for the update to start
+		<-updateStarted
+
+		// Cancel context to trigger shutdown
+		cancel()
+
+		// Wait for shutdown to complete
+		<-shutdownCompleted
+
+		// Ensure the manual update completes
+		<-updateFinished
+	})
 }

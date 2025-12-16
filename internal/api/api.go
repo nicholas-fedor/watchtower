@@ -74,7 +74,7 @@ func SetupAndStartAPI(
 	notifier types.Notifier,
 	scope string,
 	version string,
-	runUpdatesWithNotifications func(types.Filter, bool, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool) *metrics.Metric,
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
@@ -95,6 +95,7 @@ func SetupAndStartAPI(
 	if enableUpdateAPI {
 		updateHandler := update.New(func(images []string) *metrics.Metric {
 			metric := runUpdatesWithNotifications(
+				ctx,
 				filterByImage(images, filter),
 				cleanup,
 				true,

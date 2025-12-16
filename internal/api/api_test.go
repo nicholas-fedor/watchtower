@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/mock"
 
 	actionMocks "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	apiPkg "github.com/nicholas-fedor/watchtower/internal/api"
@@ -56,7 +57,6 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 	ginkgo.When("update API is enabled", func() {
 		ginkgo.It("should start API server successfully", func() {
 			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			cmd.Flags().Bool("http-api-update", true, "")
 			cmd.Flags().Bool("http-api-metrics", false, "")
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock the runUpdatesWithNotifications function
-			runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
 				return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 			}
 
@@ -79,35 +79,51 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			defaultMetrics := metrics.Default
 			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
+			done := make(chan bool, 1)
+			errChan := make(chan error, 1)
+
 			// Create mock HTTP server to avoid binding to real ports
 			mockServer := apiMocks.NewMockHTTPServer(ginkgo.GinkgoT())
-			mockServer.EXPECT().ListenAndServe().Return(nil)
+			mockServer.EXPECT().ListenAndServe().RunAndReturn(func() error {
+				done <- true
+				<-ctx.Done()
 
-			// Use a timeout context to avoid blocking indefinitely
-			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 100*time.Millisecond)
-			defer timeoutCancel()
+				return nil
+			})
+			mockServer.EXPECT().Shutdown(mock.Anything).Return(nil)
 
-			err := apiPkg.SetupAndStartAPI(
-				timeoutCtx,
-				"", "0", "test-token",
-				true, false, false, false,
-				filters.NoFilter,
-				cmd,
-				"test filter",
-				nil,   // updateLock
-				false, // cleanup
-				client,
-				notifier,
-				"", // scope
-				"v1.0.0",
-				runUpdatesWithNotifications,
-				filterByImage,
-				defaultMetrics,
-				writeStartupMessage,
-				mockServer,
-			)
+			go func() {
+				errChan <- apiPkg.SetupAndStartAPI(
+					ctx,
+					"", "0", "test-token",
+					true, false, false, false,
+					filters.NoFilter,
+					cmd,
+					"test filter",
+					nil,   // updateLock
+					false, // cleanup
+					client,
+					notifier,
+					"", // scope
+					"v1.0.0",
+					runUpdatesWithNotifications,
+					filterByImage,
+					defaultMetrics,
+					writeStartupMessage,
+					mockServer,
+				)
+			}()
 
-			// Should complete without error when context times out (clean shutdown)
+			// Wait for the server to start
+			<-done
+
+			// Cancel to shutdown
+			cancel()
+
+			// Wait for the function to return
+			err := <-errChan
+
+			// Should complete without error
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
@@ -115,7 +131,6 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 	ginkgo.When("metrics API is enabled", func() {
 		ginkgo.It("should register metrics handler", func() {
 			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			cmd.Flags().Bool("http-api-update", true, "")
 			cmd.Flags().Bool("http-api-metrics", true, "")
@@ -127,7 +142,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock functions
-			runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 			filterByImage := func(_ []string, filter types.Filter) types.Filter {
@@ -136,35 +151,51 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			defaultMetrics := metrics.Default
 			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
+			done := make(chan bool, 1)
+			errChan := make(chan error, 1)
+
 			// Create mock HTTP server to avoid binding to real ports
 			mockServer := apiMocks.NewMockHTTPServer(ginkgo.GinkgoT())
-			mockServer.EXPECT().ListenAndServe().Return(nil)
+			mockServer.EXPECT().ListenAndServe().RunAndReturn(func() error {
+				done <- true
+				<-ctx.Done()
 
-			// Use a timeout context to avoid blocking
-			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 100*time.Millisecond)
-			defer timeoutCancel()
+				return nil
+			})
+			mockServer.EXPECT().Shutdown(mock.Anything).Return(nil)
 
-			err := apiPkg.SetupAndStartAPI(
-				timeoutCtx,
-				"", "0", "test-token",
-				true, true, false, false,
-				filters.NoFilter,
-				cmd,
-				"test filter",
-				nil,
-				false,
-				client,
-				notifier,
-				"",
-				"v1.0.0",
-				runUpdatesWithNotifications,
-				filterByImage,
-				defaultMetrics,
-				writeStartupMessage,
-				mockServer,
-			)
+			go func() {
+				errChan <- apiPkg.SetupAndStartAPI(
+					ctx,
+					"", "0", "test-token",
+					true, true, false, false,
+					filters.NoFilter,
+					cmd,
+					"test filter",
+					nil,
+					false,
+					client,
+					notifier,
+					"",
+					"v1.0.0",
+					runUpdatesWithNotifications,
+					filterByImage,
+					defaultMetrics,
+					writeStartupMessage,
+					mockServer,
+				)
+			}()
 
-			// Should complete without error when context times out (clean shutdown)
+			// Wait for the server to start
+			<-done
+
+			// Cancel to shutdown
+			cancel()
+
+			// Wait for the function to return
+			err := <-errChan
+
+			// Should complete without error
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
@@ -183,7 +214,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 			notifier := typeMocks.NewMockNotifier(ginkgo.GinkgoT())
 
-			runUpdatesWithNotifications := func(_ types.Filter, _ bool, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 			filterByImage := func(_ []string, filter types.Filter) types.Filter {

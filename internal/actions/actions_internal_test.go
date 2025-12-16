@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -134,7 +135,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.TODO(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -151,7 +152,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.TODO(), client, config)
 		gomega.Expect(err).To(gomega.HaveOccurred())
 		gomega.Expect(report).To(gomega.BeNil())
 		gomega.Expect(cleanupInfos).To(gomega.BeNil())
@@ -181,7 +182,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.TODO(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -216,7 +217,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			Filter:  filters.NoFilter,
 			RunOnce: true,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.TODO(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -251,7 +252,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := UpdateConfig{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(client, config)
+		report, cleanupInfos, err := executeUpdate(context.TODO(), client, config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())

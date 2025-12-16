@@ -1,14 +1,15 @@
 package metrics_test
 
 import (
+	"context"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/ghttp"
 
 	"github.com/nicholas-fedor/watchtower/pkg/api"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
@@ -16,8 +17,7 @@ import (
 )
 
 const (
-	token  = "123123123"
-	getURL = "http://localhost:8080/v1/metrics"
+	token = "123123123"
 )
 
 func TestMetrics(t *testing.T) {
@@ -26,17 +26,24 @@ func TestMetrics(t *testing.T) {
 	ginkgo.RunSpecs(t, "Metrics Suite")
 }
 
-func getWithToken(handler http.Handler) map[string]string {
-	metricMap := map[string]string{}
-	respWriter := httptest.NewRecorder()
-
-	req := httptest.NewRequest(http.MethodGet, getURL, nil)
+func getWithToken(baseURL string) map[string]string {
+	req, _ := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		baseURL+"/v1/metrics",
+		nil,
+	)
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	handler.ServeHTTP(respWriter, req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
 
-	res := respWriter.Result()
-	body, _ := io.ReadAll(res.Body)
+	body, _ := io.ReadAll(resp.Body)
+
+	metricMap := map[string]string{}
 
 	for line := range strings.SplitSeq(string(body), "\n") {
 		if len(line) < 1 || line[0] == '#' {
@@ -51,11 +58,28 @@ func getWithToken(handler http.Handler) map[string]string {
 }
 
 var _ = ginkgo.Describe("the metrics API", func() {
-	httpAPI := api.New(token, ":8080")
-	m := metricsAPI.New()
+	var server *ghttp.Server
+	var httpAPI *api.API
+	var m *metricsAPI.Handler
+	var handleReq http.HandlerFunc
 
-	handleReq := httpAPI.RequireToken(m.Handle)
-	tryGetMetrics := func() map[string]string { return getWithToken(handleReq) }
+	ginkgo.BeforeEach(func() {
+		httpAPI = api.New(token, ":8080")
+		m = metricsAPI.New()
+		handleReq = httpAPI.RequireToken(m.Handle)
+		server = ghttp.NewServer()
+		server.RouteToHandler("GET", "/v1/metrics", ghttp.CombineHandlers(
+			ghttp.VerifyRequest("GET", "/v1/metrics"),
+			ghttp.VerifyHeaderKV("Authorization", "Bearer "+token),
+			handleReq,
+		))
+	})
+
+	ginkgo.AfterEach(func() {
+		server.Close()
+	})
+
+	tryGetMetrics := func() map[string]string { return getWithToken(server.URL()) }
 
 	ginkgo.It("should serve metrics", func() {
 		gomega.Expect(tryGetMetrics()).

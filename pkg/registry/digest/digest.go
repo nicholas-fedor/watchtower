@@ -155,7 +155,7 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 	return fetchDigest(ctx, container, authToken, http.MethodGet)
 }
 
-// buildManifestURL constructs and validates the manifest URL for a container.
+// BuildManifestURL constructs and validates the manifest URL for a container.
 //
 // It determines the appropriate scheme based on WATCHTOWER_REGISTRY_TLS_SKIP,
 // builds the initial manifest URL using the container's image information,
@@ -171,7 +171,7 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 //   - string: The original host extracted from the URL (before override).
 //   - *url.URL: Parsed URL object.
 //   - error: Non-nil if URL construction or validation fails, nil on success.
-func buildManifestURL(
+func BuildManifestURL(
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
@@ -273,7 +273,7 @@ func makeManifestRequest(
 	return req, nil
 }
 
-// handleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
+// HandleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
 //
 // It checks for redirects, updates the manifest URL if necessary, and extracts the digest
 // from the response headers or body based on the request method.
@@ -292,7 +292,7 @@ func makeManifestRequest(
 //   - string: Updated manifest URL if redirected, otherwise empty.
 //   - bool: Whether a retry is needed.
 //   - error: Non-nil if processing or extraction fails, nil on success.
-func handleManifestResponse(
+func HandleManifestResponse(
 	resp *http.Response,
 	method, originalHost, challengeHost string,
 	redirected bool,
@@ -334,6 +334,10 @@ func handleManifestResponse(
 			parsedURL.Host = challengeHost
 			manifestURL = parsedURL.String()
 
+			logrus.WithFields(fields).
+				WithField("retry_url", manifestURL).
+				Debug("Setting retry due to HEAD failure on original host")
+
 			return "", manifestURL, true, nil
 		}
 
@@ -363,6 +367,10 @@ func handleManifestResponse(
 
 				parsedURL.Host = redirectURL.Host
 				manifestURL = parsedURL.String()
+
+				logrus.WithFields(fields).
+					WithField("retry_url", manifestURL).
+					Debug("Setting retry due to redirect")
 
 				return "", manifestURL, true, nil
 			}
@@ -400,6 +408,10 @@ func handleManifestResponse(
 			parsedURL.Host = originalHost
 			manifestURL = parsedURL.String()
 
+			logrus.WithFields(fields).
+				WithField("retry_url", manifestURL).
+				Debug("Setting retry due to 401/404 on redirected host")
+
 			return "", manifestURL, true, nil
 		}
 
@@ -412,6 +424,10 @@ func handleManifestResponse(
 
 			parsedURL.Host = challengeHost
 			manifestURL = parsedURL.String()
+
+			logrus.WithFields(fields).
+				WithField("retry_url", manifestURL).
+				Debug("Setting retry due to 401/404 on original host with challenge host")
 
 			return "", manifestURL, true, nil
 		}
@@ -432,7 +448,7 @@ func handleManifestResponse(
 	logrus.WithFields(fields).Debug("Extracting digest")
 
 	if method == http.MethodHead {
-		digest, err = extractHeadDigest(resp)
+		digest, err = ExtractHeadDigest(resp)
 	} else {
 		digest, err = ExtractGetDigest(resp)
 	}
@@ -492,7 +508,7 @@ func fetchDigest(
 	client := auth.NewAuthClient()
 
 	// Build initial manifest URL to get original host
-	_, originalHost, _, err := buildManifestURL(container, "")
+	_, originalHost, _, err := BuildManifestURL(container, "")
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
 
@@ -528,9 +544,9 @@ func fetchDigest(
 	)
 
 	if challengeHost != "" && challengeHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = buildManifestURL(container, challengeHost)
+		manifestURL, _, parsedURL, err = BuildManifestURL(container, challengeHost)
 	} else {
-		manifestURL, _, parsedURL, err = buildManifestURL(container, "")
+		manifestURL, _, parsedURL, err = BuildManifestURL(container, "")
 	}
 
 	if err != nil {
@@ -568,7 +584,7 @@ func fetchDigest(
 	defer resp.Body.Close()
 
 	// Handle the manifest response, checking for redirects and extracting digest.
-	digest, _, _, err := handleManifestResponse(
+	digest, updatedURL, retry, err := HandleManifestResponse(
 		resp,
 		method,
 		originalHost,
@@ -584,13 +600,52 @@ func fetchDigest(
 		return "", err
 	}
 
+	if retry && updatedURL != "" {
+		logrus.WithFields(fields).
+			WithField("retry_url", updatedURL).
+			Debug("Retrying manifest request with updated URL")
+
+		req, err := makeManifestRequest(ctx, method, updatedURL, token)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithField("retry_url", updatedURL).
+				Debug("Failed to create retry request")
+
+			return "", err
+		}
+
+		resp, err = client.Do(req)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithField("retry_url", updatedURL).
+				Debug("Failed to execute retry request")
+
+			return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
+		}
+		defer resp.Body.Close()
+
+		digest, _, _, err = HandleManifestResponse(
+			resp,
+			method,
+			originalHost,
+			challengeHost,
+			redirected,
+			parsedURL,
+			parsedURL.Host,
+		)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithField("retry_url", updatedURL).
+				Debug("Failed to handle retry manifest response")
+
+			return "", err
+		}
+	}
+
 	logrus.WithFields(fields).WithField("remote_digest", digest).
 		Debug("Fetched remote digest")
 
 	return digest, nil
 }
 
-// extractHeadDigest extracts the image digest from a HEAD response’s headers.
+// ExtractHeadDigest extracts the image digest from a HEAD response’s headers.
 //
 // It retrieves the digest from the "Docker-Content-Digest" header, normalizing it for comparison,
 // and validates its presence to ensure a valid response from the registry.
@@ -601,7 +656,7 @@ func fetchDigest(
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if present.
 //   - error: An error if the digest is missing or the response is invalid, nil if successful.
-func extractHeadDigest(resp *http.Response) (string, error) {
+func ExtractHeadDigest(resp *http.Response) (string, error) {
 	// Retrieve the digest from the standard header.
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest == "" {

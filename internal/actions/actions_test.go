@@ -1,7 +1,10 @@
 package actions_test
 
 import (
+	"context"
 	"errors"
+	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -77,7 +80,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(params)
+			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 		})
@@ -91,51 +94,53 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 		})
 
 		ginkgo.It("should start notification batching", func() {
-			client = actionMocks.CreateMockClient(
-				&actionMocks.TestData{
-					Containers: []types.Container{
-						actionMocks.CreateMockContainer(
-							"test-container",
-							"test-container",
-							"image:latest",
-							time.Now().Add(-24*time.Hour),
-						),
+			synctest.Test(&testing.T{}, func(_ *testing.T) {
+				client = actionMocks.CreateMockClient(
+					&actionMocks.TestData{
+						Containers: []types.Container{
+							actionMocks.CreateMockContainer(
+								"test-container",
+								"test-container",
+								"image:latest",
+								time.Now().Add(-24*time.Hour),
+							),
+						},
 					},
-				},
-				false,
-				false,
-			)
+					false,
+					false,
+				)
 
-			notifier.EXPECT().StartNotification(false).Return()
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
+				notifier.EXPECT().StartNotification(false).Return()
+				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			params := actions.RunUpdatesWithNotificationsParams{
-				Client:                       client,
-				Notifier:                     notifier,
-				NotificationSplitByContainer: false,
-				NotificationReport:           false,
-				Filter:                       filter,
-				Cleanup:                      false,
-				NoRestart:                    false,
-				MonitorOnly:                  false,
-				LifecycleHooks:               false,
-				RollingRestart:               false,
-				LabelPrecedence:              false,
-				NoPull:                       false,
-				Timeout:                      time.Minute,
-				LifecycleUID:                 1000,
-				LifecycleGID:                 1001,
-				CPUCopyMode:                  "auto",
-				PullFailureDelay:             time.Duration(0),
-			}
-			metric := actions.RunUpdatesWithNotifications(params)
+				params := actions.RunUpdatesWithNotificationsParams{
+					Client:                       client,
+					Notifier:                     notifier,
+					NotificationSplitByContainer: false,
+					NotificationReport:           false,
+					Filter:                       filter,
+					Cleanup:                      false,
+					NoRestart:                    false,
+					MonitorOnly:                  false,
+					LifecycleHooks:               false,
+					RollingRestart:               false,
+					LabelPrecedence:              false,
+					NoPull:                       false,
+					Timeout:                      time.Minute,
+					LifecycleUID:                 1000,
+					LifecycleGID:                 1001,
+					CPUCopyMode:                  "auto",
+					PullFailureDelay:             time.Duration(0),
+				}
+				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
-			// Allow time for async notification to complete
-			time.Sleep(10 * time.Millisecond)
+				// Allow time for async notification to complete
+				synctest.Wait()
 
-			gomega.Expect(metric).NotTo(gomega.BeNil())
+				gomega.Expect(metric).NotTo(gomega.BeNil())
 
-			notifier.AssertExpectations(ginkgo.GinkgoT())
+				notifier.AssertExpectations(ginkgo.GinkgoT())
+			})
 		})
 
 		ginkgo.It("should handle notification split by container", func() {
@@ -180,7 +185,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(params)
+			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 
@@ -188,51 +193,53 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 		})
 
 		ginkgo.It("should handle standard grouped notifications", func() {
-			client = actionMocks.CreateMockClient(
-				&actionMocks.TestData{
-					Containers: []types.Container{
-						actionMocks.CreateMockContainer(
-							"test-container",
-							"test-container",
-							"image:latest",
-							time.Now().Add(-24*time.Hour),
-						),
+			synctest.Test(&testing.T{}, func(_ *testing.T) {
+				client = actionMocks.CreateMockClient(
+					&actionMocks.TestData{
+						Containers: []types.Container{
+							actionMocks.CreateMockContainer(
+								"test-container",
+								"test-container",
+								"image:latest",
+								time.Now().Add(-24*time.Hour),
+							),
+						},
 					},
-				},
-				false,
-				false,
-			)
+					false,
+					false,
+				)
 
-			notifier.EXPECT().StartNotification(false).Return()
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
+				notifier.EXPECT().StartNotification(false).Return()
+				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			params := actions.RunUpdatesWithNotificationsParams{
-				Client:                       client,
-				Notifier:                     notifier,
-				NotificationSplitByContainer: false,
-				NotificationReport:           false,
-				Filter:                       filter,
-				Cleanup:                      false,
-				NoRestart:                    false,
-				MonitorOnly:                  false,
-				LifecycleHooks:               false,
-				RollingRestart:               false,
-				LabelPrecedence:              false,
-				NoPull:                       false,
-				Timeout:                      time.Minute,
-				LifecycleUID:                 1000,
-				LifecycleGID:                 1001,
-				CPUCopyMode:                  "auto",
-				PullFailureDelay:             time.Duration(0),
-			}
-			metric := actions.RunUpdatesWithNotifications(params)
+				params := actions.RunUpdatesWithNotificationsParams{
+					Client:                       client,
+					Notifier:                     notifier,
+					NotificationSplitByContainer: false,
+					NotificationReport:           false,
+					Filter:                       filter,
+					Cleanup:                      false,
+					NoRestart:                    false,
+					MonitorOnly:                  false,
+					LifecycleHooks:               false,
+					RollingRestart:               false,
+					LabelPrecedence:              false,
+					NoPull:                       false,
+					Timeout:                      time.Minute,
+					LifecycleUID:                 1000,
+					LifecycleGID:                 1001,
+					CPUCopyMode:                  "auto",
+					PullFailureDelay:             time.Duration(0),
+				}
+				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
-			// Allow time for async notification to complete
-			time.Sleep(10 * time.Millisecond)
+				// Allow time for async notification to complete
+				synctest.Wait()
 
-			gomega.Expect(metric).NotTo(gomega.BeNil())
+				gomega.Expect(metric).NotTo(gomega.BeNil())
 
-			notifier.AssertExpectations(ginkgo.GinkgoT())
+				notifier.AssertExpectations(ginkgo.GinkgoT())
+			})
 		})
 		ginkgo.Context("notification splitting in log mode", func() {
 			ginkgo.It(
@@ -300,7 +307,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(params)
+					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -420,7 +427,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(params)
+				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(3))
@@ -469,7 +476,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(params)
+				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -545,7 +552,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(params)
+				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).
@@ -616,7 +623,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(params)
+				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(1))
@@ -695,7 +702,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(params)
+					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -799,7 +806,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(params)
+					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -931,7 +938,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
 				}
-				metric := actions.RunUpdatesWithNotifications(params)
+				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Updated).To(gomega.Equal(1)) // dependency-container updated
@@ -1029,7 +1036,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 						CPUCopyMode:                  "auto",
 						PullFailureDelay:             time.Duration(0),
 					}
-					metric := actions.RunUpdatesWithNotifications(params)
+					metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Updated).
@@ -1081,7 +1088,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(params)
+			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 			// CleanupImages is called internally by Update, so we check that cleanupImageIDs is processed
@@ -1125,7 +1132,7 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 				CPUCopyMode:                  "auto",
 				PullFailureDelay:             time.Duration(0),
 			}
-			metric := actions.RunUpdatesWithNotifications(params)
+			metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
 
 			gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 			gomega.Expect(metric.Updated).To(gomega.Equal(0))

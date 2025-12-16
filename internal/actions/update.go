@@ -2,6 +2,7 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -34,6 +35,7 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 // Containers with pinned images (referenced by digest) are skipped to preserve immutability.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for interacting with Docker API.
 //   - config: UpdateConfig specifying behavior like cleanup, restart, and filtering.
 //
@@ -42,9 +44,17 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 //   - []types.CleanedImageInfo: Slice of cleaned image info to clean up after updates.
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(
+	ctx context.Context,
 	client container.Client,
 	config UpdateConfig,
 ) (types.Report, []types.CleanedImageInfo, error) {
+	// Check for context cancellation early
+	select {
+	case <-ctx.Done():
+		return nil, nil, fmt.Errorf("update cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// Initialize logging for the update process start.
 	logrus.Debug("Starting container update check")
 

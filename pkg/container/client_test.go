@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
+	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -23,6 +27,12 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+const (
+	methodPost   = "POST"
+	methodDelete = "DELETE"
+	pingPath     = "/_ping"
 )
 
 var _ = ginkgo.Describe("the client", func() {
@@ -80,38 +90,6 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 
-		ginkgo.When("the container fails to stop within timeout", func() {
-			ginkgo.It("should proceed with removal", func() {
-				// Create a mock container in running state.
-				mockContainer := MockContainer(
-					WithContainerState(dockerContainerType.State{Running: true}),
-				)
-				cid := mockContainer.ContainerInfo().ID
-				// Set up mock server handlers for stop and removal.
-				mockServer.AppendHandlers(
-					StopContainerHandler(
-						cid,
-						mocks.Found,
-					), // Simulate successful stop attempt
-					mocks.RemoveContainerHandler(cid, mocks.Found), // Simulate successful removal
-				)
-				// Capture logrus output for verification.
-				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
-				defer resetLogrus()
-				// Execute StopContainer with a short timeout to simulate failure to stop.
-				err := client{
-					api: docker,
-				}.StopContainer(
-					mockContainer,
-					100*time.Millisecond,
-				)
-				// Verify no error occurs, as removal should succeed despite timeout.
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				// Verify log output includes expected message from container_source.go.
-				gomega.Eventually(logbuf).Should(gbytes.Say("Container removed successfully"))
-			})
-		})
-
 		ginkgo.When("stopping fails with an unexpected error", func() {
 			ginkgo.It("should return an error", func() {
 				// Create a mock container in running state.
@@ -123,7 +101,7 @@ var _ = ginkgo.Describe("the client", func() {
 				mockServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest(
-							"POST",
+							methodPost,
 							gomega.HaveSuffix(fmt.Sprintf("containers/%s/stop", cid)),
 						),
 						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
@@ -147,7 +125,7 @@ var _ = ginkgo.Describe("the client", func() {
 				mockServer.AppendHandlers(
 					StopContainerHandler(cid, mocks.Found), // Simulate successful stop
 					ghttp.CombineHandlers( // Removal fails
-						ghttp.VerifyRequest("DELETE", gomega.HaveSuffix(cid)),
+						ghttp.VerifyRequest(methodDelete, gomega.HaveSuffix(cid)),
 						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
 					),
 				)
@@ -520,46 +498,6 @@ var _ = ginkgo.Describe("the client", func() {
 						gomega.Expect(err).To(gomega.HaveOccurred())
 						gomega.Expect(err.Error()).
 							To(gomega.ContainSubstring("health check failed"))
-					})
-				})
-
-				ginkgo.When("timeout is reached", func() {
-					ginkgo.It("should return a timeout error", func() {
-						mockContainer := MockContainer()
-						cid := mockContainer.ContainerInfo().ID
-						// Mock inspect response with starting status
-						mockServer.AppendHandlers(
-							ghttp.CombineHandlers(
-								ghttp.VerifyRequest(
-									"GET",
-									gomega.MatchRegexp(
-										fmt.Sprintf(`^/v[0-9.]+/containers/%s/json$`, cid),
-									),
-								),
-								ghttp.RespondWithJSONEncoded(
-									http.StatusOK,
-									dockerContainerType.InspectResponse{
-										ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
-											ID: cid,
-											State: &dockerContainerType.State{
-												Status: "running",
-												Health: &dockerContainerType.Health{
-													Status: "starting",
-												},
-											},
-										},
-										Config: &dockerContainerType.Config{},
-									},
-								),
-							),
-						)
-						client := client{api: docker}
-						err := client.WaitForContainerHealthy(
-							types.ContainerID(cid),
-							100*time.Millisecond,
-						)
-						gomega.Expect(err).To(gomega.HaveOccurred())
-						gomega.Expect(err.Error()).To(gomega.ContainSubstring("timeout"))
 					})
 				})
 			})
@@ -1206,6 +1144,291 @@ var _ = ginkgo.Describe("the client", func() {
 		)
 	})
 })
+
+func TestStopContainer_ContainerStillExistsAfterStopping(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
+				w.WriteHeader(http.StatusNoContent)
+			} else if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/containers/") {
+				w.WriteHeader(http.StatusNoContent)
+			}
+		}))
+		defer server.Close()
+
+		docker, _ := dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(server.URL),
+			dockerClient.WithHTTPClient(server.Client()))
+
+		// Create a mock container in running state.
+		mockContainer := MockContainer(
+			WithContainerState(dockerContainerType.State{Running: true}),
+		)
+		// Execute StopContainer and verify no error occurs.
+		err := client{api: docker}.StopContainer(mockContainer, time.Second)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+}
+
+func TestStopContainer_ContainerDoesNotExistAfterStopping(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
+				w.WriteHeader(http.StatusNoContent)
+			} else if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/containers/") {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer server.Close()
+
+		docker, _ := dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(server.URL),
+			dockerClient.WithHTTPClient(server.Client()))
+
+		// Create a mock container in running state.
+		mockContainer := MockContainer(
+			WithContainerState(dockerContainerType.State{Running: true}),
+		)
+		// Execute StopContainer and verify no error occurs.
+		err := client{api: docker}.StopContainer(mockContainer, time.Second)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+}
+
+func TestStopContainer_StoppingFailsWithUnexpectedError(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == pingPath {
+				w.WriteHeader(http.StatusOK)
+
+				return
+			}
+
+			if strings.Contains(r.URL.Path, "/version") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"ApiVersion": "1.40", "Version": "20.10.0"}`))
+
+				return
+			}
+
+			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"message": "server error"}`))
+
+				return
+			}
+
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		docker, _ := dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(server.URL),
+			dockerClient.WithHTTPClient(server.Client()))
+
+		// Create a mock container in running state.
+		mockContainer := MockContainer(
+			WithContainerState(dockerContainerType.State{Running: true}),
+		)
+		// Execute StopContainer and verify the error is propagated.
+		err := client{api: docker}.StopContainer(mockContainer, time.Second)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		expectedMsg := "failed to stop container: Error response from daemon: server error"
+		if !strings.Contains(err.Error(), expectedMsg) {
+			t.Fatalf("expected error to contain %q, got %q", expectedMsg, err.Error())
+		}
+	})
+}
+
+func TestStopContainer_RemovalFailsWithUnexpectedError(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == pingPath {
+				w.WriteHeader(http.StatusOK)
+
+				return
+			}
+
+			if strings.Contains(r.URL.Path, "/version") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"ApiVersion": "1.40", "Version": "20.10.0"}`))
+
+				return
+			}
+
+			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
+				w.WriteHeader(http.StatusNoContent)
+
+				return
+			}
+
+			if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/containers/") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"message": "server error"}`))
+
+				return
+			}
+
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		docker, _ := dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(server.URL),
+			dockerClient.WithHTTPClient(server.Client()))
+
+		// Create a mock container in running state.
+		mockContainer := MockContainer(
+			WithContainerState(dockerContainerType.State{Running: true}),
+		)
+		// Execute StopContainer and verify the removal error is propagated.
+		err := client{api: docker}.StopContainer(mockContainer, time.Second)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		expectedMsg := "failed to remove container: Error response from daemon: server error"
+		if !strings.Contains(err.Error(), expectedMsg) {
+			t.Fatalf("expected error to contain %q, got %q", expectedMsg, err.Error())
+		}
+	})
+}
+
+func TestStopContainer_ContainerFailsToStopWithinTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == pingPath {
+				w.WriteHeader(http.StatusOK)
+
+				return
+			}
+
+			if strings.Contains(r.URL.Path, "/version") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"ApiVersion": "1.40", "Version": "20.10.0"}`))
+
+				return
+			}
+
+			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
+				w.WriteHeader(http.StatusNoContent)
+
+				return
+			}
+
+			if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/containers/") {
+				w.WriteHeader(http.StatusNoContent)
+
+				return
+			}
+
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		docker, _ := dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(server.URL),
+			dockerClient.WithHTTPClient(server.Client()))
+
+		// Create a mock container in running state.
+		mockContainer := MockContainer(
+			WithContainerState(dockerContainerType.State{Running: true}),
+		)
+		// Capture logrus output for verification.
+		resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+		defer resetLogrus()
+		// Execute StopContainer with a realistic timeout.
+		err := client{
+			api: docker,
+		}.StopContainer(
+			mockContainer,
+			1*time.Second,
+		)
+		// Verify no error occurs, as removal should succeed.
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		// Verify log output includes expected message from container_source.go.
+		if !strings.Contains(string(logbuf.Contents()), "Container removed successfully") {
+			t.Fatalf(
+				"expected log to contain 'Container removed successfully', got %q",
+				string(logbuf.Contents()),
+			)
+		}
+	})
+}
+
+func TestWaitForContainerHealthy_Timeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mockContainer := MockContainer()
+		cid := mockContainer.ContainerInfo().ID
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == pingPath {
+				w.WriteHeader(http.StatusOK)
+
+				return
+			}
+
+			if strings.Contains(r.URL.Path, "/version") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"ApiVersion": "1.40", "Version": "20.10.0"}`))
+
+				return
+			}
+
+			if strings.Contains(r.URL.Path, fmt.Sprintf("/containers/%s/json", cid)) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+
+				response := dockerContainerType.InspectResponse{
+					ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+						ID: cid,
+						State: &dockerContainerType.State{
+							Status: "running",
+							Health: &dockerContainerType.Health{Status: "starting"},
+						},
+					},
+					Config: &dockerContainerType.Config{},
+				}
+				json.NewEncoder(w).Encode(response)
+
+				return
+			}
+
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		docker, _ := dockerClient.NewClientWithOpts(
+			dockerClient.WithHost(server.URL),
+			dockerClient.WithHTTPClient(server.Client()))
+
+		client := client{api: docker}
+
+		err := client.WaitForContainerHealthy(types.ContainerID(cid), 0)
+		if err == nil {
+			t.Fatal("expected timeout error, got nil")
+		}
+
+		if !strings.Contains(err.Error(), "timeout") {
+			t.Fatalf("expected error to contain 'timeout', got %q", err.Error())
+		}
+	})
+}
 
 // captureLogrus captures logrus output in a buffer for testing.
 //
