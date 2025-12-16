@@ -2870,38 +2870,7 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 			},
 		}
 
-		go func() {
-			for {
-				req, err := http.ReadRequest(bufio.NewReader(srvConn))
-				if err != nil {
-					break
-				}
-
-				switch req.URL.Path {
-				case "/v2/":
-					srvConn.Write(
-						[]byte(
-							"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Bearer realm=\"http://test/token\",service=\"test-service\",scope=\"repository:test/image:pull\"\r\n\r\n",
-						),
-					)
-				case "/token":
-					srvConn.Write(
-						[]byte(
-							"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"token\": \"mock-token\"}",
-						),
-					)
-				case "/v2/test/image/manifests/latest":
-					time.Sleep(50 * time.Millisecond)
-					srvConn.Write(
-						[]byte(
-							"HTTP/1.1 200 OK\r\nDocker-Content-Digest: " + mockDigestHash + "\r\n\r\n",
-						),
-					)
-				default:
-					srvConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-				}
-			}
-		}()
+		go startMockSlowServer(srvConn, mockDigestHash)
 
 		mockImageRef := "test/test/image:latest"
 		mockContainerWithServer := mocks.CreateMockContainerWithDigest(
@@ -2956,6 +2925,39 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 			resp.Body.Close()
 		}
 	})
+}
+
+func startMockSlowServer(srvConn net.Conn, mockDigestHashValue string) {
+	for {
+		req, err := http.ReadRequest(bufio.NewReader(srvConn))
+		if err != nil {
+			break
+		}
+
+		switch req.URL.Path {
+		case "/v2/":
+			srvConn.Write(
+				[]byte(
+					"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Bearer realm=\"http://test/token\",service=\"test-service\",scope=\"repository:test/image:pull\"\r\n\r\n",
+				),
+			)
+		case "/token":
+			srvConn.Write(
+				[]byte(
+					"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"token\": \"mock-token\"}",
+				),
+			)
+		case "/v2/test/image/manifests/latest":
+			time.Sleep(50 * time.Millisecond)
+			srvConn.Write(
+				[]byte(
+					"HTTP/1.1 200 OK\r\nDocker-Content-Digest: " + mockDigestHashValue + "\r\n\r\n",
+				),
+			)
+		default:
+			srvConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		}
+	}
 }
 
 func getScheme() string {
