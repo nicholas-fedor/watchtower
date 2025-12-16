@@ -10,10 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/attest-build-provenance digest to 8835c60 by @renovate[bot] in [#1093](https://github.com/nicholas-fedor/watchtower/pull/1093)
+- Update actions/attest-build-provenance digest to 331a7ac by @renovate[bot] in [#1092](https://github.com/nicholas-fedor/watchtower/pull/1092)
+- Update golangci/golangci-lint-action digest to ef75033 by @renovate[bot] in [#1091](https://github.com/nicholas-fedor/watchtower/pull/1091)
+- Update Go dependencies by @nicholas-fedor in [#1088](https://github.com/nicholas-fedor/watchtower/pull/1088)
+- Update orhun/git-cliff-action digest to e16f179 by @renovate[bot] in [#1087](https://github.com/nicholas-fedor/watchtower/pull/1087)
+- Update actions/cache digest to 9255dc7 by @renovate[bot] in [#1084](https://github.com/nicholas-fedor/watchtower/pull/1084)
+- Update module github.com/docker/cli to v29.1.3+incompatible by @renovate[bot] in [#1083](https://github.com/nicholas-fedor/watchtower/pull/1083)
+- Update github/codeql-action digest to 1b168cd by @renovate[bot] in [#1082](https://github.com/nicholas-fedor/watchtower/pull/1082)
+- Update actions/cache action to v5 by @renovate[bot] in [#1081](https://github.com/nicholas-fedor/watchtower/pull/1081)
+- Update securego/gosec action to v2.22.11 by @renovate[bot] in [#1077](https://github.com/nicholas-fedor/watchtower/pull/1077)
 - Update cimg/go:1.25.5 docker digest to 9a8ad8c by @renovate[bot] in [#1073](https://github.com/nicholas-fedor/watchtower/pull/1073)
 
 ### Fixed
 
+- Suppress HTTP API server startup message when no-startup-message flag is set by @nicholas-fedor in [#1090](https://github.com/nicholas-fedor/watchtower/pull/1090)
+- Resolve chained dependency handling and add Compose depends_on support by @nicholas-fedor in [#1086](https://github.com/nicholas-fedor/watchtower/pull/1086)
+- Propagate notifications in error logging by @nicholas-fedor in [#1085](https://github.com/nicholas-fedor/watchtower/pull/1085)
 - Prevent multiple orphaned containers on self-update by @nicholas-fedor in [#1075](https://github.com/nicholas-fedor/watchtower/pull/1075)
 
 ## [1.12.5] - 2025-12-10
