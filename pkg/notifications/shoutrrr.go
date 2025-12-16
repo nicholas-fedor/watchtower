@@ -338,18 +338,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				"notification_type": shoutrrrType,
 			}).Trace("Calling Router.Send with message")
 
-			// Run Router.Send in goroutine to make it cancellable
-			sendCh := make(chan []error, 1)
-
-			go func() {
-				errs := notifier.Router.Send(msg, notifier.params)
-				sendCh <- errs
-			}()
-
-			select {
-			case errs := <-sendCh:
-				processSendErrors(notifier, errs)
-			case <-notifier.ctx.Done():
+			if !notifier.sendWithCancellation(msg) {
 				LocalLog.Debug("Context cancelled during message send")
 
 				return
@@ -388,18 +377,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 						"notification_type": shoutrrrType,
 					}).Trace("Calling Router.Send with message during shutdown")
 
-					// Run Router.Send in goroutine to make it cancellable
-					sendCh := make(chan []error, 1)
-
-					go func() {
-						errs := notifier.Router.Send(msg, notifier.params)
-						sendCh <- errs
-					}()
-
-					select {
-					case errs := <-sendCh:
-						processSendErrors(notifier, errs)
-					case <-notifier.ctx.Done():
+					if !notifier.sendWithCancellation(msg) {
 						LocalLog.Debug("Context cancelled during shutdown message send")
 
 						return
@@ -417,6 +395,30 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 
 			return
 		}
+	}
+}
+
+// sendWithCancellation sends a message with context cancellation support.
+//
+// Parameters:
+//   - msg: Message to send.
+//
+// Returns:
+//   - bool: True if sent successfully, false if cancelled.
+func (n *shoutrrrTypeNotifier) sendWithCancellation(msg string) bool {
+	sendCh := make(chan []error, 1)
+
+	go func() {
+		sendCh <- n.Router.Send(msg, n.params)
+	}()
+
+	select {
+	case errs := <-sendCh:
+		processSendErrors(n, errs)
+
+		return true
+	case <-n.ctx.Done():
+		return false
 	}
 }
 
