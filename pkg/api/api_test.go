@@ -128,6 +128,7 @@ func TestAPI_ServerShutdownTimeout(t *testing.T) {
 		mockServer := &mockHTTPServer{
 			listenErr:   nil,
 			shutdownErr: errMockShutdownFailure,
+			shutdownCh:  make(chan struct{}),
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -606,13 +607,22 @@ func testHandler(w http.ResponseWriter, _ *http.Request) {
 type mockHTTPServer struct {
 	listenErr   error
 	shutdownErr error
+	shutdownCh  chan struct{}
 }
 
 func (m *mockHTTPServer) ListenAndServe() error {
-	return m.listenErr
+	if m.listenErr != nil {
+		return m.listenErr
+	}
+	// Block until shutdown is called
+	<-m.shutdownCh
+
+	return nil
 }
 
 func (m *mockHTTPServer) Shutdown(_ context.Context) error {
+	close(m.shutdownCh)
+
 	return m.shutdownErr
 }
 
