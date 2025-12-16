@@ -11,6 +11,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
@@ -93,56 +94,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			notifier = mocks.NewMockNotifier(ginkgo.GinkgoT())
 		})
 
-		ginkgo.It("should start notification batching", func() {
-			synctest.Test(&testing.T{}, func(_ *testing.T) {
-				client = actionMocks.CreateMockClient(
-					&actionMocks.TestData{
-						Containers: []types.Container{
-							actionMocks.CreateMockContainer(
-								"test-container",
-								"test-container",
-								"image:latest",
-								time.Now().Add(-24*time.Hour),
-							),
-						},
-					},
-					false,
-					false,
-				)
-
-				notifier.EXPECT().StartNotification(false).Return()
-				notifier.EXPECT().SendNotification(mock.Anything).Return()
-
-				params := actions.RunUpdatesWithNotificationsParams{
-					Client:                       client,
-					Notifier:                     notifier,
-					NotificationSplitByContainer: false,
-					NotificationReport:           false,
-					Filter:                       filter,
-					Cleanup:                      false,
-					NoRestart:                    false,
-					MonitorOnly:                  false,
-					LifecycleHooks:               false,
-					RollingRestart:               false,
-					LabelPrecedence:              false,
-					NoPull:                       false,
-					Timeout:                      time.Minute,
-					LifecycleUID:                 1000,
-					LifecycleGID:                 1001,
-					CPUCopyMode:                  "auto",
-					PullFailureDelay:             time.Duration(0),
-				}
-				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
-
-				// Allow time for async notification to complete
-				synctest.Wait()
-
-				gomega.Expect(metric).NotTo(gomega.BeNil())
-
-				notifier.AssertExpectations(ginkgo.GinkgoT())
-			})
-		})
-
 		ginkgo.It("should handle notification split by container", func() {
 			client = actionMocks.CreateMockClient(
 				&actionMocks.TestData{
@@ -192,55 +143,6 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
-		ginkgo.It("should handle standard grouped notifications", func() {
-			synctest.Test(&testing.T{}, func(_ *testing.T) {
-				client = actionMocks.CreateMockClient(
-					&actionMocks.TestData{
-						Containers: []types.Container{
-							actionMocks.CreateMockContainer(
-								"test-container",
-								"test-container",
-								"image:latest",
-								time.Now().Add(-24*time.Hour),
-							),
-						},
-					},
-					false,
-					false,
-				)
-
-				notifier.EXPECT().StartNotification(false).Return()
-				notifier.EXPECT().SendNotification(mock.Anything).Return()
-
-				params := actions.RunUpdatesWithNotificationsParams{
-					Client:                       client,
-					Notifier:                     notifier,
-					NotificationSplitByContainer: false,
-					NotificationReport:           false,
-					Filter:                       filter,
-					Cleanup:                      false,
-					NoRestart:                    false,
-					MonitorOnly:                  false,
-					LifecycleHooks:               false,
-					RollingRestart:               false,
-					LabelPrecedence:              false,
-					NoPull:                       false,
-					Timeout:                      time.Minute,
-					LifecycleUID:                 1000,
-					LifecycleGID:                 1001,
-					CPUCopyMode:                  "auto",
-					PullFailureDelay:             time.Duration(0),
-				}
-				metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
-
-				// Allow time for async notification to complete
-				synctest.Wait()
-
-				gomega.Expect(metric).NotTo(gomega.BeNil())
-
-				notifier.AssertExpectations(ginkgo.GinkgoT())
-			})
-		})
 		ginkgo.Context("notification splitting in log mode", func() {
 			ginkgo.It(
 				"should send notifications for monitor-only containers with stale images",
@@ -1140,3 +1042,109 @@ var _ = ginkgo.Describe("RunUpdatesWithNotifications", func() {
 		})
 	})
 })
+
+func TestNotificationBatching(t *testing.T) {
+	filter := filters.NoFilter
+	notifier := mocks.NewMockNotifier(t)
+
+	synctest.Test(t, func(t *testing.T) {
+		client := actionMocks.CreateMockClient(
+			&actionMocks.TestData{
+				Containers: []types.Container{
+					actionMocks.CreateMockContainer(
+						"test-container",
+						"test-container",
+						"image:latest",
+						time.Now().Add(-24*time.Hour),
+					),
+				},
+			},
+			false,
+			false,
+		)
+
+		notifier.EXPECT().StartNotification(false).Return()
+		notifier.EXPECT().SendNotification(mock.Anything).Return()
+
+		params := actions.RunUpdatesWithNotificationsParams{
+			Client:                       client,
+			Notifier:                     notifier,
+			NotificationSplitByContainer: false,
+			NotificationReport:           false,
+			Filter:                       filter,
+			Cleanup:                      false,
+			NoRestart:                    false,
+			MonitorOnly:                  false,
+			LifecycleHooks:               false,
+			RollingRestart:               false,
+			LabelPrecedence:              false,
+			NoPull:                       false,
+			Timeout:                      time.Minute,
+			LifecycleUID:                 1000,
+			LifecycleGID:                 1001,
+			CPUCopyMode:                  "auto",
+			PullFailureDelay:             time.Duration(0),
+		}
+		metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+
+		// Allow time for async notification to complete
+		synctest.Wait()
+
+		assert.NotNil(t, metric)
+
+		notifier.AssertExpectations(t)
+	})
+}
+
+func TestStandardGroupedNotifications(t *testing.T) {
+	filter := filters.NoFilter
+	notifier := mocks.NewMockNotifier(t)
+
+	synctest.Test(t, func(t *testing.T) {
+		client := actionMocks.CreateMockClient(
+			&actionMocks.TestData{
+				Containers: []types.Container{
+					actionMocks.CreateMockContainer(
+						"test-container",
+						"test-container",
+						"image:latest",
+						time.Now().Add(-24*time.Hour),
+					),
+				},
+			},
+			false,
+			false,
+		)
+
+		notifier.EXPECT().StartNotification(false).Return()
+		notifier.EXPECT().SendNotification(mock.Anything).Return()
+
+		params := actions.RunUpdatesWithNotificationsParams{
+			Client:                       client,
+			Notifier:                     notifier,
+			NotificationSplitByContainer: false,
+			NotificationReport:           false,
+			Filter:                       filter,
+			Cleanup:                      false,
+			NoRestart:                    false,
+			MonitorOnly:                  false,
+			LifecycleHooks:               false,
+			RollingRestart:               false,
+			LabelPrecedence:              false,
+			NoPull:                       false,
+			Timeout:                      time.Minute,
+			LifecycleUID:                 1000,
+			LifecycleGID:                 1001,
+			CPUCopyMode:                  "auto",
+			PullFailureDelay:             time.Duration(0),
+		}
+		metric := actions.RunUpdatesWithNotifications(context.TODO(), params)
+
+		// Allow time for async notification to complete
+		synctest.Wait()
+
+		assert.NotNil(t, metric)
+
+		notifier.AssertExpectations(t)
+	})
+}
