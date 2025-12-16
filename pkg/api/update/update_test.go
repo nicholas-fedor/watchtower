@@ -535,9 +535,10 @@ func TestHandleConcurrentRequestsWithRestarted(t *testing.T) {
 
 func TestConcurrentRequests(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		calledCount := 0
+		var calledCount atomic.Int32
+
 		mockUpdateFn := func(_ []string) *metrics.Metric {
-			calledCount++
+			calledCount.Add(1)
 
 			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
 		}
@@ -562,8 +563,8 @@ func TestConcurrentRequests(t *testing.T) {
 
 		synctest.Wait()
 
-		if calledCount != 3 {
-			t.Errorf("expected 3 calls, got %d", calledCount)
+		if calledCount.Load() != 3 {
+			t.Errorf("expected 3 calls, got %d", calledCount.Load())
 		}
 	})
 }
