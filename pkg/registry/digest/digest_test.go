@@ -2784,7 +2784,7 @@ var _ = ginkgo.Describe("Digests", func() {
 							ghttp.RespondWith(http.StatusNotFound, nil),
 						),
 						ghttp.CombineHandlers(
-							ghttp.VerifyRequest("/v2/lscr.io/test/image/manifests/latest", "HEAD"),
+							ghttp.VerifyRequest("HEAD", "/v2/lscr.io/test/image/manifests/latest"),
 							ghttp.RespondWith(http.StatusOK, nil, http.Header{
 								digest.ContentDigestHeader: []string{mockDigestHash},
 							}),
@@ -2895,7 +2895,7 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 					time.Sleep(50 * time.Millisecond)
 					srvConn.Write(
 						[]byte(
-							"HTTP/1.1 200 OK\r\nContent-Digest: " + mockDigestHashValue + "\r\n\r\n",
+							"HTTP/1.1 200 OK\r\nDocker-Content-Digest: " + mockDigestHashValue + "\r\n\r\n",
 						),
 					)
 				default:
