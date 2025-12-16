@@ -26,7 +26,7 @@ import (
 // Parameters:
 //   - ctx: The context for cancellation, allowing early shutdown on context timeout.
 //   - lock: The channel used to synchronize updates, ensuring only one runs at a time.
-func WaitForRunningUpdate(_ context.Context, lock chan bool) {
+func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 	const updateWaitTimeout = 60 * time.Second
 
 	logrus.Debug("Checking lock status before shutdown.")
@@ -37,6 +37,8 @@ func WaitForRunningUpdate(_ context.Context, lock chan bool) {
 			logrus.Debug("Lock acquired, update finished.")
 		case <-time.After(updateWaitTimeout):
 			logrus.Warn("Timeout waiting for running update to finish, proceeding with shutdown.")
+		case <-ctx.Done():
+			logrus.Warn("Context cancelled while waiting for running update.")
 		}
 	} else {
 		logrus.Debug("No update running, lock available.")
