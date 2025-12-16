@@ -12,6 +12,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var _ = ginkgo.Describe("the update action", func() {
@@ -123,7 +124,7 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 	})
 }
 
-func TestUpdateAction_CancelledContext(t *testing.T) {
+func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		client := mocks.CreateMockClient(getCommonTestData(), false, false)
 		cancelledCtx, cancel := context.WithCancel(context.Background())
@@ -155,82 +156,52 @@ func TestUpdateAction_CancelledContext(t *testing.T) {
 	})
 }
 
-func TestUpdateAction_CancelledContextBeforeOperations(t *testing.T) {
+func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Create test data with one stale container
-		testData := getCommonTestData()
-		testData.Staleness = map[string]bool{
-			"test-container-01": true,
-			"test-container-02": false,
-			"test-container-03": false,
-		}
+		ctx, cancel := context.WithCancel(context.Background())
+		client := mocks.CreateMockClientWithContext(ctx, getCommonTestData(), false, false)
 
-		client := mocks.CreateMockClient(testData, false, false)
+		// Start update in a goroutine
+		done := make(chan struct{})
 
-		// Use a context that will be cancelled, but after some operations might have started
-		// Since the mock doesn't actually use context, this tests the early cancellation check
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		var (
+			report types.Report
+			err    error
+		)
+
+		go func() {
+			defer close(done)
+
+			report, _, err = actions.Update(
+				ctx,
+				client,
+				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			)
+		}()
+
+		// Wait a bit to allow operations to start, then cancel
+		time.Sleep(5 * time.Millisecond)
 		cancel()
 
-		report, cleanupImageInfos, err := actions.Update(
-			cancelledCtx,
-			client,
-			actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
-		)
+		// Wait for the update to complete
+		<-done
 
 		synctest.Wait()
 
+		// Depending on when cancellation occurred, err might be context canceled or nil with failed operations
+		if err != nil && !strings.Contains(err.Error(), "context canceled") {
+			t.Fatalf("unexpected error: %s", err.Error())
+		}
+
+		// If no early cancellation, check that operations failed due to context
 		if err == nil {
-			t.Fatal("expected error")
-		}
-
-		if !strings.Contains(err.Error(), "update cancelled") {
-			t.Fatalf("expected 'update cancelled', got %s", err.Error())
-		}
-
-		if report != nil {
-			t.Fatal("expected nil report")
-		}
-
-		if len(cleanupImageInfos) != 0 {
-			t.Fatal("expected empty cleanupImageInfos")
-		}
-	})
-}
-
-func TestUpdateAction_CancelledContextDependencyScenario(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// Create test data with dependencies to verify cancellation handling
-		testData := getCommonTestData()
-
-		client := mocks.CreateMockClient(testData, false, false)
-
-		// Since we can't easily simulate timeout in sorting, test with cancelled context
-		cancelledCtx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		report, cleanupImageInfos, err := actions.Update(
-			cancelledCtx,
-			client,
-			actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
-		)
-
-		synctest.Wait()
-
-		if err == nil {
-			t.Fatal("expected error")
-		}
-
-		if !strings.Contains(err.Error(), "update cancelled") {
-			t.Fatalf("expected 'update cancelled', got %s", err.Error())
-		}
-
-		if report != nil {
-			t.Fatal("expected nil report")
-		}
-
-		if len(cleanupImageInfos) != 0 {
-			t.Fatal("expected empty cleanupImageInfos")
+			if report == nil {
+				t.Fatal("expected report")
+			}
+			// Check that some operations failed
+			if len(report.Failed()) == 0 {
+				t.Fatal("expected some failed operations due to cancellation")
+			}
 		}
 	})
 }
