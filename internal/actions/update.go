@@ -931,16 +931,6 @@ func restartStaleContainer(
 	// Rename Watchtower containers regardless of NoRestart flag, but skip in run-once mode
 	// as there's no need to avoid conflicts with a continuously running instance.
 	if container.IsWatchtower() && !params.RunOnce {
-		// Check pull success before renaming
-		stale, _, err := client.IsContainerStale(container, params)
-		if err != nil || !stale {
-			logrus.WithFields(fields).
-				WithError(err).
-				Debug("Skipping Watchtower self-update due to pull failure or non-stale image")
-
-			return container.ID(), false, nil // Skip self-update without error
-		}
-
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{

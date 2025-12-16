@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(client.TestData.RenameContainerCount).
 				To(gomega.Equal(1), "RenameContainer should be called once")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(2), "IsContainerStale should be called twice for Watchtower")
+				To(gomega.Equal(1), "IsContainerStale should be called once for Watchtower")
 		})
 	})
 

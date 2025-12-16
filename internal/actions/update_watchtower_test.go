@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			gomega.Expect(client.TestData.StopContainerCount).
 				To(gomega.Equal(1), "StopContainer should be called once for old Watchtower")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(2), "IsContainerStale should be called twice for Watchtower")
+				To(gomega.Equal(1), "IsContainerStale should be called once for Watchtower")
 		})
 
 		ginkgo.It("should skip rename with no-restart for Watchtower", func() {
