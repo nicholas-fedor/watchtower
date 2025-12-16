@@ -133,7 +133,7 @@ func CompareDigest(
 		Debug("Fetched remote digest")
 
 	// Compare the fetched remote digest with the container’s local digests.
-	matches := digestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
+	matches := DigestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
 	logrus.WithFields(fields).WithField("matches", matches).Debug("Completed digest comparison")
 
 	return matches, nil
@@ -807,7 +807,7 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 	return normalizedDigest, nil
 }
 
-// digestsMatch compares a list of local digests with a remote digest to determine if there’s a match.
+// DigestsMatch compares a list of local digests with a remote digest to determine if there’s a match.
 // It normalizes both the remote digest and each local digest, checking for equality to confirm
 // whether the container’s image is up-to-date with the registry’s latest version.
 //
@@ -817,7 +817,7 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 //
 // Returns:
 //   - bool: True if any normalized local digest matches the normalized remote digest, false otherwise.
-func digestsMatch(localDigests []string, remoteDigest string) bool {
+func DigestsMatch(localDigests []string, remoteDigest string) bool {
 	// Normalize the remote digest once for efficiency.
 	normalizedRemoteDigest := NormalizeDigest(remoteDigest)
 

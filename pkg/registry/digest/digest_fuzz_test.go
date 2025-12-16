@@ -81,28 +81,6 @@ func FuzzNormalizeDigest(f *testing.F) {
 	})
 }
 
-// digestsMatch replicates digest.digestsMatch logic.
-func digestsMatch(localDigests []string, remoteDigest string) bool {
-	if len(localDigests) == 0 {
-		return false
-	}
-
-	normalizedRemote := digest.NormalizeDigest(remoteDigest)
-
-	for _, local := range localDigests {
-		parts := strings.SplitN(local, "@", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		if digest.NormalizeDigest(parts[1]) == normalizedRemote {
-			return true
-		}
-	}
-
-	return false
-}
-
 // FuzzDigestsMatch fuzzes the digestsMatch function to ensure robust handling of malformed inputs.
 // It tests arrays of digest strings and remote digest strings with various edge cases.
 func FuzzDigestsMatch(f *testing.F) {
@@ -133,8 +111,8 @@ func FuzzDigestsMatch(f *testing.F) {
 		var localDigests []string
 		// Ignore unmarshal errors to test robustness with malformed JSON
 		json.Unmarshal([]byte(localJSON), &localDigests)
-		// Call digestsMatch; we don't care about the result, just that it doesn't panic
-		digestsMatch(localDigests, remote)
+		// Call DigestsMatch; we don't care about the result, just that it doesn't panic
+		digest.DigestsMatch(localDigests, remote)
 	})
 }
 

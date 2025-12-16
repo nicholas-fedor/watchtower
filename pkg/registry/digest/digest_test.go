@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -139,25 +138,6 @@ var _ = ginkgo.Describe("Digests", func() {
 		return digest.NormalizeDigest(digestHeader), nil
 	}
 
-	// digestsMatch replicates digest.digestsMatch logic
-	digestsMatch := func(localDigests []string, remoteDigest string) bool {
-		if len(localDigests) == 0 {
-			return false
-		}
-		normalizedRemote := digest.NormalizeDigest(remoteDigest)
-		for _, local := range localDigests {
-			parts := strings.SplitN(local, "@", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			if digest.NormalizeDigest(parts[1]) == normalizedRemote {
-				return true
-			}
-		}
-
-		return false
-	}
-
 	ginkgo.When("a digest comparison is done", func() {
 		ginkgo.It("should return true if digests match",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
@@ -231,7 +211,10 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			remoteDigest, err := extractHeadDigest(resp)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			matches := digestsMatch(mockContainerEmptyDigests.ImageInfo().RepoDigests, remoteDigest)
+			matches := digest.DigestsMatch(
+				mockContainerEmptyDigests.ImageInfo().RepoDigests,
+				remoteDigest,
+			)
 			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
@@ -299,7 +282,10 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			remoteDigest, err := extractHeadDigest(resp)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			matches := digestsMatch(mockContainerWithServer.ImageInfo().RepoDigests, remoteDigest)
+			matches := digest.DigestsMatch(
+				mockContainerWithServer.ImageInfo().RepoDigests,
+				remoteDigest,
+			)
 			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
@@ -580,7 +566,7 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			remoteDigest, err := extractHeadDigest(resp)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			matches := digestsMatch(
+			matches := digest.DigestsMatch(
 				mockContainerWithInvalidDigest.ImageInfo().RepoDigests,
 				remoteDigest,
 			)
@@ -893,7 +879,10 @@ var _ = ginkgo.Describe("Digests", func() {
 
 			remoteDigest, err := extractHeadDigest(resp)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			matches := digestsMatch(mockContainerWithServer.ImageInfo().RepoDigests, remoteDigest)
+			matches := digest.DigestsMatch(
+				mockContainerWithServer.ImageInfo().RepoDigests,
+				remoteDigest,
+			)
 			gomega.Expect(matches).To(gomega.BeTrue())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
 		})
@@ -1104,21 +1093,21 @@ var _ = ginkgo.Describe("Digests", func() {
 		ginkgo.It("should handle malformed local digests without @ separator", func() {
 			localDigests := []string{"malformed-digest"}
 			remoteDigest := mockDigestHash
-			result := digestsMatch(localDigests, remoteDigest)
+			result := digest.DigestsMatch(localDigests, remoteDigest)
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("should handle local digests with empty parts after @", func() {
 			localDigests := []string{"repo@"}
 			remoteDigest := mockDigestHash
-			result := digestsMatch(localDigests, remoteDigest)
+			result := digest.DigestsMatch(localDigests, remoteDigest)
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("should handle local digests with only one part after @", func() {
 			localDigests := []string{"repo@singlepart"}
 			remoteDigest := mockDigestHash
-			result := digestsMatch(localDigests, remoteDigest)
+			result := digest.DigestsMatch(localDigests, remoteDigest)
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
@@ -1127,21 +1116,21 @@ var _ = ginkgo.Describe("Digests", func() {
 				"repo@namespace@" + mockDigestHash,
 			}
 			remoteDigest := mockDigestHash
-			result := digestsMatch(localDigests, remoteDigest)
+			result := digest.DigestsMatch(localDigests, remoteDigest)
 			gomega.Expect(result).To(gomega.BeFalse()) // Should not match due to malformed format
 		})
 
 		ginkgo.It("should handle empty local digests slice", func() {
 			localDigests := []string{}
 			remoteDigest := mockDigestHash
-			result := digestsMatch(localDigests, remoteDigest)
+			result := digest.DigestsMatch(localDigests, remoteDigest)
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("should handle nil local digests slice", func() {
 			var localDigests []string
 			remoteDigest := mockDigestHash
-			result := digestsMatch(localDigests, remoteDigest)
+			result := digest.DigestsMatch(localDigests, remoteDigest)
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
