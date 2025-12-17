@@ -148,8 +148,8 @@ var _ = ginkgo.Describe("Actions", func() {
 			})
 		})
 
-		ginkgo.When("executeUpdate returns an error", func() {
-			ginkgo.It("should return zero metric on update failure", func() {
+		ginkgo.When("no containers are provided", func() {
+			ginkgo.It("should return zero metric when container list is empty", func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{},
@@ -179,7 +179,7 @@ var _ = ginkgo.Describe("Actions", func() {
 					PullFailureDelay:             time.Duration(0),
 				}
 
-				// Mock will cause executeUpdate to return an error
+				// Empty container list results in zero metrics
 				metric := RunUpdatesWithNotifications(context.Background(), params)
 
 				gomega.Expect(metric).NotTo(gomega.BeNil())
@@ -726,10 +726,10 @@ var _ = ginkgo.Describe("Actions", func() {
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
-		ginkgo.It("should skip nil containers in all processing loops", func() {
+		ginkgo.It("should handle empty container lists gracefully", func() {
 			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
 
-			// Return empty slices instead of slices with nil elements to avoid panics in logging
+			// Return empty slices - all lists are empty
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
@@ -767,14 +767,10 @@ var _ = ginkgo.Describe("Actions", func() {
 			gomega.Expect(cleanedImages[0].ContainerName).To(gomega.Equal("test-container"))
 		})
 
-		ginkgo.It("should handle cleanup errors gracefully", func() {
-			// This test verifies that when CleanupImages returns an error,
-			// the function logs the error but still returns a valid slice
+		ginkgo.It("should return a valid slice when cleanup input is empty", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			// The mock client doesn't simulate errors, but we can test the nil return case
-			// by ensuring the function handles the case where cleaned is nil
 			cleanedImages := performImageCleanup(client, true, []types.CleanedImageInfo{})
-			// Should return a valid slice even if cleanup fails
+			// Should return a valid slice even with empty input
 			gomega.Expect(cleanedImages).NotTo(gomega.BeNil())
 		})
 	})
