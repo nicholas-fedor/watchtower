@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Refactor and realign test scope of actions_test.go file by @nicholas-fedor in [#1100](https://github.com/nicholas-fedor/watchtower/pull/1100)
+- Ensure local image staleness checking for --no-pull flag by @nicholas-fedor in [#1099](https://github.com/nicholas-fedor/watchtower/pull/1099)
+
+## [1.13.0] - 2025-12-16
+
 ### Chores
 
 - Update github/codeql-action digest to 5d4e8d1 by @renovate[bot] in [#1097](https://github.com/nicholas-fedor/watchtower/pull/1097)
@@ -2453,7 +2460,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.12.5...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.13.0...HEAD)
+- [1.13.0](https://github.com/nicholas-fedor/watchtower/compare/v1.12.5...v1.13.0)
 - [1.12.5](https://github.com/nicholas-fedor/watchtower/compare/v1.12.4...v1.12.5)
 - [1.12.4](https://github.com/nicholas-fedor/watchtower/compare/v1.12.3...v1.12.4)
 - [1.12.3](https://github.com/nicholas-fedor/watchtower/compare/v1.12.2...v1.12.3)
