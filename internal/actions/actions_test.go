@@ -226,6 +226,31 @@ var _ = ginkgo.Describe("Actions", func() {
 			gomega.Expect(entries[0].Message).To(gomega.Equal("Removing image"))
 			gomega.Expect(entries[0].Data["container_name"]).To(gomega.Equal("test-container"))
 		})
+
+		ginkgo.It("should return multiple entries for multiple matches", func() {
+			cleanedImages := []types.CleanedImageInfo{
+				{
+					ContainerName: "test-container",
+					ImageName:     "image:v1.0",
+					ImageID:       types.ImageID("sha256:123"),
+				},
+				{
+					ContainerName: "test-container",
+					ImageName:     "image:v2.0",
+					ImageID:       types.ImageID("sha256:456"),
+				},
+				{
+					ContainerName: "other-container",
+					ImageName:     "image:v3.0",
+					ImageID:       types.ImageID("sha256:789"),
+				},
+			}
+
+			entries := buildCleanupEntriesForContainer(cleanedImages, "test-container")
+			gomega.Expect(entries).To(gomega.HaveLen(2))
+			gomega.Expect(entries[0].Message).To(gomega.Equal("Removing image"))
+			gomega.Expect(entries[1].Message).To(gomega.Equal("Removing image"))
+		})
 	})
 
 	ginkgo.Describe("buildUpdateEntries", func() {
@@ -285,6 +310,14 @@ var _ = ginkgo.Describe("Actions", func() {
 			gomega.Expect(entries[0].Message).To(gomega.Equal(FoundNewImageMessage))
 			gomega.Expect(entries[1].Message).To(gomega.Equal(UpdateSkippedMessage))
 			gomega.Expect(entries[2].Message).To(gomega.Equal(ContainerRemainsRunningMessage))
+		})
+
+		ginkgo.It("should handle nil container gracefully", func() {
+			now := time.Now()
+			// This will panic with nil pointer dereference, so we expect it to panic
+			gomega.Expect(func() {
+				buildUpdateEntries(nil, types.ContainerID(""), types.ContainerID(""), now)
+			}).To(gomega.Panic())
 		})
 	})
 
@@ -492,6 +525,23 @@ var _ = ginkgo.Describe("Actions", func() {
 			gomega.Expect(metric.Scanned).To(gomega.Equal(2))
 			gomega.Expect(metric.Updated).To(gomega.Equal(1))
 			gomega.Expect(metric.Failed).To(gomega.Equal(1))
+			gomega.Expect(metric.Restarted).To(gomega.Equal(0))
+		})
+
+		ginkgo.It("should handle empty report gracefully", func() {
+			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+
+			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+
+			metric := generateAndLogMetric(mockReport)
+
+			gomega.Expect(metric).NotTo(gomega.BeNil())
+			gomega.Expect(metric.Scanned).To(gomega.Equal(0))
+			gomega.Expect(metric.Updated).To(gomega.Equal(0))
+			gomega.Expect(metric.Failed).To(gomega.Equal(0))
 			gomega.Expect(metric.Restarted).To(gomega.Equal(0))
 		})
 	})
