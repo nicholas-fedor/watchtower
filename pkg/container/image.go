@@ -42,17 +42,6 @@ type imageClient struct {
 	api dockerClient.APIClient
 }
 
-// newImageClient creates a new imageClient instance.
-//
-// Parameters:
-//   - api: Docker API client.
-//
-// Returns:
-//   - imageClient: Initialized client for image operations.
-func newImageClient(api dockerClient.APIClient) imageClient {
-	return imageClient{api: api}
-}
-
 // IsContainerStale determines if a container’s image is outdated.
 //
 // It skips pulling if NoPull is set, otherwise pulls and compares images.
@@ -79,9 +68,7 @@ func (c imageClient) IsContainerStale(
 
 	// Skip pull if NoPull is enabled.
 	if sourceContainer.IsNoPull(params) {
-		clog.Debug("Skipping image pull due to no-pull setting")
-
-		return false, sourceContainer.SafeImageID(), nil
+		return c.checkLocalImageStaleness(ctx, sourceContainer, clog)
 	}
 
 	if err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed); err != nil {
@@ -197,6 +184,91 @@ func (c imageClient) PullImage(
 	return c.performImagePull(ctx, sourceContainer.ImageName(), opts, fields)
 }
 
+// RemoveImageByID deletes an image from the Docker host.
+//
+// It removes the image with force and pruning, logging details if debug enabled.
+//
+// Parameters:
+//   - imageID: ID of the image to remove.
+//   - imageName: Name of the image to remove (for logging purposes).
+//
+// Returns:
+//   - error: Non-nil if removal fails, nil on success.
+func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) error {
+	clog := logrus.WithFields(logrus.Fields{
+		"image_id":   imageID.ShortID(),
+		"image_name": imageName,
+	})
+	clog.WithField("notify", "yes").Info("Removing image")
+
+	// Perform image removal with force and pruning.
+	items, err := c.api.ImageRemove(
+		context.Background(),
+		string(imageID),
+		dockerImage.RemoveOptions{
+			Force:         true,
+			PruneChildren: true,
+		},
+	)
+	if err != nil {
+		if cerrdefs.IsNotFound(err) {
+			clog.WithError(err).Debug("Image not found, no removal needed")
+
+			return fmt.Errorf("%w: %s", err, imageID)
+		}
+
+		clog.WithError(err).Debug("Failed to remove image")
+
+		return fmt.Errorf("%w: %s: %w", errRemoveImageFailed, imageID, err)
+	}
+
+	clog.Debug("Cleaned up old image")
+
+	// Log removal details if debug is enabled.
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		deleted := strings.Builder{}
+		untagged := strings.Builder{}
+
+		for _, item := range items {
+			if item.Deleted != "" {
+				if deleted.Len() > 0 {
+					deleted.WriteString(", ")
+				}
+
+				deleted.WriteString(types.ImageID(item.Deleted).ShortID())
+			}
+
+			if item.Untagged != "" {
+				if untagged.Len() > 0 {
+					untagged.WriteString(", ")
+				}
+
+				untagged.WriteString(types.ImageID(item.Untagged).ShortID())
+			}
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"deleted":    deleted.String(),
+			"image_id":   imageID.ShortID(),
+			"image_name": imageName,
+			"untagged":   untagged.String(),
+		}).Debug("Image removal details")
+	}
+
+	return nil
+}
+
+// newImageClient creates a new imageClient instance.
+//
+// Parameters:
+//   - api: Docker API client.
+//
+// Returns:
+//   - imageClient: Initialized client for image operations.
+func newImageClient(api dockerClient.APIClient) imageClient {
+	return imageClient{api: api}
+}
+
 // shouldSkipPull determines if an image pull can be skipped.
 //
 // It compares digests via HEAD request to avoid unnecessary pulls.
@@ -299,80 +371,6 @@ func (c imageClient) performImagePull(
 	return nil
 }
 
-// RemoveImageByID deletes an image from the Docker host.
-//
-// It removes the image with force and pruning, logging details if debug enabled.
-//
-// Parameters:
-//   - imageID: ID of the image to remove.
-//   - imageName: Name of the image to remove (for logging purposes).
-//
-// Returns:
-//   - error: Non-nil if removal fails, nil on success.
-func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) error {
-	clog := logrus.WithFields(logrus.Fields{
-		"image_id":   imageID.ShortID(),
-		"image_name": imageName,
-	})
-	clog.WithField("notify", "yes").Info("Removing image")
-
-	// Perform image removal with force and pruning.
-	items, err := c.api.ImageRemove(
-		context.Background(),
-		string(imageID),
-		dockerImage.RemoveOptions{
-			Force:         true,
-			PruneChildren: true,
-		},
-	)
-	if err != nil {
-		if cerrdefs.IsNotFound(err) {
-			clog.WithError(err).Debug("Image not found, no removal needed")
-
-			return fmt.Errorf("%w: %s", err, imageID)
-		}
-
-		clog.WithError(err).Debug("Failed to remove image")
-
-		return fmt.Errorf("%w: %s: %w", errRemoveImageFailed, imageID, err)
-	}
-
-	clog.Debug("Cleaned up old image")
-
-	// Log removal details if debug is enabled.
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		deleted := strings.Builder{}
-		untagged := strings.Builder{}
-
-		for _, item := range items {
-			if item.Deleted != "" {
-				if deleted.Len() > 0 {
-					deleted.WriteString(", ")
-				}
-
-				deleted.WriteString(types.ImageID(item.Deleted).ShortID())
-			}
-
-			if item.Untagged != "" {
-				if untagged.Len() > 0 {
-					untagged.WriteString(", ")
-				}
-
-				untagged.WriteString(types.ImageID(item.Untagged).ShortID())
-			}
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"deleted":    deleted.String(),
-			"image_id":   imageID.ShortID(),
-			"image_name": imageName,
-			"untagged":   untagged.String(),
-		}).Debug("Image removal details")
-	}
-
-	return nil
-}
-
 // warnOnHeadFailed decides whether to warn about failed HEAD requests during image pulls.
 // It evaluates the warning strategy: "always" returns true, "never" returns false, and "auto" delegates
 // to registry-specific logic.
@@ -396,4 +394,41 @@ func (c imageClient) warnOnHeadFailed(
 	}
 
 	return registry.WarnOnAPIConsumption(sourceContainer)
+}
+
+// checkLocalImageStaleness checks if a container's image is stale without pulling.
+//
+// It performs local image inspection and comparison, handling logging.
+//
+// Parameters:
+//   - ctx: Context for operation control.
+//   - sourceContainer: Container to check.
+//   - clog: Logger with container and image fields.
+//
+// Returns:
+//   - bool: True if image is stale, false otherwise.
+//   - types.ImageID: Latest image ID.
+//   - error: Non-nil if inspection fails, nil on success.
+func (c imageClient) checkLocalImageStaleness(
+	ctx context.Context,
+	sourceContainer types.Container,
+	clog *logrus.Entry,
+) (bool, types.ImageID, error) {
+	clog.Debug("Skipping image pull due to no-pull setting - checking local image only")
+	clog.WithField("current_image_id", sourceContainer.SafeImageID()).
+		Debug("Current container image ID")
+
+	stale, latestID, err := c.HasNewImage(ctx, sourceContainer)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to check local image")
+
+		return false, sourceContainer.SafeImageID(), err
+	}
+
+	clog.WithFields(logrus.Fields{
+		"stale":           stale,
+		"latest_image_id": latestID,
+	}).Debug("Local image check result")
+
+	return stale, latestID, nil
 }
