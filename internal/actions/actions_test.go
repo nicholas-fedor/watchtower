@@ -178,6 +178,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockContainerReport := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
 			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
 
+			mockContainerReport.EXPECT().Error().Return("")
 			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainerReport})
 			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
@@ -188,7 +189,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			gomega.Expect(result).NotTo(gomega.BeNil())
 			gomega.Expect(result.RestartedReports).To(gomega.HaveLen(1))
-			gomega.Expect(result.RestartedReports[0]).To(gomega.HaveOccurred())
+			gomega.Expect(result.RestartedReports[0].Error()).To(gomega.BeEmpty())
 			gomega.Expect(result.ScannedReports).To(gomega.HaveLen(1))
 			gomega.Expect(result.FailedReports).To(gomega.BeEmpty())
 			gomega.Expect(result.SkippedReports).To(gomega.BeEmpty())
@@ -328,8 +329,8 @@ var _ = ginkgo.Describe("Actions", func() {
 			// We expect some result or error, but mainly that it doesn't panic
 			gomega.Expect(result).NotTo(gomega.BeNil())
 			gomega.Expect(cleanupImages).NotTo(gomega.BeNil())
-			// err can be nil or not depending on the mock
-			_ = err
+			// For this mock configuration, we expect no error
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
 
@@ -384,9 +385,19 @@ var _ = ginkgo.Describe("Actions", func() {
 
 		ginkgo.It("should call sendSplitNotifications when split is true", func() {
 			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
-			// Since sendSplitNotifications is called internally, we can't easily mock it
-			// This test would require more complex setup, so we'll test the nil notifier case
-			sendNotifications(nil, true, false, mockReport, []types.CleanedImageInfo{})
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+
+			// Set up mock expectations for split notification behavior
+			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
+
+			sendNotifications(notifier, true, false, mockReport, []types.CleanedImageInfo{})
+			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 	})
 
@@ -421,6 +432,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 		ginkgo.It("should handle empty results gracefully", func() {
 			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
@@ -430,7 +442,9 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			sendSplitNotifications(nil, true, mockReport, []types.CleanedImageInfo{})
+			// With empty results, no notifications should be sent
+			sendSplitNotifications(notifier, true, mockReport, []types.CleanedImageInfo{})
+			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 	})
 
@@ -439,6 +453,20 @@ var _ = ginkgo.Describe("Actions", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 			cleanedImages := performImageCleanup(client, false, []types.CleanedImageInfo{})
 			gomega.Expect(cleanedImages).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should perform cleanup when cleanup is enabled", func() {
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+			cleanedImages := performImageCleanup(client, true, []types.CleanedImageInfo{
+				{
+					ContainerName: "test-container",
+					ImageName:     "test-image:v1.0",
+					ImageID:       types.ImageID("sha256:123"),
+				},
+			})
+			// The function should return the cleaned images when cleanup is enabled
+			gomega.Expect(cleanedImages).To(gomega.HaveLen(1))
+			gomega.Expect(cleanedImages[0].ContainerName).To(gomega.Equal("test-container"))
 		})
 	})
 
