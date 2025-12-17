@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -10,6 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
 	dockerClient "github.com/docker/docker/client"
 	gomegaTypes "github.com/onsi/gomega/types"
 
@@ -100,6 +103,118 @@ var _ = ginkgo.Describe("the client", func() {
 				c := client{api: docker}
 				err := c.RemoveImageByID(types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
+			})
+		})
+	})
+	ginkgo.When("checking container staleness with no-pull", func() {
+		ginkgo.When("no newer local image exists", func() {
+			ginkgo.It("should return false and current image ID", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/test-image:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID: currentImageID,
+						}),
+					),
+				)
+				c := client{api: docker}
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
+				stale, latestID, err := c.IsContainerStale(
+					container,
+					types.UpdateParams{NoPull: true},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeFalse())
+				gomega.Expect(latestID).To(gomega.Equal(types.ImageID(currentImageID)))
+				gomega.Eventually(logbuf).
+					Should(gbytes.Say(`msg="Skipping image pull due to no-pull setting - checking local image only"`))
+				gomega.Eventually(logbuf).Should(gbytes.Say(`msg="No new image found"`))
+			})
+		})
+		ginkgo.When("a newer local image exists", func() {
+			ginkgo.It("should return true and new image ID", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				newImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/test-image:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID: newImageID,
+						}),
+					),
+				)
+				c := client{api: docker}
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
+				stale, latestID, err := c.IsContainerStale(
+					container,
+					types.UpdateParams{NoPull: true},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeTrue())
+				gomega.Expect(latestID).To(gomega.Equal(types.ImageID(newImageID)))
+				gomega.Eventually(logbuf).
+					Should(gbytes.Say(`msg="Skipping image pull due to no-pull setting - checking local image only"`))
+				gomega.Eventually(logbuf).Should(gbytes.Say(`msg="Found new image"`))
+			})
+		})
+		ginkgo.When("image inspection fails", func() {
+			ginkgo.It("should return an error", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/test-image:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusNotFound,
+							map[string]string{"message": "No such image"},
+						),
+					),
+				)
+				c := client{api: docker}
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
+				stale, latestID, err := c.IsContainerStale(
+					container,
+					types.UpdateParams{NoPull: true},
+				)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(stale).To(gomega.BeFalse())
+				gomega.Expect(latestID).To(gomega.Equal(types.ImageID(currentImageID)))
+				gomega.Eventually(logbuf).
+					Should(gbytes.Say(`msg="Skipping image pull due to no-pull setting - checking local image only"`))
+				gomega.Eventually(logbuf).Should(gbytes.Say(`msg="Failed to inspect latest image"`))
 			})
 		})
 	})
