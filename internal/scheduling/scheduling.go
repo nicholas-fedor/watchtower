@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -81,9 +80,9 @@ func RunUpgradesOnSchedule(
 	lock chan bool,
 	cleanup bool,
 	scheduleSpec string,
-	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
+	writeStartupMessage func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool),
 	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool) *metrics.Metric,
-	client container.Client,
+	client types.Client,
 	scope string,
 	notifier types.Notifier,
 	metaVersion string,

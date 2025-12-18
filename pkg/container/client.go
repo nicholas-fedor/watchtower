@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/afero"
 
 	cerrdefs "github.com/containerd/errdefs"
+	dockerTypes "github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerClient "github.com/docker/docker/client"
 
@@ -37,100 +38,13 @@ var (
 	errHealthCheckFailed = errors.New("container health check failed")
 )
 
-// Client defines the interface for interacting with the Docker API within Watchtower.
-//
-// It provides methods for managing containers, images, and executing commands, abstracting the underlying Docker client operations.
-type Client interface {
-	// ListContainers retrieves a filtered list of containers running on the host.
-	//
-	// The provided filter determines which containers are included in the result.
-	ListContainers(filter types.Filter) ([]types.Container, error)
-
-	// GetContainer fetches detailed information about a specific container by its ID.
-	//
-	// Returns the container object or an error if the container cannot be retrieved.
-	GetContainer(containerID types.ContainerID) (types.Container, error)
-
-	// StopContainer stops and removes a specified container, respecting the given timeout.
-	//
-	// It ensures the container is no longer running or present on the host.
-	StopContainer(container types.Container, timeout time.Duration) error
-
-	// StartContainer creates and starts a new container based on the provided container's configuration.
-	//
-	// Returns the new container's ID or an error if creation or startup fails.
-	StartContainer(container types.Container) (types.ContainerID, error)
-
-	// RenameContainer renames an existing container to the specified new name.
-	//
-	// Returns an error if the rename operation fails.
-	RenameContainer(container types.Container, newName string) error
-
-	// IsContainerStale checks if a container's image is outdated compared to the latest available version.
-	//
-	// Returns whether the container is stale, the latest image ID, and any error encountered.
-	IsContainerStale(
-		container types.Container,
-		params types.UpdateParams,
-	) (bool, types.ImageID, error)
-
-	// ExecuteCommand runs a command inside a container and returns whether to skip updates based on the result.
-	//
-	// The timeout specifies how long to wait for the command to complete.
-	// UID and GID specify the user to run the command as, defaulting to container's configured user.
-	ExecuteCommand(
-		container types.Container,
-		command string,
-		timeout int,
-		uid int,
-		gid int,
-	) (bool, error)
-
-	// RemoveImageByID deletes an image from the Docker host by its ID.
-	//
-	// Parameters:
-	//   - imageID: ID of the image to remove.
-	//   - imageName: Name of the image to remove (for logging purposes).
-	//
-	// Returns an error if the removal fails.
-	RemoveImageByID(imageID types.ImageID, imageName string) error
-
-	// WarnOnHeadPullFailed determines whether to log a warning when a HEAD request fails during image pulls.
-	//
-	// The decision is based on the configured warning strategy and container context.
-	WarnOnHeadPullFailed(container types.Container) bool
-
-	// GetVersion returns the client's API version.
-	GetVersion() string
-
-	// GetInfo returns system information from the Docker daemon.
-	//
-	// Returns system-wide information about the Docker installation.
-	GetInfo() (map[string]any, error)
-
-	// WaitForContainerHealthy waits for a container to become healthy or times out.
-	//
-	// It polls the container's health status until it reports "healthy" or the timeout is reached.
-	// If the container has no health check configured, it returns immediately.
-	WaitForContainerHealthy(containerID types.ContainerID, timeout time.Duration) error
-
-	// ListAllContainers retrieves a list of all containers from the Docker host, regardless of status.
-	//
-	// Returns all containers without filtering by status or other criteria.
-	ListAllContainers() ([]types.Container, error)
-
-	// UpdateContainer updates the configuration of an existing container.
-	//
-	// It modifies container settings such as restart policy using the Docker API ContainerUpdate.
-	UpdateContainer(container types.Container, config dockerContainer.UpdateConfig) error
-}
-
 // client is the concrete implementation of the Client interface.
 //
 // It wraps the Docker API client and applies custom behavior via ClientOptions.
 type client struct {
 	api dockerClient.APIClient
 	ClientOptions
+	registryConfig *types.RegistryConfig
 }
 
 // ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
@@ -156,7 +70,7 @@ type ClientOptions struct {
 //
 // Returns:
 //   - Client: Initialized client instance (exits on failure).
-func NewClient(opts ClientOptions) Client {
+func NewClient(opts ClientOptions) types.Client {
 	ctx := context.Background()
 
 	// Initialize client with autonegotiation, ignoring DOCKER_API_VERSION initially.
@@ -226,7 +140,7 @@ func NewClient(opts ClientOptions) Client {
 // Returns:
 //   - []types.Container: List of matching containers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
+func (c *client) ListContainers(filter types.Filter) ([]types.Container, error) {
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
 	isPodman := c.getPodmanFlag()
 
@@ -251,7 +165,7 @@ func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
 // Returns:
 //   - types.Container: Container details if found.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c client) GetContainer(containerID types.ContainerID) (types.Container, error) {
+func (c *client) GetContainer(containerID types.ContainerID) (types.Container, error) {
 	// Retrieve container details using helper function.
 	container, err := GetSourceContainer(c.api, containerID)
 	if err != nil {
@@ -275,7 +189,7 @@ func (c client) GetContainer(containerID types.ContainerID) (types.Container, er
 //
 // Returns:
 //   - error: Non-nil if stop/removal fails, nil on success.
-func (c client) StopContainer(container types.Container, timeout time.Duration) error {
+func (c *client) StopContainer(container types.Container, timeout time.Duration) error {
 	// Stop and remove container using helper function with volume option.
 	err := StopSourceContainer(c.api, container, timeout, c.RemoveVolumes)
 	if err != nil {
@@ -303,7 +217,7 @@ func (c client) StopContainer(container types.Container, timeout time.Duration) 
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation/start fails, nil on success.
-func (c client) StartContainer(container types.Container) (types.ContainerID, error) {
+func (c *client) StartContainer(container types.Container) (types.ContainerID, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
@@ -349,7 +263,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 // Returns:
 //   - []types.Container: List of all containers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c client) ListAllContainers() ([]types.Container, error) {
+func (c *client) ListAllContainers() ([]types.Container, error) {
 	ctx := context.Background()
 	clog := logrus.WithField("list_all", true)
 
@@ -407,12 +321,12 @@ func (c client) ListAllContainers() ([]types.Container, error) {
 //
 // Returns:
 //   - error: Non-nil if update fails, nil on success.
-func (c client) UpdateContainer(
+func (c *client) UpdateContainer(
 	container types.Container,
 	config dockerContainer.UpdateConfig,
 ) error {
 	ctx := context.Background()
-	clog := logrus.WithField("container_id", container.ID())
+	clog := logrus.WithField("container_id", container.ID().ShortID())
 
 	clog.Debug("Updating container configuration")
 
@@ -420,7 +334,7 @@ func (c client) UpdateContainer(
 	if err != nil {
 		clog.WithError(err).Debug("Failed to update container")
 
-		return fmt.Errorf("failed to update container %s: %w", container.ID(), err)
+		return fmt.Errorf("failed to update container %s: %w", container.ID().ShortID(), err)
 	}
 
 	clog.Debug("Container configuration updated")
@@ -436,7 +350,7 @@ func (c client) UpdateContainer(
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
-func (c client) RenameContainer(container types.Container, newName string) error {
+func (c *client) RenameContainer(container types.Container, newName string) error {
 	// Perform rename using helper function.
 	err := RenameTargetContainer(c.api, container, newName)
 	if err != nil {
@@ -463,7 +377,7 @@ func (c client) RenameContainer(container types.Container, newName string) error
 //
 // Returns:
 //   - bool: True if warning is needed, false otherwise.
-func (c client) WarnOnHeadPullFailed(container types.Container) bool {
+func (c *client) WarnOnHeadPullFailed(container types.Container) bool {
 	// Apply warning strategy based on configuration.
 	if c.WarnOnHeadFailed == WarnAlways {
 		return true
@@ -487,12 +401,12 @@ func (c client) WarnOnHeadPullFailed(container types.Container) bool {
 //   - bool: True if stale, false otherwise.
 //   - types.ImageID: Latest image ID.
 //   - error: Non-nil if check fails, nil on success.
-func (c client) IsContainerStale(
+func (c *client) IsContainerStale(
 	container types.Container,
 	params types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	// Use image client to perform staleness check.
-	imgClient := newImageClient(c.api)
+	imgClient := newImageClient(c.api, c.registryConfig)
 
 	stale, newestImage, err := imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
 	if err != nil {
@@ -524,7 +438,7 @@ func (c client) IsContainerStale(
 // Returns:
 //   - bool: True if updates should be skipped, false otherwise.
 //   - error: Non-nil if execution fails, nil on success.
-func (c client) ExecuteCommand(
+func (c *client) ExecuteCommand(
 	container types.Container,
 	command string,
 	timeout int,
@@ -532,7 +446,7 @@ func (c client) ExecuteCommand(
 	gid int,
 ) (bool, error) {
 	ctx := context.Background()
-	clog := logrus.WithField("container_id", container.ID())
+	clog := logrus.WithField("container_id", container.ID().ShortID())
 
 	// Generate JSON metadata for the container.
 	metadataJSON, err := generateContainerMetadata(container)
@@ -661,7 +575,7 @@ func generateContainerMetadata(container types.Container) (string, error) {
 // Returns:
 //   - string: Captured output if successful.
 //   - error: Non-nil if attachment or reading fails, nil on success.
-func (c client) captureExecOutput(ctx context.Context, execID string) (string, error) {
+func (c *client) captureExecOutput(ctx context.Context, execID string) (string, error) {
 	clog := logrus.WithField("exec_id", execID)
 
 	// Attach to the exec instance for output.
@@ -712,7 +626,7 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 // Returns:
 //   - bool: True if updates should be skipped (exit code 75), false otherwise.
 //   - error: Non-nil if inspection fails or command errors, nil on success.
-func (c client) waitForExecOrTimeout(
+func (c *client) waitForExecOrTimeout(
 	ctx context.Context,
 	execID string,
 	execOutput string,
@@ -790,14 +704,14 @@ func (c client) waitForExecOrTimeout(
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
+func (c *client) RemoveImageByID(imageID types.ImageID, imageName string) error {
 	// Use image client to remove the image.
-	imgClient := newImageClient(c.api)
+	imgClient := newImageClient(c.api, c.registryConfig)
 
 	err := imgClient.RemoveImageByID(imageID, imageName)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
-			"image_id":   imageID,
+			"image_id":   imageID.ShortID(),
 			"image_name": imageName,
 		}).Debug("Failed to remove image")
 
@@ -816,35 +730,216 @@ func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
 //
 // Returns:
 //   - string: Docker API version (e.g., "1.44").
-func (c client) GetVersion() string {
+func (c *client) GetVersion() string {
 	return strings.Trim(c.api.ClientVersion(), "\"")
 }
 
 // GetInfo returns system information from the Docker daemon.
 //
 // Returns:
-//   - map[string]interface{}: System information.
+//   - types.SystemInfo: System information.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c client) GetInfo() (map[string]any, error) {
+func (c *client) GetInfo() (types.SystemInfo, error) {
 	ctx := context.Background()
 
 	info, err := c.api.Info(ctx)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to get system info")
 
-		return nil, fmt.Errorf("failed to get system info: %w", err)
+		return types.SystemInfo{}, fmt.Errorf("failed to get system info: %w", err)
 	}
 
-	// Convert to map for easier access
-	infoMap := map[string]any{
-		"Name":            info.Name,
-		"ServerVersion":   info.ServerVersion,
-		"OSType":          info.OSType,
-		"OperatingSystem": info.OperatingSystem,
-		"Driver":          info.Driver,
+	// Convert to SystemInfo struct
+	var registryConfig *types.RegistryConfig
+
+	if info.RegistryConfig != nil {
+		insecureCIDRs := make([]string, len(info.RegistryConfig.InsecureRegistryCIDRs))
+		for i, cidr := range info.RegistryConfig.InsecureRegistryCIDRs {
+			insecureCIDRs[i] = cidr.String()
+		}
+
+		registryConfig = &types.RegistryConfig{
+			Mirrors:               info.RegistryConfig.Mirrors,
+			InsecureRegistryCIDRs: insecureCIDRs,
+		}
 	}
 
-	return infoMap, nil
+	systemInfo := types.SystemInfo{
+		Name:            info.Name,
+		ServerVersion:   info.ServerVersion,
+		OSType:          info.OSType,
+		OperatingSystem: info.OperatingSystem,
+		Driver:          info.Driver,
+		RegistryConfig:  registryConfig,
+	}
+
+	// Cache the registry config for mirror support
+	c.registryConfig = registryConfig
+
+	return systemInfo, nil
+}
+
+// GetServerVersion returns version information from the Docker daemon.
+//
+// Returns:
+//   - types.VersionInfo: Version information.
+//   - error: Non-nil if retrieval fails, nil on success.
+func (c *client) GetServerVersion() (types.VersionInfo, error) {
+	ctx := context.Background()
+
+	version, err := c.api.ServerVersion(ctx)
+	if err != nil {
+		logrus.WithError(err).Debug("Failed to get server version")
+
+		return types.VersionInfo{}, fmt.Errorf("failed to get server version: %w", err)
+	}
+
+	// Convert to VersionInfo struct
+	versionInfo := types.VersionInfo{
+		Version:       version.Version,
+		APIVersion:    version.APIVersion,
+		MinAPIVersion: version.MinAPIVersion,
+		GitCommit:     version.GitCommit,
+		GoVersion:     version.GoVersion,
+		Os:            version.Os,
+		Arch:          version.Arch,
+		KernelVersion: version.KernelVersion,
+		Experimental:  version.Experimental,
+		BuildTime:     version.BuildTime,
+	}
+
+	return versionInfo, nil
+}
+
+// GetDiskUsage returns disk usage information from the Docker daemon.
+//
+// Returns:
+//   - types.DiskUsage: Disk usage statistics.
+//   - error: Non-nil if retrieval fails, nil on success.
+func (c *client) GetDiskUsage() (types.DiskUsage, error) {
+	ctx := context.Background()
+
+	usage, err := c.api.DiskUsage(ctx, dockerTypes.DiskUsageOptions{})
+	if err != nil {
+		logrus.WithError(err).Debug("Failed to get disk usage")
+
+		return types.DiskUsage{}, fmt.Errorf("failed to get disk usage: %w", err)
+	}
+
+	// Convert to types.DiskUsage
+	diskUsage := types.DiskUsage{
+		LayersSize: usage.LayersSize,
+	}
+
+	// Convert images
+	if usage.Images != nil {
+		diskUsage.Images = make([]types.ImageSummary, len(usage.Images))
+		for i, img := range usage.Images {
+			diskUsage.Images[i] = types.ImageSummary{
+				ID:          img.ID,
+				ParentID:    img.ParentID,
+				RepoTags:    img.RepoTags,
+				RepoDigests: img.RepoDigests,
+				Created:     img.Created,
+				Size:        img.Size,
+				SharedSize:  img.SharedSize,
+				VirtualSize: img.Size, // Use Size instead of deprecated VirtualSize
+				Labels:      img.Labels,
+				Containers:  img.Containers,
+			}
+		}
+	}
+
+	// Convert containers
+	if usage.Containers != nil {
+		diskUsage.Containers = make([]types.ContainerSummary, len(usage.Containers))
+		for i, cont := range usage.Containers {
+			diskUsage.Containers[i] = types.ContainerSummary{
+				ID:         cont.ID,
+				Names:      cont.Names,
+				Image:      cont.Image,
+				ImageID:    cont.ImageID,
+				Command:    cont.Command,
+				Created:    cont.Created,
+				SizeRw:     cont.SizeRw,
+				SizeRootFs: cont.SizeRootFs,
+				Labels:     cont.Labels,
+				State:      cont.State,
+				Status:     cont.Status,
+			}
+			// Convert ports
+			if cont.Ports != nil {
+				diskUsage.Containers[i].Ports = make([]types.Port, len(cont.Ports))
+				for j, port := range cont.Ports {
+					diskUsage.Containers[i].Ports[j] = types.Port{
+						IP:          port.IP,
+						PrivatePort: port.PrivatePort,
+						PublicPort:  port.PublicPort,
+						Type:        port.Type,
+					}
+				}
+			}
+		}
+	}
+
+	// Convert volumes
+	if usage.Volumes != nil {
+		diskUsage.Volumes = make([]types.VolumeSummary, len(usage.Volumes))
+		for i, vol := range usage.Volumes {
+			diskUsage.Volumes[i] = types.VolumeSummary{
+				Name:       vol.Name,
+				Driver:     vol.Driver,
+				Mountpoint: vol.Mountpoint,
+				CreatedAt:  vol.CreatedAt,
+				Status:     vol.Status,
+				Labels:     vol.Labels,
+				Scope:      vol.Scope,
+				Options:    vol.Options,
+			}
+			if vol.UsageData != nil {
+				diskUsage.Volumes[i].UsageData = &types.VolumeUsageData{
+					Size:     vol.UsageData.Size,
+					RefCount: vol.UsageData.RefCount,
+				}
+			}
+		}
+	}
+
+	return diskUsage, nil
+}
+
+// GetTotalDiskUsage returns the total disk usage from the Docker daemon.
+//
+// Returns:
+//   - int64: Total disk usage size.
+//   - error: Non-nil if retrieval fails, nil on success.
+func (c *client) GetTotalDiskUsage() (int64, error) {
+	diskUsage, err := c.GetDiskUsage()
+	if err != nil {
+		return 0, err
+	}
+
+	// Calculate total disk usage including all components
+	totalSize := diskUsage.LayersSize
+
+	// Add container disk usage
+	for _, container := range diskUsage.Containers {
+		totalSize += container.SizeRw + container.SizeRootFs
+	}
+
+	// Add volume disk usage
+	for _, volume := range diskUsage.Volumes {
+		if volume.UsageData != nil {
+			totalSize += volume.UsageData.Size
+		}
+	}
+
+	// Add build cache disk usage
+	for _, cache := range diskUsage.BuildCache {
+		totalSize += cache.Size
+	}
+
+	return totalSize, nil
 }
 
 // detectPodman determines if the container runtime is Podman using multiple detection methods.
@@ -852,7 +947,7 @@ func (c client) GetInfo() (map[string]any, error) {
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
 //   - error: Non-nil if detection fails, nil on success.
-func (c client) detectPodman() (bool, error) {
+func (c *client) detectPodman() (bool, error) {
 	// Check for Podman marker file
 	if _, err := c.Fs.Stat("/run/.containerenv"); err == nil {
 		logrus.Debug("Detected Podman via marker file /run/.containerenv")
@@ -883,16 +978,14 @@ func (c client) detectPodman() (bool, error) {
 		return false, err
 	}
 
-	if name, exists := info["Name"]; exists && name == "podman" {
+	if info.Name == "podman" {
 		logrus.Debug("Detected Podman via API Name field")
 
 		return true, nil
-	} else if serverVersion, exists := info["ServerVersion"]; exists {
-		if sv, ok := serverVersion.(string); ok && strings.Contains(strings.ToLower(sv), "podman") {
-			logrus.Debug("Detected Podman via API ServerVersion field")
+	} else if strings.Contains(strings.ToLower(info.ServerVersion), "podman") {
+		logrus.Debug("Detected Podman via API ServerVersion field")
 
-			return true, nil
-		}
+		return true, nil
 	}
 
 	logrus.Debug("No Podman detection criteria met, assuming Docker")
@@ -904,7 +997,7 @@ func (c client) detectPodman() (bool, error) {
 //
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
-func (c client) getPodmanFlag() bool {
+func (c *client) getPodmanFlag() bool {
 	// Only perform detection in auto mode; otherwise, assume Docker
 	if c.CPUCopyMode != CPUCopyModeAuto {
 		return false
@@ -931,7 +1024,7 @@ func (c client) getPodmanFlag() bool {
 //
 // Returns:
 //   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
-func (c client) WaitForContainerHealthy(
+func (c *client) WaitForContainerHealthy(
 	containerID types.ContainerID,
 	timeout time.Duration,
 ) error {

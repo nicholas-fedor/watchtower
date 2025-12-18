@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSliceEqual_True verifies that identical slices are considered equal.
@@ -344,4 +345,341 @@ func TestNormalizeContainerName_SlashInMiddle(t *testing.T) {
 
 	result := NormalizeContainerName("test/container")
 	assert.Equal(t, "test/container", result)
+}
+
+// TestParseBinaryUnits_PiB verifies that parseBinaryUnits correctly parses pebibyte units.
+func TestParseBinaryUnits_PiB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseBinaryUnits("2PiB")
+	require.NoError(t, err)
+	assert.Equal(t, pebibyteMultiplier, multiplier)
+	assert.Equal(t, "2", valueStr)
+}
+
+// TestParseBinaryUnits_TiB verifies that parseBinaryUnits correctly parses tebibyte units.
+func TestParseBinaryUnits_TiB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseBinaryUnits("1.5TiB")
+	require.NoError(t, err)
+	assert.Equal(t, tebibyteMultiplier, multiplier)
+	assert.Equal(t, "1.5", valueStr)
+}
+
+// TestParseBinaryUnits_GiB verifies that parseBinaryUnits correctly parses gibibyte units.
+func TestParseBinaryUnits_GiB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseBinaryUnits("512GiB")
+	require.NoError(t, err)
+	assert.Equal(t, gibibyteMultiplier, multiplier)
+	assert.Equal(t, "512", valueStr)
+}
+
+// TestParseBinaryUnits_MiB verifies that parseBinaryUnits correctly parses mebibyte units.
+func TestParseBinaryUnits_MiB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseBinaryUnits("1024MiB")
+	require.NoError(t, err)
+	assert.Equal(t, mebibyteMultiplier, multiplier)
+	assert.Equal(t, "1024", valueStr)
+}
+
+// TestParseBinaryUnits_KiB verifies that parseBinaryUnits correctly parses kibibyte units.
+func TestParseBinaryUnits_KiB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseBinaryUnits("2048KiB")
+	require.NoError(t, err)
+	assert.Equal(t, kibibyteMultiplier, multiplier)
+	assert.Equal(t, "2048", valueStr)
+}
+
+// TestParseBinaryUnits_Unsupported verifies that parseBinaryUnits returns an error for unsupported units.
+func TestParseBinaryUnits_Unsupported(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := parseBinaryUnits("100XiB")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported binary unit")
+}
+
+// TestParseDecimalUnits_PB verifies that parseDecimalUnits correctly parses petabyte units.
+func TestParseDecimalUnits_PB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("1PB")
+	require.NoError(t, err)
+	assert.Equal(t, petabyteMultiplier, multiplier)
+	assert.Equal(t, "1", valueStr)
+}
+
+// TestParseDecimalUnits_P verifies that parseDecimalUnits correctly parses petabyte units with short suffix.
+func TestParseDecimalUnits_P(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("2P")
+	require.NoError(t, err)
+	assert.Equal(t, petabyteMultiplier, multiplier)
+	assert.Equal(t, "2", valueStr)
+}
+
+// TestParseDecimalUnits_TB verifies that parseDecimalUnits correctly parses terabyte units.
+func TestParseDecimalUnits_TB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("500TB")
+	require.NoError(t, err)
+	assert.Equal(t, terabyteMultiplier, multiplier)
+	assert.Equal(t, "500", valueStr)
+}
+
+// TestParseDecimalUnits_T verifies that parseDecimalUnits correctly parses terabyte units with short suffix.
+func TestParseDecimalUnits_T(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("1T")
+	require.NoError(t, err)
+	assert.Equal(t, terabyteMultiplier, multiplier)
+	assert.Equal(t, "1", valueStr)
+}
+
+// TestParseDecimalUnits_GB verifies that parseDecimalUnits correctly parses gigabyte units.
+func TestParseDecimalUnits_GB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("100GB")
+	require.NoError(t, err)
+	assert.Equal(t, gigabyteMultiplier, multiplier)
+	assert.Equal(t, "100", valueStr)
+}
+
+// TestParseDecimalUnits_G verifies that parseDecimalUnits correctly parses gigabyte units with short suffix.
+func TestParseDecimalUnits_G(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("50G")
+	require.NoError(t, err)
+	assert.Equal(t, gigabyteMultiplier, multiplier)
+	assert.Equal(t, "50", valueStr)
+}
+
+// TestParseDecimalUnits_MB verifies that parseDecimalUnits correctly parses megabyte units.
+func TestParseDecimalUnits_MB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("256MB")
+	require.NoError(t, err)
+	assert.Equal(t, megabyteMultiplier, multiplier)
+	assert.Equal(t, "256", valueStr)
+}
+
+// TestParseDecimalUnits_M verifies that parseDecimalUnits correctly parses megabyte units with short suffix.
+func TestParseDecimalUnits_M(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("128M")
+	require.NoError(t, err)
+	assert.Equal(t, megabyteMultiplier, multiplier)
+	assert.Equal(t, "128", valueStr)
+}
+
+// TestParseDecimalUnits_KB verifies that parseDecimalUnits correctly parses kilobyte units.
+func TestParseDecimalUnits_KB(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("1024KB")
+	require.NoError(t, err)
+	assert.Equal(t, kilobyteMultiplier, multiplier)
+	assert.Equal(t, "1024", valueStr)
+}
+
+// TestParseDecimalUnits_K verifies that parseDecimalUnits correctly parses kilobyte units with short suffix.
+func TestParseDecimalUnits_K(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("512K")
+	require.NoError(t, err)
+	assert.Equal(t, kilobyteMultiplier, multiplier)
+	assert.Equal(t, "512", valueStr)
+}
+
+// TestParseDecimalUnits_B verifies that parseDecimalUnits correctly parses byte units.
+func TestParseDecimalUnits_B(t *testing.T) {
+	t.Parallel()
+
+	multiplier, valueStr, err := parseDecimalUnits("2048B")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), multiplier)
+	assert.Equal(t, "2048", valueStr)
+}
+
+// TestParseDecimalUnits_Unsupported verifies that parseDecimalUnits returns an error for unsupported units.
+func TestParseDecimalUnits_Unsupported(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := parseDecimalUnits("100Z")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported unit")
+}
+
+// TestParseDiskSpace_EmptySize verifies that ParseDiskSpace returns errEmptySize for empty input.
+func TestParseDiskSpace_EmptySize(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDiskSpace("", 0)
+	require.Error(t, err)
+	assert.Equal(t, errEmptySize, err)
+}
+
+// TestParseDiskSpace_PercentageWithoutMaxSpace verifies that ParseDiskSpace returns errPercentageRequiresMaxSpace for percentage without max space.
+func TestParseDiskSpace_PercentageWithoutMaxSpace(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDiskSpace("50%", 0)
+	require.Error(t, err)
+	assert.Equal(t, errPercentageRequiresMaxSpace, err)
+}
+
+// TestParseDiskSpace_PercentageOutOfRange verifies that ParseDiskSpace returns errPercentageOutOfRange for invalid percentages.
+func TestParseDiskSpace_PercentageOutOfRange(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDiskSpace("150%", 1000)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "percentage out of range")
+}
+
+// TestParseDiskSpace_PercentageNegative verifies that ParseDiskSpace returns errPercentageOutOfRange for negative percentages.
+func TestParseDiskSpace_PercentageNegative(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDiskSpace("-10%", 1000)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "percentage out of range")
+}
+
+// TestParseDiskSpace_PlainNumber verifies that ParseDiskSpace correctly parses plain numbers as bytes.
+func TestParseDiskSpace_PlainNumber(t *testing.T) {
+	t.Parallel()
+
+	result, err := ParseDiskSpace("1024", 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1024), result)
+}
+
+// TestParseDiskSpace_Percentage verifies that ParseDiskSpace correctly calculates percentage-based sizes.
+func TestParseDiskSpace_Percentage(t *testing.T) {
+	t.Parallel()
+
+	result, err := ParseDiskSpace("50%", 2000)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1000), result)
+}
+
+// TestParseDiskSpace_BinaryUnits verifies that ParseDiskSpace correctly parses binary units.
+func TestParseDiskSpace_BinaryUnits(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"1KiB", kibibyteMultiplier},
+		{"2MiB", 2 * mebibyteMultiplier},
+		{"1GiB", gibibyteMultiplier},
+		{"1TiB", tebibyteMultiplier},
+		{"1PiB", pebibyteMultiplier},
+	}
+
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := ParseDiskSpace(test.input, 0)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+// TestParseDiskSpace_DecimalUnits verifies that ParseDiskSpace correctly parses decimal units.
+func TestParseDiskSpace_DecimalUnits(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"1K", kilobyteMultiplier},
+		{"1KB", kilobyteMultiplier},
+		{"2M", 2 * megabyteMultiplier},
+		{"2MB", 2 * megabyteMultiplier},
+		{"1G", gigabyteMultiplier},
+		{"1GB", gigabyteMultiplier},
+		{"1T", terabyteMultiplier},
+		{"1TB", terabyteMultiplier},
+		{"1P", petabyteMultiplier},
+		{"1PB", petabyteMultiplier},
+		{"100B", 100},
+	}
+
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := ParseDiskSpace(test.input, 0)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+// TestParseDiskSpace_InvalidNumericValue verifies that ParseDiskSpace returns an error for invalid numeric values.
+func TestParseDiskSpace_InvalidNumericValue(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDiskSpace("invalidMB", 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid numeric value")
+}
+
+// TestParseDiskSpace_UnsupportedUnit verifies that ParseDiskSpace returns an error for unsupported units.
+func TestParseDiskSpace_UnsupportedUnit(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDiskSpace("100Z", 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported unit")
+}
+
+// TestConstants_BinaryUnits verifies that binary unit constants are correctly defined.
+func TestConstants_BinaryUnits(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, int64(1024), kibibyteMultiplier)
+	assert.Equal(t, mebibyteMultiplier, int64(1024*1024))
+	assert.Equal(t, gibibyteMultiplier, int64(1024*1024*1024))
+	assert.Equal(t, tebibyteMultiplier, int64(1024*1024*1024*1024))
+	assert.Equal(t, pebibyteMultiplier, int64(1024*1024*1024*1024*1024))
+}
+
+// TestConstants_DecimalUnits verifies that decimal unit constants are correctly defined.
+func TestConstants_DecimalUnits(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, int64(1000), kilobyteMultiplier)
+	assert.Equal(t, megabyteMultiplier, int64(1000*1000))
+	assert.Equal(t, gigabyteMultiplier, int64(1000*1000*1000))
+	assert.Equal(t, terabyteMultiplier, int64(1000*1000*1000*1000))
+	assert.Equal(t, petabyteMultiplier, int64(1000*1000*1000*1000*1000))
+}
+
+// TestConstants_Percentage verifies that percentage constant is correctly defined.
+func TestConstants_Percentage(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 100, hundredPercent)
 }

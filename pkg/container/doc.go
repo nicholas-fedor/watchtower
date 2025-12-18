@@ -11,7 +11,7 @@
 //
 // Usage example:
 //
-//	cli := container.NewClient(container.ClientOptions{})
+//	cli := container.NewClient(types.ClientOptions{})
 //	containers, _ := cli.ListContainers(filters.NoFilter)
 //	for _, c := range containers {
 //	    stale, _, _ := cli.IsContainerStale(c, types.UpdateParams{})

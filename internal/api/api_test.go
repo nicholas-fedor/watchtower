@@ -10,10 +10,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 
-	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	mockAPI "github.com/nicholas-fedor/watchtower/pkg/api/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -46,12 +44,12 @@ var _ = ginkgo.Describe("GetAPIAddr", func() {
 var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 	var (
 		cmd    *cobra.Command
-		client mockActions.MockClient
+		client *mockTypes.MockClient
 	)
 
 	ginkgo.BeforeEach(func() {
 		cmd = &cobra.Command{}
-		client = mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+		client = mockTypes.NewMockClient(ginkgo.GinkgoT())
 	})
 
 	ginkgo.When("update API is enabled", func() {
@@ -77,7 +75,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				return filter
 			}
 			defaultMetrics := metrics.Default
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool) {}
 
 			done := make(chan bool, 1)
 			errChan := make(chan error, 1)
@@ -149,7 +147,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				return filter
 			}
 			defaultMetrics := metrics.Default
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool) {}
 
 			done := make(chan bool, 1)
 			errChan := make(chan error, 1)
@@ -221,7 +219,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				return filter
 			}
 			defaultMetrics := metrics.Default
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool) {}
 
 			err := api.SetupAndStartAPI(
 				ctx,

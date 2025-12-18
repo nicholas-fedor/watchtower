@@ -129,13 +129,70 @@ func (r *report) All() []types.ContainerReport {
 	return all
 }
 
+// Filter returns a new report containing only containers that pass the provided filter.
+func (r *report) Filter(filter types.Filter) types.Report {
+	filtered := &report{
+		scanned:   filterContainers(r.scanned, filter),
+		updated:   filterContainers(r.updated, filter),
+		failed:    filterContainers(r.failed, filter),
+		skipped:   filterContainers(r.skipped, filter),
+		stale:     filterContainers(r.stale, filter),
+		fresh:     filterContainers(r.fresh, filter),
+		restarted: filterContainers(r.restarted, filter),
+	}
+
+	return filtered
+}
+
 type sortableContainers []types.ContainerReport
 
-// Len implements sort.Interface.Len.
 func (s sortableContainers) Len() int { return len(s) }
 
-// Less implements sort.Interface.Less.
 func (s sortableContainers) Less(i, j int) bool { return s[i].ID() < s[j].ID() }
 
-// Swap implements sort.Interface.Swap.
 func (s sortableContainers) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+// containerReportAdapter adapts a ContainerReport to FilterableContainer for filtering.
+type containerReportAdapter struct {
+	report types.ContainerReport
+}
+
+func (a *containerReportAdapter) Name() string {
+	return a.report.Name()
+}
+
+func (a *containerReportAdapter) IsWatchtower() bool {
+	return false // Reports don't have watchtower status
+}
+
+func (a *containerReportAdapter) Enabled() (bool, bool) {
+	return false, false // Reports don't have enable status
+}
+
+func (a *containerReportAdapter) Scope() (string, bool) {
+	return "", false // Reports don't have scope
+}
+
+func (a *containerReportAdapter) ImageName() string {
+	return a.report.ImageName()
+}
+
+// filterContainers applies a filter to a slice of container reports.
+func filterContainers(
+	containers []types.ContainerReport,
+	filter types.Filter,
+) []types.ContainerReport {
+	if filter == nil {
+		return containers
+	}
+
+	filtered := make([]types.ContainerReport, 0, len(containers))
+	for _, container := range containers {
+		adapter := &containerReportAdapter{report: container}
+		if filter(adapter) {
+			filtered = append(filtered, container)
+		}
+	}
+
+	return filtered
+}

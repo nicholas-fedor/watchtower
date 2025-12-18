@@ -8,7 +8,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
@@ -48,7 +47,8 @@ const (
 func handleUpdateResult(result types.Report, err error) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
-		logrus.WithError(err).Error("Update execution failed")
+		logrus.WithError(err).
+			Debug("Update execution failed")
 
 		return &metrics.Metric{
 			Scanned: 0,
@@ -73,7 +73,7 @@ func handleUpdateResult(result types.Report, err error) *metrics.Metric {
 
 // RunUpdatesWithNotificationsParams holds the parameters for RunUpdatesWithNotifications.
 type RunUpdatesWithNotificationsParams struct {
-	Client                       container.Client
+	Client                       types.Client
 	Notifier                     types.Notifier
 	NotificationSplitByContainer bool
 	NotificationReport           bool
@@ -91,6 +91,8 @@ type RunUpdatesWithNotificationsParams struct {
 	CPUCopyMode                  string
 	PullFailureDelay             time.Duration
 	RunOnce                      bool
+	DiskSpaceMax                 string
+	DiskSpaceWarn                string
 }
 
 // UpdateConfig holds the configuration parameters for container updates.
@@ -109,6 +111,8 @@ type UpdateConfig struct {
 	CPUCopyMode      string
 	PullFailureDelay time.Duration
 	RunOnce          bool
+	DiskSpaceMax     string
+	DiskSpaceWarn    string
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -147,6 +151,8 @@ func RunUpdatesWithNotifications(
 		LifecycleGID:     params.LifecycleGID,
 		CPUCopyMode:      params.CPUCopyMode,
 		RunOnce:          params.RunOnce,
+		DiskSpaceMax:     params.DiskSpaceMax,
+		DiskSpaceWarn:    params.DiskSpaceWarn,
 	}
 
 	// Execute the container update operation
@@ -384,7 +390,7 @@ func startNotifications(notifier types.Notifier, notificationSplitByContainer bo
 //   - error: Any error encountered during the update execution.
 func executeUpdate(
 	ctx context.Context,
-	client container.Client,
+	client types.Client,
 	config UpdateConfig,
 ) (types.Report, []types.CleanedImageInfo, error) {
 	// Log before calling the Update function
@@ -410,7 +416,7 @@ func executeUpdate(
 // Returns:
 //   - []types.CleanedImageInfo: Slice of successfully cleaned image info.
 func performImageCleanup(
-	client container.Client,
+	client types.Client,
 	cleanup bool,
 	cleanupImageInfos []types.CleanedImageInfo,
 ) []types.CleanedImageInfo {
@@ -515,10 +521,10 @@ func sendSplitNotifications(
 	cleanedImages []types.CleanedImageInfo,
 ) {
 	// Map to track notified container IDs to prevent duplicate notifications.
-	// Key is the full container ID string for uniqueness, value is boolean indicating
+	// Key is the full container ID for uniqueness, value is boolean indicating
 	// whether a notification has been sent for this container.
 	// This map is scoped to the function to ensure tracking is per-notification-session.
-	notified := make(map[string]bool)
+	notified := make(map[types.ContainerID]bool)
 
 	logrus.WithFields(logrus.Fields{
 		"updated_count":   len(result.Updated()),
@@ -557,8 +563,7 @@ func sendSplitNotifications(
 				continue
 			}
 
-			containerID := string(updatedContainer.ID())
-			if notified[containerID] {
+			if notified[updatedContainer.ID()] {
 				// Skip notification if already sent for this container ID
 				continue
 			}
@@ -566,7 +571,7 @@ func sendSplitNotifications(
 			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
 			notifier.SendNotification(singleContainerReport)
 
-			notified[containerID] = true
+			notified[updatedContainer.ID()] = true
 		}
 
 		// Send individual report notifications for each restarted container
@@ -586,8 +591,7 @@ func sendSplitNotifications(
 				continue
 			}
 
-			containerID := string(restartedContainer.ID())
-			if notified[containerID] {
+			if notified[restartedContainer.ID()] {
 				// Skip notification if already sent for this container ID
 				continue
 			}
@@ -595,7 +599,7 @@ func sendSplitNotifications(
 			singleContainerReport := buildSingleRestartedContainerReport(restartedContainer, result)
 			notifier.SendNotification(singleContainerReport)
 
-			notified[containerID] = true
+			notified[restartedContainer.ID()] = true
 		}
 
 		// Send notifications for monitor-only containers when notificationReport is true
@@ -616,8 +620,7 @@ func sendSplitNotifications(
 			}
 
 			if staleContainer.IsMonitorOnly() {
-				containerID := string(staleContainer.ID())
-				if notified[containerID] {
+				if notified[staleContainer.ID()] {
 					// Skip notification if already sent for this container ID
 					continue
 				}
@@ -625,7 +628,7 @@ func sendSplitNotifications(
 				singleContainerReport := buildSingleContainerReport(staleContainer, result)
 				notifier.SendNotification(singleContainerReport)
 
-				notified[containerID] = true
+				notified[staleContainer.ID()] = true
 			}
 		}
 	} else {
@@ -653,8 +656,7 @@ func sendSplitNotifications(
 				continue
 			}
 
-			containerID := string(updatedContainer.ID())
-			if notified[containerID] {
+			if notified[updatedContainer.ID()] {
 				// Skip notification if already sent for this container ID
 				continue
 			}
@@ -675,7 +677,7 @@ func sendSplitNotifications(
 
 			notifier.SendFilteredEntries(entries, singleContainerReport)
 
-			notified[containerID] = true
+			notified[updatedContainer.ID()] = true
 		}
 
 		// Send individual filtered entry notifications for each restarted container
@@ -694,8 +696,7 @@ func sendSplitNotifications(
 				continue
 			}
 
-			containerID := string(restartedContainer.ID())
-			if notified[containerID] {
+			if notified[restartedContainer.ID()] {
 				// Skip notification if already sent for this container ID
 				continue
 			}
@@ -743,7 +744,7 @@ func sendSplitNotifications(
 
 			notifier.SendFilteredEntries(entries, singleContainerReport)
 
-			notified[containerID] = true
+			notified[restartedContainer.ID()] = true
 		}
 
 		// Send notifications for monitor-only containers when notificationReport is false
@@ -763,8 +764,7 @@ func sendSplitNotifications(
 			}
 
 			if staleContainer.IsMonitorOnly() {
-				containerID := string(staleContainer.ID())
-				if notified[containerID] {
+				if notified[staleContainer.ID()] {
 					// Skip notification if already sent for this container ID
 					continue
 				}
@@ -785,7 +785,7 @@ func sendSplitNotifications(
 
 				notifier.SendFilteredEntries(entries, singleContainerReport)
 
-				notified[containerID] = true
+				notified[staleContainer.ID()] = true
 			}
 		}
 	}

@@ -362,6 +362,51 @@ Environment Variable: WATCHTOWER_MONITOR_ONLY
 
     See [Label Precedence](#label_precedence).
 
+### Disk Space Max
+
+Sets the maximum disk space capacity for monitoring before container updates.
+Watchtower monitors Docker storage usage and prevents updates when the specified limit is exceeded to prevent disk exhaustion during updates.
+
+```text
+            Argument: --disk-space-max
+Environment Variable: WATCHTOWER_DISK_SPACE_MAX
+                Type: String (disk space value, e.g., "10GB", "50GiB", "1PiB", "2PB")
+             Default: None
+```
+
+!!! Note
+    When set, Watchtower automatically sets a warning threshold at 75% of the specified maximum disk space.
+    For example, `--disk-space-max=40GB` sets the warning threshold to 30GB.
+
+    This monitors Docker-managed storage (images, containers, volumes) as a proxy for host disk usage, since the Docker API doesn't provide direct access to host filesystem information.
+
+    When the maximum disk space is exceeded, Watchtower will return an error and prevent container updates to avoid disk exhaustion on resource-constrained hosts.
+
+### Disk Space Warn
+
+Overrides the automatic warning threshold when disk space monitoring is enabled.
+Allows custom control over when disk space warnings are triggered, but allows updates to proceed.
+
+```text
+            Argument: --disk-space-warn
+Environment Variable: WATCHTOWER_DISK_SPACE_WARN
+                Type: String (disk space value, e.g., "5GB", "25GiB", "1PiB", "80%")
+             Default: 75% of --disk-space-max value
+```
+
+!!! Note
+    Requires `--disk-space-max` to be set.
+    When not specified, defaults to 75% of the maximum disk space value.
+
+    Supports the same units as `--disk-space-max` (KB, MB, GB, GiB, MiB, PiB, PB, etc.) plus percentage values (e.g., "80%").
+
+    Unlike the maximum threshold which prevents updates, warnings allow container updates to proceed while alerting about potential disk space issues.
+
+    Examples:
+    - `--disk-space-max=40GB --disk-space-warn=25GB` warns when Docker usage exceeds 25GB but allows updates
+    - `--disk-space-max=40GB --disk-space-warn=80%` warns when Docker usage exceeds 32GB (80% of 40GB) but allows updates
+    - `--disk-space-max=2PiB --disk-space-warn=1.5PiB` warns when Docker usage exceeds 1.5PiB but allows updates
+
 ### Disable Image Pulling
 
 Prevents pulling new images from registries, monitoring only local image cache changes.
@@ -725,7 +770,7 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
 
 ### HTTP API Host
 
-Sets the host to bind the HTTP API to.
+Sets the host address to bind the HTTP API.
 
 ```text
             Argument: --http-api-host
@@ -838,6 +883,21 @@ Environment Variable: WATCHTOWER_NO_STARTUP_MESSAGE
                 Type: Boolean
              Default: false
 ```
+
+### Include Host Info
+
+Includes comprehensive host information in startup logging, such as OS details, Docker version, kernel version, and disk usage summary.
+
+```text
+            Argument: --include-host-info
+Environment Variable: WATCHTOWER_INCLUDE_HOST_INFO
+                Type: Boolean
+             Default: false
+```
+
+!!! Note
+    This provides detailed information about the host environment during startup.
+    Useful for debugging and monitoring host system details.
 
 ## Lifecycle & Health
 

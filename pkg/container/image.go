@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -13,6 +14,7 @@ import (
 	dockerClient "github.com/docker/docker/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -39,7 +41,8 @@ type WarningStrategy string
 //
 // It uses a Docker API client for image tasks.
 type imageClient struct {
-	api dockerClient.APIClient
+	api            dockerClient.APIClient
+	registryConfig *types.RegistryConfig
 }
 
 // IsContainerStale determines if a container’s image is outdated.
@@ -262,11 +265,68 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) er
 //
 // Parameters:
 //   - api: Docker API client.
+//   - registryConfig: Registry configuration with mirrors.
 //
 // Returns:
 //   - imageClient: Initialized client for image operations.
-func newImageClient(api dockerClient.APIClient) imageClient {
-	return imageClient{api: api}
+func newImageClient(api dockerClient.APIClient, registryConfig *types.RegistryConfig) imageClient {
+	return imageClient{api: api, registryConfig: registryConfig}
+}
+
+// getMirrorsForRegistry returns the list of mirrors for a given registry hostname.
+//
+// It checks per-registry mirrors first, then falls back to global mirrors.
+//
+// Parameters:
+//   - registryHost: The registry hostname (e.g., "docker.io").
+//
+// Returns:
+//   - []string: List of mirror URLs for the registry.
+func (c imageClient) getMirrorsForRegistry(registryHost string) []string {
+	if c.registryConfig == nil {
+		return nil
+	}
+
+	// Check for per-registry mirrors
+	if c.registryConfig.Registries != nil {
+		if mirrors, ok := c.registryConfig.Registries[registryHost]; ok {
+			return mirrors
+		}
+	}
+
+	// Fall back to global mirrors
+	return c.registryConfig.Mirrors
+}
+
+// isMirrorHost checks if the given host is a configured mirror.
+//
+// Parameters:
+//   - host: The registry hostname to check.
+//
+// Returns:
+//   - bool: True if the host is a configured mirror, false otherwise.
+func (c imageClient) isMirrorHost(host string) bool {
+	if c.registryConfig == nil {
+		return false
+	}
+
+	// Check global mirrors
+	for _, m := range c.registryConfig.Mirrors {
+		if host == m {
+			return true
+		}
+	}
+
+	// Check per-registry mirrors
+	for _, mirrors := range c.registryConfig.Registries {
+		for _, m := range mirrors {
+			if host == m {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // shouldSkipPull determines if an image pull can be skipped.
@@ -329,9 +389,9 @@ func (c imageClient) shouldSkipPull(
 	}
 }
 
-// performImagePull executes a full image pull.
+// performImagePull executes a full image pull with mirror support.
 //
-// It pulls the image and reads the response to ensure completion.
+// It tries mirrors first, then falls back to the original registry.
 //
 // Parameters:
 //   - ctx: Context for operation control.
@@ -348,7 +408,64 @@ func (c imageClient) performImagePull(
 	fields logrus.Fields,
 ) error {
 	clog := logrus.WithFields(fields)
-	clog.Debug("Initiating image pull")
+
+	// Extract registry host from image name
+	registryHost, err := auth.GetRegistryAddress(imageName)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to extract registry host, proceeding with direct pull")
+
+		return c.pullFromRegistry(ctx, imageName, opts, fields)
+	}
+
+	// Get mirrors for this registry
+	mirrors := c.getMirrorsForRegistry(registryHost)
+	if len(mirrors) == 0 {
+		clog.Debug("No mirrors configured, proceeding with direct pull")
+
+		return c.pullFromRegistry(ctx, imageName, opts, fields)
+	}
+
+	// Try mirrors first
+	for _, mirror := range mirrors {
+		mirrorImageName := c.rewriteImageForMirror(imageName, registryHost, mirror)
+		clog.WithField("mirror", mirror).Debug("Attempting pull from mirror")
+
+		err := c.pullFromRegistry(ctx, mirrorImageName, opts, fields)
+		if err == nil {
+			clog.WithField("mirror", mirror).Info("Successfully pulled image from mirror")
+
+			return nil
+		}
+
+		clog.WithError(err).
+			WithField("mirror", mirror).
+			Debug("Failed to pull from mirror, trying next")
+	}
+
+	// Fall back to direct registry
+	clog.Debug("All mirrors failed, falling back to direct registry pull")
+
+	return c.pullFromRegistry(ctx, imageName, opts, fields)
+}
+
+// pullFromRegistry performs the actual image pull from a specific registry.
+//
+// Parameters:
+//   - ctx: Context for operation control.
+//   - imageName: Image to pull (may be rewritten for mirror).
+//   - opts: Pull options with auth.
+//   - fields: Logging fields for context.
+//
+// Returns:
+//   - error: Non-nil if pull or read fails, nil on success.
+func (c imageClient) pullFromRegistry(
+	ctx context.Context,
+	imageName string,
+	opts dockerImage.PullOptions,
+	fields logrus.Fields,
+) error {
+	clog := logrus.WithFields(fields)
+	clog.WithField("registry", imageName).Debug("Initiating image pull")
 
 	// Start the image pull.
 	response, err := c.api.ImagePull(ctx, imageName, opts)
@@ -369,6 +486,55 @@ func (c imageClient) performImagePull(
 	clog.Debug("Image pull completed")
 
 	return nil
+}
+
+// rewriteImageForMirror rewrites the image name to use a mirror registry.
+//
+// It uses proper Docker reference parsing to handle complex image references,
+// checks if the image is already using a configured mirror, and replaces only
+// the registry domain while preserving tags, digests, and paths.
+//
+// Parameters:
+//   - imageName: Original image name.
+//   - originalHost: Original registry host.
+//   - mirrorHost: Mirror registry host.
+//
+// Returns:
+//   - string: Rewritten image name.
+func (c imageClient) rewriteImageForMirror(imageName, originalHost, mirrorHost string) string {
+	// Check if the current host is already a configured mirror
+	if c.isMirrorHost(originalHost) {
+		return imageName
+	}
+
+	// Parse the Docker reference
+	ref, err := reference.ParseNormalizedNamed(imageName)
+	if err != nil {
+		// Fallback to basic string replacement if parsing fails
+		return strings.Replace(imageName, originalHost, mirrorHost, 1)
+	}
+
+	// Verify the domain matches the original host
+	if reference.Domain(ref) != originalHost {
+		// Domain mismatch, fallback to string replacement
+		return strings.Replace(imageName, originalHost, mirrorHost, 1)
+	}
+
+	// Build the new image name with the mirror host
+	path := reference.Path(ref)
+	newName := mirrorHost + "/" + path
+
+	// Add tag if present
+	if tagged, ok := ref.(reference.NamedTagged); ok {
+		newName += ":" + tagged.Tag()
+	}
+
+	// Add digest if present
+	if digested, ok := ref.(reference.Canonical); ok {
+		newName += "@" + digested.Digest().String()
+	}
+
+	return newName
 }
 
 // warnOnHeadFailed decides whether to warn about failed HEAD requests during image pulls.

@@ -9,7 +9,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -24,7 +23,7 @@ var (
 // Parameters:
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
-func ExecutePreChecks(client container.Client, params types.UpdateParams) {
+func ExecutePreChecks(client types.Client, params types.UpdateParams) {
 	uid := params.LifecycleUID
 	gid := params.LifecycleGID
 	clog := logrus.WithField(
@@ -53,7 +52,7 @@ func ExecutePreChecks(client container.Client, params types.UpdateParams) {
 // Parameters:
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
-func ExecutePostChecks(client container.Client, params types.UpdateParams) {
+func ExecutePostChecks(client types.Client, params types.UpdateParams) {
 	uid := params.LifecycleUID
 	gid := params.LifecycleGID
 	clog := logrus.WithField("filter", fmt.Sprintf("%v", params.Filter))
@@ -81,7 +80,7 @@ func ExecutePostChecks(client container.Client, params types.UpdateParams) {
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePreCheckCommand(client container.Client, container types.Container, uid int, gid int) {
+func ExecutePreCheckCommand(client types.Client, container types.Container, uid int, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePreCheckCommand()
 
@@ -119,7 +118,7 @@ func ExecutePreCheckCommand(client container.Client, container types.Container, 
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePostCheckCommand(client container.Client, container types.Container, uid int, gid int) {
+func ExecutePostCheckCommand(client types.Client, container types.Container, uid int, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePostCheckCommand()
 
@@ -162,7 +161,7 @@ func ExecutePostCheckCommand(client container.Client, container types.Container,
 //   - bool: True if command ran, false if skipped.
 //   - error: Non-nil if execution fails, nil otherwise.
 func ExecutePreUpdateCommand(
-	client container.Client,
+	client types.Client,
 	container types.Container,
 	uid int,
 	gid int,
@@ -229,7 +228,7 @@ func ExecutePreUpdateCommand(
 //   - uid: UID to run command as.
 //   - gid: GID to run command as.
 func ExecutePostUpdateCommand(
-	client container.Client,
+	client types.Client,
 	newContainerID types.ContainerID,
 	uid int,
 	gid int,

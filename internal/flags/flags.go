@@ -272,6 +272,12 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Do health check and exit")
 
 	flags.BoolP(
+		"include-host-info",
+		"",
+		envBool("WATCHTOWER_INCLUDE_HOST_INFO"),
+		"Include comprehensive host information in startup logging")
+
+	flags.BoolP(
 		"label-take-precedence",
 		"",
 		envBool("WATCHTOWER_LABEL_TAKE_PRECEDENCE"),
@@ -318,6 +324,20 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Minimum TLS version for registry connections (e.g., TLS1.0, TLS1.1, TLS1.2, TLS1.3); default is TLS1.2",
 	)
 	viper.MustBindEnv("WATCHTOWER_REGISTRY_TLS_MIN_VERSION")
+
+	flags.StringP(
+		"disk-space-max",
+		"",
+		envString("WATCHTOWER_DISK_SPACE_MAX"),
+		"Set maximum disk space for monitoring before container updates (e.g., '30GB')",
+	)
+
+	flags.StringP(
+		"disk-space-warn",
+		"",
+		envString("WATCHTOWER_DISK_SPACE_WARN"),
+		"Disk space warning threshold (e.g., '100MB', '1.5GB', '500MiB', '10%'); warn if available space is below this value",
+	)
 }
 
 // RegisterNotificationFlags adds notification flags to the root command.

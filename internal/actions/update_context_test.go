@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			func() {
 				// Create test data with multiple stale containers
 				testData := getCommonTestData()
-				testData.Staleness = map[string]bool{
+				testData.Staleness = map[types.ContainerID]bool{
 					"test-container-01": true,
 					"test-container-02": true,
 					"test-container-03": true,

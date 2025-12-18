@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 							},
 						}),
 				},
-				Staleness: map[string]bool{
+				Staleness: map[types.ContainerID]bool{
 					"watchtower": true,
 				},
 			},
@@ -70,7 +70,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 							},
 						}),
 				},
-				Staleness: map[string]bool{
+				Staleness: map[types.ContainerID]bool{
 					"watchtower": true,
 				},
 			},
@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						&dockerContainer.Config{},
 					),
 				},
-				Staleness: map[string]bool{
+				Staleness: map[types.ContainerID]bool{
 					"test-container": false,
 				},
 			},
@@ -173,7 +173,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 						&dockerContainer.Config{},
 					),
 				},
-				Staleness: map[string]bool{
+				Staleness: map[types.ContainerID]bool{
 					"test-container": true,
 				},
 			},
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 							},
 						}),
 				},
-				Staleness: map[string]bool{
+				Staleness: map[types.ContainerID]bool{
 					"watchtower": true,
 				},
 			},
@@ -243,7 +243,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 							},
 						}),
 				},
-				Staleness: map[string]bool{
+				Staleness: map[types.ContainerID]bool{
 					"watchtower": true,
 				},
 			},

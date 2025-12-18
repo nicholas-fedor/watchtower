@@ -25,6 +25,18 @@ The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible met
 | `watchtower_scans_total`                | Counter | Number of scans since the watchtower started                                |
 | `watchtower_scans_skipped`              | Counter | Number of skipped scans since watchtower started                            |
 
+## Host Metrics
+
+In addition to the Prometheus-compatible metrics above, Watchtower provides additional HTTP API endpoints for retrieving detailed host system information from the Docker daemon. These endpoints are available when the HTTP API is enabled with `--http-api-metrics`.
+
+### Host Information Endpoints
+
+- **`/v1/metrics/host/info`** - Returns system information including Docker version, OS details, and registry configuration
+- **`/v1/metrics/host/version`** - Returns detailed Docker daemon version information including API versions and build details
+- **`/v1/metrics/host/disk-usage`** - Returns comprehensive disk usage statistics for images, containers, volumes, and build cache
+
+These endpoints return JSON responses with detailed information about the Docker host system, useful for monitoring and troubleshooting Docker environments.
+
 ## Example Prometheus `scrape_config`
 
 ```yaml

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,7 +46,7 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(
 	ctx context.Context,
-	client container.Client,
+	client types.Client,
 	config UpdateConfig,
 ) (types.Report, []types.CleanedImageInfo, error) {
 	// Check for context cancellation early
@@ -69,20 +70,22 @@ func Update(
 
 	// Map UpdateConfig to types.UpdateParams for internal use.
 	params := types.UpdateParams{
-		Filter:           config.Filter,
-		Cleanup:          config.Cleanup,
-		NoRestart:        config.NoRestart,
-		Timeout:          config.Timeout,
-		MonitorOnly:      config.MonitorOnly,
-		LifecycleHooks:   config.LifecycleHooks,
-		RollingRestart:   config.RollingRestart,
-		LabelPrecedence:  config.LabelPrecedence,
-		NoPull:           config.NoPull,
-		PullFailureDelay: config.PullFailureDelay,
-		LifecycleUID:     config.LifecycleUID,
-		LifecycleGID:     config.LifecycleGID,
-		CPUCopyMode:      config.CPUCopyMode,
-		RunOnce:          config.RunOnce,
+		Filter:             config.Filter,
+		Cleanup:            config.Cleanup,
+		NoRestart:          config.NoRestart,
+		Timeout:            config.Timeout,
+		MonitorOnly:        config.MonitorOnly,
+		LifecycleHooks:     config.LifecycleHooks,
+		RollingRestart:     config.RollingRestart,
+		LabelPrecedence:    config.LabelPrecedence,
+		NoPull:             config.NoPull,
+		PullFailureDelay:   config.PullFailureDelay,
+		LifecycleUID:       config.LifecycleUID,
+		LifecycleGID:       config.LifecycleGID,
+		CPUCopyMode:        config.CPUCopyMode,
+		RunOnce:            config.RunOnce,
+		DiskSpaceMaximum:   config.DiskSpaceMax,
+		DiskSpaceThreshold: config.DiskSpaceWarn,
 	}
 
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
@@ -91,11 +94,48 @@ func Update(
 		lifecycle.ExecutePreChecks(client, params)
 	}
 
+	// Check disk space if enabled
+	if params.DiskSpaceMaximum != "" {
+		// Parse the maximum disk space first
+		maxSpace, err := util.ParseDiskSpace(params.DiskSpaceMaximum, 0)
+		if err != nil {
+			return nil, nil, fmt.Errorf(
+				"failed to parse maximum disk space %s: %w",
+				params.DiskSpaceMaximum,
+				err,
+			)
+		}
+
+		threshold := params.DiskSpaceThreshold
+		if threshold == "" {
+			// Calculate 75% of the maximum disk space as default threshold
+			threshold = strconv.FormatInt(maxSpace*3/4, 10) // 75% of max space
+		} else {
+			// Parse the threshold, allowing percentages relative to max space
+			parsedThreshold, err := util.ParseDiskSpace(threshold, maxSpace)
+			if err != nil {
+				return nil, nil, fmt.Errorf(
+					"failed to parse disk space threshold %s: %w",
+					threshold,
+					err,
+				)
+			}
+
+			threshold = strconv.FormatInt(parsedThreshold, 10)
+		}
+
+		// Check disk space before updates and prevent updates if low to avoid exhaustion during container updates
+		if err := checkDiskSpace(client, threshold, params.DiskSpaceMaximum); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// Fetch the list of containers based on the provided filter (e.g., all, specific names).
 	containers, err := client.ListContainers(params.Filter)
 	if err != nil {
 		// Log and return an error if container listing fails.
-		logrus.WithError(err).Debug("Failed to list containers")
+		logrus.WithError(err).
+			Debug("Failed to list containers")
 
 		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
@@ -104,7 +144,8 @@ func Update(
 	allContainers, err := client.ListContainers(filters.NoFilter)
 	if err != nil {
 		// Log and return an error if listing all containers fails.
-		logrus.WithError(err).Debug("Failed to list all containers")
+		logrus.WithError(err).
+			Debug("Failed to list all containers")
 
 		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
@@ -206,19 +247,22 @@ func Update(
 			err = sourceContainer.VerifyConfiguration()
 			if err != nil {
 				// Log configuration verification failure with detailed context.
-				logrus.WithError(err).WithFields(logrus.Fields{
-					"container_name": sourceContainer.Name(),
-					"container_id":   sourceContainer.ID().ShortID(),
-					"image_name":     sourceContainer.ImageName(),
-					"image_id":       sourceContainer.ImageID().ShortID(),
-				}).Debug("Failed to verify container configuration")
+				logrus.WithError(err).
+					WithFields(logrus.Fields{
+						"container_name": sourceContainer.Name(),
+						"container_id":   sourceContainer.ID().ShortID(),
+						"image_name":     sourceContainer.ImageName(),
+						"image_id":       sourceContainer.ImageID().ShortID(),
+					}).
+					Debug("Failed to verify container configuration")
 			}
 		}
 
 		// Handle staleness check results, logging skips or adding to the progress report.
 		if err != nil {
 			// Skip containers with staleness check errors, marking them as skipped.
-			clog.WithError(err).Debug("Cannot update container, skipping")
+			clog.WithError(err).
+				Debug("Cannot update container, skipping")
 
 			stale = false
 			staleCheckFailed++
@@ -327,7 +371,8 @@ func Update(
 	// Sort containers to restart by dependencies to ensure correct update and restart order.
 	err = sorter.SortByDependencies(allContainersToRestart)
 	if err != nil {
-		logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
+		logrus.WithError(err).
+			Debug("Failed to sort all containers to restart by dependencies")
 
 		return nil, []types.CleanedImageInfo{}, fmt.Errorf(
 			"%w: %w",
@@ -603,7 +648,7 @@ func isInvalidImageName(name string) bool {
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
 func performRollingRestart(
 	containers []types.Container,
-	client container.Client,
+	client types.Client,
 	params types.UpdateParams,
 	cleanupImageInfos *[]types.CleanedImageInfo,
 	progress *session.Progress,
@@ -691,7 +736,7 @@ func performRollingRestart(
 //   - []types.CleanedImageInfo: Slice of cleaned image info for stopped containers.
 func stopContainersInReversedOrder(
 	containers []types.Container,
-	client container.Client,
+	client types.Client,
 	params types.UpdateParams,
 ) (map[types.ContainerID]error, []types.CleanedImageInfo) {
 	failed := make(map[types.ContainerID]error, len(containers))
@@ -731,7 +776,7 @@ func stopContainersInReversedOrder(
 //   - error: Non-nil if stop fails, nil on success or if skipped.
 func stopStaleContainer(
 	container types.Container,
-	client container.Client,
+	client types.Client,
 	params types.UpdateParams,
 ) error {
 	fields := logrus.Fields{
@@ -787,7 +832,9 @@ func stopStaleContainer(
 
 	// Stop the container with the configured timeout.
 	if err := client.StopContainer(container, params.Timeout); err != nil {
-		logrus.WithFields(fields).WithError(err).Error("Failed to stop container")
+		logrus.WithFields(fields).
+			WithError(err).
+			Debug("Failed to stop container")
 
 		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
 	}
@@ -812,7 +859,7 @@ func stopStaleContainer(
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed restarts.
 func restartContainersInSortedOrder(
 	containers []types.Container,
-	client container.Client,
+	client types.Client,
 	params types.UpdateParams,
 	stoppedImages []types.CleanedImageInfo,
 	cleanupImageInfos *[]types.CleanedImageInfo,
@@ -925,7 +972,7 @@ func addCleanupImageInfo(
 //   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
 	container types.Container,
-	client container.Client,
+	client types.Client,
 	params types.UpdateParams,
 ) (types.ContainerID, bool, error) {
 	fields := logrus.Fields{
@@ -941,10 +988,12 @@ func restartStaleContainer(
 	if container.IsWatchtower() && !params.RunOnce {
 		newName := util.RandName()
 		if err := client.RenameContainer(container, newName); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"container": container.Name(),
-				"new_name":  newName,
-			}).Debug("Failed to rename Watchtower container")
+			logrus.WithError(err).
+				WithFields(logrus.Fields{
+					"container": container.Name(),
+					"new_name":  newName,
+				}).
+				Debug("Failed to rename Watchtower container")
 
 			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
 		}
@@ -964,7 +1013,9 @@ func restartStaleContainer(
 
 		newContainerID, err = client.StartContainer(container)
 		if err != nil {
-			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Failed to start container")
 			// Clean up renamed Watchtower container on failure
 			if renamed && container.IsWatchtower() {
 				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
@@ -1005,14 +1056,17 @@ func restartStaleContainer(
 		if err := client.UpdateContainer(container, updateConfig); err != nil {
 			logrus.WithError(err).
 				WithFields(fields).
-				Warn("Failed to update restart policy for old Watchtower container")
+				Debug("Failed to update restart policy for old Watchtower container")
 
 			// Continue with stopping even if update fails
 		}
 
 		// Stop the old container gracefully
 		if err := client.StopContainer(container, params.Timeout); err != nil {
-			logrus.WithError(err).WithFields(fields).Warn("Failed to stop old Watchtower container")
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to stop old Watchtower container")
+
 			// Don't fail the update, just log the warning
 		} else {
 			logrus.WithFields(fields).Debug("Stopped old Watchtower container")

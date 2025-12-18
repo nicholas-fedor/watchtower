@@ -37,7 +37,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								},
 							}),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"watchtower": true,
 					},
 				},
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								},
 							}),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"watchtower": true,
 					},
 				},
@@ -130,7 +130,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								},
 							}),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"watchtower": true,
 					},
 				},
@@ -271,7 +271,7 @@ func TestSafeguardDelay(t *testing.T) {
 							},
 						}),
 				},
-				Staleness: map[string]bool{
+				Staleness: map[types.ContainerID]bool{
 					"watchtower": true, // Simulate stale Watchtower
 				},
 			},

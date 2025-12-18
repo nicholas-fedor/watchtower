@@ -8,7 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -29,7 +29,7 @@ const stopContainerTimeout = 10 * time.Minute
 //
 // Returns:
 //   - error: Non-nil if rolling restarts conflict with dependencies, nil otherwise.
-func CheckForSanity(client container.Client, filter types.Filter, rollingRestarts bool) error {
+func CheckForSanity(client types.Client, filter types.Filter, rollingRestarts bool) error {
 	logrus.Debug("Performing pre-update sanity checks")
 
 	// Skip checks if rolling restarts are disabled, as dependencies are irrelevant.
@@ -81,7 +81,7 @@ func CheckForSanity(client container.Client, filter types.Filter, rollingRestart
 //   - bool: True if cleanup occurred (multiple instances were found and excess ones stopped), false otherwise.
 //   - error: Non-nil if cleanup fails, nil if single instance or successful cleanup.
 func CheckForMultipleWatchtowerInstances(
-	client container.Client,
+	client types.Client,
 	cleanup bool,
 	scope string,
 	cleanupImageInfos *[]types.CleanedImageInfo,
@@ -136,7 +136,7 @@ func CheckForMultipleWatchtowerInstances(
 //   - error: Non-nil if stopping fails, nil on success.
 func cleanupExcessWatchtowers(
 	containers []types.Container,
-	client container.Client,
+	client types.Client,
 	cleanup bool,
 	cleanupImageInfos *[]types.CleanedImageInfo,
 ) (bool, error) {
@@ -162,7 +162,7 @@ func cleanupExcessWatchtowers(
 	newestImageID := newestContainer.SafeImageID()
 	logrus.WithFields(logrus.Fields{
 		"newest_container": newestContainer.Name(),
-		"newest_image_id":  newestImageID,
+		"newest_image_id":  newestImageID.ShortID(),
 	}).Debug("Identified newest container")
 
 	// Stop each excess container and collect image IDs for cleanup.
@@ -196,7 +196,7 @@ func cleanupExcessWatchtowers(
 	if cleanup {
 		cleaned, err := CleanupImages(client, *cleanupImageInfos)
 		if err != nil {
-			logrus.WithError(err).Warn("Failed to clean up some images during Watchtower cleanup")
+			logrus.WithError(err).Debug("Failed to clean up some images during Watchtower cleanup")
 		} else if len(cleaned) > 0 {
 			logrus.WithField("cleaned_images", len(cleaned)).Debug("Successfully cleaned up images during Watchtower cleanup")
 		}
@@ -233,7 +233,7 @@ func cleanupExcessWatchtowers(
 //   - []CleanedImageInfo: Slice of successfully cleaned image info.
 //   - error: Non-nil if any image removal failed, nil otherwise.
 func CleanupImages(
-	client container.Client,
+	client types.Client,
 	cleanedImages []types.CleanedImageInfo,
 ) ([]types.CleanedImageInfo, error) {
 	// Return early if no images need cleanup to optimize performance.
@@ -257,14 +257,14 @@ func CleanupImages(
 			// Check if this is a "No such image" error (expected when multiple instances clean up the same image)
 			if strings.Contains(err.Error(), "No such image") {
 				logrus.WithFields(logrus.Fields{
-					"image_id":   imageID,
+					"image_id":   imageID.ShortID(),
 					"image_name": cleanedImage.ImageName,
 				}).Debug("Image already removed")
 			} else {
 				logrus.WithError(err).WithFields(logrus.Fields{
-					"image_id":   imageID,
+					"image_id":   imageID.ShortID(),
 					"image_name": cleanedImage.ImageName,
-				}).Warn("Failed to remove image")
+				}).Debug("Failed to remove image")
 				removalErrors = append(removalErrors, fmt.Errorf("failed to remove image %s: %w", imageID, err))
 			}
 		} else {
@@ -304,4 +304,75 @@ func containerNames(containers []types.Container) []string {
 	}
 
 	return names
+}
+
+// checkDiskSpace retrieves disk usage information and prevents updates if disk space is low.
+//
+// It gets the current total disk usage from Docker and returns an error if it
+// exceeds the configured threshold or if available space is below the threshold.
+// This check blocks updates when disk space is insufficient.
+//
+// Parameters:
+//   - client: Container client for Docker operations.
+//   - thresholdStr: Disk space threshold as a string.
+//   - maxSpaceStr: Maximum disk space as a string (optional). If provided, checks available space instead of usage.
+//
+// Returns:
+//   - error: Non-nil if disk space is insufficient, nil otherwise.
+func checkDiskSpace(client types.Client, thresholdStr string, maxSpaceStr string) error {
+	var (
+		maxSpace int64
+		err      error
+	)
+
+	// Parse optional maximum disk space
+	if maxSpaceStr != "" {
+		maxSpace, err = util.ParseDiskSpace(maxSpaceStr, 0)
+		if err != nil {
+			return fmt.Errorf("failed to parse maximum disk space: %w", err)
+		}
+	}
+
+	// Parse threshold with percentage support
+	threshold, err := util.ParseDiskSpace(thresholdStr, maxSpace)
+	if err != nil {
+		return fmt.Errorf("failed to parse disk space threshold: %w", err)
+	}
+
+	// Get total disk usage from Docker
+	totalSize, err := client.GetTotalDiskUsage()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve total disk usage information: %w", err)
+	}
+
+	// Check available space when maxSpace is provided, otherwise check usage
+	if maxSpaceStr != "" {
+		// Calculate available space and check against threshold
+		available := maxSpace - totalSize
+		if available < threshold {
+			return fmt.Errorf(
+				"%w: available %d bytes, threshold %d bytes",
+				errInsufficientDiskSpaceAvailable,
+				available,
+				threshold,
+			)
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"available_disk_space": available,
+			"threshold":            threshold,
+		}).Debug("Disk space check passed")
+	} else {
+		// Check total usage against threshold
+		if totalSize > threshold {
+			return fmt.Errorf("%w: usage %d bytes exceeds threshold %d bytes", errInsufficientDiskSpaceUsage, totalSize, threshold)
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"total_disk_usage": totalSize,
+			"threshold":        threshold,
+		}).Debug("Disk space check passed")
+	}
+
+	return nil
 }

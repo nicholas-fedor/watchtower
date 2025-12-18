@@ -219,6 +219,48 @@ Logs:
 2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.
 ```
 
+## Report Filtering
+
+Reports support filtering to include only containers that match specific criteria. The `Filter` method returns a new report containing only containers that pass the provided filter function.
+
+### Using Filters in Templates
+
+While filters are primarily used programmatically, you can leverage filtering in custom templates when working with notification systems that support custom filter functions.
+
+```go title="Example Filtered Report Template"
+{{- if .Report -}}
+  {{- $filteredReport := .Report.Filter (yourFilterFunction) -}}
+  {{- with $filteredReport -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+    {{- if ( or .Updated .Restarted .Failed ) -}}
+      {{- range .Updated}}
+- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+      {{- end -}}
+      {{- range .Fresh}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
+      {{- end -}}
+      {{- range .Restarted}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
+      {{- end -}}
+      {{- range .Skipped}}
+- {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+      {{- end -}}
+      {{- range .Failed}}
+- {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- if .Entries -}}
+
+Logs:
+{{- end -}}
+{{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
+{{- end -}}
+```
+
+!!! Note
+    Filter functions must implement the `types.Filter` interface, which takes a `FilterableContainer` and returns a boolean. Common filtering criteria include container name patterns, image names, or custom labels.
+
 ## Customizing Templates
 
 You can create custom templates to format notifications differently.

@@ -399,10 +399,10 @@ Turns out everything is on fire
 				)
 				shoutrrr.AddLogHook()
 				shoutrrr.StartNotification(false)
-				logrus.Info("This log message is sponsored by ContainrrrVPN")
+				logrus.Info("This log message is sponsored by Watchtower")
 				shoutrrr.SendNotification(nil)
 				gomega.Eventually(logBuffer).
-					Should(gbytes.Say(`Shoutrrr: This log message is sponsored by ContainrrrVPN`))
+					Should(gbytes.Say(`Shoutrrr: This log message is sponsored by Watchtower`))
 			})
 		})
 	})

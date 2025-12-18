@@ -14,9 +14,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nicholas-fedor/watchtower/pkg/api"
+	"github.com/nicholas-fedor/watchtower/pkg/api/host"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -70,14 +70,14 @@ func SetupAndStartAPI(
 	filterDesc string,
 	updateLock chan bool,
 	cleanup bool,
-	client container.Client,
+	client types.Client,
 	notifier types.Notifier,
 	scope string,
 	version string,
 	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool) *metrics.Metric,
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
-	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
+	writeStartupMessage func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool),
 	server ...api.HTTPServer,
 ) error {
 	// Get the formatted HTTP api address string.
@@ -123,7 +123,11 @@ func SetupAndStartAPI(
 	// Register the metrics API endpoint if enabled, providing access to update metrics.
 	if enableMetricsAPI {
 		metricsHandler := metricsAPI.New()
-		httpAPI.RegisterHandler(metricsHandler.Path, metricsHandler.Handle)
+		httpAPI.RegisterFunc(metricsHandler.Path, metricsHandler.Handle)
+
+		// Register host metrics endpoints
+		hostHandler := host.New(client)
+		httpAPI.RegisterHandler(hostHandler.Path, hostHandler)
 	}
 
 	// Start the API server, logging errors unless it's a clean shutdown.

@@ -19,32 +19,32 @@ type MockClient struct {
 	TestData      *TestData
 	pullImages    bool
 	removeVolumes bool
-	Stopped       map[string]bool // Track stopped containers by ID.
+	Stopped       map[types.ContainerID]bool // Track stopped containers by ID.
 	ctx           context.Context // Context for cancellation simulation
 }
 
 // TestData holds configuration data for MockClient’s test behavior.
 // It defines container states, staleness, and mock operation results.
 type TestData struct {
-	TriedToRemoveImageCount      int               // Number of times RemoveImageByID was called.
-	RenameContainerCount         int               // Number of times RenameContainer was called.
-	StopContainerCount           int               // Number of times StopContainer was called.
-	StartContainerCount          int               // Number of times StartContainer was called.
-	UpdateContainerCount         int               // Number of times UpdateContainer was called.
-	IsContainerStaleCount        int               // Number of times IsContainerStale was called.
-	WaitForContainerHealthyCount int               // Number of times WaitForContainerHealthy was called.
-	NameOfContainerToKeep        string            // Name of the container to avoid stopping.
-	Containers                   []types.Container // List of mock containers.
-	Staleness                    map[string]bool   // Map of container names to staleness status.
-	IsContainerStaleError        error             // Error to return from IsContainerStale (for testing).
-	ListContainersError          error             // Error to return from ListContainers (for testing).
-	StopContainerError           error             // Error to return from StopContainer (for testing).
-	UpdateContainerError         error             // Error to return from UpdateContainer (for testing).
-	StopContainerFailCount       int               // Number of times StopContainer should fail before succeeding.
-	RemoveImageError             error             // Error to return from RemoveImageByID (for testing).
-	FailedImageIDs               []types.ImageID   // List of image IDs that should fail removal.
-	StopOrder                    []string          // Order in which containers were stopped.
-	StartOrder                   []string          // Order in which containers were started.
+	TriedToRemoveImageCount      int                     // Number of times RemoveImageByID was called.
+	RenameContainerCount         int                     // Number of times RenameContainer was called.
+	StopContainerCount           int                     // Number of times StopContainer was called.
+	StartContainerCount          int                     // Number of times StartContainer was called.
+	UpdateContainerCount         int                     // Number of times UpdateContainer was called.
+	IsContainerStaleCount        int                     // Number of times IsContainerStale was called.
+	WaitForContainerHealthyCount int                     // Number of times WaitForContainerHealthy was called.
+	NameOfContainerToKeep        string                  // Name of the container to avoid stopping.
+	Containers                   []types.Container       // List of mock containers.
+	Staleness                    map[types.ContainerID]bool // Map of container IDs to staleness status.
+	IsContainerStaleError        error                   // Error to return from IsContainerStale (for testing).
+	ListContainersError          error                   // Error to return from ListContainers (for testing).
+	StopContainerError           error                   // Error to return from StopContainer (for testing).
+	UpdateContainerError         error                   // Error to return from UpdateContainer (for testing).
+	StopContainerFailCount       int                     // Number of times StopContainer should fail before succeeding.
+	RemoveImageError             error                   // Error to return from RemoveImageByID (for testing).
+	FailedImageIDs               []types.ImageID         // List of image IDs that should fail removal.
+	StopOrder                    []string                // Order in which containers were stopped.
+	StartOrder                   []string                // Order in which containers were started.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -68,7 +68,7 @@ func CreateMockClientWithContext(ctx context.Context, data *TestData, pullImages
 		TestData:      data,
 		pullImages:    pullImages,
 		removeVolumes: removeVolumes,
-		Stopped:       make(map[string]bool),
+		Stopped:       make(map[types.ContainerID]bool),
 		ctx:           ctx,
 	}
 }
@@ -127,7 +127,7 @@ func (client MockClient) StopContainer(c types.Container, _ time.Duration) error
 		client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
 		return client.TestData.StopContainerError
 	}
-	client.Stopped[string(c.ID())] = true
+	client.Stopped[c.ID()] = true
 	client.TestData.StopOrder = append(client.TestData.StopOrder, c.Name())
 	return nil
 }
@@ -135,7 +135,7 @@ func (client MockClient) StopContainer(c types.Container, _ time.Duration) error
 // IsContainerRunning checks if a container is running based on the Stopped map.
 // It returns true if the container’s ID is not marked as stopped, false otherwise.
 func (client MockClient) IsContainerRunning(c types.Container) bool {
-	return !client.Stopped[string(c.ID())]
+	return !client.Stopped[c.ID()]
 }
 
 // StartContainer simulates starting a container, returning the container's ID and no error.
@@ -215,7 +215,7 @@ func (client MockClient) ExecuteCommand(
 }
 
 // IsContainerStale determines if a container is stale based on TestData’s Staleness map.
-// It returns true if the container’s name isn’t explicitly marked as fresh, along with an empty ImageID and no error.
+// It returns true if the container’s ID isn’t explicitly marked as fresh, along with an empty ImageID and no error.
 // If IsContainerStaleError is set, it returns that error instead.
 func (client MockClient) IsContainerStale(
 	cont types.Container,
@@ -238,7 +238,7 @@ func (client MockClient) IsContainerStale(
 		return false, "", client.TestData.IsContainerStaleError
 	}
 
-	stale, found := client.TestData.Staleness[cont.Name()]
+	stale, found := client.TestData.Staleness[cont.ID()]
 	if !found {
 		stale = true // Default to stale if not specified.
 	}
@@ -259,11 +259,41 @@ func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Dur
 }
 
 // GetInfo returns mock system information for testing.
-// It provides a basic map with mock Docker/Podman info.
-func (client MockClient) GetInfo() (map[string]any, error) {
-	return map[string]any{
-		"Name":          "docker",
-		"ServerVersion": "1.50",
-		"OSType":        "linux",
+// It provides a basic SystemInfo with mock Docker/Podman info.
+func (client MockClient) GetInfo() (types.SystemInfo, error) {
+	return types.SystemInfo{
+		Name:          "docker",
+		ServerVersion: "1.50",
+		OSType:        "linux",
+		OperatingSystem: "linux",
+		Driver:        "overlay2",
+	}, nil
+}
+
+// GetDiskUsage returns mock disk usage information for testing.
+func (client MockClient) GetDiskUsage() (types.DiskUsage, error) {
+	return types.DiskUsage{
+		LayersSize: 1024 * 1024 * 1024, // 1GB
+	}, nil
+}
+
+// GetTotalDiskUsage returns mock total disk usage for testing.
+func (client MockClient) GetTotalDiskUsage() (int64, error) {
+	return 1024 * 1024 * 1024, nil // 1GB
+}
+
+// GetServerVersion returns mock version information for testing.
+func (client MockClient) GetServerVersion() (types.VersionInfo, error) {
+	return types.VersionInfo{
+		Version:       "1.50",
+		APIVersion:    "1.50",
+		MinAPIVersion: "1.24",
+		GitCommit:     "mock-commit",
+		GoVersion:     "go1.21",
+		Os:            "linux",
+		Arch:          "amd64",
+		KernelVersion: "5.10",
+		Experimental:  false,
+		BuildTime:     "2024-01-01T00:00:00.000000000+00:00",
 	}, nil
 }

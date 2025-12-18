@@ -10,8 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestStartupLogging runs the Ginkgo test suite for the internal logging startup package.
@@ -23,13 +24,13 @@ func TestStartupLogging(t *testing.T) {
 var _ = ginkgo.Describe("WriteStartupMessage", func() {
 	var (
 		cmd    *cobra.Command
-		client mockActions.MockClient
+		client *mockTypes.MockClient
 		buffer *bytes.Buffer
 	)
 
 	ginkgo.BeforeEach(func() {
 		cmd = &cobra.Command{}
-		client = mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+		client = mockTypes.NewMockClient(ginkgo.GinkgoT())
 		buffer = &bytes.Buffer{}
 		logrus.SetOutput(buffer)
 	})
@@ -43,6 +44,8 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		cmd.PersistentFlags().Bool("http-api-update", true, "")
 		cmd.PersistentFlags().String("http-api-host", "", "")
 		cmd.PersistentFlags().String("http-api-port", "8080", "")
+
+		client.EXPECT().GetVersion().Return("1.50")
 
 		logging.WriteStartupMessage(
 			cmd,
@@ -106,6 +109,8 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		cmd.PersistentFlags().Bool("no-startup-message", false, "")
 		cmd.PersistentFlags().Bool("http-api-update", false, "")
 
+		client.EXPECT().GetVersion().Return("1.50")
+
 		logging.WriteStartupMessage(
 			cmd,
 			time.Time{},
@@ -129,6 +134,8 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		cmd.PersistentFlags().Bool("no-startup-message", false, "")
 		cmd.PersistentFlags().Bool("http-api-update", false, "")
 
+		client.EXPECT().GetVersion().Return("1.50")
+
 		logging.WriteStartupMessage(
 			cmd,
 			time.Time{},
@@ -142,6 +149,77 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Trace-level logging enabled"))
+	})
+
+	ginkgo.It("should log host information when include-host-info flag is enabled", func() {
+		cmd.PersistentFlags().Bool("no-startup-message", false, "")
+		cmd.PersistentFlags().Bool("include-host-info", true, "")
+		cmd.PersistentFlags().Bool("http-api-update", false, "")
+
+		client.EXPECT().GetVersion().Return("1.50")
+		client.EXPECT().GetInfo().Return(types.SystemInfo{
+			OperatingSystem: "Ubuntu 20.04",
+			OSType:          "linux",
+			ServerVersion:   "20.10.0",
+		}, nil)
+		client.EXPECT().GetServerVersion().Return(types.VersionInfo{
+			Version:       "20.10.0",
+			KernelVersion: "5.4.0-42-generic",
+			GoVersion:     "go1.16.3",
+			Arch:          "amd64",
+		}, nil)
+		client.EXPECT().GetDiskUsage().Return(types.DiskUsage{
+			LayersSize: 1024 * 1024 * 1024, // 1GB
+			Images:     make([]types.ImageSummary, 5),
+			Containers: make([]types.ContainerSummary, 3),
+			Volumes:    make([]types.VolumeSummary, 2),
+		}, nil)
+
+		logging.WriteStartupMessage(
+			cmd,
+			time.Time{},
+			"Watching all containers",
+			"",
+			client,
+			nil,
+			"v1.0.0",
+			nil, // read from flags
+		)
+
+		output := buffer.String()
+		gomega.Expect(output).To(gomega.ContainSubstring("Host OS: Ubuntu 20.04 linux"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Docker Server Version: 20.10.0"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Kernel Version: 5.4.0-42-generic"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Docker Version: 20.10.0"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Go Version: go1.16.3"))
+		gomega.Expect(output).To(gomega.ContainSubstring("Architecture: amd64"))
+		gomega.Expect(output).
+			To(gomega.ContainSubstring("Disk Usage: 1073741824 bytes used by 5 images, 3 containers, 2 volumes"))
+	})
+
+	ginkgo.It("should not log host information when include-host-info flag is disabled", func() {
+		cmd.PersistentFlags().Bool("no-startup-message", false, "")
+		cmd.PersistentFlags().Bool("include-host-info", false, "")
+		cmd.PersistentFlags().Bool("http-api-update", false, "")
+
+		client.EXPECT().GetVersion().Return("1.50")
+		// Should not call GetInfo, GetServerVersion, or GetDiskUsage
+
+		logging.WriteStartupMessage(
+			cmd,
+			time.Time{},
+			"Watching all containers",
+			"",
+			client,
+			nil,
+			"v1.0.0",
+			nil, // read from flags
+		)
+
+		output := buffer.String()
+		gomega.Expect(output).NotTo(gomega.ContainSubstring("Host OS:"))
+		gomega.Expect(output).NotTo(gomega.ContainSubstring("Kernel Version:"))
+		gomega.Expect(output).NotTo(gomega.ContainSubstring("Disk Usage:"))
 	})
 })
 

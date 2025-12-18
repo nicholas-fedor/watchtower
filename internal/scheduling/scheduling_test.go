@@ -9,12 +9,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestWaitForRunningUpdate(t *testing.T) {
@@ -51,7 +50,7 @@ func TestWaitForRunningUpdate(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+	client := mockTypes.NewMockClient(t)
 
 	ctx := t.Context()
 
@@ -61,7 +60,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool) {}
 
 	// Use timeout to avoid hanging
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
@@ -92,7 +91,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+	client := mockTypes.NewMockClient(t)
 
 	ctx := t.Context()
 
@@ -105,7 +104,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool) {}
 
 	// Use timeout to avoid hanging
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
@@ -156,7 +155,7 @@ func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+	client := mockTypes.NewMockClient(t)
 
 	ctx := t.Context()
 
@@ -164,7 +163,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool) {}
 
 	err := scheduling.RunUpgradesOnSchedule(
 		ctx,
@@ -194,7 +193,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 
 func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 	cmd := &cobra.Command{}
-	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+	client := mockTypes.NewMockClient(t)
 
 	ctx := t.Context()
 
@@ -202,7 +201,7 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(*cobra.Command, time.Time, string, string, types.Client, types.Notifier, string, *bool) {}
 
 	// Cancel immediately
 	cancelledCtx, cancelFunc := context.WithCancel(ctx)

@@ -10,6 +10,7 @@ type Report interface {
 	Fresh() []ContainerReport     // Fresh containers.
 	Restarted() []ContainerReport // Restarted containers (linked dependencies).
 	All() []ContainerReport       // All unique containers.
+	Filter(filter Filter) Report  // Filter report using provided filter.
 }
 
 // ContainerReport defines a container’s session status.

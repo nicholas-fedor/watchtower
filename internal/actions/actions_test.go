@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("Actions", func() {
 								time.Now(),
 							),
 						},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"test-container": false, // Container is not stale
 						},
 					},
@@ -90,6 +90,8 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
+					DiskSpaceMax:                 "",
+					DiskSpaceWarn:                "0",
 				}
 				metric := RunUpdatesWithNotifications(context.Background(), params)
 
@@ -112,7 +114,7 @@ var _ = ginkgo.Describe("Actions", func() {
 								&dockerContainer.Config{},
 							),
 						},
-						Staleness: map[string]bool{"test-container": true},
+						Staleness: map[types.ContainerID]bool{"test-container": true},
 					},
 					false,
 					false,
@@ -140,6 +142,8 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
+					DiskSpaceMax:                 "",
+					DiskSpaceWarn:                "0",
 				}
 				metric := RunUpdatesWithNotifications(context.Background(), params)
 
@@ -153,7 +157,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{},
-						Staleness:  map[string]bool{},
+						Staleness:  map[types.ContainerID]bool{},
 					},
 					false,
 					false,
@@ -177,6 +181,8 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
+					DiskSpaceMax:                 "",
+					DiskSpaceWarn:                "0",
 				}
 
 				// Empty container list results in zero metrics
@@ -374,7 +380,7 @@ var _ = ginkgo.Describe("Actions", func() {
 							time.Now(),
 						),
 					},
-					Staleness: map[string]bool{"test-container": true},
+					Staleness: map[types.ContainerID]bool{"test-container": true},
 				},
 				false,
 				false,
@@ -395,9 +401,57 @@ var _ = ginkgo.Describe("Actions", func() {
 				CPUCopyMode:      "auto",
 				PullFailureDelay: time.Duration(0),
 				RunOnce:          true,
+				DiskSpaceMax:     "",
+				DiskSpaceWarn:    "0",
 			}
 
 			// Test that function can be called without panicking
+			result, cleanupImages, err := executeUpdate(context.Background(), client, config)
+
+			// We expect some result or error, but mainly that it doesn't panic
+			gomega.Expect(result).NotTo(gomega.BeNil())
+			gomega.Expect(cleanupImages).NotTo(gomega.BeNil())
+			// For this mock configuration, we expect no error
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should execute update with disk space checking enabled", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainer(
+							"test-container",
+							"test-container",
+							"image:latest",
+							time.Now(),
+						),
+					},
+					Staleness: map[types.ContainerID]bool{"test-container": true},
+				},
+				false,
+				false,
+			)
+
+			config := UpdateConfig{
+				Filter:           filters.NoFilter,
+				Cleanup:          false,
+				NoRestart:        false,
+				MonitorOnly:      false,
+				LifecycleHooks:   false,
+				RollingRestart:   false,
+				LabelPrecedence:  false,
+				NoPull:           false,
+				Timeout:          time.Minute,
+				LifecycleUID:     1000,
+				LifecycleGID:     1001,
+				CPUCopyMode:      "auto",
+				PullFailureDelay: time.Duration(0),
+				RunOnce:          true,
+				DiskSpaceMax:     "2GB",
+				DiskSpaceWarn:    "500MB",
+			}
+
+			// Test that function can be called with disk space checking enabled
 			result, cleanupImages, err := executeUpdate(context.Background(), client, config)
 
 			// We expect some result or error, but mainly that it doesn't panic
@@ -773,6 +827,50 @@ var _ = ginkgo.Describe("Actions", func() {
 			// Should return a valid slice even with empty input
 			gomega.Expect(cleanedImages).NotTo(gomega.BeNil())
 		})
+	})
+
+	ginkgo.Describe("checkDiskSpace", func() {
+		ginkgo.It("should log warning when disk usage exceeds threshold (old behavior)", func() {
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+			// Test with threshold lower than mock disk usage (1GB)
+			checkDiskSpace(client, "500MB", "") // 500MB threshold
+
+			// The function logs, so we verify it doesn't panic
+		})
+
+		ginkgo.It("should log debug when disk usage is below threshold (old behavior)", func() {
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+			// Test with threshold higher than mock disk usage (1GB)
+			checkDiskSpace(client, "2GB", "") // 2GB threshold
+
+			// The function logs, so we verify it doesn't panic
+		})
+
+		ginkgo.It(
+			"should log warning when available disk space is below threshold (new behavior)",
+			func() {
+				client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+				// Test with max space 1.5GB, threshold 500MB, mock usage 1GB -> available 0.5GB < 500MB
+				checkDiskSpace(client, "500MB", "1.5GB")
+
+				// The function logs, so we verify it doesn't panic
+			},
+		)
+
+		ginkgo.It(
+			"should log debug when available disk space is above threshold (new behavior)",
+			func() {
+				client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+				// Test with max space 2GB, threshold 500MB, mock usage 1GB -> available 1GB > 500MB
+				checkDiskSpace(client, "500MB", "2GB")
+
+				// The function logs, so we verify it doesn't panic
+			},
+		)
 	})
 
 	ginkgo.Describe("generateAndLogMetric", func() {

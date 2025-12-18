@@ -37,7 +37,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								},
 							}),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"watchtower": true, // Simulate stale Watchtower
 					},
 				},
@@ -123,7 +123,7 @@ var _ = ginkgo.Describe("the update action", func() {
 							restartContainer1,
 							restartContainer2,
 						},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"stale-container":     true,
 							"restart-container-1": false,
 							"restart-container-2": false,
@@ -203,7 +203,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						restartedContainer,
 						freshContainer,
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"updated-container":   true,
 						"restarted-container": false,
 						"fresh-container":     false,
@@ -272,7 +272,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					client := mockActions.CreateMockClient(
 						&mockActions.TestData{
 							Containers: []types.Container{updatedContainer, restartedContainer},
-							Staleness: map[string]bool{
+							Staleness: map[types.ContainerID]bool{
 								"updated-container":   true,
 								"restarted-container": false,
 							},
@@ -331,7 +331,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: []types.Container{updatedContainer, restartedContainer},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"updated-container":   true,
 						"restarted-container": false,
 					},
@@ -391,7 +391,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: []types.Container{dependency, dependent},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"dependency": true,
 						"dependent":  true,
 					},
@@ -457,7 +457,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: []types.Container{containerC, containerB, containerA},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"container-c": true,
 						"container-b": false,
 						"container-a": true,
@@ -499,7 +499,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: []types.Container{container},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"standalone-container": false,
 					},
 				},
@@ -854,7 +854,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					client := mockActions.CreateMockClient(
 						&mockActions.TestData{
 							Containers: []types.Container{staleContainer, restartContainer},
-							Staleness: map[string]bool{
+							Staleness: map[types.ContainerID]bool{
 								"stale-container":   true,
 								"restart-container": false,
 							},
@@ -926,11 +926,11 @@ var _ = ginkgo.Describe("the update action", func() {
 
 					// Mark all as stale
 					if client.TestData.Staleness == nil {
-						client.TestData.Staleness = make(map[string]bool)
+						client.TestData.Staleness = make(map[types.ContainerID]bool)
 					}
 					for i := range containers {
 						name := fmt.Sprintf("perf-container-%d", i)
-						client.TestData.Staleness[name] = true
+						client.TestData.Staleness[types.ContainerID(name)] = true
 					}
 
 					// Measure performance of rolling restart
@@ -1003,7 +1003,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{containerA, containerB, containerC},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"priority-c": true,
 							"priority-b": false,
 							"priority-a": false,
@@ -1085,7 +1085,7 @@ var _ = ginkgo.Describe("the update action", func() {
 							restartContainer1,
 							restartContainer2,
 						},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"mixed-stale":     true,
 							"mixed-restart-1": false,
 							"mixed-restart-2": false,

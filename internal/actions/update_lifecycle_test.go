@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-02": true,
 				}
 				report, cleanupImageInfos, err := actions.Update(
@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-uid-gid": true,
 				}
 				report, cleanupImageInfos, err := actions.Update(
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-02": true,
 				}
 				report, cleanupImageInfos, err := actions.Update(
@@ -176,7 +176,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-02": true,
 				}
 				report, cleanupImageInfos, err := actions.Update(
@@ -371,7 +371,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-02": true,
 				}
 				report, cleanupImageInfos, err := actions.Update(
@@ -417,7 +417,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 					false,
 				)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-02": true,
 				}
 				report, cleanupImageInfos, err := actions.Update(

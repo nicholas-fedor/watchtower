@@ -403,3 +403,49 @@ func (_c *MockReport_Updated_Call) RunAndReturn(run func() []types.ContainerRepo
 	_c.Call.Return(run)
 	return _c
 }
+
+// Filter provides a mock function for the type MockReport
+func (_mock *MockReport) Filter(filter types.Filter) types.Report {
+	ret := _mock.Called(filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Filter")
+	}
+
+	var r0 types.Report
+	if returnFunc, ok := ret.Get(0).(func(types.Filter) types.Report); ok {
+		r0 = returnFunc(filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.Report)
+		}
+	}
+	return r0
+}
+
+// MockReport_Filter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Filter'
+type MockReport_Filter_Call struct {
+	*mock.Call
+}
+
+// Filter is a helper method to define mock.On call
+func (_e *MockReport_Expecter) Filter(filter interface{}) *MockReport_Filter_Call {
+	return &MockReport_Filter_Call{Call: _e.mock.On("Filter", filter)}
+}
+
+func (_c *MockReport_Filter_Call) Run(run func(types.Filter)) *MockReport_Filter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.Filter))
+	})
+	return _c
+}
+
+func (_c *MockReport_Filter_Call) Return(report types.Report) *MockReport_Filter_Call {
+	_c.Call.Return(report)
+	return _c
+}
+
+func (_c *MockReport_Filter_Call) RunAndReturn(run func(types.Filter) types.Report) *MockReport_Filter_Call {
+	_c.Call.Return(run)
+	return _c
+}

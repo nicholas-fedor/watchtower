@@ -152,6 +152,60 @@ func (r *report) All() []types.ContainerReport {
 	return allFromSlices(r.scanned, r.updated, r.restarted, r.failed, r.skipped, r.stale, r.fresh)
 }
 
+// logFilterStats logs filtering statistics for a report type.
+func logFilterStats(reportType string,
+	originalScanned, filteredScanned,
+	originalUpdated, filteredUpdated,
+	originalFailed, filteredFailed,
+	originalSkipped, filteredSkipped,
+	originalStale, filteredStale,
+	originalFresh, filteredFresh,
+	originalRestarted, filteredRestarted []types.ContainerReport,
+) {
+	logrus.WithFields(logrus.Fields{
+		"original_scanned":   len(originalScanned),
+		"filtered_scanned":   len(filteredScanned),
+		"original_updated":   len(originalUpdated),
+		"filtered_updated":   len(filteredUpdated),
+		"original_failed":    len(originalFailed),
+		"filtered_failed":    len(filteredFailed),
+		"original_skipped":   len(originalSkipped),
+		"filtered_skipped":   len(filteredSkipped),
+		"original_stale":     len(originalStale),
+		"filtered_stale":     len(filteredStale),
+		"original_fresh":     len(originalFresh),
+		"filtered_fresh":     len(filteredFresh),
+		"original_restarted": len(originalRestarted),
+		"filtered_restarted": len(filteredRestarted),
+	}).Debug("Filtered " + reportType)
+}
+
+// Filter returns a new report containing only containers that pass the provided filter.
+//
+// Parameters:
+//   - filter: Filter function to apply to containers.
+//
+// Returns:
+//   - types.Report: New filtered report.
+func (r *report) Filter(filter types.Filter) types.Report {
+	filtered := &report{
+		scanned:   filterContainers(r.scanned, filter),
+		updated:   filterContainers(r.updated, filter),
+		failed:    filterContainers(r.failed, filter),
+		skipped:   filterContainers(r.skipped, filter),
+		stale:     filterContainers(r.stale, filter),
+		fresh:     filterContainers(r.fresh, filter),
+		restarted: filterContainers(r.restarted, filter),
+	}
+
+	logFilterStats("report", r.scanned, filtered.scanned, r.updated, filtered.updated,
+		r.failed, filtered.failed, r.skipped, filtered.skipped,
+		r.stale, filtered.stale, r.fresh, filtered.fresh,
+		r.restarted, filtered.restarted)
+
+	return filtered
+}
+
 // NewReport creates a report from progress data.
 //
 // Parameters:
@@ -250,6 +304,63 @@ func sortCategories(report *report) {
 	sort.Sort(SortableContainers(report.restarted))
 }
 
+// containerReportAdapter adapts a ContainerReport to FilterableContainer for filtering.
+type containerReportAdapter struct {
+	report types.ContainerReport
+}
+
+// Name returns the container name.
+func (a *containerReportAdapter) Name() string {
+	return a.report.Name()
+}
+
+// IsWatchtower returns false for reports (not applicable).
+func (a *containerReportAdapter) IsWatchtower() bool {
+	return false // Reports don't have watchtower status
+}
+
+// Enabled returns false for reports (not applicable).
+func (a *containerReportAdapter) Enabled() (bool, bool) {
+	return false, false // Reports don't have enable status
+}
+
+// Scope returns empty for reports (not applicable).
+func (a *containerReportAdapter) Scope() (string, bool) {
+	return "", false // Reports don't have scope
+}
+
+// ImageName returns the image name.
+func (a *containerReportAdapter) ImageName() string {
+	return a.report.ImageName()
+}
+
+// filterContainers applies a filter to a slice of container reports.
+//
+// Parameters:
+//   - containers: Slice of container reports to filter.
+//   - filter: Filter function to apply.
+//
+// Returns:
+//   - []types.ContainerReport: Filtered slice of container reports.
+func filterContainers(
+	containers []types.ContainerReport,
+	filter types.Filter,
+) []types.ContainerReport {
+	if filter == nil {
+		return containers
+	}
+
+	filtered := make([]types.ContainerReport, 0, len(containers))
+	for _, container := range containers {
+		adapter := &containerReportAdapter{report: container}
+		if filter(adapter) {
+			filtered = append(filtered, container)
+		}
+	}
+
+	return filtered
+}
+
 // Len returns the slice length.
 //
 // Returns:
@@ -304,6 +415,32 @@ func (r *SingleContainerReport) All() []types.ContainerReport {
 		r.StaleReports,
 		r.FreshReports,
 	)
+}
+
+// Filter returns a new SingleContainerReport containing only containers that pass the provided filter.
+//
+// Parameters:
+//   - filter: Filter function to apply to containers.
+//
+// Returns:
+//   - types.Report: New filtered SingleContainerReport.
+func (r *SingleContainerReport) Filter(filter types.Filter) types.Report {
+	filtered := &SingleContainerReport{
+		UpdatedReports:   filterContainers(r.UpdatedReports, filter),
+		RestartedReports: filterContainers(r.RestartedReports, filter),
+		ScannedReports:   filterContainers(r.ScannedReports, filter),
+		FailedReports:    filterContainers(r.FailedReports, filter),
+		SkippedReports:   filterContainers(r.SkippedReports, filter),
+		StaleReports:     filterContainers(r.StaleReports, filter),
+		FreshReports:     filterContainers(r.FreshReports, filter),
+	}
+
+	logFilterStats("SingleContainerReport", r.ScannedReports, filtered.ScannedReports,
+		r.UpdatedReports, filtered.UpdatedReports, r.FailedReports, filtered.FailedReports,
+		r.SkippedReports, filtered.SkippedReports, r.StaleReports, filtered.StaleReports,
+		r.FreshReports, filtered.FreshReports, r.RestartedReports, filtered.RestartedReports)
+
+	return filtered
 }
 
 // Swap exchanges two reports.

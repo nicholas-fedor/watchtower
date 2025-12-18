@@ -66,10 +66,10 @@ var _ = ginkgo.Describe("the update action", func() {
 						containerB,
 						containerC,
 					},
-					Staleness: map[string]bool{
-						"test-container-a": true,
-						"test-container-b": true,
-						"test-container-c": true,
+					Staleness: map[types.ContainerID]bool{
+						types.ContainerID("test-container-a"): true,
+						types.ContainerID("test-container-b"): true,
+						types.ContainerID("test-container-c"): true,
 					},
 				},
 				false,
@@ -264,7 +264,7 @@ var _ = ginkgo.Describe("the update action", func() {
 								ExposedPorts: map[nat.Port]struct{}{},
 							}),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"container-with-malformed-depends": true,
 					},
 				},
@@ -288,7 +288,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: containers,
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"container-a": true,
 						"container-b": true,
 						"container-c": true,
@@ -363,7 +363,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{base, dep1, indep},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"base":  true,
 							"dep1":  false,
 							"indep": false,
@@ -424,7 +424,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						containerA,
 						containerB,
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"container-a": false,
 						"container-b": false,
 					},
@@ -472,7 +472,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Containers: []types.Container{
 							dependent,
 						},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"dependent-container": true,
 						},
 					},
@@ -564,7 +564,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						containerC,
 						containerA,
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"container-d": true,
 						"container-b": false,
 						"container-c": false,
@@ -614,7 +614,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					Containers: []types.Container{
 						selfDependent,
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"self-container": true,
 					},
 				},
@@ -659,7 +659,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					Containers: []types.Container{
 						dependent,
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"dependent-container": true,
 					},
 				},
@@ -765,7 +765,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						containerB,
 						containerA,
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"container-e": true,
 						"container-d": false,
 						"container-c": false,
@@ -831,7 +831,7 @@ var _ = ginkgo.Describe("the update action", func() {
 							containerB,
 							containerA,
 						},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"container-b": true,
 							"container-a": false,
 						},
@@ -958,7 +958,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{containerC, containerB, containerA},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"container-c-rolling": true,
 							"container-b-rolling": true,
 							"container-a-rolling": true,
@@ -1023,7 +1023,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: []types.Container{dependency, dependent},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"fresh-dependency": false,
 						"stale-dependent":  true,
 					},
@@ -1080,7 +1080,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: []types.Container{dependency, dependent},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"stale-dependency": true,
 						"fresh-dependent":  false,
 					},
@@ -1236,7 +1236,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{database, webApp1, webApp2, apiService},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"database":    true,
 							"web-app-1":   false,
 							"web-app-2":   false,
@@ -1334,7 +1334,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						containerA,
 						containerD,
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"service-c": true,
 						"service-b": true,
 						"service-a": true,
@@ -1422,7 +1422,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
 					Containers: []types.Container{aDatabase, bService1, dService3, cService2},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"a-database": false,
 						"b-service1": true,
 						"c-service2": true,

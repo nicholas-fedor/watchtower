@@ -3,7 +3,7 @@
 //
 // Key components:
 //   - Execute Functions: Handle lifecycle hook execution (e.g., ExecutePreUpdateCommand).
-//   - Client Integration: Uses container.Client for command execution.
+//   - Client Integration: Uses types.Client for command execution.
 //
 // Usage example:
 //
@@ -13,5 +13,5 @@
 //	    logrus.WithError(err).Error("Pre-update failed")
 //	}
 //
-// The package integrates with container.Client, supports error handling, and uses logrus for logging.
+// The package integrates with types.Client, supports error handling, and uses logrus for logging.
 package lifecycle

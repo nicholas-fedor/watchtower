@@ -40,4 +40,12 @@ var (
 	errInvalidImageReference = errors.New("invalid image reference")
 	// errCircularDependency indicates a circular dependency between containers.
 	errCircularDependency = errors.New("circular dependency detected")
+	// errInsufficientDiskSpaceAvailable indicates insufficient available disk space below threshold.
+	errInsufficientDiskSpaceAvailable = errors.New(
+		"insufficient disk space: available space below threshold",
+	)
+	// errInsufficientDiskSpaceUsage indicates disk usage exceeds the configured threshold.
+	errInsufficientDiskSpaceUsage = errors.New(
+		"insufficient disk space: usage exceeds threshold",
+	)
 )

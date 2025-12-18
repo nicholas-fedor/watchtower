@@ -56,7 +56,7 @@ func getLinkedTestData(withImageInfo bool) *mockActions.TestData {
 		imageInfo)
 
 	return &mockActions.TestData{
-		Staleness: map[string]bool{linkingContainer.Name(): false},
+		Staleness: map[types.ContainerID]bool{types.ContainerID(linkingContainer.Name()): false},
 		Containers: []types.Container{
 			staleContainer,
 			linkingContainer,
@@ -88,7 +88,10 @@ func getNetworkModeTestData() *mockActions.TestData {
 	dependentContainer.ContainerInfo().HostConfig.NetworkMode = "container:network-dependency"
 
 	return &mockActions.TestData{
-		Staleness:  map[string]bool{staleContainer.Name(): true, dependentContainer.Name(): false},
+		Staleness: map[types.ContainerID]bool{
+			types.ContainerID(staleContainer.Name()):     true,
+			types.ContainerID(dependentContainer.Name()): false,
+		},
 		Containers: []types.Container{staleContainer, dependentContainer},
 	}
 }
@@ -129,7 +132,10 @@ func getComposeTestData() *mockActions.TestData {
 		})
 
 	return &mockActions.TestData{
-		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
+		Staleness: map[types.ContainerID]bool{
+			types.ContainerID(dbContainer.Name()):  true,
+			types.ContainerID(webContainer.Name()): false,
+		},
 		Containers: []types.Container{dbContainer, webContainer},
 	}
 }
@@ -185,10 +191,10 @@ func getComposeMultiHopTestData() *mockActions.TestData {
 		})
 
 	return &mockActions.TestData{
-		Staleness: map[string]bool{
-			cacheContainer.Name(): true,
-			dbContainer.Name():    false,
-			appContainer.Name():   false,
+		Staleness: map[types.ContainerID]bool{
+			types.ContainerID(cacheContainer.Name()): true,
+			types.ContainerID(dbContainer.Name()):    false,
+			types.ContainerID(appContainer.Name()):   false,
 		},
 		Containers: []types.Container{cacheContainer, dbContainer, appContainer},
 	}

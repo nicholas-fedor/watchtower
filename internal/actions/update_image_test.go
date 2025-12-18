@@ -38,11 +38,11 @@ var _ = ginkgo.Describe("the update action", func() {
 							"image:1.0.0",
 							time.Now()),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"tagged-container": true,
 					},
 				},
-				Stopped: make(map[string]bool),
+				Stopped: make(map[types.ContainerID]bool),
 			}
 			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -67,11 +67,11 @@ var _ = ginkgo.Describe("the update action", func() {
 							"image",
 							time.Now()),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"untagged-container": true,
 					},
 				},
-				Stopped: make(map[string]bool),
+				Stopped: make(map[types.ContainerID]bool),
 			}
 			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -97,11 +97,11 @@ var _ = ginkgo.Describe("the update action", func() {
 							time.Now(),
 						),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"pinned-container": true,
 					},
 				},
-				Stopped: make(map[string]bool),
+				Stopped: make(map[types.ContainerID]bool),
 			}
 			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -131,11 +131,11 @@ var _ = ginkgo.Describe("the update action", func() {
 								time.Now(),
 							),
 						},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"pinned-tagged-container": true,
 						},
 					},
-					Stopped: make(map[string]bool),
+					Stopped: make(map[types.ContainerID]bool),
 				}
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
@@ -167,11 +167,11 @@ var _ = ginkgo.Describe("the update action", func() {
 							":latest",
 							time.Now()),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"invalid-container": true,
 					},
 				},
-				Stopped: make(map[string]bool),
+				Stopped: make(map[types.ContainerID]bool),
 			}
 			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -200,11 +200,11 @@ var _ = ginkgo.Describe("the update action", func() {
 								nil,
 							),
 						},
-						Staleness: map[string]bool{
+						Staleness: map[types.ContainerID]bool{
 							"edge-container": true,
 						},
 					},
-					Stopped: make(map[string]bool),
+					Stopped: make(map[types.ContainerID]bool),
 				}
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
@@ -242,11 +242,11 @@ var _ = ginkgo.Describe("the update action", func() {
 							":latest",
 							time.Now()),
 					},
-					Staleness: map[string]bool{
+					Staleness: map[types.ContainerID]bool{
 						"InvalidContainer": true,
 					},
 				},
-				Stopped: make(map[string]bool),
+				Stopped: make(map[types.ContainerID]bool),
 			}
 			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

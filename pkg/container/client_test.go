@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("the client", func() {
 					), // Simulate successful removal
 				)
 				// Execute StopContainer and verify no error occurs.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -97,7 +97,7 @@ var _ = ginkgo.Describe("the client", func() {
 					), // Removal fails gracefully
 				)
 				// Execute StopContainer and verify no error occurs.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -120,7 +120,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute StopContainer and verify the error is propagated.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 				gomega.Expect(err).
 					To(gomega.MatchError(gomega.ContainSubstring("failed to stop container: Error response from daemon: server error")))
 			})
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute StopContainer and verify the removal error is propagated.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 				gomega.Expect(err).
 					To(gomega.MatchError(gomega.ContainSubstring("failed to remove container: Error response from daemon: server error")))
 			})
@@ -952,7 +952,7 @@ var _ = ginkgo.Describe("the client", func() {
 
 	ginkgo.Describe("TLS client methods", func() {
 		var tlsServer *ghttp.Server
-		var testClient Client
+		var testClient types.Client
 
 		ginkgo.BeforeEach(func() {
 			tlsServer = ghttp.NewTLSServer()
@@ -988,7 +988,7 @@ var _ = ginkgo.Describe("the client", func() {
 			info, err := testClient.GetInfo()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(info).NotTo(gomega.BeNil())
-			gomega.Expect(info["Name"]).To(gomega.Equal("docker-server"))
+			gomega.Expect(info.Name).To(gomega.Equal("docker-server"))
 		})
 
 		ginkgo.It("GetInfo handles TLS connection failures gracefully", func() {
@@ -1039,11 +1039,211 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 			info, err := testClient.GetInfo()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("Name", "test-docker"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("ServerVersion", "25.0.0"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("OSType", "linux"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("OperatingSystem", "Alpine Linux"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("Driver", "btrfs"))
+			gomega.Expect(info.Name).To(gomega.Equal("test-docker"))
+			gomega.Expect(info.ServerVersion).To(gomega.Equal("25.0.0"))
+			gomega.Expect(info.OSType).To(gomega.Equal("linux"))
+			gomega.Expect(info.OperatingSystem).To(gomega.Equal("Alpine Linux"))
+			gomega.Expect(info.Driver).To(gomega.Equal("btrfs"))
+		})
+
+		ginkgo.It("GetInfo handles error responses gracefully", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/info")),
+					ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+				),
+			)
+			_, err := testClient.GetInfo()
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get system info"))
+		})
+
+		ginkgo.It("GetInfo properly converts registry configuration", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/info")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"Name":          "docker-server",
+						"ServerVersion": "24.0.0",
+						"RegistryConfig": map[string]any{
+							"Mirrors":               []string{"mirror1", "mirror2"},
+							"InsecureRegistryCIDRs": []string{"10.0.0.0/8", "172.16.0.0/12"},
+						},
+					}),
+				),
+			)
+			info, err := testClient.GetInfo()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(info.RegistryConfig).NotTo(gomega.BeNil())
+			gomega.Expect(info.RegistryConfig.Mirrors).
+				To(gomega.Equal([]string{"mirror1", "mirror2"}))
+			gomega.Expect(info.RegistryConfig.InsecureRegistryCIDRs).
+				To(gomega.Equal([]string{"10.0.0.0/8", "172.16.0.0/12"}))
+		})
+
+		ginkgo.It("GetServerVersion successfully retrieves version information over TLS", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/version")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"Version":       "24.0.0",
+						"ApiVersion":    "1.44",
+						"MinAPIVersion": "1.12",
+						"GitCommit":     "abc123",
+						"GoVersion":     "go1.20",
+						"Os":            "linux",
+						"Arch":          "amd64",
+						"KernelVersion": "5.4.0",
+						"Experimental":  true,
+						"BuildTime":     "2023-01-01T00:00:00.000000000+00:00",
+					}),
+				),
+			)
+			version, err := testClient.GetServerVersion()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(version.Version).To(gomega.Equal("24.0.0"))
+			gomega.Expect(version.APIVersion).To(gomega.Equal("1.44"))
+			gomega.Expect(version.MinAPIVersion).To(gomega.Equal("1.12"))
+			gomega.Expect(version.GitCommit).To(gomega.Equal("abc123"))
+			gomega.Expect(version.GoVersion).To(gomega.Equal("go1.20"))
+			gomega.Expect(version.Os).To(gomega.Equal("linux"))
+			gomega.Expect(version.Arch).To(gomega.Equal("amd64"))
+			gomega.Expect(version.KernelVersion).To(gomega.Equal("5.4.0"))
+			gomega.Expect(version.Experimental).To(gomega.BeTrue())
+			gomega.Expect(version.BuildTime).To(gomega.Equal("2023-01-01T00:00:00.000000000+00:00"))
+		})
+
+		ginkgo.It("GetServerVersion handles error responses gracefully", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/version")),
+					ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+				),
+			)
+			_, err := testClient.GetServerVersion()
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get server version"))
+		})
+
+		ginkgo.It("GetDiskUsage successfully retrieves disk usage statistics over TLS", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/system/df")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"LayersSize": 1024,
+						"Images": []map[string]any{
+							{
+								"Id":          "image1",
+								"ParentId":    "parent1",
+								"RepoTags":    []string{"repo:tag"},
+								"RepoDigests": []string{"digest1"},
+								"Created":     1234567890,
+								"Size":        512,
+								"SharedSize":  256,
+								"Labels":      map[string]string{"key": "value"},
+								"Containers":  1,
+							},
+						},
+						"Containers": []map[string]any{
+							{
+								"Id":         "container1",
+								"Names":      []string{"/name"},
+								"Image":      "image",
+								"ImageID":    "imageid",
+								"Command":    "cmd",
+								"Created":    1234567890,
+								"SizeRw":     100,
+								"SizeRootFs": 200,
+								"Labels":     map[string]string{"key": "value"},
+								"State":      "running",
+								"Status":     "Up",
+								"Ports": []map[string]any{
+									{
+										"IP":          "0.0.0.0",
+										"PrivatePort": 80,
+										"PublicPort":  8080,
+										"Type":        "tcp",
+									},
+								},
+							},
+						},
+						"Volumes": []map[string]any{
+							{
+								"Name":       "volume1",
+								"Driver":     "local",
+								"Mountpoint": "/mnt",
+								"CreatedAt":  "2023-01-01",
+								"Status":     map[string]string{"status": "ok"},
+								"Labels":     map[string]string{"key": "value"},
+								"Scope":      "local",
+								"Options":    map[string]string{"opt": "val"},
+								"UsageData": map[string]any{
+									"Size":     300,
+									"RefCount": 1,
+								},
+							},
+						},
+					}),
+				),
+			)
+			usage, err := testClient.GetDiskUsage()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(usage.LayersSize).To(gomega.Equal(int64(1024)))
+			gomega.Expect(usage.Images).To(gomega.HaveLen(1))
+			gomega.Expect(usage.Containers).To(gomega.HaveLen(1))
+			gomega.Expect(usage.Volumes).To(gomega.HaveLen(1))
+			gomega.Expect(usage.Images[0].ID).To(gomega.Equal("image1"))
+			gomega.Expect(usage.Containers[0].ID).To(gomega.Equal("container1"))
+			gomega.Expect(usage.Volumes[0].Name).To(gomega.Equal("volume1"))
+		})
+
+		ginkgo.It("GetDiskUsage handles error responses gracefully", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/system/df")),
+					ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+				),
+			)
+			_, err := testClient.GetDiskUsage()
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get disk usage"))
+		})
+
+		ginkgo.It("GetTotalDiskUsage calculates total disk usage correctly over TLS", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/system/df")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"LayersSize": 1000,
+						"Containers": []map[string]any{
+							{"SizeRw": 100, "SizeRootFs": 200},
+							{"SizeRw": 50, "SizeRootFs": 150},
+						},
+						"Volumes": []map[string]any{
+							{"UsageData": map[string]any{"Size": 300}},
+						},
+						"BuildCache": []map[string]any{
+							{"Size": 400},
+						},
+					}),
+				),
+			)
+			total, err := testClient.GetTotalDiskUsage()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			// 1000 + (100+200 + 50+150) + 300 = 1000 + 500 + 300 = 1800
+			gomega.Expect(total).To(gomega.Equal(int64(1800)))
+		})
+
+		ginkgo.It("GetTotalDiskUsage propagates errors from GetDiskUsage", func() {
+			tlsServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.ContainSubstring("/system/df")),
+					ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+				),
+			)
+			_, err := testClient.GetTotalDiskUsage()
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get disk usage"))
 		})
 	})
 
@@ -1193,7 +1393,7 @@ func TestStopContainer_ContainerStillExistsAfterStopping(t *testing.T) {
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopContainer and verify no error occurs.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1220,7 +1420,7 @@ func TestStopContainer_ContainerDoesNotExistAfterStopping(t *testing.T) {
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopContainer and verify no error occurs.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1265,7 +1465,7 @@ func TestStopContainer_StoppingFailsWithUnexpectedError(t *testing.T) {
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopContainer and verify the error is propagated.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1321,7 +1521,7 @@ func TestStopContainer_RemovalFailsWithUnexpectedError(t *testing.T) {
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopContainer and verify the removal error is propagated.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		err := (&client{api: docker}).StopContainer(mockedContainer, time.Second)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1378,9 +1578,9 @@ func TestStopContainer_ContainerFailsToStopWithinTimeout(t *testing.T) {
 		resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 		defer resetLogrus()
 		// Execute StopContainer with a realistic timeout.
-		err := client{
+		err := (&client{
 			api: docker,
-		}.StopContainer(
+		}).StopContainer(
 			mockedContainer,
 			1*time.Second,
 		)

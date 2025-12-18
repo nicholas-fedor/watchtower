@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -35,7 +34,7 @@ func WriteStartupMessage(
 	sched time.Time,
 	filtering string,
 	scope string,
-	client container.Client,
+	client types.Client,
 	notifier types.Notifier,
 	watchtowerVersion string,
 	updateOnStart *bool,
@@ -71,6 +70,12 @@ func WriteStartupMessage(
 	}
 
 	startupLog.Info("Watchtower ", watchtowerVersion, " using Docker API v", apiVersion)
+
+	// Log comprehensive host information if enabled
+	includeHostInfo, _ := c.PersistentFlags().GetBool("include-host-info")
+	if includeHostInfo && client != nil {
+		LogHostInfo(startupLog, client)
+	}
 
 	// Log details about configured notifiers or lack thereof.
 	var notifierNames []string
@@ -147,6 +152,91 @@ func LogNotifierInfo(log *logrus.Entry, notifierNames []string) {
 	} else {
 		log.Info("Using no notifications")
 	}
+}
+
+// LogHostInfo logs comprehensive host information including system info, version info, and disk usage.
+//
+// It retrieves and displays key details like host OS, Docker version, kernel version, and disk usage summary
+// to provide users with detailed information about the host environment.
+//
+// Parameters:
+//   - log: The logrus.Entry used to write the host information.
+//   - client: The Docker client instance used to retrieve host information.
+func LogHostInfo(log *logrus.Entry, client types.Client) {
+	// Retrieve system information
+	if sysInfo, err := client.GetInfo(); err == nil {
+		log.Info(fmt.Sprintf("Host OS: %s %s", sysInfo.OperatingSystem, sysInfo.OSType))
+		log.Info("Docker Server Version: " + sysInfo.ServerVersion)
+
+		// Log registry configuration if available
+		if sysInfo.RegistryConfig != nil {
+			if len(sysInfo.RegistryConfig.Mirrors) > 0 {
+				log.Info("Registry Mirrors: " + strings.Join(sysInfo.RegistryConfig.Mirrors, ", "))
+			}
+
+			if len(sysInfo.RegistryConfig.InsecureRegistryCIDRs) > 0 {
+				log.Info(
+					"Insecure Registry CIDRs: " + strings.Join(
+						sysInfo.RegistryConfig.InsecureRegistryCIDRs,
+						", ",
+					),
+				)
+			}
+		}
+	} else {
+		log.Debug(fmt.Sprintf("Failed to retrieve system info: %v", err))
+	}
+
+	// Retrieve version information
+	if versionInfo, err := client.GetServerVersion(); err == nil {
+		log.Info("Kernel Version: " + versionInfo.KernelVersion)
+		log.Info("Docker Version: " + versionInfo.Version)
+		log.Info("Go Version: " + versionInfo.GoVersion)
+		log.Info("Architecture: " + versionInfo.Arch)
+	} else {
+		log.Debug(fmt.Sprintf("Failed to retrieve version info: %v", err))
+	}
+
+	// Retrieve disk usage information
+	if diskUsage, err := client.GetDiskUsage(); err == nil {
+		totalSize := diskUsage.LayersSize
+		imageCount := len(diskUsage.Images)
+		containerCount := len(diskUsage.Containers)
+		volumeCount := len(diskUsage.Volumes)
+		log.Info(fmt.Sprintf("Disk Usage: %d bytes used by %d images, %d containers, %d volumes",
+			totalSize, imageCount, containerCount, volumeCount))
+	} else {
+		log.Debug(fmt.Sprintf("Failed to retrieve disk usage: %v", err))
+	}
+}
+
+// GetHostContextFields returns logrus fields with host context information for debugging.
+//
+// It retrieves OS type, Docker version, and architecture from the Docker client
+// to provide valuable debugging information in error logs.
+//
+// Parameters:
+//   - client: The Docker client instance used to retrieve host information (can be nil).
+//
+// Returns:
+//   - logrus.Fields: Fields containing host_os, docker_version, and architecture.
+func GetHostContextFields(client types.Client) logrus.Fields {
+	fields := logrus.Fields{}
+
+	if client == nil {
+		return fields
+	}
+
+	if sysInfo, err := client.GetInfo(); err == nil {
+		fields["host_os"] = fmt.Sprintf("%s %s", sysInfo.OperatingSystem, sysInfo.OSType)
+		fields["docker_version"] = sysInfo.ServerVersion
+	}
+
+	if versionInfo, err := client.GetServerVersion(); err == nil {
+		fields["architecture"] = versionInfo.Arch
+	}
+
+	return fields
 }
 
 // LogScheduleInfo logs information about the scheduling or run mode configuration.

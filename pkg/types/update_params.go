@@ -6,18 +6,20 @@ import (
 
 // UpdateParams defines options for the Update function.
 type UpdateParams struct {
-	Filter           Filter        // Container filter.
-	Cleanup          bool          // Remove old images if true.
-	NoRestart        bool          // Skip restarts if true.
-	Timeout          time.Duration // Update timeout.
-	MonitorOnly      bool          // Monitor without updating if true.
-	NoPull           bool          // Skip image pulls if true.
-	LifecycleHooks   bool          // Enable lifecycle hooks if true.
-	RollingRestart   bool          // Use rolling restart if true.
-	LabelPrecedence  bool          // Prioritize labels if true.
-	PullFailureDelay time.Duration // Delay after failed self-update pull.
-	LifecycleUID     int           // Default UID for lifecycle hooks.
-	LifecycleGID     int           // Default GID for lifecycle hooks.
-	CPUCopyMode      string        // CPU copy mode for container recreation.
-	RunOnce          bool          // Run once mode if true.
+	Filter             Filter        // Container filter.
+	Cleanup            bool          // Remove old images if true.
+	NoRestart          bool          // Skip restarts if true.
+	Timeout            time.Duration // Update timeout.
+	MonitorOnly        bool          // Monitor without updating if true.
+	NoPull             bool          // Skip image pulls if true.
+	LifecycleHooks     bool          // Enable lifecycle hooks if true.
+	RollingRestart     bool          // Use rolling restart if true.
+	LabelPrecedence    bool          // Prioritize labels if true.
+	PullFailureDelay   time.Duration // Delay after failed self-update pull.
+	LifecycleUID       int           // Default UID for lifecycle hooks.
+	LifecycleGID       int           // Default GID for lifecycle hooks.
+	CPUCopyMode        string        // CPU copy mode for container recreation.
+	RunOnce            bool          // Run once mode if true.
+	DiskSpaceMaximum   string        // Maximum disk space for checking before updates.
+	DiskSpaceThreshold string        // Minimum disk space threshold.
 }

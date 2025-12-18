@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			channel := "123456789"
 			token := "abvsihdbau"
 			color := notifications.ColorInt
-			username := "containrrrbot"
+			username := "watchtowerbot"
 			iconURL := "https://github.com/nicholas-fedor/watchtower/blob/main/watchtower-sq180.png"
 			expected := fmt.Sprintf(
 				"discord://%s@%s?color=0x%x&colordebug=0x0&colorerror=0x0&colorinfo=0x0&colorwarn=0x0&username=watchtower",
@@ -230,7 +230,7 @@ var _ = ginkgo.Describe("notifications", func() {
 		ginkgo.When("converting a slack service config into a shoutrrr url", func() {
 			command := cmd.NewRootCommand()
 			flags.RegisterNotificationFlags(command)
-			username := "containrrrbot"
+			username := "watchtowerbot"
 			tokenA := "AAAAAAAAA"
 			tokenB := "BBBBBBBBB"
 			tokenC := "123456789123456789123456"
@@ -442,7 +442,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			ginkgo.It("should set the from address in the URL", func() {
 				fromAddress := "lala@example.com"
 				expectedOutput := buildExpectedURL(
-					"containrrrbot",
+					"watchtowerbot",
 					"secret-password",
 					"mail.watchtower.dev",
 					25,
@@ -460,7 +460,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"--notification-email-to",
 					"mail@example.com",
 					"--notification-email-server-user",
-					"containrrrbot",
+					"watchtowerbot",
 					"--notification-email-server-password",
 					"secret-password",
 					"--notification-email-server",
@@ -475,7 +475,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				fromAddress := "sender@example.com"
 				toAddress := "receiver@example.com"
 				expectedOutput := buildExpectedURL(
-					"containrrrbot",
+					"watchtowerbot",
 					"secret-password",
 					"mail.watchtower.dev",
 					25,
@@ -493,7 +493,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"--notification-email-to",
 					toAddress,
 					"--notification-email-server-user",
-					"containrrrbot",
+					"watchtowerbot",
 					"--notification-email-server-password",
 					"secret-password",
 					"--notification-email-server",

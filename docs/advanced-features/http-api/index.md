@@ -4,15 +4,17 @@
 
 Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mode) HTTP API server.
 
-!!! Caution
-    This is a relatively simple API with significant security implications.
+!!! Warning "This is a relatively simple API with significant security implications."
 
 ## Endpoints
 
-|            **Name**            | **Endpoint**  |          **Parameters**           |                           **Description**                            |
-|:------------------------------:|:-------------:|:---------------------------------:|:--------------------------------------------------------------------:|
-|   [Update](#http_api_update)   | `/v1/update`  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation |
-| [Metrics](../metrics/index.md) | `/v1/metrics` |                                   |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
+| **Name**                            | **Endpoint**                  | **Parameters**                    | **Description**                                                      |
+|-------------------------------------|-------------------------------|-----------------------------------|----------------------------------------------------------------------|
+| [Update](#http_api_update)          | `/v1/update`                  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation |
+| [Metrics](../metrics/index.md)      | `/v1/metrics`                 |                                   | Exposes Prometheus-compatible metrics for monitoring and alerting    |
+| [Host Info](#host_info)             | `/v1/metrics/host/info`       |                                   | Returns system information from the Docker daemon                    |
+| [Host Version](#host_version)       | `/v1/metrics/host/version`    |                                   | Returns version information from the Docker daemon                   |
+| [Host Disk Usage](#host_disk_usage) | `/v1/metrics/host/disk-usage` |                                   | Returns disk usage information from the Docker daemon                |
 
 ### HTTP API Update
 
@@ -159,3 +161,88 @@ services:
 
 !!! Note
     Both `--http-api-update` and `--http-api-metrics` can be enabled simultaneously to provide both update triggering and monitoring capabilities.
+
+### Host Info
+
+Returns system information from the Docker daemon, including details about the host system, Docker version, and configuration.
+
+#### Response Format
+
+```json
+{
+  "name": "docker-desktop",
+  "server_version": "24.0.6",
+  "os_type": "linux",
+  "operating_system": "Docker Desktop",
+  "driver": "overlay2",
+  "registry_config": {
+    "mirrors": ["https://registry-mirror.example.com"],
+    "insecure_registry_cidrs": [],
+    "registries": {}
+  }
+}
+```
+
+### Host Version
+
+Returns detailed version information from the Docker daemon, including API versions, build details, and system information.
+
+#### Response Format
+
+```json
+{
+  "version": "24.0.6",
+  "api_version": "1.43",
+  "min_api_version": "1.12",
+  "git_commit": "a61e2b4",
+  "go_version": "go1.20.7",
+  "os": "linux",
+  "arch": "amd64",
+  "kernel_version": "5.15.49-linuxkit",
+  "experimental": true,
+  "build_time": "2023-09-12T11:45:06.000000000+00:00"
+}
+```
+
+### Host Disk Usage
+
+Returns comprehensive disk usage statistics from the Docker daemon, including information about images, containers, volumes, and build cache.
+
+#### Response Format
+
+```json
+{
+  "layers_size": 2147483648,
+  "images": [
+    {
+      "id": "sha256:abcd1234...",
+      "repo_tags": ["nginx:latest"],
+      "size": 187123456,
+      "containers": 2
+    }
+  ],
+  "containers": [
+    {
+      "id": "abcd1234...",
+      "names": ["/nginx-container"],
+      "image": "nginx:latest",
+      "state": "running",
+      "size_rw": 1024,
+      "size_root_fs": 187123456
+    }
+  ],
+  "volumes": [
+    {
+      "name": "my-volume",
+      "driver": "local",
+      "mountpoint": "/var/lib/docker/volumes/my-volume/_data",
+      "scope": "local",
+      "usage_data": {
+        "size": 1048576,
+        "ref_count": 1
+      }
+    }
+  ],
+  "build_cache": []
+}
+```

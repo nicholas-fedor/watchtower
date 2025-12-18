@@ -44,7 +44,7 @@ var (
 	// It provides an interface for listing, stopping, starting, and managing containers, initialized during
 	// the preRun phase with options derived from command-line flags and environment variables such as
 	// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
-	client container.Client
+	client types.Client
 
 	// scheduleSpec holds the cron-formatted schedule string that dictates when periodic container updates occur.
 	//
@@ -154,6 +154,18 @@ var (
 	// controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
 	cpuCopyMode string
 
+	// diskSpaceMax specifies the maximum disk space for monitoring before updates.
+	//
+	// It is set in preRun via the --disk-space-max flag or the WATCHTOWER_DISK_SPACE_MAX environment variable,
+	// allowing users to monitor disk usage before attempting container updates.
+	diskSpaceMax string
+
+	// diskSpaceWarn specifies the disk space warning threshold.
+	//
+	// It is set in preRun via the --disk-space-warn flag or the WATCHTOWER_DISK_SPACE_WARN environment variable,
+	// defining the threshold below which disk space warnings are triggered.
+	diskSpaceWarn string
+
 	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 	//
 	// It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
@@ -192,6 +204,8 @@ var (
 			CPUCopyMode:                  cpuCopyMode,
 			PullFailureDelay:             time.Duration(0),
 			RunOnce:                      runOnce,
+			DiskSpaceMax:                 diskSpaceMax,
+			DiskSpaceWarn:                diskSpaceWarn,
 		}
 
 		return actions.RunUpdatesWithNotifications(ctx, params)
@@ -297,6 +311,10 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Retrieve notification report flag.
 	notificationReport, _ = flagsSet.GetBool("notification-report")
+
+	// Retrieve disk space check flags.
+	diskSpaceMax, _ = flagsSet.GetString("disk-space-max")
+	diskSpaceWarn, _ = flagsSet.GetString("disk-space-warn")
 
 	// Log the scope if specified, aiding debugging by confirming the operational boundary.
 	if scope != "" {
@@ -452,7 +470,7 @@ func run(c *cobra.Command, normalizedNames []string) {
 // Returns:
 //   - types.ContainerID: The container ID if found.
 //   - error: Non-nil if the container ID cannot be retrieved.
-func getContainerID(client container.Client) (types.ContainerID, error) {
+func getContainerID(client types.Client) (types.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
 		return "", ErrContainerIDNotFound
@@ -482,7 +500,7 @@ func getContainerID(client container.Client) (types.ContainerID, error) {
 //
 // Returns:
 //   - error: Non-nil if container ID retrieval or scope derivation fails, nil on success or if derivation is skipped.
-func deriveScopeFromContainer(client container.Client) error {
+func deriveScopeFromContainer(client types.Client) error {
 	// Skip derivation if scope is already explicitly set via flags or environment.
 	if scope != "" {
 		return nil

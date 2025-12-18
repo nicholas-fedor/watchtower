@@ -17,7 +17,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.When("there are multiple containers using the same image", func() {
 			ginkgo.It("should collect the image ID once for deferred cleanup", func() {
 				client := mockActions.CreateMockClient(getCommonTestData(), false, false)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-01": true,
 					"test-container-02": true,
 					"test-container-03": true,
@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					),
 				)
 				client := mockActions.CreateMockClient(testData, false, false)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-01":     true,
 					"test-container-02":     true,
 					"test-container-03":     true,
@@ -78,7 +78,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.When("there are linked containers being updated", func() {
 			ginkgo.It("should collect only the stale container's image ID", func() {
 				client := mockActions.CreateMockClient(getLinkedTestData(true), false, false)
-				client.TestData.Staleness["test-container-01"] = true
+				client.TestData.Staleness[types.ContainerID("test-container-01")] = true
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
@@ -97,7 +97,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.When("performing a rolling restart update", func() {
 			ginkgo.It("should collect the image ID for deferred cleanup", func() {
 				client := mockActions.CreateMockClient(getCommonTestData(), false, false)
-				client.TestData.Staleness = map[string]bool{
+				client.TestData.Staleness = map[types.ContainerID]bool{
 					"test-container-01": true,
 					"test-container-02": true,
 					"test-container-03": true,
@@ -122,7 +122,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.When("updating a linked container with missing image info", func() {
 			ginkgo.It("should gracefully fail and collect no image IDs", func() {
 				client := mockActions.CreateMockClient(getLinkedTestData(false), false, false)
-				client.TestData.Staleness["test-container-01"] = true
+				client.TestData.Staleness[types.ContainerID("test-container-01")] = true
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
