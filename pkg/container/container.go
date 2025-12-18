@@ -159,6 +159,10 @@ func (c Container) ContainerInfo() *dockerContainer.InspectResponse {
 // Returns:
 //   - types.ContainerID: Container ID.
 func (c Container) ID() types.ContainerID {
+	if c.containerInfo == nil {
+		return ""
+	}
+
 	return types.ContainerID(c.containerInfo.ID)
 }
 
@@ -179,6 +183,10 @@ func (c Container) IsRunning() bool {
 // Returns:
 //   - bool: True if restarting, false otherwise.
 func (c Container) IsRestarting() bool {
+	if c.containerInfo == nil || c.containerInfo.State == nil {
+		return false
+	}
+
 	return c.containerInfo.State.Restarting
 }
 
@@ -226,6 +234,12 @@ func (c Container) ImageName() string {
 	// Prefer Zodiac label for image name.
 	imageName, ok := c.getLabelValue(zodiacLabel)
 	if !ok {
+		if c.containerInfo == nil || c.containerInfo.Config == nil {
+			clog.Warn("No container config available, using default image name")
+
+			return "unknown:latest"
+		}
+
 		imageName = c.containerInfo.Config.Image
 
 		clog.Debug("Using Config.Image for image name")
@@ -354,6 +368,12 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 //   - *dockerContainerType.HostConfig: Host configuration for container creation.
 func (c Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	clog := logrus.WithField("container", c.Name())
+
+	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
+		clog.Warn("No container host config available")
+
+		return &dockerContainer.HostConfig{}
+	}
 
 	hostConfig := c.containerInfo.HostConfig
 
