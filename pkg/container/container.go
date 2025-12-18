@@ -485,33 +485,21 @@ func ResolveContainerIdentifier(c types.Container) string {
 	info := c.ContainerInfo()
 	// Return container name if nil.
 	if info == nil {
-		if name := c.Name(); name != "" {
-			return name
-		}
-
-		return string(c.ID())
+		return nameOrID(c)
 	}
 
 	// Get the container configuration
 	cfg := info.Config
 	// Return container name if nil.
 	if cfg == nil {
-		if name := c.Name(); name != "" {
-			return name
-		}
-
-		return string(c.ID())
+		return nameOrID(c)
 	}
 
 	// Get the container labels
 	labels := cfg.Labels
 	// Return container name if empty.
 	if len(labels) == 0 {
-		if name := c.Name(); name != "" {
-			return name
-		}
-
-		return string(c.ID())
+		return nameOrID(c)
 	}
 
 	if serviceName := compose.GetServiceName(labels); serviceName != "" {
@@ -519,6 +507,11 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return serviceName
 	}
 
+	return nameOrID(c)
+}
+
+// nameOrID returns the container name if non-empty, otherwise returns the container ID.
+func nameOrID(c types.Container) string {
 	if name := c.Name(); name != "" {
 		return name
 	}
