@@ -452,34 +452,46 @@ func (c Container) Links() []string {
 }
 
 // ResolveContainerIdentifier returns the service name if available,
-// otherwise container name.
+// otherwise container name. Falls back to container ID if name is empty.
 //
 // Parameters:
 //   - c: Container to get identifier for
 //
 // Returns:
-//   - string: Service name if available, otherwise container name
+//   - string: Service name if available, otherwise container name, otherwise container ID
 //     Always returns a non-empty string for valid containers
 func ResolveContainerIdentifier(c types.Container) string {
 	// Get the container information.
 	info := c.ContainerInfo()
 	// Return container name if nil.
 	if info == nil {
-		return c.Name()
+		if name := c.Name(); name != "" {
+			return name
+		}
+
+		return string(c.ID())
 	}
 
 	// Get the container configuration
 	cfg := info.Config
 	// Return container name if nil.
 	if cfg == nil {
-		return c.Name()
+		if name := c.Name(); name != "" {
+			return name
+		}
+
+		return string(c.ID())
 	}
 
 	// Get the container labels
 	labels := cfg.Labels
 	// Return container name if empty.
 	if len(labels) == 0 {
-		return c.Name()
+		if name := c.Name(); name != "" {
+			return name
+		}
+
+		return string(c.ID())
 	}
 
 	if serviceName := compose.GetServiceName(labels); serviceName != "" {
@@ -487,7 +499,11 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return serviceName
 	}
 
-	return c.Name()
+	if name := c.Name(); name != "" {
+		return name
+	}
+
+	return string(c.ID())
 }
 
 // getLinksFromWatchtowerLabel extracts dependency links from the
