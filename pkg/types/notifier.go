@@ -24,4 +24,7 @@ type Notifier interface {
 		entries []*logrus.Entry,
 		report Report,
 	)
+
+	// ShouldSendNotification checks if a notification should be sent for the given report based on the notifier's configuration.
+	ShouldSendNotification(report Report) bool
 }

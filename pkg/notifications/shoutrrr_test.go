@@ -676,6 +676,131 @@ Turns out everything is on fire
 			})
 		})
 	})
+
+	ginkgo.Describe("ShouldSendNotification", func() {
+		ginkgo.When("notification level is error", func() {
+			ginkgo.It("should return true when report has failed containers", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					logrus.ErrorLevel,
+					"",
+					false,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+
+				mockReport := mockActions.CreateMockProgressReport(session.FailedState)
+				result := shoutrrr.ShouldSendNotification(mockReport)
+				gomega.Expect(result).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should return false when report has no failed containers", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					logrus.ErrorLevel,
+					"",
+					false,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+
+				mockReport := mockActions.CreateMockProgressReport(session.FreshState)
+				result := shoutrrr.ShouldSendNotification(mockReport)
+				gomega.Expect(result).To(gomega.BeFalse())
+			})
+		})
+
+		ginkgo.When("notification level is warn", func() {
+			ginkgo.It("should return true regardless of report content", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					logrus.WarnLevel,
+					"",
+					false,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+
+				mockReport := mockActions.CreateMockProgressReport(session.FreshState)
+				result := shoutrrr.ShouldSendNotification(mockReport)
+				gomega.Expect(result).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("notification level is info", func() {
+			ginkgo.It("should return true regardless of report content", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					logrus.InfoLevel,
+					"",
+					false,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+
+				mockReport := mockActions.CreateMockProgressReport(session.FreshState)
+				result := shoutrrr.ShouldSendNotification(mockReport)
+				gomega.Expect(result).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("notification level is debug", func() {
+			ginkgo.It("should return true regardless of report content", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					logrus.DebugLevel,
+					"",
+					false,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+
+				mockReport := mockActions.CreateMockProgressReport(session.FreshState)
+				result := shoutrrr.ShouldSendNotification(mockReport)
+				gomega.Expect(result).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("notification level is trace", func() {
+			ginkgo.It("should return true regardless of report content", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					logrus.TraceLevel,
+					"",
+					false,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+
+				mockReport := mockActions.CreateMockProgressReport(session.FreshState)
+				result := shoutrrr.ShouldSendNotification(mockReport)
+				gomega.Expect(result).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("report is nil", func() {
+			ginkgo.It("should return true", func() {
+				shoutrrr := createNotifier(
+					[]string{"logger://"},
+					logrus.ErrorLevel,
+					"",
+					false,
+					StaticData{},
+					false,
+					time.Duration(0),
+				)
+
+				result := shoutrrr.ShouldSendNotification(nil)
+				gomega.Expect(result).To(gomega.BeTrue())
+			})
+		})
+	})
 })
 
 func TestSlowNotificationNotSent(t *testing.T) {

@@ -489,7 +489,9 @@ func sendNotifications(
 			var waitGroup sync.WaitGroup
 
 			waitGroup.Go(func() {
-				notifier.SendNotification(result)
+				if notifier.ShouldSendNotification(result) {
+					notifier.SendNotification(result)
+				}
 			})
 
 			waitGroup.Wait()
@@ -569,7 +571,9 @@ func sendSplitNotifications(
 			}
 
 			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
-			notifier.SendNotification(singleContainerReport)
+			if notifier.ShouldSendNotification(singleContainerReport) {
+				notifier.SendNotification(singleContainerReport)
+			}
 
 			notified[updatedContainer.ID()] = true
 		}
@@ -597,7 +601,9 @@ func sendSplitNotifications(
 			}
 
 			singleContainerReport := buildSingleRestartedContainerReport(restartedContainer, result)
-			notifier.SendNotification(singleContainerReport)
+			if notifier.ShouldSendNotification(singleContainerReport) {
+				notifier.SendNotification(singleContainerReport)
+			}
 
 			notified[restartedContainer.ID()] = true
 		}
@@ -626,7 +632,9 @@ func sendSplitNotifications(
 				}
 
 				singleContainerReport := buildSingleContainerReport(staleContainer, result)
-				notifier.SendNotification(singleContainerReport)
+				if notifier.ShouldSendNotification(singleContainerReport) {
+					notifier.SendNotification(singleContainerReport)
+				}
 
 				notified[staleContainer.ID()] = true
 			}
@@ -675,7 +683,9 @@ func sendSplitNotifications(
 			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, updatedContainer.Name())
 			entries = append(entries, containerCleanupEntries...)
 
-			notifier.SendFilteredEntries(entries, singleContainerReport)
+			if notifier.ShouldSendNotification(singleContainerReport) {
+				notifier.SendFilteredEntries(entries, singleContainerReport)
+			}
 
 			notified[updatedContainer.ID()] = true
 		}
@@ -742,7 +752,9 @@ func sendSplitNotifications(
 			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, restartedContainer.Name())
 			entries = append(entries, containerCleanupEntries...)
 
-			notifier.SendFilteredEntries(entries, singleContainerReport)
+			if notifier.ShouldSendNotification(singleContainerReport) {
+				notifier.SendFilteredEntries(entries, singleContainerReport)
+			}
 
 			notified[restartedContainer.ID()] = true
 		}
@@ -783,7 +795,9 @@ func sendSplitNotifications(
 				containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, staleContainer.Name())
 				entries = append(entries, containerCleanupEntries...)
 
-				notifier.SendFilteredEntries(entries, singleContainerReport)
+				if notifier.ShouldSendNotification(singleContainerReport) {
+					notifier.SendFilteredEntries(entries, singleContainerReport)
+				}
 
 				notified[staleContainer.ID()] = true
 			}

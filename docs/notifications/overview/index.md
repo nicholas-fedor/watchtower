@@ -57,7 +57,7 @@ Environment Variable: WATCHTOWER_NOTIFICATIONS_LEVEL
 ```
 
 !!! Note
-    In legacy mode (`--notification-report=false`), only `info`-level logs trigger notifications, ensuring a focused step-by-step update summary.
+    The notification level setting applies to both report mode (`--notification-report=true`) and legacy mode (`--notification-report=false`).
 
 ### Hostname
 

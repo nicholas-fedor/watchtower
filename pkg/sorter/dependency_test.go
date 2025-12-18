@@ -394,6 +394,30 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(result[0].Name()).To(gomega.Equal("container2")) // web service
 			gomega.Expect(result[1].Name()).To(gomega.Equal("container1")) // depends on web
 		})
+
+		ginkgo.It("should handle containers with empty identifiers", func() {
+			// This tests that containers with empty names fall back to using container ID as identifier
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("") // Empty name
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+			c1.EXPECT().Links().Return(nil)
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: ""}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("") // Empty name
+			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: ""}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			containers := []types.Container{c1, c2}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred()) // Should not detect false cycle
+			gomega.Expect(result).To(gomega.HaveLen(2))
+		})
 	})
 })
 

@@ -159,6 +159,10 @@ func (c Container) ContainerInfo() *dockerContainer.InspectResponse {
 // Returns:
 //   - types.ContainerID: Container ID.
 func (c Container) ID() types.ContainerID {
+	if c.containerInfo == nil {
+		return ""
+	}
+
 	return types.ContainerID(c.containerInfo.ID)
 }
 
@@ -179,6 +183,10 @@ func (c Container) IsRunning() bool {
 // Returns:
 //   - bool: True if restarting, false otherwise.
 func (c Container) IsRestarting() bool {
+	if c.containerInfo == nil || c.containerInfo.State == nil {
+		return false
+	}
+
 	return c.containerInfo.State.Restarting
 }
 
@@ -226,6 +234,12 @@ func (c Container) ImageName() string {
 	// Prefer Zodiac label for image name.
 	imageName, ok := c.getLabelValue(zodiacLabel)
 	if !ok {
+		if c.containerInfo == nil || c.containerInfo.Config == nil {
+			clog.Warn("No container config available, using default image name")
+
+			return "unknown:latest"
+		}
+
 		imageName = c.containerInfo.Config.Image
 
 		clog.Debug("Using Config.Image for image name")
@@ -355,6 +369,12 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 func (c Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	clog := logrus.WithField("container", c.Name())
 
+	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
+		clog.Warn("No container host config available")
+
+		return &dockerContainer.HostConfig{}
+	}
+
 	hostConfig := c.containerInfo.HostConfig
 
 	// Adjust link format for each entry (and drop invalid ones).
@@ -452,34 +472,34 @@ func (c Container) Links() []string {
 }
 
 // ResolveContainerIdentifier returns the service name if available,
-// otherwise container name.
+// otherwise container name. Falls back to container ID if name is empty.
 //
 // Parameters:
 //   - c: Container to get identifier for
 //
 // Returns:
-//   - string: Service name if available, otherwise container name
+//   - string: Service name if available, otherwise container name, otherwise container ID
 //     Always returns a non-empty string for valid containers
 func ResolveContainerIdentifier(c types.Container) string {
 	// Get the container information.
 	info := c.ContainerInfo()
 	// Return container name if nil.
 	if info == nil {
-		return c.Name()
+		return nameOrID(c)
 	}
 
 	// Get the container configuration
 	cfg := info.Config
 	// Return container name if nil.
 	if cfg == nil {
-		return c.Name()
+		return nameOrID(c)
 	}
 
 	// Get the container labels
 	labels := cfg.Labels
 	// Return container name if empty.
 	if len(labels) == 0 {
-		return c.Name()
+		return nameOrID(c)
 	}
 
 	if serviceName := compose.GetServiceName(labels); serviceName != "" {
@@ -487,7 +507,16 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return serviceName
 	}
 
-	return c.Name()
+	return nameOrID(c)
+}
+
+// nameOrID returns the container name if non-empty, otherwise returns the container ID.
+func nameOrID(c types.Container) string {
+	if name := c.Name(); name != "" {
+		return name
+	}
+
+	return string(c.ID())
 }
 
 // getLinksFromWatchtowerLabel extracts dependency links from the

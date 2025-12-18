@@ -122,6 +122,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 				notifier.EXPECT().StartNotification(true).Return()
+				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
 
 				params := RunUpdatesWithNotificationsParams{
@@ -529,6 +530,7 @@ var _ = ginkgo.Describe("Actions", func() {
 		ginkgo.It("should send grouped notification when split is false", func() {
 			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mockReport).Return(true)
 			notifier.EXPECT().SendNotification(mockReport).Return()
 			sendNotifications(notifier, false, false, mockReport, []types.CleanedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
@@ -573,6 +575,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				// Mock the SendNotification call
 				notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
 				sendSplitNotifications(notifier, true, mockReport, []types.CleanedImageInfo{})
@@ -622,6 +625,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 				notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
 
 				sendSplitNotifications(notifier, false, mockReport, []types.CleanedImageInfo{})
@@ -646,6 +650,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
 			sendSplitNotifications(notifier, true, mockReport, []types.CleanedImageInfo{})
@@ -694,6 +699,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 				notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
 				sendSplitNotifications(notifier, true, mockReport, []types.CleanedImageInfo{})
@@ -721,6 +727,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
 
 			sendSplitNotifications(notifier, false, mockReport, []types.CleanedImageInfo{})
@@ -747,6 +754,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
 
 			sendSplitNotifications(notifier, false, mockReport, []types.CleanedImageInfo{})
@@ -774,6 +782,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
 
 			sendSplitNotifications(notifier, false, mockReport, []types.CleanedImageInfo{})
@@ -797,6 +806,35 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			sendSplitNotifications(notifier, true, mockReport, []types.CleanedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
+		})
+	})
+
+	ginkgo.Describe("notification level filtering", func() {
+		ginkgo.Context("when notification level is error", func() {
+			ginkgo.It("should not send notifications when no errors occur", func() {
+				mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+
+				// Set up report with no errors - only successful updates
+				mockContainer := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
+				mockContainer.EXPECT().ID().Return(types.ContainerID("test-id"))
+				mockContainer.EXPECT().Name().Return("test-container")
+				mockContainer.EXPECT().Error().Return("") // No error
+
+				mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
+				mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+				mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
+				mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer})
+				mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
+				mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
+				mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
+
+				notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(false)
+				// With notification level set to error and no errors, no notification should be sent
+
+				sendSplitNotifications(notifier, true, mockReport, []types.CleanedImageInfo{})
+				notifier.AssertExpectations(ginkgo.GinkgoT())
+			})
 		})
 	})
 

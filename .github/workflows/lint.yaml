@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
+        uses: actions/setup-go@4aaadf42668403795cdfdb15b1c4250e9fed12b9
         with:
           go-version-file: "go.mod"
 
