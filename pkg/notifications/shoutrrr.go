@@ -655,6 +655,23 @@ func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, repo
 	n.sendEntries(entries, report)
 }
 
+// ShouldSendNotification checks if a notification should be sent for the given report based on the notifier's log level.
+//
+// Parameters:
+//   - report: The report to check.
+//
+// Returns:
+//   - bool: True if notification should be sent, false otherwise.
+func (n *shoutrrrTypeNotifier) ShouldSendNotification(report types.Report) bool {
+	if report != nil && n.logLevel == logrus.ErrorLevel {
+		if len(report.Failed()) == 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Levels returns log levels that trigger notifications.
 //
 // Returns:
