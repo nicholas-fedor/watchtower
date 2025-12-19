@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/attest-build-provenance digest to 00014ed by @renovate[bot] in [#1128](https://github.com/nicholas-fedor/watchtower/pull/1128)
 - Update cimg/go:1.25.5 docker digest to b644c11 by @renovate[bot] in [#1127](https://github.com/nicholas-fedor/watchtower/pull/1127)
 - Update nicholas-fedor/govulncheck-action digest to ec02307 by @renovate[bot] in [#1123](https://github.com/nicholas-fedor/watchtower/pull/1123)
 - Update alpine:3.23.2 docker digest to 865b95f by @renovate[bot] in [#1122](https://github.com/nicholas-fedor/watchtower/pull/1122)
