@@ -632,12 +632,12 @@ func runMain(cfg config.RunConfig) int {
 	defer cancel()
 
 	// Configure and start the HTTP API, handling any startup errors.
-	if err := api.SetupAndStartAPI(ctx, cfg.APIHost, cfg.APIPort, cfg.APIToken, cfg.EnableUpdateAPI, cfg.EnableMetricsAPI, cfg.UnblockHTTPAPI, cfg.NoStartupMessage, cfg.Filter, cfg.Command, cfg.FilterDesc, updateLock, cleanup, client, notifier, scope, meta.Version, runUpdatesWithNotifications, filters.FilterByImage, metrics.Default, logging.WriteStartupMessage); err != nil {
+	if err := api.SetupAndStartAPI(ctx, cfg.APIHost, cfg.APIPort, cfg.APIToken, cfg.EnableUpdateAPI, cfg.EnableMetricsAPI, cfg.UnblockHTTPAPI, cfg.NoStartupMessage, cfg.Filter, cfg.Command, cfg.FilterDesc, updateLock, cleanup, monitorOnly, client, notifier, scope, meta.Version, runUpdatesWithNotifications, filters.FilterByImage, metrics.Default, logging.WriteStartupMessage); err != nil {
 		return 1
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
-	if err := scheduling.RunUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup, scheduleSpec, logging.WriteStartupMessage, runUpdatesWithNotifications, client, scope, notifier, meta.Version, cfg.UpdateOnStart, cleanupOccurred); err != nil {
+	if err := scheduling.RunUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup, scheduleSpec, logging.WriteStartupMessage, runUpdatesWithNotifications, client, scope, notifier, meta.Version, monitorOnly, cfg.UpdateOnStart, cleanupOccurred); err != nil {
 		logNotify("Scheduled upgrades failed", err)
 
 		return 1

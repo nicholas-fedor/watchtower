@@ -793,6 +793,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		"",
 		nil,
 		"",
+		false,
 		true,
 		false,
 	)
@@ -879,6 +880,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			"",
 			nil,
 			"",
+			false,
 			true,
 			false,
 		)
@@ -971,6 +973,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 			"",
 			false,
 			false,
+			false,
 		)
 
 		// Should not return an error
@@ -1040,6 +1043,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 			"",
 			nil,
 			"",
+			false,
 			updateOnStart,
 			false,
 		)
@@ -1124,6 +1128,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				"",
 				nil,
 				"",
+				false,
 				updateOnStart1,
 				false,
 			)
@@ -1153,6 +1158,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				"",
 				nil,
 				"",
+				false,
 				updateOnStart2,
 				false,
 			)
@@ -1311,6 +1317,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				"",
 				nil,
 				"",
+				false,
 				false,
 				false,
 			)

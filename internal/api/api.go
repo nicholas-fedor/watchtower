@@ -70,6 +70,7 @@ func SetupAndStartAPI(
 	filterDesc string,
 	updateLock chan bool,
 	cleanup bool,
+	monitorOnly bool,
 	client container.Client,
 	notifier types.Notifier,
 	scope string,
@@ -97,6 +98,7 @@ func SetupAndStartAPI(
 			params := types.UpdateParams{
 				Cleanup:        cleanup,
 				RunOnce:        true,
+				MonitorOnly:    monitorOnly,
 				SkipSelfUpdate: false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
 			}
 			metric := runUpdatesWithNotifications(ctx, filterByImage(images, filter), params)

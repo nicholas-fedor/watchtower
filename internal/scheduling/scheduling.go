@@ -87,6 +87,7 @@ func RunUpgradesOnSchedule(
 	scope string,
 	notifier types.Notifier,
 	metaVersion string,
+	monitorOnly bool,
 	updateOnStart bool,
 	skipFirstRun bool,
 ) error {
@@ -108,6 +109,7 @@ func RunUpgradesOnSchedule(
 			params := types.UpdateParams{
 				Cleanup:        cleanup,
 				RunOnce:        false,
+				MonitorOnly:    monitorOnly,
 				SkipSelfUpdate: skipWatchtowerSelfUpdate,
 			}
 			metric := runUpdatesWithNotifications(ctx, filter, params)

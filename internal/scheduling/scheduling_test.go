@@ -81,6 +81,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 		"",  // scope
 		nil, // no notifier
 		"v1.0.0",
+		false, // monitorOnly
 		false, // updateOnStart
 		false, // skipFirstRun
 	)
@@ -125,6 +126,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 		"",
 		nil,
 		"v1.0.0",
+		false, // monitorOnly
 		true,  // updateOnStart
 		false, // skipFirstRun
 	)
@@ -180,6 +182,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		"",
 		nil,
 		"v1.0.0",
+		false, // monitorOnly
 		false, // updateOnStart
 		false, // skipFirstRun
 	)
@@ -222,10 +225,83 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		"",
 		nil,
 		"v1.0.0",
+		false, // monitorOnly
 		false, // updateOnStart
 		false, // skipFirstRun
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
+	}
+}
+
+func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
+	tests := []struct {
+		name              string
+		monitorOnly       bool
+		expectMonitorOnly bool
+	}{
+		{
+			name:              "monitorOnly false",
+			monitorOnly:       false,
+			expectMonitorOnly: false,
+		},
+		{
+			name:              "monitorOnly true",
+			monitorOnly:       true,
+			expectMonitorOnly: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+			ctx := t.Context()
+
+			var capturedParams types.UpdateParams
+
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+				capturedParams = params
+
+				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+			}
+
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+
+			// Use timeout to avoid hanging
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
+			defer timeoutCancel()
+
+			err := scheduling.RunUpgradesOnSchedule(
+				timeoutCtx,
+				cmd,
+				filters.NoFilter,
+				"test filter",
+				nil,   // no lock
+				false, // cleanup
+				"",    // empty schedule
+				writeStartupMessage,
+				runUpdatesWithNotifications,
+				client,
+				"",  // scope
+				nil, // no notifier
+				"v1.0.0",
+				tt.monitorOnly, // monitorOnly parameter
+				true,           // updateOnStart - trigger immediate update
+				false,          // skipFirstRun
+			)
+			if err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if capturedParams.MonitorOnly != tt.expectMonitorOnly {
+				t.Errorf(
+					"expected MonitorOnly=%v, got %v",
+					tt.expectMonitorOnly,
+					capturedParams.MonitorOnly,
+				)
+			}
+		})
 	}
 }
