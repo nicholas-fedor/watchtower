@@ -753,7 +753,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 
 	// Mock the update function to signal when called
 	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
 		atomic.AddInt32(&updateCallCount, 1)
 
 		select {
@@ -837,7 +837,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
 			callTime := time.Now()
 
 			atomic.AddInt32(&updateCallCount, 1)
@@ -936,7 +936,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
 			select {
 			case updateCalled <- true:
 			default:
@@ -1003,7 +1003,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
 			select {
 			case updateCalled <- true:
 			default:
@@ -1093,7 +1093,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
 			atomic.AddInt32(&updateCallCount, 1)
 			synctest.Wait() // Simulate update work
 
@@ -1279,7 +1279,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 		// Mock runUpdatesWithNotifications to simulate a long-running update
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
 			// Signal that we're in the update
 			synctest.Wait() // Simulate update work
 

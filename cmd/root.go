@@ -169,10 +169,12 @@ var (
 	//   - ctx: Context for cancellation and timeouts.
 	//   - filter: The types.Filter determining which containers are targeted for updates.
 	//   - cleanup: Boolean indicating whether to remove old images after updates.
+	//   - runOnce: Boolean indicating whether this is a run-once execution.
+	//   - skipSelfUpdate: Boolean indicating whether to skip Watchtower self-updates.
 	//
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, cleanup bool, runOnce bool) *metrics.Metric {
+	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, cleanup bool, runOnce bool, skipSelfUpdate bool) *metrics.Metric {
 		params := actions.RunUpdatesWithNotificationsParams{
 			Client:                       client,
 			Notifier:                     notifier,
@@ -192,6 +194,7 @@ var (
 			CPUCopyMode:                  cpuCopyMode,
 			PullFailureDelay:             time.Duration(0),
 			RunOnce:                      runOnce,
+			SkipSelfUpdate:               skipSelfUpdate,
 		}
 
 		return actions.RunUpdatesWithNotifications(ctx, params)
@@ -571,6 +574,7 @@ func runMain(cfg config.RunConfig) int {
 			cfg.Filter,
 			cleanup,
 			cfg.RunOnce,
+			false, // SkipSelfUpdate is not needed for run-once
 		)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()

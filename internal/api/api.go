@@ -74,7 +74,7 @@ func SetupAndStartAPI(
 	notifier types.Notifier,
 	scope string,
 	version string,
-	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool, bool) *metrics.Metric,
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
@@ -99,6 +99,7 @@ func SetupAndStartAPI(
 				filterByImage(images, filter),
 				cleanup,
 				true,
+				false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
 			)
 			defaultMetrics().RegisterScan(metric)
 
