@@ -571,7 +571,7 @@ func runMain(cfg config.RunConfig) int {
 			Cleanup:        cleanup,
 			RunOnce:        cfg.RunOnce,
 			MonitorOnly:    monitorOnly,
-			SkipSelfUpdate: false, // RunOnce prevents self-update
+			SkipSelfUpdate: false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
 		}
 		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
