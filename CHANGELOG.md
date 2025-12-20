@@ -8,14 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update star history chart by @nicholas-fedor in [#1125](https://github.com/nicholas-fedor/watchtower/pull/1125)
+
 ### Chores
 
+- Update golang:alpine docker digest to ac09a5f by @renovate[bot] in [#1130](https://github.com/nicholas-fedor/watchtower/pull/1130)
+- Update actions/attest-build-provenance digest to 00014ed by @renovate[bot] in [#1128](https://github.com/nicholas-fedor/watchtower/pull/1128)
+- Update cimg/go:1.25.5 docker digest to b644c11 by @renovate[bot] in [#1127](https://github.com/nicholas-fedor/watchtower/pull/1127)
+- Update nicholas-fedor/govulncheck-action digest to ec02307 by @renovate[bot] in [#1123](https://github.com/nicholas-fedor/watchtower/pull/1123)
+- Update alpine:3.23.2 docker digest to 865b95f by @renovate[bot] in [#1122](https://github.com/nicholas-fedor/watchtower/pull/1122)
 - Update golang:alpine docker digest to 7256733 by @renovate[bot] in [#1116](https://github.com/nicholas-fedor/watchtower/pull/1116)
 - Update alpine docker tag to v3.23.2 by @renovate[bot] in [#1113](https://github.com/nicholas-fedor/watchtower/pull/1113)
 - Update actions/setup-go digest to 4aaadf4 by @renovate[bot] in [#1112](https://github.com/nicholas-fedor/watchtower/pull/1112)
 
 ### Fixed
 
+- Resolve false positive circular reference detection in dependency sorting by @nicholas-fedor in [#1120](https://github.com/nicholas-fedor/watchtower/pull/1120)
 - Implement notification level filtering for report mode by @nicholas-fedor in [#1115](https://github.com/nicholas-fedor/watchtower/pull/1115)
 - Refactor and realign test scope of actions_test.go file by @nicholas-fedor in [#1100](https://github.com/nicholas-fedor/watchtower/pull/1100)
 - Ensure local image staleness checking for --no-pull flag by @nicholas-fedor in [#1099](https://github.com/nicholas-fedor/watchtower/pull/1099)

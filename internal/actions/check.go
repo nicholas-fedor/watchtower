@@ -115,7 +115,7 @@ func CheckForMultipleWatchtowerInstances(
 	}
 
 	logrus.WithField("count", len(containers)).
-		Info("Detected multiple Watchtower instances, initiating cleanup")
+		Info("Detected multiple Watchtower instances - initiating cleanup")
 
 	return cleanupExcessWatchtowers(containers, client, cleanup, cleanupImageInfos)
 }

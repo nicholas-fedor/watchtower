@@ -44,6 +44,8 @@ Simple templates are used when `--notification-report` is not set, formatting in
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
+    Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}
@@ -74,6 +76,8 @@ The [Template Preview Tool](../template-preview/index.md) uses a `notifications.
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
+    Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}
