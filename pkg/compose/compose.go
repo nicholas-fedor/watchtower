@@ -10,6 +10,8 @@ import (
 const (
 	// ComposeDependsOnLabel lists container names this container depends on from Docker Compose, comma-separated.
 	ComposeDependsOnLabel = "com.docker.compose.depends_on"
+	// ComposeProjectLabel specifies the project name of the container in Docker Compose.
+	ComposeProjectLabel = "com.docker.compose.project"
 	// ComposeServiceLabel specifies the service name of the container in Docker Compose.
 	ComposeServiceLabel = "com.docker.compose.service"
 )
@@ -57,6 +59,36 @@ func ParseDependsOnLabel(labelValue string) []string {
 	clog.WithField("parsed_services", services).Debug("Completed parsing compose depends-on label")
 
 	return services
+}
+
+// GetProjectName extracts the project name from Docker Compose labels.
+//
+// If the com.docker.compose.project label is present, returns its value.
+// Otherwise, returns an empty string.
+//
+// Parameters:
+//   - labels: Map of container labels.
+//
+// Returns:
+//   - string: Project name if present, empty string otherwise.
+func GetProjectName(labels map[string]string) string {
+	if labels == nil {
+		return ""
+	}
+
+	projectName, ok := labels[ComposeProjectLabel]
+	if !ok {
+		logrus.WithField("label", ComposeProjectLabel).Debug("Compose project label not found")
+
+		return ""
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"label": ComposeProjectLabel,
+		"value": projectName,
+	}).Debug("Retrieved compose project name")
+
+	return projectName
 }
 
 // GetServiceName extracts the service name from Docker Compose labels.

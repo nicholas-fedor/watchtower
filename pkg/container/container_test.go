@@ -505,7 +505,7 @@ var _ = ginkgo.Describe("Container", func() {
 				"com.centurylinklabs.watchtower": "true",
 			}))
 			identifier := ResolveContainerIdentifier(container)
-			gomega.Expect(identifier).To(gomega.Equal("db-service"))
+			gomega.Expect(identifier).To(gomega.Equal("myproject-db-service"))
 		})
 
 		ginkgo.It("returns container name when ContainerInfo returns nil", func() {
