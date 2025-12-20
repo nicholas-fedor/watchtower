@@ -91,6 +91,7 @@ type RunUpdatesWithNotificationsParams struct {
 	CPUCopyMode                  string
 	PullFailureDelay             time.Duration
 	RunOnce                      bool
+	SkipSelfUpdate               bool
 }
 
 // UpdateConfig holds the configuration parameters for container updates.
@@ -109,6 +110,7 @@ type UpdateConfig struct {
 	CPUCopyMode      string
 	PullFailureDelay time.Duration
 	RunOnce          bool
+	SkipSelfUpdate   bool
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -147,6 +149,7 @@ func RunUpdatesWithNotifications(
 		LifecycleGID:     params.LifecycleGID,
 		CPUCopyMode:      params.CPUCopyMode,
 		RunOnce:          params.RunOnce,
+		SkipSelfUpdate:   params.SkipSelfUpdate,
 	}
 
 	// Execute the container update operation

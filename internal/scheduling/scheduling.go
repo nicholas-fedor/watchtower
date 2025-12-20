@@ -82,11 +82,12 @@ func RunUpgradesOnSchedule(
 	cleanup bool,
 	scheduleSpec string,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
-	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric,
 	client container.Client,
 	scope string,
 	notifier types.Notifier,
 	metaVersion string,
+	monitorOnly bool,
 	updateOnStart bool,
 	skipFirstRun bool,
 ) error {
@@ -100,12 +101,18 @@ func RunUpgradesOnSchedule(
 	scheduler := cron.New()
 
 	// Define the update function to be used both for scheduled runs and immediate execution.
-	updateFunc := func() {
+	updateFunc := func(skipWatchtowerSelfUpdate bool) {
 		select {
 		case v := <-lock:
 			defer func() { lock <- v }()
 
-			metric := runUpdatesWithNotifications(ctx, filter, cleanup, false)
+			params := types.UpdateParams{
+				Cleanup:        cleanup,
+				RunOnce:        false,
+				MonitorOnly:    monitorOnly,
+				SkipSelfUpdate: skipWatchtowerSelfUpdate,
+			}
+			metric := runUpdatesWithNotifications(ctx, filter, params)
 			metrics.Default().RegisterScan(metric)
 			logrus.Debug("Update operation completed successfully")
 		default:
@@ -119,23 +126,24 @@ func RunUpgradesOnSchedule(
 		}
 	}
 
-	// Wrapper function that can skip the first run if needed
+	// Wrapper function that can skip Watchtower self-update on the first run if needed
 	var scheduledUpdateFunc func()
 
 	if skipFirstRun {
-		var firstRunSkipped uint32
+		var firstRun uint32
 
 		scheduledUpdateFunc = func() {
-			if atomic.CompareAndSwapUint32(&firstRunSkipped, 0, 1) {
-				logrus.Debug("Skipping first scheduled run due to cleanup")
-
-				return
+			skipWatchtowerSelfUpdate := atomic.CompareAndSwapUint32(&firstRun, 0, 1)
+			if skipWatchtowerSelfUpdate {
+				logrus.Debug(
+					"Skipping Watchtower self-update on first scheduled run due to cleanup",
+				)
 			}
 
-			updateFunc()
+			updateFunc(skipWatchtowerSelfUpdate)
 		}
 	} else {
-		scheduledUpdateFunc = updateFunc
+		scheduledUpdateFunc = func() { updateFunc(false) }
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
@@ -157,7 +165,7 @@ func RunUpgradesOnSchedule(
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
 	if updateOnStart {
-		updateFunc()
+		updateFunc(false)
 	}
 
 	// Start the scheduler to begin periodic execution.
