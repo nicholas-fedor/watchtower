@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockSorter "github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -342,9 +345,44 @@ func generateCollisionContainers(data []byte) []types.Container {
 
 // isRealCycle verifies that a detected cycle is actually real and not a false positive.
 func isRealCycle(containers []types.Container, circularErr CircularReferenceError) bool {
-	// For now, we assume any detected cycle is real since we're testing collision scenarios
-	// In a more sophisticated implementation, we could verify the cycle path
-	// by checking if the containers actually have circular dependencies
+	cyclePath := circularErr.CyclePath
+
+	// Edge case: cycle path must have at least 3 elements for a valid cycle (A->B->A)
+	if len(cyclePath) < 3 {
+		return false
+	}
+
+	// Create a map from normalized identifier to container for efficient lookup
+	containerMap := make(map[string]types.Container)
+
+	for _, cont := range containers {
+		normalizedIdentifier := util.NormalizeContainerName(
+			container.ResolveContainerIdentifier(cont),
+		)
+		containerMap[normalizedIdentifier] = cont
+	}
+
+	// Check each consecutive pair in the cycle path (excluding the closing duplicate)
+	for i := range len(cyclePath) - 1 {
+		fromName := cyclePath[i]
+		toName := cyclePath[i+1]
+
+		fromContainer, exists := containerMap[fromName]
+		if !exists {
+			// Container not found in the list
+			return false
+		}
+
+		links := fromContainer.Links()
+		found := slices.Contains(links, toName)
+
+		if !found {
+			// Dependency link not found
+			return false
+		}
+	}
+
+	// All dependencies in the cycle are verified
 	return true
 }
 
@@ -429,7 +467,6 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 	containers := make([]types.Container, 0, 5)
 
 	// Parse data to determine link scenario
-
 	switch {
 	case bytes.Contains(data, []byte("leading-slash-links")):
 		// Create containers with links that have leading slashes

@@ -266,6 +266,15 @@ func detectAndReportCycle(
 	normalizedMap map[types.Container]string,
 ) error {
 	if len(sorted) != len(containers) {
+		// Check if the mismatch is due to identifier collisions rather than a real cycle
+		if len(containerMap) < len(containers) {
+			// Identifier collisions caused some containers to be overwritten in the map
+			// This is not a circular dependency
+			logrus.Debug("Detected identifier collisions - not reporting as cycle")
+
+			return nil
+		}
+
 		// Identify which containers were not processed (part of cycles)
 		processed := make(map[string]bool)
 
