@@ -570,7 +570,8 @@ func runMain(cfg config.RunConfig) int {
 		params := types.UpdateParams{
 			Cleanup:        cleanup,
 			RunOnce:        cfg.RunOnce,
-			SkipSelfUpdate: false, // SkipSelfUpdate is not needed for run-once
+			MonitorOnly:    monitorOnly,
+			SkipSelfUpdate: false, // RunOnce prevents self-update
 		}
 		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
