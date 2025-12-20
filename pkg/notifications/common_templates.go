@@ -11,7 +11,8 @@ var commonTemplates = map[string]string{
 	// It iterates over .Entries, checking each entry's Message to format specific container lifecycle events.
 	// Handles messages: "Found new image" (new image available), "Stopping container" (stopping old container),
 	// "Started new container" (new container started), "Stopping linked container" (stopping linked container),
-	// "Started linked container" (linked container started), "Removing image" (image cleanup completed), "Container updated" (update completed).
+	// "Started linked container" (linked container started), "Removing image" (image cleanup completed), "Container updated" (update completed),
+	// "Detected multiple Watchtower instances - initiating cleanup" (multiple instances detected).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
 	"default-legacy": `
@@ -38,6 +39,8 @@ var commonTemplates = map[string]string{
     Updated container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}): {{with (index $e.Data "old_id")}}{{.}}{{else}}unknown{{end}} updated to {{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Skipping Watchtower self-update in run-once mode" -}}
     Run once mode: Watchtower self-update skipped
+{{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
+    Detected {{index $e.Data "count"}} Watchtower instances - initiating cleanup
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
