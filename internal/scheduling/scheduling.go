@@ -106,8 +106,8 @@ func RunUpgradesOnSchedule(
 			defer func() { lock <- v }()
 
 			params := types.UpdateParams{
-				Cleanup:       cleanup,
-				RunOnce:       false,
+				Cleanup:        cleanup,
+				RunOnce:        false,
 				SkipSelfUpdate: skipWatchtowerSelfUpdate,
 			}
 			metric := runUpdatesWithNotifications(ctx, filter, params)

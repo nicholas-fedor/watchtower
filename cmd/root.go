@@ -568,8 +568,8 @@ func runMain(cfg config.RunConfig) int {
 			nil, // read from flags
 		)
 		params := types.UpdateParams{
-			Cleanup:       cleanup,
-			RunOnce:       cfg.RunOnce,
+			Cleanup:        cleanup,
+			RunOnce:        cfg.RunOnce,
 			SkipSelfUpdate: false, // SkipSelfUpdate is not needed for run-once
 		}
 		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, params)

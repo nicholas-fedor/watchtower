@@ -95,8 +95,8 @@ func SetupAndStartAPI(
 	if enableUpdateAPI {
 		updateHandler := update.New(func(images []string) *metrics.Metric {
 			params := types.UpdateParams{
-				Cleanup:       cleanup,
-				RunOnce:       true,
+				Cleanup:        cleanup,
+				RunOnce:        true,
 				SkipSelfUpdate: false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
 			}
 			metric := runUpdatesWithNotifications(ctx, filterByImage(images, filter), params)
