@@ -168,22 +168,20 @@ var (
 	// Parameters:
 	//   - ctx: Context for cancellation and timeouts.
 	//   - filter: The types.Filter determining which containers are targeted for updates.
-	//   - cleanup: Boolean indicating whether to remove old images after updates.
-	//   - runOnce: Boolean indicating whether this is a run-once execution.
-	//   - skipSelfUpdate: Boolean indicating whether to skip Watchtower self-updates.
+	//   - params: The types.UpdateParams struct containing update configuration parameters.
 	//
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, cleanup bool, runOnce bool, skipSelfUpdate bool) *metrics.Metric {
-		params := actions.RunUpdatesWithNotificationsParams{
+	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params types.UpdateParams) *metrics.Metric {
+		actionParams := actions.RunUpdatesWithNotificationsParams{
 			Client:                       client,
 			Notifier:                     notifier,
 			NotificationSplitByContainer: notificationSplitByContainer,
 			NotificationReport:           notificationReport,
 			Filter:                       filter,
-			Cleanup:                      cleanup,
+			Cleanup:                      params.Cleanup,
 			NoRestart:                    noRestart,
-			MonitorOnly:                  monitorOnly,
+			MonitorOnly:                  params.MonitorOnly,
 			LifecycleHooks:               lifecycleHooks,
 			RollingRestart:               rollingRestart,
 			LabelPrecedence:              labelPrecedence,
@@ -193,11 +191,11 @@ var (
 			LifecycleGID:                 lifecycleGID,
 			CPUCopyMode:                  cpuCopyMode,
 			PullFailureDelay:             time.Duration(0),
-			RunOnce:                      runOnce,
-			SkipSelfUpdate:               skipSelfUpdate,
+			RunOnce:                      params.RunOnce,
+			SkipSelfUpdate:               params.SkipSelfUpdate,
 		}
 
-		return actions.RunUpdatesWithNotifications(ctx, params)
+		return actions.RunUpdatesWithNotifications(ctx, actionParams)
 	}
 )
 
@@ -569,13 +567,12 @@ func runMain(cfg config.RunConfig) int {
 			meta.Version,
 			nil, // read from flags
 		)
-		metric := runUpdatesWithNotifications(
-			context.Background(),
-			cfg.Filter,
-			cleanup,
-			cfg.RunOnce,
-			false, // SkipSelfUpdate is not needed for run-once
-		)
+		params := types.UpdateParams{
+			Cleanup:       cleanup,
+			RunOnce:       cfg.RunOnce,
+			SkipSelfUpdate: false, // SkipSelfUpdate is not needed for run-once
+		}
+		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
 

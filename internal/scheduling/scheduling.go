@@ -82,7 +82,7 @@ func RunUpgradesOnSchedule(
 	cleanup bool,
 	scheduleSpec string,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
-	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric,
 	client container.Client,
 	scope string,
 	notifier types.Notifier,
@@ -105,13 +105,12 @@ func RunUpgradesOnSchedule(
 		case v := <-lock:
 			defer func() { lock <- v }()
 
-			metric := runUpdatesWithNotifications(
-				ctx,
-				filter,
-				cleanup,
-				false,
-				skipWatchtowerSelfUpdate,
-			)
+			params := types.UpdateParams{
+				Cleanup:       cleanup,
+				RunOnce:       false,
+				SkipSelfUpdate: skipWatchtowerSelfUpdate,
+			}
+			metric := runUpdatesWithNotifications(ctx, filter, params)
 			metrics.Default().RegisterScan(metric)
 			logrus.Debug("Update operation completed successfully")
 		default:

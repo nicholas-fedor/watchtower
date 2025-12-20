@@ -57,7 +57,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 
 	cmd.Flags().Bool("update-on-start", false, "")
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
@@ -99,7 +99,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 	cmd.PersistentFlags().Bool("update-on-start", true, "")
 
 	updateCalled := false
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 		updateCalled = true
 
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
@@ -160,7 +160,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 
 	ctx := t.Context()
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
@@ -198,7 +198,7 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 
 	ctx := t.Context()
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool, _ bool) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 

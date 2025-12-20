@@ -74,7 +74,7 @@ func SetupAndStartAPI(
 	notifier types.Notifier,
 	scope string,
 	version string,
-	runUpdatesWithNotifications func(context.Context, types.Filter, bool, bool, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric,
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
@@ -94,13 +94,12 @@ func SetupAndStartAPI(
 	// Register the update API endpoint if enabled, linking it to the update handler.
 	if enableUpdateAPI {
 		updateHandler := update.New(func(images []string) *metrics.Metric {
-			metric := runUpdatesWithNotifications(
-				ctx,
-				filterByImage(images, filter),
-				cleanup,
-				true,
-				false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
-			)
+			params := types.UpdateParams{
+				Cleanup:       cleanup,
+				RunOnce:       true,
+				SkipSelfUpdate: false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
+			}
+			metric := runUpdatesWithNotifications(ctx, filterByImage(images, filter), params)
 			defaultMetrics().RegisterScan(metric)
 
 			return metric
