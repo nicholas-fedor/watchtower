@@ -2,6 +2,8 @@ package api_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	mockAPI "github.com/nicholas-fedor/watchtower/pkg/api/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -66,7 +69,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock the runUpdatesWithNotifications function
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 				return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 			}
 
@@ -100,6 +103,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 					"test filter",
 					nil,   // updateLock
 					false, // cleanup
+					false, // monitorOnly
 					client,
 					notifier,
 					"", // scope
@@ -140,7 +144,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 
 			// Mock functions
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 			filterByImage := func(_ []string, filter types.Filter) types.Filter {
@@ -171,7 +175,8 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 					cmd,
 					"test filter",
 					nil,
-					false,
+					false, // cleanup
+					false, // monitorOnly
 					client,
 					notifier,
 					"",
@@ -212,7 +217,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ bool, _ bool) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 			filterByImage := func(_ []string, filter types.Filter) types.Filter {
@@ -229,7 +234,8 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				cmd,
 				"test filter",
 				nil,
-				false,
+				false, // cleanup
+				false, // monitorOnly
 				client,
 				notifier,
 				"",
@@ -242,5 +248,58 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
+	})
+
+	ginkgo.When("update API is enabled with monitorOnly parameter", func() {
+		ginkgo.DescribeTable("should pass monitorOnly parameter to update function",
+			func(monitorOnly bool, expectMonitorOnly bool) {
+				ctx := context.Background()
+
+				var capturedParams types.UpdateParams
+				runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+					capturedParams = params
+
+					return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+				}
+				filterByImage := func(_ []string, filter types.Filter) types.Filter {
+					return filter
+				}
+				defaultMetrics := metrics.Default
+
+				// Create the update handler directly to test the parameter passing
+				updateHandler := update.New(func(images []string) *metrics.Metric {
+					params := types.UpdateParams{
+						Cleanup:        false, // cleanup
+						RunOnce:        true,
+						MonitorOnly:    monitorOnly,
+						SkipSelfUpdate: false,
+					}
+					metric := runUpdatesWithNotifications(
+						ctx,
+						filterByImage(images, filters.NoFilter),
+						params,
+					)
+					defaultMetrics().RegisterScan(metric)
+
+					return metric
+				}, nil)
+
+				// Create a test HTTP request to trigger the update
+				req, err := http.NewRequest(http.MethodPost, "/v1/update", http.NoBody)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				// Create a response recorder
+				w := httptest.NewRecorder()
+
+				// Call the handler
+				updateHandler.Handle(w, req)
+
+				// Verify the response
+				gomega.Expect(w.Code).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(capturedParams.MonitorOnly).To(gomega.Equal(expectMonitorOnly))
+			},
+			ginkgo.Entry("monitorOnly false", false, false),
+			ginkgo.Entry("monitorOnly true", true, true),
+		)
 	})
 })

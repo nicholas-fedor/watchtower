@@ -91,6 +91,7 @@ type RunUpdatesWithNotificationsParams struct {
 	CPUCopyMode                  string
 	PullFailureDelay             time.Duration
 	RunOnce                      bool
+	SkipSelfUpdate               bool
 	DiskSpaceMax                 string
 	DiskSpaceWarn                string
 }
@@ -111,6 +112,7 @@ type UpdateConfig struct {
 	CPUCopyMode      string
 	PullFailureDelay time.Duration
 	RunOnce          bool
+	SkipSelfUpdate   bool
 	DiskSpaceMax     string
 	DiskSpaceWarn    string
 }
@@ -151,6 +153,7 @@ func RunUpdatesWithNotifications(
 		LifecycleGID:     params.LifecycleGID,
 		CPUCopyMode:      params.CPUCopyMode,
 		RunOnce:          params.RunOnce,
+		SkipSelfUpdate:   params.SkipSelfUpdate,
 		DiskSpaceMax:     params.DiskSpaceMax,
 		DiskSpaceWarn:    params.DiskSpaceWarn,
 	}

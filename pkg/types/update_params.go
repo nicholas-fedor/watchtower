@@ -20,6 +20,7 @@ type UpdateParams struct {
 	LifecycleGID       int           // Default GID for lifecycle hooks.
 	CPUCopyMode        string        // CPU copy mode for container recreation.
 	RunOnce            bool          // Run once mode if true.
+	SkipSelfUpdate     bool          // Skip Watchtower self-update if true.
 	DiskSpaceMaximum   string        // Maximum disk space for checking before updates.
 	DiskSpaceThreshold string        // Minimum disk space threshold.
 }

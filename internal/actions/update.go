@@ -84,6 +84,7 @@ func Update(
 		LifecycleGID:       config.LifecycleGID,
 		CPUCopyMode:        config.CPUCopyMode,
 		RunOnce:            config.RunOnce,
+		SkipSelfUpdate:     config.SkipSelfUpdate,
 		DiskSpaceMaximum:   config.DiskSpaceMax,
 		DiskSpaceThreshold: config.DiskSpaceWarn,
 	}
@@ -224,11 +225,9 @@ func Update(
 
 		// Check if the container’s image is stale (outdated) and get the newest image ID.
 		stale, newestImage, err := client.IsContainerStale(sourceContainer, params)
+
 		// Determine if the container should be updated based on staleness and params.
-		// For Watchtower containers, allow update regardless of NoRestart flag, but skip in run-once mode.
-		shouldUpdate := stale && (!params.NoRestart || sourceContainer.IsWatchtower()) &&
-			(!params.RunOnce || !sourceContainer.IsWatchtower()) &&
-			!sourceContainer.IsMonitorOnly(params)
+		shouldUpdate := shouldUpdateContainer(stale, sourceContainer, params)
 
 		// Log when skipping Watchtower self-update in run-once mode
 		if stale && sourceContainer.IsWatchtower() && params.RunOnce {
@@ -491,6 +490,51 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 	}
 
 	logrus.WithField("marked_containers", markedContainers).Debug("Completed UpdateImplicitRestart")
+}
+
+// shouldUpdateContainer determines if a container should be updated based on its staleness and update parameters.
+//
+// It checks multiple conditions:
+// - The container must be stale (outdated image)
+// - The container must not be monitor-only
+// - Updates are allowed unless NoRestart is true and it's not a Watchtower container
+// - Watchtower containers are skipped in run-once mode
+// - Watchtower self-updates are skipped if SkipSelfUpdate is true
+//
+// Parameters:
+//   - stale: Whether the container's image is outdated.
+//   - container: The container to check.
+//   - params: Update parameters controlling update behavior.
+//
+// Returns:
+//   - bool: True if the container should be updated, false otherwise.
+func shouldUpdateContainer(stale bool, container types.Container, params types.UpdateParams) bool {
+	// Must be stale to update
+	if !stale {
+		return false
+	}
+
+	// Skip monitor-only containers
+	if container.IsMonitorOnly(params) {
+		return false
+	}
+
+	// Allow update if NoRestart is false, or if it's a Watchtower container (which can update even with NoRestart)
+	if params.NoRestart && !container.IsWatchtower() {
+		return false
+	}
+
+	// Skip Watchtower self-update in run-once mode
+	if params.RunOnce && container.IsWatchtower() {
+		return false
+	}
+
+	// Skip Watchtower self-update if SkipSelfUpdate is true
+	if params.SkipSelfUpdate && container.IsWatchtower() {
+		return false
+	}
+
+	return true
 }
 
 // linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.

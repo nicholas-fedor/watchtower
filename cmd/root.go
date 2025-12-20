@@ -180,20 +180,20 @@ var (
 	// Parameters:
 	//   - ctx: Context for cancellation and timeouts.
 	//   - filter: The types.Filter determining which containers are targeted for updates.
-	//   - cleanup: Boolean indicating whether to remove old images after updates.
+	//   - params: The types.UpdateParams struct containing update configuration parameters.
 	//
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, cleanup bool, runOnce bool) *metrics.Metric {
-		params := actions.RunUpdatesWithNotificationsParams{
+	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params types.UpdateParams) *metrics.Metric {
+		actionParams := actions.RunUpdatesWithNotificationsParams{
 			Client:                       client,
 			Notifier:                     notifier,
 			NotificationSplitByContainer: notificationSplitByContainer,
 			NotificationReport:           notificationReport,
 			Filter:                       filter,
-			Cleanup:                      cleanup,
+			Cleanup:                      params.Cleanup,
 			NoRestart:                    noRestart,
-			MonitorOnly:                  monitorOnly,
+			MonitorOnly:                  params.MonitorOnly,
 			LifecycleHooks:               lifecycleHooks,
 			RollingRestart:               rollingRestart,
 			LabelPrecedence:              labelPrecedence,
@@ -203,12 +203,13 @@ var (
 			LifecycleGID:                 lifecycleGID,
 			CPUCopyMode:                  cpuCopyMode,
 			PullFailureDelay:             time.Duration(0),
-			RunOnce:                      runOnce,
+			RunOnce:                      params.RunOnce,
+			SkipSelfUpdate:               params.SkipSelfUpdate,
 			DiskSpaceMax:                 diskSpaceMax,
 			DiskSpaceWarn:                diskSpaceWarn,
 		}
 
-		return actions.RunUpdatesWithNotifications(ctx, params)
+		return actions.RunUpdatesWithNotifications(ctx, actionParams)
 	}
 )
 
@@ -584,12 +585,13 @@ func runMain(cfg config.RunConfig) int {
 			meta.Version,
 			nil, // read from flags
 		)
-		metric := runUpdatesWithNotifications(
-			context.Background(),
-			cfg.Filter,
-			cleanup,
-			cfg.RunOnce,
-		)
+		params := types.UpdateParams{
+			Cleanup:        cleanup,
+			RunOnce:        cfg.RunOnce,
+			MonitorOnly:    monitorOnly,
+			SkipSelfUpdate: false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
+		}
+		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
 
@@ -648,12 +650,51 @@ func runMain(cfg config.RunConfig) int {
 	defer cancel()
 
 	// Configure and start the HTTP API, handling any startup errors.
-	if err := api.SetupAndStartAPI(ctx, cfg.APIHost, cfg.APIPort, cfg.APIToken, cfg.EnableUpdateAPI, cfg.EnableMetricsAPI, cfg.UnblockHTTPAPI, cfg.NoStartupMessage, cfg.Filter, cfg.Command, cfg.FilterDesc, updateLock, cleanup, client, notifier, scope, meta.Version, runUpdatesWithNotifications, filters.FilterByImage, metrics.Default, logging.WriteStartupMessage); err != nil {
+	if err := api.SetupAndStartAPI(
+		ctx,
+		cfg.APIHost,
+		cfg.APIPort,
+		cfg.APIToken,
+		cfg.EnableUpdateAPI,
+		cfg.EnableMetricsAPI,
+		cfg.UnblockHTTPAPI,
+		cfg.NoStartupMessage,
+		cfg.Filter,
+		cfg.Command,
+		cfg.FilterDesc,
+		updateLock,
+		cleanup,
+		monitorOnly,
+		client,
+		notifier,
+		scope,
+		meta.Version,
+		runUpdatesWithNotifications,
+		filters.FilterByImage,
+		metrics.Default,
+		logging.WriteStartupMessage,
+	); err != nil {
 		return 1
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
-	if err := scheduling.RunUpgradesOnSchedule(ctx, cfg.Command, cfg.Filter, cfg.FilterDesc, updateLock, cleanup, scheduleSpec, logging.WriteStartupMessage, runUpdatesWithNotifications, client, scope, notifier, meta.Version, cfg.UpdateOnStart, cleanupOccurred); err != nil {
+	if err := scheduling.RunUpgradesOnSchedule(
+		ctx, cfg.Command,
+		cfg.Filter,
+		cfg.FilterDesc,
+		updateLock,
+		cleanup,
+		scheduleSpec,
+		logging.WriteStartupMessage,
+		runUpdatesWithNotifications,
+		client,
+		scope,
+		notifier,
+		meta.Version,
+		monitorOnly,
+		cfg.UpdateOnStart,
+		cleanupOccurred,
+	); err != nil {
 		logNotify("Scheduled upgrades failed", err)
 
 		return 1
