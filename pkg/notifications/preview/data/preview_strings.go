@@ -92,7 +92,7 @@ var organizationNames = []string{
 // infoMessages is an array of realistic info-level log messages based on typical Watchtower operations.
 // These are derived from real Watchtower logs, including container operations, session management, and notifications.
 var infoMessages = []string{
-	"Detected multiple Watchtower instances, initiating cleanup",
+	"Detected multiple Watchtower instances - initiating cleanup",
 	"Stopping container",
 	"Removing image",
 	"Successfully cleaned up excess Watchtower instances",
