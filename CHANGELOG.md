@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolve false positive circular reference detection by @nicholas-fedor in [#1139](https://github.com/nicholas-fedor/watchtower/pull/1139)
 - Add SkipSelfUpdate parameter to refine self-update behavior by @nicholas-fedor in [#1137](https://github.com/nicholas-fedor/watchtower/pull/1137)
 - Resolve false positive circular reference detection in dependency sorting by @nicholas-fedor in [#1120](https://github.com/nicholas-fedor/watchtower/pull/1120)
 - Implement notification level filtering for report mode by @nicholas-fedor in [#1115](https://github.com/nicholas-fedor/watchtower/pull/1115)
