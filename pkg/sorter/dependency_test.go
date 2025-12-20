@@ -482,8 +482,12 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			result, err := sortByDependencies(containers)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.HaveLen(2))
-			gomega.Expect(result[0].Name()).To(gomega.Equal("")) // id-c2 container first
-			gomega.Expect(result[1].Name()).To(gomega.Equal("")) // depends on id-c2
+			gomega.Expect(result[0].ID()).
+				To(gomega.Equal(types.ContainerID("id-c2")))
+				// dependency first
+			gomega.Expect(result[1].ID()).
+				To(gomega.Equal(types.ContainerID("id-c1")))
+			// dependent second
 		})
 
 		ginkgo.It("should handle containers with malformed link targets", func() {
@@ -804,7 +808,8 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 
 				containers := []types.Container{c1, c2}
 
-				containerMap, indegree, _, normalizedMap := buildDependencyGraph(containers)
+				containerMap, indegree, _, normalizedMap, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				// Containers from different projects should have different identifiers
 				ident1 := container.ResolveContainerIdentifier(c1)
@@ -849,6 +854,123 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 				gomega.Expect(result).To(gomega.Equal("web"))
 			},
 		)
+	})
+
+	ginkgo.Describe("IdentifierCollisionError", func() {
+		ginkgo.It("should format error message correctly", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("container1")
+			c1.EXPECT().ID().Return(types.ContainerID("id1"))
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("container2")
+			c2.EXPECT().ID().Return(types.ContainerID("id2"))
+
+			containers := []types.Container{c1, c2}
+
+			err := IdentifierCollisionError{
+				DuplicateIdentifier: "test-id",
+				AffectedContainers:  containers,
+			}
+
+			expected := "identifier collision detected: 'test-id' used by containers: container1 (id1), container2 (id2)"
+			gomega.Expect(err.Error()).To(gomega.Equal(expected))
+		})
+	})
+
+	ginkgo.Describe("buildDependencyGraph with collisions", func() {
+		ginkgo.It(
+			"should return IdentifierCollisionError when containers have same normalized identifier",
+			func() {
+				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				c1.EXPECT().Name().Return("c1").Maybe()
+				c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
+
+				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, // Same name
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				c2.EXPECT().Name().Return("c1").Maybe()
+				c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+
+				containers := []types.Container{c1, c2}
+
+				_, _, _, _, err := buildDependencyGraph(containers)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				var collisionErr IdentifierCollisionError
+				gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
+				gomega.Expect(err.(IdentifierCollisionError).DuplicateIdentifier).
+					To(gomega.Equal("c1"))
+				gomega.Expect(err.(IdentifierCollisionError).AffectedContainers).
+					To(gomega.HaveLen(2))
+			},
+		)
+
+		ginkgo.It("should succeed when containers have different identifiers", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c1.EXPECT().Name().Return("c1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
+			c1.EXPECT().Links().Return(nil)
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c2.EXPECT().Name().Return("c2").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+
+			containers := []types.Container{c1, c2}
+
+			containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(
+				containers,
+			)
+
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containerMap).To(gomega.HaveLen(2))
+			gomega.Expect(indegree).To(gomega.HaveLen(2))
+			gomega.Expect(adjacency).To(gomega.BeEmpty()) // No links set up
+			gomega.Expect(normalizedMap).To(gomega.HaveLen(2))
+		})
+	})
+
+	ginkgo.Describe("sortByDependencies with collisions", func() {
+		ginkgo.It("should propagate IdentifierCollisionError from buildDependencyGraph", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c1.EXPECT().Name().Return("c1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, // Same name
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c2.EXPECT().Name().Return("c1").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+
+			containers := []types.Container{c1, c2}
+
+			_, err := sortByDependencies(containers)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			var collisionErr IdentifierCollisionError
+			gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
+		})
 	})
 })
 

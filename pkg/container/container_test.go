@@ -449,6 +449,70 @@ var _ = ginkgo.Describe("Container", func() {
 					gomega.HaveLen(2),
 				))
 			})
+
+			ginkgo.It("warns and skips invalid link format without colon", func() {
+				logOutput := &bytes.Buffer{}
+				originalOutput := logrus.StandardLogger().Out
+				originalLevel := logrus.GetLevel()
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.WarnLevel)
+				defer func() {
+					logrus.SetOutput(originalOutput)
+					logrus.SetLevel(originalLevel)
+				}()
+				container = MockContainer(WithLinks([]string{"invalidlink"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.BeEmpty())
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Invalid link format in host config, expected 'name:alias'"))
+			})
+
+			ginkgo.It("warns and skips link with empty container name", func() {
+				logOutput := &bytes.Buffer{}
+				originalOutput := logrus.StandardLogger().Out
+				originalLevel := logrus.GetLevel()
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.WarnLevel)
+				defer func() {
+					logrus.SetOutput(originalOutput)
+					logrus.SetLevel(originalLevel)
+				}()
+				container = MockContainer(WithLinks([]string{":alias"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.BeEmpty())
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Invalid link format in host config, missing container name"))
+			})
+
+			ginkgo.It("normalizes container names with leading slashes", func() {
+				container = MockContainer(WithLinks([]string{"/redis:test-watchtower"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("redis"))
+			})
+
+			ginkgo.It("does not prefix already prefixed container names", func() {
+				container = MockContainer(
+					WithLinks([]string{"myproject-redis:test-watchtower"}),
+					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
+				)
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("myproject-redis"))
+			})
+
+			ginkgo.It("does not prefix when project name is empty", func() {
+				container = MockContainer(WithLinks([]string{"redis:test-watchtower"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("redis"))
+			})
+
+			ginkgo.It("includes network mode dependencies", func() {
+				container = MockContainer(
+					WithNetworkMode("container:other"),
+					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
+				)
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("myproject-other"))
+			})
 		})
 
 		ginkgo.It("returns pre and post update timeout values", func() {

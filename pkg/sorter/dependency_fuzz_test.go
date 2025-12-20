@@ -48,10 +48,14 @@ func FuzzDependencySort(f *testing.F) {
 
 		// This should not panic
 		err := ds.Sort(testContainers)
-		// If there's an error, it should be a CircularReferenceError
+		// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
 		if err != nil {
-			var circularErr CircularReferenceError
-			if !errors.As(err, &circularErr) {
+			var (
+				circularErr  CircularReferenceError
+				collisionErr IdentifierCollisionError
+			)
+
+			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
 				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 			}
 		}
@@ -97,10 +101,14 @@ func FuzzCycleDetection(f *testing.F) {
 
 		// This should not panic
 		err := ds.Sort(testContainers)
-		// Error should either be nil or CircularReferenceError
+		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
-			var circularErr CircularReferenceError
-			if !errors.As(err, &circularErr) {
+			var (
+				circularErr  CircularReferenceError
+				collisionErr IdentifierCollisionError
+			)
+
+			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
 				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 			}
 		}
@@ -200,13 +208,17 @@ func FuzzSortByDependencies(f *testing.F) {
 
 		// This should not panic
 		sorted, err := sortByDependencies(containers)
-		// If there's an error, it should be a CircularReferenceError
+		// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
 		if err != nil {
-			var circularErr CircularReferenceError
-			if !errors.As(err, &circularErr) {
+			var (
+				circularErr  CircularReferenceError
+				collisionErr IdentifierCollisionError
+			)
+
+			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
 				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 			}
-			// For cycles, sorted should be nil or partial
+			// For cycles or collisions, sorted should be nil
 			return
 		}
 
@@ -723,16 +735,22 @@ func FuzzIdentifierCollisions(f *testing.F) {
 
 		// This should not panic and should not detect false cycles
 		err := ds.Sort(testContainers)
-		// Error should either be nil or CircularReferenceError (but not false positives)
+		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
-			var circularErr CircularReferenceError
-			if !errors.As(err, &circularErr) {
+			var (
+				circularErr  CircularReferenceError
+				collisionErr IdentifierCollisionError
+			)
+
+			if errors.As(err, &circularErr) {
+				// Verify the cycle is real, not a false positive due to identifier collision
+				if !isRealCycle(containers, circularErr) {
+					t.Fatalf("False positive cycle detected: %v", circularErr)
+				}
+			} else if !errors.As(err, &collisionErr) {
 				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 			}
-			// Verify the cycle is real, not a false positive due to identifier collision
-			if !isRealCycle(containers, circularErr) {
-				t.Fatalf("False positive cycle detected: %v", circularErr)
-			}
+			// IdentifierCollisionError is expected and acceptable
 		}
 	})
 }
@@ -764,10 +782,14 @@ func FuzzMalformedLabels(f *testing.F) {
 
 		// This should not panic
 		err := ds.Sort(testContainers)
-		// Error should either be nil or CircularReferenceError
+		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
-			var circularErr CircularReferenceError
-			if !errors.As(err, &circularErr) {
+			var (
+				circularErr  CircularReferenceError
+				collisionErr IdentifierCollisionError
+			)
+
+			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
 				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 			}
 		}
@@ -800,10 +822,14 @@ func FuzzLinkNormalization(f *testing.F) {
 
 		// This should not panic
 		err := ds.Sort(testContainers)
-		// Error should either be nil or CircularReferenceError
+		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
-			var circularErr CircularReferenceError
-			if !errors.As(err, &circularErr) {
+			var (
+				circularErr  CircularReferenceError
+				collisionErr IdentifierCollisionError
+			)
+
+			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
 				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 			}
 		}
@@ -835,10 +861,14 @@ func FuzzEmptyIdentifiers(f *testing.F) {
 
 		// This should not panic
 		err := ds.Sort(testContainers)
-		// Error should either be nil or CircularReferenceError
+		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
-			var circularErr CircularReferenceError
-			if !errors.As(err, &circularErr) {
+			var (
+				circularErr  CircularReferenceError
+				collisionErr IdentifierCollisionError
+			)
+
+			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
 				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 			}
 		}

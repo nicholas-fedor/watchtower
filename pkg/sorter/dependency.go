@@ -122,7 +122,10 @@ func (ds DependencySorter) Sort(containers []types.Container) error {
 //     Error includes container name and cycle path for debugging.
 func sortByDependencies(containers []types.Container) ([]types.Container, error) {
 	// Phase 1: Build the dependency graph data structures
-	containerMap, indegree, adjacency, normalizedMap := buildDependencyGraph(containers)
+	containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(containers)
+	if err != nil {
+		return nil, err
+	}
 
 	// Phase 2: Initialize processing queue with containers that have no dependencies
 	queue := initializeQueue(indegree)
@@ -180,20 +183,42 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 //   - map[string]types.Container: Container lookup map
 //   - map[string]int: Indegree count for each container
 //   - map[string][]string: Adjacency list (container -> dependents)
+//   - map[types.Container]string: Reverse map from container to normalized identifier
+//   - error: IdentifierCollisionError if duplicate identifiers detected, nil otherwise
 func buildDependencyGraph(
 	containers []types.Container,
-) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string) {
+) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error) {
 	containerMap := make(map[string]types.Container)
 	indegree := make(map[string]int)
 	adjacency := make(map[string][]string)
 	normalizedMap := make(map[types.Container]string)
 
-	// Initialize all containers in the maps with zero indegree
+	// Use temporary map to collect all containers per normalized identifier
+	tempMap := make(map[string][]types.Container)
+
 	for _, c := range containers {
 		normalizedIdentifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
-		containerMap[normalizedIdentifier] = c
-		indegree[normalizedIdentifier] = 0
-		normalizedMap[c] = normalizedIdentifier
+		tempMap[normalizedIdentifier] = append(tempMap[normalizedIdentifier], c)
+	}
+
+	// Check for identifier collisions
+	for identifier, containers := range tempMap {
+		if len(containers) > 1 {
+			logrus.Errorf(
+				"Identifier collision detected: '%s' used by multiple containers: %v",
+				identifier,
+				containers,
+			)
+
+			return nil, nil, nil, nil, IdentifierCollisionError{
+				DuplicateIdentifier: identifier,
+				AffectedContainers:  containers,
+			}
+		}
+		// No collision, populate maps
+		containerMap[identifier] = containers[0]
+		indegree[identifier] = 0
+		normalizedMap[containers[0]] = identifier
 	}
 
 	// Build the graph by processing container links (dependencies)
@@ -212,7 +237,7 @@ func buildDependencyGraph(
 		}
 	}
 
-	return containerMap, indegree, adjacency, normalizedMap
+	return containerMap, indegree, adjacency, normalizedMap, nil
 }
 
 // initializeQueue creates the initial processing queue for Kahn's algorithm.
@@ -266,15 +291,6 @@ func detectAndReportCycle(
 	normalizedMap map[types.Container]string,
 ) error {
 	if len(sorted) != len(containers) {
-		// Check if the mismatch is due to identifier collisions rather than a real cycle
-		if len(containerMap) < len(containers) {
-			// Identifier collisions caused some containers to be overwritten in the map
-			// This is not a circular dependency
-			logrus.Debug("Detected identifier collisions - not reporting as cycle")
-
-			return nil
-		}
-
 		// Identify which containers were not processed (part of cycles)
 		processed := make(map[string]bool)
 

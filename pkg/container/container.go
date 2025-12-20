@@ -478,7 +478,7 @@ func (c Container) Links() []string {
 //   - c: Container to get identifier for
 //
 // Returns:
-//   - string: "projectName_serviceName" if both available, otherwise service name if available,
+//   - string: "projectName-serviceName" if both available, otherwise service name if available,
 //     otherwise container name, otherwise container ID. Always returns a non-empty string for valid containers
 func ResolveContainerIdentifier(c types.Container) string {
 	// Get the container information.
@@ -559,7 +559,7 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 		}
 
 		normalizedLink = util.NormalizeContainerName(normalizedLink)
-		if projectName != "" && !strings.Contains(normalizedLink, "-") {
+		if projectName != "" && !strings.HasPrefix(normalizedLink, projectName+"-") {
 			normalizedLink = projectName + "-" + normalizedLink
 		}
 
@@ -671,7 +671,7 @@ func getLinksFromHostConfig(c Container, clog *logrus.Entry) []string {
 		}
 
 		normalizedName := util.NormalizeContainerName(parts[0])
-		if projectName != "" && !strings.Contains(normalizedName, "-") {
+		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
 			normalizedName = projectName + "-" + normalizedName
 		}
 
@@ -681,7 +681,7 @@ func getLinksFromHostConfig(c Container, clog *logrus.Entry) []string {
 	// Add network dependency.
 	if networkMode.IsContainer() {
 		normalizedName := util.NormalizeContainerName(networkMode.ConnectedContainer())
-		if projectName != "" && !strings.Contains(normalizedName, "-") {
+		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
 			normalizedName = projectName + "-" + normalizedName
 		}
 

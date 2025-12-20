@@ -3,10 +3,15 @@ package sorter
 import (
 	"errors"
 	"strings"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ErrCircularReference indicates a circular dependency between containers.
 var ErrCircularReference = errors.New("circular reference detected")
+
+// ErrIdentifierCollision indicates an identifier collision between containers.
+var ErrIdentifierCollision = errors.New("identifier collision detected")
 
 // CircularReferenceError represents a circular dependency error with the container name and cycle path.
 type CircularReferenceError struct {
@@ -36,4 +41,28 @@ func (e CircularReferenceError) Error() string {
 // Unwrap returns the underlying error for errors.Is compatibility.
 func (e CircularReferenceError) Unwrap() error {
 	return ErrCircularReference
+}
+
+// IdentifierCollisionError represents an error when multiple containers have the same normalized identifier.
+type IdentifierCollisionError struct {
+	DuplicateIdentifier string
+	AffectedContainers  []types.Container
+}
+
+// Error implements the error interface.
+func (e IdentifierCollisionError) Error() string {
+	containerDetails := make([]string, 0, len(e.AffectedContainers))
+	for _, c := range e.AffectedContainers {
+		containerDetails = append(containerDetails, c.Name()+" ("+c.ID().ShortID()+")")
+	}
+
+	return "identifier collision detected: '" + e.DuplicateIdentifier + "' used by containers: " + strings.Join(
+		containerDetails,
+		", ",
+	)
+}
+
+// Unwrap returns the underlying error for errors.Is compatibility.
+func (e IdentifierCollisionError) Unwrap() error {
+	return ErrIdentifierCollision
 }
