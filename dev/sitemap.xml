@@ -2,82 +2,82 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://watchtower.nickfedor.com/dev/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/http-api/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/lifecycle-hooks/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/linked-containers/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/metrics/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/remote-hosts/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/running-multiple-instances/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/stop-signals/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/arguments/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/container-selection/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/private-registries/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/secure-connections/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/installation/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/overview/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/updating-watchtower/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/usage/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/overview/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/template-preview/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/templates/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/quickstart/</loc>
-         <lastmod>2025-12-18</lastmod>
+         <lastmod>2025-12-20</lastmod>
     </url>
 </urlset>
