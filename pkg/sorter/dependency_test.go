@@ -1,6 +1,8 @@
 package sorter
 
 import (
+	"fmt"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -395,6 +397,269 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(result[1].Name()).To(gomega.Equal("container1")) // depends on web
 		})
 
+		ginkgo.It("should handle containers with service names containing leading slashes", func() {
+			// Test that containers with service names containing leading slashes are handled correctly
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("container1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+			c1.EXPECT().Links().Return([]string{"web-service"}) // Link to normalized service name
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("container2").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container2"}, Config: &dockerContainer.Config{Labels: map[string]string{"com.docker.compose.service": "/web-service"}}})
+
+				// Malformed service name with leading slash
+
+			containers := []types.Container{c1, c2}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(2))
+			gomega.Expect(result[0].Name()).
+				To(gomega.Equal("container2"))
+				// web-service container first
+			gomega.Expect(result[1].Name()).To(gomega.Equal("container1")) // depends on web-service
+		})
+
+		ginkgo.It(
+			"should handle containers with container names containing leading slashes",
+			func() {
+				// Test containers with container names containing leading slashes
+				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("container1").Maybe()
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+				c1.EXPECT().Links().Return([]string{"/web"}) // Link with leading slash
+				c1.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().Name().Return("web").Maybe()
+				c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
+				c2.EXPECT().Links().Return(nil)
+				c2.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/web"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+					// Container name with leading slash
+
+				containers := []types.Container{c1, c2}
+				result, err := sortByDependencies(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(result).To(gomega.HaveLen(2))
+				gomega.Expect(result[0].Name()).
+					To(gomega.Equal("web"))
+					// web container first
+				gomega.Expect(result[1].Name()).To(gomega.Equal("container1")) // depends on web
+			},
+		)
+
+		ginkgo.It("should handle containers with empty names falling back to IDs", func() {
+			// Test containers with empty names that fall back to container IDs
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("").Maybe() // Empty name
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+			c1.EXPECT().Links().Return([]string{"id-c2"}) // Link to other container's ID
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: ""}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("").Maybe() // Empty name
+			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: ""}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			containers := []types.Container{c1, c2}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(2))
+			gomega.Expect(result[0].ID()).
+				To(gomega.Equal(types.ContainerID("id-c2")))
+				// dependency first
+			gomega.Expect(result[1].ID()).
+				To(gomega.Equal(types.ContainerID("id-c1")))
+			// dependent second
+		})
+
+		ginkgo.It("should handle containers with malformed link targets", func() {
+			// Test containers with links to non-existent containers
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("container1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+			c1.EXPECT().
+				Links().
+				Return([]string{"non-existent", "/also-non-existent"})
+				// Links to non-existent containers
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("container2").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container2"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			containers := []types.Container{c1, c2}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(2))
+			// Order may vary since no valid dependencies
+		})
+
+		ginkgo.It("should handle containers with network mode dependencies", func() {
+			// Test containers with network mode dependencies
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("container1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+			c1.EXPECT().Links().Return([]string{"web"}) // Mock includes network dependency
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("web").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/web"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			containers := []types.Container{c1, c2}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(2))
+			gomega.Expect(result[0].Name()).To(gomega.Equal("web"))        // web container first
+			gomega.Expect(result[1].Name()).To(gomega.Equal("container1")) // depends on web
+		})
+
+		ginkgo.It("should handle containers with mixed dependency sources", func() {
+			// Test containers with dependencies from labels, links, and network mode
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("app").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+			c1.EXPECT().
+				Links().
+				Return([]string{"db", "cache", "redis", "proxy"})
+				// Mock all dependencies
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("db").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id-db")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c3.EXPECT().Name().Return("cache").Maybe()
+			c3.EXPECT().ID().Return(types.ContainerID("id-cache")).Maybe()
+			c3.EXPECT().Links().Return(nil)
+			c3.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/cache"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			c4 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c4.EXPECT().Name().Return("redis").Maybe()
+			c4.EXPECT().ID().Return(types.ContainerID("id-redis")).Maybe()
+			c4.EXPECT().Links().Return(nil)
+			c4.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/redis"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			c5 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c5.EXPECT().Name().Return("proxy").Maybe()
+			c5.EXPECT().ID().Return(types.ContainerID("id-proxy")).Maybe()
+			c5.EXPECT().Links().Return(nil)
+			c5.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/proxy"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			containers := []types.Container{c1, c2, c3, c4, c5}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(5))
+			// Dependencies should come before dependents
+			resultNames := make([]string, len(result))
+			for i, c := range result {
+				resultNames[i] = c.Name()
+			}
+			// app should be last
+			gomega.Expect(resultNames[len(resultNames)-1]).To(gomega.Equal("app"))
+		})
+
+		ginkgo.It("should handle containers with self-referencing dependencies", func() {
+			// Test containers that reference themselves (should detect as cycle)
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("container1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+			c1.EXPECT().Links().Return([]string{"container1"}) // Self-reference
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			containers := []types.Container{c1}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("circular reference detected"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("container1 -> container1"))
+			gomega.Expect(result).To(gomega.BeNil())
+		})
+
+		ginkgo.It("should handle large number of containers with no dependencies", func() {
+			// Test performance and correctness with many containers
+			containers := make([]types.Container, 100)
+			for i := range 100 {
+				c := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c.EXPECT().Name().Return(fmt.Sprintf("container%d", i)).Maybe()
+				c.EXPECT().ID().Return(types.ContainerID(fmt.Sprintf("id-c%d", i))).Maybe()
+				c.EXPECT().Links().Return(nil)
+				c.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: fmt.Sprintf("/container%d", i)}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+				containers[i] = c
+			}
+
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(100))
+		})
+
 		ginkgo.It("should handle containers with empty identifiers", func() {
 			// This tests that containers with empty names fall back to using container ID as identifier
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
@@ -467,6 +732,245 @@ var _ = ginkgo.Describe("ResolveContainerIdentifier", func() {
 		mockContainer.EXPECT().Name().Return("container1")
 		result := container.ResolveContainerIdentifier(mockContainer)
 		gomega.Expect(result).To(gomega.Equal("container1"))
+	})
+})
+
+var _ = ginkgo.Describe("Identifier Collision Issues", func() {
+	ginkgo.Describe("ResolveContainerIdentifier", func() {
+		ginkgo.It(
+			"should return different identifiers for containers from different projects with same service name",
+			func() {
+				// Container from project "app1" with service "web"
+				mockContainer1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				mockContainer1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service":     "web",
+							"com.docker.compose.project":     "app1",
+							"com.docker.compose.version":     "3.8",
+							"com.docker.compose.config-hash": "abc123",
+						},
+					},
+				})
+
+				// Container from project "app2" with same service "web"
+				mockContainer2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				mockContainer2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service":     "web",
+							"com.docker.compose.project":     "app2",
+							"com.docker.compose.version":     "3.8",
+							"com.docker.compose.config-hash": "def456",
+						},
+					},
+				})
+
+				result1 := container.ResolveContainerIdentifier(mockContainer1)
+				result2 := container.ResolveContainerIdentifier(mockContainer2)
+
+				// Containers from different projects should return different identifiers
+				gomega.Expect(result1).To(gomega.Equal("app1-web"))
+				gomega.Expect(result2).To(gomega.Equal("app2-web"))
+				gomega.Expect(result1).ToNot(gomega.Equal(result2))
+			},
+		)
+	})
+
+	ginkgo.Describe("buildDependencyGraph", func() {
+		ginkgo.It(
+			"should treat containers from different projects as separate entities in dependency graph",
+			func() {
+				// Create two containers from different projects with same service name
+				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app1_web_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "web",
+							"com.docker.compose.project": "app1",
+						},
+					},
+				})
+				c1.EXPECT().Links().Return(nil)
+
+				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app2_web_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "web",
+							"com.docker.compose.project": "app2",
+						},
+					},
+				})
+				c2.EXPECT().Links().Return(nil)
+
+				containers := []types.Container{c1, c2}
+
+				containerMap, indegree, _, normalizedMap, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Containers from different projects should have different identifiers
+				ident1 := container.ResolveContainerIdentifier(c1)
+				ident2 := container.ResolveContainerIdentifier(c2)
+				gomega.Expect(ident1).To(gomega.Equal("app1-web"))
+				gomega.Expect(ident2).To(gomega.Equal("app2-web"))
+
+				// Both containers should be in the map as separate entities
+				gomega.Expect(containerMap).To(gomega.HaveLen(2))
+				gomega.Expect(containerMap["app1-web"]).To(gomega.Equal(c1))
+				gomega.Expect(containerMap["app2-web"]).To(gomega.Equal(c2))
+
+				// Verify indegree reflects separate entities
+				gomega.Expect(indegree).To(gomega.HaveLen(2))
+				gomega.Expect(indegree["app1-web"]).To(gomega.Equal(0))
+				gomega.Expect(indegree["app2-web"]).To(gomega.Equal(0))
+
+				// The normalizedMap should show containers map to their respective identifiers
+				gomega.Expect(normalizedMap).To(gomega.HaveLen(2))
+				gomega.Expect(normalizedMap[c1]).To(gomega.Equal("app1-web"))
+				gomega.Expect(normalizedMap[c2]).To(gomega.Equal("app2-web"))
+			},
+		)
+
+		ginkgo.It(
+			"should maintain backward compatibility for containers without project labels",
+			func() {
+				// Container with service label but no project label
+				mockContainer := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "web",
+							// No project label
+						},
+					},
+				})
+
+				result := container.ResolveContainerIdentifier(mockContainer)
+
+				// Should return just the service name, same as before
+				gomega.Expect(result).To(gomega.Equal("web"))
+			},
+		)
+	})
+
+	ginkgo.Describe("IdentifierCollisionError", func() {
+		ginkgo.It("should format error message correctly", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("container1")
+			c1.EXPECT().ID().Return(types.ContainerID("id1"))
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("container2")
+			c2.EXPECT().ID().Return(types.ContainerID("id2"))
+
+			containers := []types.Container{c1, c2}
+
+			err := IdentifierCollisionError{
+				DuplicateIdentifier: "test-id",
+				AffectedContainers:  containers,
+			}
+
+			expected := "identifier collision detected: 'test-id' used by containers: container1 (id1), container2 (id2)"
+			gomega.Expect(err.Error()).To(gomega.Equal(expected))
+		})
+	})
+
+	ginkgo.Describe("buildDependencyGraph with collisions", func() {
+		ginkgo.It(
+			"should return IdentifierCollisionError when containers have same normalized identifier",
+			func() {
+				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				c1.EXPECT().Name().Return("c1").Maybe()
+				c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
+
+				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, // Same name
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				c2.EXPECT().Name().Return("c1").Maybe()
+				c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+
+				containers := []types.Container{c1, c2}
+
+				_, _, _, _, err := buildDependencyGraph(containers)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				var collisionErr IdentifierCollisionError
+				gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
+				gomega.Expect(err.(IdentifierCollisionError).DuplicateIdentifier).
+					To(gomega.Equal("c1"))
+				gomega.Expect(err.(IdentifierCollisionError).AffectedContainers).
+					To(gomega.HaveLen(2))
+			},
+		)
+
+		ginkgo.It("should succeed when containers have different identifiers", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c1.EXPECT().Name().Return("c1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
+			c1.EXPECT().Links().Return(nil)
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c2.EXPECT().Name().Return("c2").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+			c2.EXPECT().Links().Return(nil)
+
+			containers := []types.Container{c1, c2}
+
+			containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(
+				containers,
+			)
+
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containerMap).To(gomega.HaveLen(2))
+			gomega.Expect(indegree).To(gomega.HaveLen(2))
+			gomega.Expect(adjacency).To(gomega.BeEmpty()) // No links set up
+			gomega.Expect(normalizedMap).To(gomega.HaveLen(2))
+		})
+	})
+
+	ginkgo.Describe("sortByDependencies with collisions", func() {
+		ginkgo.It("should propagate IdentifierCollisionError from buildDependencyGraph", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c1.EXPECT().Name().Return("c1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, // Same name
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+			c2.EXPECT().Name().Return("c1").Maybe()
+			c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+
+			containers := []types.Container{c1, c2}
+
+			_, err := sortByDependencies(containers)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			var collisionErr IdentifierCollisionError
+			gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
+		})
 	})
 })
 

@@ -6,54 +6,61 @@ import (
 )
 
 var _ = ginkgo.Describe("Compose", func() {
-	ginkgo.Describe("ParseDependsOnLabel", func() {
-		ginkgo.It("returns nil for empty label", func() {
-			result := ParseDependsOnLabel("")
-			gomega.Expect(result).To(gomega.BeNil())
-		})
+	ginkgo.DescribeTable(
+		"ParseDependsOnLabel",
+		func(input string, expected []string) {
+			result := ParseDependsOnLabel(input)
+			gomega.Expect(result).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry("returns nil for empty label", "", nil),
+		ginkgo.Entry("parses single service", "postgres", []string{"postgres"}),
+		ginkgo.Entry("parses multiple services", "postgres,redis", []string{"postgres", "redis"}),
+		ginkgo.Entry("trims whitespace", " postgres , redis ", []string{"postgres", "redis"}),
+		ginkgo.Entry(
+			"parses colon-separated format",
+			"postgres:service_started:required,redis:service_healthy",
+			[]string{"postgres", "redis"},
+		),
+		ginkgo.Entry("ignores empty parts", "postgres,,redis", []string{"postgres", "redis"}),
+	)
 
-		ginkgo.It("parses single service", func() {
-			result := ParseDependsOnLabel("postgres")
-			gomega.Expect(result).To(gomega.Equal([]string{"postgres"}))
-		})
-
-		ginkgo.It("parses multiple services", func() {
-			result := ParseDependsOnLabel("postgres,redis")
-			gomega.Expect(result).To(gomega.Equal([]string{"postgres", "redis"}))
-		})
-
-		ginkgo.It("trims whitespace", func() {
-			result := ParseDependsOnLabel(" postgres , redis ")
-			gomega.Expect(result).To(gomega.Equal([]string{"postgres", "redis"}))
-		})
-
-		ginkgo.It("parses colon-separated format", func() {
-			result := ParseDependsOnLabel("postgres:service_started:required,redis:service_healthy")
-			gomega.Expect(result).To(gomega.Equal([]string{"postgres", "redis"}))
-		})
-
-		ginkgo.It("ignores empty parts", func() {
-			result := ParseDependsOnLabel("postgres,,redis")
-			gomega.Expect(result).To(gomega.Equal([]string{"postgres", "redis"}))
-		})
-	})
-
-	ginkgo.Describe("GetServiceName", func() {
-		ginkgo.It("returns empty string for nil labels", func() {
-			result := GetServiceName(nil)
-			gomega.Expect(result).To(gomega.Equal(""))
-		})
-
-		ginkgo.It("returns empty string when label not present", func() {
-			labels := map[string]string{"other": "value"}
+	ginkgo.DescribeTable(
+		"GetServiceName",
+		func(labels map[string]string, expected string) {
 			result := GetServiceName(labels)
-			gomega.Expect(result).To(gomega.Equal(""))
-		})
+			gomega.Expect(result).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry("returns empty string for nil labels", nil, ""),
+		ginkgo.Entry("returns empty string for empty labels", map[string]string{}, ""),
+		ginkgo.Entry(
+			"returns empty string when label not present",
+			map[string]string{"other": "value"},
+			"",
+		),
+		ginkgo.Entry(
+			"returns service name when label present",
+			map[string]string{ComposeServiceLabel: "web"},
+			"web",
+		),
+	)
 
-		ginkgo.It("returns service name when label present", func() {
-			labels := map[string]string{ComposeServiceLabel: "web"}
-			result := GetServiceName(labels)
-			gomega.Expect(result).To(gomega.Equal("web"))
-		})
-	})
+	ginkgo.DescribeTable(
+		"GetProjectName",
+		func(labels map[string]string, expected string) {
+			result := GetProjectName(labels)
+			gomega.Expect(result).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry("returns empty string for nil labels", nil, ""),
+		ginkgo.Entry("returns empty string for empty labels", map[string]string{}, ""),
+		ginkgo.Entry(
+			"returns empty string when label not present",
+			map[string]string{"other": "value"},
+			"",
+		),
+		ginkgo.Entry(
+			"returns project name when label present",
+			map[string]string{ComposeProjectLabel: "myproject"},
+			"myproject",
+		),
+	)
 })

@@ -471,15 +471,15 @@ func (c Container) Links() []string {
 	return getLinksFromHostConfig(c, clog)
 }
 
-// ResolveContainerIdentifier returns the service name if available,
-// otherwise container name. Falls back to container ID if name is empty.
+// ResolveContainerIdentifier returns the project and service name combination if both are available,
+// otherwise service name if available, otherwise container name. Falls back to container ID if name is empty.
 //
 // Parameters:
 //   - c: Container to get identifier for
 //
 // Returns:
-//   - string: Service name if available, otherwise container name, otherwise container ID
-//     Always returns a non-empty string for valid containers
+//   - string: "projectName-serviceName" if both available, otherwise service name if available,
+//     otherwise container name, otherwise container ID. Always returns a non-empty string for valid containers
 func ResolveContainerIdentifier(c types.Container) string {
 	// Get the container information.
 	info := c.ContainerInfo()
@@ -502,7 +502,15 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return nameOrID(c)
 	}
 
-	if serviceName := compose.GetServiceName(labels); serviceName != "" {
+	projectName := compose.GetProjectName(labels)
+	serviceName := compose.GetServiceName(labels)
+
+	if projectName != "" && serviceName != "" {
+		// Return project and service name combination from Compose labels.
+		return projectName + "-" + serviceName
+	}
+
+	if serviceName != "" {
 		// Return service name from Compose label.
 		return serviceName
 	}
@@ -523,7 +531,8 @@ func nameOrID(c types.Container) string {
 // watchtower depends-on label.
 //
 // It parses the com.centurylinklabs.watchtower.depends-on label value,
-// splitting on commas and normalizing each container name.
+// splitting on commas and normalizing each container name. If the container
+// has a project label, dependency names are qualified with the project name.
 //
 // Parameters:
 //   - c: Container instance
@@ -537,6 +546,8 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 		return nil
 	}
 
+	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
+
 	// Pre-allocate slice based on comma-separated values
 	parts := strings.Split(dependsOnLabelValue, ",")
 	normalizedLinks := make([]string, 0, len(parts))
@@ -548,6 +559,10 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 		}
 
 		normalizedLink = util.NormalizeContainerName(normalizedLink)
+		if projectName != "" && !strings.HasPrefix(normalizedLink, projectName+"-") {
+			normalizedLink = projectName + "-" + normalizedLink
+		}
+
 		normalizedLinks = append(normalizedLinks, normalizedLink)
 	}
 
@@ -561,7 +576,8 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 // Docker Compose depends-on label.
 //
 // It parses the com.docker.compose.depends_on label value using the compose package,
-// and normalizes each service name.
+// and normalizes each service name. If the container has a project label, service names
+// are qualified with the project name.
 //
 // Parameters:
 //   - c: Container instance
@@ -585,9 +601,16 @@ func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
 
 	services := compose.ParseDependsOnLabel(composeDependsOnLabelValue)
 
+	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
+
 	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
-		normalizedLinks = append(normalizedLinks, util.NormalizeContainerName(service))
+		normalizedService := util.NormalizeContainerName(service)
+		if projectName != "" {
+			normalizedService = projectName + "-" + normalizedService
+		}
+
+		normalizedLinks = append(normalizedLinks, normalizedService)
 	}
 
 	if len(normalizedLinks) == 0 {
@@ -605,6 +628,8 @@ func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
 // getLinksFromHostConfig extracts dependency links from Docker HostConfig.
 //
 // It parses HostConfig.Links and network mode to determine container dependencies.
+// If the container has a project label, link names are qualified with the project name
+// if they are not already qualified.
 //
 // Parameters:
 //   - c: Container instance
@@ -616,6 +641,8 @@ func getLinksFromHostConfig(c Container, clog *logrus.Entry) []string {
 	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
 		return nil
 	}
+
+	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
 
 	// Pre-allocate for links plus potential network mode dependency
 	capacity := len(c.containerInfo.HostConfig.Links)
@@ -644,15 +671,21 @@ func getLinksFromHostConfig(c Container, clog *logrus.Entry) []string {
 		}
 
 		normalizedName := util.NormalizeContainerName(parts[0])
+		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
+			normalizedName = projectName + "-" + normalizedName
+		}
+
 		normalizedLinks = append(normalizedLinks, normalizedName)
 	}
 
 	// Add network dependency.
 	if networkMode.IsContainer() {
-		normalizedLinks = append(
-			normalizedLinks,
-			util.NormalizeContainerName(networkMode.ConnectedContainer()),
-		)
+		normalizedName := util.NormalizeContainerName(networkMode.ConnectedContainer())
+		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
+			normalizedName = projectName + "-" + normalizedName
+		}
+
+		normalizedLinks = append(normalizedLinks, normalizedName)
 	}
 
 	clog.WithField("links", normalizedLinks).Debug("Retrieved links from host config")
