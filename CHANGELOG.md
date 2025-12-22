@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golangci/golangci-lint-action digest to 2e568c9 by @renovate[bot] in [#1144](https://github.com/nicholas-fedor/watchtower/pull/1144)
 - Update docker/login-action digest to 6862ffc by @renovate[bot] in [#1132](https://github.com/nicholas-fedor/watchtower/pull/1132)
 - Update golang:alpine docker digest to ac09a5f by @renovate[bot] in [#1130](https://github.com/nicholas-fedor/watchtower/pull/1130)
 - Update actions/attest-build-provenance digest to 00014ed by @renovate[bot] in [#1128](https://github.com/nicholas-fedor/watchtower/pull/1128)
