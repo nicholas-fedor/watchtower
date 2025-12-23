@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent panic in GetCreateConfig when containerInfo is nil by @nicholas-fedor in [#1147](https://github.com/nicholas-fedor/watchtower/pull/1147)
+
+## [1.13.1] - 2025-12-22
+
 ### Added
 
 - Add notification template entry and use em dash for self-update cleanup message by @nicholas-fedor in [#1136](https://github.com/nicholas-fedor/watchtower/pull/1136)
@@ -2485,7 +2491,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.13.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.13.1...HEAD)
+- [1.13.1](https://github.com/nicholas-fedor/watchtower/compare/v1.13.0...v1.13.1)
 - [1.13.0](https://github.com/nicholas-fedor/watchtower/compare/v1.12.5...v1.13.0)
 - [1.12.5](https://github.com/nicholas-fedor/watchtower/compare/v1.12.4...v1.12.5)
 - [1.12.4](https://github.com/nicholas-fedor/watchtower/compare/v1.12.3...v1.12.4)
