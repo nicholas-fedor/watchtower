@@ -280,6 +280,13 @@ func (c Container) ImageInfo() *dockerImage.InspectResponse {
 //   - *dockerContainerType.Config: Configuration for container creation.
 func (c Container) GetCreateConfig() *dockerContainer.Config {
 	clog := logrus.WithField("container", c.Name())
+
+	if c.containerInfo == nil {
+		clog.Warn("No container info available, returning minimal config")
+
+		return &dockerContainer.Config{Image: c.ImageName()}
+	}
+
 	config := c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 
