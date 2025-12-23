@@ -172,6 +172,14 @@ var _ = ginkgo.Describe("Container", func() {
 					To(gomega.Equal("test-hostname"), "Hostname should be preserved when UTS mode is empty")
 			})
 		})
+
+		ginkgo.It("returns minimal config when containerInfo is nil", func() {
+			c := MockContainer(WithImageName("test-image"))
+			c.containerInfo = nil
+			config := c.GetCreateConfig()
+			gomega.Expect(config.Image).To(gomega.Equal("unknown:latest"))
+			gomega.Expect(config).To(gomega.Equal(&dockerContainer.Config{Image: "unknown:latest"}))
+		})
 	})
 
 	ginkgo.Describe("Metadata Retrieval", func() {
