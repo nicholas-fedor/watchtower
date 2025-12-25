@@ -58,16 +58,15 @@ func ListSourceContainers(
 
 	// Build filter arguments for container states.
 	filterArgs := buildListFilterArgs(opts, isPodman)
+	clog.WithFields(logrus.Fields{
+		"custom_filter_provided": filter != nil,
+		"filter_args":            filterArgs,
+	}).Debug("Built filter arguments")
 
-	// Fetch containers with applied filters or all containers if no filter.
-	var listOptions dockerContainer.ListOptions
-	if filter == nil {
-		// List all containers without status filters
-		listOptions = dockerContainer.ListOptions{}
-	} else {
-		// Apply status filters
-		listOptions = dockerContainer.ListOptions{Filters: filterArgs}
-	}
+	// Fetch containers with status filters always applied based on ClientOptions.
+	listOptions := dockerContainer.ListOptions{Filters: filterArgs}
+
+	clog.Debug("API status filters applied based on ClientOptions")
 
 	containers, err := api.ContainerList(ctx, listOptions)
 	if err != nil {
@@ -560,6 +559,21 @@ func validateMacAddresses(
 		"version":   clientVersion,
 	})
 
+	// Handle nil network configuration by checking if the container is running and not in host network mode.
+	if config == nil {
+		clog.Debug("Nil network configuration provided")
+		// Check if the container is running and not in host network mode.
+		isRunning := sourceContainer.IsRunning()
+		// If the container is running and not in host network mode, and the API version is >= 1.44, return an error.
+		if !dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork && isRunning {
+			// Log a warning for running containers with missing network configuration in modern APIs.
+			return errNoMacInNonHost
+		}
+
+		// For non-running containers or host network mode, return nil as no validation is needed.
+		return nil
+	}
+
 	// Scan network endpoints to check for MAC address presence.
 	// A MAC address is expected for running containers in non-host networks with modern API versions.
 	foundMac := false
@@ -686,20 +700,27 @@ func debugLogMacAddress(
 	// Check for MAC addresses in the config.
 	foundMac := false
 
-	for networkName, endpoint := range networkConfig.EndpointsConfig {
-		if endpoint.MacAddress != "" {
-			clog.WithFields(logrus.Fields{
-				"network":     networkName,
-				"mac_address": endpoint.MacAddress,
-			}).Debug("Found MAC address in config")
+	// Iterate through network endpoints to find MAC addresses.
+	if networkConfig != nil {
+		// Iterate through network endpoints to find MAC addresses.
+		for networkName, endpoint := range networkConfig.EndpointsConfig {
+			// Check if the endpoint has a MAC address.
+			if endpoint.MacAddress != "" {
+				clog.WithFields(logrus.Fields{
+					"network":     networkName,
+					"mac_address": endpoint.MacAddress,
+				}).Debug("Found MAC address in config")
 
-			foundMac = true
+				// Set flag to indicate MAC address was found.
+				foundMac = true
+			}
 		}
 	}
 
 	// Log based on API version, MAC presence, and network mode.
 	switch {
-	case dockerAPIVersion.LessThan(clientVersion, minSupportedVersion): // API < v1.44
+	// API < v1.44, MAC present
+	case dockerAPIVersion.LessThan(clientVersion, minSupportedVersion):
 		if foundMac {
 			clog.Debug("Unexpected MAC address in legacy config")
 
@@ -707,6 +728,7 @@ func debugLogMacAddress(
 		}
 
 		clog.Debug("No MAC address in legacy config, Docker will handle")
+	// API < v1.44, MAC present
 	case dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork:
 		if foundMac {
 			clog.Debug("Unexpected MAC address in legacy config")
@@ -715,11 +737,14 @@ func debugLogMacAddress(
 		}
 
 		clog.Debug("No MAC address in legacy config, as expected")
-	case foundMac: // API >= v1.44, MAC present
+	// API < v1.44, MAC present
+	case foundMac:
 		clog.Debug("Verified MAC address configuration")
-	case !isHostNetwork: // API >= v1.44, no MAC, non-host network
+	// API >= v1.44, no MAC, non-host network
+	case !isHostNetwork:
 		clog.Debug("No MAC address found in config")
-	default: // API >= v1.44, no MAC, host network
+	// API >= v1.44, no MAC, host network
+	default:
 		clog.Debug("No MAC address in host network mode, as expected")
 	}
 }

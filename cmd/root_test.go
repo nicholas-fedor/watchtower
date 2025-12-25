@@ -1262,6 +1262,41 @@ func TestWaitForRunningUpdate_UpdateRunning(t *testing.T) {
 	})
 }
 
+// TestListContainersWithoutFilterIntegration verifies that client.ListContainers() is called
+// without filter arguments when no filter is provided, and that containers are returned correctly.
+func TestListContainersWithoutFilterIntegration(t *testing.T) {
+	// Set up environment
+	hostname := "test-container"
+	t.Setenv("HOSTNAME", hostname)
+
+	// Create mocks
+	mockClient := mockContainer.NewMockClient(t)
+	mockContainer := mockTypes.NewMockContainer(t)
+
+	// Set up mock expectations for ListContainers called without filter arguments
+	mockClient.EXPECT().ListContainers().Return([]types.Container{mockContainer}, nil).Once()
+
+	// Set up container mock to return the expected hostname
+	mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+		Config: &dockerContainer.Config{Hostname: hostname},
+	}).Once()
+
+	// Set up container mock to return the container ID
+	expectedID := types.ContainerID("test-container-id")
+	mockContainer.EXPECT().ID().Return(expectedID).Once()
+
+	// Execute the function that calls ListContainers without filter
+	resultID, err := getContainerID(mockClient)
+
+	// Assert results
+	require.NoError(t, err)
+	assert.Equal(t, expectedID, resultID)
+
+	// Verify mock expectations
+	mockClient.AssertExpectations(t)
+	mockContainer.AssertExpectations(t)
+}
+
 // TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate verifies that runUpgradesOnSchedule
 // waits for any running update to complete before shutting down when receiving a shutdown signal.
 func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {

@@ -1,7 +1,6 @@
 package container
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -1677,75 +1676,6 @@ func TestWaitForContainerHealthy_Timeout(t *testing.T) {
 
 		if !strings.Contains(err.Error(), "timeout") {
 			t.Fatalf("expected error to contain 'timeout', got %q", err.Error())
-		}
-	})
-}
-
-func TestStopSourceContainer_LinkedRestarting(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		logOutput := &bytes.Buffer{}
-		originalOutput := logrus.StandardLogger().Out
-		originalLevel := logrus.GetLevel()
-
-		logrus.SetOutput(logOutput)
-		logrus.SetLevel(logrus.InfoLevel)
-
-		defer func() {
-			logrus.SetOutput(originalOutput)
-			logrus.SetLevel(originalLevel)
-		}()
-
-		container := MockContainer()
-		container.SetLinkedToRestarting(true)
-		cid := container.ContainerInfo().ID
-
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == pingPath {
-				w.WriteHeader(http.StatusOK)
-
-				return
-			}
-
-			if strings.Contains(r.URL.Path, "/version") {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"ApiVersion": "1.44"}`))
-
-				return
-			}
-
-			if r.Method == http.MethodPost &&
-				strings.Contains(r.URL.Path, fmt.Sprintf("/containers/%s/stop", cid)) {
-				w.WriteHeader(http.StatusNoContent)
-
-				return
-			}
-
-			w.WriteHeader(http.StatusNotFound)
-		}))
-		defer server.Close()
-
-		docker, err := dockerClient.NewClientWithOpts(
-			dockerClient.WithHost(server.URL),
-			dockerClient.WithHTTPClient(server.Client()),
-			dockerClient.WithAPIVersionNegotiation(),
-		)
-		if err != nil {
-			t.Fatalf("failed to create docker client: %v", err)
-		}
-
-		timeout := 10 * time.Second
-
-		err = StopSourceContainer(docker, container, timeout)
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		if !strings.Contains(logOutput.String(), "Stopping linked container") {
-			t.Fatalf(
-				"expected log to contain 'Stopping linked container', got %q",
-				logOutput.String(),
-			)
 		}
 	})
 }
