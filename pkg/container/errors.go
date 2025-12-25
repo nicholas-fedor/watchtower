@@ -46,6 +46,8 @@ var (
 	errUnexpectedMacInHost = errors.New("unexpected MAC address in host network config")
 	// errNoMacInNonHost indicates no MAC address was found in a non-host network configuration where one is expected.
 	errNoMacInNonHost = errors.New("no MAC address found in non-host network config")
+	// ErrNilSourceEndpoint indicates a nil source endpoint was provided.
+	ErrNilSourceEndpoint = errors.New("nil source endpoint provided")
 )
 
 // Errors for container start and rename operations in container_target.go.

@@ -80,6 +80,7 @@ func ListSourceContainers(
 			"list_options": fmt.Sprintf("%+v", listOptions),
 		}).Debug("ContainerList API call failed")
 
+		// Handle 404 responses from Docker API
 		if strings.Contains(err.Error(), "page not found") {
 			clog.WithFields(logrus.Fields{
 				"error":       err,
@@ -420,17 +421,25 @@ func getNetworkConfig(
 	// Process each network endpoint
 	for networkName, sourceEndpoint := range containerInfo.NetworkSettings.Networks {
 		if sourceEndpoint == nil {
-			clog.WithField("network", networkName).Warn("Skipping nil endpoint")
+			clog.WithField("network", networkName).Debug("Skipping nil endpoint")
 
 			continue
 		}
 
-		targetEndpoint := processEndpoint(
+		targetEndpoint, err := processEndpoint(
 			sourceEndpoint,
 			sourceContainer.ID(),
 			clientVersion,
 			isHostNetwork,
 		)
+		if err != nil {
+			clog.WithError(err).
+				WithField("network", networkName).
+				Debug("Failed to process endpoint")
+
+			continue
+		}
+
 		config.EndpointsConfig[networkName] = targetEndpoint
 
 		clog.WithField("network", networkName).Debug("Added endpoint to network config")
@@ -456,7 +465,7 @@ func newEmptyNetworkConfig() *dockerNetwork.NetworkingConfig {
 
 // processEndpoint sanitizes a single network endpoint for the target container.
 //
-// It filters aliases, copies IPAM config, and handles MAC addresses based on API version and network mode.
+// It filters aliases, copies IPAM config, and handles MAC addresses based on API version and network mode. Returns an error if sourceEndpoint is nil.
 //
 // Parameters:
 //   - sourceEndpoint: Source endpoint to process.
@@ -465,13 +474,18 @@ func newEmptyNetworkConfig() *dockerNetwork.NetworkingConfig {
 //   - isHostNetwork: Whether the container uses host network mode.
 //
 // Returns:
-//   - *dockerNetworkType.EndpointSettings: Sanitized endpoint settings.
+//   - *dockerNetwork.EndpointSettings: Sanitized endpoint settings.
+//   - error: Non-nil if sourceEndpoint is nil, nil otherwise.
 func processEndpoint(
 	sourceEndpoint *dockerNetwork.EndpointSettings,
 	containerID types.ContainerID,
 	clientVersion string,
 	isHostNetwork bool,
-) *dockerNetwork.EndpointSettings {
+) (*dockerNetwork.EndpointSettings, error) {
+	if sourceEndpoint == nil {
+		return nil, ErrNilSourceEndpoint
+	}
+
 	clog := logrus.WithFields(logrus.Fields{
 		"container": containerID.ShortID(),
 		"version":   clientVersion,
@@ -525,7 +539,7 @@ func processEndpoint(
 		}
 	}
 
-	return targetEndpoint
+	return targetEndpoint, nil
 }
 
 // validateMacAddresses verifies the presence of MAC addresses in a container's network configuration

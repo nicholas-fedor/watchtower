@@ -11,6 +11,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerImage "github.com/docker/docker/api/types/image"
@@ -32,9 +33,11 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = dockerClient.NewClientWithOpts(
+		var err error
+		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+		require.NoError(ginkgo.GinkgoT(), err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -258,9 +261,11 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = dockerClient.NewClientWithOpts(
+		var err error
+		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+		require.NoError(ginkgo.GinkgoT(), err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -495,9 +500,11 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = dockerClient.NewClientWithOpts(
+		var err error
+		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+		require.NoError(ginkgo.GinkgoT(), err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -704,13 +711,11 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 						gomega.HaveSuffix(fmt.Sprintf("containers/%s/stop", cid)),
 					),
 					func(w http.ResponseWriter, r *http.Request) {
-						var opts dockerContainer.StopOptions
-						if err := json.NewDecoder(r.Body).Decode(&opts); err == nil {
-							gomega.Expect(opts.Signal).To(gomega.Equal("SIGTERM"))
-							if opts.Timeout != nil {
-								gomega.Expect(*opts.Timeout).To(gomega.Equal(30))
-							}
-						}
+						query := r.URL.Query()
+						signal := query.Get("signal")
+						timeoutStr := query.Get("t")
+						gomega.Expect(signal).To(gomega.Equal("SIGTERM"))
+						gomega.Expect(timeoutStr).To(gomega.Equal("30"))
 						w.WriteHeader(http.StatusNoContent)
 					},
 				),
@@ -1024,7 +1029,13 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				}
 				containerID := types.ContainerID("container_id")
 
-				result := processEndpoint(sourceEndpoint, containerID, clientVersion, isHostNetwork)
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(result.NetworkID).To(gomega.Equal("bridge_network_id"))
 				gomega.Expect(result.MacAddress).To(gomega.Equal("02:42:ac:11:00:02"))
@@ -1042,7 +1053,13 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				}
 				containerID := types.ContainerID("container_id")
 
-				result := processEndpoint(sourceEndpoint, containerID, clientVersion, isHostNetwork)
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(result.Aliases).To(gomega.ConsistOf("alias1", "alias2", "other_id"))
 			})
@@ -1057,7 +1074,13 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				}
 				containerID := types.ContainerID("container_id")
 
-				result := processEndpoint(sourceEndpoint, containerID, clientVersion, isHostNetwork)
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(result.IPAMConfig).ToNot(gomega.BeNil())
 				gomega.Expect(result.IPAMConfig.IPv4Address).To(gomega.Equal("192.168.1.100"))
@@ -1072,7 +1095,13 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				}
 				containerID := types.ContainerID("test_container_id")
 
-				result := processEndpoint(sourceEndpoint, containerID, clientVersion, isHostNetwork)
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(result.Aliases).To(gomega.BeEmpty())
 			})
@@ -1085,7 +1114,13 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				}
 				containerID := types.ContainerID("test_container_id")
 
-				result := processEndpoint(sourceEndpoint, containerID, clientVersion, isHostNetwork)
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(result.Gateway).To(gomega.Equal("172.17.0.1"))
 				gomega.Expect(result.Links).To(gomega.ConsistOf("other_container:alias"))
@@ -1112,7 +1147,13 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				}
 				containerID := types.ContainerID("container_id")
 
-				result := processEndpoint(sourceEndpoint, containerID, clientVersion, isHostNetwork)
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(result.MacAddress).To(gomega.Equal(""))
 				gomega.Expect(result.IPAddress).To(gomega.Equal(""))
@@ -1134,7 +1175,8 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 			}
 			containerID := types.ContainerID("test_container_id")
 
-			result := processEndpoint(sourceEndpoint, containerID, "1.50", isHostNetwork)
+			result, err := processEndpoint(sourceEndpoint, containerID, "1.50", isHostNetwork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Expect(result.Aliases).To(gomega.BeNil())
 		})
@@ -1147,7 +1189,8 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 			}
 			containerID := types.ContainerID("test_container_id")
 
-			result := processEndpoint(sourceEndpoint, containerID, "1.50", isHostNetwork)
+			result, err := processEndpoint(sourceEndpoint, containerID, "1.50", isHostNetwork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Expect(result.IPAMConfig).To(gomega.BeNil())
 		})
@@ -1160,7 +1203,8 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 			}
 			containerID := types.ContainerID("test_container_id")
 
-			result := processEndpoint(sourceEndpoint, containerID, "1.50", isHostNetwork)
+			result, err := processEndpoint(sourceEndpoint, containerID, "1.50", isHostNetwork)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Expect(result.MacAddress).To(gomega.Equal(""))
 			gomega.Expect(result.IPAddress).To(gomega.Equal(""))
@@ -1175,7 +1219,8 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 			}
 			containerID := types.ContainerID("test_container_id")
 
-			result := processEndpoint(sourceEndpoint, containerID, "1.50", false)
+			result, err := processEndpoint(sourceEndpoint, containerID, "1.50", false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Expect(result.IPAMConfig).To(gomega.BeNil())
 		})
@@ -1186,18 +1231,20 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 			}
 			containerID := types.ContainerID("test_container_id")
 
-			result := processEndpoint(sourceEndpoint, containerID, "1.50", false)
+			result, err := processEndpoint(sourceEndpoint, containerID, "1.50", false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Expect(result.DNSNames).To(gomega.BeEmpty())
 		})
 
 		ginkgo.Context("with nil source endpoint", func() {
-			ginkgo.It("should panic when sourceEndpoint is nil", func() {
+			ginkgo.It("should return ErrNilSourceEndpoint when sourceEndpoint is nil", func() {
 				containerID := types.ContainerID("test_container_id")
 
-				gomega.Expect(func() {
-					processEndpoint(nil, containerID, "1.50", false)
-				}).To(gomega.Panic())
+				result, err := processEndpoint(nil, containerID, "1.50", false)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err).To(gomega.MatchError(ErrNilSourceEndpoint))
+				gomega.Expect(result).To(gomega.BeNil())
 			})
 		})
 	})
@@ -1644,9 +1691,11 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = dockerClient.NewClientWithOpts(
+		var err error
+		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+		require.NoError(ginkgo.GinkgoT(), err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -1738,14 +1787,12 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 						gomega.HaveSuffix(fmt.Sprintf("containers/%s/stop", cid)),
 					),
 					func(w http.ResponseWriter, r *http.Request) {
-						// Verify the timeout is in the request body
-						var opts dockerContainer.StopOptions
-						if err := json.NewDecoder(r.Body).Decode(&opts); err == nil {
-							gomega.Expect(opts.Signal).To(gomega.Equal("SIGTERM"))
-							if opts.Timeout != nil {
-								gomega.Expect(*opts.Timeout).To(gomega.Equal(30))
-							}
-						}
+						// Verify the timeout is in the query parameters
+						query := r.URL.Query()
+						signal := query.Get("signal")
+						timeoutStr := query.Get("t")
+						gomega.Expect(signal).To(gomega.Equal("SIGTERM"))
+						gomega.Expect(timeoutStr).To(gomega.Equal("30"))
 						w.WriteHeader(http.StatusNoContent)
 					},
 				),
