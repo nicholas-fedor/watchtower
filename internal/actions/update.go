@@ -830,7 +830,7 @@ func stopStaleContainer(
 	}
 
 	// Stop the container with the configured timeout.
-	if err := client.StopContainer(container, params.Timeout); err != nil {
+	if err := client.StopAndRemoveContainer(container, params.Timeout); err != nil {
 		logrus.WithFields(fields).WithError(err).Error("Failed to stop container")
 
 		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
@@ -1013,7 +1013,7 @@ func restartStaleContainer(
 			if renamed && container.IsWatchtower() {
 				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
 
-				if cleanupErr := client.StopContainer(container, params.Timeout); cleanupErr != nil {
+				if cleanupErr := client.StopAndRemoveContainer(container, params.Timeout); cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
 						Debug("Failed to stop failed Watchtower container")
@@ -1055,11 +1055,18 @@ func restartStaleContainer(
 		}
 
 		// Stop the old container gracefully
-		if err := client.StopContainer(container, params.Timeout); err != nil {
+		if err := client.StopAndRemoveContainer(container, params.Timeout); err != nil {
 			logrus.WithError(err).WithFields(fields).Warn("Failed to stop old Watchtower container")
 			// Don't fail the update, just log the warning
 		} else {
 			logrus.WithFields(fields).Debug("Stopped old Watchtower container")
+
+			// Remove the old renamed Watchtower container
+			if err := client.RemoveContainer(container); err != nil {
+				logrus.WithError(err).WithFields(fields).Warn("Failed to remove old Watchtower container")
+			} else {
+				logrus.WithFields(fields).Debug("Removed old Watchtower container")
+			}
 		}
 	}
 

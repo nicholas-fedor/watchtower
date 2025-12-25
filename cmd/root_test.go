@@ -73,7 +73,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "test-container",
 			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.EXPECT().ListAllContainers().
+				client.EXPECT().ListContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{Hostname: "test-container"},
@@ -91,7 +91,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "test-container",
 			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.EXPECT().ListAllContainers().
+				client.EXPECT().ListContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{Hostname: "test-container"},
@@ -110,7 +110,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "test-container",
 			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.EXPECT().ListAllContainers().
+				client.EXPECT().ListContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{Hostname: "test-container"},
@@ -129,7 +129,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "test-container",
 			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.EXPECT().ListAllContainers().
+				client.EXPECT().ListContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{Hostname: "test-container"},
@@ -148,7 +148,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "my_app.container-123",
 			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.EXPECT().ListAllContainers().
+				client.EXPECT().ListContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{Hostname: "my_app.container-123"},
@@ -167,7 +167,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "watchtower_watchtower_1",
 			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.EXPECT().ListAllContainers().
+				client.EXPECT().ListContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{Hostname: "watchtower_watchtower_1"},
@@ -186,7 +186,7 @@ func TestDeriveScopeFromContainer(t *testing.T) {
 			initialScope: "",
 			hostname:     "nonexistent-container",
 			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.EXPECT().ListAllContainers().
+				client.EXPECT().ListContainers().
 					Return([]types.Container{container}, nil)
 				container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{Hostname: "nonexistent-container"},
@@ -263,7 +263,7 @@ func TestDeriveScopeFromContainer_Logging(t *testing.T) {
 	mockContainer := mockTypes.NewMockContainer(t)
 
 	// Set up successful derivation
-	mockClient.On("ListAllContainers").Return([]types.Container{mockContainer}, nil)
+	mockClient.On("ListContainers").Return([]types.Container{mockContainer}, nil)
 	mockContainer.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
 		Config: &dockerContainer.Config{Hostname: "test-container"},
 	})

@@ -459,7 +459,7 @@ func getContainerID(client container.Client) (types.ContainerID, error) {
 		return "", ErrContainerIDNotFound
 	}
 
-	containers, err := client.ListAllContainers()
+	containers, err := client.ListContainers()
 	if err != nil {
 		return "", fmt.Errorf("failed to list all containers: %w", err)
 	}

@@ -59,9 +59,28 @@ func ListSourceContainers(
 	// Build filter arguments for container states.
 	filterArgs := buildListFilterArgs(opts, isPodman)
 
-	// Fetch containers with applied filters.
-	containers, err := api.ContainerList(ctx, dockerContainer.ListOptions{Filters: filterArgs})
+	// Fetch containers with applied filters or all containers if no filter.
+	var listOptions dockerContainer.ListOptions
+	if filter == nil {
+		// List all containers without status filters
+		listOptions = dockerContainer.ListOptions{}
+	} else {
+		// Apply status filters
+		listOptions = dockerContainer.ListOptions{Filters: filterArgs}
+	}
+
+	containers, err := api.ContainerList(ctx, listOptions)
 	if err != nil {
+		// Log detailed error information for debugging
+		clog.WithFields(logrus.Fields{
+			"error":        err,
+			"error_type":   fmt.Sprintf("%T", err),
+			"endpoint":     "/containers/json",
+			"api_version":  strings.Trim(api.ClientVersion(), "\""),
+			"docker_host":  os.Getenv("DOCKER_HOST"),
+			"list_options": fmt.Sprintf("%+v", listOptions),
+		}).Debug("ContainerList API call failed")
+
 		if strings.Contains(err.Error(), "page not found") {
 			clog.WithFields(logrus.Fields{
 				"error":       err,
@@ -84,10 +103,27 @@ func ListSourceContainers(
 	for _, runningContainer := range containers {
 		container, err := GetSourceContainer(api, types.ContainerID(runningContainer.ID))
 		if err != nil {
+			// Log detailed error information for debugging container inspect failures
+			logrus.WithFields(logrus.Fields{
+				"container_id": runningContainer.ID,
+				"error":        err,
+				"error_type":   fmt.Sprintf("%T", err),
+				"api_version":  strings.Trim(api.ClientVersion(), "\""),
+				"docker_host":  os.Getenv("DOCKER_HOST"),
+			}).Debug("Failed to inspect individual container during list")
+
+			// Handle race condition where containers disappear between API calls
+			if cerrdefs.IsNotFound(err) {
+				logrus.WithField("container_id", runningContainer.ID).
+					Debug("Container no longer exists")
+
+				continue
+			}
+
 			return nil, err // Logged in GetSourceContainer
 		}
 
-		if filter(container) {
+		if filter == nil || filter(container) {
 			hostContainers = append(hostContainers, container)
 		}
 	}
@@ -120,6 +156,14 @@ func GetSourceContainer(
 	// Inspect the container to get its details.
 	containerInfo, err := api.ContainerInspect(ctx, string(containerID))
 	if err != nil {
+		// Log detailed error information for debugging
+		clog.WithFields(logrus.Fields{
+			"error":       err,
+			"error_type":  fmt.Sprintf("%T", err),
+			"api_version": strings.Trim(api.ClientVersion(), "\""),
+			"docker_host": os.Getenv("DOCKER_HOST"),
+		}).Debug("ContainerInspect API call failed")
+
 		clog.WithError(err).Debug("Failed to inspect container")
 
 		return nil, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
@@ -156,10 +200,85 @@ func GetSourceContainer(
 	return NewContainer(&containerInfo, &imageInfo), nil
 }
 
-// StopSourceContainer stops and removes the specified container using the Docker API's StopContainer method.
+// StopSourceContainer stops the specified container using the Docker API's StopContainer method.
 //
 // It checks if the container is running, sends the configured stop signal (defaulting to SIGTERM if unset),
-// waits for the specified timeout for graceful shutdown, and removes the container with optional volume cleanup.
+// and waits for the specified timeout for graceful shutdown, forcing termination with SIGKILL if necessary.
+//
+// Parameters:
+//   - api: Docker API client for interacting with the Docker daemon.
+//   - sourceContainer: Container object to stop, containing metadata like name and ID.
+//   - timeout: Duration to wait for graceful shutdown before forcing termination with SIGKILL.
+//
+// Returns:
+//   - error: Non-nil if stopping the container fails, nil on successful completion.
+func StopSourceContainer(
+	api dockerClient.APIClient,
+	sourceContainer types.Container,
+	timeout time.Duration,
+) error {
+	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"id":        sourceContainer.ID().ShortID(),
+	})
+
+	// Check if the container is running to determine if a stop operation is needed.
+	if !sourceContainer.IsRunning() {
+		// Log that the container is not running, so no stop attempt is required.
+		clog.Debug("Container is not running, no stop operation needed")
+
+		return nil
+	}
+
+	// Retrieve the container's configured stop signal, falling back to SIGTERM if not specified.
+	signal := sourceContainer.StopSignal()
+	if signal == "" {
+		// Use default SIGTERM signal if no custom signal is provided.
+		signal = defaultStopSignal
+	}
+
+	// Log the stop attempt with the signal and configured timeout for clarity.
+	message := "Stopping container"
+	if sourceContainer.IsLinkedToRestarting() {
+		message = "Stopping linked container"
+	}
+
+	clog.WithFields(logrus.Fields{
+		"signal":  signal,
+		"timeout": timeout,
+	}).Info(message)
+
+	// Record the start time to measure elapsed duration for the stop operation.
+	startTime := time.Now()
+
+	// Convert timeout from time.Duration to seconds for Docker API's StopContainer.
+	timeoutSeconds := int(timeout / time.Second)
+
+	// Call the Docker API's StopContainer with the stop signal and timeout in seconds.
+	// The API sends the signal (SIGTERM or custom), waits for the timeout, and sends SIGKILL if needed.
+	err := api.ContainerStop(ctx, string(sourceContainer.ID()), dockerContainer.StopOptions{
+		Signal:  signal,
+		Timeout: &timeoutSeconds,
+	})
+	if err != nil {
+		// Log the failure with elapsed time and error details for debugging.
+		clog.WithError(err).
+			WithField("elapsed", time.Since(startTime)).
+			Error("Failed to stop container")
+		// Wrap the error with a specific Watchtower error type for consistent error handling.
+		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
+	}
+
+	// Log successful stop with elapsed time to confirm the operation's duration.
+	clog.WithField("elapsed", time.Since(startTime)).Debug("Container stopped successfully")
+
+	return nil
+}
+
+// StopAndRemoveSourceContainer stops and removes the specified container using the Docker API.
+//
+// It first stops the container if running, then removes it with optional volume cleanup.
 //
 // Parameters:
 //   - api: Docker API client for interacting with the Docker daemon.
@@ -169,7 +288,7 @@ func GetSourceContainer(
 //
 // Returns:
 //   - error: Non-nil if stopping or removing the container fails, nil on successful completion.
-func StopSourceContainer(
+func StopAndRemoveSourceContainer(
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
 	timeout time.Duration,
@@ -181,50 +300,9 @@ func StopSourceContainer(
 		"id":        sourceContainer.ID().ShortID(),
 	})
 
-	// Check if the container is running to determine if a stop operation is needed.
-	if !sourceContainer.IsRunning() {
-		// Log that the container is not running, so no stop attempt is required.
-		clog.Debug("Container is not running, proceeding directly to removal check")
-	} else {
-		// Retrieve the container's configured stop signal, falling back to SIGTERM if not specified.
-		signal := sourceContainer.StopSignal()
-		if signal == "" {
-			// Use default SIGTERM signal if no custom signal is provided.
-			signal = defaultStopSignal
-		}
-
-		// Log the stop attempt with the signal and configured timeout for clarity.
-		message := "Stopping container"
-		if sourceContainer.IsLinkedToRestarting() {
-			message = "Stopping linked container"
-		}
-
-		clog.WithFields(logrus.Fields{
-			"signal":  signal,
-			"timeout": timeout,
-		}).Info(message)
-
-		// Record the start time to measure elapsed duration for the stop operation.
-		startTime := time.Now()
-
-		// Convert timeout from time.Duration to seconds for Docker API's StopContainer.
-		timeoutSeconds := int(timeout / time.Second)
-
-		// Call the Docker API's StopContainer with the stop signal and timeout in seconds.
-		// The API sends the signal (SIGTERM or custom), waits for the timeout, and sends SIGKILL if needed.
-		err := api.ContainerStop(ctx, string(sourceContainer.ID()), dockerContainer.StopOptions{
-			Signal:  signal,
-			Timeout: &timeoutSeconds,
-		})
-		if err != nil {
-			// Log the failure with elapsed time and error details for debugging.
-			clog.WithError(err).WithField("elapsed", time.Since(startTime)).Error("Failed to stop container")
-			// Wrap the error with a specific Watchtower error type for consistent error handling.
-			return fmt.Errorf("%w: %w", errStopContainerFailed, err)
-		}
-
-		// Log successful stop with elapsed time to confirm the operation's duration.
-		clog.WithField("elapsed", time.Since(startTime)).Debug("Container stopped successfully")
+	// Stop the container first
+	if err := StopSourceContainer(api, sourceContainer, timeout); err != nil {
+		return err
 	}
 
 	// Check if the container has AutoRemove enabled in its HostConfig, which automatically removes

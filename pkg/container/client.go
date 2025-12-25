@@ -41,20 +41,25 @@ var (
 //
 // It provides methods for managing containers, images, and executing commands, abstracting the underlying Docker client operations.
 type Client interface {
-	// ListContainers retrieves a filtered list of containers running on the host.
+	// ListContainers retrieves a list of containers, optionally filtered.
 	//
-	// The provided filter determines which containers are included in the result.
-	ListContainers(filter types.Filter) ([]types.Container, error)
+	// If no filter is provided, all containers are returned.
+	ListContainers(filter ...types.Filter) ([]types.Container, error)
 
 	// GetContainer fetches detailed information about a specific container by its ID.
 	//
 	// Returns the container object or an error if the container cannot be retrieved.
 	GetContainer(containerID types.ContainerID) (types.Container, error)
 
-	// StopContainer stops and removes a specified container, respecting the given timeout.
+	// StopContainer stops a specified container, respecting the given timeout.
+	//
+	// It ensures the container is no longer running.
+	StopContainer(container types.Container, timeout time.Duration) error
+
+	// StopAndRemoveContainer stops and removes a specified container, respecting the given timeout.
 	//
 	// It ensures the container is no longer running or present on the host.
-	StopContainer(container types.Container, timeout time.Duration) error
+	StopAndRemoveContainer(container types.Container, timeout time.Duration) error
 
 	// StartContainer creates and starts a new container based on the provided container's configuration.
 	//
@@ -114,15 +119,19 @@ type Client interface {
 	// If the container has no health check configured, it returns immediately.
 	WaitForContainerHealthy(containerID types.ContainerID, timeout time.Duration) error
 
-	// ListAllContainers retrieves a list of all containers from the Docker host, regardless of status.
-	//
-	// Returns all containers without filtering by status or other criteria.
-	ListAllContainers() ([]types.Container, error)
-
 	// UpdateContainer updates the configuration of an existing container.
 	//
 	// It modifies container settings such as restart policy using the Docker API ContainerUpdate.
 	UpdateContainer(container types.Container, config dockerContainer.UpdateConfig) error
+
+	// RemoveContainer removes a container from the Docker host.
+	//
+	// Parameters:
+	//   - container: Container to remove.
+	//
+	// Returns:
+	//   - error: Non-nil if removal fails, nil on success.
+	RemoveContainer(container types.Container) error
 }
 
 // client is the concrete implementation of the Client interface.
@@ -218,20 +227,25 @@ func NewClient(opts ClientOptions) Client {
 	}
 }
 
-// ListContainers retrieves a filtered list of containers running on the host.
+// ListContainers retrieves a list of containers, optionally filtered.
 //
 // Parameters:
-//   - filter: Filter to apply to container list.
+//   - filter: Optional filter to apply to container list.
 //
 // Returns:
 //   - []types.Container: List of matching containers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c client) ListContainers(filter types.Filter) ([]types.Container, error) {
+func (c client) ListContainers(filter ...types.Filter) ([]types.Container, error) {
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
 	isPodman := c.getPodmanFlag()
 
+	var containerFilter types.Filter
+	if len(filter) > 0 {
+		containerFilter = filter[0]
+	}
+
 	// Attempt to list source containers and handle errors by logging and returning them.
-	containers, err := ListSourceContainers(c.api, c.ClientOptions, filter, isPodman)
+	containers, err := ListSourceContainers(c.api, c.ClientOptions, containerFilter, isPodman)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
 
@@ -267,7 +281,35 @@ func (c client) GetContainer(containerID types.ContainerID) (types.Container, er
 	return container, nil
 }
 
-// StopContainer stops and removes a specified container.
+// StopContainer stops a specified container.
+//
+// Parameters:
+//   - container: Container to stop.
+//   - timeout: Duration to wait before forcing stop.
+//
+// Returns:
+//   - error: Non-nil if stop fails, nil on success.
+func (c client) StopContainer(container types.Container, timeout time.Duration) error {
+	// Stop container using helper function.
+	err := StopSourceContainer(c.api, container, timeout)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		}).Debug("Failed to stop container")
+
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}).Debug("Stopped container")
+
+	return nil
+}
+
+// StopAndRemoveContainer stops and removes a specified container.
 //
 // Parameters:
 //   - container: Container to stop and remove.
@@ -275,9 +317,9 @@ func (c client) GetContainer(containerID types.ContainerID) (types.Container, er
 //
 // Returns:
 //   - error: Non-nil if stop/removal fails, nil on success.
-func (c client) StopContainer(container types.Container, timeout time.Duration) error {
+func (c client) StopAndRemoveContainer(container types.Container, timeout time.Duration) error {
 	// Stop and remove container using helper function with volume option.
-	err := StopSourceContainer(c.api, container, timeout, c.RemoveVolumes)
+	err := StopAndRemoveSourceContainer(c.api, container, timeout, c.RemoveVolumes)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"container": container.Name(),
@@ -344,61 +386,6 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 	return newID, nil
 }
 
-// ListAllContainers retrieves a list of all containers from the Docker host, regardless of status.
-//
-// Returns:
-//   - []types.Container: List of all containers.
-//   - error: Non-nil if listing fails, nil on success.
-func (c client) ListAllContainers() ([]types.Container, error) {
-	ctx := context.Background()
-	clog := logrus.WithField("list_all", true)
-
-	clog.Debug("Retrieving all container list")
-
-	// Fetch containers with no status filter
-	containers, err := c.api.ContainerList(ctx, dockerContainer.ListOptions{})
-	if err != nil {
-		if strings.Contains(err.Error(), "page not found") {
-			clog.WithFields(logrus.Fields{
-				"error":       err,
-				"endpoint":    "/containers/json",
-				"api_version": strings.Trim(c.api.ClientVersion(), "\""),
-				"docker_host": os.Getenv("DOCKER_HOST"),
-			}).Warn("Docker API returned 404 for container list; treating as empty list")
-
-			return []types.Container{}, nil
-		}
-
-		clog.WithError(err).Debug("Failed to list all containers")
-
-		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
-	}
-
-	// Convert to types.Container
-	hostContainers := []types.Container{}
-
-	for _, runningContainer := range containers {
-		container, err := GetSourceContainer(c.api, types.ContainerID(runningContainer.ID))
-		if err != nil {
-			// Handle race condition where containers disappear between API calls
-			if cerrdefs.IsNotFound(err) {
-				logrus.WithField("container_id", runningContainer.ID).
-					Debug("Container no longer exists")
-
-				continue
-			}
-
-			return nil, err
-		}
-
-		hostContainers = append(hostContainers, container)
-	}
-
-	clog.WithField("count", len(hostContainers)).Debug("Listed all containers")
-
-	return hostContainers, nil
-}
-
 // UpdateContainer updates the configuration of an existing container.
 //
 // Parameters:
@@ -424,6 +411,42 @@ func (c client) UpdateContainer(
 	}
 
 	clog.Debug("Container configuration updated")
+
+	return nil
+}
+
+// RemoveContainer removes a container from the Docker host.
+//
+// Parameters:
+//   - container: Container to remove.
+//
+// Returns:
+//   - error: Non-nil if removal fails, nil on success.
+func (c client) RemoveContainer(container types.Container) error {
+	ctx := context.Background()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"id":        container.ID().ShortID(),
+	})
+
+	clog.Debug("Removing container")
+
+	err := c.api.ContainerRemove(ctx, string(container.ID()), dockerContainer.RemoveOptions{
+		Force: true,
+	})
+	if err != nil && !cerrdefs.IsNotFound(err) {
+		clog.WithError(err).Debug("Failed to remove container")
+
+		return fmt.Errorf("%w: %w", errRemoveContainerFailed, err)
+	}
+
+	if cerrdefs.IsNotFound(err) {
+		clog.Debug("Container already removed")
+
+		return nil
+	}
+
+	clog.Debug("Container removed")
 
 	return nil
 }

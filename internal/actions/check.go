@@ -122,7 +122,7 @@ func CheckForMultipleWatchtowerInstances(
 
 // cleanupExcessWatchtowers removes all but the latest Watchtower instance.
 //
-// It sorts containers by creation time, stops older instances, and collects cleaned images for
+// It sorts containers by creation time, stops and removes older instances, and collects cleaned images for
 // deferred cleanup, ensuring only the newest instance remains active.
 //
 // Parameters:
@@ -165,19 +165,26 @@ func cleanupExcessWatchtowers(
 		"newest_image_id":  newestImageID,
 	}).Debug("Identified newest container")
 
-	// Stop each excess container and collect image IDs for cleanup.
+	// Stop and remove excess containers.
 	for _, c := range excessContainers {
-		if err := client.StopContainer(c, stopContainerTimeout); err != nil {
+		logrus.WithField("container", c.Name()).
+			Debug("Attempting to stop and remove excess Watchtower container")
+
+		// Stop and remove the container with a timeout.
+		if err := client.StopAndRemoveContainer(c, stopContainerTimeout); err != nil {
 			logrus.WithError(err).
 				WithField("container", c.Name()).
 				Debug("Failed to stop Watchtower instance")
 
+			// Collect stop errors for reporting.
 			stopErrors = append(stopErrors, err)
 
 			continue
 		}
 
-		logrus.WithField("container", c.Name()).Debug("Stopped Watchtower instance")
+		logrus.WithField("container", c.Name()).
+			Debug("Successfully stopped and removed excess Watchtower instance")
+
 		// Skip cleanup if the image is used by the newest container.
 		if cleanup && c.SafeImageID() != newestImageID {
 			*cleanupImageInfos = append(
@@ -264,7 +271,7 @@ func CleanupImages(
 				logrus.WithError(err).WithFields(logrus.Fields{
 					"image_id":   imageID,
 					"image_name": cleanedImage.ImageName,
-				}).Warn("Failed to remove image")
+				}).Debug("Failed to remove image")
 				removalErrors = append(removalErrors, fmt.Errorf("failed to remove image %s: %w", imageID, err))
 			}
 		} else {

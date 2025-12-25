@@ -9,7 +9,7 @@ import (
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/pkg/filters"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -73,9 +73,8 @@ func CreateMockClientWithContext(ctx context.Context, data *TestData, pullImages
 	}
 }
 
-// ListContainers returns the preconfigured list of containers from TestData, applying the provided filter.
-// If the filter is nil, all containers are returned.
-func (client MockClient) ListContainers(filter types.Filter) ([]types.Container, error) {
+// ListContainers returns containers from TestData, optionally filtered.
+func (client MockClient) ListContainers(filter ...types.Filter) ([]types.Container, error) {
 	// Simulate mid-operation delay for context cancellation testing
 	time.Sleep(1 * time.Millisecond)
 	if client.ctx != nil {
@@ -89,28 +88,49 @@ func (client MockClient) ListContainers(filter types.Filter) ([]types.Container,
 	if client.TestData.ListContainersError != nil {
 		return nil, client.TestData.ListContainersError
 	}
-	filtered := []types.Container{}
-	effectiveFilter := filter
-	if effectiveFilter == nil {
-		effectiveFilter = filters.NoFilter
-	}
-	for _, c := range client.TestData.Containers {
-		if effectiveFilter(c) {
-			filtered = append(filtered, c)
-		}
-	}
-	return filtered, nil
-}
 
-// ListAllContainers returns all containers from TestData without filtering.
-func (client MockClient) ListAllContainers() ([]types.Container, error) {
-	return client.TestData.Containers, nil
+	containers := client.TestData.Containers
+	if len(filter) > 0 && filter[0] != nil {
+		filtered := []types.Container{}
+		for _, c := range containers {
+			if filter[0](c) {
+				filtered = append(filtered, c)
+			}
+		}
+		return filtered, nil
+	}
+	return containers, nil
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.
 // It records the container’s ID as stopped, increments the StopContainerCount,
 // and returns nil for simplicity.
 func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
+	client.TestData.StopContainerCount++
+
+	// Simulate mid-operation delay for context cancellation testing
+	time.Sleep(1 * time.Millisecond)
+	if client.ctx != nil {
+		select {
+		case <-client.ctx.Done():
+			return client.ctx.Err()
+		default:
+		}
+	}
+
+	if client.TestData.StopContainerError != nil &&
+		client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
+		return client.TestData.StopContainerError
+	}
+	client.Stopped[string(c.ID())] = true
+	client.TestData.StopOrder = append(client.TestData.StopOrder, c.Name())
+	return nil
+}
+
+// StopAndRemoveContainer simulates stopping and removing a container by marking it in the Stopped map.
+// It records the container’s ID as stopped, increments the StopContainerCount,
+// and returns nil for simplicity.
+func (client MockClient) StopAndRemoveContainer(c types.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount++
 
 	// Simulate mid-operation delay for context cancellation testing
@@ -255,6 +275,12 @@ func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {
 // It increments the count and returns nil to indicate success.
 func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Duration) error {
 	client.TestData.WaitForContainerHealthyCount++
+	return nil
+}
+
+// RemoveContainer simulates removing a container.
+// It returns nil to indicate success.
+func (client MockClient) RemoveContainer(_ types.Container) error {
 	return nil
 }
 
