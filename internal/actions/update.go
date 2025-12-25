@@ -1054,16 +1054,22 @@ func restartStaleContainer(
 			// Continue with stopping even if update fails
 		}
 
-		// Stop the old container gracefully
+		// Attempt to stop and remove the old Watchtower container gracefully.
 		if err := client.StopAndRemoveContainer(container, params.Timeout); err != nil {
-			logrus.WithError(err).WithFields(fields).Warn("Failed to stop old Watchtower container")
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to stop and remove old Watchtower container")
+
 			// Don't fail the update, just log the warning
 		} else {
-			logrus.WithFields(fields).Debug("Stopped old Watchtower container")
+			logrus.WithFields(fields).Debug("Attempted to stop and remove old Watchtower container")
 
-			// Remove the old renamed Watchtower container
+			// If the container is still running, force remove it
+			// This is a backup redundancy to help mitigate race conditions
+			// and timing anomalies in production environments resulting in
+			// orphaned containers.
 			if err := client.RemoveContainer(container); err != nil {
-				logrus.WithError(err).WithFields(fields).Warn("Failed to remove old Watchtower container")
+				logrus.WithError(err).WithFields(fields).Debug("Failed to remove old Watchtower container")
 			} else {
 				logrus.WithFields(fields).Debug("Removed old Watchtower container")
 			}
