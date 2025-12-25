@@ -459,11 +459,13 @@ func getContainerID(client container.Client) (types.ContainerID, error) {
 		return "", ErrContainerIDNotFound
 	}
 
+	// List all containers to find the one matching the current HOSTNAME.
 	containers, err := client.ListContainers()
 	if err != nil {
 		return "", fmt.Errorf("failed to list all containers: %w", err)
 	}
 
+	// Iterate through containers to find the one with matching hostname.
 	for _, container := range containers {
 		if container.ContainerInfo().Config.Hostname == hostname {
 			return container.ID(), nil
