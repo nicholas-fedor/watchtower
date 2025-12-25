@@ -9,7 +9,6 @@ import (
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
-
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -63,7 +62,12 @@ func CreateMockClient(data *TestData, pullImages bool, removeVolumes bool) MockC
 // CreateMockClientWithContext constructs a new MockClient instance with context for testing.
 // It initializes the client with provided context, test data, pull and volume removal flags,
 // and an empty map for tracking stopped containers.
-func CreateMockClientWithContext(ctx context.Context, data *TestData, pullImages bool, removeVolumes bool) MockClient {
+func CreateMockClientWithContext(
+	ctx context.Context,
+	data *TestData,
+	pullImages bool,
+	removeVolumes bool,
+) MockClient {
 	return MockClient{
 		TestData:      data,
 		pullImages:    pullImages,
@@ -127,29 +131,14 @@ func (client MockClient) StopContainer(c types.Container, _ time.Duration) error
 	return nil
 }
 
-// StopAndRemoveContainer simulates stopping and removing a container by marking it in the Stopped map.
-// It records the container’s ID as stopped, increments the StopContainerCount,
-// and returns nil for simplicity.
-func (client MockClient) StopAndRemoveContainer(c types.Container, _ time.Duration) error {
-	client.TestData.StopContainerCount++
-
-	// Simulate mid-operation delay for context cancellation testing
-	time.Sleep(1 * time.Millisecond)
-	if client.ctx != nil {
-		select {
-		case <-client.ctx.Done():
-			return client.ctx.Err()
-		default:
-		}
+// StopAndRemoveContainer simulates stopping and removing a container by calling StopContainer followed by RemoveContainer.
+// It properly simulates the stop-and-remove operation sequence while respecting error conditions.
+func (client MockClient) StopAndRemoveContainer(c types.Container, timeout time.Duration) error {
+	err := client.StopContainer(c, timeout)
+	if err != nil {
+		return err
 	}
-
-	if client.TestData.StopContainerError != nil &&
-		client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
-		return client.TestData.StopContainerError
-	}
-	client.Stopped[string(c.ID())] = true
-	client.TestData.StopOrder = append(client.TestData.StopOrder, c.Name())
-	return nil
+	return client.RemoveContainer(c)
 }
 
 // IsContainerRunning checks if a container is running based on the Stopped map.
