@@ -34,43 +34,6 @@ const (
 	ContainerRemainsRunningMessage = "Container remains running (monitor-only mode)"
 )
 
-// handleUpdateResult processes the result of an update operation and returns an appropriate metric.
-//
-// It checks for errors or nil results, logging accordingly, and returns a zero metric on failure
-// or nil on success to indicate continuation of the update process.
-//
-// Parameters:
-//   - result: The report from the update operation.
-//   - err: Any error encountered during the update.
-//
-// Returns:
-//   - *metrics.Metric: A zero metric if an error occurred or result is nil, nil otherwise.
-func handleUpdateResult(result types.Report, err error) *metrics.Metric {
-	// Check for errors during update execution
-	if err != nil {
-		logrus.WithError(err).Error("Update execution failed")
-
-		return &metrics.Metric{
-			Scanned: 0,
-			Updated: 0,
-			Failed:  0,
-		}
-	}
-
-	// Check if update result is nil
-	if result == nil {
-		logrus.Debug("Update result is nil, returning zero metric")
-
-		return &metrics.Metric{
-			Scanned: 0,
-			Updated: 0,
-			Failed:  0,
-		}
-	}
-
-	return nil
-}
-
 // RunUpdatesWithNotificationsParams holds the parameters for RunUpdatesWithNotifications.
 type RunUpdatesWithNotificationsParams struct {
 	Client                       container.Client
@@ -182,6 +145,43 @@ func RunUpdatesWithNotifications(
 
 	// Generate and return metric summarizing the session
 	return generateAndLogMetric(result)
+}
+
+// handleUpdateResult processes the result of an update operation and returns an appropriate metric.
+//
+// It checks for errors or nil results, logging accordingly, and returns a zero metric on failure
+// or nil on success to indicate continuation of the update process.
+//
+// Parameters:
+//   - result: The report from the update operation.
+//   - err: Any error encountered during the update.
+//
+// Returns:
+//   - *metrics.Metric: A zero metric if an error occurred or result is nil, nil otherwise.
+func handleUpdateResult(result types.Report, err error) *metrics.Metric {
+	// Check for errors during update execution
+	if err != nil {
+		logrus.WithError(err).Error("Update execution failed")
+
+		return &metrics.Metric{
+			Scanned: 0,
+			Updated: 0,
+			Failed:  0,
+		}
+	}
+
+	// Check if update result is nil
+	if result == nil {
+		logrus.Debug("Update result is nil, returning zero metric")
+
+		return &metrics.Metric{
+			Scanned: 0,
+			Updated: 0,
+			Failed:  0,
+		}
+	}
+
+	return nil
 }
 
 // buildSingleContainerReport creates a SingleContainerReport for a specific updated container.
