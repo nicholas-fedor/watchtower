@@ -601,14 +601,12 @@ func runMain(cfg config.RunConfig) int {
 		return 0
 	}
 
-	// Check for and resolve conflicts with multiple Watchtower instances.
-	var cleanupImageInfos []types.CleanedImageInfo
-
+	// Check for multiple Watchtower instances and handle cleanup if necessary.
 	cleanupOccurred, err := actions.CheckForMultipleWatchtowerInstances(
 		client,
 		cleanup,
 		scope,
-		&cleanupImageInfos,
+		&[]types.CleanedImageInfo{},
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "failed to list containers") {
