@@ -144,6 +144,7 @@ type ClientOptions struct {
 	DisableMemorySwappiness bool
 	CPUCopyMode             string
 	WarnOnHeadFailed        WarningStrategy
+	WarnOnPinnedPull        bool
 	Fs                      afero.Fs
 }
 
@@ -492,7 +493,7 @@ func (c client) IsContainerStale(
 	params types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	// Use image client to perform staleness check.
-	imgClient := newImageClient(c.api)
+	imgClient := newImageClient(c.api, c.WarnOnPinnedPull)
 
 	stale, newestImage, err := imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
 	if err != nil {
@@ -792,7 +793,7 @@ func (c client) waitForExecOrTimeout(
 //   - error: Non-nil if removal fails, nil on success.
 func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
 	// Use image client to remove the image.
-	imgClient := newImageClient(c.api)
+	imgClient := newImageClient(c.api, c.WarnOnPinnedPull)
 
 	err := imgClient.RemoveImageByID(imageID, imageName)
 	if err != nil {

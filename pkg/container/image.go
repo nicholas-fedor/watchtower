@@ -39,7 +39,8 @@ type WarningStrategy string
 //
 // It uses a Docker API client for image tasks.
 type imageClient struct {
-	api dockerClient.APIClient
+	api              dockerClient.APIClient
+	warnOnPinnedPull bool
 }
 
 // IsContainerStale determines if a container’s image is outdated.
@@ -155,7 +156,11 @@ func (c imageClient) PullImage(
 
 	// Skip pulling immutable sha256-pinned images.
 	if strings.HasPrefix(sourceContainer.ImageName(), "sha256:") {
-		clog.Warn("Skipping pull of pinned sha256 image")
+		if c.warnOnPinnedPull {
+			clog.Warn("Skipping pull of pinned sha256 image")
+		} else {
+			clog.Debug("Skipping pull of pinned sha256 image")
+		}
 
 		return errPinnedImage
 	}
@@ -262,11 +267,12 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) er
 //
 // Parameters:
 //   - api: Docker API client.
+//   - warnOnPinnedPull: Whether to send notifications when skipping pinned images.
 //
 // Returns:
 //   - imageClient: Initialized client for image operations.
-func newImageClient(api dockerClient.APIClient) imageClient {
-	return imageClient{api: api}
+func newImageClient(api dockerClient.APIClient, warnOnPinnedPull bool) imageClient {
+	return imageClient{api: api, warnOnPinnedPull: warnOnPinnedPull}
 }
 
 // shouldSkipPull determines if an image pull can be skipped.

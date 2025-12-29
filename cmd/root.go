@@ -317,6 +317,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 	reviveStopped, _ := flagsSet.GetBool("revive-stopped")
 	removeVolumes, _ := flagsSet.GetBool("remove-volumes")
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
+	warnOnPinnedPull, _ := flagsSet.GetBool("warn-on-pinned-pull")
 	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
 	cpuCopyMode, _ = flagsSet.GetString("cpu-copy-mode")
 
@@ -337,6 +338,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 		DisableMemorySwappiness: disableMemorySwappiness,
 		CPUCopyMode:             cpuCopyMode,
 		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
+		WarnOnPinnedPull:        warnOnPinnedPull,
 	})
 
 	// Set up the notification system with types specified via flags (e.g., email, Slack).

@@ -501,6 +501,11 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"When to warn about HEAD pull requests failing. Possible values: always, auto or never")
 
 	flags.Bool(
+		"warn-on-pinned-pull",
+		envBool("WATCHTOWER_WARN_ON_PINNED_PULL"),
+		"Send notifications when skipping pull of pinned sha256 images")
+
+	flags.Bool(
 		"notification-log-stdout",
 		envBool("WATCHTOWER_NOTIFICATION_LOG_STDOUT"),
 		"Write notification logs to stdout instead of logging (to stderr)")
@@ -703,6 +708,7 @@ func SetDefaults() {
 	viper.SetDefault("WATCHTOWER_CPU_COPY_MODE", "auto")
 	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS1.2")
+	viper.SetDefault("WATCHTOWER_WARN_ON_PINNED_PULL", true)
 }
 
 // EnvConfig sets Docker environment variables from flags.
