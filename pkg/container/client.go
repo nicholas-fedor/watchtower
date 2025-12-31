@@ -43,7 +43,7 @@ var (
 type Client interface {
 	// ListContainers retrieves a list of containers, optionally filtered.
 	//
-	// If no filter is provided, all containers are returned.
+	// If no filters are provided, all containers are returned.
 	ListContainers(filter ...types.Filter) ([]types.Container, error)
 
 	// GetContainer fetches detailed information about a specific container by its ID.
@@ -230,7 +230,7 @@ func NewClient(opts ClientOptions) Client {
 // ListContainers retrieves a list of containers, optionally filtered.
 //
 // Parameters:
-//   - filter: Optional filter to apply to container list.
+//   - filter: Optional filters to apply to container list. Multiple filters are combined with logical AND.
 //
 // Returns:
 //   - []types.Container: List of matching containers.
@@ -240,8 +240,24 @@ func (c client) ListContainers(filter ...types.Filter) ([]types.Container, error
 	isPodman := c.getPodmanFlag()
 
 	var containerFilter types.Filter
+
 	if len(filter) > 0 {
-		containerFilter = filter[0]
+		if len(filter) == 1 {
+			// Single filter: use it directly
+			containerFilter = filter[0]
+		} else {
+			// Multiple filters: combine them with logical AND
+			// A container must pass ALL filters to be included
+			containerFilter = func(container types.FilterableContainer) bool {
+				for _, f := range filter {
+					if !f(container) {
+						return false
+					}
+				}
+
+				return true
+			}
+		}
 	}
 
 	// Attempt to list source containers and handle errors by logging and returning them.

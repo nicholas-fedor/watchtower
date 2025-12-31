@@ -436,6 +436,53 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 
+		ginkgo.When("multiple filters are provided", func() {
+			ginkgo.It("should combine filters with logical AND", func() {
+				// Set up mock server to return running containers.
+				mockServer.AppendHandlers(mockContainer.ListContainersHandler("running"))
+				mockServer.AppendHandlers(
+					mockContainer.GetContainerHandlers(
+						&mockContainer.Watchtower,
+						&mockContainer.Running,
+					)...)
+				client := client{
+					api:           docker,
+					ClientOptions: ClientOptions{},
+				}
+				// Apply two filters: one for name "portainer" and one that always passes
+				nameFilter := filters.FilterByNames([]string{"portainer"}, filters.NoFilter)
+				containers, err := client.ListContainers(nameFilter, filters.NoFilter)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				// Should return only the "portainer" container
+				gomega.Expect(containers).To(gomega.HaveLen(1))
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("portainer"))
+			})
+
+			ginkgo.It("should return empty when filters are mutually exclusive", func() {
+				// Set up mock server to return running containers.
+				mockServer.AppendHandlers(mockContainer.ListContainersHandler("running"))
+				mockServer.AppendHandlers(
+					mockContainer.GetContainerHandlers(
+						&mockContainer.Watchtower,
+						&mockContainer.Running,
+					)...)
+				client := client{
+					api:           docker,
+					ClientOptions: ClientOptions{},
+				}
+				// Apply two mutually exclusive name filters
+				portainerFilter := filters.FilterByNames([]string{"portainer"}, filters.NoFilter)
+				watchtowerFilter := filters.FilterByNames(
+					[]string{"watchtower-running"},
+					filters.NoFilter,
+				)
+				containers, err := client.ListContainers(portainerFilter, watchtowerFilter)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				// Should return empty since no container can be both "portainer" and "watchtower-running" named
+				gomega.Expect(containers).To(gomega.BeEmpty())
+			})
+		})
+
 		ginkgo.When(`a container uses container network mode`, func() {
 			ginkgo.When(`the network container can be resolved`, func() {
 				ginkgo.It("should return the container name instead of the ID", func() {
