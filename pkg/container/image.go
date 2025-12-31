@@ -155,7 +155,7 @@ func (c imageClient) PullImage(
 
 	// Skip pulling immutable sha256-pinned images.
 	if strings.HasPrefix(sourceContainer.ImageName(), "sha256:") {
-		clog.Warn("Skipping pull of pinned sha256 image")
+		clog.Debug("Skipping pull of pinned sha256 image")
 
 		return errPinnedImage
 	}
