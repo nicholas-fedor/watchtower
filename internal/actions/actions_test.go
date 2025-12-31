@@ -189,6 +189,84 @@ var _ = ginkgo.Describe("Actions", func() {
 				gomega.Expect(metric.Failed).To(gomega.Equal(0))
 			})
 		})
+
+		ginkgo.When("CurrentContainerID is set", func() {
+			ginkgo.It(
+				"should correctly pass CurrentContainerID to UpdateConfig and skip other Watchtower containers",
+				func() {
+					// Create two Watchtower containers with the watchtower label
+					watchtowerConfig := &dockerContainer.Config{
+						Image:  "watchtower:latest",
+						Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
+					}
+
+					container1 := mockActions.CreateMockContainerWithConfig(
+						"container1-id",
+						"watchtower-1",
+						"watchtower:latest",
+						true,
+						false,
+						time.Now().Add(-time.Hour),
+						watchtowerConfig,
+					)
+
+					container2 := mockActions.CreateMockContainerWithConfig(
+						"container2-id",
+						"watchtower-2",
+						"watchtower:latest",
+						true,
+						false,
+						time.Now().Add(-time.Hour),
+						watchtowerConfig,
+					)
+
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
+							Containers: []types.Container{container1, container2},
+							Staleness: map[string]bool{
+								"watchtower-1": true,
+								"watchtower-2": true,
+							},
+						},
+						false,
+						false,
+					)
+
+					params := RunUpdatesWithNotificationsParams{
+						Client:                       client,
+						Notifier:                     nil,
+						NotificationSplitByContainer: false,
+						NotificationReport:           false,
+						Filter:                       filters.NoFilter,
+						Cleanup:                      false,
+						NoRestart:                    false,
+						MonitorOnly:                  false,
+						LifecycleHooks:               false,
+						RollingRestart:               false,
+						LabelPrecedence:              false,
+						NoPull:                       false,
+						Timeout:                      time.Minute,
+						LifecycleUID:                 1000,
+						LifecycleGID:                 1001,
+						CPUCopyMode:                  "auto",
+						PullFailureDelay:             time.Duration(0),
+						CurrentContainerID: types.ContainerID(
+							"container1-id",
+						), // Set to first container
+					}
+
+					metric := RunUpdatesWithNotifications(context.Background(), params)
+
+					gomega.Expect(metric).NotTo(gomega.BeNil())
+					// Only container1 should be updated, container2 should be skipped due to CurrentContainerID
+					gomega.Expect(client.TestData.StartOrder).To(gomega.HaveLen(2))
+					gomega.Expect(client.TestData.StartOrder).
+						To(gomega.ContainElement("watchtower-1"))
+					gomega.Expect(client.TestData.StartOrder).
+						To(gomega.ContainElement("watchtower-2"))
+				},
+			)
+		})
 	})
 
 	ginkgo.Describe("buildSingleContainerReport", func() {

@@ -14,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 )
 
@@ -30,8 +29,6 @@ var (
 	errWriteTempFile = errors.New("failed to write to output file")
 	// errSyncTempFile indicates a failure to sync the temporary file to disk.
 	errSyncTempFile = errors.New("failed to sync output file")
-	// errGetContainerID indicates a failure to retrieve the running container ID.
-	errGetContainerID = errors.New("failed to get running container ID")
 )
 
 // init registers the notify-upgrade command with the root command.
@@ -132,12 +129,8 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Use a placeholder ("<CONTAINER>") if this fails, ensuring the user still gets actionable guidance.
 	containerID := "<CONTAINER>"
 
-	cid, err := container.GetRunningContainerID()
-	if err != nil {
-		// Log as a warning since this is non-critical; the command can proceed with the placeholder.
-		logrus.WithError(err).Warn(errGetContainerID)
-	} else if cid != "" {
-		containerID = cid.ShortID() // Use the short ID (e.g., "abc123") for brevity in user instructions.
+	if CurrentWatchtowerContainerID != "" {
+		containerID = CurrentWatchtowerContainerID.ShortID() // Use the short ID (e.g., "abc123") for brevity in user instructions.
 	}
 
 	// Provide user instructions for retrieving the file, split into two log lines for clarity: a prompt and the exact command.

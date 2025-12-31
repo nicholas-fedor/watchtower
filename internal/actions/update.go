@@ -489,6 +489,12 @@ func shouldUpdateContainer(stale bool, container types.Container, params types.U
 		return false
 	}
 
+	// Skip other Watchtower containers from self-updates
+	if container.IsWatchtower() && params.CurrentContainerID != "" &&
+		container.ID() != params.CurrentContainerID {
+		return false
+	}
+
 	return true
 }
 

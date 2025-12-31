@@ -7,7 +7,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -35,10 +34,6 @@ import (
 )
 
 var (
-	ErrContainerIDNotFound = errors.New(
-		"container ID not found in /proc/self/cgroup and HOSTNAME is not set",
-	)
-
 	// client is the Docker client instance used to interact with container operations in Watchtower.
 	//
 	// It provides an interface for listing, stopping, starting, and managing containers, initialized during
@@ -154,6 +149,12 @@ var (
 	// controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
 	cpuCopyMode string
 
+	// CurrentWatchtowerContainerID stores the container ID retrieved from container.GetCurrentContainerID(client).
+	//
+	// It is initialized once in preRun after the client is set up, and used throughout the application
+	// to avoid repeated calls to GetCurrentContainerID. If retrieval fails, it is set to an empty string.
+	CurrentWatchtowerContainerID types.ContainerID
+
 	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 	//
 	// It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
@@ -173,26 +174,30 @@ var (
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
 	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params types.UpdateParams) *metrics.Metric {
+		// Prepare parameters for the update action
 		actionParams := actions.RunUpdatesWithNotificationsParams{
-			Client:                       client,
-			Notifier:                     notifier,
-			NotificationSplitByContainer: notificationSplitByContainer,
-			NotificationReport:           notificationReport,
-			Filter:                       filter,
-			Cleanup:                      params.Cleanup,
-			NoRestart:                    noRestart,
-			MonitorOnly:                  params.MonitorOnly,
-			LifecycleHooks:               lifecycleHooks,
-			RollingRestart:               rollingRestart,
-			LabelPrecedence:              labelPrecedence,
-			NoPull:                       noPull,
-			Timeout:                      timeout,
-			LifecycleUID:                 lifecycleUID,
-			LifecycleGID:                 lifecycleGID,
-			CPUCopyMode:                  cpuCopyMode,
-			PullFailureDelay:             time.Duration(0),
-			RunOnce:                      params.RunOnce,
-			SkipSelfUpdate:               params.SkipSelfUpdate,
+			Client:                       client,                       // Docker client for container operations
+			Notifier:                     notifier,                     // Notification system for sending update status messages
+			NotificationSplitByContainer: notificationSplitByContainer, // Enable separate notifications for each updated container
+			NotificationReport:           notificationReport,           // Enable report-based notifications
+			Filter:                       filter,                       // Container filter determining which containers are targeted
+			Cleanup:                      params.Cleanup,               // Remove old images after container updates
+			NoRestart:                    noRestart,                    // Prevent containers from being restarted after updates
+			MonitorOnly:                  params.MonitorOnly,           // Monitor containers without performing updates
+			LifecycleHooks:               lifecycleHooks,               // Enable pre- and post-update lifecycle hook commands
+			RollingRestart:               rollingRestart,               // Update containers sequentially rather than all at once
+			LabelPrecedence:              labelPrecedence,              // Give container label settings priority over global flags
+			NoPull:                       noPull,                       // Skip pulling new images from registry during updates
+			Timeout:                      timeout,                      // Maximum duration for container stop operations
+			LifecycleUID:                 lifecycleUID,                 // Default UID to run lifecycle hooks as
+			LifecycleGID:                 lifecycleGID,                 // Default GID to run lifecycle hooks as
+			CPUCopyMode:                  cpuCopyMode,                  // CPU settings handling when recreating containers
+			PullFailureDelay: time.Duration(
+				0,
+			), // Delay after failed Watchtower self-update pulls
+			RunOnce:            params.RunOnce,               // Perform one-time update and exit
+			SkipSelfUpdate:     params.SkipSelfUpdate,        // Skip Watchtower self-update
+			CurrentContainerID: CurrentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
 		}
 
 		return actions.RunUpdatesWithNotifications(ctx, actionParams)
@@ -339,6 +344,14 @@ func preRun(cmd *cobra.Command, _ []string) {
 		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
 	})
 
+	// Retrieve and store the current container ID for use throughout the application.
+	CurrentWatchtowerContainerID, err = container.GetCurrentContainerID(client)
+	if err != nil {
+		logrus.WithError(err).Warn("Failed to get current container ID")
+
+		CurrentWatchtowerContainerID = ""
+	}
+
 	// Set up the notification system with types specified via flags (e.g., email, Slack).
 	notifier = notifications.NewNotifier(cmd)
 	notifier.AddLogHook()
@@ -447,34 +460,6 @@ func run(c *cobra.Command, normalizedNames []string) {
 	}
 }
 
-// getContainerID retrieves the actual container ID using Docker API by matching the HOSTNAME
-// environment variable with container.Config.Hostname.
-//
-// Returns:
-//   - types.ContainerID: The container ID if found.
-//   - error: Non-nil if the container ID cannot be retrieved.
-func getContainerID(client container.Client) (types.ContainerID, error) {
-	hostname := os.Getenv("HOSTNAME")
-	if hostname == "" {
-		return "", ErrContainerIDNotFound
-	}
-
-	// List all containers to find the one matching the current HOSTNAME.
-	containers, err := client.ListContainers()
-	if err != nil {
-		return "", fmt.Errorf("failed to list all containers: %w", err)
-	}
-
-	// Iterate through containers to find the one with matching hostname.
-	for _, container := range containers {
-		if container.ContainerInfo().Config.Hostname == hostname {
-			return container.ID(), nil
-		}
-	}
-
-	return "", ErrContainerIDNotFound
-}
-
 // deriveScopeFromContainer attempts to derive the operational scope from the current container's scope label.
 // This is crucial for self-update scenarios where a new Watchtower instance needs to inherit
 // the same scope as the instance being replaced to maintain proper isolation and prevent
@@ -491,16 +476,9 @@ func deriveScopeFromContainer(client container.Client) error {
 		return nil
 	}
 
-	// Retrieve the actual container ID using Docker API by matching HOSTNAME.
-	containerID, err := getContainerID(client)
-	if err != nil {
-		// Container ID retrieval failed, return the error for proper handling.
-		return err
-	}
-
 	// Attempt to retrieve the container object using the retrieved container ID.
 	// This lookup is necessary to access the container's labels and metadata.
-	container, err := client.GetContainer(containerID)
+	container, err := client.GetContainer(CurrentWatchtowerContainerID)
 	if err != nil {
 		// Container lookup failed, but this is not a fatal error since
 		// scope derivation is a best-effort operation.
@@ -514,7 +492,7 @@ func deriveScopeFromContainer(client container.Client) error {
 		scope = derivedScope
 		logrus.WithFields(logrus.Fields{
 			"derived_scope": scope,
-			"container_id":  containerID,
+			"container_id":  CurrentWatchtowerContainerID,
 		}).Debug("Derived operational scope from current container's scope label")
 	}
 
@@ -580,10 +558,9 @@ func runMain(cfg config.RunConfig) int {
 		notifier.Close()
 
 		// Update current Watchtower container's restart policy to "no" to prevent unwanted restarts
-		if containerID, err := getContainerID(client); err != nil {
-			logrus.WithError(err).
-				Warn("Failed to get current container ID for restart policy update")
-		} else if container, err := client.GetContainer(containerID); err != nil {
+		if CurrentWatchtowerContainerID == "" {
+			logrus.Warn("Current container ID is not available for restart policy update")
+		} else if container, err := client.GetContainer(CurrentWatchtowerContainerID); err != nil {
 			logrus.WithError(err).Warn("Failed to get current container for restart policy update")
 		} else {
 			updateConfig := dockerContainer.UpdateConfig{
