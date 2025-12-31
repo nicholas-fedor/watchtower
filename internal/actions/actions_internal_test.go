@@ -17,6 +17,11 @@ import (
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+const (
+	currentWatchtowerID = "current-watchtower-id"
+	otherWatchtowerID   = "other-watchtower-id"
+)
+
 var _ = ginkgo.Describe("restartStaleContainer", func() {
 	ginkgo.It("should not rename Watchtower container in run-once mode", func() {
 		client := mockActions.CreateMockClient(
@@ -258,5 +263,196 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
 		gomega.Expect(client.TestData.UpdateContainerCount).To(gomega.Equal(1))
+	})
+})
+
+var _ = ginkgo.Describe("shouldUpdateContainer", func() {
+	ginkgo.It("should allow self-update of current Watchtower container", func() {
+		currentID := currentWatchtowerID
+		container := mockActions.CreateMockContainerWithConfig(
+			currentID,
+			"watchtower-current",
+			"watchtower:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower": "true",
+				},
+			},
+		)
+		params := types.UpdateParams{
+			CurrentContainerID: types.ContainerID(currentID),
+		}
+		result := shouldUpdateContainer(true, container, params)
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should skip other Watchtower containers from self-updates", func() {
+		currentID := currentWatchtowerID
+		otherID := otherWatchtowerID
+		container := mockActions.CreateMockContainerWithConfig(
+			otherID,
+			"watchtower-other",
+			"watchtower:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower": "true",
+				},
+			},
+		)
+		params := types.UpdateParams{
+			CurrentContainerID: types.ContainerID(currentID),
+		}
+		result := shouldUpdateContainer(true, container, params)
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should not affect non-Watchtower containers", func() {
+		currentID := currentWatchtowerID
+		container := mockActions.CreateMockContainerWithConfig(
+			"non-watchtower-id",
+			"nginx",
+			"nginx:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{},
+			},
+		)
+		params := types.UpdateParams{
+			CurrentContainerID: types.ContainerID(currentID),
+		}
+		result := shouldUpdateContainer(true, container, params)
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should allow self-update of scoped Watchtower container", func() {
+		currentID := currentWatchtowerID
+		container := mockActions.CreateMockContainerWithConfig(
+			currentID,
+			"watchtower-current",
+			"watchtower:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower":       "true",
+					"com.centurylinklabs.watchtower.scope": "prod",
+				},
+			},
+		)
+		params := types.UpdateParams{
+			CurrentContainerID: types.ContainerID(currentID),
+		}
+		result := shouldUpdateContainer(true, container, params)
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It(
+		"should skip other scoped Watchtower containers with same scope from self-updates",
+		func() {
+			currentID := currentWatchtowerID
+			otherID := otherWatchtowerID
+			container := mockActions.CreateMockContainerWithConfig(
+				otherID,
+				"watchtower-other",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower":       "true",
+						"com.centurylinklabs.watchtower.scope": "prod",
+					},
+				},
+			)
+			params := types.UpdateParams{
+				CurrentContainerID: types.ContainerID(currentID),
+			}
+			result := shouldUpdateContainer(true, container, params)
+			gomega.Expect(result).To(gomega.BeFalse())
+		},
+	)
+
+	ginkgo.It(
+		"should skip other scoped Watchtower containers with different scopes from self-updates",
+		func() {
+			currentID := currentWatchtowerID
+			otherID := otherWatchtowerID
+			container := mockActions.CreateMockContainerWithConfig(
+				otherID,
+				"watchtower-other",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower":       "true",
+						"com.centurylinklabs.watchtower.scope": "dev",
+					},
+				},
+			)
+			params := types.UpdateParams{
+				CurrentContainerID: types.ContainerID(currentID),
+			}
+			result := shouldUpdateContainer(true, container, params)
+			gomega.Expect(result).To(gomega.BeFalse())
+		},
+	)
+
+	ginkgo.It("should skip unscoped Watchtower containers from scoped self-updates", func() {
+		currentID := currentWatchtowerID
+		otherID := otherWatchtowerID
+		container := mockActions.CreateMockContainerWithConfig(
+			otherID,
+			"watchtower-other",
+			"watchtower:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower": "true",
+				},
+			},
+		)
+		params := types.UpdateParams{
+			CurrentContainerID: types.ContainerID(currentID),
+		}
+		result := shouldUpdateContainer(true, container, params)
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should skip scoped Watchtower containers from unscoped self-updates", func() {
+		currentID := currentWatchtowerID
+		otherID := otherWatchtowerID
+		container := mockActions.CreateMockContainerWithConfig(
+			otherID,
+			"watchtower-other",
+			"watchtower:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower":       "true",
+					"com.centurylinklabs.watchtower.scope": "prod",
+				},
+			},
+		)
+		params := types.UpdateParams{
+			CurrentContainerID: types.ContainerID(currentID),
+		}
+		result := shouldUpdateContainer(true, container, params)
+		gomega.Expect(result).To(gomega.BeFalse())
 	})
 })

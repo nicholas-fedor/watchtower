@@ -356,64 +356,15 @@ func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(container type
 	return _c
 }
 
-// ListAllContainers provides a mock function for the type MockClient
-func (_mock *MockClient) ListAllContainers() ([]types.Container, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListAllContainers")
-	}
-
-	var r0 []types.Container
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]types.Container, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() []types.Container); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.Container)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockClient_ListAllContainers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListAllContainers'
-type MockClient_ListAllContainers_Call struct {
-	*mock.Call
-}
-
-// ListAllContainers is a helper method to define mock.On call
-func (_e *MockClient_Expecter) ListAllContainers() *MockClient_ListAllContainers_Call {
-	return &MockClient_ListAllContainers_Call{Call: _e.mock.On("ListAllContainers")}
-}
-
-func (_c *MockClient_ListAllContainers_Call) Run(run func()) *MockClient_ListAllContainers_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockClient_ListAllContainers_Call) Return(containers []types.Container, err error) *MockClient_ListAllContainers_Call {
-	_c.Call.Return(containers, err)
-	return _c
-}
-
-func (_c *MockClient_ListAllContainers_Call) RunAndReturn(run func() ([]types.Container, error)) *MockClient_ListAllContainers_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ListContainers provides a mock function for the type MockClient
-func (_mock *MockClient) ListContainers(filter types.Filter) ([]types.Container, error) {
-	ret := _mock.Called(filter)
+func (_mock *MockClient) ListContainers(filter ...types.Filter) ([]types.Container, error) {
+	var tmpRet mock.Arguments
+	if len(filter) > 0 {
+		tmpRet = _mock.Called(filter)
+	} else {
+		tmpRet = _mock.Called()
+	}
+	ret := tmpRet
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListContainers")
@@ -421,18 +372,18 @@ func (_mock *MockClient) ListContainers(filter types.Filter) ([]types.Container,
 
 	var r0 []types.Container
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(types.Filter) ([]types.Container, error)); ok {
-		return returnFunc(filter)
+	if returnFunc, ok := ret.Get(0).(func(...types.Filter) ([]types.Container, error)); ok {
+		return returnFunc(filter...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(types.Filter) []types.Container); ok {
-		r0 = returnFunc(filter)
+	if returnFunc, ok := ret.Get(0).(func(...types.Filter) []types.Container); ok {
+		r0 = returnFunc(filter...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Container)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(types.Filter) error); ok {
-		r1 = returnFunc(filter)
+	if returnFunc, ok := ret.Get(1).(func(...types.Filter) error); ok {
+		r1 = returnFunc(filter...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -445,19 +396,22 @@ type MockClient_ListContainers_Call struct {
 }
 
 // ListContainers is a helper method to define mock.On call
-//   - filter types.Filter
-func (_e *MockClient_Expecter) ListContainers(filter interface{}) *MockClient_ListContainers_Call {
-	return &MockClient_ListContainers_Call{Call: _e.mock.On("ListContainers", filter)}
+//   - filter ...types.Filter
+func (_e *MockClient_Expecter) ListContainers(filter ...interface{}) *MockClient_ListContainers_Call {
+	return &MockClient_ListContainers_Call{Call: _e.mock.On("ListContainers",
+		append([]interface{}{}, filter...)...)}
 }
 
-func (_c *MockClient_ListContainers_Call) Run(run func(filter types.Filter)) *MockClient_ListContainers_Call {
+func (_c *MockClient_ListContainers_Call) Run(run func(filter ...types.Filter)) *MockClient_ListContainers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.Filter
-		if args[0] != nil {
-			arg0 = args[0].(types.Filter)
+		var arg0 []types.Filter
+		var variadicArgs []types.Filter
+		if len(args) > 0 {
+			variadicArgs = args[0].([]types.Filter)
 		}
+		arg0 = variadicArgs
 		run(
-			arg0,
+			arg0...,
 		)
 	})
 	return _c
@@ -468,7 +422,58 @@ func (_c *MockClient_ListContainers_Call) Return(containers []types.Container, e
 	return _c
 }
 
-func (_c *MockClient_ListContainers_Call) RunAndReturn(run func(filter types.Filter) ([]types.Container, error)) *MockClient_ListContainers_Call {
+func (_c *MockClient_ListContainers_Call) RunAndReturn(run func(filter ...types.Filter) ([]types.Container, error)) *MockClient_ListContainers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemoveContainer provides a mock function for the type MockClient
+func (_mock *MockClient) RemoveContainer(container types.Container) error {
+	ret := _mock.Called(container)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveContainer")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(types.Container) error); ok {
+		r0 = returnFunc(container)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_RemoveContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveContainer'
+type MockClient_RemoveContainer_Call struct {
+	*mock.Call
+}
+
+// RemoveContainer is a helper method to define mock.On call
+//   - container types.Container
+func (_e *MockClient_Expecter) RemoveContainer(container interface{}) *MockClient_RemoveContainer_Call {
+	return &MockClient_RemoveContainer_Call{Call: _e.mock.On("RemoveContainer", container)}
+}
+
+func (_c *MockClient_RemoveContainer_Call) Run(run func(container types.Container)) *MockClient_RemoveContainer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.Container
+		if args[0] != nil {
+			arg0 = args[0].(types.Container)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_RemoveContainer_Call) Return(err error) *MockClient_RemoveContainer_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_RemoveContainer_Call) RunAndReturn(run func(container types.Container) error) *MockClient_RemoveContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -643,6 +648,63 @@ func (_c *MockClient_StartContainer_Call) Return(containerID types.ContainerID, 
 }
 
 func (_c *MockClient_StartContainer_Call) RunAndReturn(run func(container types.Container) (types.ContainerID, error)) *MockClient_StartContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StopAndRemoveContainer provides a mock function for the type MockClient
+func (_mock *MockClient) StopAndRemoveContainer(container types.Container, timeout time.Duration) error {
+	ret := _mock.Called(container, timeout)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopAndRemoveContainer")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(types.Container, time.Duration) error); ok {
+		r0 = returnFunc(container, timeout)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_StopAndRemoveContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopAndRemoveContainer'
+type MockClient_StopAndRemoveContainer_Call struct {
+	*mock.Call
+}
+
+// StopAndRemoveContainer is a helper method to define mock.On call
+//   - container types.Container
+//   - timeout time.Duration
+func (_e *MockClient_Expecter) StopAndRemoveContainer(container interface{}, timeout interface{}) *MockClient_StopAndRemoveContainer_Call {
+	return &MockClient_StopAndRemoveContainer_Call{Call: _e.mock.On("StopAndRemoveContainer", container, timeout)}
+}
+
+func (_c *MockClient_StopAndRemoveContainer_Call) Run(run func(container types.Container, timeout time.Duration)) *MockClient_StopAndRemoveContainer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.Container
+		if args[0] != nil {
+			arg0 = args[0].(types.Container)
+		}
+		var arg1 time.Duration
+		if args[1] != nil {
+			arg1 = args[1].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_StopAndRemoveContainer_Call) Return(err error) *MockClient_StopAndRemoveContainer_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_StopAndRemoveContainer_Call) RunAndReturn(run func(container types.Container, timeout time.Duration) error) *MockClient_StopAndRemoveContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }

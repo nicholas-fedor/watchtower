@@ -72,8 +72,8 @@ var _ = ginkgo.Describe("the client", func() {
 						mockContainer.Found,
 					), // Simulate successful removal
 				)
-				// Execute StopContainer and verify no error occurs.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				// Execute StopAndRemoveContainer and verify no error occurs.
+				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -96,8 +96,8 @@ var _ = ginkgo.Describe("the client", func() {
 						mockContainer.Missing,
 					), // Removal fails gracefully
 				)
-				// Execute StopContainer and verify no error occurs.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				// Execute StopAndRemoveContainer and verify no error occurs.
+				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -126,6 +126,30 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 
+		ginkgo.When("stopping fails with an unexpected error in StopAndRemoveContainer", func() {
+			ginkgo.It("should return an error without attempting removal", func() {
+				// Create a mock container in running state.
+				mockedContainer := MockContainer(
+					WithContainerState(dockerContainer.State{Running: true}),
+				)
+				cid := mockedContainer.ContainerInfo().ID
+				// Set up mock server handler for stop failure (no remove handler needed).
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							methodPost,
+							gomega.HaveSuffix(fmt.Sprintf("containers/%s/stop", cid)),
+						),
+						ghttp.RespondWith(http.StatusInternalServerError, "stop error"),
+					),
+				)
+				// Execute StopAndRemoveContainer and verify the stop error is propagated.
+				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				gomega.Expect(err).
+					To(gomega.MatchError(gomega.ContainSubstring("failed to stop container: Error response from daemon: stop error")))
+			})
+		})
+
 		ginkgo.When("removal fails with an unexpected error", func() {
 			ginkgo.It("should return an error", func() {
 				// Create a mock container in running state.
@@ -141,10 +165,143 @@ var _ = ginkgo.Describe("the client", func() {
 						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
 					),
 				)
-				// Execute StopContainer and verify the removal error is propagated.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				// Execute StopAndRemoveContainer and verify the removal error is propagated.
+				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
 				gomega.Expect(err).
 					To(gomega.MatchError(gomega.ContainSubstring("failed to remove container: Error response from daemon: server error")))
+			})
+		})
+
+		ginkgo.When("removing a stopped container", func() {
+			ginkgo.It("should only call remove, not stop", func() {
+				// Create a mock container in stopped state.
+				mockedContainer := MockContainer(
+					WithContainerState(dockerContainer.State{Running: false}),
+				)
+				cid := mockedContainer.ContainerInfo().ID
+				// Set up mock server handler for removal only.
+				mockServer.AppendHandlers(
+					mockContainer.RemoveContainerHandler(
+						cid,
+						mockContainer.Found,
+					), // Simulate successful removal
+				)
+				// Execute StopAndRemoveContainer and verify no error occurs.
+				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			})
+		})
+
+		ginkgo.When("stopping a container with AutoRemove enabled", func() {
+			ginkgo.It("should skip removal after stopping", func() {
+				// Create a mock container with AutoRemove enabled.
+				mockedContainer := MockContainer(
+					WithContainerState(dockerContainer.State{Running: true}),
+					WithAutoRemove(true),
+				)
+				cid := mockedContainer.ContainerInfo().ID
+				// Set up mock server handler for stop only (no remove call expected).
+				mockServer.AppendHandlers(
+					StopContainerHandler(cid, mockContainer.Found),
+				)
+				// Execute StopAndRemoveContainer and verify no error occurs.
+				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			})
+		})
+	})
+
+	// Test suite for stopping containers.
+	ginkgo.When("stopping a container", func() {
+		ginkgo.When("the container is running", func() {
+			ginkgo.It("should stop the container successfully", func() {
+				// Create a mock container in running state.
+				mockedContainer := MockContainer(
+					WithContainerState(dockerContainer.State{Running: true}),
+				)
+				cid := mockedContainer.ContainerInfo().ID
+				// Set up mock server handler for stop operation.
+				mockServer.AppendHandlers(
+					StopContainerHandler(
+						cid,
+						mockContainer.Found,
+					),
+				)
+				// Execute StopContainer and verify no error occurs.
+				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			})
+		})
+
+		ginkgo.When("the container is already stopped", func() {
+			ginkgo.It("should not attempt to stop and return no error", func() {
+				// Create a mock container in stopped state.
+				mockedContainer := MockContainer(
+					WithContainerState(dockerContainer.State{Running: false}),
+				)
+				// Execute StopContainer and verify no error occurs (no API calls expected).
+				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				// Verify no requests were made to the mock server.
+				gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
+			})
+		})
+	})
+
+	// Test suite for removing containers.
+	ginkgo.When("removing a container", func() {
+		ginkgo.When("the container exists", func() {
+			ginkgo.It("should remove the container successfully", func() {
+				// Create a mock container.
+				mockedContainer := MockContainer()
+				cid := mockedContainer.ContainerInfo().ID
+				// Set up mock server handler for removal.
+				mockServer.AppendHandlers(
+					mockContainer.RemoveContainerHandler(
+						cid,
+						mockContainer.Found,
+					),
+				)
+				// Execute RemoveContainer and verify no error occurs.
+				err := client{api: docker}.RemoveContainer(mockedContainer)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			})
+		})
+
+		ginkgo.When("the container does not exist", func() {
+			ginkgo.It("should not return an error", func() {
+				// Create a mock container.
+				mockedContainer := MockContainer()
+				cid := mockedContainer.ContainerInfo().ID
+				// Set up mock server handler for removal failure (container not found).
+				mockServer.AppendHandlers(
+					mockContainer.RemoveContainerHandler(
+						cid,
+						mockContainer.Missing,
+					),
+				)
+				// Execute RemoveContainer and verify no error occurs.
+				err := client{api: docker}.RemoveContainer(mockedContainer)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			})
+		})
+
+		ginkgo.When("removal fails with an unexpected error", func() {
+			ginkgo.It("should return an error", func() {
+				// Create a mock container.
+				mockedContainer := MockContainer()
+				cid := mockedContainer.ContainerInfo().ID
+				// Set up mock server handler for removal failure.
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(methodDelete, gomega.HaveSuffix(cid)),
+						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+					),
+				)
+				// Execute RemoveContainer and verify the error is propagated.
+				err := client{api: docker}.RemoveContainer(mockedContainer)
+				gomega.Expect(err).
+					To(gomega.MatchError(gomega.ContainSubstring("failed to remove container")))
 			})
 		})
 	})
@@ -276,6 +433,53 @@ var _ = ginkgo.Describe("the client", func() {
 				containers, err := client.ListContainers(filters.NoFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(containers).NotTo(gomega.ContainElement(havingRestartingState(true)))
+			})
+		})
+
+		ginkgo.When("multiple filters are provided", func() {
+			ginkgo.It("should combine filters with logical AND", func() {
+				// Set up mock server to return running containers.
+				mockServer.AppendHandlers(mockContainer.ListContainersHandler("running"))
+				mockServer.AppendHandlers(
+					mockContainer.GetContainerHandlers(
+						&mockContainer.Watchtower,
+						&mockContainer.Running,
+					)...)
+				client := client{
+					api:           docker,
+					ClientOptions: ClientOptions{},
+				}
+				// Apply two filters: one for name "portainer" and one that always passes
+				nameFilter := filters.FilterByNames([]string{"portainer"}, filters.NoFilter)
+				containers, err := client.ListContainers(nameFilter, filters.NoFilter)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				// Should return only the "portainer" container
+				gomega.Expect(containers).To(gomega.HaveLen(1))
+				gomega.Expect(containers[0].Name()).To(gomega.Equal("portainer"))
+			})
+
+			ginkgo.It("should return empty when filters are mutually exclusive", func() {
+				// Set up mock server to return running containers.
+				mockServer.AppendHandlers(mockContainer.ListContainersHandler("running"))
+				mockServer.AppendHandlers(
+					mockContainer.GetContainerHandlers(
+						&mockContainer.Watchtower,
+						&mockContainer.Running,
+					)...)
+				client := client{
+					api:           docker,
+					ClientOptions: ClientOptions{},
+				}
+				// Apply two mutually exclusive name filters
+				portainerFilter := filters.FilterByNames([]string{"portainer"}, filters.NoFilter)
+				watchtowerFilter := filters.FilterByNames(
+					[]string{"watchtower-running"},
+					filters.NoFilter,
+				)
+				containers, err := client.ListContainers(portainerFilter, watchtowerFilter)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				// Should return empty since no container can be both "portainer" and "watchtower-running" named
+				gomega.Expect(containers).To(gomega.BeEmpty())
 			})
 		})
 
@@ -821,8 +1025,73 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 	})
 
+	// Test suite for listing containers with 500 server error.
+	ginkgo.When("listing containers with 500 server error", func() {
+		ginkgo.It("should return error", func() {
+			// Set up mock server to return 500 for /containers/json.
+			mockServer.AppendHandlers(ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/containers/json$")),
+				ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+			))
+
+			// Create client instance.
+			client := client{api: docker, ClientOptions: ClientOptions{}}
+			// Execute ListContainers and verify error is returned.
+			containers, err := client.ListContainers(filters.NoFilter)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.BeNil())
+		})
+	})
+
+	// Test suite for listing containers with 401 unauthorized error.
+	ginkgo.When("listing containers with 401 unauthorized error", func() {
+		ginkgo.It("should return error", func() {
+			// Set up mock server to return 401 for /containers/json.
+			mockServer.AppendHandlers(ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/containers/json$")),
+				ghttp.RespondWith(http.StatusUnauthorized, "unauthorized"),
+			))
+
+			// Create client instance.
+			client := client{api: docker, ClientOptions: ClientOptions{}}
+			// Execute ListContainers and verify error is returned.
+			containers, err := client.ListContainers(filters.NoFilter)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.BeNil())
+		})
+	})
+
+	// Test suite for listing containers with container inspect 500 error.
+	ginkgo.When("listing containers with container inspect 500 error", func() {
+		ginkgo.It("should return error", func() {
+			// Set up mock server to return containers for list, then 500 for inspect.
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/containers/json$")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainer.Summary{
+						{ID: "container1", Names: []string{"/test1"}},
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp("^/v[0-9.]+/containers/container1/json$"),
+					),
+					ghttp.RespondWith(http.StatusInternalServerError, "inspect error"),
+				),
+			)
+
+			// Create client instance.
+			client := client{api: docker, ClientOptions: ClientOptions{}}
+			// Execute ListContainers and verify error is returned.
+			containers, err := client.ListContainers(filters.NoFilter)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.BeNil())
+		})
+	})
+
 	// Test suite for listing all containers with ghost container handling.
-	ginkgo.Describe("ListAllContainers", func() {
+	ginkgo.Describe("ListContainers", func() {
 		ginkgo.When("containers disappear during enumeration", func() {
 			ginkgo.It("should gracefully handle ghost containers and continue processing", func() {
 				// Create mock containers: two valid ones and one that will disappear
@@ -927,11 +1196,11 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				// Execute ListAllContainers
+				// Execute ListContainers
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 				client := client{api: docker, ClientOptions: ClientOptions{}}
-				containers, err := client.ListAllContainers()
+				containers, err := client.ListContainers()
 
 				// Verify no error is returned and only valid containers are included
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1173,7 +1442,7 @@ var _ = ginkgo.Describe("the client", func() {
 	})
 })
 
-func TestStopContainer_ContainerStillExistsAfterStopping(t *testing.T) {
+func TestStopAndRemoveContainer_ContainerStillExistsAfterStopping(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
@@ -1192,15 +1461,15 @@ func TestStopContainer_ContainerStillExistsAfterStopping(t *testing.T) {
 		mockedContainer := MockContainer(
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
-		// Execute StopContainer and verify no error occurs.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		// Execute StopAndRemoveContainer and verify no error occurs.
+		err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
 	})
 }
 
-func TestStopContainer_ContainerDoesNotExistAfterStopping(t *testing.T) {
+func TestStopAndRemoveContainer_ContainerDoesNotExistAfterStopping(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
@@ -1219,8 +1488,8 @@ func TestStopContainer_ContainerDoesNotExistAfterStopping(t *testing.T) {
 		mockedContainer := MockContainer(
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
-		// Execute StopContainer and verify no error occurs.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		// Execute StopAndRemoveContainer and verify no error occurs.
+		err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1277,7 +1546,7 @@ func TestStopContainer_StoppingFailsWithUnexpectedError(t *testing.T) {
 	})
 }
 
-func TestStopContainer_RemovalFailsWithUnexpectedError(t *testing.T) {
+func TestStopAndRemoveContainer_RemovalFailsWithUnexpectedError(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == pingPath {
@@ -1320,8 +1589,8 @@ func TestStopContainer_RemovalFailsWithUnexpectedError(t *testing.T) {
 		mockedContainer := MockContainer(
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
-		// Execute StopContainer and verify the removal error is propagated.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		// Execute StopAndRemoveContainer and verify the removal error is propagated.
+		err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1377,10 +1646,10 @@ func TestStopContainer_ContainerFailsToStopWithinTimeout(t *testing.T) {
 		// Capture logrus output for verification.
 		resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 		defer resetLogrus()
-		// Execute StopContainer with a realistic timeout.
+		// Execute StopAndRemoveContainer with a realistic timeout.
 		err := client{
 			api: docker,
-		}.StopContainer(
+		}.StopAndRemoveContainer(
 			mockedContainer,
 			1*time.Second,
 		)

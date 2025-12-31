@@ -34,6 +34,122 @@ const (
 	ContainerRemainsRunningMessage = "Container remains running (monitor-only mode)"
 )
 
+// RunUpdatesWithNotificationsParams holds the parameters for RunUpdatesWithNotifications.
+type RunUpdatesWithNotificationsParams struct {
+	Client                       container.Client  // Docker client for container operations
+	Notifier                     types.Notifier    // Notification system for sending update status messages
+	NotificationSplitByContainer bool              // Enable separate notifications for each updated container
+	NotificationReport           bool              // Enable report-based notifications
+	Filter                       types.Filter      // Container filter determining which containers are targeted
+	Cleanup                      bool              // Remove old images after container updates
+	NoRestart                    bool              // Prevent containers from being restarted after updates
+	MonitorOnly                  bool              // Monitor containers without performing updates
+	LifecycleHooks               bool              // Enable pre- and post-update lifecycle hook commands
+	RollingRestart               bool              // Update containers sequentially rather than all at once
+	LabelPrecedence              bool              // Give container label settings priority over global flags
+	NoPull                       bool              // Skip pulling new images from registry during updates
+	Timeout                      time.Duration     // Maximum duration for container stop operations
+	LifecycleUID                 int               // Default UID to run lifecycle hooks as
+	LifecycleGID                 int               // Default GID to run lifecycle hooks as
+	CPUCopyMode                  string            // CPU settings handling when recreating containers
+	PullFailureDelay             time.Duration     // Delay after failed Watchtower self-update pulls
+	RunOnce                      bool              // Perform one-time update and exit
+	SkipSelfUpdate               bool              // Skip Watchtower self-update
+	CurrentContainerID           types.ContainerID // ID of the current Watchtower container for self-update logic
+}
+
+// UpdateConfig holds the configuration parameters for container updates.
+type UpdateConfig struct {
+	Filter             types.Filter      // Container filter determining which containers are targeted
+	Cleanup            bool              // Remove old images after container updates
+	NoRestart          bool              // Prevent containers from being restarted after updates
+	MonitorOnly        bool              // Monitor containers without performing updates
+	LifecycleHooks     bool              // Enable pre- and post-update lifecycle hook commands
+	RollingRestart     bool              // Update containers sequentially rather than all at once
+	LabelPrecedence    bool              // Give container label settings priority over global flags
+	NoPull             bool              // Skip pulling new images from registry during updates
+	Timeout            time.Duration     // Maximum duration for container stop operations
+	LifecycleUID       int               // Default UID to run lifecycle hooks as
+	LifecycleGID       int               // Default GID to run lifecycle hooks as
+	CPUCopyMode        string            // CPU settings handling when recreating containers
+	PullFailureDelay   time.Duration     // Delay after failed Watchtower self-update pulls
+	RunOnce            bool              // Perform one-time update and exit
+	SkipSelfUpdate     bool              // Skip Watchtower self-update
+	CurrentContainerID types.ContainerID // ID of the current Watchtower container for self-update logic
+}
+
+// RunUpdatesWithNotifications performs container updates and sends notifications about the results.
+//
+// It executes the update action with configured parameters, batches notifications, and returns a metric
+// summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
+//
+// Returns:
+//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
+func RunUpdatesWithNotifications(
+	ctx context.Context,
+	params RunUpdatesWithNotificationsParams,
+) *metrics.Metric {
+	logrus.Debug("Starting RunUpdatesWithNotifications")
+
+	// Initiate notification batching
+	startNotifications(params.Notifier, params.NotificationSplitByContainer)
+
+	// Configure update parameters based on provided flags
+	updateConfig := UpdateConfig{
+		Filter:             params.Filter,             // Container filter determining which containers are targeted
+		Cleanup:            params.Cleanup,            // Remove old images after container updates
+		NoRestart:          params.NoRestart,          // Prevent containers from being restarted after updates
+		MonitorOnly:        params.MonitorOnly,        // Monitor containers without performing updates
+		LifecycleHooks:     params.LifecycleHooks,     // Enable pre- and post-update lifecycle hook commands
+		RollingRestart:     params.RollingRestart,     // Update containers sequentially rather than all at once
+		LabelPrecedence:    params.LabelPrecedence,    // Give container label settings priority over global flags
+		NoPull:             params.NoPull,             // Skip pulling new images from registry during updates
+		Timeout:            params.Timeout,            // Maximum duration for container stop operations
+		PullFailureDelay:   params.PullFailureDelay,   // Delay after failed Watchtower self-update pulls
+		LifecycleUID:       params.LifecycleUID,       // Default UID to run lifecycle hooks as
+		LifecycleGID:       params.LifecycleGID,       // Default GID to run lifecycle hooks as
+		CPUCopyMode:        params.CPUCopyMode,        // CPU settings handling when recreating containers
+		RunOnce:            params.RunOnce,            // Perform one-time update and exit
+		SkipSelfUpdate:     params.SkipSelfUpdate,     // Skip Watchtower self-update
+		CurrentContainerID: params.CurrentContainerID, // ID of the current Watchtower container for self-update logic
+	}
+
+	// Execute the container update operation
+	result, cleanupImageInfosPtr, err := executeUpdate(ctx, params.Client, updateConfig)
+	// Process update result, return metric on failure
+	if metric := handleUpdateResult(result, err); metric != nil {
+		return metric
+	}
+
+	// Perform image cleanup if enabled
+	cleanedImages := performImageCleanup(params.Client, params.Cleanup, cleanupImageInfosPtr)
+
+	// Log update report details for debugging
+	logUpdateReport(result)
+
+	logrus.WithFields(logrus.Fields{
+		"notification_split_by_container": params.NotificationSplitByContainer,
+		"notification_report":             params.NotificationReport,
+		"notifier_present":                params.Notifier != nil,
+	}).Debug("About to send notifications")
+
+	// Send notifications about update results
+	sendNotifications(
+		params.Notifier,
+		params.NotificationSplitByContainer,
+		params.NotificationReport,
+		result,
+		cleanedImages,
+	)
+
+	// Generate and return metric summarizing the session
+	return generateAndLogMetric(result)
+}
+
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
 //
 // It checks for errors or nil results, logging accordingly, and returns a zero metric on failure
@@ -69,119 +185,6 @@ func handleUpdateResult(result types.Report, err error) *metrics.Metric {
 	}
 
 	return nil
-}
-
-// RunUpdatesWithNotificationsParams holds the parameters for RunUpdatesWithNotifications.
-type RunUpdatesWithNotificationsParams struct {
-	Client                       container.Client
-	Notifier                     types.Notifier
-	NotificationSplitByContainer bool
-	NotificationReport           bool
-	Filter                       types.Filter
-	Cleanup                      bool
-	NoRestart                    bool
-	MonitorOnly                  bool
-	LifecycleHooks               bool
-	RollingRestart               bool
-	LabelPrecedence              bool
-	NoPull                       bool
-	Timeout                      time.Duration
-	LifecycleUID                 int
-	LifecycleGID                 int
-	CPUCopyMode                  string
-	PullFailureDelay             time.Duration
-	RunOnce                      bool
-	SkipSelfUpdate               bool
-}
-
-// UpdateConfig holds the configuration parameters for container updates.
-type UpdateConfig struct {
-	Filter           types.Filter
-	Cleanup          bool
-	NoRestart        bool
-	MonitorOnly      bool
-	LifecycleHooks   bool
-	RollingRestart   bool
-	LabelPrecedence  bool
-	NoPull           bool
-	Timeout          time.Duration
-	LifecycleUID     int
-	LifecycleGID     int
-	CPUCopyMode      string
-	PullFailureDelay time.Duration
-	RunOnce          bool
-	SkipSelfUpdate   bool
-}
-
-// RunUpdatesWithNotifications performs container updates and sends notifications about the results.
-//
-// It executes the update action with configured parameters, batches notifications, and returns a metric
-// summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeouts.
-//   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
-//
-// Returns:
-//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-func RunUpdatesWithNotifications(
-	ctx context.Context,
-	params RunUpdatesWithNotificationsParams,
-) *metrics.Metric {
-	logrus.Debug("Starting RunUpdatesWithNotifications")
-
-	// Initiate notification batching
-	startNotifications(params.Notifier, params.NotificationSplitByContainer)
-
-	// Configure update parameters based on provided flags
-	updateConfig := UpdateConfig{
-		Filter:           params.Filter,
-		Cleanup:          params.Cleanup,
-		NoRestart:        params.NoRestart,
-		MonitorOnly:      params.MonitorOnly,
-		LifecycleHooks:   params.LifecycleHooks,
-		RollingRestart:   params.RollingRestart,
-		LabelPrecedence:  params.LabelPrecedence,
-		NoPull:           params.NoPull,
-		Timeout:          params.Timeout,
-		PullFailureDelay: params.PullFailureDelay,
-		LifecycleUID:     params.LifecycleUID,
-		LifecycleGID:     params.LifecycleGID,
-		CPUCopyMode:      params.CPUCopyMode,
-		RunOnce:          params.RunOnce,
-		SkipSelfUpdate:   params.SkipSelfUpdate,
-	}
-
-	// Execute the container update operation
-	result, cleanupImageInfosPtr, err := executeUpdate(ctx, params.Client, updateConfig)
-	// Process update result, return metric on failure
-	if metric := handleUpdateResult(result, err); metric != nil {
-		return metric
-	}
-
-	// Perform image cleanup if enabled
-	cleanedImages := performImageCleanup(params.Client, params.Cleanup, cleanupImageInfosPtr)
-
-	// Log update report details for debugging
-	logUpdateReport(result)
-
-	logrus.WithFields(logrus.Fields{
-		"notification_split_by_container": params.NotificationSplitByContainer,
-		"notification_report":             params.NotificationReport,
-		"notifier_present":                params.Notifier != nil,
-	}).Debug("About to send notifications")
-
-	// Send notifications about update results
-	sendNotifications(
-		params.Notifier,
-		params.NotificationSplitByContainer,
-		params.NotificationReport,
-		result,
-		cleanedImages,
-	)
-
-	// Generate and return metric summarizing the session
-	return generateAndLogMetric(result)
 }
 
 // buildSingleContainerReport creates a SingleContainerReport for a specific updated container.

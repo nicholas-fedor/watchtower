@@ -279,6 +279,23 @@ func WithHostname(hostname string) MockContainerUpdate {
 	}
 }
 
+// WithAutoRemove sets the AutoRemove flag for the mock container.
+//
+// Parameters:
+//   - autoRemove: Whether the container should be automatically removed after stopping.
+//
+// Returns:
+//   - MockContainerUpdate: Function to set AutoRemove in container HostConfig.
+func WithAutoRemove(autoRemove bool) MockContainerUpdate {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainer.HostConfig{}
+		}
+
+		c.HostConfig.AutoRemove = autoRemove
+	}
+}
+
 // MockClient is a mock implementation of the Operations interface for testing container operations.
 type MockClient struct {
 	createFunc  func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerContainer.CreateResponse, error)
