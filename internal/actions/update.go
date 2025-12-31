@@ -69,21 +69,22 @@ func Update(
 
 	// Map UpdateConfig to types.UpdateParams for internal use.
 	params := types.UpdateParams{
-		Filter:           config.Filter,
-		Cleanup:          config.Cleanup,
-		NoRestart:        config.NoRestart,
-		Timeout:          config.Timeout,
-		MonitorOnly:      config.MonitorOnly,
-		LifecycleHooks:   config.LifecycleHooks,
-		RollingRestart:   config.RollingRestart,
-		LabelPrecedence:  config.LabelPrecedence,
-		NoPull:           config.NoPull,
-		PullFailureDelay: config.PullFailureDelay,
-		LifecycleUID:     config.LifecycleUID,
-		LifecycleGID:     config.LifecycleGID,
-		CPUCopyMode:      config.CPUCopyMode,
-		RunOnce:          config.RunOnce,
-		SkipSelfUpdate:   config.SkipSelfUpdate,
+		Filter:             config.Filter,
+		Cleanup:            config.Cleanup,
+		NoRestart:          config.NoRestart,
+		Timeout:            config.Timeout,
+		MonitorOnly:        config.MonitorOnly,
+		LifecycleHooks:     config.LifecycleHooks,
+		RollingRestart:     config.RollingRestart,
+		LabelPrecedence:    config.LabelPrecedence,
+		NoPull:             config.NoPull,
+		PullFailureDelay:   config.PullFailureDelay,
+		LifecycleUID:       config.LifecycleUID,
+		LifecycleGID:       config.LifecycleGID,
+		CPUCopyMode:        config.CPUCopyMode,
+		RunOnce:            config.RunOnce,
+		SkipSelfUpdate:     config.SkipSelfUpdate,
+		CurrentContainerID: config.CurrentContainerID,
 	}
 
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
@@ -892,6 +893,12 @@ func restartContainersInSortedOrder(
 
 				break
 			}
+		}
+
+		// Skip other Watchtower containers from self-updates
+		if c.IsWatchtower() && params.CurrentContainerID != "" &&
+			c.ID() != params.CurrentContainerID {
+			continue
 		}
 
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.

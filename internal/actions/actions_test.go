@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			ginkgo.It(
 				"should correctly pass CurrentContainerID to UpdateConfig and skip other Watchtower containers",
 				func() {
-					// Create two Watchtower containers with the watchtower label
+					// Create two Watchtower containers with the watchtower label, but only container1 should be updated due to CurrentContainerID
 					watchtowerConfig := &dockerContainer.Config{
 						Image:  "watchtower:latest",
 						Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
@@ -259,11 +259,11 @@ var _ = ginkgo.Describe("Actions", func() {
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					// Only container1 should be updated, container2 should be skipped due to CurrentContainerID
-					gomega.Expect(client.TestData.StartOrder).To(gomega.HaveLen(2))
+					gomega.Expect(client.TestData.StartOrder).To(gomega.HaveLen(1))
 					gomega.Expect(client.TestData.StartOrder).
 						To(gomega.ContainElement("watchtower-1"))
 					gomega.Expect(client.TestData.StartOrder).
-						To(gomega.ContainElement("watchtower-2"))
+						To(gomega.Not(gomega.ContainElement("watchtower-2")))
 				},
 			)
 		})
