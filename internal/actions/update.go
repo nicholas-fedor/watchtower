@@ -123,6 +123,21 @@ func Update(
 		"filter":     fmt.Sprintf("%T", params.Filter),
 	}).Debug("Retrieved containers for update check")
 
+	// Skip containers that reference themselves as dependencies
+	// via the Watchtower depends-on label.
+	for _, c := range containers {
+		if cont, ok := c.(*container.Container); ok {
+			if hasSelfDependency(cont) {
+				progress.AddSkipped(c, errSelfDependency, params)
+				logrus.Warnf(
+					"Skipping container update (self-dependency): %s (%s)",
+					c.Name(),
+					c.ID().ShortID(),
+				)
+			}
+		}
+	}
+
 	// Detect circular dependencies and mark affected containers as skipped.
 	cycles := container.DetectCycles(containers)
 	for _, c := range containers {
@@ -396,6 +411,43 @@ func Update(
 	return progress.Report(), cleanupImageInfos, nil
 }
 
+// hasSelfDependency checks if a container has a self-dependency in its Watchtower depends-on label.
+func hasSelfDependency(c types.Container) bool {
+	// Obtain the container info.
+	info := c.ContainerInfo()
+
+	// Nilness check.
+	if info == nil || info.Config == nil || info.Config.Labels == nil {
+		return false
+	}
+
+	// Obtain the values from the Watchtower depends-on label.
+	dependsOnLabelValue := info.Config.Labels["com.centurylinklabs.watchtower.depends-on"]
+	if dependsOnLabelValue == "" {
+		return false
+	}
+
+	// Iterate through the links to check for self-referencing links.
+	links := strings.SplitSeq(dependsOnLabelValue, ",")
+	for link := range links {
+		// Skip empty links
+		if link == "" {
+			continue
+		}
+
+		// Normalize the link by trimming spaces and removing any leading slashes
+		normalizedLink := util.NormalizeContainerName(strings.TrimSpace(link))
+
+		// If the normalized link matches the container name, then it is self-referencing.
+		if normalizedLink == c.Name() {
+			return true
+		}
+	}
+
+	// No self-referencing links found.
+	return false
+}
+
 // UpdateImplicitRestart marks containers linked to restarting ones.
 //
 // It checks each container's links, marking those dependent on restarting containers to ensure
@@ -409,10 +461,10 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
 
-	restartByIdent := make(map[string]bool, len(allContainers))
+	restartByIdentifier := make(map[string]bool, len(allContainers))
 	for _, c := range allContainers {
 		byID[c.ID()] = c
-		restartByIdent[container.ResolveContainerIdentifier(c)] = c.ToRestart()
+		restartByIdentifier[container.ResolveContainerIdentifier(c)] = c.ToRestart()
 	}
 
 	markedContainers := []string{}
@@ -424,12 +476,15 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 
 		// c.Links() already returns normalized container names
 		links := c.Links()
+		containerIdentifier := container.ResolveContainerIdentifier(c)
 		logrus.WithFields(logrus.Fields{
-			"container": c.Name(),
-			"links":     links,
+			"container":            c.Name(),
+			"container_identifier": containerIdentifier,
+			"links":                links,
+			"to_restart":           c.ToRestart(),
 		}).Debug("Checking links for container")
 
-		if link := linkedIdentifierMarkedForRestart(links, restartByIdent); link != "" {
+		if link := linkedIdentifierMarkedForRestart(links, restartByIdentifier); link != "" {
 			logrus.WithFields(logrus.Fields{
 				"container":  c.Name(),
 				"restarting": link,
@@ -438,7 +493,7 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 
 			if ac, ok := byID[c.ID()]; ok {
 				ac.SetLinkedToRestarting(true)
-				restartByIdent[container.ResolveContainerIdentifier(ac)] = true
+				restartByIdentifier[container.ResolveContainerIdentifier(ac)] = true
 			}
 
 			markedContainers = append(markedContainers, c.Name())
@@ -501,20 +556,44 @@ func shouldUpdateContainer(stale bool, container types.Container, params types.U
 
 // linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.
 //
-// It searches for a container identifier in the links list that is marked for restart, returning its identifier.
+// It searches for a container identifier in the links list that is marked for restart,
+// returning its identifier. Identifiers may be in formats such as <project>-<service>,
+// <service>, <container name>, or <container id>. It first checks for exact matches,
+// then considers partial matches where the identifier ends with "-<link>" for <service>
+// names that lack the project prefix.
 //
 // Parameters:
 //   - links: List of linked container identifiers.
-//   - restartByIdent: Map of container identifiers to restart status.
+//   - restartByIdentifier: Map of container identifiers to restart status.
 //
 // Returns:
 //   - string: Identifier of restarting linked container, or empty if none.
-func linkedIdentifierMarkedForRestart(links []string, restartByIdent map[string]bool) string {
-	for _, ident := range links {
-		if restartByIdent[ident] {
-			return ident
+func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[string]bool) string {
+	logrus.WithFields(logrus.Fields{
+		"links":               links,
+		"restartByIdentifier": restartByIdentifier,
+	}).Debug("Searching for restarting linked container")
+
+	// Check for exact matches.
+	for _, link := range links {
+		if restartByIdentifier[link] {
+			logrus.WithField("found_restarting_identifier", link).
+				Debug("Found restarting linked container")
+
+			return link
+		}
+		// Check for partial match where identifier ends with "-"+link
+		for identifier, restarting := range restartByIdentifier {
+			if restarting && strings.HasSuffix(identifier, "-"+link) {
+				logrus.WithField("found_restarting_identifier", identifier).
+					Debug("Found restarting linked container via partial match")
+
+				return identifier
+			}
 		}
 	}
+
+	logrus.Debug("No restarting linked container found")
 
 	return ""
 }

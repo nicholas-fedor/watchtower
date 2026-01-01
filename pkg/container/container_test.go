@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -441,6 +443,118 @@ var _ = ginkgo.Describe("Container", func() {
 						"com.centurylinklabs.watchtower.depends-on": "",
 					}))
 					gomega.Expect(container.Links()).To(gomega.BeEmpty())
+				})
+
+				ginkgo.It(
+					"does not prefix container names with project name for cross-project dependencies",
+					func() {
+						container = MockContainer(WithLabels(map[string]string{
+							"com.docker.compose.project":                "myproject",
+							"com.centurylinklabs.watchtower.depends-on": "otherproject-db,external-service",
+						}))
+						links := container.Links()
+						gomega.Expect(links).To(gomega.SatisfyAll(
+							gomega.ContainElement("otherproject-db"),
+							gomega.ContainElement("external-service"),
+							gomega.HaveLen(2),
+						))
+						// Verify that links are NOT prefixed with the container's own project name
+						gomega.Expect(links).
+							To(gomega.Not(gomega.ContainElement("myproject-otherproject-db")))
+						gomega.Expect(links).
+							To(gomega.Not(gomega.ContainElement("myproject-external-service")))
+					},
+				)
+
+				ginkgo.It("handles cross-project dependencies with single container", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.project":                "webapp",
+						"com.centurylinklabs.watchtower.depends-on": "database",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("database"),
+						gomega.HaveLen(1),
+					))
+					// Verify no project prefix is added
+					gomega.Expect(links).To(gomega.Not(gomega.ContainElement("webapp-database")))
+				})
+
+				ginkgo.It("supports cross-project dependencies without project labels", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "standalone-db,external-api",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("standalone-db"),
+						gomega.ContainElement("external-api"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("handles self-referencing dependencies gracefully", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "postgres,test-watchtower,redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.Not(gomega.ContainElement("test-watchtower")),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.DescribeTable(
+					"parses malformed watchtower labels",
+					func(label string, expected []string) {
+						container = MockContainer(WithLabels(map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": label,
+						}))
+						links := container.Links()
+						gomega.Expect(links).To(gomega.Equal(expected))
+					},
+					ginkgo.Entry(
+						"empty entries",
+						",postgres,,redis,",
+						[]string{"postgres", "redis"},
+					),
+					ginkgo.Entry(
+						"extra spaces",
+						" postgres , redis ",
+						[]string{"postgres", "redis"},
+					),
+					ginkgo.Entry("empty string", "", []string{}),
+					ginkgo.Entry(
+						"multiple dependencies",
+						"postgres,redis,mysql",
+						[]string{"postgres", "redis", "mysql"},
+					),
+				)
+
+				ginkgo.It("normalizes invalid container name dependencies", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "postgres db, redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.Equal([]string{"postgres db", "redis"}))
+				})
+
+				ginkgo.It("handles very long dependency lists", func() {
+					// Generate 100 dependencies
+					var deps []string
+					for i := 1; i <= 100; i++ {
+						deps = append(deps, fmt.Sprintf("dep%d", i))
+					}
+					label := strings.Join(deps, ",")
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": label,
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.HaveLen(100))
+					gomega.Expect(links).To(gomega.ContainElement("dep1"))
+					gomega.Expect(links).To(gomega.ContainElement("dep50"))
+					gomega.Expect(links).To(gomega.ContainElement("dep100"))
 				})
 			})
 

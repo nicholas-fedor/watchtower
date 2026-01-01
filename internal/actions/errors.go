@@ -40,4 +40,6 @@ var (
 	errInvalidImageReference = errors.New("invalid image reference")
 	// errCircularDependency indicates a circular dependency between containers.
 	errCircularDependency = errors.New("circular dependency detected")
+	// errSelfDependency indicates a container has a self-dependency.
+	errSelfDependency = errors.New("container has self-dependency")
 )
