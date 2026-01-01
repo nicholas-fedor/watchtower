@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -453,6 +454,195 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 			CurrentContainerID: types.ContainerID(currentID),
 		}
 		result := shouldUpdateContainer(true, container, params)
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+})
+
+var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart", func() {
+	ginkgo.It("should return empty string for ambiguous partial matches", func() {
+		restartByIdent := map[string]bool{
+			"project1-db": true,
+			"project2-db": true,
+		}
+		links := []string{"db"}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
+		gomega.Expect(result).To(gomega.Equal(""))
+	})
+
+	ginkgo.It("should return the identifier for single partial match", func() {
+		restartByIdent := map[string]bool{
+			"project1-db": true,
+		}
+		links := []string{"db"}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
+		gomega.Expect(result).To(gomega.Equal("project1-db"))
+	})
+
+	ginkgo.It("should prioritize exact matches over partial matches", func() {
+		restartByIdent := map[string]bool{
+			"db":          true,
+			"project1-db": true,
+		}
+		links := []string{"db"}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
+		gomega.Expect(result).To(gomega.Equal("db"))
+	})
+})
+
+var _ = ginkgo.Describe("hasSelfDependency", func() {
+	ginkgo.It("should return false when no depends-on label is present", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels:       map[string]string{},
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+		result := hasSelfDependency(container)
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when depends-on label is empty", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower.depends-on": "",
+				},
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+		result := hasSelfDependency(container)
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when depends-on contains other containers", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower.depends-on": "other-container",
+				},
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+		result := hasSelfDependency(container)
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return true when depends-on contains self", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower.depends-on": "test-container",
+				},
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+		result := hasSelfDependency(container)
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It(
+		"should return true when depends-on contains self among multiple dependencies",
+		func() {
+			container := mockActions.CreateMockContainerWithConfig(
+				"test-container",
+				"/test-container",
+				"test:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "other-container,test-container,another-container",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+			result := hasSelfDependency(container)
+			gomega.Expect(result).To(gomega.BeTrue())
+		},
+	)
+
+	ginkgo.It("should handle spaces and trimming correctly", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower.depends-on": " other-container , test-container , another-container ",
+				},
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+		result := hasSelfDependency(container)
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should handle leading slashes in container names", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower.depends-on": "/test-container",
+				},
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+		result := hasSelfDependency(container)
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should return false when Config is nil", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			nil) // Config is nil
+		result := hasSelfDependency(container)
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when Labels is nil", func() {
+		container := mockActions.CreateMockContainerWithConfig(
+			"test-container",
+			"/test-container",
+			"test:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Labels:       nil, // Labels is nil
+				ExposedPorts: map[nat.Port]struct{}{},
+			})
+		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
 })

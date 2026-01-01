@@ -683,6 +683,107 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred()) // Should not detect false cycle
 			gomega.Expect(result).To(gomega.HaveLen(2))
 		})
+
+		ginkgo.It("should handle cross-project dependency resolution with ambiguous names", func() {
+			// app depending on "db"
+			app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"},
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "db"},
+				},
+			})
+			app.EXPECT().Name().Return("app").Maybe()
+			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+			app.EXPECT().Links().Return([]string{"db"})
+
+			// db1 from project1
+			db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project1_db_1"},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.service": "db",
+					"com.docker.compose.project": "project1",
+				}},
+			})
+			db1.EXPECT().Name().Return("project1_db_1").Maybe()
+			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+			db1.EXPECT().Links().Return(nil)
+
+			// db2 from project2
+			db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			db2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project2_db_1"},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.service": "db",
+					"com.docker.compose.project": "project2",
+				}},
+			})
+			db2.EXPECT().Name().Return("project2_db_1").Maybe()
+			db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
+			db2.EXPECT().Links().Return(nil)
+
+			containers := []types.Container{app, db1, db2}
+
+			containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Graph builds successfully, but no dependency resolved since "db" doesn't match "project1-db" or "project2-db"
+			gomega.Expect(containerMap).To(gomega.HaveLen(3))
+			gomega.Expect(indegree["app"]).To(gomega.Equal(0))
+			gomega.Expect(adjacency).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should detect circular dependencies via watchtower labels", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "c2"},
+				},
+			})
+			c1.EXPECT().Name().Return("c1").Maybe()
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+			c1.EXPECT().Links().Return([]string{"c2"})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "c1"},
+				},
+			})
+			c2.EXPECT().Name().Return("c2")
+			c2.EXPECT().Links().Return([]string{"c1"})
+
+			containers := []types.Container{c1, c2}
+
+			_, err := sortByDependencies(containers)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("circular reference detected"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("c1 -> c2 -> c1"))
+		})
+
+		ginkgo.It("should handle dependencies to filtered containers", func() {
+			app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"},
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "db"},
+				},
+			})
+			app.EXPECT().Name().Return("app").Maybe()
+			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+			app.EXPECT().Links().Return([]string{"db"})
+
+			// Only app in containers list, db not included
+			containers := []types.Container{app}
+
+			containerMap, indegree, _, _, err := buildDependencyGraph(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containerMap).To(gomega.HaveLen(1))
+			gomega.Expect(indegree["app"]).To(gomega.Equal(0))
+		})
 	})
 })
 
@@ -852,6 +953,60 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 
 				// Should return just the service name, same as before
 				gomega.Expect(result).To(gomega.Equal("web"))
+			},
+		)
+
+		ginkgo.It(
+			"should support exact matching for cross-project dependencies",
+			func() {
+				// Container that links to exact container name
+				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				app.EXPECT().Name().Return("app").Maybe()
+				app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+				app.EXPECT().Links().Return([]string{"project1-db"})
+
+				// DB container from project1
+				db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project1_db_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+							"com.docker.compose.project": "project1",
+						},
+					},
+				})
+				db1.EXPECT().Name().Return("project1_db_1").Maybe()
+				db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+				db1.EXPECT().Links().Return(nil)
+
+				containers := []types.Container{app, db1}
+
+				containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(
+					containers,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Verify identifiers
+				gomega.Expect(container.ResolveContainerIdentifier(app)).To(gomega.Equal("app"))
+				gomega.Expect(container.ResolveContainerIdentifier(db1)).
+					To(gomega.Equal("project1-db"))
+
+				// All containers should be in the map
+				gomega.Expect(containerMap).To(gomega.HaveLen(2))
+
+				// app should have indegree 1 (depends on db1)
+				gomega.Expect(indegree["app"]).To(gomega.Equal(1))
+
+				// db1 should have app as dependent
+				gomega.Expect(adjacency["project1-db"]).To(gomega.ContainElement("app"))
+
+				// Verify normalizedMap
+				gomega.Expect(normalizedMap).To(gomega.HaveLen(2))
 			},
 		)
 	})

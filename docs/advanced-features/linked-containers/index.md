@@ -35,6 +35,11 @@ LABEL com.centurylinklabs.watchtower.depends-on="database,redis"
 ```
 
 This label accepts a comma-separated list of container names that must be available before this container starts.
+This supports referencing containers from other Docker Compose projects or stacks, enabling cross-project dependency management.
+
+!!! Warning
+    Use unique, non-ambiguous source container names both in the Docker Compose configuration and when specifying dependencies in the `com.centurylinklabs.watchtower.depends-on` label to ensure correct dependency resolution and behavior across Docker Compose projects/stacks.
+    Ambiguous names can lead to warnings and skipped updates to prevent non-deterministic behavior.
 
 #### Docker Compose Depends-On Label
 

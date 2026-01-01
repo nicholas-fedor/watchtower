@@ -458,15 +458,24 @@ func (c Container) VerifyConfiguration() error {
 // It checks com.centurylinklabs.watchtower.depends-on first,
 // then com.docker.compose.depends_on using Docker Compose v5 API functions,
 // then falls back to HostConfig links and network mode.
+// After retrieving links from the Watchtower label, it filters out self-references.
 //
 // Returns:
 //   - []string: List of linked container names.
 func (c Container) Links() []string {
 	clog := logrus.WithField("container", c.Name())
 
-	// Check watchtower depends-on label first.
-	if links := getLinksFromWatchtowerLabel(c, clog); links != nil {
-		return links
+	// Check Watchtower's depends-on label first.
+	if links := GetLinksFromWatchtowerLabel(c, clog); links != nil {
+		// Filter out links that match the container name.
+		filteredLinks := make([]string, 0, len(links))
+		for _, link := range links {
+			if link != c.Name() {
+				filteredLinks = append(filteredLinks, link)
+			}
+		}
+
+		return filteredLinks
 	}
 
 	// Check compose depends-on label.
@@ -495,92 +504,112 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return nameOrID(c)
 	}
 
-	// Get the container configuration
+	// Get the container configuration.
 	cfg := info.Config
-	// Return container name if nil.
+
+	// If the config is nil, then return the container name, with a fallback to the ID.
 	if cfg == nil {
 		return nameOrID(c)
 	}
 
-	// Get the container labels
+	// Get the container labels.
 	labels := cfg.Labels
-	// Return container name if empty.
+
+	// If there are no labels, then return the container name, with a fallback to the ID.
 	if len(labels) == 0 {
 		return nameOrID(c)
 	}
 
+	// Obtain the container's Compose project/stack name.
 	projectName := compose.GetProjectName(labels)
+
+	// Obtain the container's service name.
 	serviceName := compose.GetServiceName(labels)
 
+	// If both the project name and service name are available, then
+	// return the container identifier using the <project>-<service> format.
 	if projectName != "" && serviceName != "" {
-		// Return project and service name combination from Compose labels.
 		return projectName + "-" + serviceName
 	}
 
+	// If only the service name is available, then return it.
 	if serviceName != "" {
-		// Return service name from Compose label.
 		return serviceName
 	}
 
+	// If only the project name is available, then return the container name, with a fallback to the ID.
 	return nameOrID(c)
 }
 
 // nameOrID returns the container name if non-empty, otherwise returns the container ID.
 func nameOrID(c types.Container) string {
+	// Return the container name if available.
 	if name := c.Name(); name != "" {
 		return name
 	}
 
+	// Otherwise, return the container ID.
 	return string(c.ID())
 }
 
-// getLinksFromWatchtowerLabel extracts dependency links from the
+// GetLinksFromWatchtowerLabel extracts dependency links from the
 // watchtower depends-on label.
 //
 // It parses the com.centurylinklabs.watchtower.depends-on label value,
-// splitting on commas and normalizing each container name. If the container
-// has a project label, dependency names are qualified with the project name.
+// splitting on commas and normalizing each container name, returning all
+// normalized links, including potential self-references.
+//
+// Note: Watchtower depends-on labels reference container names directly,
+// unlike Compose depends-on, which references services within the same project.
+// Therefore, we do not prefix with project name for Watchtower labels.
 //
 // Parameters:
 //   - c: Container instance
 //   - clog: Logger instance for debug output
 //
 // Returns:
-//   - []string: List of linked container names, empty if label not present
-func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
+//   - []string: List of all normalized links, including potential self-references, or nil if label not present
+func GetLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
+	// Get the depends-on label value or empty string if not present
 	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
+
+	// If the label is empty, return nil
 	if dependsOnLabelValue == "" {
 		return nil
 	}
 
-	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
+	clog.WithFields(logrus.Fields{
+		"depends_on_label_value": dependsOnLabelValue,
+		"container_name":         c.Name(),
+	}).Debug("Processing watchtower depends-on label")
 
-	// Pre-allocate slice based on comma-separated values
-	parts := strings.Split(dependsOnLabelValue, ",")
-	normalizedLinks := make([]string, 0, len(parts))
+	// Split the comma-separated values
+	links := strings.Split(dependsOnLabelValue, ",")
 
-	for _, normalizedLink := range parts {
-		normalizedLink = strings.TrimSpace(normalizedLink)
+	// Parse the links and normalize them
+	normalizedLinks := make([]string, 0, len(links))
+	for _, normalizedLink := range links {
+		// Skip empty links
 		if normalizedLink == "" {
 			continue
 		}
 
-		normalizedLink = util.NormalizeContainerName(normalizedLink)
-		if projectName != "" && !strings.HasPrefix(normalizedLink, projectName+"-") {
-			normalizedLink = projectName + "-" + normalizedLink
-		}
+		// Normalize the link by trimming spaces and removing any leading slashes
+		normalizedLink = util.NormalizeContainerName(strings.TrimSpace(normalizedLink))
 
+		// Add the normalized link to the result slice
 		normalizedLinks = append(normalizedLinks, normalizedLink)
 	}
 
-	clog.WithField("depends_on", dependsOnLabelValue).
-		Debug("Retrieved links from watchtower depends-on label")
+	clog.WithFields(logrus.Fields{
+		"depends_on":       dependsOnLabelValue,
+		"normalized_links": normalizedLinks,
+	}).Debug("Retrieved links from watchtower depends-on label")
 
 	return normalizedLinks
 }
 
-// getLinksFromComposeLabel extracts dependency links from the
-// Docker Compose depends-on label.
+// getLinksFromComposeLabel extracts dependency links from the Docker Compose depends-on label.
 //
 // It parses the com.docker.compose.depends_on label value using the compose package,
 // and normalizes each service name. If the container has a project label, service names
