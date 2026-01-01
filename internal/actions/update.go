@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -412,40 +413,18 @@ func Update(
 }
 
 // hasSelfDependency checks if a container has a self-dependency in its Watchtower depends-on label.
+// It now uses the shared GetLinksFromWatchtowerLabel helper function for parsing and normalization.
 func hasSelfDependency(c types.Container) bool {
-	// Obtain the container info.
-	info := c.ContainerInfo()
-
-	// Nilness check.
-	if info == nil || info.Config == nil || info.Config.Labels == nil {
+	sourceContainer, ok := c.(*container.Container)
+	if !ok {
 		return false
 	}
 
-	// Obtain the values from the Watchtower depends-on label.
-	dependsOnLabelValue := info.Config.Labels["com.centurylinklabs.watchtower.depends-on"]
-	if dependsOnLabelValue == "" {
-		return false
-	}
+	clog := logrus.WithField("container", c.Name())
 
-	// Iterate through the links to check for self-referencing links.
-	links := strings.SplitSeq(dependsOnLabelValue, ",")
-	for link := range links {
-		// Skip empty links
-		if link == "" {
-			continue
-		}
+	links := container.GetLinksFromWatchtowerLabel(*sourceContainer, clog)
 
-		// Normalize the link by trimming spaces and removing any leading slashes
-		normalizedLink := util.NormalizeContainerName(strings.TrimSpace(link))
-
-		// If the normalized link matches the container name, then it is self-referencing.
-		if normalizedLink == c.Name() {
-			return true
-		}
-	}
-
-	// No self-referencing links found.
-	return false
+	return slices.Contains(links, c.Name())
 }
 
 // UpdateImplicitRestart marks containers linked to restarting ones.

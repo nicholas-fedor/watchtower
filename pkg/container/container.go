@@ -458,15 +458,24 @@ func (c Container) VerifyConfiguration() error {
 // It checks com.centurylinklabs.watchtower.depends-on first,
 // then com.docker.compose.depends_on using Docker Compose v5 API functions,
 // then falls back to HostConfig links and network mode.
+// After retrieving links from the Watchtower label, it filters out self-references.
 //
 // Returns:
 //   - []string: List of linked container names.
 func (c Container) Links() []string {
 	clog := logrus.WithField("container", c.Name())
 
-	// Check watchtower depends-on label first.
-	if links := getLinksFromWatchtowerLabel(c, clog); links != nil {
-		return links
+	// Check Watchtower's depends-on label first.
+	if links := GetLinksFromWatchtowerLabel(c, clog); links != nil {
+		// Filter out links that match the container name.
+		filteredLinks := make([]string, 0, len(links))
+		for _, link := range links {
+			if link != c.Name() {
+				filteredLinks = append(filteredLinks, link)
+			}
+		}
+
+		return filteredLinks
 	}
 
 	// Check compose depends-on label.
@@ -543,11 +552,12 @@ func nameOrID(c types.Container) string {
 	return string(c.ID())
 }
 
-// getLinksFromWatchtowerLabel extracts dependency links from the
+// GetLinksFromWatchtowerLabel extracts dependency links from the
 // watchtower depends-on label.
 //
 // It parses the com.centurylinklabs.watchtower.depends-on label value,
-// splitting on commas and normalizing each container name.
+// splitting on commas and normalizing each container name, returning all
+// normalized links, including potential self-references.
 //
 // Note: Watchtower depends-on labels reference container names directly,
 // unlike Compose depends-on, which references services within the same project.
@@ -558,8 +568,8 @@ func nameOrID(c types.Container) string {
 //   - clog: Logger instance for debug output
 //
 // Returns:
-//   - []string: List of linked container names, empty if label not present
-func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
+//   - []string: List of all normalized links, including potential self-references, or nil if label not present
+func GetLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 	// Get the depends-on label value or empty string if not present
 	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
 
@@ -586,14 +596,6 @@ func getLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 
 		// Normalize the link by trimming spaces and removing any leading slashes
 		normalizedLink = util.NormalizeContainerName(strings.TrimSpace(normalizedLink))
-
-		// Skip self-referencing dependencies
-		if normalizedLink == c.Name() {
-			clog.WithField("skipped_link", normalizedLink).
-				Debug("Skipping self-referencing dependency")
-
-			continue
-		}
 
 		// Add the normalized link to the result slice
 		normalizedLinks = append(normalizedLinks, normalizedLink)
