@@ -553,6 +553,8 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 		"restartByIdentifier": restartByIdentifier,
 	}).Debug("Searching for restarting linked container")
 
+	var partialMatches []string
+
 	// Check for exact matches.
 	for _, link := range links {
 		if restartByIdentifier[link] {
@@ -564,12 +566,24 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 		// Check for partial match where identifier ends with "-"+link
 		for identifier, restarting := range restartByIdentifier {
 			if restarting && strings.HasSuffix(identifier, "-"+link) {
-				logrus.WithField("found_restarting_identifier", identifier).
-					Debug("Found restarting linked container via partial match")
-
-				return identifier
+				if !slices.Contains(partialMatches, identifier) {
+					partialMatches = append(partialMatches, identifier)
+				}
 			}
 		}
+	}
+
+	// Apply deterministic logic for partial matches: return the unique match if exactly one exists,
+	// otherwise log a warning and return empty string to prevent ambiguous selections.
+	if len(partialMatches) == 1 {
+		return partialMatches[0]
+	} else if len(partialMatches) > 1 {
+		logrus.WithFields(logrus.Fields{
+			"ambiguous_identifiers": partialMatches,
+			"links":                 links,
+		}).Warn("Ambiguous container links. Use unique names to avoid conflicts.")
+
+		return ""
 	}
 
 	logrus.Debug("No restarting linked container found")

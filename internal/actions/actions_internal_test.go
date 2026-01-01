@@ -459,15 +459,33 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 })
 
 var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart", func() {
-	ginkgo.It("should handle ambiguous partial matches", func() {
+	ginkgo.It("should return empty string for ambiguous partial matches", func() {
 		restartByIdent := map[string]bool{
 			"project1-db": true,
 			"project2-db": true,
 		}
 		links := []string{"db"}
 		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
-		gomega.Expect(result).
-			To(gomega.Or(gomega.Equal("project1-db"), gomega.Equal("project2-db")))
+		gomega.Expect(result).To(gomega.Equal(""))
+	})
+
+	ginkgo.It("should return the identifier for single partial match", func() {
+		restartByIdent := map[string]bool{
+			"project1-db": true,
+		}
+		links := []string{"db"}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
+		gomega.Expect(result).To(gomega.Equal("project1-db"))
+	})
+
+	ginkgo.It("should prioritize exact matches over partial matches", func() {
+		restartByIdent := map[string]bool{
+			"db":          true,
+			"project1-db": true,
+		}
+		links := []string{"db"}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
+		gomega.Expect(result).To(gomega.Equal("db"))
 	})
 })
 
