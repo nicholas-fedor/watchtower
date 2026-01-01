@@ -755,9 +755,6 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			})
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().Links().Return([]string{"c1"})
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
 
 			containers := []types.Container{c1, c2}
 
