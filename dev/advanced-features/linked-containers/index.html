@@ -1993,7 +1993,13 @@ This feature automatically detects container dependencies through various mechan
 <p>The <code>com.centurylinklabs.watchtower.depends-on</code> label allows explicit declaration of dependencies:</p>
 <div class="highlight"><span class="filename">Explicit dependency declaration</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">&quot;database,redis&quot;</span>
 </code></pre></div>
-<p>This label accepts a comma-separated list of container names that must be available before this container starts.</p>
+<p>This label accepts a comma-separated list of container names that must be available before this container starts.
+This supports referencing containers from other Docker Compose projects or stacks, enabling cross-project dependency management.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Use unique, non-ambiguous source container names both in the Docker Compose configuration and when specifying dependencies in the <code>com.centurylinklabs.watchtower.depends-on</code> label to ensure correct dependency resolution and behavior across Docker Compose projects/stacks.
+Ambiguous names can lead to warnings and skipped updates to prevent non-deterministic behavior.</p>
+</div>
 <h4 id="docker_compose_depends-on_label">Docker Compose Depends-On Label<a class="headerlink" href="#docker_compose_depends-on_label" title="Permanent link">&para;</a></h4>
 <p>Watchtower automatically recognizes Docker Compose's <code>depends_on</code> relationships:</p>
 <div class="highlight"><span class="filename">Docker Compose dependency</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">services</span><span class="p">:</span>
@@ -2268,7 +2274,7 @@ Ensure your dependency graph is acyclic.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 13, 2025 16:19:07 UTC"><span class="timeago" datetime="2025-12-13T16:19:07+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 13, 2025 16:19:07 UTC">2025-12-13</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 1, 2026 14:29:51 UTC"><span class="timeago" datetime="2026-01-01T14:29:51+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 1, 2026 14:29:51 UTC">2026-01-01</span>
   </span>
 
     
