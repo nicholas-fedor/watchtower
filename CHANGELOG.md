@@ -8,8 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update actions/attest-build-provenance digest to 405d0ea by @renovate[bot] in [#1164](https://github.com/nicholas-fedor/watchtower/pull/1164)
+- Update peter-evans/create-pull-request digest to 2271f1d by @renovate[bot] in [#1163](https://github.com/nicholas-fedor/watchtower/pull/1163)
+- Update actions/setup-python digest to 4f41a90 by @renovate[bot] in [#1158](https://github.com/nicholas-fedor/watchtower/pull/1158)
+- Update golangci/golangci-lint-action digest to e9dc929 by @renovate[bot] in [#1156](https://github.com/nicholas-fedor/watchtower/pull/1156)
+
 ### Fixed
 
+- Respect cross-project dependencies in watchtower depends-on labels by @nicholas-fedor in [#1162](https://github.com/nicholas-fedor/watchtower/pull/1162)
+- Lower log level for pinned image skip to debug by @nicholas-fedor in [#1160](https://github.com/nicholas-fedor/watchtower/pull/1160)
+- Resolve self-update container cleanup issues by @nicholas-fedor in [#1159](https://github.com/nicholas-fedor/watchtower/pull/1159)
 - Prevent panic in GetCreateConfig when containerInfo is nil by @nicholas-fedor in [#1147](https://github.com/nicholas-fedor/watchtower/pull/1147)
 
 ## [1.13.1] - 2025-12-22
