@@ -37,7 +37,7 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        uses: actions/checkout@064fe7f3312418007dea2b49a19844a9ee378f49
         with:
           fetch-depth: 0 # Full history for GoReleaser versioning.
 
