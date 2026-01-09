@@ -1,5 +1,3 @@
-// Package notifications provides mechanisms for sending notifications via various services.
-// This file contains tests for Shoutrrr notification functionality, including templating and batching.
 package notifications
 
 import (

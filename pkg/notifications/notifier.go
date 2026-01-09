@@ -1,5 +1,3 @@
-// Package notifications provides mechanisms for sending notifications via various services.
-// This file implements the core notifier creation and configuration logic.
 package notifications
 
 import (
@@ -183,7 +181,7 @@ func GetDelay(c *cobra.Command, legacyDelay time.Duration) time.Duration {
 //
 // Returns:
 //   - string: Formatted title.
-func GetTitle(hostname string, tag string) string {
+func GetTitle(hostname, tag string) string {
 	clog := logrus.WithFields(logrus.Fields{
 		"hostname": hostname,
 		"tag":      tag,

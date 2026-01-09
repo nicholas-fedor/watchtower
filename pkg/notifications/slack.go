@@ -1,5 +1,3 @@
-// Package notifications provides mechanisms for sending notifications via various services.
-// This file implements Slack notification functionality with webhook support.
 package notifications
 
 import (
@@ -121,7 +119,8 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}
 
 	// Set webhook token.
-	if err := conf.Token.SetFromProp(webhookToken); err != nil {
+	err := conf.Token.SetFromProp(webhookToken)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to set Slack webhook token")
 
 		return "", fmt.Errorf("failed to set Slack webhook token: %w", err)

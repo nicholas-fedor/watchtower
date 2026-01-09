@@ -15,6 +15,7 @@ type StaticData struct {
 // Data is the notification template data model.
 type Data struct {
 	StaticData
+
 	Entries []*logrus.Entry
 	Report  types.Report
 }
