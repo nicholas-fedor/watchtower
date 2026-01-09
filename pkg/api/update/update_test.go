@@ -428,7 +428,9 @@ func TestQueueConcurrentRequests(t *testing.T) {
 		}
 
 		var response map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -515,7 +517,9 @@ func TestHandleConcurrentRequestsWithRestarted(t *testing.T) {
 				}
 
 				var response map[string]any
-				if err := json.Unmarshal(localRec.Body.Bytes(), &response); err != nil {
+
+				err := json.Unmarshal(localRec.Body.Bytes(), &response)
+				if err != nil {
 					t.Errorf("failed to unmarshal response: %v", err)
 				}
 
@@ -581,6 +585,7 @@ func (f *faultyReadCloser) Close() error               { return nil }
 // faultyResponseWriter simulates a response writer that fails on Write.
 type faultyResponseWriter struct {
 	http.ResponseWriter
+
 	statusCode     int
 	header         http.Header
 	written        bool

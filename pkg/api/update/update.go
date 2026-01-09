@@ -1,4 +1,3 @@
-// Package update provides an HTTP API handler for triggering Watchtower container updates.
 package update
 
 import (
@@ -140,7 +139,8 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		"api_version": "v1",
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
 		logrus.WithError(err).Error("Failed to encode JSON response")
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 
