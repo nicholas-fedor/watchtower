@@ -8,9 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Add skylenet to contributor section by @nicholas-fedor in [#1183](https://github.com/nicholas-fedor/watchtower/pull/1183)
+- Auto-detect container stop timeout from Docker config by @skylenet in [#1182](https://github.com/nicholas-fedor/watchtower/pull/1182)
+
+### Chores
+
+- Update module github.com/docker/cli to v29.1.4+incompatible by @renovate[bot] in [#1181](https://github.com/nicholas-fedor/watchtower/pull/1181)
+- Update nicholas-fedor/govulncheck-action digest to 9813de4 by @renovate[bot] in [#1180](https://github.com/nicholas-fedor/watchtower/pull/1180)
+- Update module github.com/onsi/gomega to v1.39.0 by @renovate[bot] in [#1176](https://github.com/nicholas-fedor/watchtower/pull/1176)
+- Update cimg/go:1.25.5 docker digest to 955eb92 by @renovate[bot] in [#1179](https://github.com/nicholas-fedor/watchtower/pull/1179)
+- Update actions/checkout digest to 064fe7f by @renovate[bot] in [#1178](https://github.com/nicholas-fedor/watchtower/pull/1178)
+- Update module github.com/onsi/ginkgo/v2 to v2.27.4 by @renovate[bot] in [#1175](https://github.com/nicholas-fedor/watchtower/pull/1175)
+- Update docker/setup-qemu-action digest to 45136fd by @renovate[bot] in [#1174](https://github.com/nicholas-fedor/watchtower/pull/1174)
+- Update docker/setup-buildx-action digest to c7c4c00 by @renovate[bot] in [#1173](https://github.com/nicholas-fedor/watchtower/pull/1173)
+- Update nicholas-fedor/govulncheck-action digest to 0076f09 by @renovate[bot] in [#1172](https://github.com/nicholas-fedor/watchtower/pull/1172)
+- Update docker/setup-qemu-action digest to 6b85f87 by @renovate[bot] in [#1171](https://github.com/nicholas-fedor/watchtower/pull/1171)
+- Update actions/setup-go digest to ae252ee by @renovate[bot] in [#1170](https://github.com/nicholas-fedor/watchtower/pull/1170)
+- Update docker/login-action digest to 916386b by @renovate[bot] in [#1169](https://github.com/nicholas-fedor/watchtower/pull/1169)
+- Update actions/attest-build-provenance digest to 63e6444 by @renovate[bot] in [#1167](https://github.com/nicholas-fedor/watchtower/pull/1167)
+- Update golangci/golangci-lint-action digest to f75c1c4 by @renovate[bot] in [#1166](https://github.com/nicholas-fedor/watchtower/pull/1166)
+- Update actions/attest-build-provenance digest to 405d0ea by @renovate[bot] in [#1164](https://github.com/nicholas-fedor/watchtower/pull/1164)
+- Update peter-evans/create-pull-request digest to 2271f1d by @renovate[bot] in [#1163](https://github.com/nicholas-fedor/watchtower/pull/1163)
+- Update actions/setup-python digest to 4f41a90 by @renovate[bot] in [#1158](https://github.com/nicholas-fedor/watchtower/pull/1158)
+- Update golangci/golangci-lint-action digest to e9dc929 by @renovate[bot] in [#1156](https://github.com/nicholas-fedor/watchtower/pull/1156)
+
 ### Fixed
 
+- Respect cross-project dependencies in watchtower depends-on labels by @nicholas-fedor in [#1162](https://github.com/nicholas-fedor/watchtower/pull/1162)
+- Lower log level for pinned image skip to debug by @nicholas-fedor in [#1160](https://github.com/nicholas-fedor/watchtower/pull/1160)
+- Resolve self-update container cleanup issues by @nicholas-fedor in [#1159](https://github.com/nicholas-fedor/watchtower/pull/1159)
 - Prevent panic in GetCreateConfig when containerInfo is nil by @nicholas-fedor in [#1147](https://github.com/nicholas-fedor/watchtower/pull/1147)
+
+### New Contributors
+
+- @skylenet made their first contribution in [#1182](https://github.com/nicholas-fedor/watchtower/pull/1182)
 
 ## [1.13.1] - 2025-12-22
 
