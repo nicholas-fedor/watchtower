@@ -69,9 +69,9 @@ func NormalizeDigest(digest string) string {
 	// List of prefixes to strip from the digest.
 	prefixes := []string{"sha256:"}
 	for _, prefix := range prefixes {
-		if strings.HasPrefix(digest, prefix) {
+		if after, ok := strings.CutPrefix(digest, prefix); ok {
 			// Trim the prefix to get the raw digest value.
-			normalized := strings.TrimPrefix(digest, prefix)
+			normalized := after
 			logrus.WithFields(logrus.Fields{
 				"original":   digest,
 				"normalized": normalized,
@@ -693,8 +693,8 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 			Digest string `json:"digest"`
 		}
 		// Attempt to unmarshal the response body as JSON.
-		var jsonErr error
-		if jsonErr = json.Unmarshal(bodyBytes, &manifest); jsonErr == nil {
+		jsonErr := json.Unmarshal(bodyBytes, &manifest)
+		if jsonErr == nil {
 			// JSON unmarshaling succeeded, check if digest field contains a value.
 			if manifest.Digest != "" {
 				// Successfully parsed JSON manifest with digest field populated.

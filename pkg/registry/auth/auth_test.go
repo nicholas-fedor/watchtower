@@ -1,7 +1,5 @@
 // Package auth_test provides comprehensive tests for the registry authentication
-// functionality in Watchtower. It includes test suites for token retrieval,
-// challenge URL generation, and authentication URL construction, ensuring
-// robust coverage of the auth package's core operations.
+// functionality in Watchtower.
 package auth_test
 
 import (

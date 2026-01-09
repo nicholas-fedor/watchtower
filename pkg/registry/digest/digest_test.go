@@ -2848,7 +2848,7 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 		defer cliConn.Close()
 
 		tr := &http.Transport{
-			DialContext: func(_ context.Context, _ string, _ string) (net.Conn, error) {
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 				return cliConn, nil
 			},
 		}

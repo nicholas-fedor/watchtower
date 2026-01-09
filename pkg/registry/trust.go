@@ -1,5 +1,3 @@
-// Package registry provides utilities for interacting with container registries in Watchtower.
-// It handles authentication, pull option configuration, and API consumption checks for registry operations.
 package registry
 
 import (
