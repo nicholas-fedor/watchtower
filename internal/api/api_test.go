@@ -254,7 +254,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 	ginkgo.When("update API is enabled with monitorOnly parameter", func() {
 		ginkgo.DescribeTable("should pass monitorOnly parameter to update function",
-			func(monitorOnly bool, expectMonitorOnly bool) {
+			func(monitorOnly, expectMonitorOnly bool) {
 				ctx := context.Background()
 
 				var capturedParams types.UpdateParams

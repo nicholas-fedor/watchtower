@@ -1,4 +1,3 @@
-// Package flags manages command-line flags and environment variables for Watchtower configuration.
 package flags
 
 import (
@@ -672,7 +671,8 @@ func splitNotificationValues(value string) []string {
 	final := make([]string, 0, len(result))
 	// Validate each URL string using net/url.Parse
 	for _, urlStr := range result {
-		if _, err := url.Parse(urlStr); err != nil {
+		_, err := url.Parse(urlStr)
+		if err != nil {
 			logrus.Warnf("Invalid notification URL '%s': %v", urlStr, err)
 		}
 
@@ -765,19 +765,23 @@ func EnvConfig(cmd *cobra.Command) error {
 	}
 
 	// Set environment variables.
-	if err := setEnvOptStr("DOCKER_HOST", host); err != nil {
+	err = setEnvOptStr("DOCKER_HOST", host)
+	if err != nil {
 		return err
 	}
 
-	if err := setEnvOptBool("DOCKER_TLS_VERIFY", tls); err != nil {
+	err = setEnvOptBool("DOCKER_TLS_VERIFY", tls)
+	if err != nil {
 		return err
 	}
 
-	if err := setEnvOptStr("DOCKER_API_VERSION", version); err != nil {
+	err = setEnvOptStr("DOCKER_API_VERSION", version)
+	if err != nil {
 		return err
 	}
 
-	if err := setEnvOptStr("DOCKER_CERT_PATH", certPath); err != nil {
+	err = setEnvOptStr("DOCKER_CERT_PATH", certPath)
+	if err != nil {
 		return err
 	}
 
@@ -851,12 +855,13 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 //
 // Returns:
 //   - error: Non-nil if set fails, nil if skipped or successful.
-func setEnvOptStr(env string, opt string) error {
+func setEnvOptStr(env, opt string) error {
 	if opt == "" || opt == os.Getenv(env) {
 		return nil
 	}
 
-	if err := os.Setenv(env, opt); err != nil {
+	err := os.Setenv(env, opt)
+	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"env":   env,
 			"value": opt,
@@ -906,7 +911,8 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 
 	// Process each secret flag.
 	for _, secret := range secrets {
-		if err := getSecretFromFile(flags, secret); err != nil {
+		err := getSecretFromFile(flags, secret)
+		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"flag": secret,
 			}).Fatal("Failed to load secret from file")
@@ -951,7 +957,8 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 					}
 				}
 
-				if err := scanner.Err(); err != nil {
+				err = scanner.Err()
+				if err != nil {
 					logrus.WithFields(fields).
 						WithField("file", value).
 						WithError(err).
@@ -968,7 +975,8 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 			}
 		}
 
-		if err := sliceValue.Replace(values); err != nil {
+		err := sliceValue.Replace(values)
+		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to replace slice value in flag")
 
 			return fmt.Errorf("%w: %w", errReplaceSliceFailed, err)
@@ -990,7 +998,8 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 			return fmt.Errorf("%w: %w", errReadFileFailed, err)
 		}
 
-		if err := flags.Set(secret, strings.TrimSpace(string(content))); err != nil {
+		err = flags.Set(secret, strings.TrimSpace(string(content)))
+		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to set flag from file contents")
 
 			return fmt.Errorf("%w: %w", errSetFlagFailed, err)
@@ -1039,7 +1048,8 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 			logrus.WithField("version", porcelain).Fatal("Unknown porcelain version, supported: v1")
 		}
 
-		if err := appendFlagValue(flags, "notification-url", "logger://"); err != nil {
+		err := appendFlagValue(flags, "notification-url", "logger://")
+		if err != nil {
 			logrus.WithError(err).Debug("Failed to append notification-url")
 		}
 
@@ -1075,7 +1085,9 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 		interval, _ := flags.GetInt("interval")
 
 		scheduleValue := fmt.Sprintf("@every %ds", interval)
-		if err := flags.Set("schedule", scheduleValue); err != nil {
+
+		err := flags.Set("schedule", scheduleValue)
+		if err != nil {
 			logrus.WithError(err).
 				WithField("interval", interval).
 				Debug("Failed to set schedule from interval")
@@ -1089,13 +1101,15 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 
 	// Adjust log level for debug/trace.
 	if flagIsEnabled(flags, "debug") {
-		if err := flags.Set("log-level", "debug"); err != nil {
+		err := flags.Set("log-level", "debug")
+		if err != nil {
 			logrus.WithError(err).Debug("Failed to set debug log level")
 		}
 	}
 
 	if flagIsEnabled(flags, "trace") {
-		if err := flags.Set("log-level", "trace"); err != nil {
+		err := flags.Set("log-level", "trace")
+		if err != nil {
 			logrus.WithError(err).Debug("Failed to set trace log level")
 		}
 	}
@@ -1123,7 +1137,8 @@ func SetupLogging(flags *pflag.FlagSet) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
-	if err := configureLogFormat(logFormat, noColor); err != nil {
+	err = configureLogFormat(logFormat, noColor)
+	if err != nil {
 		return err
 	}
 
@@ -1224,7 +1239,8 @@ func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error 
 
 	if flagValues, ok := flag.Value.(pflag.SliceValue); ok {
 		for _, value := range values {
-			if err := flagValues.Append(value); err != nil {
+			err := flagValues.Append(value)
+			if err != nil {
 				logrus.WithError(err).WithFields(logrus.Fields{
 					"flag":  name,
 					"value": value,
@@ -1246,12 +1262,13 @@ func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error 
 //   - flags: Flag set.
 //   - name: Flag name.
 //   - value: Default value.
-func setFlagIfDefault(flags *pflag.FlagSet, name string, value string) {
+func setFlagIfDefault(flags *pflag.FlagSet, name, value string) {
 	if flags.Changed(name) {
 		return
 	}
 
-	if err := flags.Set(name, value); err != nil {
+	err := flags.Set(name, value)
+	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"flag":  name,
 			"value": value,

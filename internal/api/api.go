@@ -129,11 +129,12 @@ func SetupAndStartAPI(
 	}
 
 	// Start the API server, logging errors unless it's a clean shutdown.
-	if err := httpAPI.Start(
+	err := httpAPI.Start(
 		ctx,
 		enableUpdateAPI && !unblockHTTPAPI,
 		noStartupMessage,
-	); err != nil &&
+	)
+	if err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
 		logrus.WithError(err).Error("Failed to start API")
 

@@ -129,6 +129,8 @@ func RunUpgradesOnSchedule(
 	// Wrapper function that can skip Watchtower self-update on the first run if needed
 	var scheduledUpdateFunc func()
 
+	// If Watchtower has performed a self-cleanup, then prevent Watchtower
+	// from self-updating during the first update cycle.
 	if skipFirstRun {
 		var firstRun uint32
 
@@ -148,9 +150,10 @@ func RunUpgradesOnSchedule(
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
 	if scheduleSpec != "" {
-		if err := scheduler.AddFunc(
+		err := scheduler.AddFunc(
 			scheduleSpec,
-			scheduledUpdateFunc); err != nil {
+			scheduledUpdateFunc)
+		if err != nil {
 			return fmt.Errorf("failed to schedule updates: %w", err)
 		}
 	}
