@@ -5,7 +5,7 @@
 # Watchtower: https://github.com/nicholas-fedor/watchtower/                                          #
 # Mockery: https://vektra.github.io/mockery/latest/                                                  #
 # Configuration: https://vektra.github.io/mockery/latest/configuration                               #
-# Mockery Version: 3.3.2                                                                              #
+# Mockery Major Version: 3.x.x                                                                              #
 #                                                                                                    #
 ######################################################################################################
 
@@ -13,7 +13,7 @@
 # Mockery Usage                                                                                      #
 #                                                                                                    #
 # Install Mockery:                                                                                   #
-# go install github.com/vektra/mockery/v3@v3.3.2                                                     #
+# go install github.com/vektra/mockery/v3@latest                                                     #
 #                                                                                                    #
 # Run CLI command from root:                                                                         #
 # mockery                                                                                            #
