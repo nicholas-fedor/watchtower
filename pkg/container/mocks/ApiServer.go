@@ -29,6 +29,7 @@ const (
 // Returns the file contents or an error if the file isn’t found.
 func getMockJSONFile(relPath string) ([]byte, error) {
 	absPath, _ := filepath.Abs(relPath)
+
 	buf, err := os.ReadFile(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("mock JSON file %q not found: %w", absPath, err)
@@ -37,7 +38,7 @@ func getMockJSONFile(relPath string) ([]byte, error) {
 	return buf, nil
 }
 
-// Expects the file to exist at the given relative path; fails the test otherwise.
+// RespondWithJSONFile expects the file to exist at the given relative path; fails the test otherwise.
 func RespondWithJSONFile(
 	relPath string,
 	statusCode int,
