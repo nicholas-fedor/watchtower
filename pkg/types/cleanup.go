@@ -1,4 +1,3 @@
-// Package types provides core types for Watchtower operations.
 package types
 
 // CleanedImageInfo represents information about an image that was cleaned up during update operations.
