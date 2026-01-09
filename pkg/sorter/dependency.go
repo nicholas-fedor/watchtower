@@ -159,7 +159,13 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 	}
 
 	// Phase 4: Cycle detection
-	if err := detectAndReportCycle(sorted, containers, containerMap, adjacency, normalizedMap); err != nil {
+	if err := detectAndReportCycle(
+		sorted,
+		containers,
+		containerMap,
+		adjacency,
+		normalizedMap,
+	); err != nil {
 		return nil, err
 	}
 

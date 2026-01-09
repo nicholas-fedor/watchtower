@@ -157,7 +157,8 @@ func NewAuthClient() Client {
 
 			logrus.WithField("min_version", minVersion).Debug("Configured TLS minimum version")
 		} else {
-			logrus.WithField("min_version", minVersion).Warn("Invalid TLS minimum version specified; defaulting to TLS 1.2")
+			logrus.WithField("min_version", minVersion).
+				Warn("Invalid TLS minimum version specified; defaulting to TLS 1.2")
 		}
 	}
 

@@ -123,7 +123,11 @@ func StartTargetContainer(
 	if err := api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name()); err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 		// Clean up the created container to avoid orphaned resources
-		if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainer.RemoveOptions{Force: true}); rmErr != nil {
+		if rmErr := api.ContainerRemove(
+			ctx,
+			createdContainer.ID,
+			dockerContainer.RemoveOptions{Force: true},
+		); rmErr != nil {
 			clog.WithError(rmErr).Warn("Failed to clean up container after rename error")
 		}
 
@@ -132,9 +136,20 @@ func StartTargetContainer(
 
 	// Attach additional networks for legacy API if needed.
 	if versions.LessThan(clientVersion, "1.44") && len(networkConfig.EndpointsConfig) > 1 {
-		if err := attachNetworks(ctx, api, createdContainer.ID, networkConfig, createNetworkConfig, clog); err != nil {
+		if err := attachNetworks(
+			ctx,
+			api,
+			createdContainer.ID,
+			networkConfig,
+			createNetworkConfig,
+			clog,
+		); err != nil {
 			// Clean up the created container to avoid orphaned resources.
-			if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainer.RemoveOptions{Force: true}); rmErr != nil {
+			if rmErr := api.ContainerRemove(
+				ctx,
+				createdContainer.ID,
+				dockerContainer.RemoveOptions{Force: true},
+			); rmErr != nil {
 				clog.WithError(rmErr).
 					Warn("Failed to clean up container after network attachment error")
 			}
@@ -154,7 +169,11 @@ func StartTargetContainer(
 	// Start the newly created container.
 	clog.WithField("new_id", createdContainerID).Debug("Starting new container")
 
-	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainer.StartOptions{}); err != nil {
+	if err := api.ContainerStart(
+		ctx,
+		createdContainer.ID,
+		dockerContainer.StartOptions{},
+	); err != nil {
 		clog.WithError(err).
 			WithField("new_id", createdContainerID).
 			Debug("Failed to start new container")

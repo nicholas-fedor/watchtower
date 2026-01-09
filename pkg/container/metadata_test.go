@@ -744,7 +744,10 @@ func TestContainer_StopTimeout_WhenSet(t *testing.T) {
 	c := Container{
 		containerInfo: &dockerContainer.InspectResponse{
 			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
-			Config:            &dockerContainer.Config{StopTimeout: &timeout60, Labels: map[string]string{}},
+			Config: &dockerContainer.Config{
+				StopTimeout: &timeout60,
+				Labels:      map[string]string{},
+			},
 		},
 	}
 
@@ -760,7 +763,10 @@ func TestContainer_StopTimeout_WhenSetToZero(t *testing.T) {
 	c := Container{
 		containerInfo: &dockerContainer.InspectResponse{
 			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
-			Config:            &dockerContainer.Config{StopTimeout: &timeout0, Labels: map[string]string{}},
+			Config: &dockerContainer.Config{
+				StopTimeout: &timeout0,
+				Labels:      map[string]string{},
+			},
 		},
 	}
 
@@ -1389,7 +1395,11 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.getContainerOrGlobalBool(tt.args.globalVal, tt.args.label, tt.args.contPrecedence); got != tt.want {
+			if got := tt.c.getContainerOrGlobalBool(
+				tt.args.globalVal,
+				tt.args.label,
+				tt.args.contPrecedence,
+			); got != tt.want {
 				t.Errorf("Container.getContainerOrGlobalBool() = %v, want %v", got, tt.want)
 			}
 		})

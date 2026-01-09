@@ -569,7 +569,8 @@ func runMain(cfg config.RunConfig) int {
 				},
 			}
 			if err := client.UpdateContainer(container, updateConfig); err != nil {
-				logrus.WithError(err).Warn("Failed to update restart policy to 'no' for current container")
+				logrus.WithError(err).
+					Warn("Failed to update restart policy to 'no' for current container")
 			} else {
 				logrus.Debug("Updated current container restart policy to 'no'")
 			}

@@ -124,7 +124,11 @@ func TestExecutePreChecks(t *testing.T) {
 					"first log message mismatch",
 				)
 			} else {
-				t.Errorf("No log entries captured; expected %d with message %q", testClient.expectedLogs, testClient.expectedLogMsg)
+				t.Errorf(
+					"No log entries captured; expected %d with message %q",
+					testClient.expectedLogs,
+					testClient.expectedLogMsg,
+				)
 			}
 
 			hook.Reset()
@@ -186,7 +190,11 @@ func TestExecutePostChecks(t *testing.T) {
 			if len(hook.Entries) > 0 {
 				assert.Contains(t, hook.Entries[0].Message, testClient.expectedLogMsg)
 			} else {
-				t.Errorf("No log entries captured; expected %d with message %q", testClient.expectedLogs, testClient.expectedLogMsg)
+				t.Errorf(
+					"No log entries captured; expected %d with message %q",
+					testClient.expectedLogs,
+					testClient.expectedLogMsg,
+				)
 			}
 
 			hook.Reset()
@@ -268,7 +276,11 @@ func TestExecutePreCheckCommand(t *testing.T) {
 			if len(hook.Entries) > 0 {
 				assert.Contains(t, hook.LastEntry().Message, testClient.expectedLogMsg)
 			} else {
-				t.Errorf("No log entries captured; expected %d with message %q", testClient.expectedLogs, testClient.expectedLogMsg)
+				t.Errorf(
+					"No log entries captured; expected %d with message %q",
+					testClient.expectedLogs,
+					testClient.expectedLogMsg,
+				)
 			}
 
 			hook.Reset()
@@ -350,7 +362,11 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			if len(hook.Entries) > 0 {
 				assert.Contains(t, hook.LastEntry().Message, testClient.expectedLogMsg)
 			} else {
-				t.Errorf("No log entries captured; expected %d with message %q", testClient.expectedLogs, testClient.expectedLogMsg)
+				t.Errorf(
+					"No log entries captured; expected %d with message %q",
+					testClient.expectedLogs,
+					testClient.expectedLogMsg,
+				)
 			}
 
 			hook.Reset()
@@ -591,7 +607,11 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			if len(hook.Entries) > 0 {
 				assert.Contains(t, hook.LastEntry().Message, testClient.expectedLogMsg)
 			} else {
-				t.Errorf("No log entries captured; expected %d with message %q", testClient.expectedLogs, testClient.expectedLogMsg)
+				t.Errorf(
+					"No log entries captured; expected %d with message %q",
+					testClient.expectedLogs,
+					testClient.expectedLogMsg,
+				)
 			}
 
 			hook.Reset()

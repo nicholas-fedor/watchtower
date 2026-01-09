@@ -421,8 +421,10 @@ var _ = ginkgo.Describe("the auth module", func() {
 				To(gomega.ContainSubstring(expectedErr), fmt.Sprintf("Expected error to contain '%s'", expectedErr))
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
 		} else {
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Expected no error when fetching basic auth token")
-			gomega.Expect(token).To(gomega.Equal(expectedToken), fmt.Sprintf("Expected token to match '%s'", expectedToken))
+			gomega.Expect(err).
+				NotTo(gomega.HaveOccurred(), "Expected no error when fetching basic auth token")
+			gomega.Expect(token).
+				To(gomega.Equal(expectedToken), fmt.Sprintf("Expected token to match '%s'", expectedToken))
 		}
 	}
 
@@ -1014,7 +1016,11 @@ var _ = ginkgo.Describe("the auth module", func() {
 					servers[i].AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyRequest("GET", "/v2/"),
-							ghttp.RespondWith(http.StatusOK, `{"token": "final-token"}`, http.Header{"Content-Type": []string{"application/json"}}),
+							ghttp.RespondWith(
+								http.StatusOK,
+								`{"token": "final-token"}`,
+								http.Header{"Content-Type": []string{"application/json"}},
+							),
 						),
 					)
 				}

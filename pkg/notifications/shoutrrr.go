@@ -300,7 +300,8 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 			"rate_limit_failures": rateLimitFailures,
 		}).Warn("Notification send completed with failures")
 	} else if len(notifier.Urls) > 0 {
-		LocalLog.WithField("total_urls", len(notifier.Urls)).Debug("Notification send completed successfully")
+		LocalLog.WithField("total_urls", len(notifier.Urls)).
+			Debug("Notification send completed successfully")
 	}
 }
 

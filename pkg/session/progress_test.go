@@ -171,7 +171,11 @@ func TestUpdateFromContainer(t *testing.T) {
 					tt.want.containerError,
 				)
 			} else if got.containerError != nil && got.containerError != tt.want.containerError {
-				t.Errorf("UpdateFromContainer() error message = %v, want %v", got.containerError, tt.want.containerError)
+				t.Errorf(
+					"UpdateFromContainer() error message = %v, want %v",
+					got.containerError,
+					tt.want.containerError,
+				)
 			}
 		})
 	}
@@ -472,7 +476,12 @@ func TestProgress_AddScanned(t *testing.T) {
 						wantStatus.containerError,
 					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError != wantStatus.containerError {
-					t.Errorf("Progress.AddScanned() error message for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.AddScanned() error message for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				}
 			}
 		})
@@ -657,7 +666,12 @@ func TestProgress_Add(t *testing.T) {
 						wantStatus.containerError,
 					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError != wantStatus.containerError {
-					t.Errorf("Progress.Add() error message for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.Add() error message for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				}
 			}
 		})
@@ -744,7 +758,12 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 						wantStatus.containerError,
 					)
 				} else if gotStatus.containerError != nil && gotStatus.containerError != wantStatus.containerError {
-					t.Errorf("Progress.MarkForUpdate() error message for %v = %v, want %v", id, gotStatus.containerError, wantStatus.containerError)
+					t.Errorf(
+						"Progress.MarkForUpdate() error message for %v = %v, want %v",
+						id,
+						gotStatus.containerError,
+						wantStatus.containerError,
+					)
 				}
 			}
 		})

@@ -205,7 +205,8 @@ func cleanupExcessWatchtowers(
 		if err != nil {
 			logrus.WithError(err).Warn("Failed to clean up some images during Watchtower cleanup")
 		} else if len(cleaned) > 0 {
-			logrus.WithField("cleaned_images", len(cleaned)).Debug("Successfully cleaned up images during Watchtower cleanup")
+			logrus.WithField("cleaned_images", len(cleaned)).
+				Debug("Successfully cleaned up images during Watchtower cleanup")
 		}
 	}
 
@@ -272,14 +273,25 @@ func CleanupImages(
 					"image_id":   imageID,
 					"image_name": cleanedImage.ImageName,
 				}).Debug("Failed to remove image")
-				removalErrors = append(removalErrors, fmt.Errorf("failed to remove image %s: %w", imageID, err))
+				removalErrors = append(
+					removalErrors,
+					fmt.Errorf("failed to remove image %s: %w", imageID, err),
+				)
 			}
 		} else {
 			logrus.WithFields(logrus.Fields{
 				"image_id":   imageID.ShortID(),
 				"image_name": cleanedImage.ImageName,
 			}).Debug("Cleaned up old image")
-			cleaned = append(cleaned, types.CleanedImageInfo{ImageID: imageID, ContainerID: cleanedImage.ContainerID, ImageName: cleanedImage.ImageName, ContainerName: cleanedImage.ContainerName})
+			cleaned = append(
+				cleaned,
+				types.CleanedImageInfo{
+					ImageID:       imageID,
+					ContainerID:   cleanedImage.ContainerID,
+					ImageName:     cleanedImage.ImageName,
+					ContainerName: cleanedImage.ContainerName,
+				},
+			)
 		}
 	}
 
