@@ -707,6 +707,185 @@ var _ = ginkgo.Describe("Container", func() {
 			identifier := ResolveContainerIdentifier(container)
 			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
 		})
+
+		ginkgo.It("returns container name for replica containers", func() {
+			mockContainer := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.service":     "web",
+						"com.docker.compose.project":     "myproject",
+						"com.docker.compose.version":     "3.8",
+						"com.docker.compose.config-hash": "abc123",
+					},
+				},
+			})
+			mockContainer.EXPECT().Name().Return("myproject-web-1")
+			result := ResolveContainerIdentifier(mockContainer)
+			gomega.Expect(result).To(gomega.Equal("myproject-web-1"))
+		})
+
+		ginkgo.DescribeTable("replica container identifiers",
+			func(name string, labels map[string]string, expected, description string) {
+				container := MockContainer(WithLabels(labels))
+				if expected == name {
+					container.containerInfo.Name = name
+					container.normalizedName = name
+				}
+				result := ResolveContainerIdentifier(container)
+				gomega.Expect(result).To(gomega.Equal(expected), "Test case: %s", description)
+			},
+			ginkgo.Entry(
+				"single replica returns unique name",
+				"myproject-web-1",
+				map[string]string{
+					"com.docker.compose.service":          "web",
+					"com.docker.compose.project":          "myproject",
+					"com.docker.compose.container-number": "1",
+				},
+				"myproject-web-1",
+				"Replica should return full name to ensure uniqueness",
+			),
+			ginkgo.Entry(
+				"multiple replicas with different numbers",
+				"myproject-web-2",
+				map[string]string{
+					"com.docker.compose.service":          "web",
+					"com.docker.compose.project":          "myproject",
+					"com.docker.compose.container-number": "2",
+				},
+				"myproject-web-2",
+				"Each replica should have unique identifier",
+			),
+			ginkgo.Entry(
+				"replica without container number label",
+				"app-db-3",
+				map[string]string{
+					"com.docker.compose.service": "db",
+					"com.docker.compose.project": "app",
+				},
+				"app-db-3",
+				"Should return full name even without container number to avoid collisions",
+			),
+			ginkgo.Entry(
+				"non-replica with container number",
+				"mydb",
+				map[string]string{
+					"com.docker.compose.service":          "db",
+					"com.docker.compose.project":          "my",
+					"com.docker.compose.container-number": "1",
+				},
+				"my-db-1",
+				"Non-replica should use project-service-number format",
+			),
+			ginkgo.Entry(
+				"replica with missing service label",
+				"myproject-orphan-1",
+				map[string]string{
+					"com.docker.compose.project": "myproject",
+				},
+				"myproject-orphan-1",
+				"Container with project prefix but no service should return full name",
+			),
+			ginkgo.Entry(
+				"container with service but no project",
+				"unknown-web-2",
+				map[string]string{
+					"com.docker.compose.service": "web",
+				},
+				"web",
+				"Non-replica container with service label returns service name",
+			),
+			ginkgo.Entry(
+				"collision prevention for replicas",
+				"test-app-1",
+				map[string]string{
+					"com.docker.compose.service":          "app",
+					"com.docker.compose.project":          "test",
+					"com.docker.compose.container-number": "1",
+				},
+				"test-app-1",
+				"Should return unique name instead of potentially colliding 'test-app'",
+			),
+			ginkgo.Entry(
+				"collision prevention for replicas with same number",
+				"prod-api-1",
+				map[string]string{
+					"com.docker.compose.service":          "api",
+					"com.docker.compose.project":          "prod",
+					"com.docker.compose.container-number": "1",
+				},
+				"prod-api-1",
+				"Multiple replicas with same number should still be unique",
+			),
+		)
+
+		ginkgo.Describe("replica collision scenarios", func() {
+			ginkgo.It("prevents collision between replicas without unique identifiers", func() {
+				// Without replica logic, both would return "myapp-service"
+				replica1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replica1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "service",
+							"com.docker.compose.project": "myapp",
+						},
+					},
+				})
+				replica1.EXPECT().Name().Return("myapp-service-1")
+
+				replica2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replica2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "service",
+							"com.docker.compose.project": "myapp",
+						},
+					},
+				})
+				replica2.EXPECT().Name().Return("myapp-service-2")
+
+				id1 := ResolveContainerIdentifier(replica1)
+				id2 := ResolveContainerIdentifier(replica2)
+
+				gomega.Expect(id1).To(gomega.Equal("myapp-service-1"))
+				gomega.Expect(id2).To(gomega.Equal("myapp-service-2"))
+				gomega.Expect(id1).ToNot(gomega.Equal(id2))
+			})
+
+			ginkgo.It("handles replicas with and without container number labels", func() {
+				replicaWithNumber := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replicaWithNumber.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service":          "worker",
+							"com.docker.compose.project":          "queue",
+							"com.docker.compose.container-number": "5",
+						},
+					},
+				})
+				replicaWithNumber.EXPECT().Name().Return("queue-worker-5")
+
+				replicaWithoutNumber := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replicaWithoutNumber.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{
+						Config: &dockerContainer.Config{
+							Labels: map[string]string{
+								"com.docker.compose.service": "worker",
+								"com.docker.compose.project": "queue",
+							},
+						},
+					})
+				replicaWithoutNumber.EXPECT().Name().Return("queue-worker-6")
+
+				idWith := ResolveContainerIdentifier(replicaWithNumber)
+				idWithout := ResolveContainerIdentifier(replicaWithoutNumber)
+
+				gomega.Expect(idWith).To(gomega.Equal("queue-worker-5"))
+				gomega.Expect(idWithout).To(gomega.Equal("queue-worker-6"))
+			})
+		})
 	})
 
 	ginkgo.Describe("No-Pull Configuration", func() {
@@ -861,7 +1040,7 @@ var _ = ginkgo.Describe("Container", func() {
 			)
 
 			// WithCPUSettings configures the container's CPU settings.
-			WithCPUSettings := func(nanoCPUs int64, cpuShares int64, cpuQuota int64, cpuPeriod int64, cpusetCpus string, cpusetMems string) MockContainerUpdate {
+			WithCPUSettings := func(nanoCPUs, cpuShares, cpuQuota, cpuPeriod int64, cpusetCpus, cpusetMems string) MockContainerUpdate {
 				return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					if c.HostConfig == nil {
 						c.HostConfig = &dockerContainer.HostConfig{}

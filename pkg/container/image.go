@@ -71,7 +71,8 @@ func (c imageClient) IsContainerStale(
 		return c.checkLocalImageStaleness(ctx, sourceContainer, clog)
 	}
 
-	if err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed); err != nil {
+	err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to pull image")
 
 		return false, sourceContainer.SafeImageID(), err
@@ -360,7 +361,8 @@ func (c imageClient) performImagePull(
 	defer response.Close()
 
 	// Read response to complete the pull.
-	if _, err = io.ReadAll(response); err != nil {
+	_, err = io.ReadAll(response)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to read image pull response")
 
 		return fmt.Errorf("%w: %s: %w", errReadPullResponseFailed, imageName, err)

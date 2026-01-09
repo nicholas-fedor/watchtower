@@ -138,8 +138,9 @@ type Client interface {
 //
 // It wraps the Docker API client and applies custom behavior via ClientOptions.
 type client struct {
-	api dockerClient.APIClient
 	ClientOptions
+
+	api dockerClient.APIClient
 }
 
 // ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
@@ -191,7 +192,8 @@ func NewClient(opts ClientOptions) Client {
 			logrus.WithError(err).Fatal("Failed to create test client")
 		}
 
-		if _, err := pingCli.Ping(ctx); err != nil &&
+		_, err = pingCli.Ping(ctx)
+		if err != nil &&
 			strings.Contains(err.Error(), "page not found") {
 			logrus.WithFields(logrus.Fields{
 				"version":  version,
@@ -209,7 +211,8 @@ func NewClient(opts ClientOptions) Client {
 	// Log client and server API versions.
 	selectedVersion := cli.ClientVersion()
 
-	if serverVersion, err := cli.ServerVersion(ctx); err != nil {
+	serverVersion, err := cli.ServerVersion(ctx)
+	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"error":    err,
 			"endpoint": "/version",
@@ -619,7 +622,9 @@ func (c client) ExecuteCommand(
 	clog.WithField("exec_id", exec.ID).Debug("Starting exec instance")
 
 	execStartCheck := dockerContainer.ExecStartOptions{Tty: true}
-	if err := c.api.ContainerExecStart(ctx, exec.ID, execStartCheck); err != nil {
+
+	err = c.api.ContainerExecStart(ctx, exec.ID, execStartCheck)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to start exec instance")
 
 		return false, fmt.Errorf("%w: %w", errStartExecFailed, err)
@@ -689,6 +694,211 @@ func generateContainerMetadata(container types.Container) (string, error) {
 	}
 
 	return string(metadataJSON), nil
+}
+
+// RemoveImageByID deletes an image from the Docker host by its ID.
+//
+// Parameters:
+//   - imageID: ID of the image to remove.
+//   - imageName: Name of the image to remove (for logging purposes).
+//
+// Returns:
+//   - error: Non-nil if removal fails, nil on success.
+func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
+	// Use image client to remove the image.
+	imgClient := newImageClient(c.api)
+
+	err := imgClient.RemoveImageByID(imageID, imageName)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"image_id":   imageID,
+			"image_name": imageName,
+		}).Debug("Failed to remove image")
+
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"image_id":   imageID.ShortID(),
+		"image_name": imageName,
+	}).Debug("Cleaned up old image")
+
+	return nil
+}
+
+// GetVersion returns the client’s API version.
+//
+// Returns:
+//   - string: Docker API version (e.g., "1.44").
+func (c client) GetVersion() string {
+	return strings.Trim(c.api.ClientVersion(), "\"")
+}
+
+// GetInfo returns system information from the Docker daemon.
+//
+// Returns:
+//   - map[string]interface{}: System information.
+//   - error: Non-nil if retrieval fails, nil on success.
+func (c client) GetInfo() (map[string]any, error) {
+	ctx := context.Background()
+
+	info, err := c.api.Info(ctx)
+	if err != nil {
+		logrus.WithError(err).Debug("Failed to get system info")
+
+		return nil, fmt.Errorf("failed to get system info: %w", err)
+	}
+
+	// Convert to map for easier access
+	infoMap := map[string]any{
+		"Name":            info.Name,
+		"ServerVersion":   info.ServerVersion,
+		"OSType":          info.OSType,
+		"OperatingSystem": info.OperatingSystem,
+		"Driver":          info.Driver,
+	}
+
+	return infoMap, nil
+}
+
+// WaitForContainerHealthy waits for a container to become healthy or times out.
+//
+// Parameters:
+//   - containerID: ID of the container to wait for.
+//   - timeout: Maximum duration to wait for health.
+//
+// Returns:
+//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
+func (c client) WaitForContainerHealthy(
+	containerID types.ContainerID,
+	timeout time.Duration,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	clog := logrus.WithField("container_id", containerID)
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			clog.Warn("Timeout waiting for container to become healthy")
+
+			return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
+		case <-ticker.C:
+			// Inspect the container to check health status
+			inspect, err := c.api.ContainerInspect(ctx, string(containerID))
+			if err != nil {
+				clog.WithError(err).Debug("Failed to inspect container for health check")
+
+				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
+			}
+
+			// Check if health check is configured
+			if inspect.State.Health == nil {
+				clog.Debug("No health check configured for container, proceeding")
+
+				return nil
+			}
+
+			status := inspect.State.Health.Status
+			clog.WithField("health_status", status).Debug("Checked container health status")
+
+			if status == "healthy" {
+				clog.Debug("Container is now healthy")
+
+				return nil
+			}
+
+			if status == "unhealthy" {
+				clog.Warn("Container health check failed")
+
+				return fmt.Errorf("%w: %s", errHealthCheckFailed, containerID)
+			}
+
+			// Continue polling for "starting" or other statuses
+		}
+	}
+}
+
+// detectPodman determines if the container runtime is Podman using multiple detection methods.
+//
+// Returns:
+//   - bool: True if Podman is detected, false otherwise.
+//   - error: Non-nil if detection fails, nil on success.
+func (c client) detectPodman() (bool, error) {
+	// Check for Podman marker file
+	_, err := c.Fs.Stat("/run/.containerenv")
+	if err == nil {
+		logrus.Debug("Detected Podman via marker file /run/.containerenv")
+
+		return true, nil
+	}
+
+	// Check for Docker marker file (ensure we're not in Docker)
+	_, err = c.Fs.Stat("/.dockerenv")
+	if err == nil {
+		logrus.Debug("Detected Docker via marker file /.dockerenv")
+
+		return false, nil
+	}
+
+	// Check CONTAINER environment variable
+	if container := os.Getenv("CONTAINER"); container == "podman" || container == "oci" {
+		logrus.Debug("Detected Podman via CONTAINER environment variable")
+
+		return true, nil
+	}
+
+	// Fallback to API-based detection
+	info, err := c.GetInfo()
+	if err != nil {
+		logrus.WithError(err).
+			Debug("Failed to get system info for Podman detection, assuming Docker")
+
+		return false, err
+	}
+
+	if name, exists := info["Name"]; exists && name == "podman" {
+		logrus.Debug("Detected Podman via API Name field")
+
+		return true, nil
+	} else if serverVersion, exists := info["ServerVersion"]; exists {
+		if sv, ok := serverVersion.(string); ok && strings.Contains(strings.ToLower(sv), "podman") {
+			logrus.Debug("Detected Podman via API ServerVersion field")
+
+			return true, nil
+		}
+	}
+
+	logrus.Debug("No Podman detection criteria met, assuming Docker")
+
+	return false, nil
+}
+
+// getPodmanFlag determines if Podman detection is needed and performs it.
+//
+// Returns:
+//   - bool: True if Podman is detected, false otherwise.
+func (c client) getPodmanFlag() bool {
+	// Only perform detection in auto mode; otherwise, assume Docker
+	if c.CPUCopyMode != CPUCopyModeAuto {
+		return false
+	}
+
+	// Attempt to detect Podman using various methods (marker files, env vars, API info)
+	isPodman, err := c.detectPodman()
+	if err != nil {
+		// On detection failure, fall back to assuming Docker
+		logrus.WithError(err).Debug("Failed to detect container runtime, falling back to Docker")
+
+		return false
+	}
+
+	// Return the detection result
+	return isPodman
 }
 
 // captureExecOutput attaches to an exec instance and captures its output.
@@ -819,207 +1029,4 @@ func (c client) waitForExecOrTimeout(
 	}
 
 	return false, nil
-}
-
-// RemoveImageByID deletes an image from the Docker host by its ID.
-//
-// Parameters:
-//   - imageID: ID of the image to remove.
-//   - imageName: Name of the image to remove (for logging purposes).
-//
-// Returns:
-//   - error: Non-nil if removal fails, nil on success.
-func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
-	// Use image client to remove the image.
-	imgClient := newImageClient(c.api)
-
-	err := imgClient.RemoveImageByID(imageID, imageName)
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"image_id":   imageID,
-			"image_name": imageName,
-		}).Debug("Failed to remove image")
-
-		return err
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"image_id":   imageID.ShortID(),
-		"image_name": imageName,
-	}).Debug("Cleaned up old image")
-
-	return nil
-}
-
-// GetVersion returns the client’s API version.
-//
-// Returns:
-//   - string: Docker API version (e.g., "1.44").
-func (c client) GetVersion() string {
-	return strings.Trim(c.api.ClientVersion(), "\"")
-}
-
-// GetInfo returns system information from the Docker daemon.
-//
-// Returns:
-//   - map[string]interface{}: System information.
-//   - error: Non-nil if retrieval fails, nil on success.
-func (c client) GetInfo() (map[string]any, error) {
-	ctx := context.Background()
-
-	info, err := c.api.Info(ctx)
-	if err != nil {
-		logrus.WithError(err).Debug("Failed to get system info")
-
-		return nil, fmt.Errorf("failed to get system info: %w", err)
-	}
-
-	// Convert to map for easier access
-	infoMap := map[string]any{
-		"Name":            info.Name,
-		"ServerVersion":   info.ServerVersion,
-		"OSType":          info.OSType,
-		"OperatingSystem": info.OperatingSystem,
-		"Driver":          info.Driver,
-	}
-
-	return infoMap, nil
-}
-
-// detectPodman determines if the container runtime is Podman using multiple detection methods.
-//
-// Returns:
-//   - bool: True if Podman is detected, false otherwise.
-//   - error: Non-nil if detection fails, nil on success.
-func (c client) detectPodman() (bool, error) {
-	// Check for Podman marker file
-	if _, err := c.Fs.Stat("/run/.containerenv"); err == nil {
-		logrus.Debug("Detected Podman via marker file /run/.containerenv")
-
-		return true, nil
-	}
-
-	// Check for Docker marker file (ensure we're not in Docker)
-	if _, err := c.Fs.Stat("/.dockerenv"); err == nil {
-		logrus.Debug("Detected Docker via marker file /.dockerenv")
-
-		return false, nil
-	}
-
-	// Check CONTAINER environment variable
-	if container := os.Getenv("CONTAINER"); container == "podman" || container == "oci" {
-		logrus.Debug("Detected Podman via CONTAINER environment variable")
-
-		return true, nil
-	}
-
-	// Fallback to API-based detection
-	info, err := c.GetInfo()
-	if err != nil {
-		logrus.WithError(err).
-			Debug("Failed to get system info for Podman detection, assuming Docker")
-
-		return false, err
-	}
-
-	if name, exists := info["Name"]; exists && name == "podman" {
-		logrus.Debug("Detected Podman via API Name field")
-
-		return true, nil
-	} else if serverVersion, exists := info["ServerVersion"]; exists {
-		if sv, ok := serverVersion.(string); ok && strings.Contains(strings.ToLower(sv), "podman") {
-			logrus.Debug("Detected Podman via API ServerVersion field")
-
-			return true, nil
-		}
-	}
-
-	logrus.Debug("No Podman detection criteria met, assuming Docker")
-
-	return false, nil
-}
-
-// getPodmanFlag determines if Podman detection is needed and performs it.
-//
-// Returns:
-//   - bool: True if Podman is detected, false otherwise.
-func (c client) getPodmanFlag() bool {
-	// Only perform detection in auto mode; otherwise, assume Docker
-	if c.CPUCopyMode != CPUCopyModeAuto {
-		return false
-	}
-
-	// Attempt to detect Podman using various methods (marker files, env vars, API info)
-	isPodman, err := c.detectPodman()
-	if err != nil {
-		// On detection failure, fall back to assuming Docker
-		logrus.WithError(err).Debug("Failed to detect container runtime, falling back to Docker")
-
-		return false
-	}
-
-	// Return the detection result
-	return isPodman
-}
-
-// WaitForContainerHealthy waits for a container to become healthy or times out.
-//
-// Parameters:
-//   - containerID: ID of the container to wait for.
-//   - timeout: Maximum duration to wait for health.
-//
-// Returns:
-//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
-func (c client) WaitForContainerHealthy(
-	containerID types.ContainerID,
-	timeout time.Duration,
-) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	clog := logrus.WithField("container_id", containerID)
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			clog.Warn("Timeout waiting for container to become healthy")
-
-			return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
-		case <-ticker.C:
-			// Inspect the container to check health status
-			inspect, err := c.api.ContainerInspect(ctx, string(containerID))
-			if err != nil {
-				clog.WithError(err).Debug("Failed to inspect container for health check")
-
-				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
-			}
-
-			// Check if health check is configured
-			if inspect.State.Health == nil {
-				clog.Debug("No health check configured for container, proceeding")
-
-				return nil
-			}
-
-			status := inspect.State.Health.Status
-			clog.WithField("health_status", status).Debug("Checked container health status")
-
-			if status == "healthy" {
-				clog.Debug("Container is now healthy")
-
-				return nil
-			}
-
-			if status == "unhealthy" {
-				clog.Warn("Container health check failed")
-
-				return fmt.Errorf("%w: %s", errHealthCheckFailed, containerID)
-			}
-
-			// Continue polling for "starting" or other statuses
-		}
-	}
 }

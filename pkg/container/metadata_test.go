@@ -1,7 +1,3 @@
-// Package container provides functionality for managing Docker containers within Watchtower.
-// This file contains methods and helpers for accessing and interpreting container metadata,
-// focusing on labels that configure Watchtower behavior and lifecycle hooks.
-// These methods operate on the Container type defined in dockerContainer.go.
 package container
 
 import (
@@ -845,6 +841,13 @@ func TestContainsWatchtowerLabel(t *testing.T) {
 			name: "LabelNotSet",
 			args: args{
 				labels: map[string]string{},
+			},
+			want: false,
+		},
+		{
+			name: "LabelsNil",
+			args: args{
+				labels: nil,
 			},
 			want: false,
 		},

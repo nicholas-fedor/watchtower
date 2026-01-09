@@ -394,7 +394,13 @@ func (c Container) StopTimeout() *int {
 // Returns:
 //   - bool: True if watchtower label is "true", false otherwise.
 func ContainsWatchtowerLabel(labels map[string]string) bool {
+	if labels == nil {
+		return false
+	}
+
 	val, ok := labels[watchtowerLabel]
+	logrus.WithFields(logrus.Fields{"label": watchtowerLabel, "val": val, "ok": ok}).
+		Debug("Checking watchtower label")
 
 	return ok && val == "true"
 }

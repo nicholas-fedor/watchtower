@@ -315,7 +315,8 @@ func StopAndRemoveSourceContainer(
 	})
 
 	// Stop the container first
-	if err := StopSourceContainer(api, sourceContainer, timeout); err != nil {
+	err := StopSourceContainer(api, sourceContainer, timeout)
+	if err != nil {
 		return err
 	}
 
@@ -337,7 +338,7 @@ func StopAndRemoveSourceContainer(
 
 	// Call the Docker API's ContainerRemove to delete the container, forcing termination of any
 	// lingering processes (via SIGKILL if needed) and removing volumes if specified.
-	err := api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainer.RemoveOptions{
+	err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainer.RemoveOptions{
 		Force:         true,          // Ensure any lingering processes are terminated before removal.
 		RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
 	})
@@ -460,13 +461,14 @@ func getNetworkConfig(
 	}
 
 	// Validate MAC addresses, passing sourceContainer for state checking
-	if err := validateMacAddresses(
+	err := validateMacAddresses(
 		config,
 		sourceContainer.ID(),
 		clientVersion,
 		isHostNetwork,
 		sourceContainer,
-	); err != nil {
+	)
+	if err != nil {
 		clog.WithError(err).Debug("MAC address validation issue")
 	}
 
