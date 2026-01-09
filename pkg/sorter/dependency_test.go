@@ -1,6 +1,7 @@
 package sorter
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
@@ -395,6 +396,30 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(result).To(gomega.HaveLen(2))
 			gomega.Expect(result[0].Name()).To(gomega.Equal("container2")) // web service
 			gomega.Expect(result[1].Name()).To(gomega.Equal("container1")) // depends on web
+		})
+
+		ginkgo.It("should handle containers with replicas without collision", func() {
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("myproject-web-1")
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+			c1.EXPECT().Links().Return(nil)
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myproject-web-1"}, Config: &dockerContainer.Config{Labels: map[string]string{"com.docker.compose.service": "web", "com.docker.compose.project": "myproject"}}})
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("myproject-web-2")
+			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
+			c2.EXPECT().Links().Return(nil)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myproject-web-2"}, Config: &dockerContainer.Config{Labels: map[string]string{"com.docker.compose.service": "web", "com.docker.compose.project": "myproject"}}})
+
+			containers := []types.Container{c1, c2}
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(2))
+			// Order may vary since no dependencies
 		})
 
 		ginkgo.It("should handle containers with service names containing leading slashes", func() {
@@ -853,6 +878,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 						},
 					},
 				})
+				mockContainer1.EXPECT().Name().Return("app1_web_1")
 
 				// Container from project "app2" with same service "web"
 				mockContainer2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
@@ -866,6 +892,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 						},
 					},
 				})
+				mockContainer2.EXPECT().Name().Return("app2_web_1")
 
 				result1 := container.ResolveContainerIdentifier(mockContainer1)
 				result2 := container.ResolveContainerIdentifier(mockContainer2)
@@ -893,6 +920,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 						},
 					},
 				})
+				c1.EXPECT().Name().Return("app1_web_1").Maybe()
 				c1.EXPECT().Links().Return(nil)
 
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
@@ -905,6 +933,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 						},
 					},
 				})
+				c2.EXPECT().Name().Return("app2_web_1").Maybe()
 				c2.EXPECT().Links().Return(nil)
 
 				containers := []types.Container{c1, c2}
@@ -1060,9 +1089,19 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				var collisionErr IdentifierCollisionError
 				gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
-				gomega.Expect(err.(IdentifierCollisionError).DuplicateIdentifier).
+				gomega.Expect(func() IdentifierCollisionError {
+					var target IdentifierCollisionError
+					_ = errors.As(err, &target)
+
+					return target
+				}().DuplicateIdentifier).
 					To(gomega.Equal("c1"))
-				gomega.Expect(err.(IdentifierCollisionError).AffectedContainers).
+				gomega.Expect(func() IdentifierCollisionError {
+					var target IdentifierCollisionError
+					_ = errors.As(err, &target)
+
+					return target
+				}().AffectedContainers).
 					To(gomega.HaveLen(2))
 			},
 		)

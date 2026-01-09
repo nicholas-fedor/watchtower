@@ -39,6 +39,7 @@ func (c *SimpleContainer) ContainerInfo() *dockerContainer.InspectResponse {
 	if c.ContainerInfoField != nil {
 		return c.ContainerInfoField
 	}
+
 	name := c.ContainerName
 	if !strings.HasPrefix(name, "/") {
 		name = "/" + name
@@ -62,6 +63,7 @@ func (c *SimpleContainer) ImageID() types.ImageID {
 			return types.ImageID("sha256:" + image)
 		}
 	}
+
 	return types.ImageID("sha256:" + string(c.ContainerID))
 }
 
@@ -69,6 +71,7 @@ func (c *SimpleContainer) SafeImageID() types.ImageID {
 	if c.ContainerInfoField != nil {
 		return types.ImageID(c.ContainerInfoField.Config.Image)
 	}
+
 	return c.ImageID()
 }
 
@@ -76,6 +79,7 @@ func (c *SimpleContainer) ImageName() string {
 	if c.ContainerInfoField != nil {
 		return c.ContainerInfoField.Config.Image
 	}
+
 	return "test-image"
 }
 
@@ -89,6 +93,7 @@ func (c *SimpleContainer) StopSignal() string {
 	if c.ContainerInfoField != nil {
 		return c.ContainerInfoField.Config.StopSignal
 	}
+
 	return "SIGTERM"
 }
 
@@ -97,6 +102,7 @@ func (c *SimpleContainer) StopTimeout() *int {
 	if c.ContainerInfoField != nil && c.ContainerInfoField.Config != nil {
 		return c.ContainerInfoField.Config.StopTimeout
 	}
+
 	return nil
 }
 
@@ -118,6 +124,7 @@ func (c *SimpleContainer) PreUpdateTimeout() int {
 	if c.ContainerInfoField != nil {
 		return 0 // Return 0 to disable timeout when using custom ContainerInfo
 	}
+
 	return 30
 }
 
@@ -125,6 +132,7 @@ func (c *SimpleContainer) PostUpdateTimeout() int {
 	if c.ContainerInfoField != nil {
 		return 0
 	}
+
 	return 30
 }
 func (c *SimpleContainer) IsRestarting() bool                               { return false }

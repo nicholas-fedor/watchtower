@@ -1490,8 +1490,8 @@ func (_c *MockContainer_StopTimeout_Call) Run(run func()) *MockContainer_StopTim
 	return _c
 }
 
-func (_c *MockContainer_StopTimeout_Call) Return(timeout *int) *MockContainer_StopTimeout_Call {
-	_c.Call.Return(timeout)
+func (_c *MockContainer_StopTimeout_Call) Return(n *int) *MockContainer_StopTimeout_Call {
+	_c.Call.Return(n)
 	return _c
 }
 

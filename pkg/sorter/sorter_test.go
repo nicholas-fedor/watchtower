@@ -308,7 +308,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 			})
 
 			ginkgo.It("handles chained dependencies with slash-prefixed links", func() {
-				newMockContainer := func(t ginkgo.GinkgoTInterface, name string, id string, links []string, labels map[string]string) types.Container {
+				newMockContainer := func(t ginkgo.GinkgoTInterface, name, id string, links []string, labels map[string]string) types.Container {
 					c := mockTypes.NewMockContainer(t)
 					c.EXPECT().Name().Return(name)
 					c.EXPECT().ID().Return(types.ContainerID(id))
