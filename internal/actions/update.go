@@ -1,4 +1,3 @@
-// Package actions provides core logic for Watchtower’s container update operations.
 package actions
 
 import (
@@ -14,7 +13,6 @@ import (
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
@@ -38,7 +36,7 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for interacting with Docker API.
-//   - config: UpdateConfig specifying behavior like cleanup, restart, and filtering.
+//   - config: UpdateParams specifying behavior like cleanup, restart, and filtering.
 //
 // Returns:
 //   - types.Report: Session report summarizing scanned, updated, and failed containers.
@@ -47,7 +45,7 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 func Update(
 	ctx context.Context,
 	client container.Client,
-	config UpdateConfig,
+	config types.UpdateParams,
 ) (types.Report, []types.CleanedImageInfo, error) {
 	// Check for context cancellation early
 	select {
@@ -68,34 +66,14 @@ func Update(
 	// Track if Watchtower self-update pull failed to add safeguard delay.
 	watchtowerPullFailed := false
 
-	// Map UpdateConfig to types.UpdateParams for internal use.
-	params := types.UpdateParams{
-		Filter:             config.Filter,
-		Cleanup:            config.Cleanup,
-		NoRestart:          config.NoRestart,
-		Timeout:            config.Timeout,
-		MonitorOnly:        config.MonitorOnly,
-		LifecycleHooks:     config.LifecycleHooks,
-		RollingRestart:     config.RollingRestart,
-		LabelPrecedence:    config.LabelPrecedence,
-		NoPull:             config.NoPull,
-		PullFailureDelay:   config.PullFailureDelay,
-		LifecycleUID:       config.LifecycleUID,
-		LifecycleGID:       config.LifecycleGID,
-		CPUCopyMode:        config.CPUCopyMode,
-		RunOnce:            config.RunOnce,
-		SkipSelfUpdate:     config.SkipSelfUpdate,
-		CurrentContainerID: config.CurrentContainerID,
-	}
-
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
-	if params.LifecycleHooks {
+	if config.LifecycleHooks {
 		logrus.Debug("Executing pre-check lifecycle hooks")
-		lifecycle.ExecutePreChecks(client, params)
+		lifecycle.ExecutePreChecks(client, config)
 	}
 
-	// Fetch the list of containers based on the provided filter (e.g., all, specific names).
-	containers, err := client.ListContainers(params.Filter)
+	// Fetch the list of filteredContainers based on the provided filter (e.g., all, specific names).
+	filteredContainers, err := client.ListContainers(config.Filter)
 	if err != nil {
 		// Log and return an error if container listing fails.
 		logrus.WithError(err).Debug("Failed to list containers")
@@ -103,7 +81,7 @@ func Update(
 		return nil, nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
-	// Fetch all containers to find linked dependencies that may not be in the filtered list.
+	// Fetch an unfiltered list of all containers.
 	allContainers, err := client.ListContainers(filters.NoFilter)
 	if err != nil {
 		// Log and return an error if listing all containers fails.
@@ -113,37 +91,37 @@ func Update(
 	}
 
 	// Prepare a list of container names and images for detailed debugging output.
-	containerNames := make([]string, len(containers))
-	for i, c := range containers {
-		containerNames[i] = fmt.Sprintf("%s (%s)", c.Name(), c.ImageName())
+	filteredContainerNames := make([]string, len(filteredContainers))
+	for i, c := range filteredContainers {
+		filteredContainerNames[i] = fmt.Sprintf("%s (%s)", c.Name(), c.ImageName())
 	}
 	// Log the retrieved containers and filter details.
 	logrus.WithFields(logrus.Fields{
-		"count":      len(containers),
-		"containers": containerNames,
-		"filter":     fmt.Sprintf("%T", params.Filter),
+		"count":      len(filteredContainers),
+		"containers": filteredContainerNames,
+		"filter":     fmt.Sprintf("%T", config.Filter),
 	}).Debug("Retrieved containers for update check")
 
 	// Skip containers that reference themselves as dependencies
 	// via the Watchtower depends-on label.
-	for _, c := range containers {
-		if cont, ok := c.(*container.Container); ok {
+	for _, monitoredContainer := range filteredContainers {
+		if cont, ok := monitoredContainer.(*container.Container); ok {
 			if hasSelfDependency(cont) {
-				progress.AddSkipped(c, errSelfDependency, params)
+				progress.AddSkipped(monitoredContainer, errSelfDependency, config)
 				logrus.Warnf(
 					"Skipping container update (self-dependency): %s (%s)",
-					c.Name(),
-					c.ID().ShortID(),
+					monitoredContainer.Name(),
+					monitoredContainer.ID().ShortID(),
 				)
 			}
 		}
 	}
 
 	// Detect circular dependencies and mark affected containers as skipped.
-	cycles := container.DetectCycles(containers)
-	for _, c := range containers {
+	cycles := container.DetectCycles(filteredContainers)
+	for _, c := range filteredContainers {
 		if cycles[container.ResolveContainerIdentifier(c)] {
-			progress.AddSkipped(c, errCircularDependency, params)
+			progress.AddSkipped(c, errCircularDependency, config)
 			logrus.Warnf(
 				"Skipping container update (circular dependency): %s (%s)",
 				c.Name(),
@@ -156,7 +134,7 @@ func Update(
 	staleCheckFailed := 0
 
 	// Iterate through containers to check staleness and prepare for updates or restarts.
-	for i, sourceContainer := range containers {
+	for i, sourceContainer := range filteredContainers {
 		// Check for context cancellation to enable faster shutdown during long update cycles.
 		select {
 		case <-ctx.Done():
@@ -177,14 +155,14 @@ func Update(
 		clog := logrus.WithFields(fields)
 
 		// Check if the container uses a pinned (digest-based) image to skip updates.
-		isPinned, err := isPinned(sourceContainer, progress, params)
+		isPinned, err := isPinned(sourceContainer, progress, config)
 		if err != nil {
 			// Log and skip containers with unparsable image references, marking as skipped.
 			clog.WithError(err).Debug("Failed to check pinned image, skipping container")
 			progress.AddSkipped(
 				sourceContainer,
 				fmt.Errorf("%w: %w", errParseImageReference, err),
-				params,
+				config,
 			)
 
 			staleCheckFailed++
@@ -200,19 +178,19 @@ func Update(
 		}
 
 		// Check if the container’s image is stale (outdated) and get the newest image ID.
-		stale, newestImage, err := client.IsContainerStale(sourceContainer, params)
+		stale, newestImage, err := client.IsContainerStale(sourceContainer, config)
 
-		// Determine if the container should be updated based on staleness and params.
-		shouldUpdate := shouldUpdateContainer(stale, sourceContainer, params)
+		// Determine if the container should be updated based on staleness and config.
+		shouldUpdate := shouldUpdateContainer(stale, sourceContainer, config)
 
 		// Log when skipping Watchtower self-update in run-once mode
-		if stale && sourceContainer.IsWatchtower() && params.RunOnce {
+		if stale && sourceContainer.IsWatchtower() && config.RunOnce {
 			clog.Info("Skipping Watchtower self-update in run-once mode")
 		}
 
 		// Track old image ID before update for cleanup notifications.
 		if shouldUpdate {
-			if c, ok := containers[i].(*container.Container); ok {
+			if c, ok := filteredContainers[i].(*container.Container); ok {
 				c.OldImageID = sourceContainer.ImageID()
 			}
 		}
@@ -239,7 +217,7 @@ func Update(
 			stale = false
 			staleCheckFailed++
 
-			progress.AddSkipped(sourceContainer, err, params)
+			progress.AddSkipped(sourceContainer, err, config)
 
 			// Track if Watchtower self-update pull failed for safeguard.
 			if sourceContainer.IsWatchtower() {
@@ -256,12 +234,12 @@ func Update(
 				"stale":        stale,
 				"newest_image": newestImage,
 			}).Debug("Checked container staleness")
-			progress.AddScanned(sourceContainer, newestImage, params)
+			progress.AddScanned(sourceContainer, newestImage, config)
 		}
 
 		// Update the container’s stale status for dependency sorting.
 		// Only mark as stale if the container should actually be updated.
-		containers[i].SetStale(stale && shouldUpdate)
+		filteredContainers[i].SetStale(stale && shouldUpdate)
 
 		// Increment stale count for logging summary.
 		if stale {
@@ -271,7 +249,7 @@ func Update(
 
 	// Log the summary of staleness checks, including total, stale, and failed counts.
 	logrus.WithFields(logrus.Fields{
-		"total":  len(containers),
+		"total":  len(filteredContainers),
 		"stale":  staleCount,
 		"failed": staleCheckFailed,
 	}).Debug("Completed container staleness check")
@@ -283,7 +261,7 @@ func Update(
 	}
 
 	// Propagate stale status to allContainers since they are different instances.
-	for _, c := range containers {
+	for _, c := range filteredContainers {
 		if c.IsStale() {
 			if ac, ok := containerByID[c.ID()]; ok {
 				ac.SetStale(true)
@@ -292,18 +270,18 @@ func Update(
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
-	err = sorter.SortByDependencies(containers)
+	err = sorter.SortByDependencies(filteredContainers)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
 			var circularErr sorter.CircularReferenceError
 			if errors.As(err, &circularErr) {
 				circularName := circularErr.ContainerName
 				// Find the container and mark as skipped.
-				for _, c := range containers {
+				for _, c := range filteredContainers {
 					if c.Name() == circularName {
 						// Only add if not already skipped (e.g., from initial cycle detection)
 						if _, exists := (*progress)[c.ID()]; !exists {
-							progress.AddSkipped(c, errCircularDependency, params)
+							progress.AddSkipped(c, errCircularDependency, config)
 							logrus.Warnf(
 								"Skipping container update (circular dependency): %s (%s)",
 								c.Name(),
@@ -328,14 +306,14 @@ func Update(
 		}
 	} else {
 		// Mark containers linked to restarting ones for restart without updating.
-		UpdateImplicitRestart(containers, allContainers)
+		UpdateImplicitRestart(filteredContainers, allContainers)
 	}
 
 	// Collect all containers to restart (updates and implicit restarts)
 	var allContainersToRestart []types.Container
 
-	for _, c := range containers {
-		if c.ToRestart() && !c.IsMonitorOnly(params) {
+	for _, c := range filteredContainers {
+		if c.ToRestart() && !c.IsMonitorOnly(config) {
 			allContainersToRestart = append(allContainersToRestart, c)
 		}
 	}
@@ -363,13 +341,13 @@ func Update(
 		failedStart   map[types.ContainerID]error
 	)
 
-	if params.RollingRestart {
+	if config.RollingRestart {
 		// Apply rolling restarts for all containers in dependency order.
 		progress.UpdateFailed(
 			performRollingRestart(
 				allContainersToRestart,
 				client,
-				params,
+				config,
 				&cleanupImageInfos,
 				progress,
 			),
@@ -383,33 +361,22 @@ func Update(
 		}
 
 		// Stop and restart containers in batches, respecting dependency order.
-		failedStop, stoppedImages = stopContainersInReversedOrder(
-			allContainersToRestart,
-			client,
-			params,
-		)
+		failedStop, stoppedImages = stopContainersInReversedOrder(allContainersToRestart, client, config)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(
-			allContainersToRestart,
-			client,
-			params,
-			stoppedImages,
-			&cleanupImageInfos,
-			progress,
-		)
+		failedStart = restartContainersInSortedOrder(allContainersToRestart, client, config, stoppedImages, &cleanupImageInfos, progress)
 		progress.UpdateFailed(failedStart)
 	}
 
 	// Run post-check lifecycle hooks if enabled to finalize the update process.
-	if params.LifecycleHooks {
+	if config.LifecycleHooks {
 		logrus.Debug("Executing post-check lifecycle hooks")
-		lifecycle.ExecutePostChecks(client, params)
+		lifecycle.ExecutePostChecks(client, config)
 	}
 
 	// Add safeguard delay if Watchtower self-update pull failed to prevent rapid restarts.
 	if watchtowerPullFailed {
-		delay := params.PullFailureDelay
+		delay := config.PullFailureDelay
 		if delay == 0 {
 			delay = defaultPullFailureDelay // Default delay
 		}
@@ -446,15 +413,15 @@ func hasSelfDependency(c types.Container) bool {
 // Parameters:
 //   - containers: List of containers to update.
 //   - allContainers: List of all containers to search for linked dependencies.
-func UpdateImplicitRestart(containers []types.Container, allContainers []types.Container) {
+func UpdateImplicitRestart(containers, allContainers []types.Container) {
 	logrus.Debug("Starting UpdateImplicitRestart")
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
 
-	restartByIdentifier := make(map[string]bool, len(allContainers))
+	restartByName := make(map[string]bool, len(allContainers))
 	for _, c := range allContainers {
 		byID[c.ID()] = c
-		restartByIdentifier[container.ResolveContainerIdentifier(c)] = c.ToRestart()
+		restartByName[c.Name()] = c.ToRestart()
 	}
 
 	markedContainers := []string{}
@@ -474,7 +441,7 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 			"to_restart":           c.ToRestart(),
 		}).Debug("Checking links for container")
 
-		if link := linkedIdentifierMarkedForRestart(links, restartByIdentifier); link != "" {
+		if link := linkedIdentifierMarkedForRestart(links, restartByName); link != "" {
 			logrus.WithFields(logrus.Fields{
 				"container":  c.Name(),
 				"restarting": link,
@@ -483,7 +450,7 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 
 			if ac, ok := byID[c.ID()]; ok {
 				ac.SetLinkedToRestarting(true)
-				restartByIdentifier[container.ResolveContainerIdentifier(ac)] = true
+				restartByName[ac.Name()] = true
 			}
 
 			markedContainers = append(markedContainers, c.Name())
@@ -505,39 +472,39 @@ func UpdateImplicitRestart(containers []types.Container, allContainers []types.C
 // Parameters:
 //   - stale: Whether the container's image is outdated.
 //   - container: The container to check.
-//   - params: Update parameters controlling update behavior.
+//   - config: Update parameters controlling update behavior.
 //
 // Returns:
 //   - bool: True if the container should be updated, false otherwise.
-func shouldUpdateContainer(stale bool, container types.Container, params types.UpdateParams) bool {
+func shouldUpdateContainer(stale bool, container types.Container, config types.UpdateParams) bool {
 	// Must be stale to update
 	if !stale {
 		return false
 	}
 
 	// Skip monitor-only containers
-	if container.IsMonitorOnly(params) {
+	if container.IsMonitorOnly(config) {
 		return false
 	}
 
 	// Allow update if NoRestart is false, or if it's a Watchtower container (which can update even with NoRestart)
-	if params.NoRestart && !container.IsWatchtower() {
+	if config.NoRestart && !container.IsWatchtower() {
 		return false
 	}
 
 	// Skip Watchtower self-update in run-once mode
-	if params.RunOnce && container.IsWatchtower() {
+	if config.RunOnce && container.IsWatchtower() {
 		return false
 	}
 
 	// Skip Watchtower self-update if SkipSelfUpdate is true
-	if params.SkipSelfUpdate && container.IsWatchtower() {
+	if config.SkipSelfUpdate && container.IsWatchtower() {
 		return false
 	}
 
 	// Skip other Watchtower containers from self-updates
-	if container.IsWatchtower() && params.CurrentContainerID != "" &&
-		container.ID() != params.CurrentContainerID {
+	if container.IsWatchtower() && config.CurrentContainerID != "" &&
+		container.ID() != config.CurrentContainerID {
 		return false
 	}
 
@@ -547,10 +514,10 @@ func shouldUpdateContainer(stale bool, container types.Container, params types.U
 // linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.
 //
 // It searches for a container identifier in the links list that is marked for restart,
-// returning its identifier. Identifiers may be in formats such as <project>-<service>,
-// <service>, <container name>, or <container id>. It first checks for exact matches,
-// then considers partial matches where the identifier ends with "-<link>" for <service>
-// names that lack the project prefix.
+// returning its identifier. For links that contain "-", indicating potential service names
+// (like project-service), it performs exact matching first, then service prefix matching
+// for Compose dependencies. For links without "-", indicating service names,
+// it performs partial matching with warnings for ambiguity.
 //
 // Parameters:
 //   - links: List of linked container identifiers.
@@ -564,9 +531,6 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 		"restartByIdentifier": restartByIdentifier,
 	}).Debug("Searching for restarting linked container")
 
-	var partialMatches []string
-
-	// Check for exact matches.
 	for _, link := range links {
 		if restartByIdentifier[link] {
 			logrus.WithField("found_restarting_identifier", link).
@@ -574,27 +538,49 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 
 			return link
 		}
-		// Check for partial match where identifier ends with "-"+link
+
+		// For links containing "-", treat as potential service names (e.g., from Compose depends_on)
+		// First check for exact match, then check for service prefix match
+		if strings.Contains(link, "-") {
+			// Check if any restarting container has this link as a service prefix
+			for identifier, restarting := range restartByIdentifier {
+				if restarting && strings.HasPrefix(identifier, link+"-") {
+					logrus.WithFields(logrus.Fields{
+						"link":                 link,
+						"matched":              identifier,
+						"service_prefix_match": true,
+					}).Debug("Found restarting linked container via service prefix match")
+
+					return identifier
+				}
+			}
+
+			continue
+		}
+
+		// For links without "-", perform partial matching with warning for ambiguity
+		var partialMatches []string
+
 		for identifier, restarting := range restartByIdentifier {
-			if restarting && strings.HasSuffix(identifier, "-"+link) {
+			if restarting && strings.Contains(identifier, link) {
 				if !slices.Contains(partialMatches, identifier) {
 					partialMatches = append(partialMatches, identifier)
 				}
 			}
 		}
-	}
 
-	// Apply deterministic logic for partial matches: return the unique match if exactly one exists,
-	// otherwise log a warning and return empty string to prevent ambiguous selections.
-	if len(partialMatches) == 1 {
-		return partialMatches[0]
-	} else if len(partialMatches) > 1 {
-		logrus.WithFields(logrus.Fields{
-			"ambiguous_identifiers": partialMatches,
-			"links":                 links,
-		}).Warn("Ambiguous container links. Use unique names to avoid conflicts.")
+		// Apply deterministic logic for partial matches: return the unique match if exactly one exists,
+		// otherwise log a warning and return empty string to prevent ambiguous selections.
+		if len(partialMatches) == 1 {
+			return partialMatches[0]
+		} else if len(partialMatches) > 1 {
+			logrus.WithFields(logrus.Fields{
+				"ambiguous_identifiers": partialMatches,
+				"links":                 links,
+			}).Warn("Ambiguous container links. Use unique names to avoid conflicts.")
 
-		return ""
+			return ""
+		}
 	}
 
 	logrus.Debug("No restarting linked container found")
@@ -654,7 +640,7 @@ func parseReference(
 func isPinned(
 	container types.Container,
 	progress *session.Progress,
-	params types.UpdateParams,
+	config types.UpdateParams,
 ) (bool, error) {
 	// Set up logging with container and image details for debugging.
 	clog := logrus.WithFields(logrus.Fields{
@@ -703,7 +689,7 @@ func isPinned(
 	if isDigested {
 		// Mark the container as scanned to skip updates for pinned images.
 		clog.WithField("is_digested", isDigested).Debug("Pinned image detected, marking as scanned")
-		progress.AddScanned(container, container.SafeImageID(), params)
+		progress.AddScanned(container, container.SafeImageID(), config)
 	}
 
 	return isDigested, nil
@@ -729,7 +715,7 @@ func isInvalidImageName(name string) bool {
 // Parameters:
 //   - containers: List of containers to update or restart.
 //   - client: Container client for Docker operations.
-//   - params: Update options controlling restart behavior.
+//   - config: Update options controlling restart behavior.
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info for deferred cleanup.
 //   - progress: Progress tracker to update with new container IDs.
 //
@@ -738,7 +724,7 @@ func isInvalidImageName(name string) bool {
 func performRollingRestart(
 	containers []types.Container,
 	client container.Client,
-	params types.UpdateParams,
+	config types.UpdateParams,
 	cleanupImageInfos *[]types.CleanedImageInfo,
 	progress *session.Progress,
 ) map[types.ContainerID]error {
@@ -771,10 +757,11 @@ func performRollingRestart(
 		}
 
 		// Stop the container, handling any errors.
-		if err := stopStaleContainer(c, client, params); err != nil {
+		err := stopStaleContainer(c, client, config)
+		if err != nil {
 			failed[c.ID()] = err
 		} else {
-			newContainerID, renamed, err := restartStaleContainer(c, client, params)
+			newContainerID, renamed, err := restartStaleContainer(c, client, config)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -790,10 +777,11 @@ func performRollingRestart(
 				}
 
 				// Wait for the container to become healthy if it has a health check
-				if waitErr := client.WaitForContainerHealthy(
+				waitErr := client.WaitForContainerHealthy(
 					newContainerID,
 					defaultHealthCheckTimeout,
-				); waitErr != nil {
+				)
+				if waitErr != nil {
 					logrus.WithFields(fields).
 						WithError(waitErr).
 						Warn("Failed to wait for container to become healthy")
@@ -830,7 +818,7 @@ func performRollingRestart(
 // Parameters:
 //   - containers: List of containers to stop.
 //   - client: Container client for Docker operations.
-//   - params: Update options specifying stop timeout and other behaviors.
+//   - config: Update options specifying stop timeout and other behaviors.
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed stops.
@@ -838,7 +826,7 @@ func performRollingRestart(
 func stopContainersInReversedOrder(
 	containers []types.Container,
 	client container.Client,
-	params types.UpdateParams,
+	config types.UpdateParams,
 ) (map[types.ContainerID]error, []types.CleanedImageInfo) {
 	failed := make(map[types.ContainerID]error, len(containers))
 	stopped := make([]types.CleanedImageInfo, 0, len(containers))
@@ -851,7 +839,8 @@ func stopContainersInReversedOrder(
 			"image":     c.ImageName(),
 		}
 
-		if err := stopStaleContainer(c, client, params); err != nil {
+		err := stopStaleContainer(c, client, config)
+		if err != nil {
 			failed[c.ID()] = err
 		} else {
 			stopped = append(
@@ -879,14 +868,14 @@ func stopContainersInReversedOrder(
 // Parameters:
 //   - container: Container to stop.
 //   - client: Container client for Docker operations.
-//   - params: Update options specifying stop timeout and lifecycle hooks.
+//   - config: Update options specifying stop timeout and lifecycle hooks.
 //
 // Returns:
 //   - error: Non-nil if stop fails, nil on success or if skipped.
 func stopStaleContainer(
 	container types.Container,
 	client container.Client,
-	params types.UpdateParams,
+	config types.UpdateParams,
 ) error {
 	fields := logrus.Fields{
 		"container": container.Name(),
@@ -909,7 +898,8 @@ func stopStaleContainer(
 
 	// Verify configuration for linked containers to ensure restart compatibility.
 	if container.IsLinkedToRestarting() {
-		if err := container.VerifyConfiguration(); err != nil {
+		err := container.VerifyConfiguration()
+		if err != nil {
 			logrus.WithFields(fields).
 				WithError(err).
 				Debug("Failed to verify container configuration")
@@ -919,12 +909,12 @@ func stopStaleContainer(
 	}
 
 	// Execute pre-update lifecycle hooks if enabled, checking for skip conditions.
-	if params.LifecycleHooks {
+	if config.LifecycleHooks {
 		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(
 			client,
 			container,
-			params.LifecycleUID,
-			params.LifecycleGID,
+			config.LifecycleUID,
+			config.LifecycleGID,
 		)
 		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Pre-update command execution failed")
@@ -940,7 +930,8 @@ func stopStaleContainer(
 	}
 
 	// Stop the container with the configured timeout.
-	if err := client.StopAndRemoveContainer(container, params.Timeout); err != nil {
+	err := client.StopAndRemoveContainer(container, config.Timeout)
+	if err != nil {
 		logrus.WithFields(fields).WithError(err).Error("Failed to stop container")
 
 		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
@@ -951,13 +942,14 @@ func stopStaleContainer(
 
 // restartContainersInSortedOrder restarts stopped containers.
 //
-// It restarts containers in dependency order, collecting cleaned image info for stale containers that were not
-// renamed during a self-update, and tracking any restart failures.
+// It restarts containers in dependency order, collecting cleaned image info
+// for stale containers that were not renamed during a self-update, and
+// tracking any restart failures.
 //
 // Parameters:
 //   - containers: List of containers to restart.
 //   - client: Container client for Docker operations.
-//   - params: Update options controlling restart behavior.
+//   - config: Update options controlling restart behavior.
 //   - stoppedImages: Slice of cleaned image info for previously stopped containers.
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info for deferred cleanup.
 //   - progress: Progress tracker to update with new container IDs.
@@ -967,7 +959,7 @@ func stopStaleContainer(
 func restartContainersInSortedOrder(
 	containers []types.Container,
 	client container.Client,
-	params types.UpdateParams,
+	config types.UpdateParams,
 	stoppedImages []types.CleanedImageInfo,
 	cleanupImageInfos *[]types.CleanedImageInfo,
 	progress *session.Progress,
@@ -999,15 +991,15 @@ func restartContainersInSortedOrder(
 		}
 
 		// Skip other Watchtower containers from self-updates
-		if c.IsWatchtower() && params.CurrentContainerID != "" &&
-			c.ID() != params.CurrentContainerID {
+		if c.IsWatchtower() && config.CurrentContainerID != "" &&
+			c.ID() != config.CurrentContainerID {
 			continue
 		}
 
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
 		if c.IsWatchtower() || wasStopped {
-			newContainerID, renamed, err := restartStaleContainer(c, client, params)
+			newContainerID, renamed, err := restartStaleContainer(c, client, config)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -1036,8 +1028,7 @@ func restartContainersInSortedOrder(
 						c.ImageID(),
 						c.ImageName(),
 						c.Name(),
-						c.ID(),
-					)
+						c.ID())
 				}
 			}
 		}
@@ -1076,14 +1067,13 @@ func addCleanupImageInfo(
 
 // restartStaleContainer restarts a stale container.
 //
-// It renames Watchtower containers if applicable,
-// starts a new container, and runs post-update hooks,
-// handling errors for each step.
+// It renames Watchtower containers if applicable, starts a new container,
+// and runs post-update hooks.
 //
 // Parameters:
 //   - container: Container to restart.
 //   - client: Container client for Docker operations.
-//   - params: Update options controlling restart and lifecycle hooks.
+//   - config: Update options controlling restart and lifecycle hooks.
 //
 // Returns:
 //   - types.ContainerID: ID of the new container if started, original ID if renamed only, empty otherwise.
@@ -1092,7 +1082,7 @@ func addCleanupImageInfo(
 func restartStaleContainer(
 	container types.Container,
 	client container.Client,
-	params types.UpdateParams,
+	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
@@ -1102,11 +1092,14 @@ func restartStaleContainer(
 	renamed := false
 	newContainerID := container.ID() // Default to original ID
 
-	// Rename Watchtower containers regardless of NoRestart flag, but skip in run-once mode
-	// as there's no need to avoid conflicts with a continuously running instance.
-	if container.IsWatchtower() && !params.RunOnce {
-		newName := util.RandName()
-		if err := client.RenameContainer(container, newName); err != nil {
+	// Rename Watchtower containers regardless of NoRestart flag,
+	// but skip in run-once mode as there's no need to avoid conflicts
+	// with a continuously running instance.
+	if container.IsWatchtower() && !config.RunOnce {
+		newName := "watchtower-old-" + container.ID().ShortID()
+
+		err := client.RenameContainer(container, newName)
+		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"container": container.Name(),
 				"new_name":  newName,
@@ -1122,23 +1115,25 @@ func restartStaleContainer(
 		renamed = true
 	}
 
-	// Start the new container unless restarts are disabled (but always start for Watchtower).
-	if !params.NoRestart || container.IsWatchtower() {
-		logrus.WithFields(fields).Debug("Starting container after update/restart")
+	// Start the new container unless restarts are disabled.
+	// Watchtower containers are always started.
+	if !config.NoRestart || container.IsWatchtower() {
+		logrus.WithFields(fields).Debug("Starting container with updated configuration")
 
 		var err error
 
+		// Start the new container.
 		newContainerID, err = client.StartContainer(container)
 		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
-			// Clean up renamed Watchtower container on failure
+
+			// If there's an error and the container is an old Watchtower container,
+			// then stop and remove it.
 			if renamed && container.IsWatchtower() {
 				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
 
-				if cleanupErr := client.StopAndRemoveContainer(
-					container,
-					params.Timeout,
-				); cleanupErr != nil {
+				cleanupErr := client.StopAndRemoveContainer(container, config.Timeout)
+				if cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
 						Debug("Failed to stop failed Watchtower container")
@@ -1149,57 +1144,34 @@ func restartStaleContainer(
 		}
 
 		// Run post-update lifecycle hooks for restarting containers if enabled.
-		if container.ToRestart() && params.LifecycleHooks {
+		if container.ToRestart() && config.LifecycleHooks {
 			logrus.WithFields(fields).Debug("Executing post-update command")
 			lifecycle.ExecutePostUpdateCommand(
 				client,
 				newContainerID,
-				params.LifecycleUID,
-				params.LifecycleGID,
+				config.LifecycleUID,
+				config.LifecycleGID,
 			)
 		}
 	}
 
-	// For renamed Watchtower containers, update restart policy to "no" and stop the old container
+	// For renamed Watchtower containers, update restart policy to "no" to prevent auto-restart.
 	if renamed && container.IsWatchtower() {
 		logrus.WithFields(fields).
-			Debug("Updating restart policy and stopping old Watchtower container")
+			Debug("Updating restart policy for old Watchtower container")
 
-		// Update restart policy to "no"
+		// Create configuration update
 		updateConfig := dockerContainer.UpdateConfig{
 			RestartPolicy: dockerContainer.RestartPolicy{
 				Name: "no",
 			},
 		}
-		if err := client.UpdateContainer(container, updateConfig); err != nil {
+		// Update the renamed Watchtower container's restart policy.
+		err := client.UpdateContainer(container, updateConfig)
+		if err != nil {
 			logrus.WithError(err).
 				WithFields(fields).
 				Warn("Failed to update restart policy for old Watchtower container")
-
-			// Continue with stopping even if update fails
-		}
-
-		// Attempt to stop and remove the old Watchtower container gracefully.
-		if err := client.StopAndRemoveContainer(container, params.Timeout); err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to stop and remove old Watchtower container")
-
-			// Don't fail the update, just log the warning
-		} else {
-			logrus.WithFields(fields).Debug("Attempted to stop and remove old Watchtower container")
-
-			// If the container is still running, force remove it
-			// This is a backup redundancy to help mitigate race conditions
-			// and timing anomalies in production environments resulting in
-			// orphaned containers.
-			if err := client.RemoveContainer(container); err != nil {
-				logrus.WithError(err).
-					WithFields(fields).
-					Debug("Failed to remove old Watchtower container")
-			} else {
-				logrus.WithFields(fields).Debug("Removed old Watchtower container")
-			}
 		}
 	}
 

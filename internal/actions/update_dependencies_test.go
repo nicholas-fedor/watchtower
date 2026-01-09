@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -181,6 +181,26 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containers[2].ToRestart()).To(gomega.BeTrue())
 			},
 		)
+
+		ginkgo.It(
+			"should propagate restart with project-prefixed service names in Docker Compose",
+			func() {
+				testData := getComposeProjectPrefixedTestData()
+				containers := testData.Containers
+
+				// db container is stale
+				containers[0].SetStale(true)
+
+				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // db
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // web
+
+				actions.UpdateImplicitRestart(containers, containers)
+
+				// web should be marked for restart because it depends on db
+				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+			},
+		)
 		ginkgo.It("should propagate restart through chained dependencies", func() {
 			// Create a transitive dependency chain: A depends on B, B depends on C
 			containerC := mockActions.CreateMockContainerWithConfig(
@@ -274,7 +294,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -302,7 +322,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
@@ -375,7 +395,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -436,7 +456,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).
@@ -483,7 +503,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 
 				gomega.Expect(err).
@@ -578,7 +598,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -625,7 +645,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).
@@ -670,7 +690,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).
@@ -780,7 +800,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -843,7 +863,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 
 				gomega.Expect(err).
@@ -971,7 +991,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:        true,
 						RollingRestart: true,
 						CPUCopyMode:    "auto",
@@ -1035,7 +1055,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1092,7 +1112,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1107,6 +1127,199 @@ var _ = ginkgo.Describe("the update action", func() {
 			// Verify that dependent was marked for restart
 			gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
 		})
+	})
+
+	ginkgo.When("handling dependency sorting with multiple replicas", func() {
+		ginkgo.It("should sort containers with multiple replicas without collisions", func() {
+			// Create multiple replicas of a service: app-1, app-2, app-3, all depending on db
+			dbContainer := mockActions.CreateMockContainerWithConfig(
+				"db",
+				"/db",
+				"postgres:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // Make it stale
+				&dockerContainer.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			app1 := mockActions.CreateMockContainerWithConfig(
+				"app-1",
+				"/app-1",
+				"app:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "db",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			app2 := mockActions.CreateMockContainerWithConfig(
+				"app-2",
+				"/app-2",
+				"app:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "db",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			app3 := mockActions.CreateMockContainerWithConfig(
+				"app-3",
+				"/app-3",
+				"app:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "db",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{app1, app2, app3, dbContainer},
+					Staleness: map[string]bool{
+						"db":    true,
+						"app-1": false,
+						"app-2": false,
+						"app-3": false,
+					},
+					StopOrder:  []string{},
+					StartOrder: []string{},
+				},
+				false,
+				false,
+			)
+
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageInfos[0].ContainerName).To(gomega.Equal("db"))
+
+			// Verify that all dependent containers are marked for restart
+			gomega.Expect(app1.ToRestart()).To(gomega.BeTrue())
+			gomega.Expect(app2.ToRestart()).To(gomega.BeTrue())
+			gomega.Expect(app3.ToRestart()).To(gomega.BeTrue())
+
+			// Verify stop order: dependents first (in any order since they are equivalent), then db
+			stopOrder := client.TestData.StopOrder
+			gomega.Expect(stopOrder).To(gomega.HaveLen(4))
+			gomega.Expect(stopOrder).To(gomega.ContainElement("db"))
+			gomega.Expect(stopOrder).To(gomega.ContainElement("app-1"))
+			gomega.Expect(stopOrder).To(gomega.ContainElement("app-2"))
+			gomega.Expect(stopOrder).To(gomega.ContainElement("app-3"))
+			// db should be last in stop order
+			gomega.Expect(stopOrder[len(stopOrder)-1]).To(gomega.Equal("db"))
+
+			// Verify start order: db first, then dependents
+			startOrder := client.TestData.StartOrder
+			gomega.Expect(startOrder).To(gomega.HaveLen(4))
+			gomega.Expect(startOrder[0]).To(gomega.Equal("db"))
+			gomega.Expect(startOrder).To(gomega.ContainElement("app-1"))
+			gomega.Expect(startOrder).To(gomega.ContainElement("app-2"))
+			gomega.Expect(startOrder).To(gomega.ContainElement("app-3"))
+		})
+	})
+
+	ginkgo.When("handling mixed Compose and Watchtower dependencies", func() {
+		ginkgo.It(
+			"should prioritize Watchtower depends-on over Compose depends-on in mixed scenarios",
+			func() {
+				// Container with both Compose and Watchtower labels, where Watchtower points to different dependency
+				cacheContainer := mockActions.CreateMockContainerWithConfig(
+					"cache",
+					"/cache",
+					"redis:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				databaseContainer := mockActions.CreateMockContainerWithConfig(
+					"database",
+					"/database",
+					"postgres:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project": "myapp",
+							"com.docker.compose.service": "database",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				webService := mockActions.CreateMockContainerWithConfig(
+					"web-service",
+					"/web-service",
+					"nginx:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":                "myapp",
+							"com.docker.compose.service":                "web",
+							"com.docker.compose.depends_on":             `{"database":{"condition":"service_started"}}`,
+							"com.centurylinklabs.watchtower.depends-on": "cache", // Watchtower takes precedence
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{
+							cacheContainer,
+							databaseContainer,
+							webService,
+						},
+						Staleness: map[string]bool{
+							"cache":       true,
+							"database":    false,
+							"web-service": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).To(gomega.Equal("cache"))
+
+				// web-service should be marked for restart due to Watchtower depends-on cache, not Compose depends-on database
+				gomega.Expect(webService.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(databaseContainer.ToRestart()).To(gomega.BeFalse())
+			},
+		)
 	})
 
 	ginkgo.When("handling implicit restart propagation in both directions", func() {
@@ -1250,7 +1463,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1348,7 +1561,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1438,7 +1651,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1475,7 +1688,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1495,6 +1708,385 @@ var _ = ginkgo.Describe("the update action", func() {
 					To(gomega.Equal("network-dependent"))
 					// dependent container
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+			},
+		)
+	})
+
+	ginkgo.When("handling cross-project dependencies", func() {
+		ginkgo.It(
+			"should resolve Watchtower depends-on labels referencing containers in different projects",
+			func() {
+				// Create containers from different projects
+				app1Db := mockActions.CreateMockContainerWithConfig(
+					"app1-database",
+					"/app1-database",
+					"postgres:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project": "app1",
+							"com.docker.compose.service": "database",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				app2Web := mockActions.CreateMockContainerWithConfig(
+					"app2-web",
+					"/app2-web",
+					"nginx:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project": "app2",
+							"com.docker.compose.service": "web",
+							// Watchtower depends-on referencing container from different project
+							"com.centurylinklabs.watchtower.depends-on": "app1-database",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{app1Db, app2Web},
+						Staleness: map[string]bool{
+							"app1-database": true,
+							"app2-web":      false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).To(gomega.Equal("app1-database"))
+
+				// app2-web should be marked for restart due to cross-project dependency
+				gomega.Expect(app2Web.ToRestart()).To(gomega.BeTrue())
+			},
+		)
+
+		ginkgo.It("should prioritize Watchtower depends-on over Compose depends-on labels", func() {
+			// Container with both Watchtower and Compose depends-on labels
+			webService := mockActions.CreateMockContainerWithConfig(
+				"web-service",
+				"/web-service",
+				"nginx:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project":    "myproject",
+						"com.docker.compose.service":    "web",
+						"com.docker.compose.depends_on": `{"database":{"condition":"service_started"}}`,
+						// Watchtower depends-on should take precedence
+						"com.centurylinklabs.watchtower.depends-on": "external-cache",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			databaseService := mockActions.CreateMockContainerWithConfig(
+				"myproject-database",
+				"/myproject-database",
+				"postgres:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // Make it stale
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project": "myproject",
+						"com.docker.compose.service": "database",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			externalCache := mockActions.CreateMockContainerWithConfig(
+				"external-cache",
+				"/external-cache",
+				"redis:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // Make it stale
+				&dockerContainer.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{databaseService, externalCache, webService},
+					Staleness: map[string]bool{
+						"myproject-database": true,
+						"external-cache":     true,
+						"web-service":        false,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(2))
+			gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(2))
+
+			// web-service should be marked for restart due to Watchtower depends-on external-cache,
+			// not due to Compose depends-on database (even though database is also stale)
+			gomega.Expect(webService.ToRestart()).To(gomega.BeTrue())
+		})
+
+		ginkgo.It(
+			"should distinguish same service names in different projects using full identifiers",
+			func() {
+				// Two services with same name but different projects
+				project1Db := mockActions.CreateMockContainerWithConfig(
+					"project1-database",
+					"/project1-database",
+					"postgres:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project": "project1",
+							"com.docker.compose.service": "database",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				project2Db := mockActions.CreateMockContainerWithConfig(
+					"project2-database",
+					"/project2-database",
+					"postgres:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project": "project2",
+							"com.docker.compose.service": "database",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				// Service that depends on database from project1 only
+				appService := mockActions.CreateMockContainerWithConfig(
+					"app-service",
+					"/app-service",
+					"app:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":                "project1",
+							"com.docker.compose.service":                "app",
+							"com.centurylinklabs.watchtower.depends-on": "project1-database",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{project1Db, project2Db, appService},
+						Staleness: map[string]bool{
+							"project1-database": false,
+							"project2-database": true,
+							"app-service":       false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).
+					To(gomega.Equal("project2-database"))
+
+				// app-service should NOT be marked for restart because it depends on project1-database,
+				// which is not stale, and project2-database being stale doesn't affect it
+				gomega.Expect(appService.ToRestart()).To(gomega.BeFalse())
+			},
+		)
+
+		ginkgo.It("should resolve conflicts using full project-service-number identifiers", func() {
+			// Containers with similar names requiring full identifier resolution
+			db1 := mockActions.CreateMockContainerWithConfig(
+				"myapp-database-1",
+				"/myapp-database-1",
+				"postgres:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1), // Make it stale
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project":          "myapp",
+						"com.docker.compose.service":          "database",
+						"com.docker.compose.container-number": "1",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			db2 := mockActions.CreateMockContainerWithConfig(
+				"myapp-database-2",
+				"/myapp-database-2",
+				"postgres:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project":          "myapp",
+						"com.docker.compose.service":          "database",
+						"com.docker.compose.container-number": "2",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			// Worker that depends on specific database instance
+			worker := mockActions.CreateMockContainerWithConfig(
+				"worker",
+				"/worker",
+				"worker:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "myapp-database-1",
+					},
+					ExposedPorts: map[nat.Port]struct{}{},
+				})
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{db1, db2, worker},
+					Staleness: map[string]bool{
+						"myapp-database-1": true,
+						"myapp-database-2": false,
+						"worker":           false,
+					},
+				},
+				false,
+				false,
+			)
+
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageInfos[0].ContainerName).To(gomega.Equal("myapp-database-1"))
+
+			// Worker should be marked for restart due to dependency on specific database instance
+			gomega.Expect(worker.ToRestart()).To(gomega.BeTrue())
+		})
+
+		ginkgo.It(
+			"should handle mixed project and non-project containers with Watchtower dependencies",
+			func() {
+				// Mix of containers: some with project labels, some without
+				projectDB := mockActions.CreateMockContainerWithConfig(
+					"project-db",
+					"/project-db",
+					"postgres:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project": "myproject",
+							"com.docker.compose.service": "db",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				standaloneCache := mockActions.CreateMockContainerWithConfig(
+					"standalone-cache",
+					"/standalone-cache",
+					"redis:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "project-db",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				projectWeb := mockActions.CreateMockContainerWithConfig(
+					"myproject-web",
+					"/myproject-web",
+					"nginx:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":                "myproject",
+							"com.docker.compose.service":                "web",
+							"com.centurylinklabs.watchtower.depends-on": "standalone-cache",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{projectDB, standaloneCache, projectWeb},
+						Staleness: map[string]bool{
+							"project-db":       true,
+							"standalone-cache": false,
+							"myproject-web":    false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).To(gomega.Equal("project-db"))
+
+				// Both dependent containers should be marked for restart
+				gomega.Expect(standaloneCache.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(projectWeb.ToRestart()).To(gomega.BeTrue())
 			},
 		)
 	})

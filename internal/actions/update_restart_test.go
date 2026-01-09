@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{
+				types.UpdateParams{
 					Cleanup:     true,
 					Filter:      filters.WatchtowerContainersFilter,
 					CPUCopyMode: "auto",
@@ -60,7 +60,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
 			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(1), "StopContainer should be called once for old Watchtower")
+				To(gomega.Equal(0), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
 			gomega.Expect(client.TestData.StartContainerCount).
 				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
 			gomega.Expect(client.TestData.RenameContainerCount).
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -216,7 +216,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -284,7 +284,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, _, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+						types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 					)
 
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -343,7 +343,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -403,7 +403,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -470,7 +470,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -510,7 +510,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -867,7 +867,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, cleanupImageInfos, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{
+						types.UpdateParams{
 							Cleanup:        true,
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
@@ -938,7 +938,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, _, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{
+						types.UpdateParams{
 							Cleanup:        true,
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
@@ -1019,7 +1019,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, _, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},
@@ -1099,7 +1099,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},

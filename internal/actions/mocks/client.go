@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
@@ -55,7 +56,7 @@ func (testdata *TestData) TriedToRemoveImage() bool {
 // CreateMockClient constructs a new MockClient instance for testing.
 // It initializes the client with provided test data, pull and volume removal flags,
 // and an empty map for tracking stopped containers.
-func CreateMockClient(data *TestData, pullImages bool, removeVolumes bool) MockClient {
+func CreateMockClient(data *TestData, pullImages, removeVolumes bool) MockClient {
 	return CreateMockClientWithContext(context.Background(), data, pullImages, removeVolumes)
 }
 
@@ -81,6 +82,7 @@ func CreateMockClientWithContext(
 func (client MockClient) ListContainers(filter ...types.Filter) ([]types.Container, error) {
 	// Simulate mid-operation delay for context cancellation testing
 	time.Sleep(1 * time.Millisecond)
+
 	if client.ctx != nil {
 		select {
 		case <-client.ctx.Done():
@@ -94,15 +96,19 @@ func (client MockClient) ListContainers(filter ...types.Filter) ([]types.Contain
 	}
 
 	containers := client.TestData.Containers
+
 	if len(filter) > 0 && filter[0] != nil {
 		filtered := []types.Container{}
+
 		for _, c := range containers {
 			if filter[0](c) {
 				filtered = append(filtered, c)
 			}
 		}
+
 		return filtered, nil
 	}
+
 	return containers, nil
 }
 
@@ -114,6 +120,7 @@ func (client MockClient) StopContainer(c types.Container, _ time.Duration) error
 
 	// Simulate mid-operation delay for context cancellation testing
 	time.Sleep(1 * time.Millisecond)
+
 	if client.ctx != nil {
 		select {
 		case <-client.ctx.Done():
@@ -126,8 +133,10 @@ func (client MockClient) StopContainer(c types.Container, _ time.Duration) error
 		client.TestData.StopContainerCount <= client.TestData.StopContainerFailCount {
 		return client.TestData.StopContainerError
 	}
+
 	client.Stopped[string(c.ID())] = true
 	client.TestData.StopOrder = append(client.TestData.StopOrder, c.Name())
+
 	return nil
 }
 
@@ -138,6 +147,7 @@ func (client MockClient) StopAndRemoveContainer(c types.Container, timeout time.
 	if err != nil {
 		return err
 	}
+
 	return client.RemoveContainer(c)
 }
 
@@ -152,6 +162,7 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 func (client MockClient) StartContainer(c types.Container) (types.ContainerID, error) {
 	client.TestData.StartContainerCount++
 	client.TestData.StartOrder = append(client.TestData.StartOrder, c.Name())
+
 	return c.ID(), nil
 }
 
@@ -159,6 +170,7 @@ func (client MockClient) StartContainer(c types.Container) (types.ContainerID, e
 // It returns nil to indicate success without modifying any state.
 func (client MockClient) RenameContainer(_ types.Container, _ string) error {
 	client.TestData.RenameContainerCount++
+
 	return nil
 }
 
@@ -166,6 +178,7 @@ func (client MockClient) RenameContainer(_ types.Container, _ string) error {
 // It increments the UpdateContainerCount and returns the configured error if set.
 func (client MockClient) UpdateContainer(_ types.Container, _ dockerContainer.UpdateConfig) error {
 	client.TestData.UpdateContainerCount++
+
 	return client.TestData.UpdateContainerError
 }
 
@@ -173,11 +186,10 @@ func (client MockClient) UpdateContainer(_ types.Container, _ dockerContainer.Up
 // It simulates image cleanup and returns configured error if set or if image ID is in FailedImageIDs, nil otherwise.
 func (client MockClient) RemoveImageByID(imageID types.ImageID, _ string) error {
 	client.TestData.TriedToRemoveImageCount++
-	for _, failedID := range client.TestData.FailedImageIDs {
-		if imageID == failedID {
-			return client.TestData.RemoveImageError
-		}
+	if slices.Contains(client.TestData.FailedImageIDs, imageID) {
+		return client.TestData.RemoveImageError
 	}
+
 	return nil
 }
 
@@ -234,6 +246,7 @@ func (client MockClient) IsContainerStale(
 
 	// Simulate mid-operation delay for context cancellation testing
 	time.Sleep(1 * time.Millisecond)
+
 	if client.ctx != nil {
 		select {
 		case <-client.ctx.Done():
@@ -251,6 +264,7 @@ func (client MockClient) IsContainerStale(
 	if !found {
 		stale = true // Default to stale if not specified.
 	}
+
 	return stale, "", nil
 }
 
@@ -264,6 +278,7 @@ func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {
 // It increments the count and returns nil to indicate success.
 func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Duration) error {
 	client.TestData.WaitForContainerHealthyCount++
+
 	return nil
 }
 

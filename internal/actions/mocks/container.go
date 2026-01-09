@@ -22,7 +22,7 @@ const mockIDLength = 64
 
 // CreateMockContainer creates a container substitute valid for testing.
 // It initializes a basic container with the specified ID, name, image, and creation time.
-func CreateMockContainer(id string, name string, image string, created time.Time) types.Container {
+func CreateMockContainer(id, name, image string, created time.Time) types.Container {
 	content := dockerContainer.InspectResponse{
 		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 			ID:      id,

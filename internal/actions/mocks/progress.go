@@ -18,10 +18,10 @@ var errMockFailed = errors.New("accidentally the whole container")
 
 // State ID prefixes for generating unique mock container IDs.
 const (
-	skippedIDPrefix  = 41 // Prefix for SkippedState containers (e.g., "c7941...").
-	freshIDPrefix    = 31 // Prefix for FreshState containers (e.g., "c7931...").
-	updatedIDPrefix  = 11 // Prefix for UpdatedState containers (e.g., "c7911...").
-	failedIDPrefix   = 21 // Prefix for FailedState containers (e.g., "c7921...").
+	skippedIDPrefix   = 41 // Prefix for SkippedState containers (e.g., "c7941...").
+	freshIDPrefix     = 31 // Prefix for FreshState containers (e.g., "c7931...").
+	updatedIDPrefix   = 11 // Prefix for UpdatedState containers (e.g., "c7911...").
+	failedIDPrefix    = 21 // Prefix for FailedState containers (e.g., "c7921...").
 	restartedIDPrefix = 51 // Prefix for RestartedState containers (e.g., "c7951...").
 )
 

@@ -134,6 +134,48 @@ func getComposeTestData() *mockActions.TestData {
 	}
 }
 
+func getComposeProjectPrefixedTestData() *mockActions.TestData {
+	// Create a database container with project and service labels
+	dbContainer := mockActions.CreateMockContainerWithConfig(
+		"myapp-database-1",
+		"/myapp-database-1",
+		"postgres:latest",
+		true,
+		false,
+		time.Now().AddDate(0, 0, -1),
+		&dockerContainer.Config{
+			Image: "postgres:latest",
+			Labels: map[string]string{
+				"com.docker.compose.project": "myapp",
+				"com.docker.compose.service": "database",
+			},
+			ExposedPorts: map[nat.Port]struct{}{},
+		})
+
+	// Create a web container with project and service labels that depends on "database"
+	webContainer := mockActions.CreateMockContainerWithConfig(
+		"myapp-watchtower-test-app1-1",
+		"/myapp-watchtower-test-app1-1",
+		"nginx:latest",
+		true,
+		false,
+		time.Now(),
+		&dockerContainer.Config{
+			Image: "nginx:latest",
+			Labels: map[string]string{
+				"com.docker.compose.project":    "myapp",
+				"com.docker.compose.service":    "watchtower-test-app1",
+				"com.docker.compose.depends_on": "database:service_started:true",
+			},
+			ExposedPorts: map[nat.Port]struct{}{},
+		})
+
+	return &mockActions.TestData{
+		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
+		Containers: []types.Container{dbContainer, webContainer},
+	}
+}
+
 func getComposeMultiHopTestData() *mockActions.TestData {
 	// Create containers for a chain: cache -> db -> app
 	// depends on db, db depends on cache

@@ -459,7 +459,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				false,
 			)
 
-			config := UpdateConfig{
+			config := types.UpdateParams{
 				Filter:           filters.NoFilter,
 				Cleanup:          false,
 				NoRestart:        false,

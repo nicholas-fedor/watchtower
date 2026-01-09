@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{
+				types.UpdateParams{
 					Cleanup:          true,
 					Filter:           filters.WatchtowerContainersFilter,
 					CPUCopyMode:      "auto",
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			gomega.Expect(client.TestData.UpdateContainerCount).
 				To(gomega.Equal(1), "UpdateContainer should be called once for old Watchtower")
 			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(1), "StopContainer should be called once for old Watchtower")
+				To(gomega.Equal(0), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
 			gomega.Expect(client.TestData.IsContainerStaleCount).
 				To(gomega.Equal(1), "IsContainerStale should be called once for Watchtower")
 		})
@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			config := actions.UpdateConfig{
+			config := types.UpdateParams{
 				Cleanup:     true,
 				NoRestart:   true,
 				Filter:      filters.WatchtowerContainersFilter,
@@ -137,7 +137,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			config := actions.UpdateConfig{
+			config := types.UpdateParams{
 				Cleanup:     true,
 				RunOnce:     true,
 				Filter:      filters.WatchtowerContainersFilter,
@@ -285,7 +285,7 @@ func TestSafeguardDelay(t *testing.T) {
 		report, cleanupImageInfos, err := actions.Update(
 			context.Background(),
 			client,
-			actions.UpdateConfig{
+			types.UpdateParams{
 				Cleanup:          true,
 				Filter:           filters.WatchtowerContainersFilter,
 				CPUCopyMode:      "auto",

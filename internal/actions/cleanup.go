@@ -1,4 +1,3 @@
-// Package actions provides core logic for Watchtower’s container update operations.
 package actions
 
 import (
@@ -17,52 +16,8 @@ import (
 // stopContainerTimeout sets the container stop timeout.
 const stopContainerTimeout = 10 * time.Minute
 
-// CheckForSanity validates the environment for updates.
-//
-// It checks for dependency conflicts when rolling restarts are enabled, ensuring containers with links
-// do not cause unexpected behavior during sequential updates.
-//
-// Parameters:
-//   - client: Container client for Docker operations.
-//   - filter: Container filter to select relevant containers.
-//   - rollingRestarts: Enable rolling restarts if true.
-//
-// Returns:
-//   - error: Non-nil if rolling restarts conflict with dependencies, nil otherwise.
-func CheckForSanity(client container.Client, filter types.Filter, rollingRestarts bool) error {
-	logrus.Debug("Performing pre-update sanity checks")
-
-	// Skip checks if rolling restarts are disabled, as dependencies are irrelevant.
-	if !rollingRestarts {
-		return nil
-	}
-
-	// List containers to inspect for dependency links.
-	containers, err := client.ListContainers(filter)
-	if err != nil {
-		logrus.WithError(err).Debug("Failed to list containers")
-
-		return fmt.Errorf("%w: %w", errListContainersFailed, err)
-	}
-
-	// Check each container for links, which are incompatible with rolling restarts.
-	for _, c := range containers {
-		// c.Links() already returns normalized container names
-		if links := c.Links(); len(links) > 0 {
-			logrus.WithFields(logrus.Fields{
-				"container": c.Name(),
-				"links":     links,
-			}).Debug("Found dependencies incompatible with rolling restarts")
-
-			return fmt.Errorf("%w: %q depends on %v", errRollingRestartDependency, c.Name(), links)
-		}
-	}
-
-	logrus.WithField("container_count", len(containers)).
-		Debug("Sanity check passed, no dependencies found")
-
-	return nil
-}
+// cleanupRetryDelay sets the delay before retrying cleanup operations.
+const cleanupRetryDelay = 500 * time.Millisecond
 
 // CheckForMultipleWatchtowerInstances ensures a single Watchtower instance within the same scope.
 //
@@ -141,7 +96,8 @@ func cleanupExcessWatchtowers(
 	cleanupImageInfos *[]types.CleanedImageInfo,
 ) (bool, error) {
 	// Sort containers by creation time to identify the newest instance.
-	if err := sorter.SortByCreated(containers); err != nil {
+	err := sorter.SortByCreated(containers)
+	if err != nil {
 		logrus.WithError(err).Debug("Failed to sort containers by creation time")
 
 		return false, fmt.Errorf("%w: %w", errStopWatchtowerFailed, err)
@@ -170,8 +126,34 @@ func cleanupExcessWatchtowers(
 		logrus.WithField("container", c.Name()).
 			Debug("Attempting to stop and remove excess Watchtower container")
 
-		// Stop and remove the container with a timeout.
-		if err := client.StopAndRemoveContainer(c, stopContainerTimeout); err != nil {
+		// Stop and remove the container with timeout.
+		err := client.StopAndRemoveContainer(c, stopContainerTimeout)
+		if err != nil {
+			// Check if this is a "removal already in progress" error
+			// This happens when multiple processes attempt to remove the same container simultaneously
+			errStr := strings.ToLower(err.Error())
+			if strings.Contains(errStr, "already in progress") ||
+				strings.Contains(errStr, "removal of container") &&
+					strings.Contains(errStr, "is already in progress") {
+				logrus.WithField("container", c.Name()).
+					Debug("Container removal already in progress by another process, skipping")
+				// Don't treat this as an error - another process is handling cleanup
+				continue
+			}
+
+			// Check for "no such container" errors (container already removed)
+			if strings.Contains(errStr, "no such container") ||
+				strings.Contains(errStr, "not found") {
+				logrus.WithField("container", c.Name()).
+					Debug("Container already removed, skipping")
+				// Don't treat this as an error - container is already gone
+				continue
+			}
+
+			// Add a small delay before reporting to allow for transient issues
+			// This helps with race conditions and I/O stress scenarios
+			time.Sleep(cleanupRetryDelay)
+
 			logrus.WithError(err).
 				WithField("container", c.Name()).
 				Debug("Failed to stop Watchtower instance")
@@ -212,17 +194,40 @@ func cleanupExcessWatchtowers(
 
 	// Report any stop errors encountered during the process.
 	if len(stopErrors) > 0 {
+		// Log detailed error information for debugging
+		for i, err := range stopErrors {
+			logrus.WithError(err).
+				WithField("container_index", i).
+				WithField("total_errors", len(stopErrors)).
+				Debug("Watchtower cleanup error details")
+		}
+
+		// Check if we successfully cleaned up any containers
+		successCount := len(excessContainers) - len(stopErrors)
+		if successCount > 0 {
+			logrus.WithFields(logrus.Fields{
+				"successful_cleanups": successCount,
+				"failed_cleanups":     len(stopErrors),
+				"total_containers":    len(excessContainers),
+			}).Warn("Partially successful Watchtower cleanup - some containers may remain orphaned")
+
+			// Return success with warning rather than complete failure
+			// This allows the new Watchtower instance to continue operating
+			return true, nil
+		}
+
 		logrus.WithField("error_count", len(stopErrors)).
-			Debug("Encountered errors during Watchtower cleanup")
+			Error("All Watchtower cleanup operations failed")
 
 		return true, fmt.Errorf(
-			"%w: %d instances failed to stop",
+			"%w: all %d instances failed to stop",
 			errStopWatchtowerFailed,
 			len(stopErrors),
 		)
 	}
 
-	logrus.Info("Successfully cleaned up excess Watchtower instances")
+	logrus.WithField("cleaned_containers", len(excessContainers)).
+		Info("Successfully cleaned up all excess Watchtower instances")
 
 	return true, nil
 }
@@ -261,7 +266,8 @@ func CleanupImages(
 			continue // Skip empty IDs to avoid invalid operations.
 		}
 
-		if err := client.RemoveImageByID(imageID, cleanedImage.ImageName); err != nil {
+		err := client.RemoveImageByID(imageID, cleanedImage.ImageName)
+		if err != nil {
 			// Check if this is a "No such image" error (expected when multiple instances clean up the same image)
 			if strings.Contains(err.Error(), "No such image") {
 				logrus.WithFields(logrus.Fields{

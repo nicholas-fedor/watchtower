@@ -139,7 +139,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			false,
 			false,
 		)
-		config := UpdateConfig{
+		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			false,
 			false,
 		)
-		config := UpdateConfig{
+		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
@@ -186,7 +186,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			false,
 			false,
 		)
-		config := UpdateConfig{
+		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
@@ -220,7 +220,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			false,
 			false,
 		)
-		config := UpdateConfig{
+		config := types.UpdateParams{
 			Filter:  filters.NoFilter,
 			RunOnce: true,
 		}
@@ -256,7 +256,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			false,
 			false,
 		)
-		config := UpdateConfig{
+		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)

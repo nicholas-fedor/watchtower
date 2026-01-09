@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, MonitorOnly: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, MonitorOnly: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, cleanupImageInfos, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{
+						types.UpdateParams{
 							Cleanup:         true,
 							MonitorOnly:     true,
 							LabelPrecedence: true,
@@ -172,7 +172,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						report, cleanupImageInfos, err := actions.Update(
 							context.Background(),
 							client,
-							actions.UpdateConfig{
+							types.UpdateParams{
 								Cleanup:         true,
 								MonitorOnly:     true,
 								LabelPrecedence: true,
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, cleanupImageInfos, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{
+						types.UpdateParams{
 							Cleanup:         true,
 							MonitorOnly:     true,
 							LabelPrecedence: true,
