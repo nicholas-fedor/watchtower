@@ -365,6 +365,27 @@ func (c Container) StopSignal() string {
 	return "SIGTERM"
 }
 
+// StopTimeout returns the container's configured stop timeout in seconds.
+//
+// Returns:
+//   - *int: Timeout in seconds if set, nil if unset.
+func (c Container) StopTimeout() *int {
+	clog := logrus.WithField("container", c.Name())
+
+	// Check Config
+	if c.containerInfo != nil && c.containerInfo.Config != nil &&
+		c.containerInfo.Config.StopTimeout != nil {
+		timeout := *c.containerInfo.Config.StopTimeout
+		clog.WithField("timeout", timeout).Debug("Retrieved stop timeout from Config")
+
+		return &timeout
+	}
+
+	clog.Debug("Stop timeout not set in container config")
+
+	return nil
+}
+
 // ContainsWatchtowerLabel checks if the container is Watchtower.
 //
 // Parameters:

@@ -231,6 +231,17 @@ func StopSourceContainer(
 		return nil
 	}
 
+	// Use container's configured timeout if available and valid, otherwise use passed parameter.
+	// A timeout of 0 is valid in Docker (means no grace period - immediate SIGKILL after stop signal).
+	effectiveTimeout := timeout
+	if containerTimeout := sourceContainer.StopTimeout(); containerTimeout != nil && *containerTimeout >= 0 {
+		effectiveTimeout = time.Duration(*containerTimeout) * time.Second
+		clog.WithFields(logrus.Fields{
+			"container_timeout": effectiveTimeout,
+			"default_timeout":   timeout,
+		}).Debug("Using container-specific stop timeout")
+	}
+
 	// Retrieve the container's configured stop signal, falling back to SIGTERM if not specified.
 	signal := sourceContainer.StopSignal()
 	if signal == "" {
@@ -246,14 +257,14 @@ func StopSourceContainer(
 
 	clog.WithFields(logrus.Fields{
 		"signal":  signal,
-		"timeout": timeout,
+		"timeout": effectiveTimeout,
 	}).Info(message)
 
 	// Record the start time to measure elapsed duration for the stop operation.
 	startTime := time.Now()
 
 	// Convert timeout from time.Duration to seconds for Docker API's StopContainer.
-	timeoutSeconds := int(timeout / time.Second)
+	timeoutSeconds := int(effectiveTimeout / time.Second)
 
 	// Call the Docker API's StopContainer with the stop signal and timeout in seconds.
 	// The API sends the signal (SIGTERM or custom), waits for the timeout, and sends SIGKILL if needed.

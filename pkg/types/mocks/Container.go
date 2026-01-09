@@ -1454,6 +1454,52 @@ func (_c *MockContainer_StopSignal_Call) RunAndReturn(run func() string) *MockCo
 	return _c
 }
 
+// StopTimeout provides a mock function for the type MockContainer
+func (_mock *MockContainer) StopTimeout() *int {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopTimeout")
+	}
+
+	var r0 *int
+	if returnFunc, ok := ret.Get(0).(func() *int); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*int)
+		}
+	}
+	return r0
+}
+
+// MockContainer_StopTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopTimeout'
+type MockContainer_StopTimeout_Call struct {
+	*mock.Call
+}
+
+// StopTimeout is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) StopTimeout() *MockContainer_StopTimeout_Call {
+	return &MockContainer_StopTimeout_Call{Call: _e.mock.On("StopTimeout")}
+}
+
+func (_c *MockContainer_StopTimeout_Call) Run(run func()) *MockContainer_StopTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_StopTimeout_Call) Return(timeout *int) *MockContainer_StopTimeout_Call {
+	_c.Call.Return(timeout)
+	return _c
+}
+
+func (_c *MockContainer_StopTimeout_Call) RunAndReturn(run func() *int) *MockContainer_StopTimeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ToRestart provides a mock function for the type MockContainer
 func (_mock *MockContainer) ToRestart() bool {
 	ret := _mock.Called()

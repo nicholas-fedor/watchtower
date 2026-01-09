@@ -213,6 +213,13 @@ func (m mockContainer) StopSignal() string {
 	return "" // Minimal stub, not used in these tests
 }
 
+// StopTimeout returns the container's stop timeout in seconds. This method satisfies
+// the types.Container interface, returning nil as a minimal stub since the auth
+// package does not use this data in these authentication-focused tests.
+func (m mockContainer) StopTimeout() *int {
+	return nil // Minimal stub, not used in these tests
+}
+
 // HasImageInfo indicates whether the container has associated image info. This method
 // satisfies the types.Container interface, returning false as a minimal stub since
 // the auth package does not use this check in these authentication-focused tests.
