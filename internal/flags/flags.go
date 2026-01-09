@@ -758,7 +758,9 @@ func EnvConfig(cmd *cobra.Command) error {
 				"TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
 			)
 		} else if strings.HasPrefix(host, "unix://") {
-			logrus.Warn("TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.")
+			logrus.Warn(
+				"TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.",
+			)
 		}
 	}
 

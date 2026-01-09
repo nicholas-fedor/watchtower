@@ -649,7 +649,8 @@ func sendSplitNotifications(
 			updatedNames = append(updatedNames, c.Name())
 		}
 
-		logrus.WithField("updated_containers", updatedNames).Debug("Split notifications: sending filtered entry notifications for updated containers")
+		logrus.WithField("updated_containers", updatedNames).
+			Debug("Split notifications: sending filtered entry notifications for updated containers")
 
 		// Send individual filtered entry notifications for each updated container
 		for _, updatedContainer := range result.Updated() {
@@ -662,7 +663,8 @@ func sendSplitNotifications(
 
 			// Skip containers with empty names
 			if strings.TrimSpace(updatedContainer.Name()) == "" {
-				logrus.WithField("container_id", updatedContainer.ID().ShortID()).Debug("Encountered container with empty name, skipping notification")
+				logrus.WithField("container_id", updatedContainer.ID().ShortID()).
+					Debug("Encountered container with empty name, skipping notification")
 
 				continue
 			}
@@ -681,10 +683,18 @@ func sendSplitNotifications(
 			singleContainerReport := buildSingleContainerReport(updatedContainer, result)
 
 			// Create log entries for container update events
-			entries := buildUpdateEntries(updatedContainer, updatedContainer.ID(), updatedContainer.NewContainerID(), time.Now())
+			entries := buildUpdateEntries(
+				updatedContainer,
+				updatedContainer.ID(),
+				updatedContainer.NewContainerID(),
+				time.Now(),
+			)
 
 			// Add cleanup entries for this container
-			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, updatedContainer.Name())
+			containerCleanupEntries := buildCleanupEntriesForContainer(
+				cleanedImages,
+				updatedContainer.Name(),
+			)
 			entries = append(entries, containerCleanupEntries...)
 
 			if notifier.ShouldSendNotification(singleContainerReport) {
@@ -705,7 +715,8 @@ func sendSplitNotifications(
 
 			// Skip containers with empty names
 			if strings.TrimSpace(restartedContainer.Name()) == "" {
-				logrus.WithField("container_id", restartedContainer.ID().ShortID()).Debug("Encountered restarted container with empty name, skipping notification")
+				logrus.WithField("container_id", restartedContainer.ID().ShortID()).
+					Debug("Encountered restarted container with empty name, skipping notification")
 
 				continue
 			}
@@ -730,9 +741,19 @@ func sendSplitNotifications(
 				newID = restartedContainer.ID()
 			}
 
+			// Build cleanup entries first to preallocate the entries slice with correct capacity
+			containerCleanupEntries := buildCleanupEntriesForContainer(
+				cleanedImages,
+				restartedContainer.Name(),
+			)
+
 			// Create log entries for container restart events (similar to update but without "Found new image")
-			entries := []*logrus.Entry{
-				{
+			// Base entries: StoppingLinkedContainerMessage + StartedLinkedContainerMessage
+			const baseEntryCount = 2
+
+			entries := make([]*logrus.Entry, 0, baseEntryCount+len(containerCleanupEntries))
+			entries = append(entries,
+				&logrus.Entry{
 					Level:   logrus.InfoLevel,
 					Message: StoppingLinkedContainerMessage,
 					Data: logrus.Fields{
@@ -742,7 +763,7 @@ func sendSplitNotifications(
 					},
 					Time: now,
 				},
-				{
+				&logrus.Entry{
 					Level:   logrus.InfoLevel,
 					Message: StartedLinkedContainerMessage,
 					Data: logrus.Fields{
@@ -751,10 +772,7 @@ func sendSplitNotifications(
 					},
 					Time: now,
 				},
-			}
-
-			// Add cleanup entries for this container
-			containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, restartedContainer.Name())
+			)
 			entries = append(entries, containerCleanupEntries...)
 
 			if notifier.ShouldSendNotification(singleContainerReport) {
@@ -775,7 +793,8 @@ func sendSplitNotifications(
 
 			// Skip containers with empty names
 			if strings.TrimSpace(staleContainer.Name()) == "" {
-				logrus.WithField("container_id", staleContainer.ID().ShortID()).Debug("Encountered stale container with empty name, skipping notification")
+				logrus.WithField("container_id", staleContainer.ID().ShortID()).
+					Debug("Encountered stale container with empty name, skipping notification")
 
 				continue
 			}
@@ -795,10 +814,18 @@ func sendSplitNotifications(
 				singleContainerReport := buildSingleContainerReport(staleContainer, result)
 
 				// Create log entries for container update events (monitor-only containers don't get updated, but we still send the same format)
-				entries := buildUpdateEntries(staleContainer, staleContainer.ID(), staleContainer.NewContainerID(), time.Now())
+				entries := buildUpdateEntries(
+					staleContainer,
+					staleContainer.ID(),
+					staleContainer.NewContainerID(),
+					time.Now(),
+				)
 
 				// Add cleanup entries for this container
-				containerCleanupEntries := buildCleanupEntriesForContainer(cleanedImages, staleContainer.Name())
+				containerCleanupEntries := buildCleanupEntriesForContainer(
+					cleanedImages,
+					staleContainer.Name(),
+				)
 				entries = append(entries, containerCleanupEntries...)
 
 				if notifier.ShouldSendNotification(singleContainerReport) {

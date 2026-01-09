@@ -213,6 +213,13 @@ func (m mockContainer) StopSignal() string {
 	return "" // Minimal stub, not used in these tests
 }
 
+// StopTimeout returns the container's stop timeout in seconds. This method satisfies
+// the types.Container interface, returning nil as a minimal stub since the auth
+// package does not use this data in these authentication-focused tests.
+func (m mockContainer) StopTimeout() *int {
+	return nil // Minimal stub, not used in these tests
+}
+
 // HasImageInfo indicates whether the container has associated image info. This method
 // satisfies the types.Container interface, returning false as a minimal stub since
 // the auth package does not use this check in these authentication-focused tests.
@@ -414,8 +421,10 @@ var _ = ginkgo.Describe("the auth module", func() {
 				To(gomega.ContainSubstring(expectedErr), fmt.Sprintf("Expected error to contain '%s'", expectedErr))
 			gomega.Expect(token).To(gomega.Equal(""), "Expected empty token on failure")
 		} else {
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Expected no error when fetching basic auth token")
-			gomega.Expect(token).To(gomega.Equal(expectedToken), fmt.Sprintf("Expected token to match '%s'", expectedToken))
+			gomega.Expect(err).
+				NotTo(gomega.HaveOccurred(), "Expected no error when fetching basic auth token")
+			gomega.Expect(token).
+				To(gomega.Equal(expectedToken), fmt.Sprintf("Expected token to match '%s'", expectedToken))
 		}
 	}
 
@@ -1007,7 +1016,11 @@ var _ = ginkgo.Describe("the auth module", func() {
 					servers[i].AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyRequest("GET", "/v2/"),
-							ghttp.RespondWith(http.StatusOK, `{"token": "final-token"}`, http.Header{"Content-Type": []string{"application/json"}}),
+							ghttp.RespondWith(
+								http.StatusOK,
+								`{"token": "final-token"}`,
+								http.Header{"Content-Type": []string{"application/json"}},
+							),
 						),
 					)
 				}

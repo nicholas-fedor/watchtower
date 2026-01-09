@@ -383,10 +383,21 @@ func Update(
 		}
 
 		// Stop and restart containers in batches, respecting dependency order.
-		failedStop, stoppedImages = stopContainersInReversedOrder(allContainersToRestart, client, params)
+		failedStop, stoppedImages = stopContainersInReversedOrder(
+			allContainersToRestart,
+			client,
+			params,
+		)
 		progress.UpdateFailed(failedStop)
 
-		failedStart = restartContainersInSortedOrder(allContainersToRestart, client, params, stoppedImages, &cleanupImageInfos, progress)
+		failedStart = restartContainersInSortedOrder(
+			allContainersToRestart,
+			client,
+			params,
+			stoppedImages,
+			&cleanupImageInfos,
+			progress,
+		)
 		progress.UpdateFailed(failedStart)
 	}
 
@@ -779,8 +790,14 @@ func performRollingRestart(
 				}
 
 				// Wait for the container to become healthy if it has a health check
-				if waitErr := client.WaitForContainerHealthy(newContainerID, defaultHealthCheckTimeout); waitErr != nil {
-					logrus.WithFields(fields).WithError(waitErr).Warn("Failed to wait for container to become healthy")
+				if waitErr := client.WaitForContainerHealthy(
+					newContainerID,
+					defaultHealthCheckTimeout,
+				); waitErr != nil {
+					logrus.WithFields(fields).
+						WithError(waitErr).
+						Warn("Failed to wait for container to become healthy")
+
 					// Don't fail the update, just log the warning
 				}
 
@@ -788,7 +805,13 @@ func performRollingRestart(
 					// Only collect cleaned image info for stale containers that were not renamed, as renamed
 					// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 					// in the new container.
-					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
+					addCleanupImageInfo(
+						cleanupImageInfos,
+						c.ImageID(),
+						c.ImageName(),
+						c.Name(),
+						c.ID(),
+					)
 
 					logrus.WithFields(fields).Debug("Updated container")
 				}
@@ -831,7 +854,15 @@ func stopContainersInReversedOrder(
 		if err := stopStaleContainer(c, client, params); err != nil {
 			failed[c.ID()] = err
 		} else {
-			stopped = append(stopped, types.CleanedImageInfo{ImageID: c.SafeImageID(), ContainerID: c.ID(), ImageName: c.ImageName(), ContainerName: c.Name()})
+			stopped = append(
+				stopped,
+				types.CleanedImageInfo{
+					ImageID:       c.SafeImageID(),
+					ContainerID:   c.ID(),
+					ImageName:     c.ImageName(),
+					ContainerName: c.Name(),
+				},
+			)
 
 			logrus.WithFields(fields).Debug("Stopped container")
 		}
@@ -1000,7 +1031,13 @@ func restartContainersInSortedOrder(
 				// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
 				// in the new container.
 				if c.IsStale() && !renamedContainers[c.ID()] {
-					addCleanupImageInfo(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
+					addCleanupImageInfo(
+						cleanupImageInfos,
+						c.ImageID(),
+						c.ImageName(),
+						c.Name(),
+						c.ID(),
+					)
 				}
 			}
 		}
@@ -1098,7 +1135,10 @@ func restartStaleContainer(
 			if renamed && container.IsWatchtower() {
 				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
 
-				if cleanupErr := client.StopAndRemoveContainer(container, params.Timeout); cleanupErr != nil {
+				if cleanupErr := client.StopAndRemoveContainer(
+					container,
+					params.Timeout,
+				); cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
 						Debug("Failed to stop failed Watchtower container")
@@ -1154,7 +1194,9 @@ func restartStaleContainer(
 			// and timing anomalies in production environments resulting in
 			// orphaned containers.
 			if err := client.RemoveContainer(container); err != nil {
-				logrus.WithError(err).WithFields(fields).Debug("Failed to remove old Watchtower container")
+				logrus.WithError(err).
+					WithFields(fields).
+					Debug("Failed to remove old Watchtower container")
 			} else {
 				logrus.WithFields(fields).Debug("Removed old Watchtower container")
 			}

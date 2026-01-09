@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 					gomega.Expect(exists).To(gomega.BeFalse())
 				} else {
 					gomega.Expect(exists).To(gomega.BeTrue())
-					var actualStatuses []string
+					actualStatuses := make([]string, 0, len(statusMap))
 					for status := range statusMap {
 						actualStatuses = append(actualStatuses, status)
 					}

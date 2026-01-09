@@ -738,6 +738,81 @@ func TestContainer_StopSignal(t *testing.T) {
 	}
 }
 
+// TestContainer_StopTimeout_WhenSet verifies StopTimeout returns the configured value.
+func TestContainer_StopTimeout_WhenSet(t *testing.T) {
+	timeout60 := 60
+	c := Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config: &dockerContainer.Config{
+				StopTimeout: &timeout60,
+				Labels:      map[string]string{},
+			},
+		},
+	}
+
+	got := c.StopTimeout()
+	if got == nil || *got != timeout60 {
+		t.Errorf("Container.StopTimeout() = %v, want %v", got, timeout60)
+	}
+}
+
+// TestContainer_StopTimeout_WhenSetToZero verifies StopTimeout returns zero when configured as zero.
+func TestContainer_StopTimeout_WhenSetToZero(t *testing.T) {
+	timeout0 := 0
+	c := Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config: &dockerContainer.Config{
+				StopTimeout: &timeout0,
+				Labels:      map[string]string{},
+			},
+		},
+	}
+
+	got := c.StopTimeout()
+	if got == nil || *got != timeout0 {
+		t.Errorf("Container.StopTimeout() = %v, want %v", got, timeout0)
+	}
+}
+
+// TestContainer_StopTimeout_WhenNotSet verifies StopTimeout returns nil when not configured.
+func TestContainer_StopTimeout_WhenNotSet(t *testing.T) {
+	c := Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+		},
+	}
+
+	if got := c.StopTimeout(); got != nil {
+		t.Errorf("Container.StopTimeout() = %v, want nil", *got)
+	}
+}
+
+// TestContainer_StopTimeout_NilContainerInfo verifies StopTimeout returns nil for nil containerInfo.
+func TestContainer_StopTimeout_NilContainerInfo(t *testing.T) {
+	c := Container{containerInfo: nil}
+
+	if got := c.StopTimeout(); got != nil {
+		t.Errorf("Container.StopTimeout() = %v, want nil", *got)
+	}
+}
+
+// TestContainer_StopTimeout_NilConfig verifies StopTimeout returns nil for nil Config.
+func TestContainer_StopTimeout_NilConfig(t *testing.T) {
+	c := Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config:            nil,
+		},
+	}
+
+	if got := c.StopTimeout(); got != nil {
+		t.Errorf("Container.StopTimeout() = %v, want nil", *got)
+	}
+}
+
 func TestContainsWatchtowerLabel(t *testing.T) {
 	type args struct {
 		labels map[string]string
@@ -1320,7 +1395,11 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.getContainerOrGlobalBool(tt.args.globalVal, tt.args.label, tt.args.contPrecedence); got != tt.want {
+			if got := tt.c.getContainerOrGlobalBool(
+				tt.args.globalVal,
+				tt.args.label,
+				tt.args.contPrecedence,
+			); got != tt.want {
 				t.Errorf("Container.getContainerOrGlobalBool() = %v, want %v", got, tt.want)
 			}
 		})

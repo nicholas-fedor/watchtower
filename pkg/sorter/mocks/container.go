@@ -91,6 +91,15 @@ func (c *SimpleContainer) StopSignal() string {
 	}
 	return "SIGTERM"
 }
+
+// StopTimeout returns the container's configured stop timeout in seconds from ContainerInfoField.
+func (c *SimpleContainer) StopTimeout() *int {
+	if c.ContainerInfoField != nil && c.ContainerInfoField.Config != nil {
+		return c.ContainerInfoField.Config.StopTimeout
+	}
+	return nil
+}
+
 func (c *SimpleContainer) HasImageInfo() bool                      { return false }
 func (c *SimpleContainer) ImageInfo() *dockerImage.InspectResponse { return nil }
 func (c *SimpleContainer) GetLifecyclePreCheckCommand() string     { return "" }
