@@ -1,6 +1,3 @@
-// Package lifecycle manages the execution of lifecycle hooks for Watchtower containers.
-// It provides functions to run pre-check, post-check, pre-update, and post-update commands
-// as part of the container update process.
 package lifecycle
 
 import (
@@ -81,7 +78,7 @@ func ExecutePostChecks(client container.Client, params types.UpdateParams) {
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePreCheckCommand(client container.Client, container types.Container, uid int, gid int) {
+func ExecutePreCheckCommand(client container.Client, container types.Container, uid, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePreCheckCommand()
 
@@ -119,7 +116,7 @@ func ExecutePreCheckCommand(client container.Client, container types.Container, 
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePostCheckCommand(client container.Client, container types.Container, uid int, gid int) {
+func ExecutePostCheckCommand(client container.Client, container types.Container, uid, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePostCheckCommand()
 
