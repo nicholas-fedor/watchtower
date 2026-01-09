@@ -18,6 +18,15 @@
       ]
     },
     {
+      "login": "Foxite",
+      "name": "Dirk Kok",
+      "avatar_url": "https://avatars.githubusercontent.com/u/20421657?v=4",
+      "profile": "https://ko-fi.com/foxite",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
       "login": "piksel",
       "name": "nils måsén",
       "avatar_url": "https://avatars2.githubusercontent.com/u/807383?v=4",
@@ -829,15 +838,6 @@
       ]
     },
     {
-      "login": "Foxite",
-      "name": "Dirk Kok",
-      "avatar_url": "https://avatars.githubusercontent.com/u/20421657?v=4",
-      "profile": "https://ko-fi.com/foxite",
-      "contributions": [
-        "code"
-      ]
-    },
-    {
       "login": "EDIflyer",
       "name": "EDIflyer",
       "avatar_url": "https://avatars.githubusercontent.com/u/13610277?v=4",
@@ -859,7 +859,10 @@
       "login": "andriibratanin",
       "name": "Andrii Bratanin",
       "avatar_url": "https://avatars.githubusercontent.com/u/20169213?v=4",
-      "profile": "https://github.com/andriibratanin"
+      "profile": "https://github.com/andriibratanin",
+      "contributions": [
+        "doc"
+      ]
     },
     {
       "login": "IAmTamal",
@@ -886,6 +889,51 @@
       "profile": "http://hub.lol",
       "contributions": [
         "doc",
+        "code"
+      ]
+    },
+    {
+      "login": "yubiuser",
+      "name": "yubiuser",
+      "avatar_url": "https://avatars.githubusercontent.com/u/26622301?v=4",
+      "profile": "https://github.com/yubiuser",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "RoboMagus",
+      "name": "RoboMagus",
+      "avatar_url": "https://avatars.githubusercontent.com/u/68224306?v=4",
+      "profile": "https://github.com/RoboMagus",
+      "contributions": [
+        "infra"
+      ]
+    },
+    {
+      "login": "AzariasB",
+      "name": "AzariasB",
+      "avatar_url": "https://avatars.githubusercontent.com/u/10064282?v=4",
+      "profile": "https://github.com/AzariasB",
+      "contributions": [
+        "doc"
+      ]
+    },
+    {
+      "login": "ApprenticeofEnder",
+      "name": "ApprenticeofEnder",
+      "avatar_url": "https://avatars.githubusercontent.com/u/32110856?v=4",
+      "profile": "https://github.com/ApprenticeofEnder",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "skylenet",
+      "name": "skylenet",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1500888?v=4",
+      "profile": "https://github.com/skylenet",
+      "contributions": [
         "code"
       ]
     }
