@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.33.0 by @renovate[bot] in [#1188](https://github.com/nicholas-fedor/watchtower/pull/1188)
+- Update nicholas-fedor/govulncheck-action digest to 5e52ebd by @renovate[bot] in [#1187](https://github.com/nicholas-fedor/watchtower/pull/1187)
+- Update actions/checkout digest to 0c366fd by @renovate[bot] in [#1185](https://github.com/nicholas-fedor/watchtower/pull/1185)
+- Update actions/attest-build-provenance digest to 98f3aa9 by @renovate[bot] in [#1184](https://github.com/nicholas-fedor/watchtower/pull/1184)
 - Update module github.com/docker/cli to v29.1.4+incompatible by @renovate[bot] in [#1181](https://github.com/nicholas-fedor/watchtower/pull/1181)
 - Update nicholas-fedor/govulncheck-action digest to 9813de4 by @renovate[bot] in [#1180](https://github.com/nicholas-fedor/watchtower/pull/1180)
 - Update module github.com/onsi/gomega to v1.39.0 by @renovate[bot] in [#1176](https://github.com/nicholas-fedor/watchtower/pull/1176)
