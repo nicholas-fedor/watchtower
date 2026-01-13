@@ -67,14 +67,6 @@ func (c *SimpleContainer) ImageID() types.ImageID {
 	return types.ImageID("sha256:" + string(c.ContainerID))
 }
 
-func (c *SimpleContainer) SafeImageID() types.ImageID {
-	if c.ContainerInfoField != nil {
-		return types.ImageID(c.ContainerInfoField.Config.Image)
-	}
-
-	return c.ImageID()
-}
-
 func (c *SimpleContainer) ImageName() string {
 	if c.ContainerInfoField != nil {
 		return c.ContainerInfoField.Config.Image
@@ -114,6 +106,7 @@ func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string    { return "" }
 func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string   { return "" }
 func (c *SimpleContainer) GetLifecycleUID() (int, bool)            { return 0, false }
 func (c *SimpleContainer) GetLifecycleGID() (int, bool)            { return 0, false }
+func (c *SimpleContainer) GetContainerChain() (string, bool)       { return "", false }
 func (c *SimpleContainer) VerifyConfiguration() error              { return nil }
 func (c *SimpleContainer) SetStale(_ bool)                         {}
 func (c *SimpleContainer) IsStale() bool                           { return false }

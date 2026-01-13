@@ -15,6 +15,7 @@ import (
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
@@ -68,8 +69,10 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 //   - scope: Defines a specific operational scope for Watchtower, limiting updates to containers matching this scope.
 //   - notifier: The notification system instance responsible for sending update status messages.
 //   - metaVersion: The version string for Watchtower, used in startup messaging.
+//   - monitorOnly: Boolean indicating whether to monitor only without updating.
 //   - updateOnStart: Boolean indicating whether to perform an update immediately on startup.
 //   - skipFirstRun: Boolean indicating whether to skip the first scheduled run.
+//   - currentWatchtowerContainer: The current Watchtower container for parent checking.
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
@@ -90,6 +93,7 @@ func RunUpgradesOnSchedule(
 	monitorOnly bool,
 	updateOnStart bool,
 	skipFirstRun bool,
+	currentWatchtowerContainer types.Container,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -102,6 +106,22 @@ func RunUpgradesOnSchedule(
 
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	updateFunc := func(skipWatchtowerSelfUpdate bool) {
+		// Skip update if this is a Watchtower parent container (from self-update chain)
+		if currentWatchtowerContainer != nil {
+			chain, _ := currentWatchtowerContainer.GetContainerChain()
+
+			if container.IsWatchtowerParent(currentWatchtowerContainer.ID(), chain) {
+				logrus.Debug("Skipping scheduled update for Watchtower parent container")
+
+				nextRuns := scheduler.Entries()
+				if len(nextRuns) > 0 {
+					logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
+				}
+
+				return
+			}
+		}
+
 		select {
 		case v := <-lock:
 			defer func() { lock <- v }()
@@ -201,4 +221,46 @@ func RunUpgradesOnSchedule(
 	logrus.Debug("Scheduler stopped and update completed.")
 
 	return nil
+}
+
+// ShouldExitDueToInvalidRestart determines if the program should exit due to an invalid restart of an old Watchtower container.
+//
+// This function checks if the current container is present in the container chain.
+// If it is and the run-once flag is not set, then it indicates an invalid restart scenario
+// and returns true to signal program exit, preventing potential issues with container updates.
+//
+// Parameters:
+//   - c: The current Watchtower container to check.
+//   - flags: The flag set to check for the run-once option.
+//
+// Returns:
+//   - bool: True if the program should exit due to an invalid restart, false otherwise.
+func ShouldExitDueToInvalidRestart(
+	c types.Container,
+	flags *pflag.FlagSet,
+) bool {
+	// If the container is nil, return false to avoid unnecessary checks.
+	if c == nil {
+		return false
+	}
+
+	// Get the value of the com.centurylinklabs.watchtower.container-chain label.
+	chain, present := c.GetContainerChain()
+
+	// If the label is not present, return false.
+	if !present {
+		return false
+	}
+
+	// Check if the current container is present in the container chain.
+	if container.IsWatchtowerParent(c.ID(), chain) {
+		runOnce, _ := flags.GetBool("run-once")
+		if !runOnce {
+			// If the current container is in the chain and run-once is not set, exit.
+			return true
+		}
+	}
+
+	// If the current container is not in the chain, or run-once is set, continue normal operation.
+	return false
 }

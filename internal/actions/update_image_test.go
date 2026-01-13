@@ -44,7 +44,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				config,
+				client.TestData.Containers,
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Tagged container should be scanned")
@@ -73,7 +78,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				config,
+				client.TestData.Containers,
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Untagged container should be scanned")
@@ -103,7 +113,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				config,
+				client.TestData.Containers,
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Pinned container should be scanned")
@@ -141,6 +156,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					context.Background(),
 					client,
 					config,
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Scanned()).
@@ -173,7 +189,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				config,
+				client.TestData.Containers,
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
 				To(gomega.HaveLen(1), "Invalid container should be scanned with fallback")
@@ -210,6 +231,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					context.Background(),
 					client,
 					config,
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Skipped()).
@@ -248,7 +270,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 				Stopped: make(map[string]bool),
 			}
-			report, cleanupImageInfos, err := actions.Update(context.Background(), client, config)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				config,
+				client.TestData.Containers,
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Skipped()).
 				To(gomega.HaveLen(1), "Container with invalid fallback image should be skipped")

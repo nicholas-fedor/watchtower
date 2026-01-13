@@ -155,13 +155,6 @@ func (m mockContainer) ImageID() types.ImageID {
 	return types.ImageID("")
 }
 
-// SafeImageID returns a safe version of the container's image ID. This method satisfies
-// the types.Container interface, returning an empty ImageID as a minimal stub since
-// the auth package does not use this data in these authentication-focused tests.
-func (m mockContainer) SafeImageID() types.ImageID {
-	return types.ImageID("")
-}
-
 // IsRunning indicates whether the container is currently running. This method satisfies
 // the types.Container interface, returning true as a minimal stub since the auth package
 // does not rely on this state in these authentication-focused tests.
@@ -307,6 +300,13 @@ func (m mockContainer) GetLifecycleUID() (int, bool) {
 // package does not use this data in these authentication-focused tests.
 func (m mockContainer) GetLifecycleGID() (int, bool) {
 	return 0, false // Minimal stub, not used in these tests
+}
+
+// GetContainerChain returns the container's chain label and a boolean flag. This method satisfies the
+// types.Container interface, returning an empty string and false as a minimal stub since the auth
+// package does not use this data in these authentication-focused tests.
+func (m mockContainer) GetContainerChain() (string, bool) {
+	return "", false // Minimal stub, not used in these tests
 }
 
 // testAuthClient is a custom implementation of the AuthClient interface for testing.

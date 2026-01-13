@@ -36,8 +36,8 @@ var (
 	errUnexpectedMacInHost = errors.New("unexpected MAC address in host network config")
 	// errNoMacInNonHost indicates no MAC address was found in a non-host network configuration where one is expected.
 	errNoMacInNonHost = errors.New("no MAC address found in non-host network config")
-	// ErrNilSourceEndpoint indicates a nil source endpoint was provided.
-	ErrNilSourceEndpoint = errors.New("nil source endpoint provided")
+	// errNilSourceEndpoint indicates a nil source endpoint was provided.
+	errNilSourceEndpoint = errors.New("nil source endpoint provided")
 )
 
 // Errors for container start and rename operations in container_target.go.
@@ -58,6 +58,10 @@ var (
 	errNoContainerInfo = errors.New("no container info available")
 	// errInvalidConfig indicates the container’s configuration is invalid for recreation.
 	errInvalidConfig = errors.New("invalid container configuration")
+	// ErrUnexpectedContainerType indicates an unexpected container type was encountered.
+	ErrUnexpectedContainerType = errors.New("unexpected container type")
+	// errCurrentContainerNotCached indicates the current container is not cached for scope derivation.
+	errCurrentContainerNotCached = errors.New("current container not cached for scope derivation")
 )
 
 // Errors for image operations in image.go.

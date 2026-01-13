@@ -142,27 +142,35 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
+		report, cleanupInfos, err := executeUpdate(
+			context.Background(),
+			client,
+			config,
+			client.TestData.Containers,
+		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
 	})
 
-	ginkgo.It("should return error on update failure", func() {
+	ginkgo.It("should not return error when no containers to update", func() {
 		client := mockActions.CreateMockClient(
-			&mockActions.TestData{
-				ListContainersError: errors.New("list containers failed"),
-			},
+			&mockActions.TestData{},
 			false,
 			false,
 		)
 		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
-		gomega.Expect(err).To(gomega.HaveOccurred())
-		gomega.Expect(report).To(gomega.BeNil())
-		gomega.Expect(cleanupInfos).To(gomega.BeNil())
+		report, cleanupInfos, err := executeUpdate(
+			context.Background(),
+			client,
+			config,
+			client.TestData.Containers,
+		)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(report).NotTo(gomega.BeNil())
+		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
 	})
 
 	ginkgo.It("should execute update logic for stale containers", func() {
@@ -189,7 +197,12 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
+		report, cleanupInfos, err := executeUpdate(
+			context.Background(),
+			client,
+			config,
+			client.TestData.Containers,
+		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -224,7 +237,12 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			Filter:  filters.NoFilter,
 			RunOnce: true,
 		}
-		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
+		report, cleanupInfos, err := executeUpdate(
+			context.Background(),
+			client,
+			config,
+			client.TestData.Containers,
+		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
@@ -259,7 +277,12 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		config := types.UpdateParams{
 			Filter: filters.NoFilter,
 		}
-		report, cleanupInfos, err := executeUpdate(context.Background(), client, config)
+		report, cleanupInfos, err := executeUpdate(
+			context.Background(),
+			client,
+			config,
+			client.TestData.Containers,
+		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())

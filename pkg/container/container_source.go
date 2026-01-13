@@ -505,7 +505,7 @@ func processEndpoint(
 	isHostNetwork bool,
 ) (*dockerNetwork.EndpointSettings, error) {
 	if sourceEndpoint == nil {
-		return nil, ErrNilSourceEndpoint
+		return nil, errNilSourceEndpoint
 	}
 
 	clog := logrus.WithFields(logrus.Fields{
@@ -783,4 +783,30 @@ func debugLogMacAddress(
 	default:
 		clog.Debug("No MAC address in host network mode, as expected")
 	}
+}
+
+// IsWatchtowerParent checks if the current container ID exists in the comma-separated container-chain label values.
+//
+// It handles edge cases like empty chain or invalid IDs by returning false appropriately.
+// The chain values are trimmed of whitespace before comparison.
+//
+// Parameters:
+//   - currentID: The container ID to check for in the chain.
+//   - chain: Comma-separated string of container IDs from the container-chain label.
+//
+// Returns:
+//   - bool: True if currentID is found in the chain, false otherwise.
+func IsWatchtowerParent(currentID types.ContainerID, chain string) bool {
+	if currentID == "" || chain == "" {
+		return false
+	}
+
+	ids := strings.SplitSeq(chain, ",")
+	for id := range ids {
+		if strings.TrimSpace(id) == string(currentID) {
+			return true
+		}
+	}
+
+	return false
 }

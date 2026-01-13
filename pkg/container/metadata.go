@@ -24,6 +24,8 @@ const (
 	noPullLabel = "com.centurylinklabs.watchtower.no-pull"
 	// dependsOnLabel lists container names this container depends on, comma-separated.
 	dependsOnLabel = "com.centurylinklabs.watchtower.depends-on"
+	// ContainerChainLabel accumulates container IDs across Watchtower self-updates, comma-separated.
+	ContainerChainLabel = "com.centurylinklabs.watchtower.container-chain"
 	// zodiacLabel stores the original image name for Zodiac compatibility.
 	zodiacLabel = "com.centurylinklabs.zodiac.original-image"
 	// scope defines a unique monitoring scope for this Watchtower instance.
@@ -318,6 +320,50 @@ func (c Container) Scope() (string, bool) {
 	}).Debug("Retrieved scope")
 
 	return rawString, true
+}
+
+// GetEffectiveScope determines the effective operational scope by prioritizing explicit scope
+// over scope derived from the container's label. This is crucial for self-update scenarios where
+// a new Watchtower instance needs to inherit the same scope as the instance being replaced
+// to maintain proper isolation and prevent cross-scope interference during the update process.
+//
+// Parameters:
+//   - container: The current Watchtower container.
+//   - currentScope: The explicit scope value (takes priority if non-empty).
+//
+// Returns:
+//   - string: The effective scope.
+//   - error: Non-nil if derivation fails.
+func GetEffectiveScope(container types.Container, currentScope string) (string, error) {
+	// Skip derivation if scope is already explicitly set.
+	if currentScope != "" {
+		return currentScope, nil
+	}
+
+	// Container not available.
+	if container == nil {
+		return "", fmt.Errorf("%w", errCurrentContainerNotCached)
+	}
+
+	// Extract the scope label from the container.
+	if derivedScope, ok := container.Scope(); ok && derivedScope != "" {
+		logrus.WithFields(logrus.Fields{
+			"derived_scope": derivedScope,
+		}).Debug("Derived operational scope from current container's scope label")
+
+		return derivedScope, nil
+	}
+
+	return currentScope, nil
+}
+
+// GetContainerChain returns the container chain label value.
+//
+// Returns:
+//   - string: The label value or empty if absent.
+//   - bool: True if the label is present, false otherwise.
+func (c Container) GetContainerChain() (string, bool) {
+	return c.getLabelValue(ContainerChainLabel)
 }
 
 // IsWatchtower identifies if this is the Watchtower container.

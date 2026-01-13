@@ -52,6 +52,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
@@ -97,6 +98,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleGID:   1001,
 						CPUCopyMode:    "auto",
 					},
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -143,6 +145,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
@@ -187,6 +190,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -382,6 +386,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -428,6 +433,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
+					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))

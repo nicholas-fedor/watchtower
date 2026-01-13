@@ -1243,7 +1243,7 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 
 				result, err := processEndpoint(nil, containerID, "1.50", false)
 				gomega.Expect(err).To(gomega.HaveOccurred())
-				gomega.Expect(err).To(gomega.MatchError(ErrNilSourceEndpoint))
+				gomega.Expect(err).To(gomega.MatchError(errNilSourceEndpoint))
 				gomega.Expect(result).To(gomega.BeNil())
 			})
 		})
@@ -2087,5 +2087,47 @@ var _ = ginkgo.Describe("debugLogMacAddress", func() {
 
 			gomega.Eventually(logbuf).Should(gbytes.Say("Verified MAC address configuration"))
 		})
+	})
+})
+
+var _ = ginkgo.Describe("IsWatchtowerParent", func() {
+	ginkgo.It("should return false for empty chain", func() {
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "")
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false for empty ID", func() {
+		result := IsWatchtowerParent(types.ContainerID(""), "id1,id2")
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return true when ID is at start of chain", func() {
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "test-id,id2,id3")
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should return true when ID is in middle of chain", func() {
+		result := IsWatchtowerParent(types.ContainerID("id2"), "id1,id2,id3")
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should return true when ID is at end of chain", func() {
+		result := IsWatchtowerParent(types.ContainerID("id3"), "id1,id2,id3")
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should return true for single ID chain", func() {
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "test-id")
+		gomega.Expect(result).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should return false when ID is not in chain", func() {
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "id1,id2,id3")
+		gomega.Expect(result).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should handle chains with spaces around commas", func() {
+		result := IsWatchtowerParent(types.ContainerID("id2"), "id1, id2 , id3")
+		gomega.Expect(result).To(gomega.BeTrue())
 	})
 })

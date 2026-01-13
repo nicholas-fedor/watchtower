@@ -8,12 +8,10 @@ var (
 	errRollingRestartDependency = errors.New(
 		"container has dependencies incompatible with rolling restarts",
 	)
-	// errStopWatchtowerFailed flags failures in stopping excess Watchtower instances.
-	errStopWatchtowerFailed = errors.New("errors occurred while stopping watchtower containers")
 	// errListContainersFailed flags failures in listing containers.
 	errListContainersFailed = errors.New("failed to list containers")
-	// errImageCleanupFailed flags failures in image cleanup.
-	errImageCleanupFailed = errors.New("errors occurred during image cleanup")
+	// errImageRemovalFailed flags failures in image cleanup.
+	errImageRemovalFailed = errors.New("errors occurred during image cleanup")
 )
 
 // Errors for update operations.
@@ -28,8 +26,6 @@ var (
 	errSkipUpdate = errors.New(
 		"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
 	)
-	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
-	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
 	// errStopContainerFailed indicates a failure to stop a container during the update process.
 	errStopContainerFailed = errors.New("failed to stop container")
 	// errStartContainerFailed indicates a failure to start a container after an update.
@@ -42,4 +38,12 @@ var (
 	errCircularDependency = errors.New("circular dependency detected")
 	// errSelfDependency indicates a container has a self-dependency.
 	errSelfDependency = errors.New("container has self-dependency")
+)
+
+// Errors for Watchtower self-update operations.
+var (
+	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
+	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
+	// errStopWatchtowerFailed flags failures in stopping excess Watchtower instances.
+	errStopWatchtowerFailed = errors.New("errors occurred while stopping watchtower containers")
 )

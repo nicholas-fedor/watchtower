@@ -53,6 +53,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					Filter:      filters.WatchtowerContainersFilter,
 					CPUCopyMode: "auto",
 				},
+				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -137,6 +138,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+					client.TestData.Containers,
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -217,6 +219,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -285,6 +288,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						context.Background(),
 						client,
 						types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+						client.TestData.Containers,
 					)
 
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -344,6 +348,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -404,6 +409,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -471,6 +477,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -511,6 +518,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -872,6 +880,7 @@ var _ = ginkgo.Describe("the update action", func() {
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
 						},
+						client.TestData.Containers,
 					)
 
 					// Verify successful execution
@@ -943,6 +952,7 @@ var _ = ginkgo.Describe("the update action", func() {
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
 						},
+						client.TestData.Containers,
 					)
 					duration := time.Since(startTime)
 
@@ -1023,6 +1033,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},
+					client.TestData.Containers,
 				)
 
 				// Verify successful execution and correct categorization
@@ -1103,6 +1114,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},
+					client.TestData.Containers,
 				)
 
 				// Verify successful execution

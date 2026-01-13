@@ -311,10 +311,10 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(imageID).To(gomega.Equal(types.ImageID("")))
 			})
 
-			ginkgo.It("returns empty string for SafeImageID when imageInfo is nil", func() {
+			ginkgo.It("returns empty string for ImageID when imageInfo is nil", func() {
 				container = MockContainer(WithPortBindings())
 				container.imageInfo = nil
-				imageID := container.SafeImageID()
+				imageID := container.ImageID()
 				gomega.Expect(imageID).To(gomega.Equal(types.ImageID("")))
 			})
 		})

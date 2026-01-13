@@ -51,6 +51,16 @@ type Client interface {
 	// Returns the container object or an error if the container cannot be retrieved.
 	GetContainer(containerID types.ContainerID) (types.Container, error)
 
+	// GetCurrentWatchtowerContainer retrieves minimal container information for the specified container ID, skipping image inspection.
+	//
+	// Parameters:
+	//   - containerID: ID of the container to retrieve.
+	//
+	// Returns:
+	//   - types.Container: Container with imageInfo set to nil.
+	//   - error: Non-nil if inspection fails, nil on success.
+	GetCurrentWatchtowerContainer(containerID types.ContainerID) (types.Container, error)
+
 	// StopContainer stops a specified container, respecting the given timeout.
 	//
 	// It ensures the container is no longer running.
@@ -298,6 +308,34 @@ func (c client) GetContainer(containerID types.ContainerID) (types.Container, er
 	logrus.WithField("container_id", containerID).Debug("Retrieved container details")
 
 	return container, nil
+}
+
+// GetCurrentWatchtowerContainer retrieves container information for the specified container ID, skipping image inspection.
+//
+// Parameters:
+//   - containerID: ID of the container to retrieve.
+//
+// Returns:
+//   - types.Container: Container with imageInfo set to nil.
+//   - error: Non-nil if inspection fails, nil on success.
+func (c client) GetCurrentWatchtowerContainer(
+	containerID types.ContainerID,
+) (types.Container, error) {
+	ctx := context.Background()
+	clog := logrus.WithField("container_id", containerID)
+
+	clog.Debug("Inspecting current Watchtower container")
+
+	containerInfo, err := c.api.ContainerInspect(ctx, string(containerID))
+	if err != nil {
+		clog.WithError(err).Debug("Failed to inspect current Watchtower container")
+
+		return nil, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
+	}
+
+	clog.Debug("Retrieved minimal container info")
+
+	return NewContainer(&containerInfo, nil), nil
 }
 
 // StopContainer stops a specified container.

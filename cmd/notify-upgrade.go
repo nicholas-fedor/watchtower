@@ -131,8 +131,8 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Use a placeholder ("<CONTAINER>") if this fails, ensuring the user still gets actionable guidance.
 	containerID := "<CONTAINER>"
 
-	if CurrentWatchtowerContainerID != "" {
-		containerID = CurrentWatchtowerContainerID.ShortID() // Use the short ID (e.g., "abc123") for brevity in user instructions.
+	if currentWatchtowerContainerID != "" {
+		containerID = currentWatchtowerContainerID.ShortID() // Use the short ID (e.g., "abc123") for brevity in user instructions.
 	}
 
 	// Provide user instructions for retrieving the file, split into two log lines for clarity: a prompt and the exact command.

@@ -75,7 +75,7 @@ func (c imageClient) IsContainerStale(
 	if err != nil {
 		clog.WithError(err).Debug("Failed to pull image")
 
-		return false, sourceContainer.SafeImageID(), err
+		return false, sourceContainer.ImageID(), err
 	}
 
 	// Check for a newer image.
@@ -417,14 +417,14 @@ func (c imageClient) checkLocalImageStaleness(
 	clog *logrus.Entry,
 ) (bool, types.ImageID, error) {
 	clog.Debug("Skipping image pull due to no-pull setting - checking local image only")
-	clog.WithField("current_image_id", sourceContainer.SafeImageID()).
+	clog.WithField("current_image_id", sourceContainer.ImageID()).
 		Debug("Current container image ID")
 
 	stale, latestID, err := c.HasNewImage(ctx, sourceContainer)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to check local image")
 
-		return false, sourceContainer.SafeImageID(), err
+		return false, sourceContainer.ImageID(), err
 	}
 
 	clog.WithFields(logrus.Fields{

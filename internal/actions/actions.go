@@ -56,6 +56,7 @@ type RunUpdatesWithNotificationsParams struct {
 	RunOnce                      bool              // Perform one-time update and exit
 	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	CurrentContainerID           types.ContainerID // ID of the current Watchtower container for self-update logic
+	AllContainers                []types.Container // All containers to filter from for monitoring
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -99,7 +100,12 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Execute the container update operation
-	result, cleanupImageInfosPtr, err := executeUpdate(ctx, params.Client, updateConfig)
+	result, cleanupImageInfosPtr, err := executeUpdate(
+		ctx,
+		params.Client,
+		updateConfig,
+		params.AllContainers,
+	)
 	// Process update result, return metric on failure
 	if metric := handleUpdateResult(result, err); metric != nil {
 		return metric
@@ -229,7 +235,7 @@ func buildSingleRestartedContainerReport(
 // Returns:
 //   - []*logrus.Entry: A slice of log entries for the cleaned images associated with the container.
 func buildCleanupEntriesForContainer(
-	cleanedImages []types.CleanedImageInfo,
+	cleanedImages []types.RemovedImageInfo,
 	containerName string,
 ) []*logrus.Entry {
 	entries := make([]*logrus.Entry, 0)
@@ -363,6 +369,7 @@ func startNotifications(notifier types.Notifier, notificationSplitByContainer bo
 //   - ctx: Context for cancellation and timeouts.
 //   - client: The Docker client instance used for container operations.
 //   - config: The UpdateParams struct containing all update configuration parameters.
+//   - allContainers: All containers to filter from for monitoring.
 //
 // Returns:
 //   - types.Report: The report containing the results of the update operation.
@@ -372,11 +379,12 @@ func executeUpdate(
 	ctx context.Context,
 	client container.Client,
 	config types.UpdateParams,
-) (types.Report, []types.CleanedImageInfo, error) {
+	allContainers []types.Container,
+) (types.Report, []types.RemovedImageInfo, error) {
 	// Log before calling the Update function
 	logrus.Debug("About to call Update function")
 
-	result, cleanupImageInfos, err := Update(ctx, client, config)
+	result, cleanupImageInfos, err := Update(ctx, client, config, allContainers)
 
 	// Log after Update function returns
 	logrus.Debug("Update function returned, about to check cleanup")
@@ -398,22 +406,22 @@ func executeUpdate(
 func performImageCleanup(
 	client container.Client,
 	cleanup bool,
-	cleanupImageInfos []types.CleanedImageInfo,
-) []types.CleanedImageInfo {
+	cleanupImageInfos []types.RemovedImageInfo,
+) []types.RemovedImageInfo {
 	if cleanup {
-		cleaned, err := CleanupImages(client, cleanupImageInfos)
+		cleaned, err := RemoveImages(client, cleanupImageInfos)
 		if err != nil {
 			logrus.WithError(err).Warn("Failed to clean up some images after update")
 		}
 
 		if cleaned == nil {
-			cleaned = []types.CleanedImageInfo{}
+			cleaned = []types.RemovedImageInfo{}
 		}
 
 		return cleaned
 	}
 
-	return []types.CleanedImageInfo{}
+	return []types.RemovedImageInfo{}
 }
 
 // logUpdateReport logs the update report details for debugging purposes.
@@ -455,7 +463,7 @@ func sendNotifications(
 	notifier types.Notifier,
 	notificationSplitByContainer, notificationReport bool,
 	result types.Report,
-	cleanedImages []types.CleanedImageInfo,
+	cleanedImages []types.RemovedImageInfo,
 ) {
 	logrus.Debug("About to send notifications")
 
@@ -500,7 +508,7 @@ func sendSplitNotifications(
 	notifier types.Notifier,
 	notificationReport bool,
 	result types.Report,
-	cleanedImages []types.CleanedImageInfo,
+	cleanedImages []types.RemovedImageInfo,
 ) {
 	// Map to track notified container IDs to prevent duplicate notifications.
 	// Key is the full container ID string for uniqueness, value is boolean indicating

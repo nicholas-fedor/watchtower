@@ -97,7 +97,7 @@ func NewContainer(
 	logrus.WithFields(logrus.Fields{
 		"container": c.Name(),
 		"id":        c.ID().ShortID(),
-		"image":     c.SafeImageID(),
+		"image":     c.ImageID(),
 	}).Debug("Created new container instance")
 
 	return c
@@ -200,18 +200,6 @@ func (c Container) Name() string {
 // Returns:
 //   - types.ImageID: Image ID or empty string if imageInfo is nil.
 func (c Container) ImageID() types.ImageID {
-	if c.imageInfo == nil {
-		return ""
-	}
-
-	return types.ImageID(c.imageInfo.ID)
-}
-
-// SafeImageID returns the image ID or an empty string if unavailable.
-//
-// Returns:
-//   - types.ImageID: Image ID or empty string if imageInfo is nil.
-func (c Container) SafeImageID() types.ImageID {
 	if c.imageInfo == nil {
 		return ""
 	}

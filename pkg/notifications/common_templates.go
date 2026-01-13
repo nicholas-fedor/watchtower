@@ -39,8 +39,8 @@ var commonTemplates = map[string]string{
     Run once mode: Watchtower self-update skipped
 {{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
     Detected {{index $e.Data "count"}} Watchtower instances - initiating cleanup
-{{- else if eq $msg "Successfully cleaned up all excess Watchtower instances" -}}
-    Successfully cleaned up {{index $e.Data "cleaned_containers"}} excess Watchtower{{if eq (index $e.Data "cleaned_containers") 1}} instance{{else}} instances{{end}}
+{{- else if eq $msg "Successfully removed all excess Watchtower instances" -}}
+    Successfully removed {{index $e.Data "removed_instances"}} excess Watchtower{{if eq (index $e.Data "removed_instances") 1}} instance{{else}} instances{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}

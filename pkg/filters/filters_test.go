@@ -269,6 +269,115 @@ func TestFilterByNoneScope(t *testing.T) {
 	container.AssertExpectations(t)
 }
 
+func TestFilterByNoneScope_TransitionScenarios(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByScope("none", NoFilter)
+	assert.NotNil(t, filter)
+
+	tests := []struct {
+		name           string
+		containerScope string
+		scopeExists    bool
+		expected       bool
+		description    string
+	}{
+		{
+			name:           "explicit_none_scope",
+			containerScope: "none",
+			scopeExists:    true,
+			expected:       true,
+			description:    "container with explicit 'none' scope should match",
+		},
+		{
+			name:           "implicit_unscoped",
+			containerScope: "",
+			scopeExists:    false,
+			expected:       true,
+			description:    "container with no scope label should default to 'none' and match",
+		},
+		{
+			name:           "explicit_empty_scope",
+			containerScope: "",
+			scopeExists:    true,
+			expected:       true,
+			description:    "container with explicitly empty scope label should default to 'none' and match",
+		},
+		{
+			name:           "transition_from_scoped",
+			containerScope: "production",
+			scopeExists:    true,
+			expected:       false,
+			description:    "container transitioning from scoped to none should not match when scope is set",
+		},
+		{
+			name:           "scoped_container",
+			containerScope: "dev",
+			scopeExists:    true,
+			expected:       false,
+			description:    "regular scoped container should not match none filter",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			container := new(mockContainer.FilterableContainer)
+			container.On("Scope").Return(tt.containerScope, tt.scopeExists)
+			container.On("Name").Return("/test-container")
+
+			result := filter(container)
+			assert.Equal(t, tt.expected, result, tt.description)
+			container.AssertExpectations(t)
+		})
+	}
+}
+
+func TestFilterByNoneScope_MixedHandling(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByScope("none", NoFilter)
+	assert.NotNil(t, filter)
+
+	// Test mixed batch of containers with different scope configurations
+	containers := []struct {
+		name           string
+		containerScope string
+		scopeExists    bool
+		expected       bool
+	}{
+		{"explicit-none", "none", true, true},
+		{"implicit-unscoped", "", false, true},
+		{"explicit-empty", "", true, true},
+		{"scoped-prod", "prod", true, false},
+		{"scoped-dev", "dev", true, false},
+		{"scoped-empty-transition", "", true, true}, // empty scope still defaults to none
+	}
+
+	results := make([]bool, len(containers))
+	for i, tc := range containers {
+		container := new(mockContainer.FilterableContainer)
+		container.On("Scope").Return(tc.containerScope, tc.scopeExists)
+		container.On("Name").Return("/" + tc.name)
+		results[i] = filter(container)
+		container.AssertExpectations(t)
+	}
+
+	// Verify results
+	expectedResults := make([]bool, len(containers))
+	for i, tc := range containers {
+		expectedResults[i] = tc.expected
+	}
+
+	assert.Equal(
+		t,
+		expectedResults,
+		results,
+		"mixed handling of explicitly 'none'-scoped and truly unscoped containers",
+	)
+}
+
 func TestBuildFilterNoneScope(t *testing.T) {
 	t.Parallel()
 
