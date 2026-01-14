@@ -22,6 +22,7 @@ import (
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/mock"
 
 	dockerImage "github.com/docker/docker/api/types/image"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 const (
@@ -48,6 +50,15 @@ var (
 		Password: os.Getenv("CI_INTEGRATION_TEST_REGISTRY_GH_PASSWORD"),
 	}
 )
+
+// newMockImageInspector creates a new MockImageInspector with the specified RepoDigests.
+func newMockImageInspector(repoDigests []string) *mockTypes.MockImageInspector {
+	inspector := &mockTypes.MockImageInspector{}
+	inspector.On("ImageInspectWithRaw", mock.Anything, mock.Anything).
+		Return(dockerImage.InspectResponse{RepoDigests: repoDigests}, []byte{}, nil)
+
+	return inspector
+}
 
 // testAuthClient is a custom implementation of the AuthClient interface for testing.
 type testAuthClient struct {
@@ -142,7 +153,15 @@ var _ = ginkgo.Describe("Digests", func() {
 		ginkgo.It("should return true if digests match",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
-				matches, err := digest.CompareDigest(context.Background(), mockContainer, creds)
+				inspector := mockTypes.NewMockImageInspector(ginkgo.GinkgoT())
+				inspector.On("ImageInspectWithRaw", mock.Anything, mock.Anything).
+					Return(dockerImage.InspectResponse{RepoDigests: []string{mockDigest}}, []byte{}, nil)
+				matches, err := digest.CompareDigest(
+					context.Background(),
+					inspector,
+					mockContainer,
+					creds,
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(matches).To(gomega.BeTrue())
 			}),
@@ -312,6 +331,7 @@ var _ = ginkgo.Describe("Digests", func() {
 		ginkgo.It("should return an error when container contains no image info", func() {
 			matches, err := digest.CompareDigest(
 				context.Background(),
+				nil, // No inspector needed since container has no image info
 				mockContainerNoImage,
 				"user:pass",
 			)
@@ -619,7 +639,13 @@ var _ = ginkgo.Describe("Digests", func() {
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("challenge header did not include all values needed to construct an auth url"))
 
-			matches, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+			inspector := newMockImageInspector([]string{mockDigest})
+			matches, err := digest.CompareDigest(
+				ctx,
+				inspector,
+				mockContainerWithServer,
+				registryAuth,
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("challenge header did not include all values needed to construct an auth url"))
@@ -676,7 +702,13 @@ var _ = ginkgo.Describe("Digests", func() {
 			registryAuth := auth.TransformAuth("token")
 
 			// Test that CompareDigest does not fall back to GET for 404 and returns error
-			matches, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+			inspector := newMockImageInspector([]string{mockDigest})
+			matches, err := digest.CompareDigest(
+				ctx,
+				inspector,
+				mockContainerWithServer,
+				registryAuth,
+			)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeFalse())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(3))
@@ -729,7 +761,8 @@ var _ = ginkgo.Describe("Digests", func() {
 			registryAuth := auth.TransformAuth("token")
 
 			// Test that CompareDigest fails when HEAD returns 500 (non-404 error)
-			_, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+			inspector := newMockImageInspector([]string{mockDigest})
+			_, err := digest.CompareDigest(ctx, inspector, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
 				To(gomega.ContainSubstring("registry responded with invalid HEAD request"))
@@ -778,7 +811,8 @@ var _ = ginkgo.Describe("Digests", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			registryAuth := auth.TransformAuth("token")
-			matches, err := digest.CompareDigest(ctx, mockContainer, registryAuth)
+			inspector := newMockImageInspector([]string{mockDigest})
+			matches, err := digest.CompareDigest(ctx, inspector, mockContainer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(matches).To(gomega.BeTrue())
 		})
@@ -1156,6 +1190,62 @@ var _ = ginkgo.Describe("Digests", func() {
 				gomega.Expect(digest.NormalizeDigest(input)).To(gomega.Equal(input))
 			})
 		})
+
+		ginkgo.It("should skip digest fetch for local registries", func() {
+			mockContainerLocalhost := mockActions.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				"localhost/test/image:latest",
+				mockCreated,
+				mockDigest,
+			)
+
+			inspector := newMockImageInspector([]string{}) // Empty RepoDigests for local image
+			result, err := digest.FetchDigest(
+				context.Background(),
+				inspector,
+				mockContainerLocalhost,
+				"",
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.Equal(""))
+
+			mockContainerLocal := mockActions.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				"local/test/image:latest",
+				mockCreated,
+				mockDigest,
+			)
+
+			inspector = newMockImageInspector([]string{}) // Empty RepoDigests for local image
+			result, err = digest.FetchDigest(
+				context.Background(),
+				inspector,
+				mockContainerLocal,
+				"",
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.Equal(""))
+
+			mockContainerLoopback := mockActions.CreateMockContainerWithDigest(
+				mockID,
+				mockName,
+				"127.0.0.1/test/image:latest",
+				mockCreated,
+				mockDigest,
+			)
+
+			inspector = newMockImageInspector([]string{}) // Empty RepoDigests for local image
+			result, err = digest.FetchDigest(
+				context.Background(),
+				inspector,
+				mockContainerLoopback,
+				"",
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.Equal(""))
+		})
 	})
 
 	ginkgo.When("transforming authentication", func() {
@@ -1258,30 +1348,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
-			client := newTestAuthClient()
+			inspector := newMockImageInspector([]string{mockDigest})
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set(
-				"Accept",
-				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-			)
-			req.Header.Set("User-Agent", digest.UserAgent)
-
-			resp, err := client.Do(req)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			defer resp.Body.Close()
-
-			result, err := digest.ExtractGetDigest(resp)
+			result, err := digest.FetchDigest(ctx, inspector, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
 		})
@@ -1321,41 +1391,17 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/test/image/manifests/latest"),
-					func(w http.ResponseWriter, _ *http.Request) {
-						logrus.Debug("Simulating network failure for manifest request")
-						conn, _, err := w.(http.Hijacker).Hijack()
-						if err != nil {
-							logrus.WithError(err).Error("Failed to hijack connection")
-
-							return
-						}
-						conn.Close()
-					},
+					ghttp.RespondWith(http.StatusInternalServerError, "server error"),
 				),
 			)
 
-			client := newTestAuthClient()
+			inspector := newMockImageInspector([]string{mockDigest})
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			token, _, _, err := auth.GetToken(ctx, mockContainerWithServer, registryAuth, client)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set(
-				"Accept",
-				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-			)
-			req.Header.Set("User-Agent", digest.UserAgent)
-
-			_, err = client.Do(req)
+			_, err := digest.FetchDigest(ctx, inspector, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("EOF"))
+			gomega.Expect(err.Error()).
+				To(gomega.ContainSubstring("registry responded with invalid HEAD request"))
 		})
 
 		// Test case: Verifies that GetToken returns an error when the registry is unreachable.
@@ -1390,10 +1436,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			client := newTestAuthClient()
+			inspector := newMockImageInspector([]string{mockDigest})
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			_, _, _, err := auth.GetToken(ctx, mockContainerInvalidImage, registryAuth, client)
+			_, err := digest.FetchDigest(ctx, inspector, mockContainerInvalidImage, registryAuth)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to parse image name"))
 		})
@@ -1801,7 +1847,13 @@ var _ = ginkgo.Describe("Digests", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			registryAuth := auth.TransformAuth("token")
-			result, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+			inspector := newMockImageInspector([]string{"ghcr.io/k6io/operator@" + mockDigestHash})
+			result, err := digest.CompareDigest(
+				ctx,
+				inspector,
+				mockContainerWithServer,
+				registryAuth,
+			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.BeTrue())
 			gomega.Expect(server.ReceivedRequests()).Should(gomega.HaveLen(2))
@@ -2226,9 +2278,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
+			inspector := newMockImageInspector([]string{mockDigest})
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
+			result, err := digest.FetchDigest(ctx, inspector, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).
 				To(gomega.Equal("d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"))
@@ -2297,9 +2350,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
+			inspector := newMockImageInspector([]string{mockDigest})
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
+			result, err := digest.FetchDigest(ctx, inspector, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).
 				To(gomega.Equal("d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"))
@@ -2347,9 +2401,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 			)
 
+			inspector := newMockImageInspector([]string{mockDigest})
 			ctx := context.Background()
 			registryAuth := auth.TransformAuth("token")
-			result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
+			result, err := digest.FetchDigest(ctx, inspector, mockContainerWithServer, registryAuth)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
 		})
@@ -2396,11 +2451,17 @@ var _ = ginkgo.Describe("Digests", func() {
 					),
 				)
 
+				inspector := newMockImageInspector([]string{mockDigest})
 				ctx := context.Background()
 				viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 				defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 				registryAuth := auth.TransformAuth("")
-				result, err := digest.FetchDigest(ctx, mockContainerWithServer, registryAuth)
+				result, err := digest.FetchDigest(
+					ctx,
+					inspector,
+					mockContainerWithServer,
+					registryAuth,
+				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(result).To(gomega.Equal(digest.NormalizeDigest(mockDigestHash)))
 			})
@@ -2417,9 +2478,10 @@ var _ = ginkgo.Describe("Digests", func() {
 					mockDigest,
 				)
 
+				inspector := newMockImageInspector([]string{mockDigest})
 				ctx := context.Background()
 				registryAuth := auth.TransformAuth("token")
-				_, err := digest.FetchDigest(ctx, mockContainerInvalid, registryAuth)
+				_, err := digest.FetchDigest(ctx, inspector, mockContainerInvalid, registryAuth)
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("failed to parse image name"))
@@ -2435,9 +2497,10 @@ var _ = ginkgo.Describe("Digests", func() {
 					mockDigest,
 				)
 
+				inspector := newMockImageInspector([]string{mockDigest})
 				ctx := context.Background()
 				registryAuth := auth.TransformAuth("token")
-				_, err := digest.FetchDigest(ctx, mockContainerInvalidURL, registryAuth)
+				_, err := digest.FetchDigest(ctx, inspector, mockContainerInvalidURL, registryAuth)
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("failed to build manifest URL"))
@@ -2479,35 +2542,10 @@ var _ = ginkgo.Describe("Digests", func() {
 					),
 				)
 
-				client := newTestAuthClient()
+				inspector := newMockImageInspector([]string{mockDigest})
 				ctx := context.Background()
 				registryAuth := auth.TransformAuth("token")
-				token, _, _, err := auth.GetToken(
-					ctx,
-					mockContainerWithServer,
-					registryAuth,
-					client,
-				)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				url, err := manifest.BuildManifestURL(mockContainerWithServer, getScheme())
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				req.Header.Set("Authorization", "Bearer "+token)
-				req.Header.Set(
-					"Accept",
-					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-				)
-				req.Header.Set("User-Agent", digest.UserAgent)
-
-				resp, err := client.Do(req)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				defer resp.Body.Close()
-
-				_, err = digest.ExtractGetDigest(resp)
+				_, err := digest.FetchDigest(ctx, inspector, mockContainerWithServer, registryAuth)
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("invalid digest format in body"))
@@ -2799,11 +2837,17 @@ var _ = ginkgo.Describe("Digests", func() {
 						}),
 					)
 
+					inspector := newMockImageInspector([]string{mockDigest})
 					ctx := context.Background()
 					viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 					defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 					registryAuth := auth.TransformAuth("token")
-					result, err := digest.CompareDigest(ctx, mockContainerWithServer, registryAuth)
+					result, err := digest.CompareDigest(
+						ctx,
+						inspector,
+						mockContainerWithServer,
+						registryAuth,
+					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(result).To(gomega.BeTrue())
 				},

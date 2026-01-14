@@ -56,7 +56,6 @@ type RunUpdatesWithNotificationsParams struct {
 	RunOnce                      bool              // Perform one-time update and exit
 	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	CurrentContainerID           types.ContainerID // ID of the current Watchtower container for self-update logic
-	AllContainers                []types.Container // All containers to filter from for monitoring
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -104,7 +103,6 @@ func RunUpdatesWithNotifications(
 		ctx,
 		params.Client,
 		updateConfig,
-		params.AllContainers,
 	)
 	// Process update result, return metric on failure
 	if metric := handleUpdateResult(result, err); metric != nil {
@@ -369,7 +367,6 @@ func startNotifications(notifier types.Notifier, notificationSplitByContainer bo
 //   - ctx: Context for cancellation and timeouts.
 //   - client: The Docker client instance used for container operations.
 //   - config: The UpdateParams struct containing all update configuration parameters.
-//   - allContainers: All containers to filter from for monitoring.
 //
 // Returns:
 //   - types.Report: The report containing the results of the update operation.
@@ -379,12 +376,11 @@ func executeUpdate(
 	ctx context.Context,
 	client container.Client,
 	config types.UpdateParams,
-	allContainers []types.Container,
 ) (types.Report, []types.RemovedImageInfo, error) {
 	// Log before calling the Update function
 	logrus.Debug("About to call Update function")
 
-	result, cleanupImageInfos, err := Update(ctx, client, config, allContainers)
+	result, cleanupImageInfos, err := Update(ctx, client, config)
 
 	// Log after Update function returns
 	logrus.Debug("Update function returned, about to check cleanup")

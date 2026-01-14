@@ -53,7 +53,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					CPUCopyMode:      "auto",
 					PullFailureDelay: 10 * time.Millisecond,
 				},
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -106,7 +105,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
@@ -153,7 +151,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
@@ -209,7 +206,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				"prod",
 				&cleanupImageInfos,
 				nil, // no current container in this test context
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
@@ -257,7 +253,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				"",
 				&cleanupImageInfos,
 				nil,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
@@ -300,7 +295,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					CPUCopyMode:      "auto",
 					PullFailureDelay: 10 * time.Millisecond,
 				},
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -351,7 +345,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					CPUCopyMode:      "auto",
 					PullFailureDelay: 10 * time.Millisecond,
 				},
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -402,7 +395,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: 10 * time.Millisecond,
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -460,7 +452,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: 10 * time.Millisecond,
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -509,7 +500,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: 10 * time.Millisecond,
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Container should not be found by the filter, so no update
@@ -557,7 +547,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					CPUCopyMode:      "auto",
 					PullFailureDelay: 10 * time.Millisecond,
 				},
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -613,7 +602,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							CPUCopyMode:      "auto",
 							PullFailureDelay: 10 * time.Millisecond,
 						},
-						client.TestData.Containers,
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					// Container should not be updated due to scope mismatch
@@ -679,7 +667,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							CPUCopyMode:      "auto",
 							PullFailureDelay: 10 * time.Millisecond,
 						},
-						client.TestData.Containers,
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -740,7 +727,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							CPUCopyMode:      "auto",
 							PullFailureDelay: 10 * time.Millisecond,
 						},
-						client.TestData.Containers,
 					)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -793,7 +779,6 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: 10 * time.Millisecond,
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -849,7 +834,6 @@ func TestSafeguardDelay(t *testing.T) {
 				CPUCopyMode:      "auto",
 				PullFailureDelay: 10 * time.Millisecond,
 			},
-			client.TestData.Containers,
 		)
 
 		synctest.Wait()

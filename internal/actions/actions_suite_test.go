@@ -40,7 +40,6 @@ var _ = ginkgo.Describe("the actions package", func() {
 					"",
 					&cleanupImageIDs,
 					nil,
-					[]types.Container{},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
@@ -79,7 +78,6 @@ var _ = ginkgo.Describe("the actions package", func() {
 					"",
 					&cleanupImageIDs,
 					nil,
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
@@ -137,7 +135,6 @@ var _ = ginkgo.Describe("the actions package", func() {
 					"",
 					&cleanupImageIDs,
 					client.TestData.Containers[1], // current is the latest
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
@@ -157,7 +154,6 @@ var _ = ginkgo.Describe("the actions package", func() {
 					"",
 					&cleanupImageIDs,
 					client.TestData.Containers[1], // current is the latest
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
@@ -218,7 +214,6 @@ var _ = ginkgo.Describe("the actions package", func() {
 					"",
 					&cleanupImageIDs,
 					client.TestData.Containers[1], // current is the new one
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
@@ -302,7 +297,6 @@ var _ = ginkgo.Describe("the actions package", func() {
 					"",
 					&cleanupImageIDs,
 					client.TestData.Containers[2], // current is the newer unscoped
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
@@ -328,7 +322,6 @@ var _ = ginkgo.Describe("the actions package", func() {
 					"prod",
 					&cleanupImageIDs,
 					client.TestData.Containers[1], // current is the scoped one
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(cleanupOccurred).To(gomega.Equal(0))

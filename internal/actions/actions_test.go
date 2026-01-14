@@ -92,7 +92,6 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
-					AllContainers:                client.TestData.Containers,
 				}
 				metric := RunUpdatesWithNotifications(context.Background(), params)
 
@@ -144,7 +143,6 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
-					AllContainers:                client.TestData.Containers,
 				}
 				metric := RunUpdatesWithNotifications(context.Background(), params)
 
@@ -182,7 +180,6 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:                 1001,
 					CPUCopyMode:                  "auto",
 					PullFailureDelay:             time.Duration(0),
-					AllContainers:                client.TestData.Containers,
 				}
 
 				// Empty container list results in zero metrics
@@ -258,7 +255,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						CurrentContainerID: types.ContainerID(
 							"container1-id",
 						), // Set to first container
-						AllContainers: client.TestData.Containers,
 					}
 
 					metric := RunUpdatesWithNotifications(context.Background(), params)
@@ -487,7 +483,6 @@ var _ = ginkgo.Describe("Actions", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 
 			// We expect some result or error, but mainly that it doesn't panic
@@ -1025,7 +1020,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						LifecycleGID:     1001,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
-						AllContainers:    allContainers,
 					}
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- metric
@@ -1054,7 +1048,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						LifecycleGID:     1001,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
-						AllContainers:    allContainers,
 					}
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- metric
@@ -1167,7 +1160,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						LifecycleGID:     1001,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
-						AllContainers:    allContainers,
 					}
 					RunUpdatesWithNotifications(context.Background(), params)
 				}()
@@ -1195,7 +1187,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						LifecycleGID:     1001,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
-						AllContainers:    allContainers,
 					}
 					RunUpdatesWithNotifications(context.Background(), params)
 				}()
@@ -1298,7 +1289,6 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:     1001,
 					CPUCopyMode:      "auto",
 					PullFailureDelay: time.Duration(0),
-					AllContainers:    allContainers,
 				}
 				RunUpdatesWithNotifications(context.Background(), params)
 			}()
@@ -1326,7 +1316,6 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:     1001,
 					CPUCopyMode:      "auto",
 					PullFailureDelay: time.Duration(0),
-					AllContainers:    allContainers,
 				}
 				RunUpdatesWithNotifications(context.Background(), params)
 			}()
@@ -1432,7 +1421,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						LifecycleGID:     1001,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
-						AllContainers:    allContainers,
 					}
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- map[string]int{"prod-scanned": metric.Scanned, "prod-updated": metric.Updated}
@@ -1461,7 +1449,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						LifecycleGID:     1001,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
-						AllContainers:    allContainers,
 					}
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- map[string]int{"dev-scanned": metric.Scanned, "dev-updated": metric.Updated}
@@ -1572,7 +1559,6 @@ var _ = ginkgo.Describe("Actions", func() {
 						LifecycleGID:     1001,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
-						AllContainers:    allContainers,
 					}
 
 					metric := RunUpdatesWithNotifications(context.Background(), params)
@@ -1665,7 +1651,6 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:     1001,
 					CPUCopyMode:      "auto",
 					PullFailureDelay: time.Duration(0),
-					AllContainers:    allContainers,
 				}
 
 				// Run scope-b operation (cleanup should succeed)
@@ -1690,7 +1675,6 @@ var _ = ginkgo.Describe("Actions", func() {
 					LifecycleGID:     1001,
 					CPUCopyMode:      "auto",
 					PullFailureDelay: time.Duration(0),
-					AllContainers:    allContainers,
 				}
 
 				var wg sync.WaitGroup
@@ -1810,7 +1794,6 @@ var _ = ginkgo.Describe("Actions", func() {
 							LifecycleGID:     1001,
 							CPUCopyMode:      "auto",
 							PullFailureDelay: time.Duration(0),
-							AllContainers:    allContainers,
 						}
 						metric := RunUpdatesWithNotifications(context.Background(), params)
 						results <- metric
@@ -1839,7 +1822,6 @@ var _ = ginkgo.Describe("Actions", func() {
 							LifecycleGID:     1001,
 							CPUCopyMode:      "auto",
 							PullFailureDelay: time.Duration(0),
-							AllContainers:    allContainers,
 						}
 						metric := RunUpdatesWithNotifications(context.Background(), params)
 						results <- metric

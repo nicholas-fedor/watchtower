@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -39,6 +40,10 @@ const (
 // It can be customized at build time using linker flags (e.g., -ldflags "-X ...UserAgent=Watchtower/v1.0").
 // If not set during the build, it defaults to "Watchtower/unknown", providing a fallback identifier for registry requests.
 var UserAgent = "Watchtower/unknown"
+
+// inspectMutex synchronizes access to ImageInspector operations to ensure thread safety
+// during concurrent digest fetching operations.
+var inspectMutex sync.Mutex
 
 // Errors for digest retrieval operations.
 var (
@@ -89,6 +94,7 @@ func NormalizeDigest(digest string) string {
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
+//   - inspector: Image inspector for checking if image is locally built.
 //   - container: Container whose digest is being compared.
 //   - registryAuth: Base64-encoded auth string.
 //
@@ -97,6 +103,7 @@ func NormalizeDigest(digest string) string {
 //   - error: Non-nil if operation fails, nil on success.
 func CompareDigest(
 	ctx context.Context,
+	inspector types.ImageInspector,
 	container types.Container,
 	registryAuth string,
 ) (bool, error) {
@@ -113,7 +120,7 @@ func CompareDigest(
 	}
 
 	// Fetch the latest digest from the registry using a HEAD request for efficiency.
-	remoteDigest, err := fetchDigest(ctx, container, registryAuth, http.MethodHead)
+	remoteDigest, err := fetchDigest(ctx, inspector, container, registryAuth, http.MethodHead)
 	if err != nil {
 		return false, err
 	}
@@ -122,7 +129,7 @@ func CompareDigest(
 	if remoteDigest == "" {
 		logrus.WithFields(fields).Debug("HEAD request returned empty digest, falling back to GET")
 
-		remoteDigest, err = FetchDigest(ctx, container, registryAuth)
+		remoteDigest, err = FetchDigest(ctx, inspector, container, registryAuth)
 		if err != nil {
 			return false, err
 		}
@@ -145,14 +152,20 @@ func CompareDigest(
 //
 // Parameters:
 //   - ctx: The context controlling the request’s lifecycle, enabling cancellation or timeouts.
+//   - inspector: Image inspector for checking if image is locally built.
 //   - container: The container whose image digest is being fetched, providing the image name and reference.
 //   - authToken: A base64-encoded authentication string for registry access.
 //
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if successful.
 //   - error: An error if the request fails or digest header is missing, nil if successful.
-func FetchDigest(ctx context.Context, container types.Container, authToken string) (string, error) {
-	return fetchDigest(ctx, container, authToken, http.MethodGet)
+func FetchDigest(
+	ctx context.Context,
+	inspector types.ImageInspector,
+	container types.Container,
+	authToken string,
+) (string, error) {
+	return fetchDigest(ctx, inspector, container, authToken, http.MethodGet)
 }
 
 // BuildManifestURL constructs and validates the manifest URL for a container.
@@ -241,6 +254,7 @@ func BuildManifestURL(
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
+//   - inspector: Image inspector for checking if image is locally built.
 //   - container: Container whose digest is being retrieved.
 //   - registryAuth: Base64-encoded auth string.
 //   - method: HTTP method ("HEAD" or "GET").
@@ -250,6 +264,7 @@ func BuildManifestURL(
 //   - error: Non-nil if operation fails, nil on success.
 func fetchDigest(
 	ctx context.Context,
+	inspector types.ImageInspector,
 	container types.Container,
 	registryAuth string,
 	method string,
@@ -257,6 +272,27 @@ func fetchDigest(
 	fields := logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
+	}
+
+	// Inspect the image to check if it's locally built (no RepoDigests).
+	// Synchronize access to prevent race conditions in concurrent operations.
+	inspectMutex.Lock()
+
+	inspect, _, err := inspector.ImageInspectWithRaw(ctx, container.ImageName())
+
+	inspectMutex.Unlock()
+
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to inspect image")
+
+		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
+	}
+
+	// Skip digest fetching for locally built images (empty RepoDigests).
+	if len(inspect.RepoDigests) == 0 {
+		logrus.WithFields(fields).Debug("Skipping digest fetch for locally built image")
+
+		return "", nil
 	}
 
 	// Transform the provided auth string into a usable format for registry authentication.

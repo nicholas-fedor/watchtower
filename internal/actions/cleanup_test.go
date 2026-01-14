@@ -8,6 +8,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/docker/docker/api/types/container"
@@ -35,6 +36,10 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{mockContainer}, nil)
+
 			var cleanupImageInfo []types.RemovedImageInfo
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
 				mockClient,
@@ -42,7 +47,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"",
 				&cleanupImageInfo,
 				mockContainer,
-				[]types.Container{mockContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -78,6 +82,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					},
 				)
 
+				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{oldContainer, newContainer}, nil)
 				mockClient.EXPECT().StopAndRemoveContainer(oldContainer, 10*time.Minute).Return(nil)
 				mockClient.EXPECT().
 					RemoveImageByID(types.ImageID("watchtower:old"), "watchtower:old").
@@ -90,7 +97,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"",
 					&cleanupImageIDs,
 					newContainer,
-					[]types.Container{oldContainer, newContainer},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -119,6 +125,10 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{scopedOldContainer}, nil)
+
 			var cleanupImageIDs []types.RemovedImageInfo
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
 				mockClient,
@@ -126,7 +136,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"prod",
 				&cleanupImageIDs,
 				scopedOldContainer,
-				[]types.Container{scopedOldContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -162,6 +171,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(oldContainer, 10*time.Minute).Return(nil)
 			mockClient.EXPECT().
 				RemoveImageByID(types.ImageID("watchtower:1.11.0"), "watchtower:1.11.0").
@@ -174,7 +186,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"prod",
 				&cleanupImageIDs,
 				newContainer,
-				[]types.Container{oldContainer, newContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -200,6 +211,10 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{scopedContainer}, nil)
+
 			var cleanupImageIDs []types.RemovedImageInfo
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
 				mockClient,
@@ -207,7 +222,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"prod",
 				&cleanupImageIDs,
 				scopedContainer,
-				[]types.Container{scopedContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -243,6 +257,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(oldContainer, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []types.RemovedImageInfo
@@ -252,7 +269,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"",
 				&cleanupImageIDs,
 				newContainer,
-				[]types.Container{oldContainer, newContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -265,6 +281,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 		ginkgo.It("should not perform cleanup when currentContainer is nil", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
+			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
+
 			var cleanupImageIDs []types.RemovedImageInfo
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
 				mockClient,
@@ -272,7 +290,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"",
 				&cleanupImageIDs,
 				nil,
-				[]types.Container{},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -307,6 +324,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			)
 
 			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{oldContainer, newContainer}, nil)
+			mockClient.EXPECT().
 				StopAndRemoveContainer(oldContainer, 10*time.Minute).
 				Return(errors.New("stop container failed"))
 
@@ -317,7 +337,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"",
 				&cleanupImageIDs,
 				newContainer,
-				[]types.Container{oldContainer, newContainer},
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -365,6 +384,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			)
 
 			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{old1Container, old2Container, newContainer}, nil)
+			mockClient.EXPECT().
 				StopAndRemoveContainer(old1Container, 10*time.Minute).
 				Return(errors.New("stop container failed"))
 			mockClient.EXPECT().StopAndRemoveContainer(old2Container, 10*time.Minute).Return(nil)
@@ -376,7 +398,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"",
 				&cleanupImageIDs,
 				newContainer,
-				[]types.Container{old1Container, old2Container, newContainer},
 			)
 
 			gomega.Expect(err).
@@ -426,6 +447,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{old1Container, old2Container, newContainer}, nil)
+				mockClient.EXPECT().
 					StopAndRemoveContainer(old1Container, 10*time.Minute).
 					Return(errors.New("removal of container watchtower-old1 is already in progress")).
 					Times(3)
@@ -440,7 +464,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"",
 					&cleanupImageIDs,
 					newContainer,
-					[]types.Container{old1Container, old2Container, newContainer},
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
@@ -489,6 +512,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{old1Container, old2Container, newContainer}, nil)
+				mockClient.EXPECT().
 					StopAndRemoveContainer(old1Container, 10*time.Minute).
 					Return(cerrdefs.ErrNotFound)
 				mockClient.EXPECT().
@@ -505,7 +531,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"",
 					&cleanupImageIDs,
 					newContainer,
-					[]types.Container{old1Container, old2Container, newContainer},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -546,6 +571,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					},
 				)
 
+				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{oldContainer, newContainer}, nil)
 				mockClient.EXPECT().StopAndRemoveContainer(oldContainer, 10*time.Minute).Return(nil)
 
 				var cleanupImageIDs []types.RemovedImageInfo
@@ -555,7 +583,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"",
 					&cleanupImageIDs,
 					newContainer,
-					[]types.Container{oldContainer, newContainer},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -590,6 +617,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(oldContainer, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []types.RemovedImageInfo
@@ -599,7 +629,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"",
 				&cleanupImageIDs,
 				newContainer,
-				[]types.Container{oldContainer, newContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -642,6 +671,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{oldContainer, newContainer}, nil)
+			mockClient.EXPECT().
 				StopAndRemoveContainer(oldContainer, 10*time.Minute).
 				Return(nil).
 				Times(1)
@@ -653,7 +685,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"",
 				&cleanupImageInfos,
 				newContainer,
-				[]types.Container{oldContainer, newContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -693,22 +724,11 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
-			// Extra container in different scope
-			differentScopeContainer := createMockContainer(
-				"different-scope",
-				"watchtower-different",
-				"watchtower:latest",
-				true,
-				false,
-				time.Now().Add(-2*time.Hour),
-				map[string]string{
-					"com.centurylinklabs.watchtower":       "true",
-					"com.centurylinklabs.watchtower.scope": "dev",
-				},
-			)
-
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().
 				StopAndRemoveContainer(oldContainer, 10*time.Minute).
 				Return(nil).
@@ -722,7 +742,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"prod", // scope specified
 				&cleanupImageInfos,
 				newContainer,
-				[]types.Container{oldContainer, newContainer, differentScopeContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -766,6 +785,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{oldDifferentScopeContainer, newContainer}, nil)
+			mockClient.EXPECT().
 				StopAndRemoveContainer(oldDifferentScopeContainer, 10*time.Minute).
 				Return(nil).
 				Times(1)
@@ -780,7 +802,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"prod", // scope specified
 				&cleanupImageInfos,
 				newContainer,
-				[]types.Container{oldDifferentScopeContainer, newContainer},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -821,34 +842,11 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
-			devOldContainer := createMockContainer(
-				"dev-old",
-				"watchtower-dev-old",
-				"watchtower:latest",
-				true,
-				false,
-				time.Now().Add(-time.Hour),
-				map[string]string{
-					"com.centurylinklabs.watchtower":       "true",
-					"com.centurylinklabs.watchtower.scope": "dev",
-				},
-			)
-
-			devNewContainer := createMockContainer(
-				"dev-new",
-				"watchtower-dev-new",
-				"watchtower:latest",
-				true,
-				false,
-				time.Now(),
-				map[string]string{
-					"com.centurylinklabs.watchtower":       "true",
-					"com.centurylinklabs.watchtower.scope": "dev",
-				},
-			)
-
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{prodOldContainer, prodNewContainer}, nil)
 			mockClient.EXPECT().
 				StopAndRemoveContainer(prodOldContainer, 10*time.Minute).
 				Return(nil).
@@ -864,12 +862,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"", // no scope filter
 				&cleanupImageInfos,
 				prodNewContainer, // Use prod new as current for prod scope
-				[]types.Container{
-					prodOldContainer,
-					prodNewContainer,
-					devOldContainer,
-					devNewContainer,
-				},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -914,6 +906,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{referencedContainer, crossScopeChainContainer}, nil)
+				mockClient.EXPECT().
 					StopAndRemoveContainer(referencedContainer, 10*time.Minute).
 					Return(nil).
 					Times(1)
@@ -929,7 +924,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"scope-a", // Only clean scope-a
 					&cleanupImageInfos,
 					crossScopeChainContainer,
-					[]types.Container{referencedContainer, crossScopeChainContainer},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -987,6 +981,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					},
 				)
 
+				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{container1, container2, currentContainer}, nil)
 				// Mock partial failures: container1 stops successfully,
 				// container2 fails to stop entirely (should prevent all image cleanup)
 				mockClient.EXPECT().StopAndRemoveContainer(container1, 10*time.Minute).Return(nil)
@@ -1001,7 +998,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"test-scope",
 					&cleanupImageInfos,
 					currentContainer,
-					[]types.Container{container1, container2, currentContainer},
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
@@ -1059,6 +1055,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					},
 				)
 
+				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{notFoundContainer, stopErrorContainer, currentContainer}, nil)
 				// Mock different error types
 				mockClient.EXPECT().
 					StopAndRemoveContainer(notFoundContainer, 10*time.Minute).
@@ -1074,7 +1073,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"error-scope",
 					&cleanupImageInfos,
 					currentContainer,
-					[]types.Container{notFoundContainer, stopErrorContainer, currentContainer},
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
@@ -1129,6 +1127,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					},
 				)
 
+				mockClient.EXPECT().
+					ListContainers(mock.Anything).
+					Return([]types.Container{successContainer, failureContainer, currentContainer}, nil)
 				// Success container stops successfully
 				mockClient.EXPECT().
 					StopAndRemoveContainer(successContainer, 10*time.Minute).
@@ -1145,7 +1146,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"interrupt-scope",
 					&cleanupImageInfos,
 					currentContainer,
-					[]types.Container{successContainer, failureContainer, currentContainer},
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
@@ -1172,19 +1172,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					"com.centurylinklabs.watchtower.scope": "scope-a",
 				},
 			)
-			// Scope B container that should succeed (but not be affected)
-			scopeBContainer := createMockContainer(
-				"scope-b-success",
-				"watchtower-scope-b",
-				"watchtower:success",
-				true,
-				false,
-				time.Now().Add(-time.Hour),
-				map[string]string{
-					"com.centurylinklabs.watchtower":       "true",
-					"com.centurylinklabs.watchtower.scope": "scope-b",
-				},
-			)
+
 			currentContainer := createMockContainer(
 				"current-a",
 				"watchtower-current-a",
@@ -1198,6 +1186,9 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				},
 			)
 
+			mockClient.EXPECT().
+				ListContainers(mock.Anything).
+				Return([]types.Container{scopeAContainer, currentContainer}, nil)
 			// Only scope-a operations should occur
 			mockClient.EXPECT().
 				StopAndRemoveContainer(scopeAContainer, 10*time.Minute).
@@ -1210,7 +1201,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				"scope-a", // Only clean scope-a
 				&cleanupImageInfos,
 				currentContainer,
-				[]types.Container{scopeAContainer, scopeBContainer, currentContainer},
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -1271,7 +1261,7 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
 	})
 
-	ginkgo.It("should treat 'No such image' errors as non-errors and not add to cleaned", func() {
+	ginkgo.It("should treat 'not found' errors as non-errors and not add to cleaned", func() {
 		mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 		cleanedImages := []types.RemovedImageInfo{
@@ -1282,7 +1272,26 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 		mockClient.EXPECT().RemoveImageByID(types.ImageID("image1"), "").Return(nil)
 		mockClient.EXPECT().
 			RemoveImageByID(types.ImageID("image2"), "").
-			Return(errors.New("No such image"))
+			Return(cerrdefs.ErrNotFound)
+
+		cleaned, err := RemoveImages(mockClient, cleanedImages)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cleaned).To(gomega.HaveLen(1))
+		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
+	})
+
+	ginkgo.It("should treat 'conflict' errors as non-errors and not add to cleaned", func() {
+		mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+		cleanedImages := []types.RemovedImageInfo{
+			{ImageID: "image1", ImageName: "image1"},
+			{ImageID: "image2", ImageName: "image2"},
+		}
+
+		mockClient.EXPECT().RemoveImageByID(types.ImageID("image1"), "image1").Return(nil)
+		mockClient.EXPECT().
+			RemoveImageByID(types.ImageID("image2"), "image2").
+			Return(cerrdefs.ErrConflict)
 
 		cleaned, err := RemoveImages(mockClient, cleanedImages)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())

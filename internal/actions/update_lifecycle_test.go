@@ -52,7 +52,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
@@ -98,7 +97,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleGID:   1001,
 						CPUCopyMode:    "auto",
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -145,7 +143,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
@@ -190,7 +187,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -240,7 +236,19 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(provider.ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(consumer.ToRestart()).To(gomega.BeFalse())
 
-				actions.UpdateImplicitRestart(containers, containers)
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness: map[string]bool{
+							"test-container-provider": true,
+							"test-container-consumer": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				actions.UpdateImplicitRestart(client, containers)
 
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
@@ -258,7 +266,16 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // db
 					gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // web
 
-					actions.UpdateImplicitRestart(containers, containers)
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
+							Containers: containers,
+							Staleness:  map[string]bool{"db": true, "web": false},
+						},
+						false,
+						false,
+					)
+
+					actions.UpdateImplicitRestart(client, containers)
 
 					// web should be marked for restart because it depends on db
 					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
@@ -279,7 +296,16 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // db
 					gomega.Expect(containers[2].ToRestart()).To(gomega.BeFalse()) // app
 
-					actions.UpdateImplicitRestart(containers, containers)
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
+							Containers: containers,
+							Staleness:  map[string]bool{"cache": true, "db": false, "app": false},
+						},
+						false,
+						false,
+					)
+
+					actions.UpdateImplicitRestart(client, containers)
 
 					// All should be marked for restart: cache -> db -> app
 					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
@@ -341,8 +367,21 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containerB.ToRestart()).To(gomega.BeFalse())
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness: map[string]bool{
+							"test-container-c": true,
+							"test-container-b": false,
+							"test-container-a": false,
+						},
+					},
+					false,
+					false,
+				)
+
 				// Run UpdateImplicitRestart to propagate restart through the chain
-				actions.UpdateImplicitRestart(containers, containers)
+				actions.UpdateImplicitRestart(client, containers)
 
 				// Verify that restart propagates: A and B should now be marked for restart
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue()) // C
@@ -386,7 +425,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
@@ -433,7 +471,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
 					},
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))

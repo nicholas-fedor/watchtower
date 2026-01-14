@@ -53,7 +53,6 @@ var _ = ginkgo.Describe("the update action", func() {
 					Filter:      filters.WatchtowerContainersFilter,
 					CPUCopyMode: "auto",
 				},
-				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -138,7 +137,6 @@ var _ = ginkgo.Describe("the update action", func() {
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-					client.TestData.Containers,
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -219,7 +217,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -288,7 +285,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						context.Background(),
 						client,
 						types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-						client.TestData.Containers,
 					)
 
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -348,7 +344,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -409,7 +404,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -477,7 +471,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -518,7 +511,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -561,13 +553,21 @@ var _ = ginkgo.Describe("the update action", func() {
 						})
 
 					containers := []types.Container{containerA, containerB}
-					allContainers := []types.Container{containerA, containerB}
 
 					// Mark container B as stale (should trigger restart)
 					containerB.SetStale(true)
 
+					client := mockActions.CreateMockClient(
+						&mockActions.TestData{
+							Containers: containers,
+							Staleness:  map[string]bool{"container-a": false, "container-b": true},
+						},
+						false,
+						false,
+					)
+
 					// Run UpdateImplicitRestart - should not panic or error on invalid dependencies
-					actions.UpdateImplicitRestart(containers, allContainers)
+					actions.UpdateImplicitRestart(client, containers)
 
 					// Container A should not be marked for restart due to invalid dependency
 					gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
@@ -632,7 +632,6 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{containerD, containerC, containerB, containerA}
-				allContainers := []types.Container{containerD, containerC, containerB, containerA}
 
 				// Initially, only D should be marked for restart
 				containerD.SetStale(true)
@@ -641,8 +640,22 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containerB.ToRestart()).To(gomega.BeFalse())
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness: map[string]bool{
+							"container-d": true,
+							"container-c": false,
+							"container-b": false,
+							"container-a": false,
+						},
+					},
+					false,
+					false,
+				)
+
 				// Run UpdateImplicitRestart to propagate restart through the chain
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(client, containers)
 
 				// Verify state transitions: all containers should now be marked for restart
 				gomega.Expect(containerD.ToRestart()).To(gomega.BeTrue())
@@ -708,13 +721,26 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{base, dep1, dep2, dep3}
-				allContainers := []types.Container{base, dep1, dep2, dep3}
 
 				// Mark base as stale
 				base.SetStale(true)
 
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness: map[string]bool{
+							"base": true,
+							"dep1": false,
+							"dep2": false,
+							"dep3": false,
+						},
+					},
+					false,
+					false,
+				)
+
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(client, containers)
 
 				// Verify all dependents are marked for restart
 				gomega.Expect(base.ToRestart()).To(gomega.BeTrue())
@@ -754,13 +780,21 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{containerA, containerB}
-				allContainers := []types.Container{containerA, containerB}
 
 				// Mark container A as stale
 				containerA.SetStale(true)
 
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness:  map[string]bool{"container-a": true, "container-b": false},
+					},
+					false,
+					false,
+				)
+
 				// Run UpdateImplicitRestart - should handle circular dependency gracefully
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(client, containers)
 
 				// Both should be marked for restart despite circular dependency
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeTrue())
@@ -810,14 +844,26 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
-				allContainers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
 
 				// Mark stale containers
 				staleNoDeps.SetStale(true)
 				staleWithDeps.SetStale(true)
 
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness: map[string]bool{
+							"stale-no-deps":   true,
+							"fresh-with-deps": false,
+							"stale-with-deps": true,
+						},
+					},
+					false,
+					false,
+				)
+
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(client, containers)
 
 				// Verify correct restart marking
 				gomega.Expect(staleNoDeps.ToRestart()).To(gomega.BeTrue())
@@ -880,7 +926,6 @@ var _ = ginkgo.Describe("the update action", func() {
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
 						},
-						client.TestData.Containers,
 					)
 
 					// Verify successful execution
@@ -952,7 +997,6 @@ var _ = ginkgo.Describe("the update action", func() {
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
 						},
-						client.TestData.Containers,
 					)
 					duration := time.Since(startTime)
 
@@ -1033,7 +1077,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},
-					client.TestData.Containers,
 				)
 
 				// Verify successful execution and correct categorization
@@ -1114,7 +1157,6 @@ var _ = ginkgo.Describe("the update action", func() {
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},
-					client.TestData.Containers,
 				)
 
 				// Verify successful execution

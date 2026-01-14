@@ -295,7 +295,7 @@ func (c imageClient) shouldSkipPull(
 
 	warn := c.warnOnHeadFailed(sourceContainer, warnOnHeadFailed)
 	// Compare current and remote digests.
-	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth)
+	match, err := digest.CompareDigest(ctx, c.api, sourceContainer, registryAuth)
 	if err != nil {
 		clog.WithFields(logrus.Fields{
 			"match": match,

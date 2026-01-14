@@ -48,7 +48,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
@@ -82,7 +81,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
@@ -117,7 +115,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
@@ -156,7 +153,6 @@ var _ = ginkgo.Describe("the update action", func() {
 					context.Background(),
 					client,
 					config,
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Scanned()).
@@ -193,7 +189,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Scanned()).
@@ -231,7 +226,6 @@ var _ = ginkgo.Describe("the update action", func() {
 					context.Background(),
 					client,
 					config,
-					client.TestData.Containers,
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Skipped()).
@@ -274,7 +268,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				config,
-				client.TestData.Containers,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Skipped()).

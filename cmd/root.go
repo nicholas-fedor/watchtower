@@ -485,14 +485,6 @@ func runMain(cfg types.RunConfig) int {
 	// Ensure the Docker client is fully initialized before proceeding.
 	awaitDockerClient()
 
-	// List all containers once to avoid redundant API calls during startup
-	allContainers, err := client.ListContainers(filters.NoFilter)
-	if err != nil {
-		logNotify("Failed to list containers", err)
-
-		return 1
-	}
-
 	// runUpdatesWithNotifications performs container updates and sends notifications about the results.
 	//
 	// It executes the update action with configured parameters, batches notifications, and returns a metric
@@ -530,10 +522,11 @@ func runMain(cfg types.RunConfig) int {
 			RunOnce:            params.RunOnce,               // Perform one-time update and exit
 			SkipSelfUpdate:     params.SkipSelfUpdate,        // Skip Watchtower self-update
 			CurrentContainerID: currentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
-			AllContainers:      allContainers,                // All containers to filter from for monitoring
 		}
 
-		return actions.RunUpdatesWithNotifications(ctx, actionParams)
+		metric := actions.RunUpdatesWithNotifications(ctx, actionParams)
+
+		return metric
 	}
 
 	// If rolling restarts are enabled, validate that the containers being monitored for
@@ -607,7 +600,6 @@ func runMain(cfg types.RunConfig) int {
 		scope,
 		&[]types.RemovedImageInfo{},
 		currentWatchtowerContainer,
-		allContainers,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "failed to list containers") {

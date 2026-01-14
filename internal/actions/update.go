@@ -11,9 +11,11 @@ import (
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/docker/docker/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
@@ -36,7 +38,6 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for interacting with Docker API.
 //   - config: UpdateParams specifying behavior like cleanup, restart, and filtering.
-//   - allContainers: All containers to filter from for monitoring.
 //
 // Returns:
 //   - types.Report: Session report summarizing scanned, updated, and failed containers.
@@ -46,7 +47,6 @@ func Update(
 	ctx context.Context,
 	client container.Client,
 	config types.UpdateParams,
-	allContainers []types.Container,
 ) (types.Report, []types.RemovedImageInfo, error) {
 	// Check for context cancellation early
 	select {
@@ -57,6 +57,12 @@ func Update(
 
 	// Initialize logging for the update process start.
 	logrus.Debug("Starting container update check")
+
+	// Fetch all containers for monitoring
+	allContainers, err := client.ListContainers(filters.NoFilter)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list containers: %w", err)
+	}
 
 	// Create a progress tracker for reporting scanned, updated, and skipped containers.
 	progress := &session.Progress{}
@@ -262,7 +268,7 @@ func Update(
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
-	err := sorter.SortByDependencies(filteredContainers)
+	err = sorter.SortByDependencies(filteredContainers)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
 			var circularErr sorter.CircularReferenceError
@@ -298,7 +304,7 @@ func Update(
 		}
 	} else {
 		// Mark containers linked to restarting ones for restart without updating.
-		UpdateImplicitRestart(filteredContainers, allContainers)
+		UpdateImplicitRestart(client, filteredContainers)
 	}
 
 	// Collect all containers to restart (updates and implicit restarts)
@@ -414,10 +420,17 @@ func hasSelfDependency(c types.Container) bool {
 // they are restarted in the correct order without being marked as updated.
 //
 // Parameters:
+//   - client: Container client for listing all containers.
 //   - containers: List of containers to update.
-//   - allContainers: List of all containers to search for linked dependencies.
-func UpdateImplicitRestart(containers, allContainers []types.Container) {
+func UpdateImplicitRestart(client container.Client, containers []types.Container) {
 	logrus.Debug("Starting UpdateImplicitRestart")
+
+	allContainers, err := client.ListContainers(filters.NoFilter)
+	if err != nil {
+		logrus.WithError(err).Warn("Failed to list containers for implicit restart")
+
+		return
+	}
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
 
@@ -935,6 +948,16 @@ func stopStaleContainer(
 	// Stop the container with the configured timeout.
 	err := client.StopAndRemoveContainer(container, config.Timeout)
 	if err != nil {
+		// Check if the container is already gone (e.g., "No such container" error).
+		// Treat this as non-fatal, similar to RemoveExcessWatchtowerInstances.
+		if cerrdefs.IsNotFound(err) {
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Container not found, treating as already stopped")
+
+			return nil
+		}
+
 		logrus.WithFields(fields).WithError(err).Error("Failed to stop container")
 
 		return fmt.Errorf("%w: %w", errStopContainerFailed, err)

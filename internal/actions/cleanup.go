@@ -37,7 +37,6 @@ const maxRemovalAttempts = 3
 //   - watchtowerScope: Scope to filter Watchtower instances.
 //   - removeImageInfos: Pointer to slice of images to remove after stopping excess instances.
 //   - currentContainer: The current running Watchtower container.
-//   - allContainers: All containers to search for excess instances.
 //
 // Returns:
 //   - int: Number of removed Watchtower instances.
@@ -48,7 +47,6 @@ func RemoveExcessWatchtowerInstances(
 	scope string,
 	removeImageInfos *[]types.RemovedImageInfo,
 	currentContainer types.Container,
-	allContainers []types.Container,
 ) (int, error) {
 	logrus.WithFields(logrus.Fields{
 		"scope":          scope,
@@ -61,6 +59,12 @@ func RemoveExcessWatchtowerInstances(
 			return ""
 		}(),
 	}).Debug("Starting removal of excess Watchtower instances")
+
+	// List all containers to find excess instances
+	allContainers, err := client.ListContainers(filters.NoFilter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list containers: %w", err)
+	}
 
 	// Retrieve containers that are excess Watchtower instances within the same scope
 	excessWatchtowerContainers := getExcessContainers(
@@ -441,13 +445,19 @@ func RemoveImages(
 
 		err := client.RemoveImageByID(imageID, image.ImageName)
 		if err != nil {
-			// Check if this is a "No such image" error (expected when multiple instances remove the same image)
-			if strings.Contains(err.Error(), "No such image") {
+			// Check if this is a "not found" error (expected when multiple instances remove the same image)
+			switch {
+			case cerrdefs.IsNotFound(err):
 				logrus.WithFields(logrus.Fields{
 					"image_id":   imageID,
 					"image_name": image.ImageName,
 				}).Debug("Image already removed")
-			} else {
+			case cerrdefs.IsConflict(err):
+				logrus.WithFields(logrus.Fields{
+					"image_id":   imageID,
+					"image_name": image.ImageName,
+				}).Debug("Image is in use by running container, skipping removal")
+			default:
 				logrus.WithError(err).WithFields(logrus.Fields{
 					"image_id":   imageID,
 					"image_name": image.ImageName,

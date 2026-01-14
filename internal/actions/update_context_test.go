@@ -26,7 +26,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				cancelledCtx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -44,7 +43,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 
 			// Update continues but marks containers as skipped due to staleness check failure
@@ -76,7 +74,6 @@ var _ = ginkgo.Describe("the update action", func() {
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-					client.TestData.Containers,
 				)
 
 				// Should still attempt to process and return a report
@@ -105,7 +102,6 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 			ctx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-			client.TestData.Containers,
 		)
 
 		synctest.Wait()
@@ -138,7 +134,6 @@ func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 			cancelledCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-			client.TestData.Containers,
 		)
 
 		synctest.Wait()
@@ -181,7 +176,6 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 				ctx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				client.TestData.Containers,
 			)
 		}()
 
