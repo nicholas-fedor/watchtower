@@ -37,12 +37,12 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@064fe7f3312418007dea2b49a19844a9ee378f49
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           fetch-depth: 0 # Full history for GoReleaser versioning.
 
       - name: Set up Go
-        uses: actions/setup-go@ae252ee6fb24babc50e89fc67c4aa608e69fbf8f
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5
         with:
           go-version-file: "go.mod"
 
@@ -69,14 +69,14 @@ jobs:
 
       - name: Login to Docker Hub # Authenticate to Docker Hub
         if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@916386b00027d425839f8da46d302dab33f5875b
+        uses: docker/login-action@0567fa5ae8c9a197cb207537dc5cbb43ca3d803f
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR # Authenticate to GHCR
         if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@916386b00027d425839f8da46d302dab33f5875b
+        uses: docker/login-action@0567fa5ae8c9a197cb207537dc5cbb43ca3d803f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -101,7 +101,7 @@ jobs:
 
       - name: Generate artifact attestation # Generate attestations for prod builds.
         if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
-        uses: actions/attest-build-provenance@63e64444a7857c20bbda4810126aabe30ef3b047
+        uses: actions/attest-build-provenance@98f3aa9c27c3d6da66cf51b7d38fb7511df72d3a
         with:
           subject-checksums: ./dist/checksums.txt
 

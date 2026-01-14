@@ -34,7 +34,7 @@ jobs:
         with:
           args: "-no-fail -fmt sarif -out results.sarif ./..."
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7 # v4
+        uses: github/codeql-action/upload-sarif@cdefb33c0f6224e58673d9004f47f7cb3e328b89 # v4
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: results.sarif
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: govulncheck
-        uses: nicholas-fedor/govulncheck-action@9813de4bcecf89e36580742f9d4b9bb12d4fa7eb
+        uses: nicholas-fedor/govulncheck-action@72a75e9f40c1765090533c983a6137b24a60690a
         with:
           output-format: sarif
           output-file: ${{ env.OUTPUT_FILE }}
@@ -52,6 +52,6 @@ jobs:
           go-version-input: ""
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7 # v4
+        uses: github/codeql-action/upload-sarif@cdefb33c0f6224e58673d9004f47f7cb3e328b89 # v4
         with:
           sarif_file: ${{ env.OUTPUT_FILE }}

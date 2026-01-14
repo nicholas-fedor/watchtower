@@ -19,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/text v0.32.0
+	golang.org/x/text v0.33.0
 )
 
 require (
@@ -86,8 +86,8 @@ require (
 )
 
 require (
-	github.com/onsi/ginkgo/v2 v2.27.4
-	golang.org/x/sys v0.40.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.27.5
+	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
