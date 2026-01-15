@@ -218,7 +218,9 @@ linters:
         - w http.ResponseWriter
         - r *http.Request
         - r http.Request
-        - r *net/http/Request
+        - r *http.Request
+        - r http.Request
+        - r *mux.Router
         - r *mux.Router
   exclusions:
     presets:
