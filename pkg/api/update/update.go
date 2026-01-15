@@ -153,6 +153,5 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write(buf.Bytes())
 	if err != nil {
 		logrus.WithError(err).Error("Failed to write response")
-		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
