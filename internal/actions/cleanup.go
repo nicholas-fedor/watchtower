@@ -305,6 +305,15 @@ func removeExcessContainers(
 		"cleanup_images": cleanupImages,
 	}).Debug("Starting removal of excess containers")
 
+	localRemoved := []types.RemovedImageInfo{}
+
+	var collectedInfos *[]types.RemovedImageInfo
+	if removeImageInfos != nil {
+		collectedInfos = removeImageInfos
+	} else {
+		collectedInfos = &localRemoved
+	}
+
 	excessInstancesRemoved := 0
 
 	for _, c := range excessWatchtowerContainers {
@@ -369,7 +378,7 @@ func removeExcessContainers(
 					"image_name":   c.ImageName(),
 				}).Debug("Collecting image info for deferred removal")
 
-				*removeImageInfos = append(*removeImageInfos, types.RemovedImageInfo{
+				*collectedInfos = append(*collectedInfos, types.RemovedImageInfo{
 					ImageID:       c.ImageID(),
 					ContainerID:   c.ID(),
 					ImageName:     c.ImageName(),
@@ -380,17 +389,21 @@ func removeExcessContainers(
 	}
 
 	if excessInstancesRemoved < len(excessWatchtowerContainers) {
-		*removeImageInfos = nil
+		*collectedInfos = nil
 	}
 
 	if cleanupImages {
-		_, err := RemoveImages(client, *removeImageInfos)
+		removedInfos, err := RemoveImages(client, *collectedInfos)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
-				"removed_images_count": len(*removeImageInfos),
-				"image_infos":          *removeImageInfos,
+				"removed_images_count": len(removedInfos),
+				"image_infos":          removedInfos,
 				"cleanup_images":       true,
 			}).Error("failed to remove excess images")
+		}
+
+		if removeImageInfos != nil {
+			*removeImageInfos = removedInfos
 		}
 	}
 
