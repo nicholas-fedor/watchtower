@@ -1389,7 +1389,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				allContainers := []types.Container{appContainer, watchtowerProd, watchtowerDev}
 
-				testData := &mockActions.TestData{
+				testDataProd := &mockActions.TestData{
 					Containers: allContainers,
 					Staleness: map[string]bool{
 						"my-app":          true,
@@ -1398,8 +1398,17 @@ var _ = ginkgo.Describe("Actions", func() {
 					},
 				}
 
-				clientProd := mockActions.CreateMockClient(testData, false, false)
-				clientDev := mockActions.CreateMockClient(testData, false, false)
+				testDataDev := &mockActions.TestData{
+					Containers: allContainers,
+					Staleness: map[string]bool{
+						"my-app":          true,
+						"watchtower-prod": true,
+						"watchtower-dev":  true,
+					},
+				}
+
+				clientProd := mockActions.CreateMockClient(testDataProd, false, false)
+				clientDev := mockActions.CreateMockClient(testDataDev, false, false)
 
 				results := make(chan map[string]int, 2)
 				var wg sync.WaitGroup
