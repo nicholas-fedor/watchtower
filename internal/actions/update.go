@@ -175,8 +175,20 @@ func Update(
 			continue
 		}
 
-		// Check if the container’s image is stale (outdated) and get the newest image ID.
-		stale, newestImage, err := client.IsContainerStale(sourceContainer, config)
+		// Determine if the container is stale and needs updating.
+		// If the container is Watchtower and SkipSelfUpdate is enabled, skip the update
+		// by setting stale to false and using the current image. Otherwise, check staleness.
+		var (
+			stale       bool
+			newestImage types.ImageID
+		)
+
+		if sourceContainer.IsWatchtower() && config.SkipSelfUpdate {
+			stale = false
+			newestImage = sourceContainer.ImageID()
+		} else {
+			stale, newestImage, err = client.IsContainerStale(sourceContainer, config)
+		}
 
 		// Determine if the container should be updated based on staleness and config.
 		shouldUpdate := shouldUpdateContainer(stale, sourceContainer, config)
