@@ -295,6 +295,9 @@ func (c *Container) ImageInfo() *dockerImage.InspectResponse {
 // Returns:
 //   - *dockerContainerType.Config: Configuration for container creation.
 func (c *Container) GetCreateConfig() *dockerContainer.Config {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	clog := logrus.WithField("container", c.Name())
 
 	if c.containerInfo == nil {
