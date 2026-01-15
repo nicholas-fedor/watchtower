@@ -1036,9 +1036,12 @@ func (c client) waitForExecOrTimeout(
 		}).Debug("Checked exec status")
 
 		if execInspect.Running {
-			time.Sleep(1 * time.Second) // Wait before rechecking.
-
-			continue
+			select {
+			case <-time.After(1 * time.Second):
+				continue
+			case <-execCtx.Done():
+				return false, fmt.Errorf("exec cancelled: %w", execCtx.Err())
+			}
 		}
 
 		// Log output if present.
