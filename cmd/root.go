@@ -332,11 +332,13 @@ func preRun(cmd *cobra.Command, _ []string) {
 	}
 
 	// Retrieve the current Watchtower container.
-	currentWatchtowerContainer, err = client.GetCurrentWatchtowerContainer(
-		currentWatchtowerContainerID,
-	)
-	if err != nil {
-		logrus.WithError(err).Debug("Failed to get the current Watchtower Container")
+	if currentWatchtowerContainerID != "" {
+		currentWatchtowerContainer, err = client.GetCurrentWatchtowerContainer(
+			currentWatchtowerContainerID,
+		)
+		if err != nil {
+			logrus.WithError(err).Debug("Failed to get the current Watchtower Container")
+		}
 	}
 
 	// Check if this is an old Watchtower container that should not run continuously.
