@@ -196,7 +196,6 @@ func getFilteredContainers(
 // It parses the container chain label from the current container, identifies all linked containers
 // excluding the current one, and returns them as a slice. If the current container has
 // no chain label or an empty chain label, an empty slice is returned.
-// Chained containers are filtered to only include those in the same scope as the current container.
 //
 // Parameters:
 //   - allContainers: All containers to search for chained containers.
