@@ -854,3 +854,82 @@ func TestSafeguardDelay(t *testing.T) {
 		// The delay behavior is verified by the test completing without hanging.
 	})
 }
+
+func TestPullFailureDelayContextCancellation(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		client := mockActions.CreateMockClientWithContext(
+			ctx,
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"watchtower",
+						"/watchtower",
+						"watchtower:latest",
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower": "true",
+							},
+						}),
+				},
+				Staleness: map[string]bool{
+					"watchtower": true, // Simulate stale Watchtower
+				},
+			},
+			false,
+			false,
+		)
+
+		// Mock IsContainerStale to return an error (simulating pull failure)
+		client.TestData.IsContainerStaleError = errors.New("failed to pull image")
+
+		done := make(chan struct{})
+
+		var (
+			report            types.Report
+			cleanupImageInfos []types.RemovedImageInfo
+			err               error
+		)
+
+		go func() {
+			defer close(done)
+
+			report, cleanupImageInfos, err = actions.Update(
+				ctx,
+				client,
+				types.UpdateParams{
+					Cleanup:          true,
+					Filter:           filters.WatchtowerContainersFilter,
+					CPUCopyMode:      "auto",
+					PullFailureDelay: 100 * time.Millisecond, // Longer delay to ensure cancellation works
+				},
+			)
+		}()
+
+		// Wait a short time to allow the update to start and reach the delay
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+
+		// Wait for the update to complete
+		<-done
+
+		synctest.Wait()
+
+		// The update should complete quickly due to context cancellation
+		// We expect either context canceled error or successful completion with no updates
+		if err != nil && !errors.Is(err, context.Canceled) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if len(report.Updated()) != 0 {
+			t.Fatal("Watchtower should not be updated on pull failure")
+		}
+
+		if len(cleanupImageInfos) != 0 {
+			t.Fatal("No cleanup should occur on pull failure")
+		}
+	})
+}

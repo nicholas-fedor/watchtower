@@ -392,7 +392,13 @@ func Update(
 
 		logrus.WithField("delay", delay).
 			Info("Watchtower self-update pull failed, sleeping to prevent rapid restarts")
-		time.Sleep(delay)
+
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			logrus.WithError(ctx.Err()).
+				Debug("Context cancelled during pull-failure delay; skipping remaining delay")
+		}
 	}
 
 	// Return the final report summarizing the session and the cleanup image infos.
