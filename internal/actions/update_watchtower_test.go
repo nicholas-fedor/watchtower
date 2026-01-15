@@ -792,68 +792,13 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				gomega.Expect(chainLabel).To(gomega.HavePrefix("id-scope-y,"))
 				gomega.Expect(chainLabel).To(gomega.HaveSuffix(string(updatedContainer.ID())))
 			})
+		})
+	})
 
-			ginkgo.It(
-				"should skip staleness check for Watchtower when SkipSelfUpdate=true",
-				func() {
-					client := mockActions.CreateMockClient(
-						&mockActions.TestData{
-							Containers: []types.Container{
-								mockActions.CreateMockContainerWithConfig(
-									"watchtower",
-									"/watchtower",
-									"watchtower:latest",
-									true,
-									false,
-									time.Now(),
-									&dockerContainer.Config{
-										Labels: map[string]string{
-											"com.centurylinklabs.watchtower": "true",
-										},
-									}),
-								mockActions.CreateMockContainerWithConfig(
-									"regular",
-									"/regular",
-									"nginx:latest",
-									false,
-									false,
-									time.Now(),
-									&dockerContainer.Config{
-										Image:  "nginx:latest",
-										Labels: make(map[string]string),
-									}),
-							},
-							Staleness: map[string]bool{
-								"watchtower": true,
-								"regular":    true,
-							},
-						},
-						false,
-						false,
-					)
-					report, cleanupImageInfos, err := actions.Update(
-						context.Background(),
-						client,
-						types.UpdateParams{
-							Cleanup:          true,
-							SkipSelfUpdate:   true,
-							Filter:           filters.NoFilter,
-							CPUCopyMode:      "auto",
-							PullFailureDelay: 10 * time.Millisecond,
-						},
-					)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					gomega.Expect(report.Scanned()).To(gomega.HaveLen(2))
-					gomega.Expect(report.Updated()).
-						To(gomega.HaveLen(1), "Only regular container should be updated")
-					gomega.Expect(cleanupImageInfos).
-						To(gomega.HaveLen(1), "Only regular container cleanup")
-					gomega.Expect(client.TestData.IsContainerStaleCount).
-						To(gomega.Equal(1), "IsContainerStale should be called only for regular container")
-				},
-			)
-
-			ginkgo.It("should not update Watchtower containers when SkipSelfUpdate=true", func() {
+	ginkgo.When("SkipSelfUpdate functionality", func() {
+		ginkgo.It(
+			"should skip staleness check for Watchtower when SkipSelfUpdate=true",
+			func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{
@@ -869,9 +814,21 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 										"com.centurylinklabs.watchtower": "true",
 									},
 								}),
+							mockActions.CreateMockContainerWithConfig(
+								"regular",
+								"/regular",
+								"nginx:latest",
+								false,
+								false,
+								time.Now(),
+								&dockerContainer.Config{
+									Image:  "nginx:latest",
+									Labels: make(map[string]string),
+								}),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
+							"regular":    true,
 						},
 					},
 					false,
@@ -883,7 +840,99 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					types.UpdateParams{
 						Cleanup:          true,
 						SkipSelfUpdate:   true,
-						Filter:           filters.WatchtowerContainersFilter,
+						Filter:           filters.NoFilter,
+						CPUCopyMode:      "auto",
+						PullFailureDelay: 10 * time.Millisecond,
+					},
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Scanned()).To(gomega.HaveLen(2))
+				gomega.Expect(report.Updated()).
+					To(gomega.HaveLen(1), "Only regular container should be updated")
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.HaveLen(1), "Only regular container cleanup")
+				gomega.Expect(client.TestData.IsContainerStaleCount).
+					To(gomega.Equal(1), "IsContainerStale should be called only for regular container")
+			},
+		)
+
+		ginkgo.It("should not update Watchtower containers when SkipSelfUpdate=true", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+				},
+				false,
+				false,
+			)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:          true,
+					SkipSelfUpdate:   true,
+					Filter:           filters.WatchtowerContainersFilter,
+					CPUCopyMode:      "auto",
+					PullFailureDelay: 10 * time.Millisecond,
+				},
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Scanned()).To(gomega.HaveLen(1))
+			gomega.Expect(report.Updated()).
+				To(gomega.BeEmpty(), "Watchtower should not be updated")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.BeEmpty(), "No cleanup for skipped Watchtower")
+			gomega.Expect(client.TestData.IsContainerStaleCount).
+				To(gomega.Equal(0), "IsContainerStale should not be called for Watchtower")
+		})
+
+		ginkgo.It(
+			"should still update regular containers normally when SkipSelfUpdate=true",
+			func() {
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{
+							mockActions.CreateMockContainerWithConfig(
+								"regular",
+								"/regular",
+								"nginx:latest",
+								false,
+								false,
+								time.Now(),
+								&dockerContainer.Config{
+									Image:  "nginx:latest",
+									Labels: make(map[string]string),
+								}),
+						},
+						Staleness: map[string]bool{
+							"regular": true,
+						},
+					},
+					false,
+					false,
+				)
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{
+						Cleanup:          true,
+						SkipSelfUpdate:   true,
+						Filter:           filters.NoFilter,
 						CPUCopyMode:      "auto",
 						PullFailureDelay: 10 * time.Millisecond,
 					},
@@ -891,60 +940,13 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Scanned()).To(gomega.HaveLen(1))
 				gomega.Expect(report.Updated()).
-					To(gomega.BeEmpty(), "Watchtower should not be updated")
+					To(gomega.HaveLen(1), "Regular container should be updated")
 				gomega.Expect(cleanupImageInfos).
-					To(gomega.BeEmpty(), "No cleanup for skipped Watchtower")
+					To(gomega.HaveLen(1), "Regular container cleanup")
 				gomega.Expect(client.TestData.IsContainerStaleCount).
-					To(gomega.Equal(0), "IsContainerStale should not be called for Watchtower")
-			})
-
-			ginkgo.It(
-				"should still update regular containers normally when SkipSelfUpdate=true",
-				func() {
-					client := mockActions.CreateMockClient(
-						&mockActions.TestData{
-							Containers: []types.Container{
-								mockActions.CreateMockContainerWithConfig(
-									"regular",
-									"/regular",
-									"nginx:latest",
-									false,
-									false,
-									time.Now(),
-									&dockerContainer.Config{
-										Image:  "nginx:latest",
-										Labels: make(map[string]string),
-									}),
-							},
-							Staleness: map[string]bool{
-								"regular": true,
-							},
-						},
-						false,
-						false,
-					)
-					report, cleanupImageInfos, err := actions.Update(
-						context.Background(),
-						client,
-						types.UpdateParams{
-							Cleanup:          true,
-							SkipSelfUpdate:   true,
-							Filter:           filters.NoFilter,
-							CPUCopyMode:      "auto",
-							PullFailureDelay: 10 * time.Millisecond,
-						},
-					)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					gomega.Expect(report.Scanned()).To(gomega.HaveLen(1))
-					gomega.Expect(report.Updated()).
-						To(gomega.HaveLen(1), "Regular container should be updated")
-					gomega.Expect(cleanupImageInfos).
-						To(gomega.HaveLen(1), "Regular container cleanup")
-					gomega.Expect(client.TestData.IsContainerStaleCount).
-						To(gomega.Equal(1), "IsContainerStale should be called for regular container")
-				},
-			)
-		})
+					To(gomega.Equal(1), "IsContainerStale should be called for regular container")
+			},
+		)
 	})
 })
 
