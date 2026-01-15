@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{
+				types.UpdateParams{
 					Cleanup:     true,
 					Filter:      filters.WatchtowerContainersFilter,
 					CPUCopyMode: "auto",
@@ -60,7 +60,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
 			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(1), "StopContainer should be called once for old Watchtower")
+				To(gomega.Equal(0), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
 			gomega.Expect(client.TestData.StartContainerCount).
 				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
 			gomega.Expect(client.TestData.RenameContainerCount).
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -216,7 +216,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -284,7 +284,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, _, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+						types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 					)
 
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -343,7 +343,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -403,7 +403,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -470,7 +470,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -510,7 +510,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, _, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -553,13 +553,12 @@ var _ = ginkgo.Describe("the update action", func() {
 						})
 
 					containers := []types.Container{containerA, containerB}
-					allContainers := []types.Container{containerA, containerB}
 
 					// Mark container B as stale (should trigger restart)
 					containerB.SetStale(true)
 
 					// Run UpdateImplicitRestart - should not panic or error on invalid dependencies
-					actions.UpdateImplicitRestart(containers, allContainers)
+					actions.UpdateImplicitRestart(containers, containers)
 
 					// Container A should not be marked for restart due to invalid dependency
 					gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
@@ -624,7 +623,6 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{containerD, containerC, containerB, containerA}
-				allContainers := []types.Container{containerD, containerC, containerB, containerA}
 
 				// Initially, only D should be marked for restart
 				containerD.SetStale(true)
@@ -634,7 +632,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
 				// Run UpdateImplicitRestart to propagate restart through the chain
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Verify state transitions: all containers should now be marked for restart
 				gomega.Expect(containerD.ToRestart()).To(gomega.BeTrue())
@@ -700,13 +698,12 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{base, dep1, dep2, dep3}
-				allContainers := []types.Container{base, dep1, dep2, dep3}
 
 				// Mark base as stale
 				base.SetStale(true)
 
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Verify all dependents are marked for restart
 				gomega.Expect(base.ToRestart()).To(gomega.BeTrue())
@@ -746,13 +743,12 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{containerA, containerB}
-				allContainers := []types.Container{containerA, containerB}
 
 				// Mark container A as stale
 				containerA.SetStale(true)
 
 				// Run UpdateImplicitRestart - should handle circular dependency gracefully
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Both should be marked for restart despite circular dependency
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeTrue())
@@ -802,14 +798,13 @@ var _ = ginkgo.Describe("the update action", func() {
 					})
 
 				containers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
-				allContainers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
 
 				// Mark stale containers
 				staleNoDeps.SetStale(true)
 				staleWithDeps.SetStale(true)
 
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(containers, allContainers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Verify correct restart marking
 				gomega.Expect(staleNoDeps.ToRestart()).To(gomega.BeTrue())
@@ -867,7 +862,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, cleanupImageInfos, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{
+						types.UpdateParams{
 							Cleanup:        true,
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
@@ -938,7 +933,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					report, _, err := actions.Update(
 						context.Background(),
 						client,
-						actions.UpdateConfig{
+						types.UpdateParams{
 							Cleanup:        true,
 							RollingRestart: true,
 							CPUCopyMode:    "auto",
@@ -1019,7 +1014,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, _, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},
@@ -1099,7 +1094,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:     true,
 						CPUCopyMode: "auto",
 					},

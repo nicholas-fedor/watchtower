@@ -27,7 +27,7 @@ func UpdateFromContainer(
 ) *ContainerStatus {
 	update := &ContainerStatus{
 		containerID:    cont.ID(),
-		oldImage:       cont.SafeImageID(),
+		oldImage:       cont.ImageID(),
 		newImage:       newImage,
 		containerName:  cont.Name(),
 		imageName:      cont.ImageName(),
@@ -52,7 +52,7 @@ func UpdateFromContainer(
 //   - err: Skip reason error.
 //   - params: Update parameters for monitor-only check.
 func (m Progress) AddSkipped(cont types.Container, err error, params types.UpdateParams) {
-	update := UpdateFromContainer(cont, cont.SafeImageID(), SkippedState, params)
+	update := UpdateFromContainer(cont, cont.ImageID(), SkippedState, params)
 	update.containerError = err
 	m.Add(update)
 	logrus.WithFields(logrus.Fields{

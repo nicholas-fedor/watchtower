@@ -130,7 +130,7 @@ type SynoAuthResponse struct {
 
 type SynoAPIResponse struct {
 	Success bool          `json:"success"`
-	Error   SynologyError `json:"error,omitempty"`
+	Error   SynologyError `json:"error,omitzero"`
 }
 
 type SynologyError struct {
@@ -252,7 +252,8 @@ func parseContainerName() (string, error) {
 
 	var c WTContainer
 	// Malformed JSON from Watchtower
-	if err := json.Unmarshal([]byte(wtEnvVar), &c); err != nil {
+	err := json.Unmarshal([]byte(wtEnvVar), &c)
+	if err != nil {
 		return "", fmt.Errorf("failed to parse WT_CONTAINER JSON: %w", err)
 	}
 
@@ -306,7 +307,8 @@ func authenticate(client *http.Client, config *Config) (string, string, error) {
 
 	var resp SynoAuthResponse
 	// Unexpected response format
-	if err := json.Unmarshal(body, &resp); err != nil {
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
 		return "", "", fmt.Errorf("failed to parse auth response: %w", err)
 	}
 
@@ -370,7 +372,8 @@ func stopContainer(
 
 	var apiResp SynoAPIResponse
 	// Non-JSON response (e.g., HTML error page)
-	if err := json.Unmarshal(body, &apiResp); err != nil {
+	err = json.Unmarshal(body, &apiResp)
+	if err != nil {
 		return fmt.Errorf("failed to parse stop response: %w", err)
 	}
 

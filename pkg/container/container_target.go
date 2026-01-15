@@ -120,14 +120,16 @@ func StartTargetContainer(
 	// Rename the container to the correct name to avoid conflicts during self-update
 	clog.Debug("Renaming container to correct name")
 
-	if err := api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name()); err != nil {
+	err = api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name())
+	if err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 		// Clean up the created container to avoid orphaned resources
-		if rmErr := api.ContainerRemove(
+		rmErr := api.ContainerRemove(
 			ctx,
 			createdContainer.ID,
 			dockerContainer.RemoveOptions{Force: true},
-		); rmErr != nil {
+		)
+		if rmErr != nil {
 			clog.WithError(rmErr).Warn("Failed to clean up container after rename error")
 		}
 
@@ -136,20 +138,22 @@ func StartTargetContainer(
 
 	// Attach additional networks for legacy API if needed.
 	if versions.LessThan(clientVersion, "1.44") && len(networkConfig.EndpointsConfig) > 1 {
-		if err := attachNetworks(
+		err := attachNetworks(
 			ctx,
 			api,
 			createdContainer.ID,
 			networkConfig,
 			createNetworkConfig,
 			clog,
-		); err != nil {
+		)
+		if err != nil {
 			// Clean up the created container to avoid orphaned resources.
-			if rmErr := api.ContainerRemove(
+			rmErr := api.ContainerRemove(
 				ctx,
 				createdContainer.ID,
 				dockerContainer.RemoveOptions{Force: true},
-			); rmErr != nil {
+			)
+			if rmErr != nil {
 				clog.WithError(rmErr).
 					Warn("Failed to clean up container after network attachment error")
 			}
@@ -169,11 +173,12 @@ func StartTargetContainer(
 	// Start the newly created container.
 	clog.WithField("new_id", createdContainerID).Debug("Starting new container")
 
-	if err := api.ContainerStart(
+	err = api.ContainerStart(
 		ctx,
 		createdContainer.ID,
 		dockerContainer.StartOptions{},
-	); err != nil {
+	)
+	if err != nil {
 		clog.WithError(err).
 			WithField("new_id", createdContainerID).
 			Debug("Failed to start new container")
@@ -228,7 +233,8 @@ func attachNetworks(
 		if name != initialNetworkName && name != "" {
 			clog.WithField("network", name).Debug("Attaching additional network to container")
 
-			if err := api.NetworkConnect(ctx, name, containerID, endpoint); err != nil {
+			err := api.NetworkConnect(ctx, name, containerID, endpoint)
+			if err != nil {
 				clog.WithError(err).
 					WithField("network", name).
 					Error("Failed to attach additional network")
@@ -267,7 +273,8 @@ func RenameTargetContainer(
 	// Attempt to rename the container.
 	clog.Debug("Renaming container")
 
-	if err := api.ContainerRename(ctx, string(targetContainer.ID()), targetName); err != nil {
+	err := api.ContainerRename(ctx, string(targetContainer.ID()), targetName)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 
 		return fmt.Errorf("%w: %w", errRenameContainerFailed, err)

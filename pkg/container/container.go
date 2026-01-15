@@ -1,6 +1,3 @@
-// Package container provides functionality for managing Docker containers within Watchtower.
-// This file defines the Container type and its core methods, implementing the types.Container interface
-// to handle container state, metadata, and configuration for updates and recreation.
 package container
 
 import (
@@ -100,7 +97,7 @@ func NewContainer(
 	logrus.WithFields(logrus.Fields{
 		"container": c.Name(),
 		"id":        c.ID().ShortID(),
-		"image":     c.SafeImageID(),
+		"image":     c.ImageID(),
 	}).Debug("Created new container instance")
 
 	return c
@@ -210,18 +207,6 @@ func (c Container) ImageID() types.ImageID {
 	return types.ImageID(c.imageInfo.ID)
 }
 
-// SafeImageID returns the image ID or an empty string if unavailable.
-//
-// Returns:
-//   - types.ImageID: Image ID or empty string if imageInfo is nil.
-func (c Container) SafeImageID() types.ImageID {
-	if c.imageInfo == nil {
-		return ""
-	}
-
-	return types.ImageID(c.imageInfo.ID)
-}
-
 // ImageName returns the name of the container’s image.
 //
 // It uses the Zodiac label if present, otherwise Config.Image, appending ":latest" if untagged.
@@ -287,7 +272,7 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 		return &dockerContainer.Config{Image: c.ImageName()}
 	}
 
-	config := c.containerInfo.Config
+	config := *c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 
 	// Handle missing image info case.
@@ -296,7 +281,7 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 
 		config.Image = c.ImageName()
 
-		return config
+		return &config
 	}
 
 	// Compare with image config to clear defaults.
@@ -348,7 +333,19 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 
 	// Subtract image defaults from config.
 	config.Env = util.SliceSubtract(config.Env, imageConfig.Env)
+
+	// Preserve the watchtower label if present, as it may be subtracted as an image default.
+	watchtowerLabelValue, hasWatchtowerLabel := config.Labels[watchtowerLabel]
+
 	config.Labels = util.StringMapSubtract(config.Labels, imageConfig.Labels)
+	if hasWatchtowerLabel {
+		if config.Labels == nil {
+			config.Labels = make(map[string]string)
+		}
+
+		config.Labels[watchtowerLabel] = watchtowerLabelValue
+	}
+
 	config.Volumes = util.StructMapSubtract(config.Volumes, imageConfig.Volumes)
 
 	for k := range config.ExposedPorts {
@@ -364,7 +361,7 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 	config.Image = c.ImageName()
 	clog.WithField("image", config.Image).Debug("Generated create config")
 
-	return config
+	return &config
 }
 
 // GetCreateHostConfig generates a host configuration for recreation.
@@ -487,57 +484,61 @@ func (c Container) Links() []string {
 	return getLinksFromHostConfig(c, clog)
 }
 
-// ResolveContainerIdentifier returns the project and service name combination if both are available,
-// otherwise service name if available, otherwise container name. Falls back to container ID if name is empty.
+// ResolveContainerIdentifier returns a standardized container identifier used
+// for dependency resolution, update coordination, logging, and cycle detection.
+//
+// Container identifier formats:
+//  1. project-service-containerNumber (if project name, service name, and container number are all available)
+//  2. project-service (if project name and service name are available)
+//  3. service (if only service name is available)
+//  4. container name (if name is available)
+//  5. container ID (fallback)
 //
 // Parameters:
 //   - c: Container to get identifier for
 //
 // Returns:
-//   - string: "projectName-serviceName" if both available, otherwise service name if available,
-//     otherwise container name, otherwise container ID. Always returns a non-empty string for valid containers
+//   - string: Container identifier formatted according to the prioritization
+//     order, always returns a non-empty string for valid containers
 func ResolveContainerIdentifier(c types.Container) string {
-	// Get the container information.
 	info := c.ContainerInfo()
-	// Return container name if nil.
 	if info == nil {
 		return nameOrID(c)
 	}
 
-	// Get the container configuration.
 	cfg := info.Config
-
-	// If the config is nil, then return the container name, with a fallback to the ID.
 	if cfg == nil {
 		return nameOrID(c)
 	}
 
-	// Get the container labels.
 	labels := cfg.Labels
-
-	// If there are no labels, then return the container name, with a fallback to the ID.
 	if len(labels) == 0 {
 		return nameOrID(c)
 	}
 
-	// Obtain the container's Compose project/stack name.
 	projectName := compose.GetProjectName(labels)
-
-	// Obtain the container's service name.
 	serviceName := compose.GetServiceName(labels)
+	containerNumber := compose.GetContainerNumber(labels)
 
-	// If both the project name and service name are available, then
-	// return the container identifier using the <project>-<service> format.
+	// Handle replica containers
+	if projectName != "" && serviceName != "" &&
+		strings.HasPrefix(c.Name(), projectName+"-"+serviceName+"-") {
+		return c.Name()
+	}
+
+	// Prioritize identifier formats based on available information
+	if projectName != "" && serviceName != "" && containerNumber != "" {
+		return projectName + "-" + serviceName + "-" + containerNumber
+	}
+
 	if projectName != "" && serviceName != "" {
 		return projectName + "-" + serviceName
 	}
 
-	// If only the service name is available, then return it.
 	if serviceName != "" {
 		return serviceName
 	}
 
-	// If only the project name is available, then return the container name, with a fallback to the ID.
 	return nameOrID(c)
 }
 
@@ -642,7 +643,9 @@ func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
 	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
 		normalizedService := util.NormalizeContainerName(service)
-		if projectName != "" {
+		// If the project name isn't empty and the service name doesn't have the project name prefix,
+		// then add the project name prefix to the service name.
+		if projectName != "" && !strings.HasPrefix(normalizedService, projectName+"-") {
 			normalizedService = projectName + "-" + normalizedService
 		}
 

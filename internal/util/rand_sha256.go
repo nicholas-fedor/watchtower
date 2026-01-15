@@ -1,4 +1,3 @@
-// Package util provides utility functions for Watchtower operations.
 package util
 
 import (

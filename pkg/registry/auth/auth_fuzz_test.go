@@ -1,5 +1,3 @@
-// Package auth_test provides fuzz tests for the registry authentication functionality.
-// These tests ensure robust handling of various inputs to prevent crashes and unexpected behavior.
 package auth_test
 
 import (

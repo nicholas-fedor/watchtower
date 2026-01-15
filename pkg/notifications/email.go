@@ -1,5 +1,3 @@
-// Package notifications provides mechanisms for sending notifications via various services.
-// This file implements email notification functionality using SMTP.
 package notifications
 
 import (

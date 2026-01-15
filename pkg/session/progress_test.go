@@ -31,7 +31,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
 					mock.EXPECT().
@@ -61,7 +61,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID(""))
-					mock.EXPECT().SafeImageID().Return(types.ImageID(""))
+					mock.EXPECT().ImageID().Return(types.ImageID(""))
 					mock.EXPECT().Name().Return("")
 					mock.EXPECT().ImageName().Return("")
 					mock.EXPECT().
@@ -91,7 +91,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
 					mock.EXPECT().Name().Return("container3")
 					mock.EXPECT().ImageName().Return("image3:latest")
 					mock.EXPECT().
@@ -121,7 +121,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID(""))
-					mock.EXPECT().SafeImageID().Return(types.ImageID(""))
+					mock.EXPECT().ImageID().Return(types.ImageID(""))
 					mock.EXPECT().Name().Return("")
 					mock.EXPECT().ImageName().Return("")
 					mock.EXPECT().
@@ -170,7 +170,7 @@ func TestUpdateFromContainer(t *testing.T) {
 					got.containerError,
 					tt.want.containerError,
 				)
-			} else if got.containerError != nil && got.containerError != tt.want.containerError {
+			} else if got.containerError != nil && !errors.Is(got.containerError, tt.want.containerError) {
 				t.Errorf(
 					"UpdateFromContainer() error message = %v, want %v",
 					got.containerError,
@@ -201,7 +201,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
 					mock.EXPECT().
@@ -233,7 +233,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
 					mock.EXPECT().
@@ -265,7 +265,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
 					mock.EXPECT().Name().Return("container3")
 					mock.EXPECT().ImageName().Return("image3:latest")
 					mock.EXPECT().
@@ -351,7 +351,7 @@ func TestProgress_AddScanned(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
 					mock.EXPECT().Name().Return("container1")
 					mock.EXPECT().ImageName().Return("image1:latest")
 					mock.EXPECT().
@@ -383,7 +383,7 @@ func TestProgress_AddScanned(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img2"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img2"))
 					mock.EXPECT().Name().Return("container2")
 					mock.EXPECT().ImageName().Return("image2:latest")
 					mock.EXPECT().
@@ -415,7 +415,7 @@ func TestProgress_AddScanned(t *testing.T) {
 				cont: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
-					mock.EXPECT().SafeImageID().Return(types.ImageID("img3"))
+					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
 					mock.EXPECT().Name().Return("container3")
 					mock.EXPECT().ImageName().Return("image3:latest")
 					mock.EXPECT().
@@ -475,7 +475,7 @@ func TestProgress_AddScanned(t *testing.T) {
 						gotStatus.containerError,
 						wantStatus.containerError,
 					)
-				} else if gotStatus.containerError != nil && gotStatus.containerError != wantStatus.containerError {
+				} else if gotStatus.containerError != nil && !errors.Is(gotStatus.containerError, wantStatus.containerError) {
 					t.Errorf(
 						"Progress.AddScanned() error message for %v = %v, want %v",
 						id,
@@ -665,7 +665,7 @@ func TestProgress_Add(t *testing.T) {
 						gotStatus.containerError,
 						wantStatus.containerError,
 					)
-				} else if gotStatus.containerError != nil && gotStatus.containerError != wantStatus.containerError {
+				} else if gotStatus.containerError != nil && !errors.Is(gotStatus.containerError, wantStatus.containerError) {
 					t.Errorf(
 						"Progress.Add() error message for %v = %v, want %v",
 						id,
@@ -757,7 +757,7 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 						gotStatus.containerError,
 						wantStatus.containerError,
 					)
-				} else if gotStatus.containerError != nil && gotStatus.containerError != wantStatus.containerError {
+				} else if gotStatus.containerError != nil && !errors.Is(gotStatus.containerError, wantStatus.containerError) {
 					t.Errorf(
 						"Progress.MarkForUpdate() error message for %v = %v, want %v",
 						id,
@@ -1018,7 +1018,7 @@ func TestProgress_MarkRestarted_AddSkipped_Integration(t *testing.T) {
 	// Then add as skipped (this should overwrite)
 	mock := mockTypes.NewMockContainer(t)
 	mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-	mock.EXPECT().SafeImageID().Return(types.ImageID("img1"))
+	mock.EXPECT().ImageID().Return(types.ImageID("img1"))
 	mock.EXPECT().Name().Return("container1")
 	mock.EXPECT().ImageName().Return("image1:latest")
 	mock.EXPECT().

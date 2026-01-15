@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						LifecycleUID:   1000,
@@ -138,7 +138,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -182,7 +182,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -377,7 +377,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",
@@ -423,7 +423,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{
+					types.UpdateParams{
 						Cleanup:        true,
 						LifecycleHooks: true,
 						CPUCopyMode:    "auto",

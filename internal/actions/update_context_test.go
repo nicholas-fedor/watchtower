@@ -19,17 +19,17 @@ var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("handling context cancellation and timeout scenarios", func() {
 		ginkgo.It("should handle context cancellation during container listing", func() {
 			client := mockActions.CreateMockClient(getCommonTestData(), false, false)
-			// Simulate ListContainers error by setting it
-			client.TestData.ListContainersError = context.Canceled
+			cancelledCtx, cancel := context.WithCancel(context.Background())
+			cancel() // Cancel the context immediately
 
 			report, cleanupImageInfos, err := actions.Update(
-				context.Background(),
+				cancelledCtx,
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to list containers"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("update cancelled"))
 			gomega.Expect(report).To(gomega.BeNil())
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			report, cleanupImageInfos, err := actions.Update(
 				context.Background(),
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			// Update continues but marks containers as skipped due to staleness check failure
@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				report, cleanupImageInfos, err := actions.Update(
 					context.Background(),
 					client,
-					actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 
 				// Should still attempt to process and return a report
@@ -101,7 +101,7 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 		report, cleanupImageInfos, err := actions.Update(
 			ctx,
 			client,
-			actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 		)
 
 		synctest.Wait()
@@ -133,7 +133,7 @@ func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 		report, cleanupImageInfos, err := actions.Update(
 			cancelledCtx,
 			client,
-			actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 		)
 
 		synctest.Wait()
@@ -175,7 +175,7 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 			report, _, err = actions.Update(
 				ctx,
 				client,
-				actions.UpdateConfig{Cleanup: true, CPUCopyMode: "auto"},
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 		}()
 

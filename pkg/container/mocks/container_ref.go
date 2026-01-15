@@ -37,6 +37,7 @@ func (cr *ContainerRef) getContainerFile() (string, error) {
 	}
 
 	containerFile := fmt.Sprintf("./mocks/data/container_%v.json", file)
+
 	_, err := os.Stat(containerFile)
 	if err != nil {
 		return containerFile, fmt.Errorf(

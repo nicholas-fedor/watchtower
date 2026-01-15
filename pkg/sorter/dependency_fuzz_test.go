@@ -133,8 +133,8 @@ func parseFuzzDependencyData(data []byte) []types.Container {
 			continue
 		}
 
-		arrowIndex := bytes.Index(part, []byte("->"))
-		if arrowIndex == -1 {
+		before, after, ok := bytes.Cut(part, []byte("->"))
+		if !ok {
 			// Single node
 			node := string(bytes.TrimSpace(part))
 			if node != "" {
@@ -144,8 +144,8 @@ func parseFuzzDependencyData(data []byte) []types.Container {
 			continue
 		}
 
-		from := string(bytes.TrimSpace(part[:arrowIndex]))
-		to := string(bytes.TrimSpace(part[arrowIndex+2:]))
+		from := string(bytes.TrimSpace(before))
+		to := string(bytes.TrimSpace(after))
 
 		if from != "" && to != "" {
 			dependencies[from] = append(dependencies[from], to)

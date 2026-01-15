@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"strings"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
@@ -14,7 +15,6 @@ type Container interface {
 	IsRunning() bool                                  // Check if running.
 	Name() string                                     // Container name.
 	ImageID() ImageID                                 // Current image ID.
-	SafeImageID() ImageID                             // Current image ID or empty if nil.
 	ImageName() string                                // Image name with tag.
 	Enabled() (bool, bool)                            // Enabled status and presence.
 	IsMonitorOnly(params UpdateParams) bool           // Monitor-only check.
@@ -43,6 +43,15 @@ type Container interface {
 	IsRestarting() bool                               // Restarting status check.
 	GetCreateConfig() *dockerContainer.Config         // Creation config.
 	GetCreateHostConfig() *dockerContainer.HostConfig // Host creation config.
+	GetContainerChain() (string, bool)                // Container chain label value and presence.
+}
+
+// ImageInspector defines the interface for inspecting Docker images.
+type ImageInspector interface {
+	ImageInspectWithRaw(
+		ctx context.Context,
+		image string,
+	) (dockerImage.InspectResponse, []byte, error)
 }
 
 // ImageID is a hash string for a container image.

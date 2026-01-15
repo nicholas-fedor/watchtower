@@ -1,5 +1,3 @@
-// Package metrics provides functionality for tracking and exposing Watchtower scan metrics.
-// It integrates with Prometheus to monitor container scan outcomes, including scanned, updated, and failed counts.
 package metrics
 
 import (
@@ -9,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -108,11 +107,14 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		metrics.dropped,
 	}
 	for _, m := range metricsList {
-		if err := registry.Register(m); err != nil {
+		err := registry.Register(m)
+		if err != nil {
 			alreadyRegisteredError := &prometheus.AlreadyRegisteredError{}
 			if errors.As(err, &alreadyRegisteredError) {
 				return nil, fmt.Errorf("failed to register metric: %w", err)
 			}
+
+			logrus.WithError(err).Warn("failed to register metric")
 		}
 	}
 

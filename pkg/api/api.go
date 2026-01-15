@@ -1,4 +1,3 @@
-// Package api provides an HTTP server for Watchtower’s API endpoints.
 package api
 
 import (
@@ -111,7 +110,7 @@ func (api *API) RegisterHandler(path string, handler http.Handler) {
 }
 
 // Start launches the API server over HTTP, requiring a non-empty token.
-func (api *API) Start(ctx context.Context, block bool, noStartupMessage bool) error {
+func (api *API) Start(ctx context.Context, block, noStartupMessage bool) error {
 	if !api.hasHandlers {
 		logrus.WithField("addr", api.Addr).Debug("No handlers registered, skipping API start")
 
@@ -151,7 +150,8 @@ func (api *API) Start(ctx context.Context, block bool, noStartupMessage bool) er
 	}
 
 	go func() {
-		if err := RunHTTPServer(ctx, server); err != nil {
+		err := RunHTTPServer(ctx, server)
+		if err != nil {
 			logrus.WithError(err).
 				WithField("addr", api.Addr).
 				Debug("HTTP server encountered an error")
@@ -168,7 +168,8 @@ func RunHTTPServer(ctx context.Context, server HTTPServer) error {
 	go func() {
 		logrus.Debug("Launching HTTP server listener")
 
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		err := server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errChan <- fmt.Errorf("%w: %w", errServerFailed, err)
 		} else {
 			errChan <- nil
@@ -188,7 +189,8 @@ func RunHTTPServer(ctx context.Context, server HTTPServer) error {
 		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, serverShutdownTimeout)
 		defer shutdownCancel()
 
-		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
+		err := server.Shutdown(shutdownCtx)
+		if err != nil && !errors.Is(err, context.Canceled) {
 			logrus.WithError(err).Debug("Failed to shut down HTTP server")
 
 			return fmt.Errorf("%w: %w", errServerShutdownFailed, err)

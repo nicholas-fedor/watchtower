@@ -28,7 +28,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@de73c35617a6db3340c5f0df4ebaec93a4c965ff
         with:
-          args: --timeout=5m --fix
+          args: --timeout=5m --fix --config build/golangci-lint/golangci-lint.yaml
 
       - name: Check for uncommitted changes after formatting
         run: |

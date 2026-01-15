@@ -2,13 +2,9 @@ package cmd
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -36,323 +32,6 @@ import (
 )
 
 const testFilterDesc = "test filter"
-
-func TestDeriveScopeFromContainer(t *testing.T) {
-	// Save original scope value to restore later
-	originalScope := scope
-	originalContainerID := CurrentWatchtowerContainerID
-
-	defer func() {
-		scope = originalScope
-		CurrentWatchtowerContainerID = originalContainerID
-	}()
-
-	tests := []struct {
-		name              string
-		initialScope      string
-		hostname          string
-		mockSetup         func(*mockContainer.MockClient, *mockTypes.MockContainer)
-		expectedScope     string
-		expectedError     bool
-		expectedErrorType error
-	}{
-		{
-			name:              "scope already set - should return nil without derivation",
-			initialScope:      "preset",
-			hostname:          "test-container",
-			mockSetup:         func(*mockContainer.MockClient, *mockTypes.MockContainer) {},
-			expectedScope:     "preset",
-			expectedError:     false,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "no hostname - should return error",
-			initialScope: "",
-			hostname:     "",
-			mockSetup: func(client *mockContainer.MockClient, _ *mockTypes.MockContainer) {
-				client.EXPECT().
-					GetContainer(types.ContainerID("")).
-					Return(nil, errors.New("container not found"))
-			},
-			expectedScope:     "",
-			expectedError:     true,
-			expectedErrorType: nil, // Error is wrapped by GetCurrentContainerID
-		},
-		{
-			name:         "container lookup fails - should return error",
-			initialScope: "",
-			hostname:     "test-container",
-			mockSetup: func(client *mockContainer.MockClient, _ *mockTypes.MockContainer) {
-				client.EXPECT().GetContainer(types.ContainerID("test-container")).
-					Return(nil, errors.New("container not found"))
-			},
-			expectedScope:     "",
-			expectedError:     true,
-			expectedErrorType: nil, // Not checking specific error type for this case
-		},
-		{
-			name:         "container has no scope label - should return nil",
-			initialScope: "",
-			hostname:     "test-container",
-			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.On("GetContainer", types.ContainerID("test-container")).
-					Return(container, nil)
-				container.On("Scope").Return("", false)
-			},
-			expectedScope:     "",
-			expectedError:     false,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "container has empty scope label - should return nil",
-			initialScope: "",
-			hostname:     "test-container",
-			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.On("GetContainer", types.ContainerID("test-container")).
-					Return(container, nil)
-
-				container.On("Scope").Return("", true)
-			},
-			expectedScope:     "",
-			expectedError:     false,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "container has valid scope label - should set scope and return nil",
-			initialScope: "",
-			hostname:     "test-container",
-			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.On("GetContainer", types.ContainerID("test-container")).
-					Return(container, nil)
-				container.On("Scope").Return("production", true)
-			},
-			expectedScope:     "production",
-			expectedError:     false,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "custom hostname with special characters - should work",
-			initialScope: "",
-			hostname:     "my_app.container-123",
-			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.On("GetContainer", types.ContainerID("my_app.container-123")).
-					Return(container, nil)
-				container.On("Scope").Return("staging", true)
-			},
-			expectedScope:     "staging",
-			expectedError:     false,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "custom hostname from Docker Compose - should derive scope",
-			initialScope: "",
-			hostname:     "watchtower_watchtower_1",
-			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.On("GetContainer", types.ContainerID("watchtower_watchtower_1")).
-					Return(container, nil)
-				container.On("Scope").Return("project-watchtower", true)
-			},
-			expectedScope:     "project-watchtower",
-			expectedError:     false,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "custom hostname lookup fails - should return error",
-			initialScope: "",
-			hostname:     "nonexistent-container",
-			mockSetup: func(client *mockContainer.MockClient, _ *mockTypes.MockContainer) {
-				client.EXPECT().GetContainer(types.ContainerID("nonexistent-container")).
-					Return(nil, errors.New("container not found"))
-			},
-			expectedScope:     "",
-			expectedError:     true,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "all detection methods fail - should return error",
-			initialScope: "",
-			hostname:     "",
-			mockSetup: func(client *mockContainer.MockClient, _ *mockTypes.MockContainer) {
-				client.EXPECT().
-					GetContainer(types.ContainerID("")).
-					Return(nil, errors.New("container not found"))
-			},
-			expectedScope:     "",
-			expectedError:     true,
-			expectedErrorType: nil, // Will be wrapped error from GetCurrentContainerID
-		},
-		{
-			name:         "container with nil state - should work",
-			initialScope: "",
-			hostname:     "nil-state-container",
-			mockSetup: func(client *mockContainer.MockClient, container *mockTypes.MockContainer) {
-				client.On("GetContainer", types.ContainerID("nil-state-container")).
-					Return(container, nil)
-				container.On("Scope").Return("nil-state-scope", true)
-			},
-			expectedScope:     "nil-state-scope",
-			expectedError:     false,
-			expectedErrorType: nil,
-		},
-		{
-			name:         "container with nil config - hostname detection fails",
-			initialScope: "",
-			hostname:     "nil-config-hostname",
-			mockSetup: func(client *mockContainer.MockClient, _ *mockTypes.MockContainer) {
-				client.EXPECT().GetContainer(types.ContainerID("nil-config-hostname")).
-					Return(nil, errors.New("container not found"))
-			},
-			expectedScope:     "",
-			expectedError:     true,
-			expectedErrorType: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Reset scope to initial value
-			scope = tt.initialScope
-
-			// Set up environment
-			if tt.hostname == "" {
-				// Unset HOSTNAME to simulate no hostname scenario
-				originalHostname := os.Getenv("HOSTNAME")
-
-				os.Unsetenv("HOSTNAME")
-
-				defer t.Setenv("HOSTNAME", originalHostname)
-			} else {
-				t.Setenv("HOSTNAME", tt.hostname)
-			}
-
-			// Create mocks
-			mockClient := mockContainer.NewMockClient(t)
-			mockContainer := mockTypes.NewMockContainer(t)
-
-			// Set CurrentWatchtowerContainerID
-			if tt.hostname == "" {
-				CurrentWatchtowerContainerID = ""
-			} else {
-				CurrentWatchtowerContainerID = types.ContainerID(tt.hostname)
-			}
-
-			// Set up mock expectations
-			tt.mockSetup(mockClient, mockContainer)
-
-			// Execute function under test
-			err := deriveScopeFromContainer(mockClient)
-
-			// Assert results
-			if tt.expectedError {
-				require.Error(t, err)
-
-				if tt.expectedErrorType != nil {
-					require.ErrorIs(t, err, tt.expectedErrorType)
-				}
-			} else {
-				require.NoError(t, err)
-			}
-
-			assert.Equal(t, tt.expectedScope, scope)
-
-			// Verify mock expectations
-			mockClient.AssertExpectations(t)
-			mockContainer.AssertExpectations(t)
-		})
-	}
-}
-
-func TestDeriveScopeFromContainer_Logging(t *testing.T) {
-	// Save original scope value to restore later
-	originalScope := scope
-	originalContainerID := CurrentWatchtowerContainerID
-
-	defer func() {
-		scope = originalScope
-		CurrentWatchtowerContainerID = originalContainerID
-	}()
-
-	// Save original log level
-	originalLevel := logrus.GetLevel()
-	defer logrus.SetLevel(originalLevel)
-
-	// Set log level to debug to capture debug logs
-	logrus.SetLevel(logrus.DebugLevel)
-
-	// Set up environment
-	t.Setenv("HOSTNAME", "test-container")
-
-	// Reset scope
-	scope = ""
-
-	// Create mocks
-	mockClient := mockContainer.NewMockClient(t)
-	mockContainer := mockTypes.NewMockContainer(t)
-
-	// Set CurrentWatchtowerContainerID
-	CurrentWatchtowerContainerID = types.ContainerID("test-container")
-
-	// Set up successful derivation
-	mockClient.On("GetContainer", types.ContainerID("test-container")).Return(mockContainer, nil)
-	mockContainer.On("Scope").Return("derived-scope", true)
-
-	// Capture log output
-	var logOutput []byte
-
-	hook := &testLogHook{logs: &logOutput}
-
-	logrus.AddHook(hook)
-
-	defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
-
-	// Execute function
-	err := deriveScopeFromContainer(mockClient)
-
-	// Assert no error and scope was set
-	require.NoError(t, err)
-	assert.Equal(t, "derived-scope", scope)
-
-	// Verify log contains expected message
-	logStr := string(logOutput)
-	assert.Contains(t, logStr, "Derived operational scope from current container's scope label")
-	assert.Contains(t, logStr, "container_id=test-container")
-	assert.Contains(t, logStr, "derived_scope=derived-scope")
-
-	// Verify mock expectations
-	mockClient.AssertExpectations(t)
-	mockContainer.AssertExpectations(t)
-}
-
-// testLogHook captures log output for testing.
-type testLogHook struct {
-	logs *[]byte
-}
-
-func (h *testLogHook) Fire(entry *logrus.Entry) error {
-	// Format the log entry similar to how logrus does it
-	formatted := fmt.Sprintf("time=\"%s\" level=%s msg=\"%s\"",
-		entry.Time.Format("2006-01-02T15:04:05-07:00"),
-		entry.Level.String(),
-		entry.Message)
-
-	// Add fields
-	var stringBuilder strings.Builder
-	for k, v := range entry.Data {
-		stringBuilder.WriteString(fmt.Sprintf(" %s=%v", k, v))
-	}
-
-	formatted += stringBuilder.String()
-
-	formatted += "\n"
-
-	*h.logs = append(*h.logs, []byte(formatted)...)
-
-	return nil
-}
-
-func (h *testLogHook) Levels() []logrus.Level {
-	return []logrus.Level{logrus.DebugLevel}
-}
 
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
@@ -821,6 +500,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		false,
 		true,
 		false,
+		nil,
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -908,6 +588,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			false,
 			true,
 			false,
+			nil,
 		)
 
 		// Should not return an error (context cancellation is expected)
@@ -999,6 +680,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 			false,
 			false,
 			false,
+			nil,
 		)
 
 		// Should not return an error
@@ -1071,6 +753,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 			false,
 			updateOnStart,
 			false,
+			nil,
 		)
 
 		// Should not return an error
@@ -1156,6 +839,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false,
 				updateOnStart1,
 				false,
+				nil,
 			)
 			assert.NoError(t, err)
 			atomic.AddInt32(&completed, 1)
@@ -1186,6 +870,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false,
 				updateOnStart2,
 				false,
+				nil,
 			)
 			assert.NoError(t, err)
 			atomic.AddInt32(&completed, 1)
@@ -1380,6 +1065,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				false,
 				false,
 				false,
+				nil,
 			)
 			assert.NoError(t, err)
 

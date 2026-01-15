@@ -1,12 +1,7 @@
-// Package config provides configuration structures for Watchtower's core operations.
-// It defines types that encapsulate settings and parameters used throughout the application,
-// ensuring consistent and type-safe configuration management.
-package config
+package types
 
 import (
 	"github.com/spf13/cobra"
-
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // RunConfig encapsulates the configuration parameters for the runMain function.
@@ -20,7 +15,7 @@ type RunConfig struct {
 	// Names is a slice of container names explicitly provided as positional arguments, used for filtering.
 	Names []string
 	// Filter is the types.Filter function determining which containers are processed during updates.
-	Filter types.Filter
+	Filter Filter
 	// FilterDesc is a human-readable description of the applied filter, used in logging and notifications.
 	FilterDesc string
 	// RunOnce indicates whether to perform a single update and exit, set via the --run-once flag.

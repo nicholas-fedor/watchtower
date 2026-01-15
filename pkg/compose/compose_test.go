@@ -63,4 +63,24 @@ var _ = ginkgo.Describe("Compose", func() {
 			"myproject",
 		),
 	)
+
+	ginkgo.DescribeTable(
+		"GetContainerNumber",
+		func(labels map[string]string, expected string) {
+			result := GetContainerNumber(labels)
+			gomega.Expect(result).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry("returns empty string for nil labels", nil, ""),
+		ginkgo.Entry("returns empty string for empty labels", map[string]string{}, ""),
+		ginkgo.Entry(
+			"returns empty string when label not present",
+			map[string]string{"other": "value"},
+			"",
+		),
+		ginkgo.Entry(
+			"returns container number when label present",
+			map[string]string{ComposeContainerNumber: "1"},
+			"1",
+		),
+	)
 })

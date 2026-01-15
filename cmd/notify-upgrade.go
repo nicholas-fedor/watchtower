@@ -1,4 +1,3 @@
-// Package cmd contains the watchtower (sub-)commands.
 package cmd
 
 import (
@@ -47,7 +46,8 @@ func init() {
 // runNotifyUpgrade executes the notify-upgrade command, handling errors gracefully.
 // It wraps the main logic in runNotifyUpgradeE and logs any failures with logrus.
 func runNotifyUpgrade(cmd *cobra.Command, args []string) {
-	if err := runNotifyUpgradeE(cmd, args); err != nil {
+	err := runNotifyUpgradeE(cmd, args)
+	if err != nil {
 		logrus.WithError(err).Error("Notification upgrade failed")
 	}
 }
@@ -108,7 +108,8 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Write the constructed string to the temporary file. This is a critical step, as the file’s purpose is to store this data.
-	if _, err := fmt.Fprint(outFile, urlBuilder.String()); err != nil {
+	_, err = fmt.Fprint(outFile, urlBuilder.String())
+	if err != nil {
 		logrus.WithError(err).
 			WithField("file", outFile.Name()).
 			Debug("Failed to write to temporary file")
@@ -117,7 +118,8 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Sync the file to disk to ensure the written data is persisted, preventing loss due to buffering or system crashes.
-	if err := outFile.Sync(); err != nil {
+	err = outFile.Sync()
+	if err != nil {
 		logrus.WithError(err).
 			WithField("file", outFile.Name()).
 			Debug("Failed to sync temporary file")
@@ -129,8 +131,8 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Use a placeholder ("<CONTAINER>") if this fails, ensuring the user still gets actionable guidance.
 	containerID := "<CONTAINER>"
 
-	if CurrentWatchtowerContainerID != "" {
-		containerID = CurrentWatchtowerContainerID.ShortID() // Use the short ID (e.g., "abc123") for brevity in user instructions.
+	if currentWatchtowerContainerID != "" {
+		containerID = currentWatchtowerContainerID.ShortID() // Use the short ID (e.g., "abc123") for brevity in user instructions.
 	}
 
 	// Provide user instructions for retrieving the file, split into two log lines for clarity: a prompt and the exact command.
@@ -167,7 +169,8 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 
 	// Attempt to remove the temporary file. If this fails (e.g., due to permissions or file system issues), log a warning
 	// rather than an error, as the command has completed its primary task, and leftover files are a minor concern.
-	if err := os.Remove(outFile.Name()); err != nil {
+	err = os.Remove(outFile.Name())
+	if err != nil {
 		logrus.WithError(err).
 			WithField("file", outFile.Name()).
 			Warn("Failed to remove temporary file")

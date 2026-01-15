@@ -8,6 +8,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+
+	dockerContainer "github.com/docker/docker/api/types/container"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
@@ -16,6 +20,27 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// createTestContainer creates a *container.Container with specified chain label for testing.
+func createTestContainer(chain string) *container.Container {
+	labels := make(map[string]string)
+	if chain != "" {
+		labels[container.ContainerChainLabel] = chain
+	}
+
+	inspectResponse := &dockerContainer.InspectResponse{
+		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+			ID: "test-container-id",
+		},
+		Config: &dockerContainer.Config{
+			Hostname: "test-container",
+			Image:    "test-image",
+			Labels:   labels,
+		},
+	}
+
+	return container.NewContainer(inspectResponse, nil)
+}
 
 func TestWaitForRunningUpdate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -84,6 +109,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 		false, // monitorOnly
 		false, // updateOnStart
 		false, // skipFirstRun
+		nil,   // currentWatchtowerContainer
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -129,6 +155,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 		false, // monitorOnly
 		true,  // updateOnStart
 		false, // skipFirstRun
+		nil,   // currentWatchtowerContainer
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -185,6 +212,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		false, // monitorOnly
 		false, // updateOnStart
 		false, // skipFirstRun
+		nil,   // currentWatchtowerContainer
 	)
 	if err == nil {
 		t.Error("expected error")
@@ -228,6 +256,7 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		false, // monitorOnly
 		false, // updateOnStart
 		false, // skipFirstRun
+		nil,   // currentWatchtowerContainer
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -290,6 +319,7 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 				tt.monitorOnly, // monitorOnly parameter
 				true,           // updateOnStart - trigger immediate update
 				false,          // skipFirstRun
+				nil,            // currentWatchtowerContainer
 			)
 			if err != nil {
 				t.Errorf("expected no error, got %v", err)
@@ -302,6 +332,58 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 					capturedParams.MonitorOnly,
 				)
 			}
+		})
+	}
+}
+
+// TestShouldExitDueToInvalidRestart verifies the ShouldExitDueToInvalidRestart function
+// handles various scenarios correctly.
+func TestShouldExitDueToInvalidRestart(t *testing.T) {
+	tests := []struct {
+		name         string
+		container    types.Container
+		runOnceFlag  bool
+		expectedExit bool
+	}{
+		{
+			name:         "no container",
+			container:    nil,
+			runOnceFlag:  false,
+			expectedExit: false,
+		},
+		{
+			name:         "not a watchtower parent",
+			container:    createTestContainer("other-id"),
+			runOnceFlag:  false,
+			expectedExit: false,
+		},
+		{
+			name:         "is watchtower parent but run-once is true",
+			container:    createTestContainer("test-container-id,parent-id"),
+			runOnceFlag:  true,
+			expectedExit: false,
+		},
+		{
+			name:         "is watchtower parent and run-once is false",
+			container:    createTestContainer("test-container-id,parent-id"),
+			runOnceFlag:  false,
+			expectedExit: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create flag set
+			flagSet := &pflag.FlagSet{}
+			flagSet.Bool("run-once", tt.runOnceFlag, "")
+
+			// Test the function
+			shouldExit := scheduling.ShouldExitDueToInvalidRestart(
+				tt.container,
+				flagSet,
+			)
+
+			assert.Equal(t, tt.expectedExit, shouldExit)
 		})
 	}
 }

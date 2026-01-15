@@ -315,7 +315,8 @@ func StopAndRemoveSourceContainer(
 	})
 
 	// Stop the container first
-	if err := StopSourceContainer(api, sourceContainer, timeout); err != nil {
+	err := StopSourceContainer(api, sourceContainer, timeout)
+	if err != nil {
 		return err
 	}
 
@@ -337,7 +338,7 @@ func StopAndRemoveSourceContainer(
 
 	// Call the Docker API's ContainerRemove to delete the container, forcing termination of any
 	// lingering processes (via SIGKILL if needed) and removing volumes if specified.
-	err := api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainer.RemoveOptions{
+	err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainer.RemoveOptions{
 		Force:         true,          // Ensure any lingering processes are terminated before removal.
 		RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
 	})
@@ -460,13 +461,14 @@ func getNetworkConfig(
 	}
 
 	// Validate MAC addresses, passing sourceContainer for state checking
-	if err := validateMacAddresses(
+	err := validateMacAddresses(
 		config,
 		sourceContainer.ID(),
 		clientVersion,
 		isHostNetwork,
 		sourceContainer,
-	); err != nil {
+	)
+	if err != nil {
 		clog.WithError(err).Debug("MAC address validation issue")
 	}
 
@@ -503,7 +505,7 @@ func processEndpoint(
 	isHostNetwork bool,
 ) (*dockerNetwork.EndpointSettings, error) {
 	if sourceEndpoint == nil {
-		return nil, ErrNilSourceEndpoint
+		return nil, errNilSourceEndpoint
 	}
 
 	clog := logrus.WithFields(logrus.Fields{
@@ -781,4 +783,30 @@ func debugLogMacAddress(
 	default:
 		clog.Debug("No MAC address in host network mode, as expected")
 	}
+}
+
+// IsWatchtowerParent checks if the current container ID exists in the comma-separated container-chain label values.
+//
+// It handles edge cases like empty chain or invalid IDs by returning false appropriately.
+// The chain values are trimmed of whitespace before comparison.
+//
+// Parameters:
+//   - currentID: The container ID to check for in the chain.
+//   - chain: Comma-separated string of container IDs from the container-chain label.
+//
+// Returns:
+//   - bool: True if currentID is found in the chain, false otherwise.
+func IsWatchtowerParent(currentID types.ContainerID, chain string) bool {
+	if currentID == "" || chain == "" {
+		return false
+	}
+
+	ids := strings.SplitSeq(chain, ",")
+	for id := range ids {
+		if strings.TrimSpace(id) == string(currentID) {
+			return true
+		}
+	}
+
+	return false
 }

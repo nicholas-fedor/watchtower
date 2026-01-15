@@ -113,15 +113,15 @@ var _ = ginkgo.Describe("notifications", func() {
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				delay := notifications.GetDelay(command, time.Duration(0))
-				gomega.Expect(delay).To(gomega.Equal(time.Duration(5) * time.Second))
+				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
 		ginkgo.When("legacy delay is defined", func() {
 			ginkgo.It("should use the specified legacy delay", func() {
 				command := cmd.NewRootCommand()
 				flags.RegisterNotificationFlags(command)
-				delay := notifications.GetDelay(command, time.Duration(5)*time.Second)
-				gomega.Expect(delay).To(gomega.Equal(time.Duration(5) * time.Second))
+				delay := notifications.GetDelay(command, 5*time.Second)
+				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
 		ginkgo.When("legacy delay and delay is defined", func() {
@@ -136,8 +136,8 @@ var _ = ginkgo.Describe("notifications", func() {
 						"0",
 					})
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					delay := notifications.GetDelay(command, time.Duration(7)*time.Second)
-					gomega.Expect(delay).To(gomega.Equal(time.Duration(7) * time.Second))
+					delay := notifications.GetDelay(command, 7*time.Second)
+					gomega.Expect(delay).To(gomega.Equal(7 * time.Second))
 				},
 			)
 		})
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("notifications", func() {
 						color,
 						username,
 					)
-					expectedDelay := time.Duration(7) * time.Second
+					expectedDelay := 7 * time.Second
 					args := []string{
 						"--notifications",
 						"slack",
@@ -255,7 +255,7 @@ var _ = ginkgo.Describe("notifications", func() {
 						color,
 						url.QueryEscape(iconURL),
 					)
-					expectedDelay := time.Duration(7) * time.Second
+					expectedDelay := 7 * time.Second
 
 					args := []string{
 						"--notifications",
@@ -450,7 +450,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"mail@example.com",
 					"Plain",
 				)
-				expectedDelay := time.Duration(7) * time.Second
+				expectedDelay := 7 * time.Second
 
 				args := []string{
 					"--notifications",
@@ -483,7 +483,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					toAddress,
 					"Plain",
 				)
-				expectedDelay := time.Duration(7) * time.Second
+				expectedDelay := 7 * time.Second
 
 				args := []string{
 					"--notifications",

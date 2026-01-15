@@ -185,6 +185,68 @@ func (_c *MockClient_GetContainer_Call) RunAndReturn(run func(containerID types.
 	return _c
 }
 
+// GetCurrentWatchtowerContainer provides a mock function for the type MockClient
+func (_mock *MockClient) GetCurrentWatchtowerContainer(containerID types.ContainerID) (types.Container, error) {
+	ret := _mock.Called(containerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCurrentWatchtowerContainer")
+	}
+
+	var r0 types.Container
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(types.ContainerID) (types.Container, error)); ok {
+		return returnFunc(containerID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(types.ContainerID) types.Container); ok {
+		r0 = returnFunc(containerID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.Container)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(types.ContainerID) error); ok {
+		r1 = returnFunc(containerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_GetCurrentWatchtowerContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentWatchtowerContainer'
+type MockClient_GetCurrentWatchtowerContainer_Call struct {
+	*mock.Call
+}
+
+// GetCurrentWatchtowerContainer is a helper method to define mock.On call
+//   - containerID types.ContainerID
+func (_e *MockClient_Expecter) GetCurrentWatchtowerContainer(containerID interface{}) *MockClient_GetCurrentWatchtowerContainer_Call {
+	return &MockClient_GetCurrentWatchtowerContainer_Call{Call: _e.mock.On("GetCurrentWatchtowerContainer", containerID)}
+}
+
+func (_c *MockClient_GetCurrentWatchtowerContainer_Call) Run(run func(containerID types.ContainerID)) *MockClient_GetCurrentWatchtowerContainer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.ContainerID
+		if args[0] != nil {
+			arg0 = args[0].(types.ContainerID)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_GetCurrentWatchtowerContainer_Call) Return(container types.Container, err error) *MockClient_GetCurrentWatchtowerContainer_Call {
+	_c.Call.Return(container, err)
+	return _c
+}
+
+func (_c *MockClient_GetCurrentWatchtowerContainer_Call) RunAndReturn(run func(containerID types.ContainerID) (types.Container, error)) *MockClient_GetCurrentWatchtowerContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetInfo provides a mock function for the type MockClient
 func (_mock *MockClient) GetInfo() (map[string]any, error) {
 	ret := _mock.Called()

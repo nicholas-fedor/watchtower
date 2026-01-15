@@ -137,6 +137,59 @@ func (_c *MockContainer_Enabled_Call) RunAndReturn(run func() (bool, bool)) *Moc
 	return _c
 }
 
+// GetContainerChain provides a mock function for the type MockContainer
+func (_mock *MockContainer) GetContainerChain() (string, bool) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContainerChain")
+	}
+
+	var r0 string
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func() (string, bool)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func() bool); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockContainer_GetContainerChain_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContainerChain'
+type MockContainer_GetContainerChain_Call struct {
+	*mock.Call
+}
+
+// GetContainerChain is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) GetContainerChain() *MockContainer_GetContainerChain_Call {
+	return &MockContainer_GetContainerChain_Call{Call: _e.mock.On("GetContainerChain")}
+}
+
+func (_c *MockContainer_GetContainerChain_Call) Run(run func()) *MockContainer_GetContainerChain_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_GetContainerChain_Call) Return(s string, b bool) *MockContainer_GetContainerChain_Call {
+	_c.Call.Return(s, b)
+	return _c
+}
+
+func (_c *MockContainer_GetContainerChain_Call) RunAndReturn(run func() (string, bool)) *MockContainer_GetContainerChain_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCreateConfig provides a mock function for the type MockContainer
 func (_mock *MockContainer) GetCreateConfig() *container.Config {
 	ret := _mock.Called()
@@ -1233,50 +1286,6 @@ func (_c *MockContainer_PreUpdateTimeout_Call) RunAndReturn(run func() int) *Moc
 	return _c
 }
 
-// SafeImageID provides a mock function for the type MockContainer
-func (_mock *MockContainer) SafeImageID() types.ImageID {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for SafeImageID")
-	}
-
-	var r0 types.ImageID
-	if returnFunc, ok := ret.Get(0).(func() types.ImageID); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(types.ImageID)
-	}
-	return r0
-}
-
-// MockContainer_SafeImageID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SafeImageID'
-type MockContainer_SafeImageID_Call struct {
-	*mock.Call
-}
-
-// SafeImageID is a helper method to define mock.On call
-func (_e *MockContainer_Expecter) SafeImageID() *MockContainer_SafeImageID_Call {
-	return &MockContainer_SafeImageID_Call{Call: _e.mock.On("SafeImageID")}
-}
-
-func (_c *MockContainer_SafeImageID_Call) Run(run func()) *MockContainer_SafeImageID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockContainer_SafeImageID_Call) Return(imageID types.ImageID) *MockContainer_SafeImageID_Call {
-	_c.Call.Return(imageID)
-	return _c
-}
-
-func (_c *MockContainer_SafeImageID_Call) RunAndReturn(run func() types.ImageID) *MockContainer_SafeImageID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Scope provides a mock function for the type MockContainer
 func (_mock *MockContainer) Scope() (string, bool) {
 	ret := _mock.Called()
@@ -1490,8 +1499,8 @@ func (_c *MockContainer_StopTimeout_Call) Run(run func()) *MockContainer_StopTim
 	return _c
 }
 
-func (_c *MockContainer_StopTimeout_Call) Return(timeout *int) *MockContainer_StopTimeout_Call {
-	_c.Call.Return(timeout)
+func (_c *MockContainer_StopTimeout_Call) Return(n *int) *MockContainer_StopTimeout_Call {
+	_c.Call.Return(n)
 	return _c
 }
 

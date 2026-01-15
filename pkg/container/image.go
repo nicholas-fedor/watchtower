@@ -71,10 +71,11 @@ func (c imageClient) IsContainerStale(
 		return c.checkLocalImageStaleness(ctx, sourceContainer, clog)
 	}
 
-	if err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed); err != nil {
+	err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to pull image")
 
-		return false, sourceContainer.SafeImageID(), err
+		return false, sourceContainer.ImageID(), err
 	}
 
 	// Check for a newer image.
@@ -294,7 +295,7 @@ func (c imageClient) shouldSkipPull(
 
 	warn := c.warnOnHeadFailed(sourceContainer, warnOnHeadFailed)
 	// Compare current and remote digests.
-	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth)
+	match, err := digest.CompareDigest(ctx, c.api, sourceContainer, registryAuth)
 	if err != nil {
 		clog.WithFields(logrus.Fields{
 			"match": match,
@@ -360,7 +361,8 @@ func (c imageClient) performImagePull(
 	defer response.Close()
 
 	// Read response to complete the pull.
-	if _, err = io.ReadAll(response); err != nil {
+	_, err = io.ReadAll(response)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to read image pull response")
 
 		return fmt.Errorf("%w: %s: %w", errReadPullResponseFailed, imageName, err)
@@ -415,14 +417,14 @@ func (c imageClient) checkLocalImageStaleness(
 	clog *logrus.Entry,
 ) (bool, types.ImageID, error) {
 	clog.Debug("Skipping image pull due to no-pull setting - checking local image only")
-	clog.WithField("current_image_id", sourceContainer.SafeImageID()).
+	clog.WithField("current_image_id", sourceContainer.ImageID()).
 		Debug("Current container image ID")
 
 	stale, latestID, err := c.HasNewImage(ctx, sourceContainer)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to check local image")
 
-		return false, sourceContainer.SafeImageID(), err
+		return false, sourceContainer.ImageID(), err
 	}
 
 	clog.WithFields(logrus.Fields{

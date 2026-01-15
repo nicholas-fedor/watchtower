@@ -218,9 +218,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				resp, err := http.Post(server.URL()+"/v1/update", "application/json", nil)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				defer resp.Body.Close()
-				// Verify that StatusInternalServerError was attempted to be set
+				// Verify that StatusOK was set (status is set before writing)
 				gomega.Expect(faulty.lastStatusCode).
-					To(gomega.Equal(http.StatusInternalServerError))
+					To(gomega.Equal(http.StatusOK))
 				// Verify that writing was attempted (but failed)
 				gomega.Expect(faulty.written).To(gomega.BeTrue())
 			},
@@ -428,7 +428,9 @@ func TestQueueConcurrentRequests(t *testing.T) {
 		}
 
 		var response map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -515,7 +517,9 @@ func TestHandleConcurrentRequestsWithRestarted(t *testing.T) {
 				}
 
 				var response map[string]any
-				if err := json.Unmarshal(localRec.Body.Bytes(), &response); err != nil {
+
+				err := json.Unmarshal(localRec.Body.Bytes(), &response)
+				if err != nil {
 					t.Errorf("failed to unmarshal response: %v", err)
 				}
 
@@ -581,6 +585,7 @@ func (f *faultyReadCloser) Close() error               { return nil }
 // faultyResponseWriter simulates a response writer that fails on Write.
 type faultyResponseWriter struct {
 	http.ResponseWriter
+
 	statusCode     int
 	header         http.Header
 	written        bool

@@ -1,5 +1,3 @@
-// Package notifications provides mechanisms for sending notifications via various services.
-// This file implements the core Shoutrrr notification handling with templating and batching.
 package notifications
 
 import (
@@ -399,6 +397,165 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 	}
 }
 
+// StartNotification begins queuing messages for batching.
+//
+// It sends any existing queued entries before resetting the entries slice to ensure a fresh queue for each run.
+// When suppressSummary is true, skip sending queued entries.
+func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
+	n.entriesMutex.Lock()
+
+	// Send any existing queued entries before resetting, unless suppressed
+	if len(n.entries) > 0 && !suppressSummary {
+		n.sendEntries(n.entries, nil)
+	}
+
+	// Capture the count before resetting the slice.
+	preResetCount := len(n.entries)
+
+	// Reset the entries slice to an empty slice with initial capacity for new batching.
+	n.entries = make([]*logrus.Entry, 0, initialEntriesCapacity)
+
+	// Unlock the mutex after resetting the entries slice.
+	n.entriesMutex.Unlock()
+
+	LocalLog.WithFields(logrus.Fields{
+		"legacy_template":  n.legacyTemplate,
+		"receiving":        n.receiving.Load(),
+		"entries_count":    preResetCount,
+		"suppress_summary": suppressSummary,
+	}).Debug("StartNotification called - batching mode enabled")
+}
+
+// SendNotification sends queued messages with a report.
+//
+// Parameters:
+//   - report: Scan report to include.
+//
+// It clears the queue after sending.
+func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
+	n.entriesMutex.Lock()
+	entries := n.entries
+	n.entries = nil // Clear the queue after copying to prevent re-sending
+	n.entriesMutex.Unlock()
+
+	LocalLog.WithFields(logrus.Fields{
+		"entries_count":    len(entries),
+		"legacy_template":  n.legacyTemplate,
+		"report_available": report != nil,
+	}).Debug("SendNotification called - sending queued entries and report")
+
+	n.sendEntries(entries, report)
+}
+
+// Close stops queuing and waits for sends to complete.
+//
+// It closes the stop channel and blocks until done if a goroutine is running.
+// This method is idempotent and can be called multiple times safely.
+func (n *shoutrrrTypeNotifier) Close() {
+	n.closeOnce.Do(func() {
+		n.closed.Store(true)
+
+		if n.stop != nil {
+			close(n.stop)
+		}
+
+		if n.receiving.Load() {
+			LocalLog.Debug("Waiting for the notification goroutine to finish")
+
+			<-n.done
+		}
+
+		n.cancel()
+	})
+}
+
+// GetEntries returns a copy of the queued log entries.
+//
+// Returns:
+//   - []*logrus.Entry: Copy of queued entries.
+func (n *shoutrrrTypeNotifier) GetEntries() []*logrus.Entry {
+	n.entriesMutex.RLock()
+	defer n.entriesMutex.RUnlock()
+
+	entries := make([]*logrus.Entry, len(n.entries))
+	copy(entries, n.entries)
+
+	return entries
+}
+
+// SendFilteredEntries sends filtered log entries with an optional report.
+//
+// Parameters:
+//   - entries: Log entries to send.
+//   - report: Optional scan report.
+func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, report types.Report) {
+	n.sendEntries(entries, report)
+}
+
+// ShouldSendNotification checks if a notification should be sent for the given report based on the notifier's log level.
+//
+// Parameters:
+//   - report: The report to check.
+//
+// Returns:
+//   - bool: True if notification should be sent, false otherwise.
+func (n *shoutrrrTypeNotifier) ShouldSendNotification(report types.Report) bool {
+	if report != nil && n.logLevel == logrus.ErrorLevel {
+		if len(report.Failed()) == 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Levels returns log levels that trigger notifications.
+//
+// Returns:
+//   - []logrus.Level: Levels up to configured log level.
+func (n *shoutrrrTypeNotifier) Levels() []logrus.Level {
+	return logrus.AllLevels[:n.logLevel+1]
+}
+
+// Fire handles a log entry as a logrus hook.
+//
+// Parameters:
+//   - entry: Log entry to process.
+//
+// Returns:
+//   - error: Always nil.
+func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
+	if entry.Data["notify"] == "no" {
+		return nil // Skip non-notify entries.
+	}
+
+	if n.closed.Load() {
+		return nil // Skip if closed.
+	}
+
+	n.entriesMutex.Lock()
+	defer n.entriesMutex.Unlock()
+
+	if n.entries != nil {
+		n.entries = append(n.entries, entry) // Queue if batching.
+		LocalLog.WithFields(logrus.Fields{
+			"message":         entry.Message,
+			"level":           entry.Level.String(),
+			"entries_count":   len(n.entries),
+			"legacy_template": n.legacyTemplate,
+		}).Debug("Log entry queued for batching")
+	} else {
+		LocalLog.WithFields(logrus.Fields{
+			"message":         entry.Message,
+			"level":           entry.Level.String(),
+			"legacy_template": n.legacyTemplate,
+		}).Debug("Log entry sent immediately (not batching)")
+		n.sendEntries([]*logrus.Entry{entry}, nil) // Send immediately if not batching.
+	}
+
+	return nil
+}
+
 // sendWithCancellation sends a message with context cancellation support.
 //
 // Parameters:
@@ -559,165 +716,6 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 			}).Debug("Channel full, skipping send (backpressure)")
 		}
 	}
-}
-
-// StartNotification begins queuing messages for batching.
-//
-// It sends any existing queued entries before resetting the entries slice to ensure a fresh queue for each run.
-// When suppressSummary is true, skip sending queued entries.
-func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
-	n.entriesMutex.Lock()
-
-	// Send any existing queued entries before resetting, unless suppressed
-	if len(n.entries) > 0 && !suppressSummary {
-		n.sendEntries(n.entries, nil)
-	}
-
-	// Capture the count before resetting the slice.
-	preResetCount := len(n.entries)
-
-	// Reset the entries slice to an empty slice with initial capacity for new batching.
-	n.entries = make([]*logrus.Entry, 0, initialEntriesCapacity)
-
-	// Unlock the mutex after resetting the entries slice.
-	n.entriesMutex.Unlock()
-
-	LocalLog.WithFields(logrus.Fields{
-		"legacy_template":  n.legacyTemplate,
-		"receiving":        n.receiving.Load(),
-		"entries_count":    preResetCount,
-		"suppress_summary": suppressSummary,
-	}).Debug("StartNotification called - batching mode enabled")
-}
-
-// SendNotification sends queued messages with a report.
-//
-// Parameters:
-//   - report: Scan report to include.
-//
-// It clears the queue after sending.
-func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
-	n.entriesMutex.Lock()
-	entries := n.entries
-	n.entries = nil // Clear the queue after copying to prevent re-sending
-	n.entriesMutex.Unlock()
-
-	LocalLog.WithFields(logrus.Fields{
-		"entries_count":    len(entries),
-		"legacy_template":  n.legacyTemplate,
-		"report_available": report != nil,
-	}).Debug("SendNotification called - sending queued entries and report")
-
-	n.sendEntries(entries, report)
-}
-
-// Close stops queuing and waits for sends to complete.
-//
-// It closes the stop channel and blocks until done if a goroutine is running.
-// This method is idempotent and can be called multiple times safely.
-func (n *shoutrrrTypeNotifier) Close() {
-	n.closeOnce.Do(func() {
-		n.closed.Store(true)
-
-		if n.stop != nil {
-			close(n.stop)
-		}
-
-		if n.receiving.Load() {
-			LocalLog.Debug("Waiting for the notification goroutine to finish")
-
-			<-n.done
-		}
-
-		n.cancel()
-	})
-}
-
-// GetEntries returns a copy of the queued log entries.
-//
-// Returns:
-//   - []*logrus.Entry: Copy of queued entries.
-func (n *shoutrrrTypeNotifier) GetEntries() []*logrus.Entry {
-	n.entriesMutex.RLock()
-	defer n.entriesMutex.RUnlock()
-
-	entries := make([]*logrus.Entry, len(n.entries))
-	copy(entries, n.entries)
-
-	return entries
-}
-
-// SendFilteredEntries sends filtered log entries with an optional report.
-//
-// Parameters:
-//   - entries: Log entries to send.
-//   - report: Optional scan report.
-func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, report types.Report) {
-	n.sendEntries(entries, report)
-}
-
-// ShouldSendNotification checks if a notification should be sent for the given report based on the notifier's log level.
-//
-// Parameters:
-//   - report: The report to check.
-//
-// Returns:
-//   - bool: True if notification should be sent, false otherwise.
-func (n *shoutrrrTypeNotifier) ShouldSendNotification(report types.Report) bool {
-	if report != nil && n.logLevel == logrus.ErrorLevel {
-		if len(report.Failed()) == 0 {
-			return false
-		}
-	}
-
-	return true
-}
-
-// Levels returns log levels that trigger notifications.
-//
-// Returns:
-//   - []logrus.Level: Levels up to configured log level.
-func (n *shoutrrrTypeNotifier) Levels() []logrus.Level {
-	return logrus.AllLevels[:n.logLevel+1]
-}
-
-// Fire handles a log entry as a logrus hook.
-//
-// Parameters:
-//   - entry: Log entry to process.
-//
-// Returns:
-//   - error: Always nil.
-func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
-	if entry.Data["notify"] == "no" {
-		return nil // Skip non-notify entries.
-	}
-
-	if n.closed.Load() {
-		return nil // Skip if closed.
-	}
-
-	n.entriesMutex.Lock()
-	defer n.entriesMutex.Unlock()
-
-	if n.entries != nil {
-		n.entries = append(n.entries, entry) // Queue if batching.
-		LocalLog.WithFields(logrus.Fields{
-			"message":         entry.Message,
-			"level":           entry.Level.String(),
-			"entries_count":   len(n.entries),
-			"legacy_template": n.legacyTemplate,
-		}).Debug("Log entry queued for batching")
-	} else {
-		LocalLog.WithFields(logrus.Fields{
-			"message":         entry.Message,
-			"level":           entry.Level.String(),
-			"legacy_template": n.legacyTemplate,
-		}).Debug("Log entry sent immediately (not batching)")
-		n.sendEntries([]*logrus.Entry{entry}, nil) // Send immediately if not batching.
-	}
-
-	return nil
 }
 
 // getShoutrrrTemplate retrieves or generates a template.

@@ -1,6 +1,3 @@
-// Package lifecycle provides tests for the lifecycle hook execution logic in Watchtower.
-// It verifies the behavior of pre-check, post-check, pre-update, and post-update commands
-// under various conditions, including success, errors, and edge cases.
 package lifecycle
 
 import (

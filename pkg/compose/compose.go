@@ -14,6 +14,8 @@ const (
 	ComposeProjectLabel = "com.docker.compose.project"
 	// ComposeServiceLabel specifies the service name of the container in Docker Compose.
 	ComposeServiceLabel = "com.docker.compose.service"
+	// ComposeContainerNumber specifies the container number of the container in Docker Compose.
+	ComposeContainerNumber = "com.docker.compose.container-number"
 )
 
 // ParseDependsOnLabel parses the Docker Compose depends_on label value.
@@ -50,8 +52,6 @@ func ParseDependsOnLabel(labelValue string) []string {
 
 		serviceName := strings.TrimSpace(parts[0])
 		if serviceName != "" {
-			clog.WithField("parsed_service", serviceName).
-				Debug("Added parsed service to dependencies")
 			services = append(services, serviceName)
 		}
 	}
@@ -78,8 +78,6 @@ func GetProjectName(labels map[string]string) string {
 
 	projectName, ok := labels[ComposeProjectLabel]
 	if !ok {
-		logrus.WithField("label", ComposeProjectLabel).Debug("Compose project label not found")
-
 		return ""
 	}
 
@@ -108,8 +106,6 @@ func GetServiceName(labels map[string]string) string {
 
 	serviceName, ok := labels[ComposeServiceLabel]
 	if !ok {
-		logrus.WithField("label", ComposeServiceLabel).Debug("Compose service label not found")
-
 		return ""
 	}
 
@@ -119,4 +115,32 @@ func GetServiceName(labels map[string]string) string {
 	}).Debug("Retrieved compose service name")
 
 	return serviceName
+}
+
+// GetContainerNumber extracts the container number from the Docker Compose labels.
+//
+// If the ComposeContainerNumber label is present, returns its value.
+// Otherwise, returns an empty string.
+//
+// Parameters:
+//   - labels: Map of container labels.
+//
+// Returns:
+//   - string: Container replica number if present, empty string otherwise.
+func GetContainerNumber(labels map[string]string) string {
+	if labels == nil {
+		return ""
+	}
+
+	containerNumber, ok := labels[ComposeContainerNumber]
+	if !ok {
+		return ""
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"label": ComposeContainerNumber,
+		"value": containerNumber,
+	}).Debug("Retrieved container replica number")
+
+	return containerNumber
 }

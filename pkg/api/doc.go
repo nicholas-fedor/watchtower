@@ -9,7 +9,8 @@
 //
 //	api := api.New("secure-token")
 //	api.RegisterFunc("/v1/update", updateHandler)
-//	if err := api.Start(ctx, true); err != nil {
+//	err := api.Start(ctx, true)
+//	if err != nil {
 //	    logrus.WithError(err).Error("API start failed")
 //	}
 //

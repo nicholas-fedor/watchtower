@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -50,6 +51,16 @@ type Client interface {
 	//
 	// Returns the container object or an error if the container cannot be retrieved.
 	GetContainer(containerID types.ContainerID) (types.Container, error)
+
+	// GetCurrentWatchtowerContainer retrieves minimal container information for the specified container ID, skipping image inspection.
+	//
+	// Parameters:
+	//   - containerID: ID of the container to retrieve.
+	//
+	// Returns:
+	//   - types.Container: Container with imageInfo set to nil.
+	//   - error: Non-nil if inspection fails, nil on success.
+	GetCurrentWatchtowerContainer(containerID types.ContainerID) (types.Container, error)
 
 	// StopContainer stops a specified container, respecting the given timeout.
 	//
@@ -138,8 +149,9 @@ type Client interface {
 //
 // It wraps the Docker API client and applies custom behavior via ClientOptions.
 type client struct {
-	api dockerClient.APIClient
 	ClientOptions
+
+	api dockerClient.APIClient
 }
 
 // ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
@@ -184,23 +196,33 @@ func NewClient(opts ClientOptions) Client {
 	// Apply forced API version if set and valid.
 	if version := strings.Trim(os.Getenv("DOCKER_API_VERSION"), "\""); version != "" {
 		pingCli, err := dockerClient.NewClientWithOpts(
-			dockerClient.WithHost(cli.DaemonHost()),
+			dockerClient.FromEnv, // Include env config for TLS, etc.
 			dockerClient.WithVersion(version),
 		)
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to create test client")
 		}
 
-		if _, err := pingCli.Ping(ctx); err != nil &&
-			strings.Contains(err.Error(), "page not found") {
+		_, err = pingCli.Ping(ctx)
+		switch {
+		case err == nil:
+			// Ping succeeded: use the forced version client
+			cli = pingCli
+		case strings.Contains(err.Error(), "page not found"):
 			logrus.WithFields(logrus.Fields{
 				"version":  version,
 				"error":    err,
 				"endpoint": "/_ping",
 			}).Warn("Invalid API version; falling back to autonegotiation")
 			cli.NegotiateAPIVersion(ctx)
-		} else {
-			cli = pingCli
+		default:
+			// Other ping failure: fall back to negotiation (don't override with broken client)
+			logrus.WithFields(logrus.Fields{
+				"version":  version,
+				"error":    err,
+				"endpoint": "/_ping",
+			}).Warn("Ping failed with non-version error; falling back to autonegotiation")
+			cli.NegotiateAPIVersion(ctx)
 		}
 	} else {
 		cli.NegotiateAPIVersion(ctx)
@@ -209,7 +231,8 @@ func NewClient(opts ClientOptions) Client {
 	// Log client and server API versions.
 	selectedVersion := cli.ClientVersion()
 
-	if serverVersion, err := cli.ServerVersion(ctx); err != nil {
+	serverVersion, err := cli.ServerVersion(ctx)
+	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"error":    err,
 			"endpoint": "/version",
@@ -295,6 +318,34 @@ func (c client) GetContainer(containerID types.ContainerID) (types.Container, er
 	logrus.WithField("container_id", containerID).Debug("Retrieved container details")
 
 	return container, nil
+}
+
+// GetCurrentWatchtowerContainer retrieves container information for the specified container ID, skipping image inspection.
+//
+// Parameters:
+//   - containerID: ID of the container to retrieve.
+//
+// Returns:
+//   - types.Container: Container with imageInfo set to nil.
+//   - error: Non-nil if inspection fails, nil on success.
+func (c client) GetCurrentWatchtowerContainer(
+	containerID types.ContainerID,
+) (types.Container, error) {
+	ctx := context.Background()
+	clog := logrus.WithField("container_id", containerID)
+
+	clog.Debug("Inspecting current Watchtower container")
+
+	containerInfo, err := c.api.ContainerInspect(ctx, string(containerID))
+	if err != nil {
+		clog.WithError(err).Debug("Failed to inspect current Watchtower container")
+
+		return nil, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
+	}
+
+	clog.Debug("Retrieved minimal container info")
+
+	return NewContainer(&containerInfo, nil), nil
 }
 
 // StopContainer stops a specified container.
@@ -570,8 +621,19 @@ func (c client) ExecuteCommand(
 	uid int,
 	gid int,
 ) (bool, error) {
-	ctx := context.Background()
 	clog := logrus.WithField("container_id", container.ID())
+
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Minute)
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
 
 	// Generate JSON metadata for the container.
 	metadataJSON, err := generateContainerMetadata(container)
@@ -601,7 +663,7 @@ func (c client) ExecuteCommand(
 	clog.WithField("command", command).Debug("Creating exec instance")
 	execConfig := dockerContainer.ExecOptions{
 		Tty:    true,
-		Detach: false,
+		Detach: true,
 		Cmd:    []string{"sh", "-c", command},
 		Env:    []string{"WT_CONTAINER=" + metadataJSON},
 		User:   user,
@@ -619,7 +681,9 @@ func (c client) ExecuteCommand(
 	clog.WithField("exec_id", exec.ID).Debug("Starting exec instance")
 
 	execStartCheck := dockerContainer.ExecStartOptions{Tty: true}
-	if err := c.api.ContainerExecStart(ctx, exec.ID, execStartCheck); err != nil {
+
+	err = c.api.ContainerExecStart(ctx, exec.ID, execStartCheck)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to start exec instance")
 
 		return false, fmt.Errorf("%w: %w", errStartExecFailed, err)
@@ -691,136 +755,6 @@ func generateContainerMetadata(container types.Container) (string, error) {
 	return string(metadataJSON), nil
 }
 
-// captureExecOutput attaches to an exec instance and captures its output.
-//
-// Parameters:
-//   - ctx: Context for lifecycle control.
-//   - execID: ID of the exec instance.
-//
-// Returns:
-//   - string: Captured output if successful.
-//   - error: Non-nil if attachment or reading fails, nil on success.
-func (c client) captureExecOutput(ctx context.Context, execID string) (string, error) {
-	clog := logrus.WithField("exec_id", execID)
-
-	// Attach to the exec instance for output.
-	clog.Debug("Attaching to exec instance")
-
-	response, err := c.api.ContainerExecAttach(
-		ctx,
-		execID,
-		dockerContainer.ExecStartOptions{Tty: true},
-	)
-	if err != nil {
-		clog.WithError(err).Debug("Failed to attach to exec instance")
-
-		return "", fmt.Errorf("%w: %w", errAttachExecFailed, err)
-	}
-
-	defer response.Close()
-
-	// Read output into a buffer.
-	var writer bytes.Buffer
-
-	written, err := writer.ReadFrom(response.Reader)
-	if err != nil {
-		clog.WithError(err).Debug("Failed to read exec output")
-
-		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, err)
-	}
-
-	// Return trimmed output if any was captured.
-	if written > 0 {
-		output := strings.TrimSpace(writer.String())
-		clog.WithField("output", output).Debug("Captured exec output")
-
-		return output, nil
-	}
-
-	return "", nil
-}
-
-// waitForExecOrTimeout waits for an exec instance to complete or times out.
-//
-// Parameters:
-//   - ctx: Parent context.
-//   - execID: ID of the exec instance.
-//   - execOutput: Captured output for error reporting.
-//   - timeout: Minutes to wait (0 for no timeout).
-//
-// Returns:
-//   - bool: True if updates should be skipped (exit code 75), false otherwise.
-//   - error: Non-nil if inspection fails or command errors, nil on success.
-func (c client) waitForExecOrTimeout(
-	ctx context.Context,
-	execID string,
-	execOutput string,
-	timeout int,
-) (bool, error) {
-	const ExTempFail = 75
-
-	clog := logrus.WithField("exec_id", execID)
-
-	var execCtx context.Context
-
-	var cancel context.CancelFunc
-
-	// Set up context with timeout if specified.
-	if timeout > 0 {
-		execCtx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
-		defer cancel()
-	} else {
-		execCtx = ctx
-	}
-
-	// Poll exec status until completion.
-	for {
-		execInspect, err := c.api.ContainerExecInspect(execCtx, execID)
-		if err != nil {
-			clog.WithError(err).Debug("Failed to inspect exec instance")
-
-			return false, fmt.Errorf("%w: %w", errInspectExecFailed, err)
-		}
-
-		clog.WithFields(logrus.Fields{
-			"exit_code": execInspect.ExitCode,
-			"running":   execInspect.Running,
-		}).Debug("Checked exec status")
-
-		if execInspect.Running {
-			time.Sleep(1 * time.Second) // Wait before rechecking.
-
-			continue
-		}
-
-		// Log output if present.
-		if len(execOutput) > 0 {
-			clog.WithField("output", execOutput).Info("Command output captured")
-		}
-
-		// Handle specific exit codes.
-		if execInspect.ExitCode == ExTempFail {
-			return true, nil // Skip updates on temporary failure.
-		}
-
-		if execInspect.ExitCode > 0 {
-			err := fmt.Errorf(
-				"%w with exit code %d: %s",
-				errCommandFailed,
-				execInspect.ExitCode,
-				execOutput,
-			)
-			clog.WithError(err).Debug("Command execution failed")
-
-			return false, err
-		}
-
-		break
-	}
-
-	return false, nil
-}
-
 // RemoveImageByID deletes an image from the Docker host by its ID.
 //
 // Parameters:
@@ -886,6 +820,68 @@ func (c client) GetInfo() (map[string]any, error) {
 	return infoMap, nil
 }
 
+// WaitForContainerHealthy waits for a container to become healthy or times out.
+//
+// Parameters:
+//   - containerID: ID of the container to wait for.
+//   - timeout: Maximum duration to wait for health.
+//
+// Returns:
+//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
+func (c client) WaitForContainerHealthy(
+	containerID types.ContainerID,
+	timeout time.Duration,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	clog := logrus.WithField("container_id", containerID)
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			clog.Warn("Timeout waiting for container to become healthy")
+
+			return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
+		case <-ticker.C:
+			// Inspect the container to check health status
+			inspect, err := c.api.ContainerInspect(ctx, string(containerID))
+			if err != nil {
+				clog.WithError(err).Debug("Failed to inspect container for health check")
+
+				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
+			}
+
+			// Check if health check is configured
+			if inspect.State == nil || inspect.State.Health == nil {
+				clog.Debug("No health check configured for container, proceeding")
+
+				return nil
+			}
+
+			status := inspect.State.Health.Status
+			clog.WithField("health_status", status).Debug("Checked container health status")
+
+			if status == "healthy" {
+				clog.Debug("Container is now healthy")
+
+				return nil
+			}
+
+			if status == "unhealthy" {
+				clog.Warn("Container health check failed")
+
+				return fmt.Errorf("%w: %s", errHealthCheckFailed, containerID)
+			}
+
+			// Continue polling for "starting" or other statuses
+		}
+	}
+}
+
 // detectPodman determines if the container runtime is Podman using multiple detection methods.
 //
 // Returns:
@@ -893,14 +889,16 @@ func (c client) GetInfo() (map[string]any, error) {
 //   - error: Non-nil if detection fails, nil on success.
 func (c client) detectPodman() (bool, error) {
 	// Check for Podman marker file
-	if _, err := c.Fs.Stat("/run/.containerenv"); err == nil {
+	_, err := c.Fs.Stat("/run/.containerenv")
+	if err == nil {
 		logrus.Debug("Detected Podman via marker file /run/.containerenv")
 
 		return true, nil
 	}
 
 	// Check for Docker marker file (ensure we're not in Docker)
-	if _, err := c.Fs.Stat("/.dockerenv"); err == nil {
+	_, err = c.Fs.Stat("/.dockerenv")
+	if err == nil {
 		logrus.Debug("Detected Docker via marker file /.dockerenv")
 
 		return false, nil
@@ -962,64 +960,148 @@ func (c client) getPodmanFlag() bool {
 	return isPodman
 }
 
-// WaitForContainerHealthy waits for a container to become healthy or times out.
+// captureExecOutput attaches to an exec instance and captures its output.
 //
 // Parameters:
-//   - containerID: ID of the container to wait for.
-//   - timeout: Maximum duration to wait for health.
+//   - ctx: Context for lifecycle control.
+//   - execID: ID of the exec instance.
 //
 // Returns:
-//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
-func (c client) WaitForContainerHealthy(
-	containerID types.ContainerID,
-	timeout time.Duration,
-) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+//   - string: Captured output if successful.
+//   - error: Non-nil if attachment or reading fails, nil on success.
+func (c client) captureExecOutput(ctx context.Context, execID string) (string, error) {
+	clog := logrus.WithField("exec_id", execID)
 
-	clog := logrus.WithField("container_id", containerID)
+	// Attach to the exec instance for output.
+	clog.Debug("Attaching to exec instance")
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	response, err := c.api.ContainerExecAttach(
+		ctx,
+		execID,
+		dockerContainer.ExecStartOptions{Tty: true},
+	)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to attach to exec instance")
 
-	for {
-		select {
-		case <-ctx.Done():
-			clog.Warn("Timeout waiting for container to become healthy")
-
-			return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
-		case <-ticker.C:
-			// Inspect the container to check health status
-			inspect, err := c.api.ContainerInspect(ctx, string(containerID))
-			if err != nil {
-				clog.WithError(err).Debug("Failed to inspect container for health check")
-
-				return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
-			}
-
-			// Check if health check is configured
-			if inspect.State.Health == nil {
-				clog.Debug("No health check configured for container, proceeding")
-
-				return nil
-			}
-
-			status := inspect.State.Health.Status
-			clog.WithField("health_status", status).Debug("Checked container health status")
-
-			if status == "healthy" {
-				clog.Debug("Container is now healthy")
-
-				return nil
-			}
-
-			if status == "unhealthy" {
-				clog.Warn("Container health check failed")
-
-				return fmt.Errorf("%w: %s", errHealthCheckFailed, containerID)
-			}
-
-			// Continue polling for "starting" or other statuses
-		}
+		return "", fmt.Errorf("%w: %w", errAttachExecFailed, err)
 	}
+
+	defer response.Close()
+
+	// Read output into a buffer with timeout.
+	var writer bytes.Buffer
+
+	done := make(chan error, 1)
+
+	go func() {
+		_, err := io.Copy(&writer, response.Reader)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			clog.WithError(err).Debug("Failed to read exec output")
+
+			return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, err)
+		}
+	case <-ctx.Done():
+		response.Close()
+
+		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, ctx.Err())
+	}
+
+	// Return trimmed output if any was captured.
+	if writer.Len() > 0 {
+		output := strings.TrimSpace(writer.String())
+		clog.WithField("output", output).Debug("Captured exec output")
+
+		return output, nil
+	}
+
+	return "", nil
+}
+
+// waitForExecOrTimeout waits for an exec instance to complete or times out.
+//
+// Parameters:
+//   - ctx: Parent context.
+//   - execID: ID of the exec instance.
+//   - execOutput: Captured output for error reporting.
+//   - timeout: Minutes to wait (0 for no timeout).
+//
+// Returns:
+//   - bool: True if updates should be skipped (exit code 75), false otherwise.
+//   - error: Non-nil if inspection fails or command errors, nil on success.
+func (c client) waitForExecOrTimeout(
+	ctx context.Context,
+	execID string,
+	execOutput string,
+	timeout int,
+) (bool, error) {
+	const ExTempFail = 75
+
+	clog := logrus.WithField("exec_id", execID)
+
+	var execCtx context.Context
+
+	var cancel context.CancelFunc
+
+	// Set up context with timeout if specified.
+	if timeout > 0 {
+		execCtx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
+		defer cancel()
+	} else {
+		execCtx = ctx
+	}
+
+	// Poll exec status until completion.
+	for {
+		execInspect, err := c.api.ContainerExecInspect(execCtx, execID)
+		if err != nil {
+			clog.WithError(err).Debug("Failed to inspect exec instance")
+
+			return false, fmt.Errorf("%w: %w", errInspectExecFailed, err)
+		}
+
+		clog.WithFields(logrus.Fields{
+			"exit_code": execInspect.ExitCode,
+			"running":   execInspect.Running,
+		}).Debug("Checked exec status")
+
+		if execInspect.Running {
+			select {
+			case <-time.After(1 * time.Second):
+				continue
+			case <-execCtx.Done():
+				return false, fmt.Errorf("exec cancelled: %w", execCtx.Err())
+			}
+		}
+
+		// Log output if present.
+		if len(execOutput) > 0 {
+			clog.WithField("output_length", len(execOutput)).Debug("Command output captured")
+		}
+
+		// Handle specific exit codes.
+		if execInspect.ExitCode == ExTempFail {
+			return true, nil // Skip updates on temporary failure.
+		}
+
+		if execInspect.ExitCode > 0 {
+			err := fmt.Errorf(
+				"%w with exit code %d: %s",
+				errCommandFailed,
+				execInspect.ExitCode,
+				execOutput,
+			)
+			clog.WithError(err).Debug("Command execution failed")
+
+			return false, err
+		}
+
+		break
+	}
+
+	return false, nil
 }

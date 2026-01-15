@@ -1,5 +1,3 @@
-// Package filters provides filtering logic for Watchtower containers.
-// It defines various filter functions to select containers based on names, labels, scopes, and images.
 package filters
 
 import (

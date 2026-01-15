@@ -1,4 +1,3 @@
-// Package flags provides tests for Watchtower’s flag and environment variable handling.
 package flags
 
 import (
@@ -911,7 +910,7 @@ func TestSetupLogging_FlagErrors(t *testing.T) {
 
 // testGetSecretsFromFiles is a helper function to test secret retrieval from flags or files.
 // It sets up a command, applies arguments, and checks the resulting flag value.
-func testGetSecretsFromFiles(t *testing.T, flagName string, expected string, args ...string) {
+func testGetSecretsFromFiles(t *testing.T, flagName, expected string, args ...string) {
 	t.Helper() // Mark as helper to improve stack trace readability.
 
 	cmd := new(cobra.Command)

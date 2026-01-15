@@ -1,5 +1,3 @@
-// Package metrics provides functionality for tracking and exposing Watchtower scan metrics.
-// It integrates with Prometheus to monitor container scan outcomes, including scanned, updated, and failed counts.
 package metrics
 
 import (
@@ -281,16 +279,21 @@ func TestMetrics_StateTransitions(t *testing.T) {
 			}
 
 			for _, mf := range metricFamilies {
-				if expectedValue, exists := tt.expectedValues[*mf.Name]; exists {
-					if len(mf.Metric) == 0 {
-						t.Errorf("No metrics found for %s", *mf.Name)
+				if expectedValue, exists := tt.expectedValues[mf.GetName()]; exists {
+					if len(mf.GetMetric()) == 0 {
+						t.Errorf("No metrics found for %s", mf.GetName())
 
 						continue
 					}
 
-					actualValue := *mf.Metric[0].Gauge.Value
+					actualValue := mf.GetMetric()[0].GetGauge().GetValue()
 					if actualValue != expectedValue {
-						t.Errorf("Metric %s = %v, want %v", *mf.Name, actualValue, expectedValue)
+						t.Errorf(
+							"Metric %s = %v, want %v",
+							mf.GetName(),
+							actualValue,
+							expectedValue,
+						)
 					}
 				}
 			}
@@ -407,18 +410,18 @@ func TestMetrics_PriorityOrdering(t *testing.T) {
 		}
 
 		for _, mf := range metricFamilies {
-			if expectedValue, exists := expectedTotals[*mf.Name]; exists {
-				if len(mf.Metric) == 0 {
-					t.Errorf("No metrics found for %s", *mf.Name)
+			if expectedValue, exists := expectedTotals[mf.GetName()]; exists {
+				if len(mf.GetMetric()) == 0 {
+					t.Errorf("No metrics found for %s", mf.GetName())
 
 					continue
 				}
 
-				actualValue := *mf.Metric[0].Gauge.Value
+				actualValue := mf.GetMetric()[0].GetGauge().GetValue()
 				if actualValue != expectedValue {
 					t.Errorf(
 						"Final aggregated metric %s = %v, want %v",
-						*mf.Name,
+						mf.GetName(),
 						actualValue,
 						expectedValue,
 					)
@@ -515,21 +518,21 @@ func TestDefault(t *testing.T) {
 func verifyMetricValue(t *testing.T, mf *dto.MetricFamily, expectedValue float64) {
 	t.Helper()
 
-	if len(mf.Metric) == 0 {
-		t.Errorf("No metrics found for %s", *mf.Name)
+	if len(mf.GetMetric()) == 0 {
+		t.Errorf("No metrics found for %s", mf.GetName())
 
 		return
 	}
 
 	var actualValue float64
-	if mf.Metric[0].Gauge != nil {
-		actualValue = *mf.Metric[0].Gauge.Value
-	} else if mf.Metric[0].Counter != nil {
-		actualValue = *mf.Metric[0].Counter.Value
+	if mf.GetMetric()[0].GetGauge() != nil {
+		actualValue = mf.GetMetric()[0].GetGauge().GetValue()
+	} else if mf.GetMetric()[0].GetCounter() != nil {
+		actualValue = mf.GetMetric()[0].GetCounter().GetValue()
 	}
 
 	if actualValue != expectedValue {
-		t.Errorf("Metric %s = %v, want %v", *mf.Name, actualValue, expectedValue)
+		t.Errorf("Metric %s = %v, want %v", mf.GetName(), actualValue, expectedValue)
 	}
 }
 
@@ -572,7 +575,7 @@ func TestMetrics_IntegrationWithOtherTypes(t *testing.T) {
 		}
 
 		for _, mf := range metricFamilies {
-			if expectedValue, exists := expectedValues[*mf.Name]; exists {
+			if expectedValue, exists := expectedValues[mf.GetName()]; exists {
 				verifyMetricValue(t, mf, expectedValue)
 			}
 		}
@@ -598,7 +601,7 @@ func TestMetrics_IntegrationWithOtherTypes(t *testing.T) {
 		}
 
 		for _, mf := range metricFamilies {
-			if expectedValue, exists := finalExpectedValues[*mf.Name]; exists {
+			if expectedValue, exists := finalExpectedValues[mf.GetName()]; exists {
 				verifyMetricValue(t, mf, expectedValue)
 			}
 		}
@@ -690,8 +693,8 @@ func TestNewWithRegistry(t *testing.T) {
 			}
 
 			for _, mf := range metricFamilies {
-				if !expectedNames[*mf.Name] {
-					t.Errorf("Unexpected metric family registered: %s", *mf.Name)
+				if !expectedNames[mf.GetName()] {
+					t.Errorf("Unexpected metric family registered: %s", mf.GetName())
 				}
 			}
 		})
@@ -752,14 +755,14 @@ func TestMetrics_RaceConditions(t *testing.T) {
 		)
 
 		for _, mf := range metricFamilies {
-			switch *mf.Name {
+			switch mf.GetName() {
 			case "watchtower_scans_total":
-				if len(mf.Metric) > 0 && mf.Metric[0].Counter != nil {
-					totalScans = *mf.Metric[0].Counter.Value
+				if len(mf.GetMetric()) > 0 && mf.GetMetric()[0].GetCounter() != nil {
+					totalScans = mf.GetMetric()[0].GetCounter().GetValue()
 				}
 			case "watchtower_metrics_dropped_total":
-				if len(mf.Metric) > 0 && mf.Metric[0].Counter != nil {
-					totalDropped = *mf.Metric[0].Counter.Value
+				if len(mf.GetMetric()) > 0 && mf.GetMetric()[0].GetCounter() != nil {
+					totalDropped = mf.GetMetric()[0].GetCounter().GetValue()
 				}
 			}
 		}
@@ -798,9 +801,9 @@ func TestMetrics_RaceConditions(t *testing.T) {
 		var totalScansAfter float64
 
 		for _, mf := range metricFamiliesAfter {
-			if *mf.Name == "watchtower_scans_total" {
-				if len(mf.Metric) > 0 && mf.Metric[0].Counter != nil {
-					totalScansAfter = *mf.Metric[0].Counter.Value
+			if mf.GetName() == "watchtower_scans_total" {
+				if len(mf.GetMetric()) > 0 && mf.GetMetric()[0].GetCounter() != nil {
+					totalScansAfter = mf.GetMetric()[0].GetCounter().GetValue()
 				}
 
 				break
@@ -934,20 +937,25 @@ func TestMetrics_RestartedWithPartialFailures(t *testing.T) {
 			}
 
 			for _, mf := range metricFamilies {
-				if expectedValue, exists := tc.expected[*mf.Name]; exists {
-					if len(mf.Metric) == 0 {
-						t.Errorf("No metrics found for %s", *mf.Name)
+				if expectedValue, exists := tc.expected[mf.GetName()]; exists {
+					if len(mf.GetMetric()) == 0 {
+						t.Errorf("No metrics found for %s", mf.GetName())
 
 						continue
 					}
 
 					var actualValue float64
-					if mf.Metric[0].Gauge != nil {
-						actualValue = *mf.Metric[0].Gauge.Value
+					if mf.GetMetric()[0].GetGauge() != nil {
+						actualValue = mf.GetMetric()[0].GetGauge().GetValue()
 					}
 
 					if actualValue != expectedValue {
-						t.Errorf("Metric %s = %v, want %v", *mf.Name, actualValue, expectedValue)
+						t.Errorf(
+							"Metric %s = %v, want %v",
+							mf.GetName(),
+							actualValue,
+							expectedValue,
+						)
 					}
 				}
 			}
@@ -1198,16 +1206,16 @@ func assertMetricsStoppedAfterShutdown(
 	}
 
 	for _, mf := range metricFamilies {
-		if expectedValue, exists := expectedValues[*mf.Name]; exists {
-			if len(mf.Metric) == 0 {
+		if expectedValue, exists := expectedValues[mf.GetName()]; exists {
+			if len(mf.GetMetric()) == 0 {
 				continue
 			}
 
-			actualValue := *mf.Metric[0].Gauge.Value
+			actualValue := mf.GetMetric()[0].GetGauge().GetValue()
 			if actualValue != expectedValue {
 				t.Errorf(
 					"Metric %s changed after shutdown: got %v, want %v",
-					*mf.Name,
+					mf.GetName(),
 					actualValue,
 					expectedValue,
 				)

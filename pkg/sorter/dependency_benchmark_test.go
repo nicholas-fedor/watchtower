@@ -29,10 +29,9 @@ func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Co
 	for i := range count {
 		container := containers[i].(*mockSorter.SimpleContainer)
 		// Each container depends on up to 'dependencyFactor' percentage of previous containers
-		maxDeps := int(float64(i) * dependencyFactor)
-		if maxDeps > 5 { // Cap at 5 dependencies per container for realism
-			maxDeps = 5
-		}
+		maxDeps := min(int(float64(i)*dependencyFactor),
+			// Cap at 5 dependencies per container for realism
+			5)
 
 		var links []string
 

@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -874,8 +875,8 @@ var _ = ginkgo.Describe("the client", func() {
 	})
 
 	// Test suite for executing commands in a container.
-	ginkgo.Describe(`ExecuteCommand`, func() {
-		ginkgo.When(`logging`, func() {
+	ginkgo.Describe("ExecuteCommand", func() {
+		ginkgo.When("logging", func() {
 			ginkgo.It("should include container id field", func() {
 				client := client{
 					api:           docker,
@@ -940,7 +941,7 @@ var _ = ginkgo.Describe("the client", func() {
 						),
 						ghttp.VerifyJSONRepresenting(dockerContainer.ExecOptions{
 							User:   user,
-							Detach: false,
+							Detach: true,
 							Tty:    true,
 							Cmd: []string{
 								"sh",
@@ -948,7 +949,7 @@ var _ = ginkgo.Describe("the client", func() {
 								cmd,
 							},
 							Env: []string{
-								`WT_CONTAINER={"name":"test-container","id":"ex-cont-id","image_name":"test-image:latest","stop_signal":"SIGTERM","labels":{}}`,
+								"WT_CONTAINER={\"name\":\"test-container\",\"id\":\"ex-cont-id\",\"image_name\":\"test-image:latest\",\"stop_signal\":\"SIGTERM\",\"labels\":{}}",
 							},
 						}),
 						ghttp.RespondWithJSONEncoded(
@@ -963,8 +964,7 @@ var _ = ginkgo.Describe("the client", func() {
 							gomega.MatchRegexp(fmt.Sprintf(`^/v[0-9.]+/exec/%v/start$`, execID)),
 						),
 						ghttp.VerifyJSONRepresenting(dockerContainer.ExecStartOptions{
-							Detach: false,
-							Tty:    true,
+							Tty: true,
 						}),
 						ghttp.RespondWith(http.StatusOK, nil),
 					),
@@ -996,8 +996,150 @@ var _ = ginkgo.Describe("the client", func() {
 				// Execute command and verify log output includes container id.
 				_, err = client.ExecuteCommand(container, cmd, 1, 0, 0)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Eventually(logbuf).Should(gbytes.Say(`container_id=ex-cont-id`))
+				gomega.Eventually(logbuf).Should(gbytes.Say("container_id=ex-cont-id"))
 			})
+
+			ginkgo.It("should skip updates when command exits with code 75", func() {
+				client := client{
+					api:           docker,
+					ClientOptions: ClientOptions{},
+				}
+				// Capture logrus output in buffer.
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
+				user := ""
+				containerID := types.ContainerID("ex-cont-id")
+				execID := "ex-exec-id"
+				cmd := "exec-cmd"
+				// Set up mock server handlers for GetContainer and exec operations.
+				mockServer.AppendHandlers(
+					// Handler for ContainerInspect (GetContainer)
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp(
+								fmt.Sprintf("^/v[0-9.]+/containers/%v/json$", containerID),
+							),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerContainer.InspectResponse{
+								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+									ID:    string(containerID),
+									Name:  "/test-container",
+									Image: "test-image:latest",
+									State: &dockerContainer.State{
+										Status: "running",
+									},
+									HostConfig: &dockerContainer.HostConfig{},
+								},
+								Config: &dockerContainer.Config{
+									Image:  "test-image:latest",
+									Labels: map[string]string{},
+								},
+							},
+						),
+					),
+					// Handler for ImageInspect
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerImage.InspectResponse{
+								ID: "test-image-id",
+							},
+						),
+					),
+					// Handler for ContainerExecCreate
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"POST",
+							gomega.MatchRegexp(
+								fmt.Sprintf("^/v[0-9.]+/containers/%v/exec$", containerID),
+							),
+						),
+						ghttp.VerifyJSONRepresenting(dockerContainer.ExecOptions{
+							User:   user,
+							Detach: true,
+							Tty:    true,
+							Cmd: []string{
+								"sh",
+								"-c",
+								cmd,
+							},
+							Env: []string{
+								"WT_CONTAINER={\"name\":\"test-container\",\"id\":\"ex-cont-id\",\"image_name\":\"test-image:latest\",\"stop_signal\":\"SIGTERM\",\"labels\":{}}",
+							},
+						}),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerContainer.CommitResponse{ID: execID},
+						),
+					),
+					// Handler for ContainerExecStart
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"POST",
+							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%v/start$", execID)),
+						),
+						ghttp.VerifyJSONRepresenting(dockerContainer.ExecStartOptions{
+							Tty: true,
+						}),
+						ghttp.RespondWith(http.StatusOK, nil),
+					),
+					// Handler for ContainerExecInspect with exit code 75
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.MatchRegexp("^/v[0-9.]+/exec/ex-exec-id/json$"),
+						),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusOK,
+							dockerBackend.ExecInspect{
+								ID:       execID,
+								Running:  false,
+								ExitCode: &[]int{75}[0],
+								ProcessConfig: &dockerBackend.ExecProcessConfig{
+									Entrypoint: "sh",
+									Arguments:  []string{"-c", cmd},
+									User:       user,
+								},
+								ContainerID: string(containerID),
+							},
+						),
+					),
+				)
+				// Get the container first
+				container, err := client.GetContainer(containerID)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				// Execute command and verify skip update is true
+				skipUpdate, err := client.ExecuteCommand(container, cmd, 1, 0, 0)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(skipUpdate).To(gomega.BeTrue())
+				gomega.Eventually(logbuf).Should(gbytes.Say("container_id=ex-cont-id"))
+			})
+		})
+	})
+
+	// Test suite for captureExecOutput.
+	ginkgo.Describe("captureExecOutput", func() {
+		ginkgo.It("should return error when attach fails", func() {
+			client := client{api: docker}
+			ctx := context.Background()
+			_, err := client.captureExecOutput(ctx, "exec-id")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to attach"))
+		})
+
+		ginkgo.It("should handle context cancellation", func() {
+			client := client{api: docker}
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			_, err := client.captureExecOutput(ctx, "exec-id")
+			gomega.Expect(err).To(gomega.HaveOccurred())
 		})
 	})
 
