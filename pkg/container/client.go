@@ -847,7 +847,7 @@ func (c client) WaitForContainerHealthy(
 			}
 
 			// Check if health check is configured
-			if inspect.State.Health == nil {
+			if inspect.State == nil || inspect.State.Health == nil {
 				clog.Debug("No health check configured for container, proceeding")
 
 				return nil
