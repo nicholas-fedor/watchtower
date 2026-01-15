@@ -272,7 +272,7 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 		return &dockerContainer.Config{Image: c.ImageName()}
 	}
 
-	config := c.containerInfo.Config
+	config := *c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 
 	// Handle missing image info case.
@@ -281,7 +281,7 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 
 		config.Image = c.ImageName()
 
-		return config
+		return &config
 	}
 
 	// Compare with image config to clear defaults.
@@ -361,7 +361,7 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 	config.Image = c.ImageName()
 	clog.WithField("image", config.Image).Debug("Generated create config")
 
-	return config
+	return &config
 }
 
 // GetCreateHostConfig generates a host configuration for recreation.

@@ -304,7 +304,7 @@ func Update(
 		}
 	} else {
 		// Mark containers linked to restarting ones for restart without updating.
-		UpdateImplicitRestart(client, filteredContainers)
+		UpdateImplicitRestart(allContainers, filteredContainers)
 	}
 
 	// Collect all containers to restart (updates and implicit restarts)
@@ -420,17 +420,10 @@ func hasSelfDependency(c types.Container) bool {
 // they are restarted in the correct order without being marked as updated.
 //
 // Parameters:
-//   - client: Container client for listing all containers.
+//   - allContainers: List of all containers.
 //   - containers: List of containers to update.
-func UpdateImplicitRestart(client container.Client, containers []types.Container) {
+func UpdateImplicitRestart(allContainers, containers []types.Container) {
 	logrus.Debug("Starting UpdateImplicitRestart")
-
-	allContainers, err := client.ListContainers(filters.NoFilter)
-	if err != nil {
-		logrus.WithError(err).Warn("Failed to list containers for implicit restart")
-
-		return
-	}
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
 

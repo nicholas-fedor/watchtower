@@ -557,17 +557,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					// Mark container B as stale (should trigger restart)
 					containerB.SetStale(true)
 
-					client := mockActions.CreateMockClient(
-						&mockActions.TestData{
-							Containers: containers,
-							Staleness:  map[string]bool{"container-a": false, "container-b": true},
-						},
-						false,
-						false,
-					)
-
 					// Run UpdateImplicitRestart - should not panic or error on invalid dependencies
-					actions.UpdateImplicitRestart(client, containers)
+					actions.UpdateImplicitRestart(containers, containers)
 
 					// Container A should not be marked for restart due to invalid dependency
 					gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
@@ -640,22 +631,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containerB.ToRestart()).To(gomega.BeFalse())
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
-				client := mockActions.CreateMockClient(
-					&mockActions.TestData{
-						Containers: containers,
-						Staleness: map[string]bool{
-							"container-d": true,
-							"container-c": false,
-							"container-b": false,
-							"container-a": false,
-						},
-					},
-					false,
-					false,
-				)
-
 				// Run UpdateImplicitRestart to propagate restart through the chain
-				actions.UpdateImplicitRestart(client, containers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Verify state transitions: all containers should now be marked for restart
 				gomega.Expect(containerD.ToRestart()).To(gomega.BeTrue())
@@ -725,22 +702,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				// Mark base as stale
 				base.SetStale(true)
 
-				client := mockActions.CreateMockClient(
-					&mockActions.TestData{
-						Containers: containers,
-						Staleness: map[string]bool{
-							"base": true,
-							"dep1": false,
-							"dep2": false,
-							"dep3": false,
-						},
-					},
-					false,
-					false,
-				)
-
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(client, containers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Verify all dependents are marked for restart
 				gomega.Expect(base.ToRestart()).To(gomega.BeTrue())
@@ -784,17 +747,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				// Mark container A as stale
 				containerA.SetStale(true)
 
-				client := mockActions.CreateMockClient(
-					&mockActions.TestData{
-						Containers: containers,
-						Staleness:  map[string]bool{"container-a": true, "container-b": false},
-					},
-					false,
-					false,
-				)
-
 				// Run UpdateImplicitRestart - should handle circular dependency gracefully
-				actions.UpdateImplicitRestart(client, containers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Both should be marked for restart despite circular dependency
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeTrue())
@@ -849,21 +803,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				staleNoDeps.SetStale(true)
 				staleWithDeps.SetStale(true)
 
-				client := mockActions.CreateMockClient(
-					&mockActions.TestData{
-						Containers: containers,
-						Staleness: map[string]bool{
-							"stale-no-deps":   true,
-							"fresh-with-deps": false,
-							"stale-with-deps": true,
-						},
-					},
-					false,
-					false,
-				)
-
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(client, containers)
+				actions.UpdateImplicitRestart(containers, containers)
 
 				// Verify correct restart marking
 				gomega.Expect(staleNoDeps.ToRestart()).To(gomega.BeTrue())
