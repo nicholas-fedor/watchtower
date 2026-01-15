@@ -1002,7 +1002,7 @@ func restartContainersInSortedOrder(
 		wasStopped := false
 
 		for _, stopped := range stoppedImages {
-			if stopped.ImageID == c.ImageID() {
+			if stopped.ContainerID == c.ID() {
 				wasStopped = true
 
 				break
