@@ -384,7 +384,14 @@ func removeExcessContainers(
 	}
 
 	if cleanupImages {
-		_, _ = RemoveImages(client, *removeImageInfos)
+		_, err := RemoveImages(client, *removeImageInfos)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"removed_images_count": len(*removeImageInfos),
+				"image_infos":          *removeImageInfos,
+				"cleanup_images":       true,
+			}).Error("failed to remove excess images")
+		}
 	}
 
 	if excessInstancesRemoved < len(excessWatchtowerContainers) {
