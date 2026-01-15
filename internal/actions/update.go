@@ -189,7 +189,7 @@ func Update(
 		// Track old image ID before update for cleanup notifications.
 		if shouldUpdate {
 			if c, ok := filteredContainers[i].(*container.Container); ok {
-				c.OldImageID = sourceContainer.ImageID()
+				c.SetOldImageID(sourceContainer.ImageID())
 			}
 		}
 
@@ -415,7 +415,7 @@ func hasSelfDependency(c types.Container) bool {
 
 	clog := logrus.WithField("container", c.Name())
 
-	links := container.GetLinksFromWatchtowerLabel(*sourceContainer, clog)
+	links := container.GetLinksFromWatchtowerLabel(sourceContainer, clog)
 
 	return slices.Contains(links, c.Name())
 }
