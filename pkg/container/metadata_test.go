@@ -744,7 +744,7 @@ func TestContainer_StopTimeout_WhenSet(t *testing.T) {
 // TestContainer_StopTimeout_WhenSetToZero verifies StopTimeout returns zero when configured as zero.
 func TestContainer_StopTimeout_WhenSetToZero(t *testing.T) {
 	timeout0 := 0
-	c := Container{
+	c := &Container{
 		containerInfo: &dockerContainer.InspectResponse{
 			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
 			Config: &dockerContainer.Config{
@@ -782,7 +782,7 @@ func TestContainer_StopTimeout_NilContainerInfo(t *testing.T) {
 
 // TestContainer_StopTimeout_NilConfig verifies StopTimeout returns nil for nil Config.
 func TestContainer_StopTimeout_NilConfig(t *testing.T) {
-	c := Container{
+	c := &Container{
 		containerInfo: &dockerContainer.InspectResponse{
 			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
 			Config:            nil,
