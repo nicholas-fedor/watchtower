@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -112,6 +113,8 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 			if errors.As(err, &alreadyRegisteredError) {
 				return nil, fmt.Errorf("failed to register metric: %w", err)
 			}
+
+			logrus.WithError(err).Warn("failed to register metric")
 		}
 	}
 
