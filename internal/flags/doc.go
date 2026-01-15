@@ -12,7 +12,8 @@
 //	cmd := &cobra.Command{}
 //	flags.RegisterSystemFlags(cmd)
 //	flags.SetDefaults()
-//	if err := flags.SetupLogging(cmd.PersistentFlags()); err != nil {
+//	err := flags.SetupLogging(cmd.PersistentFlags())
+//	if err != nil {
 //	    logrus.WithError(err).Fatal("Logging setup failed")
 //	}
 //

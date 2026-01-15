@@ -15,7 +15,8 @@
 //	if err != nil {
 //	    logrus.WithError(err).Error("Update failed")
 //	}
-//	if err := actions.ValidateRollingRestartDependencies(client, filter); err != nil {
+//	err = actions.ValidateRollingRestartDependencies(client, filter)
+//	if err != nil {
 //	    logrus.WithError(err).Error("Sanity check failed")
 //	}
 //	params := actions.RunUpdatesWithNotificationsParams{
