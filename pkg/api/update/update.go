@@ -149,5 +149,9 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	// Set content type to JSON and write response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(buf.Bytes())
+
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		logrus.WithError(err).Error("Failed to write response")
+	}
 }
