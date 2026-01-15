@@ -1,6 +1,7 @@
 package update
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -119,10 +120,6 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	logrus.Debug("Handler: update function completed")
 
-	// Set content type to JSON
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
 	// Return enhanced JSON response with detailed update results
 	response := map[string]any{
 		"summary": map[string]any{
@@ -139,11 +136,18 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		"api_version": "v1",
 	}
 
-	err = json.NewEncoder(w).Encode(response)
+	var buf bytes.Buffer
+
+	err = json.NewEncoder(&buf).Encode(response)
 	if err != nil {
 		logrus.WithError(err).Error("Failed to encode JSON response")
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 
 		return
 	}
+
+	// Set content type to JSON and write response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(buf.Bytes())
 }
