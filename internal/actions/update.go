@@ -41,7 +41,7 @@ const defaultHealthCheckTimeout = 5 * time.Minute
 //
 // Returns:
 //   - types.Report: Session report summarizing scanned, updated, and failed containers.
-//   - []types.CleanedImageInfo: Slice of cleaned image info to clean up after updates.
+//   - []types.RemovedImageInfo: Slice of cleaned image info to clean up after updates.
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func Update(
 	ctx context.Context,
