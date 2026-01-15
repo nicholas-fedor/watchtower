@@ -119,10 +119,13 @@ func GetServiceName(labels map[string]string) string {
 
 // GetContainerNumber extracts the container number from the Docker Compose labels.
 //
-// If the com.docker.compose.container-number is present, returns its value.
+// If the ComposeContainerNumber label is present, returns its value.
 // Otherwise, returns an empty string.
 //
 // Parameters:
+//   - labels: Map of container labels.
+//
+// Returns:
 //   - string: Container replica number if present, empty string otherwise.
 func GetContainerNumber(labels map[string]string) string {
 	if labels == nil {
