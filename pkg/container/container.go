@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
@@ -59,8 +60,9 @@ type Operations interface {
 // It implements the types.Container interface, storing state and metadata
 // for container operations such as updates and lifecycle hooks.
 //
-//nolint:recvcheck // Intentional mix: value receivers for reads, pointer receivers for writes
+
 type Container struct {
+	mu                 sync.RWMutex                     // Protects concurrent access to mutable fields
 	LinkedToRestarting bool                             // Indicates if linked to a restarting container
 	Stale              bool                             // Marks the container as having an outdated image
 	OldImageID         types.ImageID                    // Stores the image ID before update for cleanup tracking
@@ -107,7 +109,10 @@ func NewContainer(
 //
 // Returns:
 //   - bool: True if linked, false otherwise.
-func (c Container) IsLinkedToRestarting() bool {
+func (c *Container) IsLinkedToRestarting() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return c.LinkedToRestarting
 }
 
@@ -116,6 +121,9 @@ func (c Container) IsLinkedToRestarting() bool {
 // Parameters:
 //   - value: New state value.
 func (c *Container) SetLinkedToRestarting(value bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.LinkedToRestarting = value
 }
 
@@ -123,7 +131,10 @@ func (c *Container) SetLinkedToRestarting(value bool) {
 //
 // Returns:
 //   - bool: True if stale, false otherwise.
-func (c Container) IsStale() bool {
+func (c *Container) IsStale() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return c.Stale
 }
 
@@ -132,14 +143,31 @@ func (c Container) IsStale() bool {
 // Parameters:
 //   - value: New stale value.
 func (c *Container) SetStale(value bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.Stale = value
+}
+
+// SetOldImageID sets the old image ID for cleanup tracking.
+//
+// Parameters:
+//   - id: The old image ID.
+func (c *Container) SetOldImageID(id types.ImageID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.OldImageID = id
 }
 
 // ToRestart determines if the container should be restarted.
 //
 // Returns:
 //   - bool: True if stale or linked to restarting, false otherwise.
-func (c Container) ToRestart() bool {
+func (c *Container) ToRestart() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return c.Stale || c.LinkedToRestarting
 }
 
@@ -147,7 +175,7 @@ func (c Container) ToRestart() bool {
 //
 // Returns:
 //   - *dockerContainerType.InspectResponse: Container metadata.
-func (c Container) ContainerInfo() *dockerContainer.InspectResponse {
+func (c *Container) ContainerInfo() *dockerContainer.InspectResponse {
 	return c.containerInfo
 }
 
@@ -155,7 +183,7 @@ func (c Container) ContainerInfo() *dockerContainer.InspectResponse {
 //
 // Returns:
 //   - types.ContainerID: Container ID.
-func (c Container) ID() types.ContainerID {
+func (c *Container) ID() types.ContainerID {
 	if c.containerInfo == nil {
 		return ""
 	}
@@ -167,7 +195,7 @@ func (c Container) ID() types.ContainerID {
 //
 // Returns:
 //   - bool: True if running, false otherwise.
-func (c Container) IsRunning() bool {
+func (c *Container) IsRunning() bool {
 	if c.containerInfo == nil || c.containerInfo.State == nil {
 		return false
 	}
@@ -179,7 +207,7 @@ func (c Container) IsRunning() bool {
 //
 // Returns:
 //   - bool: True if restarting, false otherwise.
-func (c Container) IsRestarting() bool {
+func (c *Container) IsRestarting() bool {
 	if c.containerInfo == nil || c.containerInfo.State == nil {
 		return false
 	}
@@ -191,7 +219,7 @@ func (c Container) IsRestarting() bool {
 //
 // Returns:
 //   - string: Normalized container name.
-func (c Container) Name() string {
+func (c *Container) Name() string {
 	return c.normalizedName
 }
 
@@ -199,7 +227,7 @@ func (c Container) Name() string {
 //
 // Returns:
 //   - types.ImageID: Image ID or empty string if imageInfo is nil.
-func (c Container) ImageID() types.ImageID {
+func (c *Container) ImageID() types.ImageID {
 	if c.imageInfo == nil {
 		return ""
 	}
@@ -213,7 +241,7 @@ func (c Container) ImageID() types.ImageID {
 //
 // Returns:
 //   - string: Image name (e.g., "alpine:latest").
-func (c Container) ImageName() string {
+func (c *Container) ImageName() string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Prefer Zodiac label for image name.
@@ -245,7 +273,7 @@ func (c Container) ImageName() string {
 //
 // Returns:
 //   - bool: True if imageInfo is non-nil, false otherwise.
-func (c Container) HasImageInfo() bool {
+func (c *Container) HasImageInfo() bool {
 	return c.imageInfo != nil
 }
 
@@ -253,7 +281,7 @@ func (c Container) HasImageInfo() bool {
 //
 // Returns:
 //   - *dockerImageType.InspectResponse: Image metadata or nil if unavailable.
-func (c Container) ImageInfo() *dockerImage.InspectResponse {
+func (c *Container) ImageInfo() *dockerImage.InspectResponse {
 	return c.imageInfo
 }
 
@@ -263,7 +291,7 @@ func (c Container) ImageInfo() *dockerImage.InspectResponse {
 //
 // Returns:
 //   - *dockerContainerType.Config: Configuration for container creation.
-func (c Container) GetCreateConfig() *dockerContainer.Config {
+func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	clog := logrus.WithField("container", c.Name())
 
 	if c.containerInfo == nil {
@@ -370,7 +398,7 @@ func (c Container) GetCreateConfig() *dockerContainer.Config {
 //
 // Returns:
 //   - *dockerContainerType.HostConfig: Host configuration for container creation.
-func (c Container) GetCreateHostConfig() *dockerContainer.HostConfig {
+func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	clog := logrus.WithField("container", c.Name())
 
 	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
@@ -414,7 +442,7 @@ func (c Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 //
 // Returns:
 //   - error: Non-nil if metadata is missing or invalid, nil on success.
-func (c Container) VerifyConfiguration() error {
+func (c *Container) VerifyConfiguration() error {
 	// Check for nil image info.
 	if c.imageInfo == nil {
 		logrus.WithField("container", "<unknown>").Debug("No image info available")
@@ -459,7 +487,7 @@ func (c Container) VerifyConfiguration() error {
 //
 // Returns:
 //   - []string: List of linked container names.
-func (c Container) Links() []string {
+func (c *Container) Links() []string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Check Watchtower's depends-on label first.
@@ -570,7 +598,7 @@ func nameOrID(c types.Container) string {
 //
 // Returns:
 //   - []string: List of all normalized links, including potential self-references, or nil if label not present
-func GetLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
+func GetLinksFromWatchtowerLabel(c *Container, clog *logrus.Entry) []string {
 	// Get the depends-on label value or empty string if not present
 	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
 
@@ -622,7 +650,7 @@ func GetLinksFromWatchtowerLabel(c Container, clog *logrus.Entry) []string {
 //
 // Returns:
 //   - []string: List of linked container names, empty if label not present
-func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
+func getLinksFromComposeLabel(c *Container, clog *logrus.Entry) []string {
 	composeDependsOnLabelValue := c.getLabelValueOrEmpty(compose.ComposeDependsOnLabel)
 	clog.WithFields(logrus.Fields{
 		"label": compose.ComposeDependsOnLabel,
@@ -676,7 +704,7 @@ func getLinksFromComposeLabel(c Container, clog *logrus.Entry) []string {
 //
 // Returns:
 //   - []string: List of linked container names
-func getLinksFromHostConfig(c Container, clog *logrus.Entry) []string {
+func getLinksFromHostConfig(c *Container, clog *logrus.Entry) []string {
 	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
 		return nil
 	}
