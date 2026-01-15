@@ -405,6 +405,9 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 // Returns:
 //   - *dockerContainerType.HostConfig: Host configuration for container creation.
 func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	clog := logrus.WithField("container", c.Name())
 
 	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
@@ -413,7 +416,8 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 		return &dockerContainer.HostConfig{}
 	}
 
-	hostConfig := c.containerInfo.HostConfig
+	hostConfigCopy := *c.containerInfo.HostConfig
+	hostConfig := &hostConfigCopy
 
 	// Adjust link format for each entry (and drop invalid ones).
 	adjusted := make([]string, 0, len(hostConfig.Links))
