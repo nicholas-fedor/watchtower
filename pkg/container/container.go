@@ -176,6 +176,9 @@ func (c *Container) ToRestart() bool {
 // Returns:
 //   - *dockerContainerType.InspectResponse: Container metadata.
 func (c *Container) ContainerInfo() *dockerContainer.InspectResponse {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return c.containerInfo
 }
 
@@ -443,6 +446,9 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 // Returns:
 //   - error: Non-nil if metadata is missing or invalid, nil on success.
 func (c *Container) VerifyConfiguration() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	// Check for nil image info.
 	if c.imageInfo == nil {
 		logrus.WithField("container", "<unknown>").Debug("No image info available")
