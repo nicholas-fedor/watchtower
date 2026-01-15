@@ -368,9 +368,12 @@ func run(command *cobra.Command, args []string) {
 		Debug("Received positional arguments for container filtering")
 
 	// Strip forward slash from container names.
-	normalizedContainerNames := make([]string, 0, len(args)*len(args))
-	for range args {
-		normalizedContainerNames = append(normalizedContainerNames, args...)
+	normalizedContainerNames := make([]string, 0, len(args))
+	for _, arg := range args {
+		normalizedContainerNames = append(
+			normalizedContainerNames,
+			util.NormalizeContainerName(arg),
+		)
 	}
 
 	// Determine the effective operational scope, prioritizing explicit scope over scope derived from the container's label.
