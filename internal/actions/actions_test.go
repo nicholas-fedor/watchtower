@@ -975,20 +975,28 @@ var _ = ginkgo.Describe("Actions", func() {
 					},
 				)
 
-				allContainers := []types.Container{scopeAContainer, scopeBContainer}
+				// Create separate container lists for each client
+				containersA := []types.Container{scopeAContainer}
+				containersB := []types.Container{scopeBContainer}
 
-				// Create shared test data with staleness for both containers
-				testData := &mockActions.TestData{
-					Containers: allContainers,
+				// Create separate test data for each client
+				testDataA := &mockActions.TestData{
+					Containers: containersA,
 					Staleness: map[string]bool{
 						"scope-a-app": true,
+					},
+				}
+
+				testDataB := &mockActions.TestData{
+					Containers: containersB,
+					Staleness: map[string]bool{
 						"scope-b-app": true,
 					},
 				}
 
 				// Create mock clients for each scope
-				clientA := mockActions.CreateMockClient(testData, false, false)
-				clientB := mockActions.CreateMockClient(testData, false, false)
+				clientA := mockActions.CreateMockClient(testDataA, false, false)
+				clientB := mockActions.CreateMockClient(testDataB, false, false)
 
 				// Results channel to collect metrics from concurrent operations
 				results := make(chan *metrics.Metric, 2)
