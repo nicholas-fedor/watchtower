@@ -686,7 +686,7 @@ func runMain(cfg types.RunConfig) int {
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)
 
-		return 1 // Exit while indicating falure.
+		return 1 // Exit while indicating failure.
 	}
 
 	return 0 // Default to success if execution completes without errors.
