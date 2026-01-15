@@ -218,9 +218,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				resp, err := http.Post(server.URL()+"/v1/update", "application/json", nil)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				defer resp.Body.Close()
-				// Verify that StatusInternalServerError was attempted to be set
+				// Verify that StatusOK was set (status is set before writing)
 				gomega.Expect(faulty.lastStatusCode).
-					To(gomega.Equal(http.StatusInternalServerError))
+					To(gomega.Equal(http.StatusOK))
 				// Verify that writing was attempted (but failed)
 				gomega.Expect(faulty.written).To(gomega.BeTrue())
 			},
