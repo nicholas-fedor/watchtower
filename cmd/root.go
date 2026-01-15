@@ -378,7 +378,8 @@ func run(command *cobra.Command, args []string) {
 
 	// Determine the effective operational scope, prioritizing explicit scope over scope derived from the container's label.
 	// This ensures scope persistence during self-updates.
-	scope, err := container.GetEffectiveScope(currentWatchtowerContainer, scope)
+	var err error
+	scope, err = container.GetEffectiveScope(currentWatchtowerContainer, scope)
 	if err != nil {
 		logrus.WithError(err).Debug("Scope derivation failed, continuing with current scope")
 	}
