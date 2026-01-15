@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -611,8 +612,19 @@ func (c client) ExecuteCommand(
 	uid int,
 	gid int,
 ) (bool, error) {
-	ctx := context.Background()
 	clog := logrus.WithField("container_id", container.ID())
+
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Minute)
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
 
 	// Generate JSON metadata for the container.
 	metadataJSON, err := generateContainerMetadata(container)
@@ -642,7 +654,7 @@ func (c client) ExecuteCommand(
 	clog.WithField("command", command).Debug("Creating exec instance")
 	execConfig := dockerContainer.ExecOptions{
 		Tty:    true,
-		Detach: false,
+		Detach: true,
 		Cmd:    []string{"sh", "-c", command},
 		Env:    []string{"WT_CONTAINER=" + metadataJSON},
 		User:   user,
@@ -967,18 +979,31 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 
 	defer response.Close()
 
-	// Read output into a buffer.
+	// Read output into a buffer with timeout.
 	var writer bytes.Buffer
 
-	written, err := writer.ReadFrom(response.Reader)
-	if err != nil {
-		clog.WithError(err).Debug("Failed to read exec output")
+	done := make(chan error, 1)
 
-		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, err)
+	go func() {
+		_, err := io.Copy(&writer, response.Reader)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			clog.WithError(err).Debug("Failed to read exec output")
+
+			return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, err)
+		}
+	case <-ctx.Done():
+		response.Close()
+
+		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, ctx.Err())
 	}
 
 	// Return trimmed output if any was captured.
-	if written > 0 {
+	if writer.Len() > 0 {
 		output := strings.TrimSpace(writer.String())
 		clog.WithField("output", output).Debug("Captured exec output")
 
@@ -1046,7 +1071,7 @@ func (c client) waitForExecOrTimeout(
 
 		// Log output if present.
 		if len(execOutput) > 0 {
-			clog.WithField("output", execOutput).Info("Command output captured")
+			clog.WithField("output_length", len(execOutput)).Debug("Command output captured")
 		}
 
 		// Handle specific exit codes.
