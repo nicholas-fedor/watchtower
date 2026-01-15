@@ -196,7 +196,7 @@ func NewClient(opts ClientOptions) Client {
 	// Apply forced API version if set and valid.
 	if version := strings.Trim(os.Getenv("DOCKER_API_VERSION"), "\""); version != "" {
 		pingCli, err := dockerClient.NewClientWithOpts(
-			dockerClient.WithHost(cli.DaemonHost()),
+			dockerClient.FromEnv, // Include env config for TLS, etc.
 			dockerClient.WithVersion(version),
 		)
 		if err != nil {
@@ -204,16 +204,25 @@ func NewClient(opts ClientOptions) Client {
 		}
 
 		_, err = pingCli.Ping(ctx)
-		if err != nil &&
-			strings.Contains(err.Error(), "page not found") {
+		switch {
+		case err == nil:
+			// Ping succeeded: use the forced version client
+			cli = pingCli
+		case strings.Contains(err.Error(), "page not found"):
 			logrus.WithFields(logrus.Fields{
 				"version":  version,
 				"error":    err,
 				"endpoint": "/_ping",
 			}).Warn("Invalid API version; falling back to autonegotiation")
 			cli.NegotiateAPIVersion(ctx)
-		} else {
-			cli = pingCli
+		default:
+			// Other ping failure: fall back to negotiation (don't override with broken client)
+			logrus.WithFields(logrus.Fields{
+				"version":  version,
+				"error":    err,
+				"endpoint": "/_ping",
+			}).Warn("Ping failed with non-version error; falling back to autonegotiation")
+			cli.NegotiateAPIVersion(ctx)
 		}
 	} else {
 		cli.NegotiateAPIVersion(ctx)
