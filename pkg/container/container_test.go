@@ -721,10 +721,8 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.DescribeTable("replica container identifiers",
 			func(name string, labels map[string]string, expected, description string) {
 				container := MockContainer(WithLabels(labels))
-				if expected == name {
-					container.containerInfo.Name = name
-					container.normalizedName = name
-				}
+				container.containerInfo.Name = name
+				container.normalizedName = name
 				result := ResolveContainerIdentifier(container)
 				gomega.Expect(result).To(gomega.Equal(expected), "Test case: %s", description)
 			},
