@@ -661,6 +661,7 @@ func runMain(cfg types.RunConfig) int {
 		logging.WriteStartupMessage,
 	)
 	if err != nil {
+		logNotify("API setup failed", err)
 		return 1 // Exit while indicating failure.
 	}
 
