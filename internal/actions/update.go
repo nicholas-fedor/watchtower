@@ -838,7 +838,7 @@ func performRollingRestart(
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed stops.
-//   - []types.CleanedImageInfo: Slice of cleaned image info for stopped containers.
+//   - []types.RemovedImageInfo: Slice of cleaned image info for stopped containers.
 func stopContainersInReversedOrder(
 	containers []types.Container,
 	client container.Client,
