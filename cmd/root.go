@@ -661,7 +661,7 @@ func runMain(cfg types.RunConfig) int {
 		logging.WriteStartupMessage,
 	)
 	if err != nil {
-		return 1 // Exit while indicating falure.
+		return 1 // Exit while indicating failure.
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
