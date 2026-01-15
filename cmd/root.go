@@ -523,12 +523,10 @@ func runMain(cfg types.RunConfig) int {
 			LifecycleUID:                 lifecycleUID,                 // Default UID to run lifecycle hooks as
 			LifecycleGID:                 lifecycleGID,                 // Default GID to run lifecycle hooks as
 			CPUCopyMode:                  cpuCopyMode,                  // CPU settings handling when recreating containers
-			PullFailureDelay: time.Duration(
-				0,
-			), // Delay after failed Watchtower self-update pulls
-			RunOnce:            params.RunOnce,               // Perform one-time update and exit
-			SkipSelfUpdate:     params.SkipSelfUpdate,        // Skip Watchtower self-update
-			CurrentContainerID: currentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
+			PullFailureDelay:             params.PullFailureDelay,      // Delay after failed Watchtower self-update pulls
+			RunOnce:                      params.RunOnce,               // Perform one-time update and exit
+			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
+			CurrentContainerID:           currentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
 		}
 
 		metric := actions.RunUpdatesWithNotifications(ctx, actionParams)
