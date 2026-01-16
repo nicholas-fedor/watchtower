@@ -2090,4 +2090,94 @@ var _ = ginkgo.Describe("the update action", func() {
 			},
 		)
 	})
+
+	ginkgo.When("handling transitive dependencies with replica container names", func() {
+		ginkgo.It(
+			"should restart all containers in db → app → web chain when db is updated",
+			func() {
+				// Create containers with replica-style names (e.g., myproject-db-1)
+				// and depends-on labels referencing service names without replica numbers
+				// This reproduces the bug where exact matching fails for transitive dependencies
+
+				dbContainer := mockActions.CreateMockContainerWithConfig(
+					"myproject-db-1",
+					"/myproject-db-1",
+					"mariadb:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // Make it stale
+					&dockerContainer.Config{
+						Image:  "mariadb:latest",
+						Labels: map[string]string{
+							// No depends-on for db
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				appContainer := mockActions.CreateMockContainerWithConfig(
+					"myproject-app-1",
+					"/myproject-app-1",
+					"php:fpm",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Image: "php:fpm",
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "myproject-db",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				webContainer := mockActions.CreateMockContainerWithConfig(
+					"myproject-web-1",
+					"/myproject-web-1",
+					"nginx:alpine",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Image: "nginx:alpine",
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "myproject-app",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{dbContainer, appContainer, webContainer},
+						Staleness: map[string]bool{
+							"myproject-db-1":  true,
+							"myproject-app-1": false,
+							"myproject-web-1": false,
+						},
+					},
+					false,
+					false,
+				)
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).
+					To(gomega.HaveLen(1))
+					// Only db is stale and updated
+
+				// Verify db was updated
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).To(gomega.Equal("myproject-db-1"))
+
+				// Verify transitive dependencies were restarted
+				gomega.Expect(appContainer.ToRestart()).
+					To(gomega.BeTrue(), "app should be restarted due to db update")
+				gomega.Expect(webContainer.ToRestart()).
+					To(gomega.BeTrue(), "web should be restarted due to transitive dependency on app")
+			},
+		)
+	})
 })
