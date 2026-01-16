@@ -651,6 +651,7 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 		"WATCHTOWER_NOTIFICATION_SLACK_ICON_EMOJI": "legacy",
 		"WATCHTOWER_NOTIFICATION_SLACK_ICON_URL":   "legacy",
 		"DOCKER_CERT_PATH":                         "new feature",
+		"WATCHTOWER_NOTIFICATION_TEMPLATE_FILE":    "new feature",
 	}
 
 	ignoredFlags := map[string]string{
@@ -658,6 +659,7 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 		"notification-slack-icon-emoji": "legacy",
 		"notification-slack-icon-url":   "legacy",
 		"cert-path":                     "new feature",
+		"notification-template-file":    "new feature",
 	}
 
 	cmd := new(cobra.Command)
