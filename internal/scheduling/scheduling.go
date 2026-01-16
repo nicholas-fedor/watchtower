@@ -104,9 +104,13 @@ func RunUpgradesOnSchedule(
 	}
 
 	// Create a new cron scheduler for managing periodic updates.
-	// Configured with seconds precision, skip overlapping runs, and panic recovery.
+	// Configured with optional seconds, skip overlapping runs, and panic recovery.
 	scheduler := cron.New(
-		cron.WithSeconds(),
+		cron.WithParser(
+			cron.NewParser(
+				cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor,
+			),
+		),
 		cron.WithChain(
 			cron.SkipIfStillRunning(cron.DefaultLogger),
 			cron.Recover(cron.DefaultLogger),
