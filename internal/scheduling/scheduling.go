@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -34,8 +34,10 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 
 	if len(lock) == 0 {
 		select {
-		case <-lock:
+		case v := <-lock:
 			logrus.Debug("Lock acquired, update finished.")
+
+			lock <- v
 		case <-time.After(updateWaitTimeout):
 			logrus.Warn("Timeout waiting for running update to finish, proceeding with shutdown.")
 		case <-ctx.Done():
@@ -102,10 +104,23 @@ func RunUpgradesOnSchedule(
 	}
 
 	// Create a new cron scheduler for managing periodic updates.
-	scheduler := cron.New()
+	// Configured with optional seconds, skip overlapping runs, and panic recovery.
+	scheduler := cron.New(
+		cron.WithParser(
+			cron.NewParser(
+				cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor,
+			),
+		),
+		cron.WithChain(
+			cron.SkipIfStillRunning(cron.DefaultLogger),
+			cron.Recover(cron.DefaultLogger),
+		),
+	)
 
 	// Define the update function to be used both for scheduled runs and immediate execution.
-	updateFunc := func(skipWatchtowerSelfUpdate bool) {
+	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
+	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
+	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool) {
 		// Skip update if this is a Watchtower parent container (from self-update chain)
 		if currentWatchtowerContainer != nil {
 			chain, _ := currentWatchtowerContainer.GetContainerChain()
@@ -122,23 +137,37 @@ func RunUpgradesOnSchedule(
 			}
 		}
 
-		select {
-		case v := <-lock:
-			defer func() { lock <- v }()
+		// Acquire the update lock: blocking waits indefinitely, non-blocking returns if unavailable
+		if blocking {
+			// Blocking acquisition: wait for the lock to become available
+			v := <-lock
 
-			params := types.UpdateParams{
-				Cleanup:        cleanup,
-				RunOnce:        false,
-				MonitorOnly:    monitorOnly,
-				SkipSelfUpdate: skipWatchtowerSelfUpdate,
+			defer func() { lock <- v }()
+		} else {
+			// Non-blocking acquisition: try to get lock without waiting, skip update if busy
+			select {
+			case v := <-lock:
+				defer func() { lock <- v }()
+			default:
+				logrus.Debug("Update skipped: another update is currently running")
+
+				return
 			}
-			metric := runUpdatesWithNotifications(ctx, filter, params)
-			metrics.Default().RegisterScan(metric)
-			logrus.Debug("Update operation completed successfully")
-		default:
-			metrics.Default().RegisterScan(nil)
-			logrus.Debug("Skipped another update already running.")
 		}
+
+		params := types.UpdateParams{
+			Cleanup:        cleanup,
+			RunOnce:        false,
+			MonitorOnly:    monitorOnly,
+			SkipSelfUpdate: skipWatchtowerSelfUpdate,
+		}
+
+		metric := runUpdatesWithNotifications(ctx, filter, params)
+		if metric != nil {
+			metrics.Default().RegisterScan(metric)
+		}
+
+		logrus.Debug("Update operation completed successfully")
 
 		nextRuns := scheduler.Entries()
 		if len(nextRuns) > 0 {
@@ -152,9 +181,10 @@ func RunUpgradesOnSchedule(
 	// If Watchtower has performed a self-cleanup, then prevent Watchtower
 	// from self-updating during the first update cycle.
 	if skipFirstRun {
-		var firstRun uint32
+		var firstRun uint32 // atomic flag to track if this is the first run
 
 		scheduledUpdateFunc = func() {
+			// Atomically check and set firstRun to ensure only the first execution skips self-update
 			skipWatchtowerSelfUpdate := atomic.CompareAndSwapUint32(&firstRun, 0, 1)
 			if skipWatchtowerSelfUpdate {
 				logrus.Debug(
@@ -162,15 +192,15 @@ func RunUpgradesOnSchedule(
 				)
 			}
 
-			updateFunc(skipWatchtowerSelfUpdate)
+			updateFunc(skipWatchtowerSelfUpdate, true)
 		}
 	} else {
-		scheduledUpdateFunc = func() { updateFunc(false) }
+		scheduledUpdateFunc = func() { updateFunc(false, true) }
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
 	if scheduleSpec != "" {
-		err := scheduler.AddFunc(
+		_, err := scheduler.AddFunc(
 			scheduleSpec,
 			scheduledUpdateFunc)
 		if err != nil {
@@ -188,11 +218,14 @@ func RunUpgradesOnSchedule(
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
 	if updateOnStart {
-		updateFunc(false)
+		updateFunc(false, false)
 	}
 
-	// Start the scheduler to begin periodic execution.
-	scheduler.Start()
+	// Start the scheduler to begin periodic execution if scheduling is enabled.
+	// Only start if a schedule spec was provided (empty string means no scheduling).
+	if scheduleSpec != "" {
+		scheduler.Start()
+	}
 
 	// Set up signal handling for graceful shutdown.
 	interrupt := make(chan os.Signal, 1)
