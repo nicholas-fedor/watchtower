@@ -2,6 +2,7 @@ package sorter
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -235,11 +236,34 @@ func buildDependencyGraph(
 		normalizedIdentifier := normalizedMap[c]
 		// c.Links() already returns normalized container names
 		for _, normalizedLink := range c.Links() {
+			// Try exact match first
 			if _, exists := containerMap[normalizedLink]; exists {
 				// This container depends on the linked container, so increment its indegree
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
 				adjacency[normalizedLink] = append(adjacency[normalizedLink], normalizedIdentifier)
+
+				continue
+			}
+
+			// Try prefix match for service names (e.g., "myproject-db" -> "myproject-db-1", "myproject-db-2")
+			// Also check for embedded service names (e.g., "test-db-1" matches "db")
+			var matchedKeys []string
+
+			for key := range containerMap {
+				if strings.HasPrefix(key, normalizedLink+"-") ||
+					strings.Contains(key, "-"+normalizedLink+"-") {
+					matchedKeys = append(matchedKeys, key)
+				}
+			}
+
+			sort.Strings(matchedKeys)
+
+			for _, key := range matchedKeys {
+				// This container depends on the linked container, so increment its indegree
+				indegree[normalizedIdentifier]++
+				// The linked container has this container as a dependent
+				adjacency[key] = append(adjacency[key], normalizedIdentifier)
 			}
 		}
 	}
