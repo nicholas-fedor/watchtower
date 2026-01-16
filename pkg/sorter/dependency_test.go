@@ -422,6 +422,56 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			// Order may vary since no dependencies
 		})
 
+		ginkgo.It(
+			"should handle prefix matching linking service name to multiple replicas deterministically",
+			func() {
+				// App container that depends on "db" service
+				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				app.EXPECT().Name().Return("app")
+				app.EXPECT().ID().Return(types.ContainerID("id-app"))
+				app.EXPECT().Links().Return([]string{"db"})
+				app.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+				// Multiple db replicas
+				db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db1.EXPECT().Name().Return("db-1")
+				db1.EXPECT().ID().Return(types.ContainerID("id-db1"))
+				db1.EXPECT().Links().Return(nil)
+				db1.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+				db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db2.EXPECT().Name().Return("db-2")
+				db2.EXPECT().ID().Return(types.ContainerID("id-db2"))
+				db2.EXPECT().Links().Return(nil)
+				db2.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-2"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+				db3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db3.EXPECT().Name().Return("db-3")
+				db3.EXPECT().ID().Return(types.ContainerID("id-db3"))
+				db3.EXPECT().Links().Return(nil)
+				db3.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-3"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+				containers := []types.Container{app, db1, db2, db3}
+				result, err := sortByDependencies(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(result).To(gomega.HaveLen(4))
+
+				// Verify deterministic sorting: dependencies (db replicas) come first in reverse alphabetical order, then dependent (app)
+				gomega.Expect(result[0].Name()).To(gomega.Equal("db-3"))
+				gomega.Expect(result[1].Name()).To(gomega.Equal("db-2"))
+				gomega.Expect(result[2].Name()).To(gomega.Equal("db-1"))
+				gomega.Expect(result[3].Name()).To(gomega.Equal("app"))
+			},
+		)
+
 		ginkgo.It("should handle containers with service names containing leading slashes", func() {
 			// Test that containers with service names containing leading slashes are handled correctly
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())

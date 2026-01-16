@@ -246,17 +246,23 @@ func buildDependencyGraph(
 				continue
 			}
 
-			// Try prefix match for service names (e.g., "myproject-db" -> "myproject-db-1")
+			// Try prefix match for service names (e.g., "myproject-db" -> "myproject-db-1", "myproject-db-2")
 			if strings.Contains(normalizedLink, "-") {
+				var matchedKeys []string
+
 				for key := range containerMap {
 					if strings.HasPrefix(key, normalizedLink+"-") {
-						// This container depends on the linked container, so increment its indegree
-						indegree[normalizedIdentifier]++
-						// The linked container has this container as a dependent
-						adjacency[key] = append(adjacency[key], normalizedIdentifier)
-
-						break // Match first container with this service prefix
+						matchedKeys = append(matchedKeys, key)
 					}
+				}
+
+				sort.Strings(matchedKeys)
+
+				for _, key := range matchedKeys {
+					// This container depends on the linked container, so increment its indegree
+					indegree[normalizedIdentifier]++
+					// The linked container has this container as a dependent
+					adjacency[key] = append(adjacency[key], normalizedIdentifier)
 				}
 			}
 		}
