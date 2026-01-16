@@ -1,6 +1,8 @@
 package compose
 
 import (
+	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -20,7 +22,7 @@ const (
 
 // ParseDependsOnLabel parses the Docker Compose depends_on label value.
 //
-// It expects a comma-separated list of service:condition:required format.
+// It handles both JSON format (Docker Compose v2+) and comma-separated string format.
 // Returns a slice of service names.
 //
 // Parameters:
@@ -33,12 +35,34 @@ func ParseDependsOnLabel(labelValue string) []string {
 		return nil
 	}
 
+	clog := logrus.WithField("label_value", labelValue)
+	clog.Debug("Parsing compose depends-on label")
+
+	// Try to parse as JSON first (Docker Compose v2+ format)
+	if strings.HasPrefix(strings.TrimSpace(labelValue), "{") {
+		var dependsOn map[string]any
+
+		err := json.Unmarshal([]byte(labelValue), &dependsOn)
+		if err != nil {
+			clog.WithError(err).Debug("Failed to parse as JSON, falling back to string parsing")
+		} else {
+			services := make([]string, 0, len(dependsOn))
+			for service := range dependsOn {
+				services = append(services, service)
+			}
+			// Sort for consistent ordering
+			sort.Strings(services)
+			clog.WithField("parsed_services", services).
+				Debug("Parsed JSON format compose depends-on label")
+
+			return services
+		}
+	}
+
+	// Fall back to string parsing (legacy format)
 	deps := strings.Split(labelValue, ",")
 	services := make([]string, 0, len(deps))
 
-	clog := logrus.WithField("label_value", labelValue)
-
-	clog.Debug("Parsing compose depends-on label")
 	// Parse comma-separated list of service:condition:required
 	for _, dep := range deps {
 		dep = strings.TrimSpace(dep)
@@ -56,7 +80,8 @@ func ParseDependsOnLabel(labelValue string) []string {
 		}
 	}
 
-	clog.WithField("parsed_services", services).Debug("Completed parsing compose depends-on label")
+	clog.WithField("parsed_services", services).
+		Debug("Completed parsing string format compose depends-on label")
 
 	return services
 }

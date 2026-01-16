@@ -535,7 +535,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						time.Now().AddDate(0, 0, -1),
 						&dockerContainer.Config{
 							Labels: map[string]string{
-								"com.centurylinklabs.watchtower.depends-on": "non-existent-container",
+								"com.centurylinklabs.watchtower.depends-on": "nonexistent",
 							},
 							ExposedPorts: map[nat.Port]struct{}{},
 						})
@@ -813,6 +813,187 @@ var _ = ginkgo.Describe("the update action", func() {
 					// Should be restarted due to dependency
 				gomega.Expect(staleWithDeps.ToRestart()).To(gomega.BeTrue())
 			})
+
+			ginkgo.It("should propagate restart through deep dependency chains", func() {
+				// Create a deep dependency chain: A -> B -> C -> D -> E -> F
+				containerF := mockActions.CreateMockContainerWithConfig(
+					"container-f",
+					"/container-f",
+					"image-f:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerE := mockActions.CreateMockContainerWithConfig(
+					"container-e",
+					"/container-e",
+					"image-e:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-f",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerD := mockActions.CreateMockContainerWithConfig(
+					"container-d",
+					"/container-d",
+					"image-d:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-e",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerC := mockActions.CreateMockContainerWithConfig(
+					"container-c",
+					"/container-c",
+					"image-c:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-d",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerB := mockActions.CreateMockContainerWithConfig(
+					"container-b",
+					"/container-b",
+					"image-b:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-c",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containerA := mockActions.CreateMockContainerWithConfig(
+					"container-a",
+					"/container-a",
+					"image-a:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "container-b",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{
+					containerF,
+					containerE,
+					containerD,
+					containerC,
+					containerB,
+					containerA,
+				}
+
+				// Initially, only F should be marked for restart
+				containerF.SetStale(true)
+				gomega.Expect(containerF.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerE.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(containerD.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(containerC.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(containerB.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
+
+				// Run UpdateImplicitRestart to propagate restart through the deep chain
+				actions.UpdateImplicitRestart(containers, containers)
+
+				// Verify state transitions: all containers should now be marked for restart
+				gomega.Expect(containerF.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerE.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerD.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerC.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerB.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containerA.ToRestart()).To(gomega.BeTrue())
+			})
+
+			ginkgo.It(
+				"should handle container names different from service names in depends-on",
+				func() {
+					// Create containers with names that include project/service suffixes (like Docker Compose)
+					// and depends-on labels that reference the service names
+					dbContainer := mockActions.CreateMockContainerWithConfig(
+						"project1-db-1",
+						"/project1-db-1",
+						"mariadb:latest",
+						true,
+						false,
+						time.Now().AddDate(0, 0, -1),
+						&dockerContainer.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					appContainer := mockActions.CreateMockContainerWithConfig(
+						"project1-app-1",
+						"/project1-app-1",
+						"php:fpm",
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "db",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					webContainer := mockActions.CreateMockContainerWithConfig(
+						"project1-web-1",
+						"/project1-web-1",
+						"nginx:alpine",
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower.depends-on": "app",
+							},
+							ExposedPorts: map[nat.Port]struct{}{},
+						})
+
+					containers := []types.Container{dbContainer, appContainer, webContainer}
+
+					// Initially, only db should be marked for restart
+					dbContainer.SetStale(true)
+					gomega.Expect(dbContainer.ToRestart()).To(gomega.BeTrue())
+					gomega.Expect(appContainer.ToRestart()).To(gomega.BeFalse())
+					gomega.Expect(webContainer.ToRestart()).To(gomega.BeFalse())
+
+					// Run UpdateImplicitRestart - should match "project1-db-1" to "db" and propagate
+					actions.UpdateImplicitRestart(containers, containers)
+
+					// Verify that restart propagates through service name matching
+					gomega.Expect(dbContainer.ToRestart()).To(gomega.BeTrue())
+					gomega.Expect(appContainer.ToRestart()).
+						To(gomega.BeTrue())
+						// depends on "db", matches "project1-db-1"
+					gomega.Expect(webContainer.ToRestart()).
+						To(gomega.BeTrue())
+					// depends on "app", matches "project1-app-1"
+				},
+			)
 		})
 
 		ginkgo.When("testing rolling restart functionality", func() {

@@ -373,6 +373,44 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(result).To(gomega.BeNil())
 		})
 
+		ginkgo.It("should handle containers with project-prefixed names and service links", func() {
+			// test-db-1 (no dependencies)
+			db := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			db.EXPECT().Name().Return("test-db-1")
+			db.EXPECT().ID().Return(types.ContainerID("id-db"))
+			db.EXPECT().Links().Return(nil)
+			db.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-db-1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			// app-1 depends on "db"
+			app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			app.EXPECT().Name().Return("app-1")
+			app.EXPECT().ID().Return(types.ContainerID("id-app"))
+			app.EXPECT().Links().Return([]string{"db"})
+			app.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app-1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			// test-web-1 depends on "app"
+			web := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			web.EXPECT().Name().Return("test-web-1")
+			web.EXPECT().ID().Return(types.ContainerID("id-web"))
+			web.EXPECT().Links().Return([]string{"app"})
+			web.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-web-1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			containers := []types.Container{web, app, db} // Unsorted order
+			result, err := sortByDependencies(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.HaveLen(3))
+			// Dependencies first: db, then app (depends on db), then web (depends on app)
+			gomega.Expect(result[0].Name()).To(gomega.Equal("test-db-1"))
+			gomega.Expect(result[1].Name()).To(gomega.Equal("app-1"))
+			gomega.Expect(result[2].Name()).To(gomega.Equal("test-web-1"))
+		})
+
 		ginkgo.It("should handle containers with service names", func() {
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("container1")
@@ -427,8 +465,8 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			func() {
 				// App container that depends on "db" service
 				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
-				app.EXPECT().Name().Return("app")
-				app.EXPECT().ID().Return(types.ContainerID("id-app"))
+				app.EXPECT().Name().Return("app").Maybe()
+				app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
 				app.EXPECT().Links().Return([]string{"db"})
 				app.EXPECT().
 					ContainerInfo().
@@ -436,39 +474,44 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 
 				// Multiple db replicas
 				db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
-				db1.EXPECT().Name().Return("db-1")
-				db1.EXPECT().ID().Return(types.ContainerID("id-db1"))
+				db1.EXPECT().Name().Return("db-1").Maybe()
+				db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
 				db1.EXPECT().Links().Return(nil)
 				db1.EXPECT().
 					ContainerInfo().
 					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
 
 				db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
-				db2.EXPECT().Name().Return("db-2")
-				db2.EXPECT().ID().Return(types.ContainerID("id-db2"))
+				db2.EXPECT().Name().Return("db-2").Maybe()
+				db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
 				db2.EXPECT().Links().Return(nil)
 				db2.EXPECT().
 					ContainerInfo().
 					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-2"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
 
 				db3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
-				db3.EXPECT().Name().Return("db-3")
-				db3.EXPECT().ID().Return(types.ContainerID("id-db3"))
+				db3.EXPECT().Name().Return("db-3").Maybe()
+				db3.EXPECT().ID().Return(types.ContainerID("id-db3")).Maybe()
 				db3.EXPECT().Links().Return(nil)
 				db3.EXPECT().
 					ContainerInfo().
 					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-3"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
 
 				containers := []types.Container{app, db1, db2, db3}
-				result, err := sortByDependencies(containers)
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-				gomega.Expect(result).To(gomega.HaveLen(4))
+				gomega.Expect(containerMap).To(gomega.HaveLen(4))
 
-				// Verify deterministic sorting: dependencies (db replicas) come first in reverse alphabetical order, then dependent (app)
-				gomega.Expect(result[0].Name()).To(gomega.Equal("db-3"))
-				gomega.Expect(result[1].Name()).To(gomega.Equal("db-2"))
-				gomega.Expect(result[2].Name()).To(gomega.Equal("db-1"))
-				gomega.Expect(result[3].Name()).To(gomega.Equal("app"))
+				// Verify app depends on all db replicas
+				gomega.Expect(indegree["app"]).To(gomega.Equal(3))
+				gomega.Expect(adjacency["db-1"]).To(gomega.ContainElement("app"))
+				gomega.Expect(adjacency["db-2"]).To(gomega.ContainElement("app"))
+				gomega.Expect(adjacency["db-3"]).To(gomega.ContainElement("app"))
+
+				// Verify db replicas have no dependencies
+				gomega.Expect(indegree["db-1"]).To(gomega.Equal(0))
+				gomega.Expect(indegree["db-2"]).To(gomega.Equal(0))
+				gomega.Expect(indegree["db-3"]).To(gomega.Equal(0))
 			},
 		)
 

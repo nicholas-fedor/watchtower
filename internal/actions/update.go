@@ -434,8 +434,8 @@ func hasSelfDependency(c types.Container) bool {
 
 // UpdateImplicitRestart marks containers linked to restarting ones.
 //
-// It checks each container's links, marking those dependent on restarting containers to ensure
-// they are restarted in the correct order without being marked as updated.
+// It uses a multi-pass algorithm to ensure transitive propagation through the dependency chain,
+// continuing until no more containers are marked for restart.
 //
 // Parameters:
 //   - allContainers: List of all containers.
@@ -452,35 +452,41 @@ func UpdateImplicitRestart(allContainers, containers []types.Container) {
 	}
 
 	markedContainers := []string{}
+	changed := true
 
-	for i, c := range containers {
-		if c.ToRestart() {
-			continue // Skip already marked containers.
-		}
+	for changed {
+		changed = false
 
-		// c.Links() already returns normalized container names
-		links := c.Links()
-		containerIdentifier := container.ResolveContainerIdentifier(c)
-		logrus.WithFields(logrus.Fields{
-			"container":            c.Name(),
-			"container_identifier": containerIdentifier,
-			"links":                links,
-			"to_restart":           c.ToRestart(),
-		}).Debug("Checking links for container")
-
-		if link := linkedIdentifierMarkedForRestart(links, restartByName); link != "" {
-			logrus.WithFields(logrus.Fields{
-				"container":  c.Name(),
-				"restarting": link,
-			}).Debug("Marked container as linked to restarting")
-			containers[i].SetLinkedToRestarting(true)
-
-			if ac, ok := byID[c.ID()]; ok {
-				ac.SetLinkedToRestarting(true)
-				restartByName[ac.Name()] = true
+		for i, c := range containers {
+			if c.ToRestart() {
+				continue // Skip already marked containers.
 			}
 
-			markedContainers = append(markedContainers, c.Name())
+			// c.Links() already returns normalized container names
+			links := c.Links()
+			containerIdentifier := container.ResolveContainerIdentifier(c)
+			logrus.WithFields(logrus.Fields{
+				"container":            c.Name(),
+				"container_identifier": containerIdentifier,
+				"links":                links,
+				"to_restart":           c.ToRestart(),
+			}).Debug("Checking links for container")
+
+			if link := linkedIdentifierMarkedForRestart(links, restartByName); link != "" {
+				logrus.WithFields(logrus.Fields{
+					"container":  c.Name(),
+					"restarting": link,
+				}).Debug("Marked container as linked to restarting")
+				containers[i].SetLinkedToRestarting(true)
+
+				if ac, ok := byID[c.ID()]; ok {
+					ac.SetLinkedToRestarting(true)
+					restartByName[ac.Name()] = true
+				}
+
+				markedContainers = append(markedContainers, c.Name())
+				changed = true
+			}
 		}
 	}
 
@@ -559,9 +565,11 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 	}).Debug("Searching for restarting linked container")
 
 	for _, link := range links {
+		logrus.WithField("checking_link", link).Debug("Checking link for restarting match")
+
 		if restartByIdentifier[link] {
 			logrus.WithField("found_restarting_identifier", link).
-				Debug("Found restarting linked container")
+				Debug("Found restarting linked container via exact match")
 
 			return link
 		}
@@ -569,6 +577,8 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 		// For links containing "-", treat as potential service names (e.g., from Compose depends_on)
 		// First check for exact match, then check for service prefix match
 		if strings.Contains(link, "-") {
+			logrus.WithField("link_contains_dash", link).
+				Debug("Link contains dash, checking service prefix match")
 			// Check if any restarting container has this link as a service prefix
 			for identifier, restarting := range restartByIdentifier {
 				if restarting && strings.HasPrefix(identifier, link+"-") {
@@ -579,6 +589,29 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 					}).Debug("Found restarting linked container via service prefix match")
 
 					return identifier
+				}
+			}
+
+			// For compose dependencies with "-", also check for service name matches
+			// Extract service name (last part after the last dash)
+			parts := strings.Split(link, "-")
+			if len(parts) > 1 {
+				serviceName := parts[len(parts)-1]
+				logrus.WithFields(logrus.Fields{
+					"link":        link,
+					"serviceName": serviceName,
+				}).Debug("Checking for service name match")
+
+				for identifier, restarting := range restartByIdentifier {
+					if restarting && strings.Contains(identifier, serviceName) {
+						logrus.WithFields(logrus.Fields{
+							"link":        link,
+							"serviceName": serviceName,
+							"matched":     identifier,
+						}).Debug("Found restarting linked container via service name match")
+
+						return identifier
+					}
 				}
 			}
 

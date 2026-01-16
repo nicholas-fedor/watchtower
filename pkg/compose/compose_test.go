@@ -22,6 +22,16 @@ var _ = ginkgo.Describe("Compose", func() {
 			[]string{"postgres", "redis"},
 		),
 		ginkgo.Entry("ignores empty parts", "postgres,,redis", []string{"postgres", "redis"}),
+		ginkgo.Entry(
+			"parses JSON format",
+			`{"database":{"condition":"service_started"}}`,
+			[]string{"database"},
+		),
+		ginkgo.Entry(
+			"parses JSON format with multiple services",
+			`{"database":{"condition":"service_started"},"cache":{"condition":"service_healthy"}}`,
+			[]string{"cache", "database"}, // Sorted alphabetically
+		),
 	)
 
 	ginkgo.DescribeTable(
