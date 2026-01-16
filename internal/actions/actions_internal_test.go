@@ -477,14 +477,42 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 })
 
 var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart", func() {
-	ginkgo.It("should return empty string for ambiguous partial matches", func() {
+	ginkgo.It("should return the identifier for single project match", func() {
 		restartByIdent := map[string]bool{
 			"project1-db": true,
 			"project2-db": true,
 		}
 		links := []string{"db"}
-		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
-		gomega.Expect(result).To(gomega.Equal(""))
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"project1-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting1 := mockActions.CreateMockContainerWithConfig(
+			"project1-db",
+			"project1-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting2 := mockActions.CreateMockContainerWithConfig(
+			"project2-db",
+			"project2-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting1, restarting2}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("project1-db"))
 	})
 
 	ginkgo.It("should return the identifier for single partial match", func() {
@@ -492,7 +520,26 @@ var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart", func() {
 			"project1-db": true,
 		}
 		links := []string{"db"}
-		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"project1-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting1 := mockActions.CreateMockContainerWithConfig(
+			"project1-db",
+			"project1-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting1}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
 		gomega.Expect(result).To(gomega.Equal("project1-db"))
 	})
 
@@ -502,7 +549,35 @@ var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart", func() {
 			"project1-db": true,
 		}
 		links := []string{"db"}
-		result := linkedIdentifierMarkedForRestart(links, restartByIdent)
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"project1-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting1 := mockActions.CreateMockContainerWithConfig(
+			"project1-db",
+			"project1-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		exact := mockActions.CreateMockContainerWithConfig(
+			"db",
+			"db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting1, exact}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
 		gomega.Expect(result).To(gomega.Equal("db"))
 	})
 })

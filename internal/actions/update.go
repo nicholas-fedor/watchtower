@@ -14,6 +14,7 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/docker/docker/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
@@ -27,6 +28,9 @@ const defaultPullFailureDelay = 5 * time.Minute
 
 // defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
 const defaultHealthCheckTimeout = 5 * time.Minute
+
+// projectServiceParts defines the expected number of parts in a project-service link format.
+const projectServiceParts = 2
 
 // Update scans and updates containers based on parameters.
 //
@@ -472,7 +476,12 @@ func UpdateImplicitRestart(allContainers, containers []types.Container) {
 				"to_restart":           c.ToRestart(),
 			}).Debug("Checking links for container")
 
-			if link := linkedIdentifierMarkedForRestart(links, restartByName); link != "" {
+			if link := linkedIdentifierMarkedForRestart(
+				links,
+				restartByName,
+				c,
+				allContainers,
+			); link != "" {
 				logrus.WithFields(logrus.Fields{
 					"container":  c.Name(),
 					"restarting": link,
@@ -547,26 +556,42 @@ func shouldUpdateContainer(stale bool, container types.Container, config types.U
 // linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.
 //
 // It searches for a container identifier in the links list that is marked for restart,
-// returning its identifier. For links that contain "-", indicating potential service names
-// (like project-service), it performs exact matching first, then service prefix matching
-// for Compose dependencies. For links without "-", indicating service names,
-// it performs partial matching with warnings for ambiguity.
+// returning its identifier. For exact matches, it matches directly. For links containing
+// a dash (project-service format), it extracts the project and service, matching containers
+// with the same project and service. For links without dashes (service names only),
+// it matches containers with that service name across projects for cross-project dependencies.
 //
 // Parameters:
 //   - links: List of linked container identifiers.
 //   - restartByIdentifier: Map of container identifiers to restart status.
+//   - dependentContainer: The container that has the dependency.
+//   - allContainers: List of all containers.
 //
 // Returns:
 //   - string: Identifier of restarting linked container, or empty if none.
-func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[string]bool) string {
+func linkedIdentifierMarkedForRestart(
+	links []string,
+	restartByIdentifier map[string]bool,
+	dependentContainer types.Container,
+	allContainers []types.Container,
+) string {
+	nameToContainer := make(map[string]types.Container, len(allContainers))
+	for _, cont := range allContainers {
+		nameToContainer[cont.Name()] = cont
+	}
+
+	dependentProject := getProject(dependentContainer)
+
 	logrus.WithFields(logrus.Fields{
 		"links":               links,
 		"restartByIdentifier": restartByIdentifier,
+		"dependentProject":    dependentProject,
 	}).Debug("Searching for restarting linked container")
 
 	for _, link := range links {
 		logrus.WithField("checking_link", link).Debug("Checking link for restarting match")
 
+		// Exact match
 		if restartByIdentifier[link] {
 			logrus.WithField("found_restarting_identifier", link).
 				Debug("Found restarting linked container via exact match")
@@ -574,76 +599,76 @@ func linkedIdentifierMarkedForRestart(links []string, restartByIdentifier map[st
 			return link
 		}
 
-		// For links containing "-", treat as potential service names (e.g., from Compose depends_on)
-		// First check for exact match, then check for service prefix match
-		if strings.Contains(link, "-") {
-			logrus.WithField("link_contains_dash", link).
-				Debug("Link contains dash, checking service prefix match")
-			// Check if any restarting container has this link as a service prefix
+		if strings.Contains(link, "-") && strings.Count(link, "-") == 1 {
+			// project-service format (only if exactly one dash)
+			parts := strings.Split(link, "-")
+			if len(parts) != projectServiceParts {
+				continue
+			}
+
+			linkProject := parts[0]
+			serviceName := parts[1]
+
+			logrus.WithFields(logrus.Fields{
+				"link":        link,
+				"linkProject": linkProject,
+				"serviceName": serviceName,
+			}).Debug("Checking project-service match")
+
 			for identifier, restarting := range restartByIdentifier {
-				if restarting && strings.HasPrefix(identifier, link+"-") {
+				if restarting && getProject(nameToContainer[identifier]) == linkProject &&
+					strings.Contains(identifier, serviceName) {
 					logrus.WithFields(logrus.Fields{
-						"link":                 link,
-						"matched":              identifier,
-						"service_prefix_match": true,
-					}).Debug("Found restarting linked container via service prefix match")
+						"link":    link,
+						"matched": identifier,
+						"project": linkProject,
+						"service": serviceName,
+					}).Debug("Found restarting linked container via project-service match")
 
 					return identifier
 				}
 			}
-
-			// For compose dependencies with "-", also check for service name matches
-			// Extract service name (last part after the last dash)
-			parts := strings.Split(link, "-")
-			if len(parts) > 1 {
-				serviceName := parts[len(parts)-1]
-				logrus.WithFields(logrus.Fields{
-					"link":        link,
-					"serviceName": serviceName,
-				}).Debug("Checking for service name match")
-
-				for identifier, restarting := range restartByIdentifier {
-					if restarting && strings.Contains(identifier, serviceName) {
-						logrus.WithFields(logrus.Fields{
-							"link":        link,
-							"serviceName": serviceName,
-							"matched":     identifier,
-						}).Debug("Found restarting linked container via service name match")
-
-						return identifier
-					}
-				}
-			}
-
-			continue
-		}
-
-		// For links without "-", perform partial matching with warning for ambiguity
-		var partialMatches []string
-
-		for identifier, restarting := range restartByIdentifier {
-			if restarting && strings.Contains(identifier, link) {
-				if !slices.Contains(partialMatches, identifier) {
-					partialMatches = append(partialMatches, identifier)
-				}
-			}
-		}
-
-		// Apply deterministic logic for partial matches: return the unique match if exactly one exists,
-		// otherwise log a warning and return empty string to prevent ambiguous selections.
-		if len(partialMatches) == 1 {
-			return partialMatches[0]
-		} else if len(partialMatches) > 1 {
+		} else {
+			// service name only, match across projects for cross-project dependencies
 			logrus.WithFields(logrus.Fields{
-				"ambiguous_identifiers": partialMatches,
-				"links":                 links,
-			}).Warn("Ambiguous container links. Use unique names to avoid conflicts.")
+				"link":             link,
+				"dependentProject": dependentProject,
+			}).Debug("Checking service-only match")
 
-			return ""
+			for identifier, restarting := range restartByIdentifier {
+				if restarting && strings.Contains(identifier, link) {
+					logrus.WithFields(logrus.Fields{
+						"link":    link,
+						"matched": identifier,
+						"project": getProject(nameToContainer[identifier]),
+					}).Debug("Found restarting linked container via service-only match")
+
+					return identifier
+				}
+			}
 		}
 	}
 
 	logrus.Debug("No restarting linked container found")
+
+	return ""
+}
+
+// getProject extracts the project name from a container's compose project label.
+func getProject(c types.Container) string {
+	if cont, ok := c.(*container.Container); ok {
+		if info := cont.ContainerInfo(); info != nil && info.Config != nil {
+			project := compose.GetProjectName(info.Config.Labels)
+			if project != "" {
+				return project
+			}
+		}
+	}
+	// Fallback to parsing from container name
+	containerName := c.Name()
+	if idx := strings.Index(containerName, "-"); idx > 0 {
+		return containerName[:idx]
+	}
 
 	return ""
 }
