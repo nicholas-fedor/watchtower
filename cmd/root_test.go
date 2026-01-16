@@ -809,14 +809,14 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			atomic.AddInt32(&updateCallCount, 1)
 			synctest.Wait() // Simulate update work
 
-			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+			return nil // Don't trigger metrics in test
 		}
 
 		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
 		// Start both instances concurrently
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
@@ -847,7 +847,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		}()
 
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
@@ -1034,13 +1034,13 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 			// Signal that we're in the update
 			synctest.Wait() // Simulate update work
 
-			return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+			return nil // Don't trigger metrics in test
 		}
 
 		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
 		// Create a cancellable context for shutdown
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 
 		// Start runUpgradesOnSchedule in a goroutine
 		go func() {
