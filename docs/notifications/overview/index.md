@@ -147,6 +147,23 @@ docker run -d \
   nickfedor/watchtower
 ```
 
+## Notification Templates
+
+Watchtower allows you to customize the format and content of notification messages using Go templates. You can define templates either inline or load them from a file.
+
+### Inline Templates
+
+Use the `--notification-template` argument or `WATCHTOWER_NOTIFICATION_TEMPLATE` environment variable to specify a template directly as a string.
+
+### File-Based Templates
+
+For more complex templates or better maintainability, use the `--notification-template-file` argument or `WATCHTOWER_NOTIFICATION_TEMPLATE_FILE` environment variable to specify a path to a template file.
+
+!!! Note
+    When both inline and file-based templates are specified, the file-based template takes precedence.
+
+For detailed information about template syntax, available data structures, and examples, see the [Notification Templates](../templates/index.md) documentation.
+
 ## Email Notifications
 
 Watchtower uses Shoutrrr's [smtp service](https://shoutrrr.nickfedor.com/services/email/){target="_blank" rel="noopener noreferrer"} to send email notifications.

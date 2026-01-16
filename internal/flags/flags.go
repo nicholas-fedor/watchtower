@@ -474,6 +474,11 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		envString("WATCHTOWER_NOTIFICATION_TEMPLATE"),
 		"The shoutrrr text/template for the messages")
 
+	flags.String(
+		"notification-template-file",
+		envString("WATCHTOWER_NOTIFICATION_TEMPLATE_FILE"),
+		"Path to a file containing the Shoutrrr text/template for the messages")
+
 	flags.StringArray(
 		"notification-url",
 		filterEmptyStrings(splitNotificationValues(envString("WATCHTOWER_NOTIFICATION_URL"))),
@@ -947,7 +952,8 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 
 					return fmt.Errorf("%w: %w", errOpenFileFailed, err)
 				}
-				defer file.Close()
+
+				defer func() { _ = file.Close() }()
 
 				scanner := bufio.NewScanner(file)
 				for scanner.Scan() {

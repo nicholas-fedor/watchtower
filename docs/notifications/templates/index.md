@@ -15,6 +15,32 @@ Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE
              Default: See default templates below
 ```
 
+### Notification Template File
+
+Sets the path to a file containing the Go template used for formatting notification messages.
+
+```text
+            Argument: --notification-template-file
+Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE_FILE
+                Type: String
+             Default: (empty)
+```
+
+When both `--notification-template` and `--notification-template-file` are specified, the file-based template takes precedence over the inline template.
+
+#### Examples
+
+Create a template file named `custom-template.txt` with your desired template content, then mount it into the container and specify the path:
+
+```bash
+docker run -d \
+  --name watchtower \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /path/to/custom-template.txt:/custom-template.txt \
+  -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
+  nickfedor/watchtower:latest
+```
+
 ### Notification Report
 
 Enables the session report as the notification template data, including container statuses and logs.

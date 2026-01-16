@@ -828,6 +828,17 @@ Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
              Default: None
 ```
 
+### Notification Template File
+
+Specifies the path to a file containing the Shoutrrr text/template for notification messages.
+
+```text
+             Argument: --notification-template-file
+ Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE_FILE
+                 Type: String
+              Default: None
+```
+
 ### Disable Startup Message
 
 Suppresses the info-level notification sent when Watchtower starts.

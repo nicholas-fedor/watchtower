@@ -141,6 +141,33 @@ var _ = ginkgo.Describe("notifications", func() {
 				},
 			)
 		})
+		ginkgo.When("notification template file is specified", func() {
+			ginkgo.It("should load template from file", func() {
+				content := "{{.Data.Host}} updated"
+				tmpFile, err := os.CreateTemp("", "template")
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				defer os.Remove(tmpFile.Name())
+
+				_, err = tmpFile.WriteString(content)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				tmpFile.Close()
+
+				command := cmd.NewRootCommand()
+				flags.RegisterNotificationFlags(command)
+
+				err = command.ParseFlags([]string{
+					"--notification-url",
+					"logger://",
+					"--notification-template-file",
+					tmpFile.Name(),
+				})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				notifier := notifications.NewNotifier(command)
+				gomega.Expect(notifier).NotTo(gomega.BeNil())
+				gomega.Expect(notifier.GetNames()).To(gomega.ContainElement("logger"))
+			})
+		})
 	})
 	ginkgo.Describe("the slack notifier", func() {
 		// builderFn := notifications.NewSlackNotifier

@@ -40,7 +40,21 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 	// Extract notification settings.
 	reportTemplate, _ := flag.GetBool("notification-report")
 	stdout, _ := flag.GetBool("notification-log-stdout")
+
 	tplString, _ := flag.GetString("notification-template")
+	if tplFile, _ := flag.GetString("notification-template-file"); tplFile != "" {
+		content, err := os.ReadFile(tplFile)
+		if err != nil {
+			clog.WithError(err).
+				WithField("file", tplFile).
+				Fatal("Failed to read notification template file")
+		}
+
+		tplString = string(content)
+
+		clog.WithField("file", tplFile).Debug("Loaded notification template from file")
+	}
+
 	urls, _ := flag.GetStringArray("notification-url")
 
 	data := GetTemplateData(c)
