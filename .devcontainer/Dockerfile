@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1@sha256:b6afd42430b15f2d2a4c5a02b919e98a525b785b1aaff16747d2f623364e39b6
-FROM golang:1.25.6-alpine3.22@sha256:ab0033b336123effda5e57bda16c24334cf91f30695fa646ac67f1b2093877df
+FROM golang:1.25.6-alpine3.22@sha256:d9c983d2ac66c3f43208dfb6b092dd1296baa058766e3aa88a1b233adeb416c1
 ARG GOOS=linux
 ARG TARGETARCH
 
