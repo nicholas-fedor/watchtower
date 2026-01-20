@@ -8,13 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add support for file-based notification templates by @nicholas-fedor in [#1209](https://github.com/nicholas-fedor/watchtower/pull/1209)
+
 ### Changed
 
+- Update cron package to v3 with enhanced concurrency control by @nicholas-fedor in [#1208](https://github.com/nicholas-fedor/watchtower/pull/1208)
+- Fix Watchtower self-update logging during safeguard period by @nicholas-fedor in [#1204](https://github.com/nicholas-fedor/watchtower/pull/1204)
 - Add skylenet to contributor section by @nicholas-fedor in [#1183](https://github.com/nicholas-fedor/watchtower/pull/1183)
 - Auto-detect container stop timeout from Docker config by @skylenet in [#1182](https://github.com/nicholas-fedor/watchtower/pull/1182)
 
 ### Chores
 
+- Update actions/setup-python digest to bfe8cc5 by @renovate[bot] in [#1221](https://github.com/nicholas-fedor/watchtower/pull/1221)
+- Update goreleaser/goreleaser-action digest to aacbb7f by @renovate[bot] in [#1220](https://github.com/nicholas-fedor/watchtower/pull/1220)
+- Update golangci/golangci-lint-action digest to a3a03ee by @renovate[bot] in [#1219](https://github.com/nicholas-fedor/watchtower/pull/1219)
+- Update golang:alpine docker digest to d9b2e14 by @renovate[bot] in [#1218](https://github.com/nicholas-fedor/watchtower/pull/1218)
+- Update golang:1.25.6-alpine3.22 docker digest to d9c983d by @renovate[bot] in [#1217](https://github.com/nicholas-fedor/watchtower/pull/1217)
+- Update cimg/go docker tag to v1.25.6 by @renovate[bot] in [#1215](https://github.com/nicholas-fedor/watchtower/pull/1215)
+- Update actions/cache digest to 8b402f5 by @renovate[bot] in [#1214](https://github.com/nicholas-fedor/watchtower/pull/1214)
+- Update actions/attest-build-provenance digest to 6865550 by @renovate[bot] in [#1213](https://github.com/nicholas-fedor/watchtower/pull/1213)
+- Update module github.com/docker/cli to v29.1.5+incompatible by @renovate[bot] in [#1212](https://github.com/nicholas-fedor/watchtower/pull/1212)
+- Update golang docker tag to v1.25.6 by @renovate[bot] in [#1207](https://github.com/nicholas-fedor/watchtower/pull/1207)
+- Update golang:alpine docker digest to e689855 by @renovate[bot] in [#1206](https://github.com/nicholas-fedor/watchtower/pull/1206)
+- Update dependency go to v1.25.6 by @renovate[bot] in [#1205](https://github.com/nicholas-fedor/watchtower/pull/1205)
+- Update module github.com/sirupsen/logrus to v1.9.4 by @renovate[bot] in [#1203](https://github.com/nicholas-fedor/watchtower/pull/1203)
+- Update peter-evans/create-pull-request digest to 34aa40e by @renovate[bot] in [#1202](https://github.com/nicholas-fedor/watchtower/pull/1202)
+- Update peter-evans/create-pull-request digest to 641099d by @renovate[bot] in [#1200](https://github.com/nicholas-fedor/watchtower/pull/1200)
+- Update cimg/go:1.25.5 docker digest to e88af54 by @renovate[bot] in [#1198](https://github.com/nicholas-fedor/watchtower/pull/1198)
+- Update docker/login-action digest to 0567fa5 by @renovate[bot] in [#1197](https://github.com/nicholas-fedor/watchtower/pull/1197)
+- Update nicholas-fedor/govulncheck-action digest to 72a75e9 by @renovate[bot] in [#1196](https://github.com/nicholas-fedor/watchtower/pull/1196)
+- Update actions/setup-go digest to 7a3fe6c by @renovate[bot] in [#1195](https://github.com/nicholas-fedor/watchtower/pull/1195)
+- Update module github.com/onsi/ginkgo/v2 to v2.27.5 by @renovate[bot] in [#1194](https://github.com/nicholas-fedor/watchtower/pull/1194)
+- Update nicholas-fedor/govulncheck-action digest to 301b2fd by @renovate[bot] in [#1193](https://github.com/nicholas-fedor/watchtower/pull/1193)
+- Update actions/setup-go digest to d73f6bc by @renovate[bot] in [#1192](https://github.com/nicholas-fedor/watchtower/pull/1192)
+- Update golangci/golangci-lint-action digest to de73c35 by @renovate[bot] in [#1191](https://github.com/nicholas-fedor/watchtower/pull/1191)
+- Update github/codeql-action digest to cdefb33 by @renovate[bot] in [#1190](https://github.com/nicholas-fedor/watchtower/pull/1190)
+- Update module golang.org/x/text to v0.33.0 by @renovate[bot] in [#1188](https://github.com/nicholas-fedor/watchtower/pull/1188)
+- Update nicholas-fedor/govulncheck-action digest to 5e52ebd by @renovate[bot] in [#1187](https://github.com/nicholas-fedor/watchtower/pull/1187)
+- Update actions/checkout digest to 0c366fd by @renovate[bot] in [#1185](https://github.com/nicholas-fedor/watchtower/pull/1185)
+- Update actions/attest-build-provenance digest to 98f3aa9 by @renovate[bot] in [#1184](https://github.com/nicholas-fedor/watchtower/pull/1184)
 - Update module github.com/docker/cli to v29.1.4+incompatible by @renovate[bot] in [#1181](https://github.com/nicholas-fedor/watchtower/pull/1181)
 - Update nicholas-fedor/govulncheck-action digest to 9813de4 by @renovate[bot] in [#1180](https://github.com/nicholas-fedor/watchtower/pull/1180)
 - Update module github.com/onsi/gomega to v1.39.0 by @renovate[bot] in [#1176](https://github.com/nicholas-fedor/watchtower/pull/1176)
@@ -36,6 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Enhance transitive dependency restart for Docker Compose services by @nicholas-fedor in [#1211](https://github.com/nicholas-fedor/watchtower/pull/1211)
+- Resolve data race in concurrent container operations by @nicholas-fedor in [#1201](https://github.com/nicholas-fedor/watchtower/pull/1201)
+- Correct self-update, container management, and dependency issues by @nicholas-fedor in [#1199](https://github.com/nicholas-fedor/watchtower/pull/1199)
 - Respect cross-project dependencies in watchtower depends-on labels by @nicholas-fedor in [#1162](https://github.com/nicholas-fedor/watchtower/pull/1162)
 - Lower log level for pinned image skip to debug by @nicholas-fedor in [#1160](https://github.com/nicholas-fedor/watchtower/pull/1160)
 - Resolve self-update container cleanup issues by @nicholas-fedor in [#1159](https://github.com/nicholas-fedor/watchtower/pull/1159)
