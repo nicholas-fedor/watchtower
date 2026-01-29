@@ -21,19 +21,109 @@ The [`NOTIFICATION URL`](../../configuration/arguments/index.md#notification_url
 
 ### Using Multiple Notification Services
 
-The [`NOTIFICATION URL`](../../configuration/arguments/index.md#notification_url) configuration option can also be used multiple times or use a comma-separated list in the `WATCHTOWER_NOTIFICATION_URL` environment variable to utilize multiple notification services.
+Watchtower supports sending notifications to multiple services simultaneously.
+The preferred method is to use multiple Shoutrrr URL's.
 
-!!! Note "Using multiple notifications with environment variables"
-    There is currently a bug in Viper ([Issue](https://github.com/spf13/viper/issues/380){target="_blank" rel="noopener noreferrer"}), which prevents comma-separated slices to be used when using the environment variable.
+For most Watchtower deployments via Docker Compose, this is best achieved via using either a comma-separated list or YAML array for the [`WATCHTOWER_NOTIFICATION_URL`](../../configuration/arguments/index.md#notification_url) environment variable.
+When running Watchtower via the Docker CLI, the [`--notification-url`](../../configuration/arguments/index.md#notification_url) CLI flag can be used multiple times, or use a comma-separated list.
 
-    A workaround is available where we instead put quotes around the environment variable value and replace the commas with spaces:
+!!! Note "Environment Variable Format"
+    - Both `WATCHTOWER_NOTIFICATION_URL` and `WATCHTOWER_NOTIFICATIONS` support comma-separated and space-separated values via custom parsers that bypass Viper's default behavior.
+    - Commas within URLs (e.g., in query parameters) are preserved.
+    - For Docker Compose, the YAML array syntax is the recommended approach.
 
-    ```
-    WATCHTOWER_NOTIFICATIONS="slack msteams"
-    ```
+=== "Docker CLI"
 
-    If you're a `docker-compose` user, make sure to specify environment variables' values in your `.yml` file without double quotes (`"`).
-    This prevents unexpected errors when Watchtower starts.
+    === "Environment Variable"
+
+        ```bash
+        docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -e WATCHTOWER_NOTIFICATION_URL="discord://token@webhookid,telegram://token@telegram?chats=@channel" \
+        nickfedor/watchtower
+        ```
+
+    === "Flags"
+
+        ```bash
+        docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        nickfedor/watchtower \
+        --notification-url "discord://token@webhookid" \
+        --notification-url "telegram://token@telegram?chats=@channel"
+        ```
+
+=== "Docker Compose"
+
+    === "YAML Array"
+
+        ```yaml
+        services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+            WATCHTOWER_NOTIFICATION_URL:
+                - "discord://token@webhookid"
+                - "telegram://token@telegram?chats=@channel"
+            volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        ```
+
+    === "Single-line"
+
+        ```yaml
+        services:
+          watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+              WATCHTOWER_NOTIFICATION_URL: "discord://token@webhookid,telegram://token@telegram?chats=@channel"
+            volumes:
+              - /var/run/docker.sock:/var/run/docker.sock
+        ```
+
+    === "Multi-line"
+
+        ```yaml
+        services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+            WATCHTOWER_NOTIFICATION_URL: >
+                discord://token@webhookid,
+                telegram://token@telegram?chats=@channel
+            volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        ```
+
+    !!! Warning "Do NOT define the variable multiple times"
+        Defining `WATCHTOWER_NOTIFICATION_URL` multiple times in your environment
+        will cause the last value to overwrite previous ones:
+
+        ```yaml
+        # WRONG - Only the second URL will be used:
+        environment:
+        - WATCHTOWER_NOTIFICATION_URL=discord://xxx
+        - WATCHTOWER_NOTIFICATION_URL=telegram://xxx
+        ```
+
+!!! Note "CLI Flags vs Environment Variables"
+    The CLI flag can be called multiple times as CLI arguments; however, defining the environment variable multiple times will NOT work and only the last value will be used.
+
+    This is because CLI flags use a StringArray type that supports multiple invocations,  while environment variables are simple key-value pairs that get overwritten when defined multiple times.
+
+    For environment variables, use comma-separated values or YAML arrays instead.
+
+#### Verifying Multiple Notifications
+
+When Watchtower starts, check the logs for the notification summary:
+
+```text
+time="2026-01-28T16:07:24+01:00" level=info msg="Using notifications: discord, telegram"
+```
+
+If you only see one service listed (e.g., `Using notifications: telegram`), your multiple URL configuration was not parsed correctly.
 
 ### Startup Notifications
 
@@ -269,80 +359,114 @@ Email notification flags (e.g., `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, `WATCHTO
 
 === "Docker CLI"
 
-    ```bash
-    docker run -d \
-      --name watchtower \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      -e WATCHTOWER_NOTIFICATIONS=email \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=user \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=secret \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
-      nickfedor/watchtower
-    ```
+    === "Env Vars"
 
-=== "Docker CLI (SMTP Relay)"
+        ```bash
+        docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -e WATCHTOWER_NOTIFICATIONS=email \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=user \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=secret \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
+        nickfedor/watchtower
+        ```
 
-    ```bash
-    docker run -d \
-      --name watchtower \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      -e WATCHTOWER_NOTIFICATIONS=email \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=relay.example.com \
-      nickfedor/watchtower
-    ```
+    === "Flags"
 
-    !!! Note
-        This assumes that you already have an SMTP server up and running that you can connect to.
-        If you don't or you want to bring up Watchtower with your own simple SMTP relay, then check out the Docker Compose example.
+        ```bash
+        docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        nickfedor/watchtower \
+        --notifications email \
+        --notification-email-from sender@example.com \
+        --notification-email-to recipient@example.com \
+        --notification-email-server smtp.example.com \
+        --notification-email-server-port 587 \
+        --notification-email-server-user user \
+        --notification-email-server-password secret \
+        --notification-email-delay 10
+        ```
+
+    === "Env Vars (SMTP Relay)"
+
+        ```bash
+        docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -e WATCHTOWER_NOTIFICATIONS=email \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=relay.example.com \
+        nickfedor/watchtower
+        ```
+
+    === "Flags (SMTP Relay)"
+
+        ```bash
+        docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        nickfedor/watchtower \
+        --notifications email \
+        --notification-email-from sender@example.com \
+        --notification-email-to recipient@example.com \
+        --notification-email-server relay.example.com
+        ```
+
+        !!! Note
+            This assumes that you already have an SMTP server up and running that you can connect to.
+            If you don't or you want to bring up Watchtower with your own simple SMTP relay, then check out the Docker Compose example.
 
 === "Docker Compose"
 
-    ```yaml
-    services:
-      watchtower:
-        image: nickfedor/watchtower:latest
-        environment:
-          WATCHTOWER_NOTIFICATIONS: email
-          WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
-          WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
-          WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
-          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
-          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: user
-          WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: secret
-          WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 10
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```
+    === "Docker Compose"
 
-=== "Docker Compose (SMTP Relay)"
+        ```yaml
+        services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+            WATCHTOWER_NOTIFICATIONS: email
+            WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
+            WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
+            WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
+            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
+            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: user
+            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: secret
+            WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 10
+            volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        ```
 
-    ```yaml
-    services:
-      watchtower:
-        image: nickfedor/watchtower:latest
-        environment:
-          WATCHTOWER_NOTIFICATIONS: email
-          WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
-          WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
-          WATCHTOWER_NOTIFICATION_EMAIL_SERVER: relay.example.com
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```
+    === "SMTP Relay"
 
-    !!! Note
-        The example assumes that your domain is called `example.com` and that you are going to use a valid certificate for `smtp.example.com`.
+        ```yaml
+        services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+            WATCHTOWER_NOTIFICATIONS: email
+            WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
+            WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
+            WATCHTOWER_NOTIFICATION_EMAIL_SERVER: relay.example.com
+            volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        ```
 
-        This hostname has to be used as `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, otherwise the TLS connection will fail with `Failed to send notification email` or `connection: connection refused` errors.
+        !!! Note
+            The example assumes that your domain is called `example.com` and that you are going to use a valid certificate for `smtp.example.com`.
 
-        We also have to add a network for this setup in order to add an alias to it.
+            This hostname has to be used as `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, otherwise the TLS connection will fail with `Failed to send notification email` or `connection: connection refused` errors.
 
-        If you also want to enable DKIM or other features on the SMTP server, then you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay){target="_blank" rel="noopener noreferrer"}
+            We also have to add a network for this setup in order to add an alias to it.
+
+            If you also want to enable DKIM or other features on the SMTP server, then you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay){target="_blank" rel="noopener noreferrer"}
 
 ### Legacy Notification Flags
 
@@ -462,7 +586,7 @@ docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
 
 Example Legacy Configuration:
 
-=== "Docker CLI"
+=== "Docker CLI (Env Vars)"
 
     ```bash
     docker run -d \
@@ -476,6 +600,22 @@ Example Legacy Configuration:
       -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
       -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
       nickfedor/watchtower
+    ```
+
+=== "Docker CLI (Flags)"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notifications email \
+      --notification-email-server smtp.example.com \
+      --notification-email-server-port 587 \
+      --notification-email-server-user user@example.com \
+      --notification-email-server-password secret \
+      --notification-email-from sender@example.com \
+      --notification-email-to recipient@example.com
     ```
 
 === "Docker Compose"
@@ -510,7 +650,7 @@ Example Legacy Configuration:
 
 2. Replace the legacy flags with:
 <!-- markdownlint-disable -->
-=== "Docker CLI"
+=== "Docker CLI (Env Vars)"
 
     ```bash
     docker run -d \
@@ -521,6 +661,19 @@ Example Legacy Configuration:
       -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
       -e WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG=Watchtower \
       nickfedor/watchtower
+    ```
+
+=== "Docker CLI (Flags)"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notifications shoutrrr \
+      --notification-url "smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes" \
+      --notification-email-delay 10 \
+      --notification-email-subjecttag Watchtower
     ```
 
 === "Docker Compose"
@@ -547,7 +700,7 @@ Example Legacy Configuration:
 
 ### Example Slack Configuration
 
-=== "Docker CLI"
+=== "Docker CLI (Env Vars)"
 
     ```bash
     docker run -d \
@@ -558,6 +711,19 @@ Example Legacy Configuration:
       -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
       -e WATCHTOWER_NOTIFICATION_SLACK_CHANNEL=#my-custom-channel \
       nickfedor/watchtower
+    ```
+
+=== "Docker CLI (Flags)"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notifications slack \
+      --notification-slack-hook-url "https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy" \
+      --notification-slack-identifier watchtower-server-1 \
+      --notification-slack-channel "#my-custom-channel"
     ```
 
 === "Docker Compose"
@@ -619,7 +785,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
 
 ## Microsoft Teams Notifications
 
-=== "Docker CLI"
+=== "Docker CLI (Env Vars)"
 
     ```bash
     docker run -d \
@@ -629,6 +795,18 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
       -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
       -e WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA=true \
       nickfedor/watchtower
+    ```
+
+=== "Docker CLI (Flags)"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notifications msteams \
+      --notification-msteams-hook "https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
+      --notification-msteams-data
     ```
 
 === "Docker Compose"
@@ -678,7 +856,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA
 
 ## Gotify Notifications
 
-=== "Docker CLI"
+=== "Docker CLI (Env Vars)"
 
     ```bash
     docker run -d \
@@ -689,6 +867,19 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA
       -e WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN="SuperSecretToken" \
       -e WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY=true \
       nickfedor/watchtower
+    ```
+
+=== "Docker CLI (Flags)"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notifications gotify \
+      --notification-gotify-url "https://my.gotify.tld/" \
+      --notification-gotify-token "SuperSecretToken" \
+      --notification-gotify-tls-skip-verify
     ```
 
 === "Docker Compose"
@@ -765,7 +956,7 @@ The server must be able to receive SMS verification codes during initial setup a
 
 ### Example Signal Configuration
 
-=== "Docker CLI"
+=== "Docker CLI (Env Vars)"
 
     ```bash
     docker run -d \
@@ -773,6 +964,16 @@ The server must be able to receive SMS verification codes during initial setup a
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATION_URL=signal://localhost:8080/+1234567890/+0987654321 \
       nickfedor/watchtower
+    ```
+
+=== "Docker CLI (Flags)"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notification-url "signal://localhost:8080/+1234567890/+0987654321"
     ```
 
 === "Docker Compose"
