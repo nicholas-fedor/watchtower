@@ -757,13 +757,30 @@ Environment Variable: WATCHTOWER_HTTP_API_PORT
 
 Configures the notification service URL.
 Can reference a file for sensitive values.
+Supports multiple URLs via comma-separated values or multiple flags.
 
 ```text
              Argument: --notification-url
-Environment Variable: WATCHTOWER_NOTIFICATION_URL
-                 Type: String
-              Default: None
+ Environment Variable: WATCHTOWER_NOTIFICATION_URL
+                  Type: String (comma-separated or multiple flags)
+               Default: None
 ```
+
+!!! Note "Multiple Notification URLs"
+    To send notifications to multiple services simultaneously, you can:
+
+    - Use comma-separated URLs: `--notification-url="discord://xxx,telegram://yyy"`
+    - Specify the flag multiple times: `--notification-url=discord://xxx --notification-url=telegram://yyy`
+    - Use YAML arrays in Docker Compose (recommended)
+
+    See [Configuring Multiple Notification URLs](../../notifications/overview/index.md#using_multiple_notification_services) for detailed examples.
+
+!!! Note "CLI Flags vs Environment Variables"
+    The CLI flag can be called multiple times as CLI arguments; however, defining the environment variable multiple times will NOT work and only the last value will be used.
+
+    This is because CLI flags use a StringArray type that supports multiple invocations,  while environment variables are simple key-value pairs that get overwritten when defined multiple times.
+
+    For environment variables, use comma-separated values or YAML arrays instead.
 
 ### Notification Split by Container
 
