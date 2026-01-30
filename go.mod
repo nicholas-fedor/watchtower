@@ -13,8 +13,8 @@ require (
 	github.com/docker/go-connections v0.6.0
 	github.com/moby/docker-image-spec v1.3.1
 	github.com/nicholas-fedor/shoutrrr v0.13.1
-	github.com/onsi/ginkgo/v2 v2.27.5
-	github.com/onsi/gomega v1.39.0
+	github.com/onsi/ginkgo/v2 v2.28.0
+	github.com/onsi/gomega v1.39.1
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
