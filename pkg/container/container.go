@@ -491,38 +491,62 @@ func (c *Container) VerifyConfiguration() error {
 	return nil
 }
 
-// Links returns a list of container names this container depends on.
+// filterSelfReferences removes any links that reference the container itself.
 //
-// It checks com.centurylinklabs.watchtower.depends-on first,
-// then com.docker.compose.depends_on using Docker Compose v5 API functions,
-// then falls back to HostConfig links and network mode.
-// After retrieving links from the Watchtower label, it filters out self-references.
+// This prevents circular dependencies where a container would depend on itself,
+// which could cause infinite loops during dependency resolution and update processing.
+// Self-references are filtered out to ensure the dependency graph remains acyclic
+// and containers are processed in the correct order.
+//
+// Parameters:
+//   - links: List of container names this container depends on.
+//   - containerName: Name of the current container being checked.
 //
 // Returns:
-//   - []string: List of linked container names.
+//   - []string: Filtered list with self-references removed.
+func filterSelfReferences(links []string, containerName string) []string {
+	filtered := make([]string, 0, len(links))
+	for _, link := range links {
+		// Skip links that reference the container itself to prevent self-dependencies
+		if link != containerName {
+			filtered = append(filtered, link)
+		}
+	}
+
+	return filtered
+}
+
+// Links returns a list of container names this container depends on.
+//
+// It retrieves dependencies from multiple sources in priority order:
+//  1. com.centurylinklabs.watchtower.depends-on label (Watchtower's native dependency format)
+//  2. com.docker.compose.depends_on label (Docker Compose dependencies via v5 API)
+//  3. HostConfig.Links (legacy Docker links)
+//  4. NetworkMode.ConnectedContainer() (container network mode dependencies)
+//
+// Self-references are filtered out from all link sources to prevent circular
+// dependencies where a container would depend on itself. This ensures the
+// dependency resolution algorithm can process containers in a valid topological order.
+//
+// Returns:
+//   - []string: List of linked container names with self-references removed.
 func (c *Container) Links() []string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Check Watchtower's depends-on label first.
 	if links := GetLinksFromWatchtowerLabel(c, clog); links != nil {
-		// Filter out links that match the container name.
-		filteredLinks := make([]string, 0, len(links))
-		for _, link := range links {
-			if link != c.Name() {
-				filteredLinks = append(filteredLinks, link)
-			}
-		}
-
-		return filteredLinks
+		return filterSelfReferences(links, c.Name())
 	}
 
 	// Check compose depends-on label.
 	if links := getLinksFromComposeLabel(c, clog); links != nil {
-		return links
+		return filterSelfReferences(links, c.Name())
 	}
 
 	// Fall back to HostConfig links and network mode.
-	return getLinksFromHostConfig(c, clog)
+	links := getLinksFromHostConfig(c, clog)
+
+	return filterSelfReferences(links, c.Name())
 }
 
 // ResolveContainerIdentifier returns a standardized container identifier used

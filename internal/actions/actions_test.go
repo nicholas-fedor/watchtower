@@ -26,7 +26,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				result := &mockTypes.MockReport{}
 				err := errors.New("test error")
 
-				metric := handleUpdateResult(result, err)
+				metric := handleUpdateResult(result, err, nil)
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 		ginkgo.When("given a nil result", func() {
 			ginkgo.It("should return a zero metric", func() {
-				metric := handleUpdateResult(nil, nil)
+				metric := handleUpdateResult(nil, nil, nil)
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("Actions", func() {
 		ginkgo.When("given a valid result with no error", func() {
 			ginkgo.It("should return nil", func() {
 				result := &mockTypes.MockReport{}
-				metric := handleUpdateResult(result, nil)
+				metric := handleUpdateResult(result, nil, nil)
 				gomega.Expect(metric).To(gomega.BeNil())
 			})
 		})

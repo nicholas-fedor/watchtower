@@ -954,6 +954,117 @@ var _ = ginkgo.Describe("ResolveContainerIdentifier", func() {
 	})
 })
 
+var _ = ginkgo.Describe("Prefix Matching Issues", func() {
+	ginkgo.It(
+		"should not match containers with similar names that are not Docker Compose replicas (issue-1161)",
+		func() {
+			// App container that depends on "watchtower-test-database"
+			app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			app.EXPECT().Name().Return("watchtower-test-app1").Maybe()
+			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+			app.EXPECT().Links().Return([]string{"watchtower-test-database"})
+			app.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/watchtower-test-app1",
+					},
+					Config: &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			// First database container (exact match)
+			db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			db1.EXPECT().Name().Return("watchtower-test-database").Maybe()
+			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+			db1.EXPECT().Links().Return(nil)
+			db1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/watchtower-test-database",
+					},
+					Config: &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			// Second database container with similar name (should NOT be matched)
+			db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			db2.EXPECT().Name().Return("watchtower-test-database2").Maybe()
+			db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
+			db2.EXPECT().Links().Return(nil)
+			db2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/watchtower-test-database2",
+					},
+					Config: &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			containers := []types.Container{app, db1, db2}
+			containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containerMap).To(gomega.HaveLen(3))
+
+			// Verify app depends ONLY on watchtower-test-database, not on watchtower-test-database2
+			gomega.Expect(indegree["watchtower-test-app1"]).To(gomega.Equal(1))
+			gomega.Expect(adjacency["watchtower-test-database"]).
+				To(gomega.ContainElement("watchtower-test-app1"))
+			gomega.Expect(adjacency["watchtower-test-database2"]).To(gomega.BeEmpty())
+
+			// Verify db1 and db2 have no dependencies
+			gomega.Expect(indegree["watchtower-test-database"]).To(gomega.Equal(0))
+			gomega.Expect(indegree["watchtower-test-database2"]).To(gomega.Equal(0))
+		},
+	)
+
+	ginkgo.It("should match Docker Compose-style numeric replica suffixes", func() {
+		// App container that depends on "myapp-db"
+		app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		app.EXPECT().Name().Return("myapp-app1").Maybe()
+		app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+		app.EXPECT().Links().Return([]string{"myapp-db"})
+		app.EXPECT().
+			ContainerInfo().
+			Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-app1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+
+		// Database replicas with numeric suffixes (should be matched)
+		db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		db1.EXPECT().Name().Return("myapp-db-1").Maybe()
+		db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+		db1.EXPECT().Links().Return(nil)
+		db1.EXPECT().
+			ContainerInfo().
+			Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-db-1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+
+		db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		db2.EXPECT().Name().Return("myapp-db-2").Maybe()
+		db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
+		db2.EXPECT().Links().Return(nil)
+		db2.EXPECT().
+			ContainerInfo().
+			Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-db-2"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+
+		containers := []types.Container{app, db1, db2}
+		containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(containerMap).To(gomega.HaveLen(3))
+
+		// Verify app depends on BOTH db replicas (since they have numeric suffixes)
+		gomega.Expect(indegree["myapp-app1"]).To(gomega.Equal(2))
+		gomega.Expect(adjacency["myapp-db-1"]).To(gomega.ContainElement("myapp-app1"))
+		gomega.Expect(adjacency["myapp-db-2"]).To(gomega.ContainElement("myapp-app1"))
+	})
+})
+
 var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 	ginkgo.Describe("ResolveContainerIdentifier", func() {
 		ginkgo.It(

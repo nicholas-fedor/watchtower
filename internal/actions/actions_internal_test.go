@@ -99,20 +99,57 @@ var _ = ginkgo.Describe("handleUpdateResult", func() {
 	ginkgo.It("should return zero metric when error is not nil", func() {
 		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
 		err := errors.New("test error")
-		result := handleUpdateResult(mockReport, err)
+		result := handleUpdateResult(mockReport, err, nil)
 		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))
 	})
 
 	ginkgo.It("should return zero metric when result is nil", func() {
 		var err error
-		result := handleUpdateResult(nil, err)
+		result := handleUpdateResult(nil, err, nil)
 		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))
 	})
 
 	ginkgo.It("should return nil when result is not nil and error is nil", func() {
 		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
 		var err error
-		result := handleUpdateResult(mockReport, err)
+		result := handleUpdateResult(mockReport, err, nil)
+		gomega.Expect(result).To(gomega.BeNil())
+	})
+
+	ginkgo.It("should send notification when error occurs and notifier is provided", func() {
+		// Create a mock notifier that tracks if SendNotification was called
+		mockNotifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+		mockNotifier.EXPECT().SendNotification(nil).Times(1)
+
+		// Call handleUpdateResult with an error and the mock notifier
+		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+		err := errors.New("dependency resolution error")
+		result := handleUpdateResult(mockReport, err, mockNotifier)
+
+		// Verify we got the expected metric
+		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))
+	})
+
+	ginkgo.It("should not send notification when error occurs and notifier is nil", func() {
+		// Call handleUpdateResult with an error and nil notifier
+		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+		err := errors.New("dependency resolution error")
+		result := handleUpdateResult(mockReport, err, nil)
+
+		// Verify we got the expected metric
+		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))
+	})
+
+	ginkgo.It("should not send notification when there is no error", func() {
+		// Create a mock notifier with no expectations (will fail if any method is called)
+		mockNotifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+
+		// Call handleUpdateResult without an error
+		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+		var err error
+		result := handleUpdateResult(mockReport, err, mockNotifier)
+
+		// Verify we got the expected result
 		gomega.Expect(result).To(gomega.BeNil())
 	})
 })

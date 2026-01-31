@@ -556,10 +556,17 @@ func shouldUpdateContainer(stale bool, container types.Container, config types.U
 // linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.
 //
 // It searches for a container identifier in the links list that is marked for restart,
-// returning its identifier. For exact matches, it matches directly. For links containing
-// a dash (project-service format), it extracts the project and service, matching containers
-// with the same project and service. For links without dashes (service names only),
-// it matches containers with that service name across projects for cross-project dependencies.
+// returning its identifier. The matching follows this priority order:
+//
+//  1. Exact match: Direct identifier match in restartByIdentifier map.
+//
+//  2. Project-service format (exactly one dash): Matches containers where both the project
+//     and service name match the linked container's project and service.
+//
+//  3. Service-only format (no dash): Prioritizes same-project matches first, then falls back
+//     to cross-project matches. This ensures that dependencies within the same Docker Compose
+//     project are preferred over external dependencies, while still allowing cross-project
+//     dependencies when no same-project match exists.
 //
 // Parameters:
 //   - links: List of linked container identifiers.
@@ -629,22 +636,45 @@ func linkedIdentifierMarkedForRestart(
 				}
 			}
 		} else {
-			// service name only, match across projects for cross-project dependencies
+			// service name only, prioritize same project first, then cross-project dependencies
 			logrus.WithFields(logrus.Fields{
 				"link":             link,
 				"dependentProject": dependentProject,
 			}).Debug("Checking service-only match")
 
+			// crossProjectMatch stores the first cross-project match found, used as fallback
+			// when no same-project match exists
+			var crossProjectMatch string
+
 			for identifier, restarting := range restartByIdentifier {
 				if restarting && strings.Contains(identifier, link) {
-					logrus.WithFields(logrus.Fields{
-						"link":    link,
-						"matched": identifier,
-						"project": getProject(nameToContainer[identifier]),
-					}).Debug("Found restarting linked container via service-only match")
+					matchProject := getProject(nameToContainer[identifier])
+					// Priority 1: Same-project match - return immediately
+					if matchProject == dependentProject {
+						logrus.WithFields(logrus.Fields{
+							"link":    link,
+							"matched": identifier,
+							"project": matchProject,
+						}).Debug("Found restarting linked container via same-project service match")
 
-					return identifier
+						return identifier
+					}
+					// Priority 2: Cross-project match - remember first match for fallback
+					if crossProjectMatch == "" {
+						crossProjectMatch = identifier
+					}
 				}
+			}
+
+			// If no same-project match was found, return cross-project match as fallback
+			if crossProjectMatch != "" {
+				logrus.WithFields(logrus.Fields{
+					"link":    link,
+					"matched": crossProjectMatch,
+					"project": getProject(nameToContainer[crossProjectMatch]),
+				}).Debug("Found restarting linked container via cross-project service match")
+
+				return crossProjectMatch
 			}
 		}
 	}

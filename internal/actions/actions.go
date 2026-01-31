@@ -105,7 +105,7 @@ func RunUpdatesWithNotifications(
 		updateConfig,
 	)
 	// Process update result, return metric on failure
-	if metric := handleUpdateResult(result, err); metric != nil {
+	if metric := handleUpdateResult(result, err, params.Notifier); metric != nil {
 		return metric
 	}
 
@@ -136,19 +136,27 @@ func RunUpdatesWithNotifications(
 
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
 //
-// It checks for errors or nil results, logging accordingly, and returns a zero metric on failure
-// or nil on success to indicate continuation of the update process.
+// It checks for errors or nil results, logging accordingly. If an error occurred, it sends a
+// notification via the provided notifier (if not nil) to alert about the failure. On error or
+// nil result, it returns a zero metric to indicate the failure state. On success, it returns nil
+// to indicate continuation of the update process.
 //
 // Parameters:
 //   - result: The report from the update operation.
 //   - err: Any error encountered during the update.
+//   - notifier: The notification system for sending error alerts; may be nil.
 //
 // Returns:
 //   - *metrics.Metric: A zero metric if an error occurred or result is nil, nil otherwise.
-func handleUpdateResult(result types.Report, err error) *metrics.Metric {
+func handleUpdateResult(result types.Report, err error, notifier types.Notifier) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
 		logrus.WithError(err).Error("Update execution failed")
+
+		// Send notification about the error
+		if notifier != nil {
+			notifier.SendNotification(nil)
+		}
 
 		return &metrics.Metric{
 			Scanned: 0,

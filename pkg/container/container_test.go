@@ -24,6 +24,9 @@ import (
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+// testContainerName is used for testing self-referencing dependency scenarios.
+const testContainerName = "gluetun"
+
 var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Configuration Validation", func() {
 		ginkgo.It("returns an error when image info is nil", func() {
@@ -496,6 +499,35 @@ var _ = ginkgo.Describe("Container", func() {
 						gomega.Not(gomega.ContainElement("test-watchtower")),
 						gomega.HaveLen(2),
 					))
+				})
+
+				ginkgo.It(
+					"does not create self-reference when container name matches dependency",
+					func() {
+						// Create a container named testContainerName with depends-on: testContainerName
+						container = MockContainer(WithLabels(map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": testContainerName,
+						}))
+						// Rename container to testContainerName (default is "test-watchtower")
+						container.containerInfo.Name = testContainerName
+						container.normalizedName = testContainerName
+
+						links := container.Links()
+						gomega.Expect(links).To(gomega.BeEmpty(),
+							"Container with name matching dependency should not include self in links")
+					},
+				)
+
+				ginkgo.It("filters self-references from compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": testContainerName,
+					}))
+					container.containerInfo.Name = testContainerName
+					container.normalizedName = testContainerName
+
+					links := container.Links()
+					gomega.Expect(links).To(gomega.BeEmpty(),
+						"Compose depends-on with self-reference should be filtered out")
 				})
 
 				ginkgo.DescribeTable(
