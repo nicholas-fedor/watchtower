@@ -356,7 +356,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			assertOrderBefore(resultNames, "d", "c")
 		})
 
-		ginkgo.It("should detect self-referencing containers as cycles", func() {
+		ginkgo.It("should skip self-referencing containers without creating cycles", func() {
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
 			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
@@ -367,10 +367,11 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 
 			containers := []types.Container{c1}
 			result, err := sortByDependencies(containers)
-			gomega.Expect(err).To(gomega.HaveOccurred()) // Self-reference creates a cycle
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("circular reference detected"))
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("c1 -> c1"))
-			gomega.Expect(result).To(gomega.BeNil())
+			gomega.Expect(err).
+				ToNot(gomega.HaveOccurred())
+				// Self-reference is filtered, not a cycle
+			gomega.Expect(result).To(gomega.HaveLen(1))
+			gomega.Expect(result[0].Name()).To(gomega.Equal("c1"))
 		})
 
 		ginkgo.It("should handle containers with project-prefixed names and service links", func() {
@@ -741,23 +742,27 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(resultNames[len(resultNames)-1]).To(gomega.Equal("app"))
 		})
 
-		ginkgo.It("should handle containers with self-referencing dependencies", func() {
-			// Test containers that reference themselves (should detect as cycle)
-			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().Name().Return("container1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links().Return([]string{"container1"}) // Self-reference
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+		ginkgo.It(
+			"should skip containers with self-referencing dependencies without creating cycles",
+			func() {
+				// Test containers that reference themselves (self-reference is filtered as safety net)
+				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("container1").Maybe()
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+				c1.EXPECT().Links().Return([]string{"container1"}) // Self-reference
+				c1.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
 
-			containers := []types.Container{c1}
-			result, err := sortByDependencies(containers)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("circular reference detected"))
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("container1 -> container1"))
-			gomega.Expect(result).To(gomega.BeNil())
-		})
+				containers := []types.Container{c1}
+				result, err := sortByDependencies(containers)
+				gomega.Expect(err).
+					ToNot(gomega.HaveOccurred())
+					// Self-reference is filtered, not a cycle
+				gomega.Expect(result).To(gomega.HaveLen(1))
+				gomega.Expect(result[0].Name()).To(gomega.Equal("container1"))
+			},
+		)
 
 		ginkgo.It("should handle large number of containers with no dependencies", func() {
 			// Test performance and correctness with many containers

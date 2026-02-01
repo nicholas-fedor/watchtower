@@ -247,13 +247,24 @@ func buildDependencyGraph(
 		for _, normalizedLink := range c.Links() {
 			// Try exact match first
 			if _, exists := containerMap[normalizedLink]; exists {
-				// Self-references are filtered at container.Links() level, but this check
-				// remains as a fallback safety net. Skipping increment prevents cycle creation.
+				if normalizedLink == normalizedIdentifier {
+					// Self-reference detected: the container's Links() include itself.
+					// This can occur when:
+					//   - A container is linked to a service name that resolves to itself
+					//   - Docker Compose service dependencies create circular references
+					//   - Manual labeling creates self-referential dependencies
+					//
+					// While container.Links() filters most self-references, this guard prevents
+					// edge cases from corrupting the dependency graph. Skipping the increment
+					// ensures the container is treated as having no dependencies (indegree 0),
+					// preventing a circular dependency error for what is essentially a no-op.
+					continue
+				}
 				// This container depends on the linked container, so increment its indegree
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
 				adjacency[normalizedLink] = append(adjacency[normalizedLink], normalizedIdentifier)
-
+	
 				continue
 			}
 
@@ -277,11 +288,26 @@ func buildDependencyGraph(
 				}
 			}
 
+			// Sort matched keys for deterministic dependency ordering
+			// This ensures that when multiple replicas match (e.g., "db-1", "db-2"),
+			// the dependencies are added in a consistent, predictable order.
 			sort.Strings(matchedKeys)
-
+	
 			for _, key := range matchedKeys {
-				// Self-references are filtered at container.Links() level, but this check
-				// remains as a fallback safety net. Skipping increment prevents cycle creation.
+				if key == normalizedIdentifier {
+					// Self-reference via prefix match: the container matched itself as a replica.
+					// This can happen when a container name follows the replica pattern
+					// (e.g., "myapp-1" linking to "myapp" would incorrectly match itself).
+					//
+					// This check prevents a container from creating a dependency on itself
+					// through the prefix matching logic. Without this guard, a container
+					// named "app-1" with a link to "app" would increment its own indegree,
+					// potentially causing incorrect dependency calculations or cycles.
+					//
+					// Note: While container.Links() should filter self-references upstream,
+					// this defensive check ensures robustness against edge cases.
+					continue
+				}
 				// This container depends on the linked container, so increment its indegree
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent

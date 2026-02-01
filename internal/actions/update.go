@@ -656,7 +656,22 @@ func linkedIdentifierMarkedForRestart(
 			// the full project-service format.
 			var crossProjectMatch string
 
-			for identifier, restarting := range restartByIdentifier {
+			// Collect and sort identifiers to ensure deterministic iteration order.
+			// This is critical for reproducible behavior: without sorting, the iteration
+			// order of restartByIdentifier map would be random, causing different
+			// cross-project matches to be selected on each run when multiple candidates
+			// exist. Sorting ensures that:
+			//   1. The same cross-project container is always selected as fallback
+			//   2. Restarts happen in a predictable, testable order
+			//   3. Multiple Watchtower runs produce consistent results
+			identifiers := make([]string, 0, len(restartByIdentifier))
+			for identifier := range restartByIdentifier {
+				identifiers = append(identifiers, identifier)
+			}
+			// Sort alphabetically for deterministic ordering across all identifiers
+			slices.Sort(identifiers)
+			for _, identifier := range identifiers {
+				restarting := restartByIdentifier[identifier]
 				if restarting && strings.Contains(identifier, link) {
 					matchProject := getProject(nameToContainer[identifier])
 					// Priority 1: Same-project match - return immediately
@@ -670,8 +685,10 @@ func linkedIdentifierMarkedForRestart(
 						return identifier
 					}
 					// Priority 2: Cross-project match - remember first match for fallback.
-					// Due to non-deterministic map iteration, any matching container may be selected
-					// when multiple cross-project matches exist. This is acceptable as a last resort.
+					// We only store the first match to maintain deterministic behavior.
+					// Since identifiers are sorted alphabetically above, the first match
+					// in alphabetical order will be selected, ensuring consistent
+					// cross-project dependency resolution across multiple runs.
 					if crossProjectMatch == "" {
 						crossProjectMatch = identifier
 					}
