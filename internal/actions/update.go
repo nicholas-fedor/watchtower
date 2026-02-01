@@ -670,6 +670,7 @@ func linkedIdentifierMarkedForRestart(
 			}
 			// Sort alphabetically for deterministic ordering across all identifiers
 			slices.Sort(identifiers)
+
 			for _, identifier := range identifiers {
 				restarting := restartByIdentifier[identifier]
 				if restarting && strings.Contains(identifier, link) {

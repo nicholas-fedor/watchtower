@@ -264,7 +264,7 @@ func buildDependencyGraph(
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
 				adjacency[normalizedLink] = append(adjacency[normalizedLink], normalizedIdentifier)
-	
+
 				continue
 			}
 
@@ -292,7 +292,7 @@ func buildDependencyGraph(
 			// This ensures that when multiple replicas match (e.g., "db-1", "db-2"),
 			// the dependencies are added in a consistent, predictable order.
 			sort.Strings(matchedKeys)
-	
+
 			for _, key := range matchedKeys {
 				if key == normalizedIdentifier {
 					// Self-reference via prefix match: the container matched itself as a replica.
