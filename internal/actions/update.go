@@ -556,10 +556,17 @@ func shouldUpdateContainer(stale bool, container types.Container, config types.U
 // linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.
 //
 // It searches for a container identifier in the links list that is marked for restart,
-// returning its identifier. For exact matches, it matches directly. For links containing
-// a dash (project-service format), it extracts the project and service, matching containers
-// with the same project and service. For links without dashes (service names only),
-// it matches containers with that service name across projects for cross-project dependencies.
+// returning its identifier. The matching follows this priority order:
+//
+//  1. Exact match: Direct identifier match in restartByIdentifier map.
+//
+//  2. Project-service format (exactly one dash): Matches containers where both the project
+//     and service name match the linked container's project and service.
+//
+//  3. Service-only format (no dash): Prioritizes same-project matches first, then falls back
+//     to cross-project matches. This ensures that dependencies within the same Docker Compose
+//     project are preferred over external dependencies, while still allowing cross-project
+//     dependencies when no same-project match exists.
 //
 // Parameters:
 //   - links: List of linked container identifiers.
@@ -629,22 +636,76 @@ func linkedIdentifierMarkedForRestart(
 				}
 			}
 		} else {
-			// service name only, match across projects for cross-project dependencies
+			// service name only, prioritize same project first, then cross-project dependencies
 			logrus.WithFields(logrus.Fields{
 				"link":             link,
 				"dependentProject": dependentProject,
 			}).Debug("Checking service-only match")
 
-			for identifier, restarting := range restartByIdentifier {
-				if restarting && strings.Contains(identifier, link) {
-					logrus.WithFields(logrus.Fields{
-						"link":    link,
-						"matched": identifier,
-						"project": getProject(nameToContainer[identifier]),
-					}).Debug("Found restarting linked container via service-only match")
+			// crossProjectMatch stores the first cross-project match found, used as fallback
+			// when no same-project match exists.
+			//
+			// NOTE: Go map iteration order is non-deterministic, so when multiple cross-project
+			// containers match the service name, the first one encountered during iteration is
+			// selected. This non-determinism is acceptable for fallback scenarios where no exact
+			// or same-project match exists, as it provides a "best effort" approach.
+			//
+			// The strings.Contains matching is intentional for service-only lookups, allowing
+			// service names like "db" to match container identifiers like "project1-db" or
+			// "myapp-db". This flexible matching enables shorthand references without requiring
+			// the full project-service format.
+			var crossProjectMatch string
 
-					return identifier
+			// Collect and sort identifiers to ensure deterministic iteration order.
+			// This is critical for reproducible behavior: without sorting, the iteration
+			// order of restartByIdentifier map would be random, causing different
+			// cross-project matches to be selected on each run when multiple candidates
+			// exist. Sorting ensures that:
+			//   1. The same cross-project container is always selected as fallback
+			//   2. Restarts happen in a predictable, testable order
+			//   3. Multiple Watchtower runs produce consistent results
+			identifiers := make([]string, 0, len(restartByIdentifier))
+			for identifier := range restartByIdentifier {
+				identifiers = append(identifiers, identifier)
+			}
+			// Sort alphabetically for deterministic ordering across all identifiers
+			slices.Sort(identifiers)
+
+			for _, identifier := range identifiers {
+				restarting := restartByIdentifier[identifier]
+				if restarting && strings.Contains(identifier, link) {
+					matchProject := getProject(nameToContainer[identifier])
+					// Priority 1: Same-project match - return immediately
+					if matchProject == dependentProject {
+						logrus.WithFields(logrus.Fields{
+							"link":    link,
+							"matched": identifier,
+							"project": matchProject,
+						}).Debug("Found restarting linked container via same-project service match")
+
+						return identifier
+					}
+					// Priority 2: Cross-project match - remember first match for fallback.
+					// We only store the first match to maintain deterministic behavior.
+					// Since identifiers are sorted alphabetically above, the first match
+					// in alphabetical order will be selected, ensuring consistent
+					// cross-project dependency resolution across multiple runs.
+					if crossProjectMatch == "" {
+						crossProjectMatch = identifier
+					}
 				}
+			}
+
+			// If no same-project match was found, return cross-project match as fallback.
+			// See note above about non-deterministic selection when multiple matches exist.
+			if crossProjectMatch != "" {
+				logrus.WithFields(logrus.Fields{
+					"link":    link,
+					"matched": crossProjectMatch,
+					"project": getProject(nameToContainer[crossProjectMatch]),
+				}).Debug("Found restarting linked container via cross-project service match")
+
+				return crossProjectMatch
 			}
 		}
 	}

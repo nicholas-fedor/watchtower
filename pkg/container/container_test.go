@@ -24,6 +24,12 @@ import (
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+// testContainerName is used for testing self-referencing dependency scenarios.
+const testContainerName = "gluetun"
+
+// webContainerName is used for testing filterSelfReferences scenarios.
+const webContainerName = "web"
+
 var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Configuration Validation", func() {
 		ginkgo.It("returns an error when image info is nil", func() {
@@ -498,6 +504,35 @@ var _ = ginkgo.Describe("Container", func() {
 					))
 				})
 
+				ginkgo.It(
+					"does not create self-reference when container name matches dependency",
+					func() {
+						// Create a container named testContainerName with depends-on: testContainerName
+						container = MockContainer(WithLabels(map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": testContainerName,
+						}))
+						// Rename container to testContainerName (default is "test-watchtower")
+						container.containerInfo.Name = testContainerName
+						container.normalizedName = testContainerName
+
+						links := container.Links()
+						gomega.Expect(links).To(gomega.BeEmpty(),
+							"Container with name matching dependency should not include self in links")
+					},
+				)
+
+				ginkgo.It("filters self-references from compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": testContainerName,
+					}))
+					container.containerInfo.Name = testContainerName
+					container.normalizedName = testContainerName
+
+					links := container.Links()
+					gomega.Expect(links).To(gomega.BeEmpty(),
+						"Compose depends-on with self-reference should be filtered out")
+				})
+
 				ginkgo.DescribeTable(
 					"parses malformed watchtower labels",
 					func(label string, expected []string) {
@@ -875,6 +910,43 @@ var _ = ginkgo.Describe("Container", func() {
 
 				gomega.Expect(idWith).To(gomega.Equal("queue-worker-5"))
 				gomega.Expect(idWithout).To(gomega.Equal("queue-worker-6"))
+			})
+		})
+
+		ginkgo.Describe("filterSelfReferences", func() {
+			ginkgo.It("filters out basic self-references from links", func() {
+				links := []string{"db", webContainerName, "cache"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache"}))
+			})
+
+			ginkgo.It("filters out multiple self-references", func() {
+				links := []string{"first", webContainerName, "second", webContainerName, "third"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"first", "second", "third"}))
+			})
+
+			ginkgo.It("returns empty slice when all links are self-references", func() {
+				links := []string{webContainerName}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.BeEmpty())
+			})
+
+			ginkgo.It("preserves order of non-self links", func() {
+				links := []string{"db", webContainerName, "cache", webContainerName, "redis"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache", "redis"}))
+			})
+
+			ginkgo.It("returns original slice unchanged when no self-references exist", func() {
+				links := []string{"db", "cache"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache"}))
 			})
 		})
 	})

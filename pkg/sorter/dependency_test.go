@@ -356,7 +356,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			assertOrderBefore(resultNames, "d", "c")
 		})
 
-		ginkgo.It("should detect self-referencing containers as cycles", func() {
+		ginkgo.It("should skip self-referencing containers without creating cycles", func() {
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
 			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
@@ -367,11 +367,71 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 
 			containers := []types.Container{c1}
 			result, err := sortByDependencies(containers)
-			gomega.Expect(err).To(gomega.HaveOccurred()) // Self-reference creates a cycle
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("circular reference detected"))
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("c1 -> c1"))
-			gomega.Expect(result).To(gomega.BeNil())
+			gomega.Expect(err).
+				ToNot(gomega.HaveOccurred())
+				// Self-reference is filtered, not a cycle
+			gomega.Expect(result).To(gomega.HaveLen(1))
+			gomega.Expect(result[0].Name()).To(gomega.Equal("c1"))
 		})
+
+		ginkgo.It(
+			"should skip self-reference via prefix matching for replica-named containers",
+			func() {
+				// Container named "myapp-1" linking to "myapp" should NOT create a self-dependency
+				// The prefix matching would match "myapp-1" when looking for "myapp" replicas,
+				// but the self-reference guard should skip it
+				myapp := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				myapp.EXPECT().Name().Return("myapp-1").Maybe()
+				myapp.EXPECT().ID().Return(types.ContainerID("id-myapp")).Maybe()
+				myapp.EXPECT().Links().Return([]string{"myapp"})
+				myapp.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{
+						ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-1"},
+						Config:            &dockerContainer.Config{Labels: map[string]string{}},
+					})
+
+				containers := []types.Container{myapp}
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(containerMap).To(gomega.HaveLen(1))
+
+				// Self-reference via prefix matching should be skipped
+				// indegree["myapp-1"] should be 0 (not incremented)
+				gomega.Expect(indegree["myapp-1"]).To(gomega.Equal(0))
+				// adjacency["myapp-1"] should NOT contain "myapp-1"
+				gomega.Expect(adjacency["myapp-1"]).ToNot(gomega.ContainElement("myapp-1"))
+			},
+		)
+
+		ginkgo.It(
+			"should skip self-reference via prefix matching for db replica-named containers",
+			func() {
+				// Container named "db-1" linking to "db" should NOT create a self-dependency
+				// Similar to the myapp case, this tests another common naming pattern
+				db := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db.EXPECT().Name().Return("db-1").Maybe()
+				db.EXPECT().ID().Return(types.ContainerID("id-db")).Maybe()
+				db.EXPECT().Links().Return([]string{"db"})
+				db.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{
+						ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-1"},
+						Config:            &dockerContainer.Config{Labels: map[string]string{}},
+					})
+
+				containers := []types.Container{db}
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(containerMap).To(gomega.HaveLen(1))
+
+				// Self-reference via prefix matching should be skipped
+				// indegree["db-1"] should be 0 (not incremented)
+				gomega.Expect(indegree["db-1"]).To(gomega.Equal(0))
+				// adjacency["db-1"] should NOT contain "db-1"
+				gomega.Expect(adjacency["db-1"]).ToNot(gomega.ContainElement("db-1"))
+			},
+		)
 
 		ginkgo.It("should handle containers with project-prefixed names and service links", func() {
 			// test-db-1 (no dependencies)
@@ -741,23 +801,27 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(resultNames[len(resultNames)-1]).To(gomega.Equal("app"))
 		})
 
-		ginkgo.It("should handle containers with self-referencing dependencies", func() {
-			// Test containers that reference themselves (should detect as cycle)
-			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
-			c1.EXPECT().Name().Return("container1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links().Return([]string{"container1"}) // Self-reference
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+		ginkgo.It(
+			"should skip containers with self-referencing dependencies without creating cycles",
+			func() {
+				// Test containers that reference themselves (self-reference is filtered as safety net)
+				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				c1.EXPECT().Name().Return("container1").Maybe()
+				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+				c1.EXPECT().Links().Return([]string{"container1"}) // Self-reference
+				c1.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/container1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
 
-			containers := []types.Container{c1}
-			result, err := sortByDependencies(containers)
-			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("circular reference detected"))
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("container1 -> container1"))
-			gomega.Expect(result).To(gomega.BeNil())
-		})
+				containers := []types.Container{c1}
+				result, err := sortByDependencies(containers)
+				gomega.Expect(err).
+					ToNot(gomega.HaveOccurred())
+					// Self-reference is filtered, not a cycle
+				gomega.Expect(result).To(gomega.HaveLen(1))
+				gomega.Expect(result[0].Name()).To(gomega.Equal("container1"))
+			},
+		)
 
 		ginkgo.It("should handle large number of containers with no dependencies", func() {
 			// Test performance and correctness with many containers
@@ -951,6 +1015,117 @@ var _ = ginkgo.Describe("ResolveContainerIdentifier", func() {
 		mockContainer.EXPECT().Name().Return("container1")
 		result := container.ResolveContainerIdentifier(mockContainer)
 		gomega.Expect(result).To(gomega.Equal("container1"))
+	})
+})
+
+var _ = ginkgo.Describe("Prefix Matching Issues", func() {
+	ginkgo.It(
+		"should not match containers with similar names that are not Docker Compose replicas (issue-1161)",
+		func() {
+			// App container that depends on "watchtower-test-database"
+			app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			app.EXPECT().Name().Return("watchtower-test-app1").Maybe()
+			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+			app.EXPECT().Links().Return([]string{"watchtower-test-database"})
+			app.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/watchtower-test-app1",
+					},
+					Config: &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			// First database container (exact match)
+			db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			db1.EXPECT().Name().Return("watchtower-test-database").Maybe()
+			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+			db1.EXPECT().Links().Return(nil)
+			db1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/watchtower-test-database",
+					},
+					Config: &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			// Second database container with similar name (should NOT be matched)
+			db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			db2.EXPECT().Name().Return("watchtower-test-database2").Maybe()
+			db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
+			db2.EXPECT().Links().Return(nil)
+			db2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/watchtower-test-database2",
+					},
+					Config: &dockerContainer.Config{Labels: map[string]string{}},
+				})
+
+			containers := []types.Container{app, db1, db2}
+			containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containerMap).To(gomega.HaveLen(3))
+
+			// Verify app depends ONLY on watchtower-test-database, not on watchtower-test-database2
+			gomega.Expect(indegree["watchtower-test-app1"]).To(gomega.Equal(1))
+			gomega.Expect(adjacency["watchtower-test-database"]).
+				To(gomega.ContainElement("watchtower-test-app1"))
+			gomega.Expect(adjacency["watchtower-test-database2"]).To(gomega.BeEmpty())
+
+			// Verify db1 and db2 have no dependencies
+			gomega.Expect(indegree["watchtower-test-database"]).To(gomega.Equal(0))
+			gomega.Expect(indegree["watchtower-test-database2"]).To(gomega.Equal(0))
+		},
+	)
+
+	ginkgo.It("should match Docker Compose-style numeric replica suffixes", func() {
+		// App container that depends on "myapp-db"
+		app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		app.EXPECT().Name().Return("myapp-app1").Maybe()
+		app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+		app.EXPECT().Links().Return([]string{"myapp-db"})
+		app.EXPECT().
+			ContainerInfo().
+			Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-app1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+
+		// Database replicas with numeric suffixes (should be matched)
+		db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		db1.EXPECT().Name().Return("myapp-db-1").Maybe()
+		db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+		db1.EXPECT().Links().Return(nil)
+		db1.EXPECT().
+			ContainerInfo().
+			Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-db-1"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+
+		db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		db2.EXPECT().Name().Return("myapp-db-2").Maybe()
+		db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
+		db2.EXPECT().Links().Return(nil)
+		db2.EXPECT().
+			ContainerInfo().
+			Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-db-2"},
+				Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			})
+
+		containers := []types.Container{app, db1, db2}
+		containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(containerMap).To(gomega.HaveLen(3))
+
+		// Verify app depends on BOTH db replicas (since they have numeric suffixes)
+		gomega.Expect(indegree["myapp-app1"]).To(gomega.Equal(2))
+		gomega.Expect(adjacency["myapp-db-1"]).To(gomega.ContainElement("myapp-app1"))
+		gomega.Expect(adjacency["myapp-db-2"]).To(gomega.ContainElement("myapp-app1"))
 	})
 })
 
@@ -1259,6 +1434,25 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 			gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
 		})
 	})
+})
+
+var _ = ginkgo.Describe("isPositiveInteger", func() {
+	ginkgo.DescribeTable("validates positive integers correctly",
+		func(input string, expected bool) {
+			result := isPositiveInteger(input)
+			gomega.Expect(result).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry("should return true for single digit positive integer", "1", true),
+		ginkgo.Entry("should return true for multi-digit positive integer", "123", true),
+		ginkgo.Entry("should return true for large positive integer", "999", true),
+		ginkgo.Entry("should return true for zero-prefixed positive integer", "01", true),
+		ginkgo.Entry("should return false for zero", "0", false),
+		ginkgo.Entry("should return false for negative number", "-1", false),
+		ginkgo.Entry("should return false for alphabetic string", "abc", false),
+		ginkgo.Entry("should return false for alphanumeric string", "1a", false),
+		ginkgo.Entry("should return false for empty string", "", false),
+		ginkgo.Entry("should return false for decimal number", "1.5", false),
+	)
 })
 
 func assertOrderBefore(names []string, first, second string) {

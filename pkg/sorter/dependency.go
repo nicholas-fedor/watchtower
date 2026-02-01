@@ -2,6 +2,7 @@ package sorter
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -184,6 +185,14 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 // Normalization ensures consistent handling of Docker Compose service names vs container names.
 // Container links from c.Links() are already normalized.
 //
+// Link Matching Strategy:
+// The function first attempts exact matches for container links. If no exact match is found,
+// it performs prefix matching for Docker Compose-style replica suffixes (e.g., "db" matches "db-1", "db-2").
+// To prevent incorrect matches with similarly named containers (e.g., "db" matching "dbase" or "db-backup"),
+// the prefix matching only succeeds when the suffix after "-" is a positive integer. This ensures that
+// "watchtower-test-database" does NOT match "watchtower-test-database2", which would incorrectly
+// create a dependency relationship.
+//
 // Parameters:
 //   - containers: List of containers to build graph for.
 //
@@ -238,6 +247,19 @@ func buildDependencyGraph(
 		for _, normalizedLink := range c.Links() {
 			// Try exact match first
 			if _, exists := containerMap[normalizedLink]; exists {
+				if normalizedLink == normalizedIdentifier {
+					// Self-reference detected: the container's Links() include itself.
+					// This can occur when:
+					//   - A container is linked to a service name that resolves to itself
+					//   - Docker Compose service dependencies create circular references
+					//   - Manual labeling creates self-referential dependencies
+					//
+					// While container.Links() filters most self-references, this guard prevents
+					// edge cases from corrupting the dependency graph. Skipping the increment
+					// ensures the container is treated as having no dependencies (indegree 0),
+					// preventing a circular dependency error for what is essentially a no-op.
+					continue
+				}
 				// This container depends on the linked container, so increment its indegree
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
@@ -246,20 +268,46 @@ func buildDependencyGraph(
 				continue
 			}
 
-			// Try prefix match for service names (e.g., "myproject-db" -> "myproject-db-1", "myproject-db-2")
-			// Also check for embedded service names (e.g., "test-db-1" matches "db")
+			// Try prefix match for Docker Compose replica suffixes only (e.g., "db" -> "db-1", "db-2")
+			// Only match if the suffix after "-" is a positive integer (Compose-style replica numbering).
+			// This strict matching prevents incorrectly treating "database2" as a replica of "database",
+			// or "db-backup" as a replica of "db". Only numeric suffixes like "-1", "-2" are considered
+			// valid replica indicators, which is consistent with Docker Compose's replica naming convention.
 			var matchedKeys []string
 
 			for key := range containerMap {
-				if strings.HasPrefix(key, normalizedLink+"-") ||
-					strings.Contains(key, "-"+normalizedLink+"-") {
-					matchedKeys = append(matchedKeys, key)
+				if strings.HasPrefix(key, normalizedLink+"-") {
+					// Extract the suffix after the link name and "-"
+					suffix := key[len(normalizedLink)+1:]
+					// Only match if the suffix is a positive integer (replica number).
+					// This ensures we don't match "watchtower-test-database" when looking for "watchtower-test-database2",
+					// or create false dependencies between similarly named but distinct services.
+					if isPositiveInteger(suffix) {
+						matchedKeys = append(matchedKeys, key)
+					}
 				}
 			}
 
+			// Sort matched keys for deterministic dependency ordering
+			// This ensures that when multiple replicas match (e.g., "db-1", "db-2"),
+			// the dependencies are added in a consistent, predictable order.
 			sort.Strings(matchedKeys)
 
 			for _, key := range matchedKeys {
+				if key == normalizedIdentifier {
+					// Self-reference via prefix match: the container matched itself as a replica.
+					// This can happen when a container name follows the replica pattern
+					// (e.g., "myapp-1" linking to "myapp" would incorrectly match itself).
+					//
+					// This check prevents a container from creating a dependency on itself
+					// through the prefix matching logic. Without this guard, a container
+					// named "app-1" with a link to "app" would increment its own indegree,
+					// potentially causing incorrect dependency calculations or cycles.
+					//
+					// Note: While container.Links() should filter self-references upstream,
+					// this defensive check ensures robustness against edge cases.
+					continue
+				}
 				// This container depends on the linked container, so increment its indegree
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
@@ -269,6 +317,35 @@ func buildDependencyGraph(
 	}
 
 	return containerMap, indegree, adjacency, normalizedMap, nil
+}
+
+// isPositiveInteger checks if a string represents a positive integer (1 or greater).
+//
+// This validation is critical for distinguishing Docker Compose-style replica suffixes
+// (e.g., "db-1", "db-2") from other hyphenated container names (e.g., "db-backup",
+// "db-temp"). Docker Compose uses sequential positive integers starting from 1 to
+// identify replica instances. By requiring a positive integer suffix, we ensure that:
+//
+//   - "db" correctly matches "db-1" and "db-2" as replicas
+//   - "db" does NOT match "dbase" (no hyphen) or "db-backup" (non-numeric suffix)
+//   - "database" does NOT match "database2" (no separator)
+//
+// This prevents false dependency relationships between unrelated containers with
+// similar names, which could cause incorrect update ordering or circular dependencies.
+//
+// Parameters:
+//   - s: The string to check (typically the suffix after "-" in a container name).
+//
+// Returns:
+//   - bool: True if the string is a valid integer >= 1, false otherwise.
+func isPositiveInteger(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	n, err := strconv.Atoi(s)
+
+	return err == nil && n > 0
 }
 
 // initializeQueue creates the initial processing queue for Kahn's algorithm.
