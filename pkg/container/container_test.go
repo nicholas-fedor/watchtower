@@ -27,6 +27,9 @@ import (
 // testContainerName is used for testing self-referencing dependency scenarios.
 const testContainerName = "gluetun"
 
+// webContainerName is used for testing filterSelfReferences scenarios.
+const webContainerName = "web"
+
 var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Configuration Validation", func() {
 		ginkgo.It("returns an error when image info is nil", func() {
@@ -907,6 +910,43 @@ var _ = ginkgo.Describe("Container", func() {
 
 				gomega.Expect(idWith).To(gomega.Equal("queue-worker-5"))
 				gomega.Expect(idWithout).To(gomega.Equal("queue-worker-6"))
+			})
+		})
+
+		ginkgo.Describe("filterSelfReferences", func() {
+			ginkgo.It("filters out basic self-references from links", func() {
+				links := []string{"db", webContainerName, "cache"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache"}))
+			})
+
+			ginkgo.It("filters out multiple self-references", func() {
+				links := []string{"first", webContainerName, "second", webContainerName, "third"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"first", "second", "third"}))
+			})
+
+			ginkgo.It("returns empty slice when all links are self-references", func() {
+				links := []string{webContainerName}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.BeEmpty())
+			})
+
+			ginkgo.It("preserves order of non-self links", func() {
+				links := []string{"db", webContainerName, "cache", webContainerName, "redis"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache", "redis"}))
+			})
+
+			ginkgo.It("returns original slice unchanged when no self-references exist", func() {
+				links := []string{"db", "cache"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache"}))
 			})
 		})
 	})

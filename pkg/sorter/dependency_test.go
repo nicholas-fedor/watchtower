@@ -374,6 +374,65 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(result[0].Name()).To(gomega.Equal("c1"))
 		})
 
+		ginkgo.It(
+			"should skip self-reference via prefix matching for replica-named containers",
+			func() {
+				// Container named "myapp-1" linking to "myapp" should NOT create a self-dependency
+				// The prefix matching would match "myapp-1" when looking for "myapp" replicas,
+				// but the self-reference guard should skip it
+				myapp := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				myapp.EXPECT().Name().Return("myapp-1").Maybe()
+				myapp.EXPECT().ID().Return(types.ContainerID("id-myapp")).Maybe()
+				myapp.EXPECT().Links().Return([]string{"myapp"})
+				myapp.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{
+						ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp-1"},
+						Config:            &dockerContainer.Config{Labels: map[string]string{}},
+					})
+
+				containers := []types.Container{myapp}
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(containerMap).To(gomega.HaveLen(1))
+
+				// Self-reference via prefix matching should be skipped
+				// indegree["myapp-1"] should be 0 (not incremented)
+				gomega.Expect(indegree["myapp-1"]).To(gomega.Equal(0))
+				// adjacency["myapp-1"] should NOT contain "myapp-1"
+				gomega.Expect(adjacency["myapp-1"]).ToNot(gomega.ContainElement("myapp-1"))
+			},
+		)
+
+		ginkgo.It(
+			"should skip self-reference via prefix matching for db replica-named containers",
+			func() {
+				// Container named "db-1" linking to "db" should NOT create a self-dependency
+				// Similar to the myapp case, this tests another common naming pattern
+				db := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db.EXPECT().Name().Return("db-1").Maybe()
+				db.EXPECT().ID().Return(types.ContainerID("id-db")).Maybe()
+				db.EXPECT().Links().Return([]string{"db"})
+				db.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{
+						ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-1"},
+						Config:            &dockerContainer.Config{Labels: map[string]string{}},
+					})
+
+				containers := []types.Container{db}
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(containerMap).To(gomega.HaveLen(1))
+
+				// Self-reference via prefix matching should be skipped
+				// indegree["db-1"] should be 0 (not incremented)
+				gomega.Expect(indegree["db-1"]).To(gomega.Equal(0))
+				// adjacency["db-1"] should NOT contain "db-1"
+				gomega.Expect(adjacency["db-1"]).ToNot(gomega.ContainElement("db-1"))
+			},
+		)
+
 		ginkgo.It("should handle containers with project-prefixed names and service links", func() {
 			// test-db-1 (no dependencies)
 			db := mockTypes.NewMockContainer(ginkgo.GinkgoT())
@@ -1375,6 +1434,25 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 			gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
 		})
 	})
+})
+
+var _ = ginkgo.Describe("isPositiveInteger", func() {
+	ginkgo.DescribeTable("validates positive integers correctly",
+		func(input string, expected bool) {
+			result := isPositiveInteger(input)
+			gomega.Expect(result).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry("should return true for single digit positive integer", "1", true),
+		ginkgo.Entry("should return true for multi-digit positive integer", "123", true),
+		ginkgo.Entry("should return true for large positive integer", "999", true),
+		ginkgo.Entry("should return true for zero-prefixed positive integer", "01", true),
+		ginkgo.Entry("should return false for zero", "0", false),
+		ginkgo.Entry("should return false for negative number", "-1", false),
+		ginkgo.Entry("should return false for alphabetic string", "abc", false),
+		ginkgo.Entry("should return false for alphanumeric string", "1a", false),
+		ginkgo.Entry("should return false for empty string", "", false),
+		ginkgo.Entry("should return false for decimal number", "1.5", false),
+	)
 })
 
 func assertOrderBefore(names []string, first, second string) {

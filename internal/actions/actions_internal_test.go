@@ -619,6 +619,353 @@ var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart", func() {
 	})
 })
 
+var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart same-project priority", func() {
+	ginkgo.It("should prioritize same-project match over cross-project matches", func() {
+		// Both same-project and cross-project matches exist
+		// Same-project match should be returned regardless of alphabetical order
+		restartByIdent := map[string]bool{
+			"myproject-db":    true, // Same project as dependent
+			"otherproject-db": true, // Different project (alphabetically first)
+			"zzproject-db":    true, // Different project (alphabetically last)
+		}
+		links := []string{"db"}
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"myproject-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting1 := mockActions.CreateMockContainerWithConfig(
+			"myproject-db",
+			"myproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting2 := mockActions.CreateMockContainerWithConfig(
+			"otherproject-db",
+			"otherproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting3 := mockActions.CreateMockContainerWithConfig(
+			"zzproject-db",
+			"zzproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting1, restarting2, restarting3}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("myproject-db"))
+	})
+
+	ginkgo.It("should return same-project match when multiple cross-project matches exist", func() {
+		// Same-project match should be preferred over many cross-project matches
+		restartByIdent := map[string]bool{
+			"alpha-db":     true, // Cross-project (alphabetically first)
+			"beta-db":      true, // Cross-project
+			"gamma-db":     true, // Cross-project
+			"myproject-db": true, // Same project (not alphabetically first)
+		}
+		links := []string{"db"}
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"myproject-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restartingSame := mockActions.CreateMockContainerWithConfig(
+			"myproject-db",
+			"myproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restartingAlpha := mockActions.CreateMockContainerWithConfig(
+			"alpha-db",
+			"alpha-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restartingBeta := mockActions.CreateMockContainerWithConfig(
+			"beta-db",
+			"beta-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restartingGamma := mockActions.CreateMockContainerWithConfig(
+			"gamma-db",
+			"gamma-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{
+			dependent,
+			restartingSame,
+			restartingAlpha,
+			restartingBeta,
+			restartingGamma,
+		}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("myproject-db"))
+	})
+})
+
+var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart project-service format", func() {
+	ginkgo.It("should match project-service format link with restarting container", func() {
+		// Link uses project-service format "myproject-db"
+		restartByIdent := map[string]bool{
+			"myproject-db": true,
+		}
+		links := []string{"myproject-db"} // project-service format
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"otherproject-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting := mockActions.CreateMockContainerWithConfig(
+			"myproject-db",
+			"myproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("myproject-db"))
+	})
+
+	ginkgo.It("should match project-service format across different projects", func() {
+		// Link uses project-service format to reference a container in a different project
+		restartByIdent := map[string]bool{
+			"databaseproject-db": true,
+		}
+		links := []string{"databaseproject-db"} // project-service format
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"webproject-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting := mockActions.CreateMockContainerWithConfig(
+			"databaseproject-db",
+			"databaseproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("databaseproject-db"))
+	})
+
+	ginkgo.It("should prioritize exact match over project-service format match", func() {
+		// When both exact match and project-service format match exist
+		// Exact match should be preferred
+		restartByIdent := map[string]bool{
+			"db":           true, // Exact match
+			"myproject-db": true, // Project-service format match
+		}
+		links := []string{"db"} // Exact match
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"otherproject-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restartingExact := mockActions.CreateMockContainerWithConfig(
+			"db",
+			"db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restartingProjectService := mockActions.CreateMockContainerWithConfig(
+			"myproject-db",
+			"myproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{
+			dependent,
+			restartingExact,
+			restartingProjectService,
+		}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("db"))
+	})
+
+	ginkgo.It(
+		"should match project-service format when service name differs from project name",
+		func() {
+			// Link uses project-service format with complex names
+			restartByIdent := map[string]bool{
+				"production-api-gateway": true,
+			}
+			links := []string{"production-api-gateway"}
+			dependent := mockActions.CreateMockContainerWithConfig(
+				"dependent",
+				"frontend-web",
+				"web:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{},
+			)
+			restarting := mockActions.CreateMockContainerWithConfig(
+				"production-api-gateway",
+				"production-api-gateway",
+				"gateway:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{},
+			)
+			allContainers := []types.Container{dependent, restarting}
+			result := linkedIdentifierMarkedForRestart(
+				links,
+				restartByIdent,
+				dependent,
+				allContainers,
+			)
+			gomega.Expect(result).To(gomega.Equal("production-api-gateway"))
+		},
+	)
+})
+
+var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart cross-project fallback", func() {
+	ginkgo.It(
+		"should select alphabetically first cross-project match when no same-project match exists",
+		func() {
+			// Multiple cross-project containers restarting, none from dependent's project
+			// Should select alphabetically first: "project1-db" comes before "project2-db" and "project3-db"
+			restartByIdent := map[string]bool{
+				"project2-db": true,
+				"project1-db": true, // Alphabetically first
+				"project3-db": true,
+			}
+			links := []string{"db"}
+			dependent := mockActions.CreateMockContainerWithConfig(
+				"dependent",
+				"project4-web",
+				"web:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{},
+			)
+			restarting1 := mockActions.CreateMockContainerWithConfig(
+				"project1-db",
+				"project1-db",
+				"db:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{},
+			)
+			restarting2 := mockActions.CreateMockContainerWithConfig(
+				"project2-db",
+				"project2-db",
+				"db:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{},
+			)
+			restarting3 := mockActions.CreateMockContainerWithConfig(
+				"project3-db",
+				"project3-db",
+				"db:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{},
+			)
+			allContainers := []types.Container{dependent, restarting1, restarting2, restarting3}
+			result := linkedIdentifierMarkedForRestart(
+				links,
+				restartByIdent,
+				dependent,
+				allContainers,
+			)
+			gomega.Expect(result).To(gomega.Equal("project1-db"))
+		},
+	)
+
+	ginkgo.It("should return cross-project fallback when no same-project match exists", func() {
+		// Only cross-project match exists, no same-project match
+		restartByIdent := map[string]bool{
+			"otherproject-db": true, // Only cross-project match
+		}
+		links := []string{"db"}
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"myproject-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting := mockActions.CreateMockContainerWithConfig(
+			"otherproject-db",
+			"otherproject-db",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("otherproject-db"))
+	})
+})
+
 var _ = ginkgo.Describe("hasSelfDependency", func() {
 	ginkgo.It("should return false when no depends-on label is present", func() {
 		container := mockActions.CreateMockContainerWithConfig(
@@ -774,5 +1121,47 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeFalse())
+	})
+})
+
+var _ = ginkgo.Describe("emptyReport", func() {
+	ginkgo.It("Scanned() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.Scanned()).To(gomega.BeNil())
+	})
+
+	ginkgo.It("Updated() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.Updated()).To(gomega.BeNil())
+	})
+
+	ginkgo.It("Failed() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.Failed()).To(gomega.BeNil())
+	})
+
+	ginkgo.It("Skipped() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.Skipped()).To(gomega.BeNil())
+	})
+
+	ginkgo.It("Stale() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.Stale()).To(gomega.BeNil())
+	})
+
+	ginkgo.It("Fresh() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.Fresh()).To(gomega.BeNil())
+	})
+
+	ginkgo.It("Restarted() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.Restarted()).To(gomega.BeNil())
+	})
+
+	ginkgo.It("All() should return nil", func() {
+		report := emptyReport{}
+		gomega.Expect(report.All()).To(gomega.BeNil())
 	})
 })
