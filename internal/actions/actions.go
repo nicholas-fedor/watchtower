@@ -134,6 +134,19 @@ func RunUpdatesWithNotifications(
 	return generateAndLogMetric(result)
 }
 
+// emptyReport is a non-nil empty report used when sending notifications about errors.
+// It prevents panics in notifier implementations that may dereference the report.
+type emptyReport struct{}
+
+func (emptyReport) Scanned() []types.ContainerReport   { return nil }
+func (emptyReport) Updated() []types.ContainerReport   { return nil }
+func (emptyReport) Failed() []types.ContainerReport    { return nil }
+func (emptyReport) Skipped() []types.ContainerReport   { return nil }
+func (emptyReport) Stale() []types.ContainerReport     { return nil }
+func (emptyReport) Fresh() []types.ContainerReport     { return nil }
+func (emptyReport) Restarted() []types.ContainerReport { return nil }
+func (emptyReport) All() []types.ContainerReport       { return nil }
+
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
 //
 // It checks for errors or nil results, logging accordingly. If an error occurred, it sends a
@@ -155,7 +168,7 @@ func handleUpdateResult(result types.Report, err error, notifier types.Notifier)
 
 		// Send notification about the error
 		if notifier != nil {
-			notifier.SendNotification(nil)
+			notifier.SendNotification(emptyReport{})
 		}
 
 		return &metrics.Metric{

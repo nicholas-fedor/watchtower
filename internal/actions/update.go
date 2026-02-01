@@ -643,7 +643,17 @@ func linkedIdentifierMarkedForRestart(
 			}).Debug("Checking service-only match")
 
 			// crossProjectMatch stores the first cross-project match found, used as fallback
-			// when no same-project match exists
+			// when no same-project match exists.
+			//
+			// NOTE: Go map iteration order is non-deterministic, so when multiple cross-project
+			// containers match the service name, the first one encountered during iteration is
+			// selected. This non-determinism is acceptable for fallback scenarios where no exact
+			// or same-project match exists, as it provides a "best effort" approach.
+			//
+			// The strings.Contains matching is intentional for service-only lookups, allowing
+			// service names like "db" to match container identifiers like "project1-db" or
+			// "myapp-db". This flexible matching enables shorthand references without requiring
+			// the full project-service format.
 			var crossProjectMatch string
 
 			for identifier, restarting := range restartByIdentifier {
@@ -659,14 +669,17 @@ func linkedIdentifierMarkedForRestart(
 
 						return identifier
 					}
-					// Priority 2: Cross-project match - remember first match for fallback
+					// Priority 2: Cross-project match - remember first match for fallback.
+					// Due to non-deterministic map iteration, any matching container may be selected
+					// when multiple cross-project matches exist. This is acceptable as a last resort.
 					if crossProjectMatch == "" {
 						crossProjectMatch = identifier
 					}
 				}
 			}
 
-			// If no same-project match was found, return cross-project match as fallback
+			// If no same-project match was found, return cross-project match as fallback.
+			// See note above about non-deterministic selection when multiple matches exist.
 			if crossProjectMatch != "" {
 				logrus.WithFields(logrus.Fields{
 					"link":    link,

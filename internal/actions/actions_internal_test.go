@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("handleUpdateResult", func() {
 	ginkgo.It("should send notification when error occurs and notifier is provided", func() {
 		// Create a mock notifier that tracks if SendNotification was called
 		mockNotifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
-		mockNotifier.EXPECT().SendNotification(nil).Times(1)
+		mockNotifier.EXPECT().SendNotification(emptyReport{}).Times(1)
 
 		// Call handleUpdateResult with an error and the mock notifier
 		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())

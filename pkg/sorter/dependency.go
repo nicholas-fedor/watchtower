@@ -247,7 +247,8 @@ func buildDependencyGraph(
 		for _, normalizedLink := range c.Links() {
 			// Try exact match first
 			if _, exists := containerMap[normalizedLink]; exists {
-				// Allow self-references (they will create cycles)
+				// Self-references are filtered at container.Links() level, but this check
+				// remains as a fallback safety net. Skipping increment prevents cycle creation.
 				// This container depends on the linked container, so increment its indegree
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
@@ -279,7 +280,8 @@ func buildDependencyGraph(
 			sort.Strings(matchedKeys)
 
 			for _, key := range matchedKeys {
-				// Allow self-references (they will create cycles)
+				// Self-references are filtered at container.Links() level, but this check
+				// remains as a fallback safety net. Skipping increment prevents cycle creation.
 				// This container depends on the linked container, so increment its indegree
 				indegree[normalizedIdentifier]++
 				// The linked container has this container as a dependent
