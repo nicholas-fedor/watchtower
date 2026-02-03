@@ -451,65 +451,85 @@ func ContainsWatchtowerLabel(labels map[string]string) bool {
 	return ok && val == "true"
 }
 
-// getLabelValueOrEmpty retrieves a label’s value or empty string.
+// getRawLabelValue retrieves a raw label value.
+//
+// Parameters:
+//   - label: The label key to retrieve the value from.
+//
+// Returns:
+//   - string: Label value if present.
+//   - bool: True if label exists and is accessible, false otherwise.
+func (c *Container) getRawLabelValue(label string) (string, bool) {
+	if c.containerInfo == nil || c.containerInfo.Config == nil ||
+		c.containerInfo.Config.Labels == nil {
+		return "", false
+	}
+
+	val, ok := c.containerInfo.Config.Labels[label]
+
+	return val, ok
+}
+
+// getLabelValueOrEmpty retrieves a label's value or empty string.
 //
 // Returns:
 //   - string: Label value or empty if absent.
 func (c *Container) getLabelValueOrEmpty(label string) string {
-	var clog *logrus.Entry
-	if c.containerInfo == nil || c.containerInfo.Config == nil {
-		clog = logrus.WithField("container", "<unknown>")
-	} else {
-		clog = logrus.WithField("container", c.Name())
-	}
+	val, ok := c.getRawLabelValue(label)
+	if !ok {
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			var clog *logrus.Entry
+			if c.containerInfo == nil || c.containerInfo.Config == nil {
+				clog = logrus.WithField("container", "<unknown>")
+			} else {
+				clog = logrus.WithField("container", c.Name())
+			}
 
-	// Check for nil metadata.
-	if c.containerInfo == nil || c.containerInfo.Config == nil ||
-		c.containerInfo.Config.Labels == nil {
-		clog.WithField("label", label).Debug("No labels available")
+			if c.containerInfo == nil || c.containerInfo.Config == nil ||
+				c.containerInfo.Config.Labels == nil {
+				clog.WithField("label", label).Debug("No labels available")
+			} else {
+				clog.WithField("label", label).Debug("Label not found")
+			}
+		}
 
 		return ""
 	}
 
-	// Return label value if present.
-	if val, ok := c.containerInfo.Config.Labels[label]; ok {
-		return val
-	}
-
-	clog.WithField("label", label).Debug("Label not found")
-
-	return ""
+	return val
 }
 
-// getLabelValue fetches a label’s value and presence.
+// getLabelValue fetches a label's value and presence.
 //
 // Returns:
 //   - string: Label value if present.
 //   - bool: True if label exists, false otherwise.
 func (c *Container) getLabelValue(label string) (string, bool) {
-	clog := logrus.WithField("container", c.Name())
+	val, ok := c.getRawLabelValue(label)
+	if !ok {
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
 
-	// Check for nil metadata.
-	if c.containerInfo == nil || c.containerInfo.Config == nil ||
-		c.containerInfo.Config.Labels == nil {
-		clog.WithField("label", label).Debug("No labels available")
+			if c.containerInfo == nil || c.containerInfo.Config == nil ||
+				c.containerInfo.Config.Labels == nil {
+				clog.WithField("label", label).Debug("No labels available")
+			} else {
+				clog.WithField("label", label).Debug("Label not found")
+			}
+		}
 
 		return "", false
 	}
 
-	// Return value and presence.
-	if val, ok := c.containerInfo.Config.Labels[label]; ok {
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		clog := logrus.WithField("container", c.Name())
 		clog.WithFields(logrus.Fields{
 			"label": label,
 			"value": val,
 		}).Debug("Retrieved label value")
-
-		return val, true
 	}
 
-	clog.WithField("label", label).Debug("Label not found")
-
-	return "", false
+	return val, true
 }
 
 // getBoolLabelValue parses a label as a boolean.
@@ -518,49 +538,55 @@ func (c *Container) getLabelValue(label string) (string, bool) {
 //   - bool: Parsed value if valid.
 //   - error: Non-nil if parsing fails or label is absent, nil on success.
 func (c *Container) getBoolLabelValue(label string) (bool, error) {
-	clog := logrus.WithField("container", c.Name())
-
-	// Check for nil metadata.
-	if c.containerInfo == nil || c.containerInfo.Config == nil ||
-		c.containerInfo.Config.Labels == nil {
-		clog.WithField("label", label).Debug("No labels available")
-
-		return false, errLabelNotFound
-	}
-
-	// Fetch label value.
-	strVal, ok := c.containerInfo.Config.Labels[label]
+	strVal, ok := c.getRawLabelValue(label)
 	if !ok {
-		clog.WithField("label", label).Debug("Label not found")
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
+
+			if c.containerInfo == nil || c.containerInfo.Config == nil ||
+				c.containerInfo.Config.Labels == nil {
+				clog.WithField("label", label).Debug("No labels available")
+			} else {
+				clog.WithField("label", label).Debug("Label not found")
+			}
+		}
 
 		return false, errLabelNotFound
 	}
 
-	// Parse as boolean.
 	// Treat empty string as false to handle cases where label is explicitly set to empty
 	if strVal == "" {
-		clog.WithFields(logrus.Fields{
-			"label": label,
-			"value": strVal,
-		}).Debug("Treating empty string as false for boolean label")
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
+			clog.WithFields(logrus.Fields{
+				"label": label,
+				"value": strVal,
+			}).Debug("Treating empty string as false for boolean label")
+		}
 
 		return false, nil
 	}
 
 	value, err := strconv.ParseBool(strVal)
 	if err != nil {
-		clog.WithError(err).WithFields(logrus.Fields{
-			"label": label,
-			"value": strVal,
-		}).Warn("Failed to parse boolean label value")
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
+			clog.WithError(err).WithFields(logrus.Fields{
+				"label": label,
+				"value": strVal,
+			}).Warn("Failed to parse boolean label value")
+		}
 
 		return false, fmt.Errorf("%w: %s=%q", err, label, strVal)
 	}
 
-	clog.WithFields(logrus.Fields{
-		"label": label,
-		"value": value,
-	}).Debug("Parsed boolean label value")
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		clog := logrus.WithField("container", c.Name())
+		clog.WithFields(logrus.Fields{
+			"label": label,
+			"value": value,
+		}).Debug("Parsed boolean label value")
+	}
 
 	return value, nil
 }
