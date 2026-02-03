@@ -234,7 +234,8 @@ func Update(
 			progress.AddSkipped(sourceContainer, err, config)
 
 			// Track if Watchtower self-update pull failed for safeguard.
-			if sourceContainer.IsWatchtower() {
+			// Only set to true if we actually attempted a self-update (i.e., SkipSelfUpdate is false)
+			if sourceContainer.IsWatchtower() && !config.SkipSelfUpdate {
 				watchtowerPullFailed = true
 			}
 		} else {
