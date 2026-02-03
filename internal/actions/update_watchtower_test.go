@@ -902,11 +902,76 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 		})
 
 		ginkgo.It(
-			"should still update regular containers normally when SkipSelfUpdate=true",
+			"should not trigger safeguard delay when SkipSelfUpdate=true and pull fails",
 			func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{
+							mockActions.CreateMockContainerWithConfig(
+								"watchtower",
+								"/watchtower",
+								"watchtower:latest",
+								true,
+								false,
+								time.Now(),
+								&dockerContainer.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+								}),
+						},
+						Staleness: map[string]bool{
+							"watchtower": true,
+						},
+					},
+					false,
+					false,
+				)
+				// Simulate pull failure by setting an error on IsContainerStale
+				client.TestData.IsContainerStaleError = errors.New("failed to pull image")
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{
+						Cleanup:          true,
+						SkipSelfUpdate:   true,
+						Filter:           filters.WatchtowerContainersFilter,
+						CPUCopyMode:      "auto",
+						PullFailureDelay: 10 * time.Millisecond,
+					},
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				// Watchtower should not be updated when SkipSelfUpdate=true
+				gomega.Expect(report.Updated()).
+					To(gomega.BeEmpty(), "Watchtower should not be updated when SkipSelfUpdate=true")
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.BeEmpty(), "No cleanup should occur for skipped Watchtower")
+				// IsContainerStale should NOT be called because staleness check is skipped
+				// when SkipSelfUpdate=true for Watchtower containers
+				gomega.Expect(client.TestData.IsContainerStaleCount).
+					To(gomega.Equal(0), "IsContainerStale should not be called for Watchtower when SkipSelfUpdate=true")
+			},
+		)
+
+		ginkgo.It(
+			"should still process regular containers when SkipSelfUpdate=true",
+			func() {
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{
+							mockActions.CreateMockContainerWithConfig(
+								"watchtower",
+								"/watchtower",
+								"watchtower:latest",
+								true,
+								false,
+								time.Now(),
+								&dockerContainer.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+								}),
 							mockActions.CreateMockContainerWithConfig(
 								"regular",
 								"/regular",
@@ -920,7 +985,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								}),
 						},
 						Staleness: map[string]bool{
-							"regular": true,
+							"watchtower": true,
+							"regular":    true,
 						},
 					},
 					false,
@@ -938,13 +1004,70 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(report.Scanned()).To(gomega.HaveLen(1))
+				// Only regular container should be updated
 				gomega.Expect(report.Updated()).
-					To(gomega.HaveLen(1), "Regular container should be updated")
+					To(gomega.HaveLen(1), "Only regular container should be updated")
+				gomega.Expect(report.Updated()[0].Name()).
+					To(gomega.Equal("regular"))
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.HaveLen(1), "Regular container cleanup")
+				// IsContainerStale should be called only for regular container
 				gomega.Expect(client.TestData.IsContainerStaleCount).
-					To(gomega.Equal(1), "IsContainerStale should be called for regular container")
+					To(gomega.Equal(1), "IsContainerStale should be called only for regular container")
+			},
+		)
+
+		ginkgo.It(
+			"should trigger safeguard delay when Watchtower pull fails with SkipSelfUpdate=false",
+			func() {
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{
+							mockActions.CreateMockContainerWithConfig(
+								"watchtower",
+								"/watchtower",
+								"watchtower:latest",
+								true,
+								false,
+								time.Now(),
+								&dockerContainer.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+								}),
+						},
+						Staleness: map[string]bool{
+							"watchtower": true,
+						},
+					},
+					false,
+					false,
+				)
+				// Simulate pull failure
+				client.TestData.IsContainerStaleError = errors.New("failed to pull image")
+
+				// Note: PullFailureDelay is tested via synctest in TestSafeguardDelay
+				// This test verifies that the staleness check is called and fails
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{
+						Cleanup:          true,
+						SkipSelfUpdate:   false, // Explicitly set to false
+						Filter:           filters.WatchtowerContainersFilter,
+						CPUCopyMode:      "auto",
+						PullFailureDelay: 10 * time.Millisecond,
+					},
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				// Watchtower should not be updated on pull failure
+				gomega.Expect(report.Updated()).
+					To(gomega.BeEmpty(), "Watchtower should not be updated on pull failure")
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.BeEmpty(), "No cleanup should occur on pull failure")
+				// IsContainerStale should be called (unlike SkipSelfUpdate=true)
+				gomega.Expect(client.TestData.IsContainerStaleCount).
+					To(gomega.Equal(1), "IsContainerStale should be called when SkipSelfUpdate=false")
 			},
 		)
 	})

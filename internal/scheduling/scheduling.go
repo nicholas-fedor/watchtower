@@ -130,7 +130,9 @@ func RunUpgradesOnSchedule(
 
 				nextRuns := scheduler.Entries()
 				if len(nextRuns) > 0 {
-					logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
+					logrus.Debug(
+						"Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String(),
+					)
 				}
 
 				return
@@ -171,7 +173,7 @@ func RunUpgradesOnSchedule(
 
 		nextRuns := scheduler.Entries()
 		if len(nextRuns) > 0 {
-			logrus.Debug("Scheduled next run: " + nextRuns[0].Next.String())
+			logrus.Debug("Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String())
 		}
 	}
 
