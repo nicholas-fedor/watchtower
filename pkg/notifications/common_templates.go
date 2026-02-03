@@ -43,7 +43,7 @@ var commonTemplates = map[string]string{
     Successfully removed {{index $e.Data "removed_instances"}} excess Watchtower{{if eq (index $e.Data "removed_instances") 1}} instance{{else}} instances{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
-    {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
+    {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}
 {{- else -}}
     {{- /* For messages without data, show just the message */ -}}
     {{$msg}}
