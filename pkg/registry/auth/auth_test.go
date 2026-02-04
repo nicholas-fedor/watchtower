@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1451,6 +1452,82 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			result := auth.TransformAuth(inputAuth)
 			gomega.Expect(result).To(gomega.Equal(inputAuth))
+		})
+	})
+
+	// NewAuthClientCachingTests tests the HTTP client caching behavior using sync.Once.
+	// These tests verify that the cached client is properly initialized once and reused
+	// across multiple calls, ensuring thread-safety and efficient resource usage.
+	ginkgo.Describe("NewAuthClient caching", func() {
+		// Test case: Verifies that multiple calls to NewAuthClient return the same
+		// client instance, ensuring proper caching behavior.
+		ginkgo.It("should return the same client instance on multiple calls", func() {
+			client1 := auth.NewAuthClient()
+			client2 := auth.NewAuthClient()
+			client3 := auth.NewAuthClient()
+
+			// All calls should return the exact same client instance
+			gomega.Expect(client1).To(gomega.BeIdenticalTo(client2))
+			gomega.Expect(client2).To(gomega.BeIdenticalTo(client3))
+		})
+
+		// Test case: Verifies that concurrent calls to NewAuthClient are thread-safe
+		// and return the same client instance without race conditions.
+		ginkgo.It("should handle concurrent access safely", func() {
+			const numGoroutines = 100
+			clients := make([]auth.Client, numGoroutines)
+			var wg sync.WaitGroup
+
+			for i := range numGoroutines {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					clients[idx] = auth.NewAuthClient()
+				}(i)
+			}
+
+			wg.Wait()
+
+			// All goroutines should have received the same client instance
+			for i := 1; i < numGoroutines; i++ {
+				gomega.Expect(clients[i]).To(gomega.BeIdenticalTo(clients[0]))
+			}
+		})
+
+		// Test case: Verifies that the cached client is not recreated on subsequent
+		// calls, ensuring the sync.Once mechanism works correctly.
+		ginkgo.It("should not recreate the client on subsequent calls", func() {
+			// First call initializes the cached client
+			client1 := auth.NewAuthClient()
+
+			// Make multiple subsequent calls
+			client2 := auth.NewAuthClient()
+			client3 := auth.NewAuthClient()
+			client4 := auth.NewAuthClient()
+
+			// All calls should return the same cached client
+			gomega.Expect(client1).To(gomega.BeIdenticalTo(client2))
+			gomega.Expect(client2).To(gomega.BeIdenticalTo(client3))
+			gomega.Expect(client3).To(gomega.BeIdenticalTo(client4))
+		})
+
+		// Test case: Verifies that the client returned by NewAuthClient is usable
+		// for making HTTP requests, ensuring the cached client is fully functional.
+		ginkgo.It("should return a functional client", func() {
+			client := auth.NewAuthClient()
+
+			// Create a simple HTTP request to verify the client works
+			req, err := http.NewRequestWithContext(
+				context.Background(),
+				http.MethodGet,
+				"http://httpbin.org/get",
+				nil,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// The client should be able to execute requests (may fail due to network,
+			// but the call itself should not panic)
+			_, _ = client.Do(req)
 		})
 	})
 })

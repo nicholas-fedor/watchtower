@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/distribution/reference"
@@ -85,6 +86,12 @@ var TLSVersionMap = map[string]uint16{
 	"TLS1.3": tls.VersionTLS13,
 }
 
+// Cached client variables for HTTP client reuse.
+var (
+	cachedClient   Client    // Cached HTTP client for registry authentication requests.
+	clientInitOnce sync.Once // Ensures the cached client is initialized only once.
+)
+
 // Client defines the interface for executing HTTP requests to container registries.
 //
 // This interface abstracts the HTTP client used for authentication operations, enabling
@@ -129,65 +136,69 @@ func (r *registryClient) Do(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// NewAuthClient creates a new Client instance configured with TLS settings.
+// NewAuthClient returns a cached Client for registry authentication requests.
 //
-// It initializes the HTTP client based on Viper configuration values for
-// WATCHTOWER_REGISTRY_TLS_SKIP and WATCHTOWER_REGISTRY_TLS_MIN_VERSION, setting
-// appropriate TLS verification and minimum version requirements. The client is
-// configured with default timeouts and connection limits for robust registry access.
+// The client is initialized once on the first call using Viper configuration
+// values WATCHTOWER_REGISTRY_TLS_SKIP and WATCHTOWER_REGISTRY_TLS_MIN_VERSION.
+// Subsequent calls return the same cached client instance. The client is configured
+// with default timeouts and connection limits for registry access.
 //
 // Returns:
-//   - Client: A new Client instance ready for registry authentication requests.
+//   - Client: Ready for registry authentication requests.
 func NewAuthClient() Client {
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12, // Default to TLS 1.2 for secure communication.
-	}
-
-	// Configure TLS verification based on WATCHTOWER_REGISTRY_TLS_SKIP.
-	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
-		tlsConfig.InsecureSkipVerify = true
-
-		logrus.Debug("TLS verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP configuration")
-	}
-
-	// Configure minimum TLS version based on WATCHTOWER_REGISTRY_TLS_MIN_VERSION.
-	if minVersion := viper.GetString("WATCHTOWER_REGISTRY_TLS_MIN_VERSION"); minVersion != "" {
-		if version, ok := TLSVersionMap[strings.ToUpper(minVersion)]; ok {
-			tlsConfig.MinVersion = version
-
-			logrus.WithField("min_version", minVersion).Debug("Configured TLS minimum version")
-		} else {
-			logrus.WithField("min_version", minVersion).
-				Warn("Invalid TLS minimum version specified; defaulting to TLS 1.2")
+	clientInitOnce.Do(func() {
+		tlsConfig := &tls.Config{
+			MinVersion: tls.VersionTLS12, // Default to TLS 1.2 for secure communication.
 		}
-	}
 
-	return &registryClient{
-		client: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsConfig,                 // TLS configuration for secure registry connections.
-				Proxy:           http.ProxyFromEnvironment, // Respect proxy environment variables (e.g., HTTP_PROXY, HTTPS_PROXY).
-				DialContext: (&net.Dialer{
-					Timeout:   DefaultDialTimeoutSeconds * time.Second,   // Timeout for establishing TCP connections.
-					KeepAlive: DefaultDialKeepAliveSeconds * time.Second, // Keep-alive probes for persistent connections.
-				}).DialContext,
-				MaxIdleConns:          DefaultMaxIdleConns,                             // Maximum number of idle connections to keep open.
-				IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,     // Timeout for closing idle connections.
-				TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second, // Timeout for completing TLS handshakes.
-				ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,      // Timeout for receiving HTTP 100-Continue responses.
-			},
-			Timeout: DefaultTimeoutSeconds * time.Second, // Overall timeout for HTTP requests.
-			CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-				if len(
-					via,
-				) >= DefaultMaxRedirects { // Limit redirects to prevent excessive loops or attacks.
-					return http.ErrUseLastResponse
-				}
+		// Configure TLS verification based on WATCHTOWER_REGISTRY_TLS_SKIP.
+		if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+			tlsConfig.InsecureSkipVerify = true
 
-				return nil
+			logrus.Debug("TLS verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP configuration")
+		}
+
+		// Configure minimum TLS version based on WATCHTOWER_REGISTRY_TLS_MIN_VERSION.
+		if minVersion := viper.GetString("WATCHTOWER_REGISTRY_TLS_MIN_VERSION"); minVersion != "" {
+			if version, ok := TLSVersionMap[strings.ToUpper(minVersion)]; ok {
+				tlsConfig.MinVersion = version
+
+				logrus.WithField("min_version", minVersion).Debug("Configured TLS minimum version")
+			} else {
+				logrus.WithField("min_version", minVersion).
+					Warn("Invalid TLS minimum version specified; defaulting to TLS 1.2")
+			}
+		}
+
+		cachedClient = &registryClient{
+			client: &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: tlsConfig,                 // TLS configuration for secure registry connections.
+					Proxy:           http.ProxyFromEnvironment, // Respect proxy environment variables (e.g., HTTP_PROXY, HTTPS_PROXY).
+					DialContext: (&net.Dialer{
+						Timeout:   DefaultDialTimeoutSeconds * time.Second,   // Timeout for establishing TCP connections.
+						KeepAlive: DefaultDialKeepAliveSeconds * time.Second, // Keep-alive probes for persistent connections.
+					}).DialContext,
+					MaxIdleConns:          DefaultMaxIdleConns,                             // Maximum number of idle connections to keep open.
+					IdleConnTimeout:       DefaultIdleConnTimeoutSeconds * time.Second,     // Timeout for closing idle connections.
+					TLSHandshakeTimeout:   DefaultTLSHandshakeTimeoutSeconds * time.Second, // Timeout for completing TLS handshakes.
+					ExpectContinueTimeout: DefaultExpectContinueTimeout * time.Second,      // Timeout for receiving HTTP 100-Continue responses.
+				},
+				Timeout: DefaultTimeoutSeconds * time.Second, // Overall timeout for HTTP requests.
+				CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+					if len(
+						via,
+					) >= DefaultMaxRedirects { // Limit redirects to prevent excessive loops or attacks.
+						return http.ErrUseLastResponse
+					}
+
+					return nil
+				},
 			},
-		},
-	}
+		}
+	})
+
+	return cachedClient
 }
 
 // extractChallengeHost extracts the host from a realm URL (e.g., "https://ghcr.io/token" -> "ghcr.io").
