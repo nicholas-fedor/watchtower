@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/distribution/reference"
 )
 
 // BenchmarkNewAuthClient benchmarks the NewAuthClient function which creates
@@ -90,18 +92,19 @@ func BenchmarkGetRegistryAddress(b *testing.B) {
 // BenchmarkGetChallengeURL benchmarks GetChallengeURL which constructs
 // the challenge URL for registry authentication.
 func BenchmarkGetChallengeURL(b *testing.B) {
-	// Note: This requires a reference.Named which is complex to create in benchmarks
-	// This benchmark tests string operations that would be used
-	testImages := []string{
+	refs := make([]reference.Named, 0, 2)
+
+	for _, img := range []string{
 		"ghcr.io/example/app:latest",
 		"docker.io/library/nginx:latest",
+	} {
+		ref, _ := reference.ParseNormalizedNamed(img)
+		refs = append(refs, ref)
 	}
 
 	for b.Loop() {
-		for _, img := range testImages {
-			// Simulate the domain extraction part
-			_ = strings.ToLower(img)
-			_ = strings.Split(img, "/")
+		for _, ref := range refs {
+			_ = GetChallengeURL(ref)
 		}
 	}
 }
@@ -133,13 +136,11 @@ func BenchmarkProcessChallengeComplexScope(b *testing.B) {
 
 // BenchmarkGetAuthURL benchmarks GetAuthURL which constructs the authentication URL.
 func BenchmarkGetAuthURL(b *testing.B) {
-	// Pre-defined challenge parts
 	challenge := "bearer realm=\"https://ghcr.io/token\",service=\"ghcr.io\",scope=\"repository:user/repo:pull\""
+	ref, _ := reference.ParseNormalizedNamed("ghcr.io/user/repo:latest")
 
 	for b.Loop() {
-		// This requires a reference.Named, so we benchmark the string operations
-		_ = strings.ToLower(challenge)
-		_ = strings.TrimPrefix(challenge, "bearer")
+		_, _ = GetAuthURL(challenge, ref)
 	}
 }
 
@@ -176,9 +177,7 @@ func BenchmarkHTTPClientCreation(b *testing.B) {
 // BenchmarkHTTPTransportCreation benchmarks HTTP transport creation with custom settings.
 func BenchmarkHTTPTransportCreation(b *testing.B) {
 	for b.Loop() {
-		_ = &http.Transport{
-			MaxIdleConns: 100,
-		}
+		_ = &http.Transport{}
 	}
 }
 

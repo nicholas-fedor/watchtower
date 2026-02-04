@@ -49,12 +49,14 @@ func BenchmarkDigestsMatchNoMatch(b *testing.B) {
 // BenchmarkDigestsMatchManyDigests benchmarks DigestsMatch with a large number of local digests.
 // This simulates containers with multiple image tags or mirrored registries.
 func BenchmarkDigestsMatchManyDigests(b *testing.B) {
-	// Generate 20 local digests to simulate multi-mirror scenario
+	// Generate 20 local digests with match at the end to simulate worst-case iteration
 	localDigests := make([]string, 20)
-	for i := range 20 {
+	for i := range 19 {
 		localDigests[i] = "ghcr.io/mirror/registry-" + string(rune('a'+i)) +
-			"/app@sha256:" + testDigest
+			"/app@sha256:" + strings.Repeat(string(rune('a'+i)), 64)
 	}
+
+	localDigests[19] = "ghcr.io/mirror/registry-t/app@sha256:" + testDigest
 
 	remoteDigest := testDigest
 

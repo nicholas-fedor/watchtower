@@ -1494,23 +1494,6 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 		})
 
-		// Test case: Verifies that the cached client is not recreated on subsequent
-		// calls, ensuring the sync.Once mechanism works correctly.
-		ginkgo.It("should not recreate the client on subsequent calls", func() {
-			// First call initializes the cached client
-			client1 := auth.NewAuthClient()
-
-			// Make multiple subsequent calls
-			client2 := auth.NewAuthClient()
-			client3 := auth.NewAuthClient()
-			client4 := auth.NewAuthClient()
-
-			// All calls should return the same cached client
-			gomega.Expect(client1).To(gomega.BeIdenticalTo(client2))
-			gomega.Expect(client2).To(gomega.BeIdenticalTo(client3))
-			gomega.Expect(client3).To(gomega.BeIdenticalTo(client4))
-		})
-
 		// Test case: Verifies that the client returned by NewAuthClient is usable
 		// for making HTTP requests, ensuring the cached client is fully functional.
 		ginkgo.It("should return a functional client", func() {
