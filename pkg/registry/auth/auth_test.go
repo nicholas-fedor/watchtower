@@ -1514,19 +1514,28 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Verifies that the client returned by NewAuthClient is usable
 		// for making HTTP requests, ensuring the cached client is fully functional.
 		ginkgo.It("should return a functional client", func() {
+			// Create a mock HTTP server to simulate a registry response.
+			server := ghttp.NewServer()
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/get"),
+					ghttp.RespondWith(200, ""),
+				),
+			)
+			defer server.Close()
+
 			client := auth.NewAuthClient()
 
-			// Create a simple HTTP request to verify the client works
+			// Create a simple HTTP request to the mock server.
 			req, err := http.NewRequestWithContext(
 				context.Background(),
 				http.MethodGet,
-				"http://httpbin.org/get",
+				server.URL()+"/get",
 				nil,
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			// The client should be able to execute requests (may fail due to network,
-			// but the call itself should not panic)
+			// The client should be able to execute requests without panic or error.
 			_, _ = client.Do(req)
 		})
 	})

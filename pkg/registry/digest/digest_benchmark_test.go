@@ -37,7 +37,7 @@ func BenchmarkDigestsMatchNoMatch(b *testing.B) {
 		"docker.io/library/nginx@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		"docker.io/library/postgres@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 		"quay.io/redhat/ubi8@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-		"gcr.io/distroless/static@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		"gcr.io/distroless/static@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 	}
 	remoteDigest := testDigest
 

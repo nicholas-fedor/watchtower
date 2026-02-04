@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/base64"
 	"net/http"
 	"strings"
 	"testing"
@@ -186,7 +187,7 @@ func BenchmarkBase64Encoding(b *testing.B) {
 	input := "testuser:testpassword"
 
 	for b.Loop() {
-		_ = []byte(input)
+		_ = base64.StdEncoding.EncodeToString([]byte(input))
 	}
 }
 
