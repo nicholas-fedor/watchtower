@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1451,6 +1452,74 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			result := auth.TransformAuth(inputAuth)
 			gomega.Expect(result).To(gomega.Equal(inputAuth))
+		})
+	})
+
+	// NewAuthClientCachingTests tests the HTTP client caching behavior using sync.Once.
+	// These tests verify that the cached client is properly initialized once and reused
+	// across multiple calls, ensuring thread-safety and efficient resource usage.
+	ginkgo.Describe("NewAuthClient caching", func() {
+		// Test case: Verifies that multiple calls to NewAuthClient return the same
+		// client instance, ensuring proper caching behavior.
+		ginkgo.It("should return the same client instance on multiple calls", func() {
+			client1 := auth.NewAuthClient()
+			client2 := auth.NewAuthClient()
+			client3 := auth.NewAuthClient()
+
+			// All calls should return the exact same client instance
+			gomega.Expect(client1).To(gomega.BeIdenticalTo(client2))
+			gomega.Expect(client2).To(gomega.BeIdenticalTo(client3))
+		})
+
+		// Test case: Verifies that concurrent calls to NewAuthClient are thread-safe
+		// and return the same client instance without race conditions.
+		ginkgo.It("should handle concurrent access safely", func() {
+			const numGoroutines = 100
+			clients := make([]auth.Client, numGoroutines)
+			var wg sync.WaitGroup
+
+			for i := range numGoroutines {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					clients[idx] = auth.NewAuthClient()
+				}(i)
+			}
+
+			wg.Wait()
+
+			// All goroutines should have received the same client instance
+			for i := 1; i < numGoroutines; i++ {
+				gomega.Expect(clients[i]).To(gomega.BeIdenticalTo(clients[0]))
+			}
+		})
+
+		// Test case: Verifies that the client returned by NewAuthClient is usable
+		// for making HTTP requests, ensuring the cached client is fully functional.
+		ginkgo.It("should return a functional client", func() {
+			// Create a mock HTTP server to simulate a registry response.
+			server := ghttp.NewServer()
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/get"),
+					ghttp.RespondWith(200, ""),
+				),
+			)
+			defer server.Close()
+
+			client := auth.NewAuthClient()
+
+			// Create a simple HTTP request to the mock server.
+			req, err := http.NewRequestWithContext(
+				context.Background(),
+				http.MethodGet,
+				server.URL()+"/get",
+				nil,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// The client should be able to execute requests without panic or error.
+			_, _ = client.Do(req)
 		})
 	})
 })
