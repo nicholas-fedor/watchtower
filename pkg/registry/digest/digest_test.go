@@ -1168,6 +1168,48 @@ var _ = ginkgo.Describe("Digests", func() {
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
+		ginkgo.It("should match when local digest includes repository prefix", func() {
+			localDigests := []string{"repo@sha256:abc123"}
+			remoteDigest := "sha256:abc123"
+			result := digest.DigestsMatch(localDigests, remoteDigest)
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should match when remote digest has no sha256 prefix", func() {
+			localDigests := []string{"repo@sha256:abc123"}
+			remoteDigest := "abc123"
+			result := digest.DigestsMatch(localDigests, remoteDigest)
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should not match when remote digest is empty", func() {
+			localDigests := []string{"repo@sha256:abc123"}
+			remoteDigest := ""
+			result := digest.DigestsMatch(localDigests, remoteDigest)
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should match when one of multiple local digests matches remote", func() {
+			localDigests := []string{"repo1@sha256:hash1", "repo2@sha256:hash2"}
+			remoteDigest := "sha256:hash1"
+			result := digest.DigestsMatch(localDigests, remoteDigest)
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should not match when none of multiple local digests match remote", func() {
+			localDigests := []string{"repo1@sha256:hash1", "repo2@sha256:hash2"}
+			remoteDigest := "sha256:hash3"
+			result := digest.DigestsMatch(localDigests, remoteDigest)
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should match when local digest has empty repo prefix", func() {
+			localDigests := []string{"@sha256:abc123"}
+			remoteDigest := "sha256:abc123"
+			result := digest.DigestsMatch(localDigests, remoteDigest)
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
 		ginkgo.Describe("NormalizeDigest", func() {
 			ginkgo.It("should trim sha256: prefix from digest", func() {
 				input := mockDigestHash

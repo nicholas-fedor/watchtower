@@ -1,7 +1,7 @@
 // Package digest provides functionality for retrieving and comparing Docker image digests in Watchtower.
 // It enables the update process by fetching digests from container registries using HTTP requests,
 // comparing them with local image digests, and handling authentication transformations to ensure compatibility
-// with various registry authentication schemes. This package is integral to determining whether a container’s
+// with various registry authentication schemes. This package is integral to determining whether a container's
 // image is stale and requires an update.
 package digest
 
@@ -24,17 +24,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// ContentDigestHeader is the HTTP header key used to retrieve the digest from a registry’s response.
+// ContentDigestHeader is the HTTP header key used to retrieve the digest from a registry's response.
 // This header, typically "Docker-Content-Digest", contains the digest value (e.g., "sha256:abc...") for an image manifest,
 // allowing Watchtower to compare or fetch it without downloading the full manifest body.
 const ContentDigestHeader = "Docker-Content-Digest"
-
-const (
-	// minDigestParts defines the minimum number of parts expected when splitting a digest string.
-	// A valid digest typically has two parts: a prefix (e.g., "sha256") and a hash value (e.g., "abc..."), separated by a colon.
-	// This constant ensures digest strings are well-formed before comparison or processing.
-	minDigestParts = 2
-)
 
 // UserAgent is the User-Agent header value used in HTTP requests to identify Watchtower as the client.
 // It can be customized at build time using linker flags (e.g., -ldflags "-X ...UserAgent=Watchtower/v1.0").
@@ -49,7 +42,7 @@ var inspectMutex sync.Mutex
 var (
 	// errMissingImageInfo indicates the container lacks image metadata, preventing digest operations.
 	errMissingImageInfo = errors.New("container image info missing")
-	// errInvalidRegistryResponse indicates the registry’s HEAD response lacks a digest or is malformed.
+	// errInvalidRegistryResponse indicates the registry's HEAD response lacks a digest or is malformed.
 	errInvalidRegistryResponse = errors.New("registry responded with invalid HEAD request")
 	// errFailedGetToken indicates a failure to obtain an authentication token from the registry.
 	errFailedGetToken = errors.New("failed to get token")
@@ -90,7 +83,7 @@ func NormalizeDigest(digest string) string {
 	return digest
 }
 
-// CompareDigest checks whether a container’s current image digest matches the latest from its registry.
+// CompareDigest checks whether a container's current image digest matches the latest from its registry.
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
@@ -135,11 +128,7 @@ func CompareDigest(
 		}
 	}
 
-	logrus.WithFields(fields).
-		WithField("remote_digest", remoteDigest).
-		Debug("Fetched remote digest")
-
-	// Compare the fetched remote digest with the container’s local digests.
+	// Compare the fetched remote digest with the container's local digests.
 	matches := DigestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
 	logrus.WithFields(fields).WithField("matches", matches).Debug("Completed digest comparison")
 
@@ -151,7 +140,7 @@ func CompareDigest(
 // HEAD requests are unsupported. The digest is extracted from the response headers and normalized for consistency.
 //
 // Parameters:
-//   - ctx: The context controlling the request’s lifecycle, enabling cancellation or timeouts.
+//   - ctx: The context controlling the request's lifecycle, enabling cancellation or timeouts.
 //   - inspector: Image inspector for checking if image is locally built.
 //   - container: The container whose image digest is being fetched, providing the image name and reference.
 //   - authToken: A base64-encoded authentication string for registry access.
@@ -375,7 +364,8 @@ func fetchDigest(
 
 		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
 	}
-	defer resp.Body.Close()
+
+	defer func() { _ = resp.Body.Close() }()
 
 	// Handle the manifest response, checking for redirects and extracting digest.
 	digest, updatedURL, retry, err := HandleManifestResponse(
@@ -605,7 +595,7 @@ func HandleManifestResponse(
 	}
 
 	if err != nil {
-		logrus.WithFields(fields).WithError(err).Debug("Failed to extract digest")
+		logrus.WithError(err).WithFields(fields).Debug("Failed to extract digest")
 
 		return "", "", false, err
 	}
@@ -617,7 +607,7 @@ func HandleManifestResponse(
 	return digest, "", false, nil
 }
 
-// ExtractHeadDigest extracts the image digest from a HEAD response’s headers.
+// ExtractHeadDigest extracts the image digest from a HEAD response's headers.
 //
 // It retrieves the digest from the "Docker-Content-Digest" header, normalizing it for comparison,
 // and validates its presence to ensure a valid response from the registry.
@@ -656,7 +646,7 @@ func ExtractHeadDigest(resp *http.Response) (string, error) {
 	return normalizedDigest, nil
 }
 
-// ExtractGetDigest extracts the image digest from a GET response’s headers or body.
+// ExtractGetDigest extracts the image digest from a GET response's headers or body.
 //
 // It first tries to retrieve the digest from the "Docker-Content-Digest" header.
 // If the header is missing, it falls back to parsing the response body as a JSON
@@ -779,12 +769,13 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 	return normalizedDigest, nil
 }
 
-// DigestsMatch compares a list of local digests with a remote digest to determine if there’s a match.
+// DigestsMatch compares a list of local digests with a remote digest to determine if there's a match.
+//
 // It normalizes both the remote digest and each local digest, checking for equality to confirm
-// whether the container’s image is up-to-date with the registry’s latest version.
+// whether the container's image is up-to-date with the registry's latest version.
 //
 // Parameters:
-//   - localDigests: A slice of local digests from the container’s image info (e.g., "sha256:abc...").
+//   - localDigests: A slice of local digests from the container's image info (e.g., "sha256:abc...").
 //   - remoteDigest: The digest fetched from the registry (e.g., "sha256:abc..." or raw hash).
 //
 // Returns:
@@ -793,23 +784,42 @@ func DigestsMatch(localDigests []string, remoteDigest string) bool {
 	// Normalize the remote digest once for efficiency.
 	normalizedRemoteDigest := NormalizeDigest(remoteDigest)
 
+	logrus.WithFields(logrus.Fields{
+		"local_digests": localDigests,
+		"remote_digest": normalizedRemoteDigest,
+	}).Debug("Comparing digests")
+
 	for _, digest := range localDigests {
-		// Split digest into repo and hash parts (e.g., "repo@sha256:abc").
-		parts := strings.Split(digest, "@")
-		if len(parts) < minDigestParts {
-			continue // Skip malformed digests.
+		// Cut the digest into repo and hash parts (e.g., "repo@sha256:abc").
+		repo, after, found := strings.Cut(digest, "@")
+
+		// Skip malformed digests without @ separator.
+		if !found {
+			logrus.WithFields(logrus.Fields{
+				"digest": digest,
+			}).Debug("Skipping malformed digest without @ separator")
+
+			continue
 		}
 
-		// Normalize the local digest’s hash part.
-		normalizedLocalDigest := NormalizeDigest(parts[1])
-		logrus.WithFields(logrus.Fields{
-			"local_digest":  normalizedLocalDigest,
-			"remote_digest": normalizedRemoteDigest,
-		}).Debug("Comparing digests")
+		// Handle case where digest starts with "@" (e.g., "@sha256:abc123")
+		// This is a valid format that Docker may report in some contexts.
+		if repo == "" {
+			logrus.WithFields(logrus.Fields{
+				"digest":        digest,
+				"remote_digest": normalizedRemoteDigest,
+			}).Debug("Local digest has empty repo prefix, comparing only digest part")
+		}
+
+		// Remove the sha256: prefix, if needed.
+		normalizedLocalDigest := NormalizeDigest(after)
 
 		// Return true on the first match.
 		if normalizedLocalDigest == normalizedRemoteDigest {
-			logrus.Debug("Found digest match")
+			logrus.WithFields(logrus.Fields{
+				"local_digest":  digest,
+				"remote_digest": normalizedRemoteDigest,
+			}).Debug("Found digest match")
 
 			return true
 		}
@@ -887,7 +897,8 @@ func retryManifestRequest(
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
 	}
-	defer resp.Body.Close()
+
+	defer func() { _ = resp.Body.Close() }()
 
 	digest, _, _, err := HandleManifestResponse(
 		resp,
