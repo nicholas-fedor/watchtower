@@ -266,9 +266,9 @@ func fetchDigest(
 	// Inspect the image to check if it's locally built (no RepoDigests).
 	// Synchronize access to prevent race conditions in concurrent operations.
 	inspectMutex.Lock()
-	defer inspectMutex.Unlock()
-
 	inspect, _, err := inspector.ImageInspectWithRaw(ctx, container.ImageName())
+	inspectMutex.Unlock()
+
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to inspect image")
 
