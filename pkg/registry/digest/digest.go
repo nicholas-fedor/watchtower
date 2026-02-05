@@ -266,7 +266,9 @@ func fetchDigest(
 	// Inspect the image to check if it's locally built (no RepoDigests).
 	// Synchronize access to prevent race conditions in concurrent operations.
 	inspectMutex.Lock()
+
 	inspect, _, err := inspector.ImageInspectWithRaw(ctx, container.ImageName())
+
 	inspectMutex.Unlock()
 
 	if err != nil {
