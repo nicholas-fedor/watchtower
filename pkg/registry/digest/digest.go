@@ -128,10 +128,6 @@ func CompareDigest(
 		}
 	}
 
-	logrus.WithFields(fields).
-		WithField("remote_digest", remoteDigest).
-		Debug("Fetched remote digest")
-
 	// Compare the fetched remote digest with the container's local digests.
 	matches := DigestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
 	logrus.WithFields(fields).WithField("matches", matches).Debug("Completed digest comparison")
