@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improve digest matching efficiency and reliability by @nicholas-fedor in [#1289](https://github.com/nicholas-fedor/watchtower/pull/1289)
+- Cache HTTP client for registry authentication requests by @nicholas-fedor in [#1287](https://github.com/nicholas-fedor/watchtower/pull/1287)
+
+### Chores
+
+- Delete FUNDING.yml by @nicholas-fedor in [#1298](https://github.com/nicholas-fedor/watchtower/pull/1298)
+- Add FUNDING.yml by @nicholas-fedor in [#1297](https://github.com/nicholas-fedor/watchtower/pull/1297)
+- Update nicholas-fedor/go-proxy-pull-action digest to f0551db by @renovate[bot] in [#1296](https://github.com/nicholas-fedor/watchtower/pull/1296)
+- Update golang:1.25.7-alpine3.22 docker digest to 20c8a94 by @renovate[bot] in [#1295](https://github.com/nicholas-fedor/watchtower/pull/1295)
+- Update golang:alpine docker digest to f6751d8 by @renovate[bot] in [#1294](https://github.com/nicholas-fedor/watchtower/pull/1294)
+- Update github/codeql-action digest to 45cbd0c by @renovate[bot] in [#1293](https://github.com/nicholas-fedor/watchtower/pull/1293)
+- Update cimg/go docker tag to v1.25.7 by @renovate[bot] in [#1291](https://github.com/nicholas-fedor/watchtower/pull/1291)
+- Update nicholas-fedor/go-proxy-pull-action digest to 9c51cce by @renovate[bot] in [#1288](https://github.com/nicholas-fedor/watchtower/pull/1288)
+- Update golang docker tag to v1.25.7 by @renovate[bot] in [#1286](https://github.com/nicholas-fedor/watchtower/pull/1286)
+- Update golang:alpine docker digest to f4622e3 by @renovate[bot] in [#1285](https://github.com/nicholas-fedor/watchtower/pull/1285)
+- Update dependency go to v1.25.7 by @renovate[bot] in [#1284](https://github.com/nicholas-fedor/watchtower/pull/1284)
+- Update nicholas-fedor/go-proxy-pull-action digest to 998d963 by @renovate[bot] in [#1283](https://github.com/nicholas-fedor/watchtower/pull/1283)
+- Update cimg/go:1.25.6 docker digest to 81789fa by @renovate[bot] in [#1281](https://github.com/nicholas-fedor/watchtower/pull/1281)
+- Update actions/checkout digest to de0fac2 by @renovate[bot] in [#1280](https://github.com/nicholas-fedor/watchtower/pull/1280)
+
+## [1.14.1] - 2026-02-03
+
+### Changed
+
 - Extract getRawLabelValue to eliminate code duplication by @nicholas-fedor in [#1277](https://github.com/nicholas-fedor/watchtower/pull/1277)
 - Update documentation for multiple notification URLs and CLI flags by @nicholas-fedor in [#1251](https://github.com/nicholas-fedor/watchtower/pull/1251)
 
@@ -2619,7 +2643,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.1...HEAD)
+- [1.14.1](https://github.com/nicholas-fedor/watchtower/compare/v1.14.0...v1.14.1)
 - [1.14.0](https://github.com/nicholas-fedor/watchtower/compare/v1.13.1...v1.14.0)
 - [1.13.1](https://github.com/nicholas-fedor/watchtower/compare/v1.13.0...v1.13.1)
 - [1.13.0](https://github.com/nicholas-fedor/watchtower/compare/v1.12.5...v1.13.0)
