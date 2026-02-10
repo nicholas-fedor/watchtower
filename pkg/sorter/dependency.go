@@ -186,8 +186,12 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 // Container links from c.Links() are already normalized.
 //
 // Link Matching Strategy:
-// The function first attempts exact matches for container links. If no exact match is found,
-// it performs prefix matching for Docker Compose-style replica suffixes (e.g., "db" matches "db-1", "db-2").
+// The function attempts multiple matching strategies in order of specificity:
+//  1. Exact match - direct key lookup in containerMap
+//  2. Prefix match for replicas - matches Docker Compose replica suffixes (e.g., "db" matches "db-1", "db-2")
+//  3. Service-only match - strips project prefix from identifiers (e.g., "postgresql-postgres" -> "postgres")
+//     to handle cases where watchtower labels specify only the service name without project context
+//
 // To prevent incorrect matches with similarly named containers (e.g., "db" matching "dbase" or "db-backup"),
 // the prefix matching only succeeds when the suffix after "-" is a positive integer. This ensures that
 // "watchtower-test-database" does NOT match "watchtower-test-database2", which would incorrectly
@@ -268,7 +272,7 @@ func buildDependencyGraph(
 				continue
 			}
 
-			// Try prefix match for Docker Compose replica suffixes only (e.g., "db" -> "db-1", "db-2")
+			// 2. Try prefix match for Docker Compose replica suffixes only (e.g., "db" -> "db-1", "db-2")
 			// Only match if the suffix after "-" is a positive integer (Compose-style replica numbering).
 			// This strict matching prevents incorrectly treating "database2" as a replica of "database",
 			// or "db-backup" as a replica of "db". Only numeric suffixes like "-1", "-2" are considered
@@ -313,6 +317,67 @@ func buildDependencyGraph(
 				// The linked container has this container as a dependent
 				adjacency[key] = append(adjacency[key], normalizedIdentifier)
 			}
+
+			// If we found replica matches, skip service-only matching
+			if len(matchedKeys) > 0 {
+				continue
+			}
+
+			// 3. Try matching by service name only (strip project prefix from containerMap keys)
+			// This handles the case where watchtower labels specify only the service name
+			// (e.g., "postgres") but the containerMap key includes the project prefix
+			// (e.g., "postgresql-postgres").
+			//
+			// IMPORTANT: Only match if there's exactly ONE container with this service name
+			// to avoid ambiguous cross-project dependencies. If multiple containers from
+			// different projects have the same service name, we should NOT match any of them.
+			var serviceMatchKeys []string
+
+			for key := range containerMap {
+				serviceName := extractServiceName(key)
+				if serviceName == normalizedLink {
+					serviceMatchKeys = append(serviceMatchKeys, key)
+				}
+			}
+
+			// Only apply service-only matching if there's exactly ONE unambiguous match
+			if len(serviceMatchKeys) == 1 {
+				serviceMatchKey := serviceMatchKeys[0]
+
+				if serviceMatchKey == normalizedIdentifier {
+					// Self-reference via service name match.
+					// This prevents a container from creating a dependency on itself
+					// when its service name matches the link.
+					continue
+				}
+
+				// Log the service-only match for debugging
+				logrus.WithFields(logrus.Fields{
+					"link":              normalizedLink,
+					"matched_key":       serviceMatchKey,
+					"dependent":         normalizedIdentifier,
+					"match_type":        "service_only",
+					"extracted_service": extractServiceName(serviceMatchKey),
+				}).Debug("Matched dependency via service name fallback")
+
+				// This container depends on the linked container, so increment its indegree
+				indegree[normalizedIdentifier]++
+				// The linked container has this container as a dependent
+				adjacency[serviceMatchKey] = append(
+					adjacency[serviceMatchKey],
+					normalizedIdentifier,
+				)
+			} else if len(serviceMatchKeys) > 1 {
+				// Multiple matches found - this is ambiguous (e.g., same service name in different projects)
+				// Log this situation for debugging but don't create any dependencies
+				logrus.WithFields(logrus.Fields{
+					"link":         normalizedLink,
+					"matched_keys": serviceMatchKeys,
+					"dependent":    normalizedIdentifier,
+					"match_count":  len(serviceMatchKeys),
+					"match_type":   "service_only_ambiguous",
+				}).Debug("Skipped ambiguous service name match (multiple containers with same service name)")
+			}
 		}
 	}
 
@@ -346,6 +411,53 @@ func isPositiveInteger(s string) bool {
 	n, err := strconv.Atoi(s)
 
 	return err == nil && n > 0
+}
+
+// extractServiceName extracts the service name from a container identifier.
+//
+// Container identifiers from ResolveContainerIdentifier() follow the pattern:
+//   - "project-service" when both project and service labels exist
+//   - "project-service-N" for Docker Compose replicas (N is replica number)
+//   - "servicename" when only service name is available (no project context)
+//
+// This function extracts just the service name by:
+//  1. If there's no hyphen, return the whole string (it's already just a service name)
+//  2. If there are hyphens, the service name is the last segment (or last two segments
+//     if the last segment is a replica number)
+//
+// Examples:
+//   - "postgresql-postgres" -> "postgres"
+//   - "postgresql-postgres-1" -> "postgres" (strips replica suffix)
+//   - "myapp" -> "myapp"
+//   - "my-app-service" -> "service" (last segment before any replica number)
+//   - "my-app-service-2" -> "service" (strips replica suffix)
+//
+// Parameters:
+//   - identifier: The full container identifier (e.g., "postgresql-postgres").
+//
+// Returns:
+//   - string: The extracted service name.
+func extractServiceName(identifier string) string {
+	if identifier == "" {
+		return ""
+	}
+
+	// If no hyphen, the identifier is already just a service name
+	if !strings.Contains(identifier, "-") {
+		return identifier
+	}
+
+	parts := strings.Split(identifier, "-")
+
+	// Check if the last part is a replica number (positive integer)
+	// If so, we need to skip it and take the second-to-last part as service name
+	if isPositiveInteger(parts[len(parts)-1]) {
+		// Return the part before the replica number (e.g., "service" from "project-service-1")
+		return parts[len(parts)-2]
+	}
+
+	// No replica number, service name is the last part
+	return parts[len(parts)-1]
 }
 
 // initializeQueue creates the initial processing queue for Kahn's algorithm.
