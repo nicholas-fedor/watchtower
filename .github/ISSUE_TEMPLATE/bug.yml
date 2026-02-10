@@ -1,7 +1,9 @@
 name: 🐛 Bug report
 description: Report a bug or issue with Watchtower.
 title: "[Bug]:"
-labels: ["Type: Bug"]
+assignees: "nicholas-fedor"
+labels: "bug"
+projects: "nicholas-fedor/3"
 
 body:
   - type: markdown
@@ -14,7 +16,8 @@ body:
         - For features, use the [feature request form](https://github.com/nicholas-fedor/watchtower/issues/new?template=feature_request.yml).
         - If you have additional items to share, such as debug log files or screenshots, then you may attach them in subsequent messages.
 
-        [!WARNING] Do NOT submit sensitive information in logs, screenshots, etc that could lead to system/account compromise.
+        ⚠️ Do NOT submit sensitive information in logs, screenshots, etc that could lead to system/account compromise.
+        ❗ Low quality bug reports, such as those that fail to provide adequate diagnostic information, are subject to closure.
 
   - type: checkboxes
     id: checklist
@@ -43,7 +46,7 @@ body:
       label: Steps to Reproduce
       description: Provide detailed steps to reproduce the issue.
       placeholder: |
-        1. Start Watchtower with Docker compose: `docker compose up -d`
+        1. Start Watchtower with Docker Compose: `docker compose up -d`
         2. Wait for the update cycle
         3. Observe the errant behavior in Docker logs or notifications
     validations:
@@ -71,7 +74,7 @@ body:
     id: docker_version
     attributes:
       label: Docker Version
-      description: Output of `docker version`
+      description: Run the terminal command `docker version`. Copy and paste the result below.
       render: bash
     validations:
       required: true
@@ -79,58 +82,57 @@ body:
   - type: textarea
     id: docker_info
     attributes:
-      label: Docker Info
-      description: Output of `docker info` (optional)
+      label: Docker Info (optional)
+      description: Run the terminal command `docker info`. Copy and paste the result below.
       render: bash
     validations:
       required: false
 
   - type: textarea
-    id: configuration
+    id: docker-compose
     attributes:
-      label: Watchtower Configuration
+      label: Docker Compose Configuration
       description: |
-        How are you running Watchtower?
-        Please provide your Docker command, docker-compose.yml, or other configuration details.
+        If you are running Watchtower using Docker Compose, then please share your Compose file.
       placeholder: |
-        e.g., Docker command:
-        ```bash
-        docker run --rm \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          nickfedor/watchtower:latest \
-          --debug \
-          --interval 30 \
-          --cleanup
-        ```
-
-        Or docker-compose.yml:
-        ```yaml
         services:
           watchtower:
             image: nickfedor/watchtower:latest
             restart: unless-stopped
             volumes:
               - /var/run/docker.sock:/var/run/docker.sock
-        ```
+      render: yaml
     validations:
-      required: true
+      required: false
+
+  - type: textarea
+    id: docker-cli
+    attributes:
+      label: Docker CLI Command
+      description: |
+        If you are running Watchtower using the Docker CLI, then please share the command.
+      placeholder: |
+        docker run --rm \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          nickfedor/watchtower:latest \
+          --debug \
+          --interval 30 \
+          --cleanup
+      render: bash
+    validations:
+      required: false
 
   - type: textarea
     id: logs
     attributes:
       label: Debug Logs
       description: |
-        Paste the logs from running Watchtower with the `--debug` or `WATCHTOWER_DEBUG=true` option.
-        If you need to submit full debug logs, then you should add them as an attachment in a separate message after submitting the issue.
-
-        Info-level logs are typically not sufficient for debugging issues!
-      render: text
+        Paste or attach the logs from running Watchtower with the `--debug` or `WATCHTOWER_DEBUG=true` option.  
+        ❗ Info-level logs are not sufficient for debugging issues!  
+        Logs must show the errors and/or relevant execution necessary for debugging and issue resolution.
       placeholder: |
-        Example log output:
-        ```
         time="2023-01-01T00:00:00Z" level=debug msg="Checking for updates..."
         time="2023-01-01T00:00:00Z" level=error msg="Failed to check for updates: ..."
-        ```
     validations:
       required: true
 
