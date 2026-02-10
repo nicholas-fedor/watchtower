@@ -1455,6 +1455,352 @@ var _ = ginkgo.Describe("isPositiveInteger", func() {
 	)
 })
 
+var _ = ginkgo.Describe("extractServiceName", func() {
+	ginkgo.DescribeTable("extracts service name from container identifier",
+		func(input, expected string) {
+			result := extractServiceName(input)
+			gomega.Expect(result).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry(
+			"should return simple identifier without project prefix as-is",
+			"postgres",
+			"postgres",
+		),
+		ginkgo.Entry(
+			"should extract service name from project-service identifier",
+			"postgresql-postgres",
+			"postgres",
+		),
+		ginkgo.Entry(
+			"should extract service name from project-service-replica identifier",
+			"project-service-1",
+			"service",
+		),
+		ginkgo.Entry(
+			"should extract service name from complex project-service-replica identifier",
+			"myapp-database-2",
+			"database",
+		),
+		ginkgo.Entry(
+			"should return empty string for empty input",
+			"",
+			"",
+		),
+		ginkgo.Entry(
+			"should handle single character identifier",
+			"a",
+			"a",
+		),
+		ginkgo.Entry(
+			"should handle identifier with multiple dashes",
+			"my-complex-app-name-service-3",
+			"service",
+		),
+		ginkgo.Entry(
+			"should handle two-part identifier without replica",
+			"myapp-web",
+			"web",
+		),
+		ginkgo.Entry(
+			"should handle two-part identifier with replica",
+			"web-1",
+			"web",
+		),
+		ginkgo.Entry(
+			"should return last part when no replica suffix",
+			"project-web",
+			"web",
+		),
+		ginkgo.Entry(
+			"should handle replica number 0 (not positive, so treat as name)",
+			"service-0",
+			"0",
+		),
+		ginkgo.Entry(
+			"should handle large replica number",
+			"project-service-999",
+			"service",
+		),
+	)
+})
+
+var _ = ginkgo.Describe("Service-Only Matching", func() {
+	ginkgo.Describe("buildDependencyGraph", func() {
+		ginkgo.It(
+			"should match single unambiguous cross-project service by service name",
+			func() {
+				// App container from project1 that depends on "db" service
+				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project1_app_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "app",
+							"com.docker.compose.project": "project1",
+						},
+					},
+				})
+				app.EXPECT().Name().Return("project1_app_1").Maybe()
+				app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+				app.EXPECT().Links().Return([]string{"db"}) // Link to just "db" service name
+
+				// DB container from project2 (different project, but only one "db" service)
+				db := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project2_db_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+							"com.docker.compose.project": "project2",
+						},
+					},
+				})
+				db.EXPECT().Name().Return("project2_db_1").Maybe()
+				db.EXPECT().ID().Return(types.ContainerID("id-db")).Maybe()
+				db.EXPECT().Links().Return(nil)
+
+				containers := []types.Container{app, db}
+
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Verify containers are in the map
+				gomega.Expect(containerMap).To(gomega.HaveLen(2))
+
+				// App should have indegree 1 (depends on db via service-only match)
+				gomega.Expect(indegree["project1-app"]).To(gomega.Equal(1))
+
+				// DB should have app as dependent
+				gomega.Expect(adjacency["project2-db"]).To(gomega.ContainElement("project1-app"))
+			},
+		)
+
+		ginkgo.It(
+			"should match watchtower label referencing service name without project prefix",
+			func() {
+				// App container with watchtower depends-on label referencing just "postgres"
+				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/myapp"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "postgres",
+						},
+					},
+				})
+				app.EXPECT().Name().Return("myapp").Maybe()
+				app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+				app.EXPECT().Links().Return([]string{"postgres"})
+
+				// Postgres container with project prefix in identifier
+				postgres := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				postgres.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/postgresql_postgres_1",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "postgres",
+							"com.docker.compose.project": "postgresql",
+						},
+					},
+				})
+				postgres.EXPECT().Name().Return("postgresql_postgres_1").Maybe()
+				postgres.EXPECT().ID().Return(types.ContainerID("id-postgres")).Maybe()
+				postgres.EXPECT().Links().Return(nil)
+
+				containers := []types.Container{app, postgres}
+
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Verify containers are in the map
+				gomega.Expect(containerMap).To(gomega.HaveLen(2))
+
+				// App should have indegree 1 (depends on postgres via service-only match)
+				gomega.Expect(indegree["myapp"]).To(gomega.Equal(1))
+
+				// Postgres should have app as dependent
+				gomega.Expect(adjacency["postgresql-postgres"]).To(gomega.ContainElement("myapp"))
+			},
+		)
+
+		ginkgo.It(
+			"should NOT match when multiple containers have same service name (ambiguous)",
+			func() {
+				// App container that depends on "db" service
+				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				app.EXPECT().Name().Return("app").Maybe()
+				app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+				app.EXPECT().Links().Return([]string{"db"})
+
+				// DB container from project1
+				db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project1_db_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+							"com.docker.compose.project": "project1",
+						},
+					},
+				})
+				db1.EXPECT().Name().Return("project1_db_1").Maybe()
+				db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+				db1.EXPECT().Links().Return(nil)
+
+				// DB container from project2 (same service name, different project)
+				db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project2_db_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+							"com.docker.compose.project": "project2",
+						},
+					},
+				})
+				db2.EXPECT().Name().Return("project2_db_1").Maybe()
+				db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
+				db2.EXPECT().Links().Return(nil)
+
+				containers := []types.Container{app, db1, db2}
+
+				containerMap, indegree, _, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Verify all containers are in the map
+				gomega.Expect(containerMap).To(gomega.HaveLen(3))
+
+				// App should have indegree 0 (ambiguous match rejected)
+				gomega.Expect(indegree["app"]).To(gomega.Equal(0))
+
+				// Both db containers should have indegree 0
+				gomega.Expect(indegree["project1-db"]).To(gomega.Equal(0))
+				gomega.Expect(indegree["project2-db"]).To(gomega.Equal(0))
+			},
+		)
+
+		ginkgo.It(
+			"should prefer exact match over service-only match",
+			func() {
+				// App container that links to exact identifier "project1-db"
+				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				app.EXPECT().Name().Return("app").Maybe()
+				app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+				app.EXPECT().Links().Return([]string{"project1-db"})
+
+				// DB container from project1
+				db1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project1_db_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+							"com.docker.compose.project": "project1",
+						},
+					},
+				})
+				db1.EXPECT().Name().Return("project1_db_1").Maybe()
+				db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
+				db1.EXPECT().Links().Return(nil)
+
+				// DB container from project2 (should NOT be matched)
+				db2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				db2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project2_db_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+							"com.docker.compose.project": "project2",
+						},
+					},
+				})
+				db2.EXPECT().Name().Return("project2_db_1").Maybe()
+				db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
+				db2.EXPECT().Links().Return(nil)
+
+				containers := []types.Container{app, db1, db2}
+
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Verify all containers are in the map
+				gomega.Expect(containerMap).To(gomega.HaveLen(3))
+
+				// App should have indegree 1 (exact match to project1-db only)
+				gomega.Expect(indegree["app"]).To(gomega.Equal(1))
+
+				// Only project1-db should have app as dependent
+				gomega.Expect(adjacency["project1-db"]).To(gomega.ContainElement("app"))
+				gomega.Expect(adjacency["project2-db"]).ToNot(gomega.ContainElement("app"))
+			},
+		)
+
+		ginkgo.It(
+			"should prefer replica match over service-only match",
+			func() {
+				// App container that links to "db" (should match db-1 replica, not project1-db)
+				app := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/app"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				app.EXPECT().Name().Return("app").Maybe()
+				app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
+				app.EXPECT().Links().Return([]string{"db"})
+
+				// DB replica container (db-1 pattern)
+				dbReplica := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				dbReplica.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/db-1"},
+					Config:            &dockerContainer.Config{Labels: map[string]string{}},
+				})
+				dbReplica.EXPECT().Name().Return("db-1").Maybe()
+				dbReplica.EXPECT().ID().Return(types.ContainerID("id-dbreplica")).Maybe()
+				dbReplica.EXPECT().Links().Return(nil)
+
+				// DB container with project prefix (service name also "db")
+				dbProject := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				dbProject.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/project_db_1"},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+							"com.docker.compose.project": "project",
+						},
+					},
+				})
+				dbProject.EXPECT().Name().Return("project_db_1").Maybe()
+				dbProject.EXPECT().ID().Return(types.ContainerID("id-dbproject")).Maybe()
+				dbProject.EXPECT().Links().Return(nil)
+
+				containers := []types.Container{app, dbReplica, dbProject}
+
+				containerMap, indegree, adjacency, _, err := buildDependencyGraph(containers)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// Verify all containers are in the map
+				gomega.Expect(containerMap).To(gomega.HaveLen(3))
+
+				// App should have indegree 1 (replica match to db-1)
+				gomega.Expect(indegree["app"]).To(gomega.Equal(1))
+
+				// db-1 should have app as dependent (replica match)
+				gomega.Expect(adjacency["db-1"]).To(gomega.ContainElement("app"))
+			},
+		)
+	})
+})
+
 func assertOrderBefore(names []string, first, second string) {
 	gomega.Expect(indexOf(names, first)).To(gomega.BeNumerically("<", indexOf(names, second)))
 }
