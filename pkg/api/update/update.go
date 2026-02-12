@@ -54,8 +54,13 @@ func New(updateFn func(images []string) *metrics.Metric, updateLock chan bool) *
 
 // Handle processes HTTP update requests, triggering container updates with lock synchronization.
 //
-// It extracts image names from query parameters (if provided) and executes the update. If another update
-// is in progress, it returns HTTP 429 (Too Many Requests). On success, it returns HTTP 200 (OK) with JSON results.
+// For targeted updates (with image query parameters), the handler blocks until the lock is available,
+// ensuring the specific images are updated even if another update is in progress.
+//
+// For full updates (no image query parameters), the handler returns HTTP 429 (Too Many Requests) immediately
+// if another update is already running, since queuing a redundant full scan provides no benefit.
+//
+// On success, it returns HTTP 200 (OK) with JSON results including summary metrics, timing, and metadata.
 // Errors during request processing (e.g., reading the body) return HTTP 500 (Internal Server Error).
 //
 // Parameters:
@@ -92,22 +97,63 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		logrus.Debug("No image query parameters provided")
 	}
 
-	// Acquire lock, blocking if another update is in progress (requests will queue).
+	// Acquire lock with different strategies based on update type.
 	logrus.Debug("Handler: trying to acquire lock")
 
-	chanValue := <-handle.lock
-
-	logrus.Debug("Handler: acquired lock")
-
-	defer func() {
-		logrus.Debug("Handler: releasing lock")
-
-		handle.lock <- chanValue
-	}()
-
 	if len(images) > 0 {
+		// Targeted update: block until the lock is available to ensure specific images are updated.
+		chanValue := <-handle.lock
+
+		logrus.Debug("Handler: acquired lock for targeted update")
+
+		defer func() {
+			logrus.Debug("Handler: releasing lock")
+
+			handle.lock <- chanValue
+		}()
+
 		logrus.WithField("images", images).Info("Executing targeted update")
 	} else {
+		// Full update: try to acquire lock without blocking.
+		// If another update is already running, a redundant full scan is unnecessary.
+		select {
+		case chanValue := <-handle.lock:
+			logrus.Debug("Handler: acquired lock for full update")
+
+			defer func() {
+				logrus.Debug("Handler: releasing lock")
+
+				handle.lock <- chanValue
+			}()
+		default:
+			logrus.Debug("Skipped update, another update already in progress")
+
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "30")
+			w.WriteHeader(http.StatusTooManyRequests)
+
+			errResponse := map[string]any{
+				"error":       "another update is already running",
+				"api_version": "v1",
+				"timestamp":   time.Now().UTC().Format(time.RFC3339),
+			}
+
+			var buf bytes.Buffer
+			encErr := json.NewEncoder(&buf).Encode(errResponse)
+			if encErr != nil {
+				logrus.WithError(encErr).Error("Failed to encode 429 response")
+
+				return
+			}
+
+			_, writeErr := w.Write(buf.Bytes())
+			if writeErr != nil {
+				logrus.WithError(writeErr).Error("Failed to write 429 response")
+			}
+
+			return
+		}
+
 		logrus.Info("Executing full update")
 	}
 
