@@ -58,10 +58,12 @@ func getWithToken(baseURL string) (map[string]string, error) {
 }
 
 var _ = ginkgo.Describe("the metrics API", func() {
-	var server *ghttp.Server
-	var httpAPI *api.API
-	var m *metricsAPI.Handler
-	var handleReq http.HandlerFunc
+	var (
+		server    *ghttp.Server
+		httpAPI   *api.API
+		m         *metricsAPI.Handler
+		handleReq http.HandlerFunc
+	)
 
 	ginkgo.BeforeEach(func() {
 		httpAPI = api.New(token, ":8080")
@@ -136,6 +138,7 @@ var _ = ginkgo.Describe("the metrics API", func() {
 		for range 3 {
 			metrics.Default().RegisterScan(nil)
 		}
+
 		gomega.Eventually(metrics.Default().QueueIsEmpty).Should(gomega.BeTrue())
 
 		gomega.Eventually(tryGetMetrics).Should(gomega.SatisfyAll(

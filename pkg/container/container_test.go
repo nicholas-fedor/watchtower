@@ -574,6 +574,7 @@ var _ = ginkgo.Describe("Container", func() {
 					for i := 1; i <= 100; i++ {
 						deps = append(deps, fmt.Sprintf("dep%d", i))
 					}
+
 					label := strings.Join(deps, ",")
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": label,
@@ -603,12 +604,15 @@ var _ = ginkgo.Describe("Container", func() {
 				logOutput := &bytes.Buffer{}
 				originalOutput := logrus.StandardLogger().Out
 				originalLevel := logrus.GetLevel()
+
 				logrus.SetOutput(logOutput)
 				logrus.SetLevel(logrus.WarnLevel)
+
 				defer func() {
 					logrus.SetOutput(originalOutput)
 					logrus.SetLevel(originalLevel)
 				}()
+
 				container = MockContainer(WithLinks([]string{"invalidlink"}))
 				links := container.Links()
 				gomega.Expect(links).To(gomega.BeEmpty())
@@ -620,12 +624,15 @@ var _ = ginkgo.Describe("Container", func() {
 				logOutput := &bytes.Buffer{}
 				originalOutput := logrus.StandardLogger().Out
 				originalLevel := logrus.GetLevel()
+
 				logrus.SetOutput(logOutput)
 				logrus.SetLevel(logrus.WarnLevel)
+
 				defer func() {
 					logrus.SetOutput(originalOutput)
 					logrus.SetLevel(originalLevel)
 				}()
+
 				container = MockContainer(WithLinks([]string{":alias"}))
 				links := container.Links()
 				gomega.Expect(links).To(gomega.BeEmpty())
@@ -1030,6 +1037,7 @@ var _ = ginkgo.Describe("Container", func() {
 				if c.HostConfig == nil {
 					c.HostConfig = &dockerContainer.HostConfig{}
 				}
+
 				c.HostConfig.MemorySwappiness = &swappiness
 			}
 		}
@@ -1038,6 +1046,7 @@ var _ = ginkgo.Describe("Container", func() {
 			logOutput = &bytes.Buffer{}
 			logrus.SetOutput(logOutput)
 			logrus.SetLevel(logrus.DebugLevel)
+
 			mockContainer = MockContainer(WithMemorySwappiness(defaultMemorySwappiness))
 			inspectResponse := dockerContainer.InspectResponse{
 				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -1061,6 +1070,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 			if disableMemorySwappiness {
 				hostConfig.MemorySwappiness = nil
+
 				clog.Debug("Disabled memory swappiness for Podman compatibility")
 			}
 
@@ -1080,6 +1090,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 			if disableMemorySwappiness {
 				hostConfig.MemorySwappiness = nil
+
 				clog.Debug("Disabled memory swappiness for Podman compatibility")
 			}
 
@@ -1108,6 +1119,7 @@ var _ = ginkgo.Describe("Container", func() {
 					if c.HostConfig == nil {
 						c.HostConfig = &dockerContainer.HostConfig{}
 					}
+
 					c.HostConfig.NanoCPUs = nanoCPUs
 					c.HostConfig.CPUShares = cpuShares
 					c.HostConfig.CPUQuota = cpuQuota
@@ -1121,6 +1133,7 @@ var _ = ginkgo.Describe("Container", func() {
 				logOutput = &bytes.Buffer{}
 				logrus.SetOutput(logOutput)
 				logrus.SetLevel(logrus.DebugLevel)
+
 				mockContainer = MockContainer(
 					WithCPUSettings(
 						defaultNanoCPUs,
@@ -1317,6 +1330,7 @@ var _ = ginkgo.Describe("Container", func() {
 					if c.HostConfig == nil {
 						c.HostConfig = &dockerContainer.HostConfig{}
 					}
+
 					c.HostConfig.MemorySwappiness = &defaultMemorySwappiness
 				},
 			)

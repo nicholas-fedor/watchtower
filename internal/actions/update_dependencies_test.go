@@ -2098,7 +2098,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				// Create containers with replica-style names (e.g., myproject-db-1)
 				// and depends-on labels referencing service names without replica numbers
 				// This reproduces the bug where exact matching fails for transitive dependencies
-
 				dbContainer := mockActions.CreateMockContainerWithConfig(
 					"myproject-db-1",
 					"/myproject-db-1",

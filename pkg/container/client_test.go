@@ -37,10 +37,13 @@ const (
 )
 
 var _ = ginkgo.Describe("the client", func() {
-	var docker *dockerClient.Client
-	var mockServer *ghttp.Server
+	var (
+		docker     *dockerClient.Client
+		mockServer *ghttp.Server
+	)
 
 	// Set up a mock Docker server before each test.
+
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
 		docker, _ = dockerClient.NewClientWithOpts(
@@ -318,6 +321,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 					)...)
+
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{},
@@ -338,6 +342,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 					)...)
+
 				filter := filters.FilterByNames([]string{"lollercoaster"}, filters.NoFilter)
 				client := client{
 					api:           docker,
@@ -359,6 +364,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 					)...)
+
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{},
@@ -383,6 +389,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 					)...)
+
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{IncludeStopped: true},
@@ -406,6 +413,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Running,
 						&mockContainer.Restarting,
 					)...)
+
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{IncludeRestarting: true},
@@ -426,6 +434,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 					)...)
+
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{IncludeRestarting: false},
@@ -446,6 +455,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 					)...)
+
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{},
@@ -467,6 +477,7 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 					)...)
+
 				client := client{
 					api:           docker,
 					ClientOptions: ClientOptions{},
@@ -491,6 +502,7 @@ var _ = ginkgo.Describe("the client", func() {
 					consumerContainerRef := mockContainer.NetConsumerOK
 					mockServer.AppendHandlers(
 						mockContainer.GetContainerHandlers(&consumerContainerRef)...)
+
 					client := client{
 						api:           docker,
 						ClientOptions: ClientOptions{},
@@ -498,6 +510,7 @@ var _ = ginkgo.Describe("the client", func() {
 					// Execute GetContainer and verify network mode resolution.
 					container, err := client.GetContainer(consumerContainerRef.ContainerID())
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 					networkMode := container.ContainerInfo().HostConfig.NetworkMode
 					gomega.Expect(networkMode.ConnectedContainer()).
 						To(gomega.Equal(mockContainer.NetSupplierContainerName))
@@ -510,6 +523,7 @@ var _ = ginkgo.Describe("the client", func() {
 					consumerContainerRef := mockContainer.NetConsumerInvalidSupplier
 					mockServer.AppendHandlers(
 						mockContainer.GetContainerHandlers(&consumerContainerRef)...)
+
 					client := client{
 						api:           docker,
 						ClientOptions: ClientOptions{},
@@ -517,6 +531,7 @@ var _ = ginkgo.Describe("the client", func() {
 					// Execute GetContainer and verify fallback to container ID.
 					container, err := client.GetContainer(consumerContainerRef.ContainerID())
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 					networkMode := container.ContainerInfo().HostConfig.NetworkMode
 					gomega.Expect(networkMode.ConnectedContainer()).
 						To(gomega.Equal(mockContainer.NetSupplierNotFoundID))
@@ -550,6 +565,7 @@ var _ = ginkgo.Describe("the client", func() {
 								),
 							),
 						)
+
 						client := client{api: docker}
 						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -572,6 +588,7 @@ var _ = ginkgo.Describe("the client", func() {
 								),
 								func(w http.ResponseWriter, _ *http.Request) {
 									callCount++
+
 									var response dockerContainer.InspectResponse
 									if callCount <= 2 { // First two calls return starting
 										response = dockerContainer.InspectResponse{
@@ -600,6 +617,7 @@ var _ = ginkgo.Describe("the client", func() {
 											Config: &dockerContainer.Config{},
 										}
 									}
+
 									w.Header().Set("Content-Type", "application/json")
 									w.WriteHeader(http.StatusOK)
 									json.NewEncoder(w).Encode(response)
@@ -614,6 +632,7 @@ var _ = ginkgo.Describe("the client", func() {
 								),
 								func(w http.ResponseWriter, _ *http.Request) {
 									callCount++
+
 									var response dockerContainer.InspectResponse
 									if callCount <= 2 { // First two calls return starting
 										response = dockerContainer.InspectResponse{
@@ -642,6 +661,7 @@ var _ = ginkgo.Describe("the client", func() {
 											Config: &dockerContainer.Config{},
 										}
 									}
+
 									w.Header().Set("Content-Type", "application/json")
 									w.WriteHeader(http.StatusOK)
 									json.NewEncoder(w).Encode(response)
@@ -656,6 +676,7 @@ var _ = ginkgo.Describe("the client", func() {
 								),
 								func(w http.ResponseWriter, _ *http.Request) {
 									callCount++
+
 									var response dockerContainer.InspectResponse
 									if callCount <= 2 { // First two calls return starting
 										response = dockerContainer.InspectResponse{
@@ -684,12 +705,14 @@ var _ = ginkgo.Describe("the client", func() {
 											Config: &dockerContainer.Config{},
 										}
 									}
+
 									w.Header().Set("Content-Type", "application/json")
 									w.WriteHeader(http.StatusOK)
 									json.NewEncoder(w).Encode(response)
 								},
 							),
 						)
+
 						client := client{api: docker}
 						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -726,6 +749,7 @@ var _ = ginkgo.Describe("the client", func() {
 								),
 							),
 						)
+
 						client := client{api: docker}
 						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
 						gomega.Expect(err).To(gomega.HaveOccurred())
@@ -754,8 +778,10 @@ var _ = ginkgo.Describe("the client", func() {
 
 				ginkgo.It("should detect Podman via CONTAINER environment variable", func() {
 					memFs := afero.NewMemMapFs()
+
 					restore := withEnvVars(map[string]string{"CONTAINER": "podman"})
 					defer restore()
+
 					testClient := client{
 						api: docker,
 						ClientOptions: ClientOptions{
@@ -769,6 +795,7 @@ var _ = ginkgo.Describe("the client", func() {
 
 				ginkgo.It("should detect Podman via API Name field", func() {
 					memFs := afero.NewMemMapFs()
+
 					mockServer.AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
@@ -777,6 +804,7 @@ var _ = ginkgo.Describe("the client", func() {
 							}),
 						),
 					)
+
 					testClient := client{
 						api: docker,
 						ClientOptions: ClientOptions{
@@ -790,6 +818,7 @@ var _ = ginkgo.Describe("the client", func() {
 
 				ginkgo.It("should detect Podman via API ServerVersion field", func() {
 					memFs := afero.NewMemMapFs()
+
 					mockServer.AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
@@ -798,6 +827,7 @@ var _ = ginkgo.Describe("the client", func() {
 							}),
 						),
 					)
+
 					testClient := client{
 						api: docker,
 						ClientOptions: ClientOptions{
@@ -820,6 +850,7 @@ var _ = ginkgo.Describe("the client", func() {
 							}),
 						),
 					)
+
 					testClient := client{
 						api: docker,
 						ClientOptions: ClientOptions{
@@ -833,14 +864,17 @@ var _ = ginkgo.Describe("the client", func() {
 
 				ginkgo.It("should fall back to Docker when detection fails", func() {
 					memFs := afero.NewMemMapFs()
+
 					mockServer.AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
 							ghttp.RespondWith(http.StatusInternalServerError, "server error"),
 						),
 					)
+
 					resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 					defer resetLogrus()
+
 					testClient := client{
 						api: docker,
 						ClientOptions: ClientOptions{
@@ -885,6 +919,7 @@ var _ = ginkgo.Describe("the client", func() {
 				// Capture logrus output in buffer.
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
+
 				user := ""
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "ex-exec-id"
@@ -1007,6 +1042,7 @@ var _ = ginkgo.Describe("the client", func() {
 				// Capture logrus output in buffer.
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
+
 				user := ""
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "ex-exec-id"
@@ -1138,6 +1174,7 @@ var _ = ginkgo.Describe("the client", func() {
 			client := client{api: docker}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
+
 			_, err := client.captureExecOutput(ctx, "exec-id")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 		})
@@ -1341,6 +1378,7 @@ var _ = ginkgo.Describe("the client", func() {
 				// Execute ListContainers
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
+
 				client := client{api: docker, ClientOptions: ClientOptions{}}
 				containers, err := client.ListContainers()
 
@@ -1353,6 +1391,7 @@ var _ = ginkgo.Describe("the client", func() {
 				for i, c := range containers {
 					containerIDs[i] = string(c.ID())
 				}
+
 				gomega.Expect(containerIDs).To(gomega.ContainElement(validContainer1ID))
 				gomega.Expect(containerIDs).To(gomega.ContainElement(validContainer2ID))
 				gomega.Expect(containerIDs).NotTo(gomega.ContainElement(ghostContainerID))
@@ -1362,8 +1401,10 @@ var _ = ginkgo.Describe("the client", func() {
 	})
 
 	ginkgo.Describe("TLS client methods", func() {
-		var tlsServer *ghttp.Server
-		var testClient Client
+		var (
+			tlsServer  *ghttp.Server
+			testClient Client
+		)
 
 		ginkgo.BeforeEach(func() {
 			tlsServer = ghttp.NewTLSServer()
@@ -1396,6 +1437,7 @@ var _ = ginkgo.Describe("the client", func() {
 					}),
 				),
 			)
+
 			info, err := testClient.GetInfo()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(info).NotTo(gomega.BeNil())
@@ -1406,6 +1448,7 @@ var _ = ginkgo.Describe("the client", func() {
 			// Create a non-TLS server to simulate TLS failure
 			httpServer := ghttp.NewServer()
 			defer httpServer.Close()
+
 			httpServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.RespondWith(http.StatusOK, "OK"),
@@ -1448,6 +1491,7 @@ var _ = ginkgo.Describe("the client", func() {
 					}),
 				),
 			)
+
 			info, err := testClient.GetInfo()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(info).To(gomega.HaveKeyWithValue("Name", "test-docker"))
@@ -1464,6 +1508,7 @@ var _ = ginkgo.Describe("the client", func() {
 			func() {
 				tlsServer := ghttp.NewTLSServer()
 				defer tlsServer.Close()
+
 				tlsServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/_ping"),
@@ -1477,11 +1522,13 @@ var _ = ginkgo.Describe("the client", func() {
 						}),
 					),
 				)
+
 				restore := withEnvVars(map[string]string{
 					"DOCKER_TLS_VERIFY": "1",
 					"DOCKER_HOST":       tlsServer.URL(),
 				})
 				defer restore()
+
 				client := NewClient(ClientOptions{})
 				gomega.Expect(client).NotTo(gomega.BeNil())
 			},
@@ -1490,6 +1537,7 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.It("should fail when TLS is required but server is HTTP-only", func() {
 			httpServer := ghttp.NewServer()
 			defer httpServer.Close()
+
 			httpServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.RespondWith(http.StatusOK, "OK"),
@@ -1498,17 +1546,20 @@ var _ = ginkgo.Describe("the client", func() {
 					ghttp.RespondWith(http.StatusInternalServerError, "TLS connection failed"),
 				),
 			)
+
 			restore := withEnvVars(map[string]string{
 				"DOCKER_TLS_VERIFY": "1",
 				"DOCKER_HOST":       httpServer.URL(),
 			})
 			defer restore()
+
 			gomega.Expect(func() { NewClient(ClientOptions{}) }).ToNot(gomega.Panic())
 		})
 
 		ginkgo.It("should negotiate API version with TLS", func() {
 			tlsServer := ghttp.NewTLSServer()
 			defer tlsServer.Close()
+
 			tlsServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
@@ -1518,11 +1569,13 @@ var _ = ginkgo.Describe("the client", func() {
 					}),
 				),
 			)
+
 			restore := withEnvVars(map[string]string{
 				"DOCKER_TLS_VERIFY": "1",
 				"DOCKER_HOST":       tlsServer.URL(),
 			})
 			defer restore()
+
 			client := NewClient(ClientOptions{})
 			gomega.Expect(client).NotTo(gomega.BeNil())
 		})
@@ -1530,6 +1583,7 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.It("should use forced API version with TLS", func() {
 			tlsServer := ghttp.NewTLSServer()
 			defer tlsServer.Close()
+
 			tlsServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/_ping"),
@@ -1543,12 +1597,14 @@ var _ = ginkgo.Describe("the client", func() {
 					}),
 				),
 			)
+
 			restore := withEnvVars(map[string]string{
 				"DOCKER_TLS_VERIFY":  "1",
 				"DOCKER_HOST":        tlsServer.URL(),
 				"DOCKER_API_VERSION": "1.40",
 			})
 			defer restore()
+
 			client := NewClient(ClientOptions{})
 			gomega.Expect(client).NotTo(gomega.BeNil())
 		})
@@ -1558,6 +1614,7 @@ var _ = ginkgo.Describe("the client", func() {
 			func() {
 				tlsServer := ghttp.NewTLSServer()
 				defer tlsServer.Close()
+
 				tlsServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/_ping"),
@@ -1571,12 +1628,14 @@ var _ = ginkgo.Describe("the client", func() {
 						}),
 					),
 				)
+
 				restore := withEnvVars(map[string]string{
 					"DOCKER_TLS_VERIFY":  "1",
 					"DOCKER_HOST":        tlsServer.URL(),
 					"DOCKER_API_VERSION": "1.99",
 				})
 				defer restore()
+
 				client := NewClient(ClientOptions{})
 				gomega.Expect(client).NotTo(gomega.BeNil())
 			},

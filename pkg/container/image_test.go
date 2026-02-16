@@ -22,8 +22,11 @@ import (
 )
 
 var _ = ginkgo.Describe("the client", func() {
-	var docker *dockerClient.Client
-	var mockServer *ghttp.Server
+	var (
+		docker     *dockerClient.Client
+		mockServer *ghttp.Server
+	)
+
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
 		docker, _ = dockerClient.NewClientWithOpts(
@@ -36,8 +39,10 @@ var _ = ginkgo.Describe("the client", func() {
 	ginkgo.Describe("WarnOnHeadPullFailed", func() {
 		containerUnknown := MockContainer(WithImageName("unknown.repo/prefix/imagename:latest"))
 		containerKnown := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
+
 		ginkgo.When(`warn on head failure is set to "always"`, func() {
 			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAlways}}
+
 			ginkgo.It("should always return true", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeTrue())
 				gomega.Expect(c.WarnOnHeadPullFailed(containerKnown)).To(gomega.BeTrue())
@@ -45,6 +50,7 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 		ginkgo.When(`warn on head failure is set to "auto"`, func() {
 			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAuto}}
+
 			ginkgo.It("should return false for unknown repos", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeFalse())
 			})
@@ -54,6 +60,7 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 		ginkgo.When(`warn on head failure is set to "never"`, func() {
 			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnNever}}
+
 			ginkgo.It("should never return true", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeFalse())
 				gomega.Expect(c.WarnOnHeadPullFailed(containerKnown)).To(gomega.BeFalse())
@@ -82,9 +89,12 @@ var _ = ginkgo.Describe("the client", func() {
 				imageAParent := util.GenerateRandomSHA256()
 				images := map[string][]string{imageA: {imageAParent}}
 				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(images))
+
 				c := client{api: docker}
+
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
+
 				gomega.Expect(c.RemoveImageByID(types.ImageID(imageA), "test-image")).
 					To(gomega.Succeed())
 				shortA := types.ImageID(imageA).ShortID()
@@ -99,7 +109,9 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.When("image is not found", func() {
 			ginkgo.It("should return an error", func() {
 				image := util.GenerateRandomSHA256()
+
 				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(nil))
+
 				c := client{api: docker}
 				err := c.RemoveImageByID(types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
@@ -117,6 +129,7 @@ var _ = ginkgo.Describe("the client", func() {
 						image.ID = currentImageID
 					},
 				)
+
 				mockServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest(
@@ -128,9 +141,12 @@ var _ = ginkgo.Describe("the client", func() {
 						}),
 					),
 				)
+
 				c := client{api: docker}
+
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
+
 				stale, latestID, err := c.IsContainerStale(
 					container,
 					types.UpdateParams{NoPull: true},
@@ -154,6 +170,7 @@ var _ = ginkgo.Describe("the client", func() {
 						image.ID = currentImageID
 					},
 				)
+
 				mockServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest(
@@ -165,9 +182,12 @@ var _ = ginkgo.Describe("the client", func() {
 						}),
 					),
 				)
+
 				c := client{api: docker}
+
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
+
 				stale, latestID, err := c.IsContainerStale(
 					container,
 					types.UpdateParams{NoPull: true},
@@ -190,6 +210,7 @@ var _ = ginkgo.Describe("the client", func() {
 						image.ID = currentImageID
 					},
 				)
+
 				mockServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest(
@@ -202,9 +223,12 @@ var _ = ginkgo.Describe("the client", func() {
 						),
 					),
 				)
+
 				c := client{api: docker}
+
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
+
 				stale, latestID, err := c.IsContainerStale(
 					container,
 					types.UpdateParams{NoPull: true},

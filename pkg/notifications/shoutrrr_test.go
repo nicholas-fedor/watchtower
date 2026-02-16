@@ -111,6 +111,7 @@ updt1 (mock/updt1:latest): Updated
 					time.Second,
 				)
 				shoutrrr.AddLogHook()
+
 				hooksAfter := len(logrus.StandardLogger().Hooks[level])
 				gomega.Expect(hooksAfter).To(gomega.BeNumerically(">", hooksBefore))
 			})
@@ -128,8 +129,11 @@ updt1 (mock/updt1:latest): Updated
 					time.Second,
 				)
 				shoutrrr.AddLogHook()
+
 				hooksBefore := len(logrus.StandardLogger().Hooks[level])
+
 				shoutrrr.AddLogHook()
+
 				hooksAfter := len(logrus.StandardLogger().Hooks[level])
 				gomega.Expect(hooksAfter).To(gomega.Equal(hooksBefore))
 			})
@@ -658,9 +662,11 @@ Turns out everything is on fire
 
 				// Start multiple goroutines calling Close concurrently
 				done := make(chan bool, 10)
+
 				for range 10 {
 					go func() {
 						shoutrrr.Close()
+
 						done <- true
 					}()
 				}
