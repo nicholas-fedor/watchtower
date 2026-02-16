@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
 
       - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@ad49e30a4293d8b651970339723336478abbfbde
+        uses: crazy-max/ghaction-import-gpg@5a30dd90ba97bcb89e03060b1d36736828e222e4
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
