@@ -92,8 +92,6 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 		logrus.WithField("images", images).Debug("Extracted images from query parameters")
 	} else {
-		images = nil
-
 		logrus.Debug("No image query parameters provided")
 	}
 
@@ -102,15 +100,22 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	if len(images) > 0 {
 		// Targeted update: block until the lock is available to ensure specific images are updated.
-		chanValue := <-handle.lock
+		// Use select with request context to avoid goroutine leaks if the client disconnects.
+		select {
+		case chanValue := <-handle.lock:
+			logrus.Debug("Handler: acquired lock for targeted update")
 
-		logrus.Debug("Handler: acquired lock for targeted update")
+			defer func() {
+				logrus.Debug("Handler: releasing lock")
 
-		defer func() {
-			logrus.Debug("Handler: releasing lock")
+				handle.lock <- chanValue
+			}()
+		case <-r.Context().Done():
+			logrus.Debug("Handler: request cancelled while waiting for lock")
+			http.Error(w, "request cancelled", http.StatusServiceUnavailable)
 
-			handle.lock <- chanValue
-		}()
+			return
+		}
 
 		logrus.WithField("images", images).Info("Executing targeted update")
 	} else {
