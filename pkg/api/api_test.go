@@ -503,8 +503,10 @@ func TestAPI_StartServerAsyncLogErrorOnFailure(t *testing.T) {
 
 var _ = ginkgo.Describe("API", func() {
 	ginkgo.Describe("RequireToken middleware", func() {
-		var apiInstance *api.API
-		var server *ghttp.Server
+		var (
+			apiInstance *api.API
+			server      *ghttp.Server
+		)
 
 		ginkgo.BeforeEach(func() {
 			apiInstance = api.New(testToken, ":8080")
@@ -577,7 +579,9 @@ var _ = ginkgo.Describe("API", func() {
 		ginkgo.It("should fail with a fatal log when token is empty", func() {
 			emptyTokenAPI := api.New("", ":8080")
 			emptyTokenAPI.RegisterFunc("/test", http.HandlerFunc(testHandler))
+
 			var logOutput string
+
 			logrus.SetOutput(&testLogWriter{
 				buffer: []byte{},
 				writeFunc: func(b []byte) (int, error) {
@@ -587,9 +591,12 @@ var _ = ginkgo.Describe("API", func() {
 				},
 			})
 			defer logrus.SetOutput(nil)
+
 			originalExit := logrus.StandardLogger().ExitFunc
 			logrus.StandardLogger().ExitFunc = func(int) { panic("fatal exit") }
+
 			defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
+
 			gomega.Expect(func() { _ = emptyTokenAPI.Start(context.Background(), true, false) }).
 				To(gomega.Panic())
 			gomega.Expect(logOutput).

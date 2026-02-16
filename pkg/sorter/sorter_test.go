@@ -28,6 +28,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					},
 				})
 				c3.EXPECT().Name().Return("c3")
+
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -38,6 +39,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					},
 				})
 				c1.EXPECT().Name().Return("c1")
+
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -69,6 +71,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				})
 				c1.EXPECT().Name().Return("c1").Maybe()
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
+
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
@@ -110,6 +113,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						Labels: map[string]string{},
 					},
 				})
+
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -139,6 +143,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						Labels: map[string]string{},
 					},
 				})
+
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -149,6 +154,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						Labels: map[string]string{},
 					},
 				})
+
 				c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c3.EXPECT().Name().Return("c3")
 				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
@@ -179,6 +185,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						Labels: map[string]string{},
 					},
 				})
+
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
@@ -208,6 +215,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						Labels: map[string]string{},
 					},
 				})
+
 				c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c3.EXPECT().Name().Return("c3")
 				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
@@ -237,6 +245,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				watchtower := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				watchtower.EXPECT().Name().Return("watchtower")
 				watchtower.EXPECT().IsWatchtower().Return(true)
+
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
@@ -247,6 +256,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						Labels: map[string]string{},
 					},
 				})
+
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -272,6 +282,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				watchtower1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				watchtower1.EXPECT().Name().Return("watchtower1")
 				watchtower1.EXPECT().IsWatchtower().Return(true)
+
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
@@ -282,9 +293,11 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 						Labels: map[string]string{},
 					},
 				})
+
 				watchtower2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				watchtower2.EXPECT().Name().Return("watchtower2")
 				watchtower2.EXPECT().IsWatchtower().Return(true)
+
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))

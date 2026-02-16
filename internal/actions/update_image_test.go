@@ -16,8 +16,10 @@ import (
 var _ = ginkgo.Describe("the update action", func() {
 	// Tests for image reference handling to cover isPinned functionality
 	ginkgo.When("handling different image reference formats", func() {
-		var client *mockActions.MockClient
-		var config types.UpdateParams
+		var (
+			client *mockActions.MockClient
+			config types.UpdateParams
+		)
 
 		ginkgo.BeforeEach(func() {
 			config = types.UpdateParams{

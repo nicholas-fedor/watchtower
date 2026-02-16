@@ -33,7 +33,9 @@ var _ = ginkgo.Describe("the actions package", func() {
 					false,
 					false,
 				)
+
 				var cleanupImageIDs []types.RemovedImageInfo
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 					mockClient,
 					false,
@@ -71,7 +73,9 @@ var _ = ginkgo.Describe("the actions package", func() {
 					false,
 					false,
 				)
+
 				var cleanupImageIDs []types.RemovedImageInfo
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 					client,
 					false,
@@ -87,6 +91,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 		})
 		ginkgo.When("given multiple containers", func() {
 			var client mockActions.MockClient
+
 			ginkgo.BeforeEach(func() {
 				client = mockActions.CreateMockClient(
 					&mockActions.TestData{
@@ -129,6 +134,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should stop all but the latest one", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 					client,
 					false,
@@ -148,6 +154,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should collect image IDs and clean up when cleanup is enabled", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 					client,
 					true,
@@ -170,6 +177,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 		})
 		ginkgo.When("simulating a self-update with excess Watchtower instances", func() {
 			var client mockActions.MockClient
+
 			ginkgo.BeforeEach(func() {
 				client = mockActions.CreateMockClient(
 					&mockActions.TestData{
@@ -208,6 +216,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should stop the old instance and clean up its image", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 					client,
 					true,
@@ -232,6 +241,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 		ginkgo.When("unscoped and scoped instances coexist", func() {
 			var client mockActions.MockClient
+
 			ginkgo.BeforeEach(func() {
 				client = mockActions.CreateMockClient(
 					&mockActions.TestData{
@@ -291,6 +301,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should only clean up unscoped instances when scope is empty", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 					client,
 					false,
@@ -316,6 +327,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 			ginkgo.It("should clean up within scoped instances when scope is specified", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 					client,
 					false,

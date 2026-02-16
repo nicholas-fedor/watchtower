@@ -28,12 +28,16 @@ const (
 )
 
 var _ = ginkgo.Describe("ListSourceContainers", func() {
-	var docker *dockerClient.Client
-	var mockServer *ghttp.Server
+	var (
+		docker     *dockerClient.Client
+		mockServer *ghttp.Server
+	)
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
+
 		var err error
+
 		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
@@ -50,7 +54,9 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/containers/json$")),
 			func(w http.ResponseWriter, r *http.Request) {
 				filtersParam := r.URL.Query().Get("filters")
+
 				var filters map[string]map[string]bool
+
 				err := json.Unmarshal([]byte(filtersParam), &filters)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -59,10 +65,12 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 					gomega.Expect(exists).To(gomega.BeFalse())
 				} else {
 					gomega.Expect(exists).To(gomega.BeTrue())
+
 					actualStatuses := make([]string, 0, len(statusMap))
 					for status := range statusMap {
 						actualStatuses = append(actualStatuses, status)
 					}
+
 					gomega.Expect(actualStatuses).To(gomega.ConsistOf(expectedStatuses))
 				}
 
@@ -256,12 +264,16 @@ var _ = ginkgo.Describe("buildListFilterArgs", func() {
 })
 
 var _ = ginkgo.Describe("GetSourceContainer", func() {
-	var docker *dockerClient.Client
-	var mockServer *ghttp.Server
+	var (
+		docker     *dockerClient.Client
+		mockServer *ghttp.Server
+	)
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
+
 		var err error
+
 		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
@@ -495,12 +507,16 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 })
 
 var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
-	var docker *dockerClient.Client
-	var mockServer *ghttp.Server
+	var (
+		docker     *dockerClient.Client
+		mockServer *ghttp.Server
+	)
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
+
 		var err error
+
 		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
@@ -714,6 +730,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 						query := r.URL.Query()
 						signal := query.Get("signal")
 						timeoutStr := query.Get("t")
+
 						gomega.Expect(signal).To(gomega.Equal("SIGTERM"))
 						gomega.Expect(timeoutStr).To(gomega.Equal("30"))
 						w.WriteHeader(http.StatusNoContent)
@@ -1644,7 +1661,9 @@ var _ = ginkgo.Describe("filterAliases", func() {
 
 	ginkgo.It("handles nil alias list", func() {
 		shortID := testShortID
+
 		var aliases []string
+
 		result := filterAliases(aliases, shortID)
 		gomega.Expect(result).To(gomega.BeEmpty())
 	})
@@ -1686,12 +1705,16 @@ var _ = ginkgo.Describe("filterAliases", func() {
 })
 
 var _ = ginkgo.Describe("StopSourceContainer", func() {
-	var docker *dockerClient.Client
-	var mockServer *ghttp.Server
+	var (
+		docker     *dockerClient.Client
+		mockServer *ghttp.Server
+	)
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
+
 		var err error
+
 		docker, err = dockerClient.NewClientWithOpts(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
@@ -1791,6 +1814,7 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 						query := r.URL.Query()
 						signal := query.Get("signal")
 						timeoutStr := query.Get("t")
+
 						gomega.Expect(signal).To(gomega.Equal("SIGTERM"))
 						gomega.Expect(timeoutStr).To(gomega.Equal("30"))
 						w.WriteHeader(http.StatusNoContent)
