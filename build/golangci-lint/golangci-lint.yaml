@@ -68,6 +68,21 @@ formatters:
     gofumpt:
       module-path: "github.com/nicholas-fedor/watchtower"
       extra-rules: true
+    golines:
+      # Target maximum line length.
+      # Default: 100
+      max-len: 200
+      # Length of a tabulation.
+      # Default: 4
+      tab-len: 4
+      # Shorten single-line comments.
+      # Default: false
+      shorten-comments: true
+      # Default: true
+      reformat-tags: true
+      # Split chained methods on the dots as opposed to the arguments.
+      # Default: true
+      chain-split-dots: true
 
 # Linters Configuration
 linters:
@@ -188,6 +203,34 @@ linters:
     - wsl # deprecated, replaced by wsl_v5 (whitespace linter)
     - zerologlint # Detects the wrong usage of zerolog that a user forgets to dispatch with Send or Msg.
   settings:
+    revive:
+      enable-all-rules: false
+      # Configure rules
+      rules:
+        # Rule to check for meaningless package names
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#var-naming
+        - name: var-naming
+          severity: warning
+          disabled: false
+          exclude: [""]
+          arguments:
+            - [""] # AllowList
+            - [""] # DenyList
+            - - skip-initialism-name-checks: false
+                upper-case-const: true
+                skip-package-name-checks: true
+                skip-package-name-collision-with-go-std: true
+                extra-bad-package-names:
+                  - helpers
+                  - models
+        # Rule to check for package name conflicts
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#package-comments
+        - name: package-comments
+          severity: warning
+          disabled: false
+          exclude:
+            - ".*pkg/api/metrics/.*"
+            - ".*pkg/metrics/.*"
     testifylint:
       enable-all: true
     varnamelen:
@@ -244,22 +287,6 @@ linters:
           - usetesting
           - wrapcheck
           - varnamelen
-      - path: "internal/util/.*"
-        linters:
-          - revive
-        text: "avoid meaningless package names"
-      - path: "pkg/types/.*"
-        linters:
-          - revive
-        text: "avoid meaningless package names"
-      - path: "internal/api/.*"
-        linters:
-          - revive
-        text: "avoid meaningless package names"
-      - path: "pkg/api/.*"
-        linters:
-          - revive
-        text: "avoid meaningless package names"
       - path: "doc.go$"
         linters:
           - dupword

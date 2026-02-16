@@ -25,6 +25,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -33,6 +34,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c2.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c3.EXPECT().Name().Return("c3")
 			c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
@@ -58,6 +60,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -84,6 +87,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -92,6 +96,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c2.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c3.EXPECT().Name().Return("c3")
 			c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
@@ -119,6 +124,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().Links().Return([]string{"c1"})
@@ -138,6 +144,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			watchtower := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			watchtower.EXPECT().Name().Return("watchtower")
 			watchtower.EXPECT().IsWatchtower().Return(true)
+
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
 			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
@@ -146,6 +153,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -199,6 +207,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -220,6 +229,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -243,6 +253,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			a.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/a"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			b := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			b.EXPECT().Name().Return("b")
 			b.EXPECT().ID().Return(types.ContainerID("id-b"))
@@ -250,6 +261,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			b.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/b"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c.EXPECT().Name().Return("c")
 			c.EXPECT().ID().Return(types.ContainerID("id-c"))
@@ -274,6 +286,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().Links().Return([]string{"c1"})
@@ -318,6 +331,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			a.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/a"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			b := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			b.EXPECT().Name().Return("b")
 			b.EXPECT().ID().Return(types.ContainerID("id-b"))
@@ -334,6 +348,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			c.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
 			d := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			d.EXPECT().Name().Return("d")
 			d.EXPECT().ID().Return(types.ContainerID("id-d"))
@@ -826,6 +841,7 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 		ginkgo.It("should handle large number of containers with no dependencies", func() {
 			// Test performance and correctness with many containers
 			containers := make([]types.Container, 100)
+
 			for i := range 100 {
 				c := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c.EXPECT().Name().Return(fmt.Sprintf("container%d", i)).Maybe()
@@ -1212,6 +1228,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 				// Containers from different projects should have different identifiers
 				ident1 := container.ResolveContainerIdentifier(c1)
 				ident2 := container.ResolveContainerIdentifier(c2)
+
 				gomega.Expect(ident1).To(gomega.Equal("app1-web"))
 				gomega.Expect(ident2).To(gomega.Equal("app2-web"))
 
@@ -1355,10 +1372,12 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 				_, _, _, _, err := buildDependencyGraph(containers)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
+
 				var collisionErr IdentifierCollisionError
 				gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
 				gomega.Expect(func() IdentifierCollisionError {
 					var target IdentifierCollisionError
+
 					_ = errors.As(err, &target)
 
 					return target
@@ -1366,6 +1385,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 					To(gomega.Equal("c1"))
 				gomega.Expect(func() IdentifierCollisionError {
 					var target IdentifierCollisionError
+
 					_ = errors.As(err, &target)
 
 					return target
@@ -1430,6 +1450,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 			_, err := sortByDependencies(containers)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
+
 			var collisionErr IdentifierCollisionError
 			gomega.Expect(err).To(gomega.BeAssignableToTypeOf(collisionErr))
 		})

@@ -186,8 +186,10 @@ var _ = ginkgo.Describe("byCreated", func() {
 		ginkgo.It("should swap elements at different indices", func() {
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
+
 			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c3.EXPECT().Name().Return("c3")
 
@@ -204,6 +206,7 @@ var _ = ginkgo.Describe("byCreated", func() {
 		ginkgo.It("should swap adjacent elements", func() {
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
+
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 

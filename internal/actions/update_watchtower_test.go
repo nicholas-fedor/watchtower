@@ -199,7 +199,9 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
+
 			var cleanupImageInfos []types.RemovedImageInfo
+
 			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 				client,
 				true, // cleanup=true
@@ -246,7 +248,9 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
+
 			var cleanupImageInfos []types.RemovedImageInfo
+
 			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
 				client,
 				true,

@@ -123,6 +123,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 
 	ginkgo.It("should warn about trace logging", func() {
 		originalLevel := logrus.GetLevel()
+
 		logrus.SetLevel(logrus.TraceLevel)
 		defer logrus.SetLevel(originalLevel)
 
@@ -215,6 +216,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 
 	ginkgo.It("should log one-time update", func() {
 		cmd.PersistentFlags().Bool("run-once", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
@@ -226,6 +228,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	ginkgo.It("should log flag conflict when both run-once and update-on-start are set", func() {
 		cmd.PersistentFlags().Bool("run-once", true, "")
 		cmd.PersistentFlags().Bool("update-on-start", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
@@ -237,6 +240,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 
 	ginkgo.It("should log update on start", func() {
 		cmd.PersistentFlags().Bool("update-on-start", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
@@ -248,6 +252,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	ginkgo.It("should log HTTP API without periodic polls", func() {
 		cmd.PersistentFlags().Bool("http-api-update", true, "")
 		cmd.PersistentFlags().Bool("http-api-periodic-polls", false, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
@@ -260,6 +265,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	ginkgo.It("should log HTTP API with periodic polls", func() {
 		cmd.PersistentFlags().Bool("http-api-update", true, "")
 		cmd.PersistentFlags().Bool("http-api-periodic-polls", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)

@@ -373,6 +373,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 	runBasicAuthTest := func(challengeHeader, creds, expectedToken, expectedErr string) {
 		// Create a TLS test server to simulate the registry.
 		server := ghttp.NewTLSServer()
+
 		server.AppendHandlers(
 			ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/v2/"),
@@ -407,12 +408,15 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 		// Temporarily disable WATCHTOWER_REGISTRY_TLS_SKIP to ensure HTTPS scheme.
 		originalTLSSkip := viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP")
+
 		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 		defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", originalTLSSkip)
 
 		// Execute GetToken and verify the result.
 		token, _, _, err := auth.GetToken(context.Background(), containerInstance, creds, client)
+
 		gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+
 		if expectedErr != "" {
 			gomega.Expect(err).
 				To(gomega.HaveOccurred(), fmt.Sprintf("Expected an error for challenge '%s'", challengeHeader))
@@ -432,6 +436,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 	runBearerHeaderTest := func(creds, expectedToken string, expectAuthFailure bool) {
 		// Create a TLS test server to simulate the registry.
 		server := ghttp.NewTLSServer()
+
 		server.AppendHandlers(
 			ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/"),
@@ -444,6 +449,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 							return
 						}
 					}
+
 					w.Header().Set("Content-Type", "application/json")
 					fmt.Fprintf(w, `{"token": "%s"}`, expectedToken)
 				},
@@ -469,6 +475,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 		// Execute GetBearerHeader and verify the result.
 		token, err := auth.GetBearerHeader(context.Background(), challenge, ref, creds, client)
+
 		gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(token).To(gomega.Equal("Bearer " + expectedToken))
@@ -498,6 +505,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should return basic auth token when challenged with basic", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
 			runBasicAuthTest("Basic realm=\"test\"", "user:pass", "Basic user:pass", "")
 		})
 
@@ -506,6 +514,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fail with no credentials for basic auth", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
 			runBasicAuthTest("Basic realm=\"test\"", "", "", "no credentials available")
 		})
 
@@ -514,6 +523,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fail with unsupported challenge type", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
 			runBasicAuthTest(
 				"Digest realm=\"test\"",
 				"user:pass",
@@ -552,6 +562,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			func() {
 				// Create an HTTP test server to simulate the registry.
 				server := ghttp.NewServer()
+
 				server.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/v2/"),
@@ -588,6 +599,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 					"",
 					client,
 				)
+
 				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(token).To(gomega.Equal(""))
@@ -599,6 +611,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fail for HTTPS to HTTP registry without TLS skip", func() {
 			// Create an HTTP test server to simulate the registry.
 			server := ghttp.NewServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -624,6 +637,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			// Execute GetToken and verify the expected failure.
 			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+
 			gomega.Expect(server.ReceivedRequests()).To(gomega.BeEmpty())
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
@@ -636,6 +650,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should handle empty WWW-Authenticate header with 401 status", func() {
 			// Create a TLS test server to simulate the registry.
 			server := ghttp.NewTLSServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -678,6 +693,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should handle HTTPS registry with 200 OK without TLS skip", func() {
 			// Create a TLS test server to simulate a secure registry.
 			server := ghttp.NewTLSServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -710,6 +726,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			// Execute GetToken and verify the result.
 			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
@@ -720,6 +737,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should handle invalid TLS min version", func() {
 			// Create a TLS test server to simulate a secure registry.
 			server := ghttp.NewTLSServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -754,6 +772,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			// Execute GetToken and verify the result.
 			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
@@ -764,6 +783,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fail with TLS version mismatch", func() {
 			// Create a TLS test server to simulate a secure registry.
 			server := ghttp.NewTLSServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -797,7 +817,9 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 		ginkgo.It("should extract the challenge host for bearer token", func() {
 			defer ginkgo.GinkgoRecover()
+
 			redirectServer := ghttp.NewTLSServer()
+
 			redirectServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/token"),
@@ -807,6 +829,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer redirectServer.Close()
 
 			server := ghttp.NewTLSServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -861,6 +884,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Verifies that GetToken returns redirect=false when the challenge request is not redirected.
 		ginkgo.It("should return redirect=false when challenge request is not redirected", func() {
 			defer ginkgo.GinkgoRecover()
+
 			server := ghttp.NewTLSServer()
 			server.RouteToHandler("GET", "/v2/", ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/v2/"),
@@ -877,6 +901,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 					},
 				),
 			))
+
 			server.RouteToHandler("GET", "/token", ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/token"),
 				ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
@@ -917,6 +942,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Verifies that GetToken returns redirect=true when the challenge request is redirected.
 		ginkgo.It("should return redirect=true when challenge request is redirected", func() {
 			defer ginkgo.GinkgoRecover()
+
 			redirectServer := ghttp.NewTLSServer()
 			redirectServer.RouteToHandler("GET", "/v2/", ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/v2/"),
@@ -933,6 +959,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 					},
 				),
 			))
+
 			redirectServer.RouteToHandler("GET", "/token", ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/token"),
 				ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
@@ -940,6 +967,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer redirectServer.Close()
 
 			server := ghttp.NewTLSServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/v2/"),
@@ -994,11 +1022,13 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fail when exceeding maximum redirects", func() {
 			// Create a chain of test servers to simulate multiple redirects
 			redirectCount := auth.DefaultMaxRedirects + 1 // Exceed limit (3 + 1 = 4 redirects)
+
 			servers := make([]*ghttp.Server, redirectCount)
 			for i := range redirectCount {
 				servers[i] = ghttp.NewServer()
 				defer servers[i].Close()
 			}
+
 			for i := range redirectCount {
 				if i < redirectCount-1 {
 					servers[i].AppendHandlers(
@@ -1108,6 +1138,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fetch a bearer token successfully", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
 			runBearerHeaderTest("", "test-token", false)
 		})
 
@@ -1116,6 +1147,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fetch a bearer token with credentials", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
 			runBearerHeaderTest("user:pass", "auth-token", true)
 		})
 
@@ -1138,6 +1170,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should fail on invalid JSON response", func() {
 			// Create a TLS test server to simulate the registry.
 			server := ghttp.NewTLSServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/"),
@@ -1167,6 +1200,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			// Execute GetBearerHeader and verify the failure.
 			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
+
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal(""))
@@ -1190,6 +1224,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 					},
 				),
 			))
+
 			server.RouteToHandler("GET", "/token", ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/token"),
 				ghttp.RespondWith(
@@ -1226,6 +1261,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 
 			// Call GetBearerHeader directly to test processChallenge
 			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
+
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			gomega.Expect(err).
 				NotTo(gomega.HaveOccurred(), "Expected no error from GetBearerHeader")
@@ -1243,6 +1279,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				challenge := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull"`
 				imageRef, err := reference.ParseNormalizedNamed("nicholas-fedor/watchtower")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 				expected := &url.URL{
 					Host:     "ghcr.io",
 					Scheme:   "https",
@@ -1475,13 +1512,17 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// and return the same client instance without race conditions.
 		ginkgo.It("should handle concurrent access safely", func() {
 			const numGoroutines = 100
+
 			clients := make([]auth.Client, numGoroutines)
+
 			var wg sync.WaitGroup
 
 			for i := range numGoroutines {
 				wg.Add(1)
+
 				go func(idx int) {
 					defer wg.Done()
+
 					clients[idx] = auth.NewAuthClient()
 				}(i)
 			}
@@ -1499,6 +1540,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		ginkgo.It("should return a functional client", func() {
 			// Create a mock HTTP server to simulate a registry response.
 			server := ghttp.NewServer()
+
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/get"),

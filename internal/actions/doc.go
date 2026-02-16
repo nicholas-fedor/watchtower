@@ -39,5 +39,6 @@
 //	}
 //	metric := actions.RunUpdatesWithNotifications(params)
 //
-// The package integrates with the container package for Docker operations, session package for update reporting, sorter package for container ordering, and lifecycle package for pre/post-update hooks, using logrus for logging operations and errors.
+// The package integrates with the container package for Docker operations, session package for update reporting, sorter package for container ordering, and lifecycle package for pre/post-update
+// hooks, using logrus for logging operations and errors.
 package actions

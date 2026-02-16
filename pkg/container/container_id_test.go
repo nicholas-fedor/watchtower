@@ -310,6 +310,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 			if wantErr {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(got).To(gomega.BeEmpty())
+
 				if errorSubstring != "" {
 					gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorSubstring))
 				}
@@ -482,6 +483,7 @@ var _ = ginkgo.Describe("GetCurrentContainerID", func() {
 			if expectError {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(id).To(gomega.BeEmpty())
+
 				if errorSubstring != "" {
 					gomega.Expect(err.Error()).To(gomega.ContainSubstring(errorSubstring))
 				}

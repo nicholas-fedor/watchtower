@@ -29,9 +29,11 @@ func TestUpdate(t *testing.T) {
 }
 
 var _ = ginkgo.Describe("Update Handler", func() {
-	var updateLock chan bool
-	var mockUpdateFn func(images []string) *metrics.Metric
-	var handler *update.Handler
+	var (
+		updateLock   chan bool
+		mockUpdateFn func(images []string) *metrics.Metric
+		handler      *update.Handler
+	)
 
 	ginkgo.BeforeEach(func() {
 		updateLock = nil
@@ -39,6 +41,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
 		} // Mock function returning sample metrics.
 		handler = update.New(mockUpdateFn, updateLock)
+
 		logrus.SetOutput(io.Discard) // Suppress logs during tests.
 	})
 
@@ -52,6 +55,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 		ginkgo.It("should use provided lock if given", func() {
 			customLock := make(chan bool, 1)
 			customLock <- true
+
 			handler = update.New(mockUpdateFn, customLock)
 			gomega.Expect(handler.Path).To(gomega.Equal("/v1/update"))
 			// Verify handler is initialized with the provided lock.
@@ -76,6 +80,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				called := false
 				mockUpdateFn = func(images []string) *metrics.Metric {
 					called = true
+
 					gomega.Expect(images).To(gomega.BeNil())
 
 					return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
@@ -89,7 +94,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 					bytes.NewBufferString("test body"),
 				)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 				defer resp.Body.Close()
+
 				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 				gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
@@ -127,6 +134,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				called := false
 				mockUpdateFn = func(images []string) *metrics.Metric {
 					called = true
+
 					gomega.Expect(images).To(gomega.Equal([]string{"foo/bar", "baz/qux"}))
 
 					return &metrics.Metric{Scanned: 2, Updated: 1, Failed: 0}
@@ -140,7 +148,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 					bytes.NewBufferString("test body"),
 				)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 				defer resp.Body.Close()
+
 				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 				gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
@@ -176,6 +186,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 		ginkgo.It("should return 500 Internal Server Error on body read failure", func() {
 			// Simulate read error by using a faulty reader.
 			faultyReader := &faultyReadCloser{err: errors.New("read error")}
+
 			server.AppendHandlers(func(w http.ResponseWriter, r *http.Request) {
 				r.Body = faultyReader
 				handler.Handle(w, r)
@@ -187,7 +198,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				bytes.NewBufferString("test body"),
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			defer resp.Body.Close()
+
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusInternalServerError))
 			body, err := io.ReadAll(resp.Body)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -210,6 +223,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 
 				// Simulate JSON encoding failure by replacing the writer
 				var faulty *faultyResponseWriter
+
 				server.AppendHandlers(func(w http.ResponseWriter, r *http.Request) {
 					faulty = &faultyResponseWriter{ResponseWriter: w}
 					handler.Handle(faulty, r)
@@ -217,6 +231,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 
 				resp, err := http.Post(server.URL()+"/v1/update", "application/json", nil)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 				defer resp.Body.Close()
 				// Verify that StatusOK was set (status is set before writing)
 				gomega.Expect(faulty.lastStatusCode).
@@ -232,6 +247,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				called := false
 				mockUpdateFn = func(images []string) *metrics.Metric {
 					called = true
+
 					gomega.Expect(images).To(gomega.BeNil())
 
 					// Simulate state transition: containers scanned, some updated, some restarted
@@ -246,7 +262,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 					bytes.NewBufferString("test body"),
 				)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 				defer resp.Body.Close()
+
 				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 				gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
@@ -283,7 +301,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 					bytes.NewBufferString("test body"),
 				)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 				defer resp.Body.Close()
+
 				gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 
 				var response map[string]any
@@ -323,7 +343,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				bytes.NewBufferString("test body"),
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			defer resp.Body.Close()
+
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 			gomega.Expect(resp.Header.Get("Content-Type")).To(gomega.Equal("application/json"))
 
@@ -331,6 +353,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 			gomega.Expect(json.NewDecoder(resp.Body).Decode(&response)).To(gomega.Succeed())
 
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+
 			summary := response["summary"].(map[string]any)
 			gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(1000)))
 			gomega.Expect(summary["updated"]).To(gomega.Equal(float64(200)))
@@ -360,7 +383,9 @@ var _ = ginkgo.Describe("Update Handler", func() {
 					bytes.NewBufferString("test body"),
 				)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 				defer resp.Body.Close()
+
 				gomega.Expect(resp.StatusCode).
 					To(gomega.Equal(http.StatusOK))
 					// Still 200 since no error in processing

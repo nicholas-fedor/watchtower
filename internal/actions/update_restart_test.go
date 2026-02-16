@@ -149,6 +149,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				// Verify categorization
 				updated := report.Updated()
 				restarted := report.Restarted()
+
 				gomega.Expect(updated[0].Name()).To(gomega.Equal("stale-container"))
 				gomega.Expect(restarted[0].Name()).To(gomega.Equal("restart-container-1"))
 				gomega.Expect(restarted[1].Name()).To(gomega.Equal("restart-container-2"))
@@ -1104,6 +1105,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					if client.TestData.Staleness == nil {
 						client.TestData.Staleness = make(map[string]bool)
 					}
+
 					for i := range containers {
 						name := fmt.Sprintf("perf-container-%d", i)
 						client.TestData.Staleness[name] = true

@@ -1000,6 +1000,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				// Results channel to collect metrics from concurrent operations
 				results := make(chan *metrics.Metric, 2)
+
 				var wg sync.WaitGroup
 
 				// Launch concurrent updates for different scopes
@@ -1007,6 +1008,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				go func() {
 					defer wg.Done()
+
 					params := RunUpdatesWithNotificationsParams{
 						Client:                       clientA,
 						Notifier:                     nil,
@@ -1029,12 +1031,14 @@ var _ = ginkgo.Describe("Actions", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
 					}
+
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- metric
 				}()
 
 				go func() {
 					defer wg.Done()
+
 					params := RunUpdatesWithNotificationsParams{
 						Client:                       clientB,
 						Notifier:                     nil,
@@ -1057,6 +1061,7 @@ var _ = ginkgo.Describe("Actions", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
 					}
+
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- metric
 				}()
@@ -1073,6 +1078,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				// Verify we got results from both concurrent operations
 				gomega.Expect(metrics).To(gomega.HaveLen(2))
+
 				for _, metric := range metrics {
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					gomega.Expect(metric.Scanned).
@@ -1147,6 +1153,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				go func() {
 					defer wg.Done()
+
 					params := RunUpdatesWithNotificationsParams{
 						Client:                       client1,
 						Notifier:                     nil,
@@ -1174,6 +1181,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				go func() {
 					defer wg.Done()
+
 					params := RunUpdatesWithNotificationsParams{
 						Client:                       client2,
 						Notifier:                     nil,
@@ -1276,6 +1284,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			go func() {
 				defer wg.Done()
+
 				params := RunUpdatesWithNotificationsParams{
 					Client:                       clientA,
 					Notifier:                     nil,
@@ -1303,6 +1312,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			go func() {
 				defer wg.Done()
+
 				params := RunUpdatesWithNotificationsParams{
 					Client:                       clientB,
 					Notifier:                     nil,
@@ -1411,12 +1421,14 @@ var _ = ginkgo.Describe("Actions", func() {
 				clientDev := mockActions.CreateMockClient(testDataDev, false, false)
 
 				results := make(chan map[string]int, 2)
+
 				var wg sync.WaitGroup
 
 				wg.Add(2)
 
 				go func() {
 					defer wg.Done()
+
 					params := RunUpdatesWithNotificationsParams{
 						Client:                       clientProd,
 						Notifier:                     nil,
@@ -1439,12 +1451,14 @@ var _ = ginkgo.Describe("Actions", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
 					}
+
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- map[string]int{"prod-scanned": metric.Scanned, "prod-updated": metric.Updated}
 				}()
 
 				go func() {
 					defer wg.Done()
+
 					params := RunUpdatesWithNotificationsParams{
 						Client:                       clientDev,
 						Notifier:                     nil,
@@ -1467,6 +1481,7 @@ var _ = ginkgo.Describe("Actions", func() {
 						CPUCopyMode:      "auto",
 						PullFailureDelay: time.Duration(0),
 					}
+
 					metric := RunUpdatesWithNotifications(context.Background(), params)
 					results <- map[string]int{"dev-scanned": metric.Scanned, "dev-updated": metric.Updated}
 				}()
@@ -1485,11 +1500,13 @@ var _ = ginkgo.Describe("Actions", func() {
 				// Verify concurrent operations completed independently
 				totalScanned := 0
 				totalUpdated := 0
+
 				for _, resultMap := range resultMaps {
 					for key, value := range resultMap {
 						if key == "prod-scanned" || key == "dev-scanned" {
 							totalScanned += value
 						}
+
 						if key == "prod-updated" || key == "dev-updated" {
 							totalUpdated += value
 						}
@@ -1695,18 +1712,21 @@ var _ = ginkgo.Describe("Actions", func() {
 				}
 
 				var wg sync.WaitGroup
+
 				results := make(chan *metrics.Metric, 2)
 
 				wg.Add(2)
 
 				go func() {
 					defer wg.Done()
+
 					metric := RunUpdatesWithNotifications(context.Background(), paramsA)
 					results <- metric
 				}()
 
 				go func() {
 					defer wg.Done()
+
 					metric := RunUpdatesWithNotifications(context.Background(), paramsB)
 					results <- metric
 				}()
@@ -1722,6 +1742,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				// Verify scope isolation in error handling
 				gomega.Expect(metrics).To(gomega.HaveLen(2))
+
 				for _, metric := range metrics {
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					// Each scope processes exactly one container
@@ -1784,12 +1805,14 @@ var _ = ginkgo.Describe("Actions", func() {
 
 					// Run concurrent operations
 					var wg sync.WaitGroup
+
 					results := make(chan *metrics.Metric, 2)
 
 					wg.Add(2)
 
 					go func() {
 						defer wg.Done()
+
 						params := RunUpdatesWithNotificationsParams{
 							Client:                       clientX,
 							Notifier:                     nil,
@@ -1812,12 +1835,14 @@ var _ = ginkgo.Describe("Actions", func() {
 							CPUCopyMode:      "auto",
 							PullFailureDelay: time.Duration(0),
 						}
+
 						metric := RunUpdatesWithNotifications(context.Background(), params)
 						results <- metric
 					}()
 
 					go func() {
 						defer wg.Done()
+
 						params := RunUpdatesWithNotificationsParams{
 							Client:                       clientY,
 							Notifier:                     nil,
@@ -1840,6 +1865,7 @@ var _ = ginkgo.Describe("Actions", func() {
 							CPUCopyMode:      "auto",
 							PullFailureDelay: time.Duration(0),
 						}
+
 						metric := RunUpdatesWithNotifications(context.Background(), params)
 						results <- metric
 					}()
@@ -1855,6 +1881,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 					// Verify proper isolation of error reporting
 					gomega.Expect(metrics).To(gomega.HaveLen(2))
+
 					totalScanned := 0
 					totalFailed := 0
 					totalUpdated := 0

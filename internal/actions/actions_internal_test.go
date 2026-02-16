@@ -105,13 +105,16 @@ var _ = ginkgo.Describe("handleUpdateResult", func() {
 
 	ginkgo.It("should return zero metric when result is nil", func() {
 		var err error
+
 		result := handleUpdateResult(nil, err, nil)
 		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))
 	})
 
 	ginkgo.It("should return nil when result is not nil and error is nil", func() {
 		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+
 		var err error
+
 		result := handleUpdateResult(mockReport, err, nil)
 		gomega.Expect(result).To(gomega.BeNil())
 	})
@@ -146,7 +149,9 @@ var _ = ginkgo.Describe("handleUpdateResult", func() {
 
 		// Call handleUpdateResult without an error
 		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+
 		var err error
+
 		result := handleUpdateResult(mockReport, err, mockNotifier)
 
 		// Verify we got the expected result

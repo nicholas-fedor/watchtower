@@ -89,6 +89,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			mockServer := mockAPI.NewMockHTTPServer(ginkgo.GinkgoT())
 			mockServer.EXPECT().ListenAndServe().RunAndReturn(func() error {
 				done <- true
+
 				<-ctx.Done()
 
 				return nil
@@ -162,6 +163,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			mockServer := mockAPI.NewMockHTTPServer(ginkgo.GinkgoT())
 			mockServer.EXPECT().ListenAndServe().RunAndReturn(func() error {
 				done <- true
+
 				<-ctx.Done()
 
 				return nil
@@ -258,6 +260,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				ctx := context.Background()
 
 				var capturedParams types.UpdateParams
+
 				runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
 					capturedParams = params
 
