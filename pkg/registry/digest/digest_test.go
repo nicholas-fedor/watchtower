@@ -1508,7 +1508,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			registryAuth := auth.TransformAuth("token")
 			_, _, _, err := auth.GetToken(ctx, mockContainerUnreachable, registryAuth, client)
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.MatchRegexp("no such host|server misbehaving"))
+			gomega.Expect(err.Error()).To(gomega.MatchRegexp("Temporary failure in name resolution|no such host|server misbehaving"))
 		})
 
 		ginkgo.It("should return an error if manifest URL build fails", func() {
