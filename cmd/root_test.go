@@ -497,7 +497,6 @@ func TestConcurrentScheduledAndTargetedAPIUpdate(t *testing.T) {
 	})
 }
 
-
 // TestUpdateOnStartTriggersImmediateUpdate verifies that the --update-on-start flag
 // triggers an immediate update before scheduling periodic updates.
 func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {

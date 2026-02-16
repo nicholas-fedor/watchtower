@@ -139,6 +139,7 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			}
 
 			var buf bytes.Buffer
+
 			encErr := json.NewEncoder(&buf).Encode(errResponse)
 			if encErr != nil {
 				logrus.WithError(encErr).Error("Failed to encode 429 response")
