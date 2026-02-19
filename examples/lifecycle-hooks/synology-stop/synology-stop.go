@@ -356,6 +356,7 @@ func stopContainer(
 	req.Header.Set("X-Syno-Token", synoToken) // CSRF protection [DSM API Guide §3.2]
 	req.AddCookie(&http.Cookie{Name: "id", Value: sid})
 
+	//nolint:gosec // G704: SSRF via taint analysis - intentional API call to Synology server
 	resp, err := client.Do(req)
 	// Network or timeout error
 	if err != nil {
@@ -401,6 +402,7 @@ func logout(client *http.Client, config *Config, sid string) error {
 
 	req.AddCookie(&http.Cookie{Name: "id", Value: sid})
 
+	//nolint:gosec // G704: SSRF via taint analysis - intentional API call to Synology server
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("logout request failed: %w", err)
@@ -435,6 +437,7 @@ func doHTTPRequest(
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	}
 
+	//nolint:gosec // G704: SSRF via taint analysis - intentional API call to Synology server
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request failed: %w", err)

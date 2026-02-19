@@ -99,6 +99,12 @@ builds:
     ignore:
       - goos: windows
         goarch: riscv64
+      - goos: windows
+        goarch: arm
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
 
     # Set the modified timestamp on the output binary, typically
     # you would do this to ensure a build was reproducible.
