@@ -290,6 +290,19 @@ linters:
       - path: "doc.go$"
         linters:
           - dupword
+      # Exclude G117 (hardcoded credentials) false positives for struct field names
+      - path: "pkg/notifications/email.go"
+        linters:
+          - gosec
+        text: "G117"
+      - path: "pkg/types/config.go"
+        linters:
+          - gosec
+        text: "G117"
+      - path: "pkg/types/registry_credentials.go"
+        linters:
+          - gosec
+        text: "G117"
     paths:
       - ".*/mocks/.*"
     warn-unused: true
