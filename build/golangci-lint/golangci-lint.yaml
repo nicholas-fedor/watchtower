@@ -290,7 +290,7 @@ linters:
       - path: "doc.go$"
         linters:
           - dupword
-      # Exclude G117 (hardcoded credentials) false positives for struct field names
+      # Exclude G117 (potential exposure of secrets via JSON marshaling) false positives for struct field names
       - path: "pkg/notifications/email.go"
         linters:
           - gosec
