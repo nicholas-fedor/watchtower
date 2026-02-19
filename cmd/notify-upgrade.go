@@ -169,6 +169,8 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 
 	// Attempt to remove the temporary file. If this fails (e.g., due to permissions or file system issues), log a warning
 	// rather than an error, as the command has completed its primary task, and leftover files are a minor concern.
+	//
+	//nolint:gosec // G703: Path traversal via taint analysis - removing temporary download file after upgrade notification
 	err = os.Remove(outFile.Name())
 	if err != nil {
 		logrus.WithError(err).

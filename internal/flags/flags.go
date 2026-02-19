@@ -1031,6 +1031,7 @@ func isFilePath(path string) bool {
 		return false
 	}
 
+	//nolint:gosec // G703: Path traversal via taint analysis - validating user-provided path exists
 	_, err := os.Stat(path)
 
 	return !errors.Is(err, os.ErrNotExist)

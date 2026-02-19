@@ -128,6 +128,7 @@ type registryClient struct {
 //   - *http.Response: The HTTP response from the registry, if successful.
 //   - error: Non-nil if the request fails, nil otherwise.
 func (r *registryClient) Do(req *http.Request) (*http.Response, error) {
+	//nolint:gosec // G704: SSRF via taint analysis - intentional HTTP request to user-configured registry
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
