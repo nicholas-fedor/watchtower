@@ -445,6 +445,7 @@ func TestFullUpdateReturns429WhenLocked(t *testing.T) {
 		}
 
 		var response map[string]any
+
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		if err != nil {
 			t.Fatalf("failed to decode response: %v", err)
