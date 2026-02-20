@@ -723,9 +723,13 @@ func TestConcurrentRequests(t *testing.T) {
 
 		synctest.Wait()
 
-		// At least one should succeed, the rest may be rejected.
-		if successCount.Load() < 1 {
-			t.Error("expected at least one successful request")
+		// With a capacity-1 lock, exactly one request succeeds.
+		if successCount.Load() != 1 {
+			t.Errorf("expected exactly 1 successful request, got %d", successCount.Load())
+		}
+
+		if rejectedCount.Load() != 2 {
+			t.Errorf("expected 2 rejected requests, got %d", rejectedCount.Load())
 		}
 
 		total := successCount.Load() + rejectedCount.Load()

@@ -13,6 +13,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 )
 
+// retryAfterSeconds is the value for the Retry-After header in 429 responses.
+const retryAfterSeconds = "30"
+
 // Handler triggers container update scans via HTTP.
 //
 // It holds the update function, endpoint path, and concurrency lock for the /v1/update endpoint.
@@ -134,7 +137,7 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			logrus.Debug("Skipped update, another update already in progress")
 
 			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Retry-After", "30")
+			w.Header().Set("Retry-After", retryAfterSeconds)
 			w.WriteHeader(http.StatusTooManyRequests)
 
 			errResponse := map[string]any{
