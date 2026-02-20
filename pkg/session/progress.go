@@ -85,14 +85,21 @@ func (m Progress) AddScanned(
 // Parameters:
 //   - failures: Map of container IDs to errors.
 func (m Progress) UpdateFailed(failures map[types.ContainerID]error) {
-	for id, err := range failures {
-		update := m[id]
+	for containerID, err := range failures {
+		update, exists := m[containerID]
+		if !exists {
+			logrus.WithField("container_id", containerID.ShortID()).
+				Debug("Container not found in progress map, cannot mark as failed")
+
+			continue
+		}
+
 		update.containerError = err
 		update.state = FailedState
 		logrus.WithFields(logrus.Fields{
-			"container_id": id.ShortID(),
+			"container_id": containerID.ShortID(),
 			"name":         update.Name(),
-		}).WithError(err).Debug("Updated container state to failed")
+		}).WithError(err).Warn("Updated container state to failed")
 	}
 }
 
