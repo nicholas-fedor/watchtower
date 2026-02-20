@@ -554,6 +554,20 @@ func TestProgress_UpdateFailed(t *testing.T) {
 				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
 			},
 		},
+		{
+			name: "failure container not in progress map",
+			m: Progress{
+				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
+			},
+			args: args{
+				failures: map[types.ContainerID]error{
+					"cont2": errors.New("container not found"),
+				},
+			},
+			want: Progress{
+				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
