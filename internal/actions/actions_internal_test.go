@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 			RunOnce: true,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(renamed).To(gomega.BeFalse())
 		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(0))
@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 			RunOnce: false,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(renamed).To(gomega.BeTrue())
 		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(1))

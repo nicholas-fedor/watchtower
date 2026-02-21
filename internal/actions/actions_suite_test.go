@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -37,6 +38,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					context.Background(),
 					mockClient,
 					false,
 					"",
@@ -77,6 +79,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					context.Background(),
 					client,
 					false,
 					"",
@@ -136,6 +139,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					context.Background(),
 					client,
 					false,
 					"",
@@ -156,6 +160,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					context.Background(),
 					client,
 					true,
 					"",
@@ -218,6 +223,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					context.Background(),
 					client,
 					true,
 					"",
@@ -303,6 +309,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					context.Background(),
 					client,
 					false,
 					"",
@@ -329,6 +336,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					context.Background(),
 					client,
 					false,
 					"prod",

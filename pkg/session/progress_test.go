@@ -14,10 +14,10 @@ import (
 
 func TestUpdateFromContainer(t *testing.T) {
 	type args struct {
-		cont     types.Container
-		newImage types.ImageID
-		state    State
-		params   types.UpdateParams
+		container types.Container
+		newImage  types.ImageID
+		state     State
+		params    types.UpdateParams
 	}
 
 	tests := []struct {
@@ -28,7 +28,7 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "basic container update",
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
@@ -58,7 +58,7 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "empty container fields",
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID(""))
 					mock.EXPECT().ImageID().Return(types.ImageID(""))
@@ -88,7 +88,7 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "monitor-only container",
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
@@ -118,7 +118,7 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "empty monitor-only container",
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID(""))
 					mock.EXPECT().ImageID().Return(types.ImageID(""))
@@ -149,7 +149,7 @@ func TestUpdateFromContainer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := UpdateFromContainer(
-				tt.args.cont,
+				tt.args.container,
 				tt.args.newImage,
 				tt.args.state,
 				tt.args.params,
@@ -183,9 +183,9 @@ func TestUpdateFromContainer(t *testing.T) {
 
 func TestProgress_AddSkipped(t *testing.T) {
 	type args struct {
-		cont   types.Container
-		err    error
-		params types.UpdateParams
+		container types.Container
+		err       error
+		params    types.UpdateParams
 	}
 
 	tests := []struct {
@@ -198,7 +198,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 			name: "add skipped with error",
 			m:    Progress{},
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
@@ -230,7 +230,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 			name: "add skipped without error",
 			m:    Progress{},
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img2"))
@@ -262,7 +262,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 			name: "add skipped monitor-only with error",
 			m:    Progress{},
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
@@ -293,7 +293,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.AddSkipped(tt.args.cont, tt.args.err, tt.args.params)
+			tt.m.AddSkipped(tt.args.container, tt.args.err, tt.args.params)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf("Progress.AddSkipped() map length = %d, want %d", len(tt.m), len(tt.want))
@@ -333,9 +333,9 @@ func TestProgress_AddSkipped(t *testing.T) {
 
 func TestProgress_AddScanned(t *testing.T) {
 	type args struct {
-		cont     types.Container
-		newImage types.ImageID
-		params   types.UpdateParams
+		container types.Container
+		newImage  types.ImageID
+		params    types.UpdateParams
 	}
 
 	tests := []struct {
@@ -348,7 +348,7 @@ func TestProgress_AddScanned(t *testing.T) {
 			name: "add scanned with new image",
 			m:    Progress{},
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
@@ -380,7 +380,7 @@ func TestProgress_AddScanned(t *testing.T) {
 			name: "add scanned with same image",
 			m:    Progress{},
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img2"))
@@ -412,7 +412,7 @@ func TestProgress_AddScanned(t *testing.T) {
 			name: "add scanned monitor-only with new image",
 			m:    Progress{},
 			args: args{
-				cont: func() types.Container {
+				container: func() types.Container {
 					mock := mockTypes.NewMockContainer(t)
 					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
 					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
@@ -443,7 +443,7 @@ func TestProgress_AddScanned(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.AddScanned(tt.args.cont, tt.args.newImage, tt.args.params)
+			tt.m.AddScanned(tt.args.container, tt.args.newImage, tt.args.params)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf("Progress.AddScanned() map length = %d, want %d", len(tt.m), len(tt.want))
@@ -1094,12 +1094,12 @@ func TestProgress_Report_With_Restarted_In_All(t *testing.T) {
 	foundRestarted := false
 	foundFailed := false
 
-	for _, cont := range all {
-		if cont.ID() == "cont1" {
+	for _, c := range all {
+		if c.ID() == "cont1" {
 			foundRestarted = true
 		}
 
-		if cont.ID() == "cont2" {
+		if c.ID() == "cont2" {
 			foundFailed = true
 		}
 	}

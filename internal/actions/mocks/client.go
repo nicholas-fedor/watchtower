@@ -26,26 +26,26 @@ type MockClient struct {
 // TestData holds configuration data for MockClient’s test behavior.
 // It defines container states, staleness, and mock operation results.
 type TestData struct {
-	TriedToRemoveImageCount      int                           // Number of times RemoveImageByID was called.
-	RenameContainerCount         int                           // Number of times RenameContainer was called.
-	StopContainerCount           int                           // Number of times StopContainer was called.
-	StartContainerCount          int                           // Number of times StartContainer was called.
-	UpdateContainerCount         int                           // Number of times UpdateContainer was called.
-	IsContainerStaleCount        int                           // Number of times IsContainerStale was called.
-	WaitForContainerHealthyCount int                           // Number of times WaitForContainerHealthy was called.
-	NameOfContainerToKeep        string                        // Name of the container to avoid stopping.
-	Containers                   []types.Container             // List of mock containers.
+	TriedToRemoveImageCount      int                                   // Number of times RemoveImageByID was called.
+	RenameContainerCount         int                                   // Number of times RenameContainer was called.
+	StopContainerCount           int                                   // Number of times StopContainer was called.
+	StartContainerCount          int                                   // Number of times StartContainer was called.
+	UpdateContainerCount         int                                   // Number of times UpdateContainer was called.
+	IsContainerStaleCount        int                                   // Number of times IsContainerStale was called.
+	WaitForContainerHealthyCount int                                   // Number of times WaitForContainerHealthy was called.
+	NameOfContainerToKeep        string                                // Name of the container to avoid stopping.
+	Containers                   []types.Container                     // List of mock containers.
 	ContainersByID               map[types.ContainerID]types.Container // Map of containers by ID.
-	Staleness                    map[string]bool               // Map of container names to staleness status.
-	IsContainerStaleError        error                         // Error to return from IsContainerStale (for testing).
-	ListContainersError          error                         // Error to return from ListContainers (for testing).
-	StopContainerError           error                         // Error to return from StopContainer (for testing).
-	UpdateContainerError         error                         // Error to return from UpdateContainer (for testing).
-	StopContainerFailCount       int                           // Number of times StopContainer should fail before succeeding.
-	RemoveImageError             error                         // Error to return from RemoveImageByID (for testing).
-	FailedImageIDs               []types.ImageID               // List of image IDs that should fail removal.
-	StopOrder                    []string                      // Order in which containers were stopped.
-	StartOrder                   []string                      // Order in which containers were started.
+	Staleness                    map[string]bool                       // Map of container names to staleness status.
+	IsContainerStaleError        error                                 // Error to return from IsContainerStale (for testing).
+	ListContainersError          error                                 // Error to return from ListContainers (for testing).
+	StopContainerError           error                                 // Error to return from StopContainer (for testing).
+	UpdateContainerError         error                                 // Error to return from UpdateContainer (for testing).
+	StopContainerFailCount       int                                   // Number of times StopContainer should fail before succeeding.
+	RemoveImageError             error                                 // Error to return from RemoveImageByID (for testing).
+	FailedImageIDs               []types.ImageID                       // List of image IDs that should fail removal.
+	StopOrder                    []string                              // Order in which containers were stopped.
+	StartOrder                   []string                              // Order in which containers were started.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -87,7 +87,7 @@ func CreateMockClientWithContext(
 }
 
 // ListContainers returns containers from TestData, optionally filtered.
-func (client MockClient) ListContainers(filter ...types.Filter) ([]types.Container, error) {
+func (client MockClient) ListContainers(_ context.Context, filter ...types.Filter) ([]types.Container, error) {
 	// Simulate mid-operation delay for context cancellation testing
 	time.Sleep(1 * time.Millisecond)
 
@@ -123,7 +123,7 @@ func (client MockClient) ListContainers(filter ...types.Filter) ([]types.Contain
 // StopContainer simulates stopping a container by marking it in the Stopped map.
 // It records the container’s ID as stopped, increments the StopContainerCount,
 // and returns nil for simplicity.
-func (client MockClient) StopContainer(c types.Container, _ time.Duration) error {
+func (client MockClient) StopContainer(_ context.Context, c types.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount++
 
 	// Simulate mid-operation delay for context cancellation testing
@@ -150,13 +150,13 @@ func (client MockClient) StopContainer(c types.Container, _ time.Duration) error
 
 // StopAndRemoveContainer simulates stopping and removing a container by calling StopContainer followed by RemoveContainer.
 // It properly simulates the stop-and-remove operation sequence while respecting error conditions.
-func (client MockClient) StopAndRemoveContainer(c types.Container, timeout time.Duration) error {
-	err := client.StopContainer(c, timeout)
+func (client MockClient) StopAndRemoveContainer(_ context.Context, c types.Container, timeout time.Duration) error {
+	err := client.StopContainer(context.Background(), c, timeout)
 	if err != nil {
 		return err
 	}
 
-	return client.RemoveContainer(c)
+	return client.RemoveContainer(context.Background(), c)
 }
 
 // IsContainerRunning checks if a container is running based on the Stopped map.
@@ -167,7 +167,7 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 
 // StartContainer simulates starting a container, returning the container's ID and no error.
 // It provides a minimal implementation for testing purposes.
-func (client MockClient) StartContainer(c types.Container) (types.ContainerID, error) {
+func (client MockClient) StartContainer(_ context.Context, c types.Container) (types.ContainerID, error) {
 	client.TestData.StartContainerCount++
 	client.TestData.StartOrder = append(client.TestData.StartOrder, c.Name())
 
@@ -176,7 +176,7 @@ func (client MockClient) StartContainer(c types.Container) (types.ContainerID, e
 
 // RenameContainer simulates renaming a container, incrementing the RenameContainerCount.
 // It returns nil to indicate success without modifying any state.
-func (client MockClient) RenameContainer(_ types.Container, _ string) error {
+func (client MockClient) RenameContainer(_ context.Context, _ types.Container, _ string) error {
 	client.TestData.RenameContainerCount++
 
 	return nil
@@ -184,7 +184,7 @@ func (client MockClient) RenameContainer(_ types.Container, _ string) error {
 
 // UpdateContainer simulates updating a container's configuration.
 // It increments the UpdateContainerCount and returns the configured error if set.
-func (client MockClient) UpdateContainer(_ types.Container, _ dockerContainer.UpdateConfig) error {
+func (client MockClient) UpdateContainer(_ context.Context, _ types.Container, _ dockerContainer.UpdateConfig) error {
 	client.TestData.UpdateContainerCount++
 
 	return client.TestData.UpdateContainerError
@@ -192,7 +192,7 @@ func (client MockClient) UpdateContainer(_ types.Container, _ dockerContainer.Up
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
 // It simulates image cleanup and returns configured error if set or if image ID is in FailedImageIDs, nil otherwise.
-func (client MockClient) RemoveImageByID(imageID types.ImageID, _ string) error {
+func (client MockClient) RemoveImageByID(_ context.Context, imageID types.ImageID, _ string) error {
 	client.TestData.TriedToRemoveImageCount++
 	if slices.Contains(client.TestData.FailedImageIDs, imageID) {
 		return client.TestData.RemoveImageError
@@ -203,7 +203,7 @@ func (client MockClient) RemoveImageByID(imageID types.ImageID, _ string) error 
 
 // GetContainer returns the container with the specified ID from TestData.
 // It provides a mock response for testing container retrieval.
-func (client MockClient) GetContainer(containerID types.ContainerID) (types.Container, error) {
+func (client MockClient) GetContainer(_ context.Context, containerID types.ContainerID) (types.Container, error) {
 	if c, ok := client.TestData.ContainersByID[containerID]; ok {
 		return c, nil
 	}
@@ -212,7 +212,7 @@ func (client MockClient) GetContainer(containerID types.ContainerID) (types.Cont
 
 // GetCurrentWatchtowerContainer returns the container with the specified ID from TestData with imageInfo set to nil.
 // It provides a mock response for testing current Watchtower container retrieval.
-func (client MockClient) GetCurrentWatchtowerContainer(containerID types.ContainerID) (types.Container, error) {
+func (client MockClient) GetCurrentWatchtowerContainer(_ context.Context, containerID types.ContainerID) (types.Container, error) {
 	if c, ok := client.TestData.ContainersByID[containerID]; ok {
 		// Return a copy with imageInfo nil
 		// Since it's a mock, just return the same container
@@ -235,6 +235,7 @@ var errCommandFailed = errors.New("command exited with non-zero code")
 // It returns a SkipUpdate boolean indicating whether to skip the update and an error if the command fails.
 // The method uses predefined command behaviors to mimic real execution outcomes.
 func (client MockClient) ExecuteCommand(
+	_ context.Context,
 	_ types.Container,
 	command string,
 	_ int,
@@ -261,7 +262,8 @@ func (client MockClient) ExecuteCommand(
 // It returns true if the container’s name isn’t explicitly marked as fresh, along with an empty ImageID and no error.
 // If IsContainerStaleError is set, it returns that error instead.
 func (client MockClient) IsContainerStale(
-	cont types.Container,
+	_ context.Context,
+	container types.Container,
 	_ types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	client.TestData.IsContainerStaleCount++
@@ -282,7 +284,7 @@ func (client MockClient) IsContainerStale(
 		return false, "", client.TestData.IsContainerStaleError
 	}
 
-	stale, found := client.TestData.Staleness[cont.Name()]
+	stale, found := client.TestData.Staleness[container.Name()]
 	if !found {
 		stale = true // Default to stale if not specified.
 	}
@@ -298,7 +300,7 @@ func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {
 
 // WaitForContainerHealthy simulates waiting for a container to become healthy.
 // It increments the count and returns nil to indicate success.
-func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Duration) error {
+func (client MockClient) WaitForContainerHealthy(_ context.Context, _ types.ContainerID, _ time.Duration) error {
 	client.TestData.WaitForContainerHealthyCount++
 
 	return nil
@@ -306,13 +308,13 @@ func (client MockClient) WaitForContainerHealthy(_ types.ContainerID, _ time.Dur
 
 // RemoveContainer simulates removing a container.
 // It returns nil to indicate success.
-func (client MockClient) RemoveContainer(_ types.Container) error {
+func (client MockClient) RemoveContainer(_ context.Context, _ types.Container) error {
 	return nil
 }
 
 // GetInfo returns mock system information for testing.
 // It provides a basic map with mock Docker/Podman info.
-func (client MockClient) GetInfo() (map[string]any, error) {
+func (client MockClient) GetInfo(_ context.Context) (map[string]any, error) {
 	return map[string]any{
 		"Name":          "docker",
 		"ServerVersion": "1.50",

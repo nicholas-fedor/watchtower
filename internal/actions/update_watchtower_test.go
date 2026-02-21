@@ -203,6 +203,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			var cleanupImageInfos []types.RemovedImageInfo
 
 			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				context.Background(),
 				client,
 				true, // cleanup=true
 				"prod",
@@ -252,6 +253,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			var cleanupImageInfos []types.RemovedImageInfo
 
 			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				context.Background(),
 				client,
 				true,
 				"",

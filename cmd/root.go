@@ -324,7 +324,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 	})
 
 	// Retrieve and store the current container ID for use throughout the application.
-	currentWatchtowerContainerID, err = container.GetCurrentContainerID(client)
+	currentWatchtowerContainerID, err = container.GetCurrentContainerID(context.Background(), client)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to get current container ID")
 
@@ -334,6 +334,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Retrieve the current Watchtower container.
 	if currentWatchtowerContainerID != "" {
 		currentWatchtowerContainer, err = client.GetCurrentWatchtowerContainer(
+			context.Background(),
 			currentWatchtowerContainerID,
 		)
 		if err != nil {
@@ -363,8 +364,8 @@ func preRun(cmd *cobra.Command, _ []string) {
 // This function bridges flag parsing and the application’s primary workflow.
 //
 // Parameters:
-//   - c: The cobra.Command instance being executed, providing access to parsed flags.
-//   - names: A slice of container names provided as positional arguments, used for filtering.
+//   - command: The cobra.Command instance being executed, providing access to parsed flags.
+//   - args: A slice of container names provided as positional arguments, used for filtering.
 func run(command *cobra.Command, args []string) {
 	logrus.WithField("positional_args", args).
 		Debug("Received positional arguments for container filtering")
@@ -537,7 +538,7 @@ func runMain(cfg types.RunConfig) int {
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
 	if rollingRestart {
-		err := actions.ValidateRollingRestartDependencies(client, cfg.Filter)
+		err := actions.ValidateRollingRestartDependencies(context.Background(), client, cfg.Filter)
 		if err != nil {
 			logNotify("Rolling restart compatibility validation failed", err)
 
@@ -581,7 +582,7 @@ func runMain(cfg types.RunConfig) int {
 				},
 			}
 
-			err := client.UpdateContainer(currentWatchtowerContainer, updateConfig)
+			err := client.UpdateContainer(context.Background(), currentWatchtowerContainer, updateConfig)
 			if err != nil {
 				logrus.WithError(err).
 					Warn("Failed to update restart policy to 'no' for current container")
@@ -600,6 +601,7 @@ func runMain(cfg types.RunConfig) int {
 
 	// Check for and cleanup excess Watchtower instances within scope.
 	totalRemovedInstances, err := actions.RemoveExcessWatchtowerInstances(
+		context.Background(),
 		client,
 		cleanup,
 		scope,

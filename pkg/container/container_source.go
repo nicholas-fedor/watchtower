@@ -28,6 +28,7 @@ const defaultStopSignal = "SIGTERM"
 // It filters containers based on options and a provided filter function.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - opts: Client options for filtering.
 //   - filter: Function to filter containers.
@@ -37,12 +38,12 @@ const defaultStopSignal = "SIGTERM"
 //   - []types.Container: Filtered list of containers.
 //   - error: Non-nil if listing fails, nil on success.
 func ListSourceContainers(
+	ctx context.Context,
 	api dockerClient.APIClient,
 	opts ClientOptions,
 	filter types.Filter,
 	isPodmanOptional ...bool,
 ) ([]types.Container, error) {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"include_stopped":    opts.IncludeStopped,
 		"include_restarting": opts.IncludeRestarting,
@@ -101,7 +102,7 @@ func ListSourceContainers(
 	hostContainers := []types.Container{}
 
 	for _, runningContainer := range containers {
-		container, err := GetSourceContainer(api, types.ContainerID(runningContainer.ID))
+		container, err := GetSourceContainer(ctx, api, types.ContainerID(runningContainer.ID))
 		if err != nil {
 			// Log detailed error information for debugging container inspect failures
 			logrus.WithFields(logrus.Fields{
@@ -138,6 +139,7 @@ func ListSourceContainers(
 // It resolves network mode if it references another container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - containerID: ID of the container to inspect.
 //
@@ -145,10 +147,10 @@ func ListSourceContainers(
 //   - types.Container: Container object if successful.
 //   - error: Non-nil if inspection fails, nil on success.
 func GetSourceContainer(
+	ctx context.Context,
 	api dockerClient.APIClient,
 	containerID types.ContainerID,
 ) (types.Container, error) {
-	ctx := context.Background()
 	clog := logrus.WithField("container_id", containerID)
 
 	clog.Debug("Inspecting container")
@@ -208,6 +210,7 @@ func GetSourceContainer(
 // and waits for the specified timeout for graceful shutdown, forcing termination with SIGKILL if necessary.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client for interacting with the Docker daemon.
 //   - sourceContainer: Container object to stop, containing metadata like name and ID.
 //   - timeout: Duration to wait for graceful shutdown before forcing termination with SIGKILL.
@@ -215,11 +218,11 @@ func GetSourceContainer(
 // Returns:
 //   - error: Non-nil if stopping the container fails, nil on successful completion.
 func StopSourceContainer(
+	ctx context.Context,
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
 	timeout time.Duration,
 ) error {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"id":        sourceContainer.ID().ShortID(),
@@ -295,6 +298,7 @@ func StopSourceContainer(
 // It first stops the container if running, then removes it with optional volume cleanup.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client for interacting with the Docker daemon.
 //   - sourceContainer: Container object to stop and remove, containing metadata like name and ID.
 //   - timeout: Duration to wait for graceful shutdown before forcing termination with SIGKILL.
@@ -303,19 +307,19 @@ func StopSourceContainer(
 // Returns:
 //   - error: Non-nil if stopping or removing the container fails, nil on successful completion.
 func StopAndRemoveSourceContainer(
+	ctx context.Context,
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
 	timeout time.Duration,
 	removeVolumes bool,
 ) error {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"id":        sourceContainer.ID().ShortID(),
 	})
 
 	// Stop the container first
-	err := StopSourceContainer(api, sourceContainer, timeout)
+	err := StopSourceContainer(ctx, api, sourceContainer, timeout)
 	if err != nil {
 		return err
 	}

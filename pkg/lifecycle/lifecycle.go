@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -19,9 +20,10 @@ var (
 // ExecutePreChecks runs pre-check lifecycle hooks for filtered containers.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
-func ExecutePreChecks(client container.Client, params types.UpdateParams) {
+func ExecutePreChecks(ctx context.Context, client container.Client, params types.UpdateParams) {
 	uid := params.LifecycleUID
 	gid := params.LifecycleGID
 	clog := logrus.WithField(
@@ -31,7 +33,7 @@ func ExecutePreChecks(client container.Client, params types.UpdateParams) {
 	clog.Debug("Listing containers for pre-checks")
 
 	// Fetch containers using the provided filter.
-	containers, err := client.ListContainers(params.Filter)
+	containers, err := client.ListContainers(ctx, params.Filter)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to list containers for pre-checks")
 
@@ -41,23 +43,24 @@ func ExecutePreChecks(client container.Client, params types.UpdateParams) {
 	clog.WithField("count", len(containers)).Debug("Found containers for pre-checks")
 
 	for _, currentContainer := range containers {
-		ExecutePreCheckCommand(client, currentContainer, uid, gid)
+		ExecutePreCheckCommand(ctx, client, currentContainer, uid, gid)
 	}
 }
 
 // ExecutePostChecks runs post-check lifecycle hooks for filtered containers.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
-func ExecutePostChecks(client container.Client, params types.UpdateParams) {
+func ExecutePostChecks(ctx context.Context, client container.Client, params types.UpdateParams) {
 	uid := params.LifecycleUID
 	gid := params.LifecycleGID
 	clog := logrus.WithField("filter", fmt.Sprintf("%v", params.Filter))
 	clog.Debug("Listing containers for post-checks")
 
 	// Fetch containers using the provided filter.
-	containers, err := client.ListContainers(params.Filter)
+	containers, err := client.ListContainers(ctx, params.Filter)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to list containers for post-checks")
 
@@ -67,18 +70,19 @@ func ExecutePostChecks(client container.Client, params types.UpdateParams) {
 	clog.WithField("count", len(containers)).Debug("Found containers for post-checks")
 
 	for _, currentContainer := range containers {
-		ExecutePostCheckCommand(client, currentContainer, uid, gid)
+		ExecutePostCheckCommand(ctx, client, currentContainer, uid, gid)
 	}
 }
 
 // ExecutePreCheckCommand executes the pre-check hook for a container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePreCheckCommand(client container.Client, container types.Container, uid, gid int) {
+func ExecutePreCheckCommand(ctx context.Context, client container.Client, container types.Container, uid, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePreCheckCommand()
 
@@ -103,7 +107,7 @@ func ExecutePreCheckCommand(client container.Client, container types.Container, 
 	// Execute command with default timeout.
 	clog.WithField("command", command).Debug("Executing pre-check command")
 
-	_, err := client.ExecuteCommand(container, command, 1, effectiveUID, effectiveGID)
+	_, err := client.ExecuteCommand(ctx, container, command, 1, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Pre-check command failed")
 	}
@@ -112,11 +116,12 @@ func ExecutePreCheckCommand(client container.Client, container types.Container, 
 // ExecutePostCheckCommand executes the post-check hook for a container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePostCheckCommand(client container.Client, container types.Container, uid, gid int) {
+func ExecutePostCheckCommand(ctx context.Context, client container.Client, container types.Container, uid, gid int) {
 	clog := logrus.WithField("container", container.Name())
 	command := container.GetLifecyclePostCheckCommand()
 
@@ -141,7 +146,7 @@ func ExecutePostCheckCommand(client container.Client, container types.Container,
 	// Execute command with default timeout.
 	clog.WithField("command", command).Debug("Executing post-check command")
 
-	_, err := client.ExecuteCommand(container, command, 1, effectiveUID, effectiveGID)
+	_, err := client.ExecuteCommand(ctx, container, command, 1, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Post-check command failed")
 	}
@@ -150,6 +155,7 @@ func ExecutePostCheckCommand(client container.Client, container types.Container,
 // ExecutePreUpdateCommand executes the pre-update hook for a container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - container: Container to process.
 //   - uid: UID to run command as.
@@ -159,6 +165,7 @@ func ExecutePostCheckCommand(client container.Client, container types.Container,
 //   - bool: True if command ran, false if skipped.
 //   - error: Non-nil if execution fails, nil otherwise.
 func ExecutePreUpdateCommand(
+	ctx context.Context,
 	client container.Client,
 	container types.Container,
 	uid int,
@@ -201,7 +208,7 @@ func ExecutePreUpdateCommand(
 	// Execute command with configured timeout.
 	clog.WithField("command", command).Debug("Executing pre-update command")
 
-	success, err := client.ExecuteCommand(container, command, timeout, effectiveUID, effectiveGID)
+	success, err := client.ExecuteCommand(ctx, container, command, timeout, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Pre-update command failed")
 
@@ -221,11 +228,13 @@ func ExecutePreUpdateCommand(
 // ExecutePostUpdateCommand executes the post-update hook for a container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - newContainerID: ID of the updated container.
 //   - uid: UID to run command as.
 //   - gid: GID to run command as.
 func ExecutePostUpdateCommand(
+	ctx context.Context,
 	client container.Client,
 	newContainerID types.ContainerID,
 	uid int,
@@ -235,7 +244,7 @@ func ExecutePostUpdateCommand(
 	clog.Debug("Retrieving container for post-update")
 
 	// Retrieve container by ID.
-	newContainer, err := client.GetContainer(newContainerID)
+	newContainer, err := client.GetContainer(ctx, newContainerID)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to get container for post-update")
 
@@ -270,7 +279,7 @@ func ExecutePostUpdateCommand(
 	// Execute command with configured timeout.
 	clog.WithField("command", command).Debug("Executing post-update command")
 
-	_, err = client.ExecuteCommand(newContainer, command, timeout, effectiveUID, effectiveGID)
+	_, err = client.ExecuteCommand(ctx, newContainer, command, timeout, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).WithFields(logrus.Fields{
 			"container_id": newContainerID.ShortID(),

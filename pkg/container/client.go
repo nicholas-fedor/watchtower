@@ -45,56 +45,114 @@ type Client interface {
 	// ListContainers retrieves a list of containers, optionally filtered.
 	//
 	// If no filters are provided, all containers are returned.
-	ListContainers(filter ...types.Filter) ([]types.Container, error)
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - filter: Optional filters to apply to container list. Multiple filters are combined with logical AND.
+	//
+	// Returns:
+	//   - []types.Container: List of matching containers.
+	//   - error: Non-nil if listing fails, nil on success.
+	ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error)
 
 	// GetContainer fetches detailed information about a specific container by its ID.
 	//
-	// Returns the container object or an error if the container cannot be retrieved.
-	GetContainer(containerID types.ContainerID) (types.Container, error)
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - containerID: ID of the container to retrieve.
+	//
+	// Returns:
+	//   - types.Container: Container details if found.
+	//   - error: Non-nil if retrieval fails, nil on success.
+	GetContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error)
 
 	// GetCurrentWatchtowerContainer retrieves minimal container information for the specified container ID, skipping image inspection.
 	//
 	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
 	//   - containerID: ID of the container to retrieve.
 	//
 	// Returns:
 	//   - types.Container: Container with imageInfo set to nil.
 	//   - error: Non-nil if inspection fails, nil on success.
-	GetCurrentWatchtowerContainer(containerID types.ContainerID) (types.Container, error)
+	GetCurrentWatchtowerContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error)
 
 	// StopContainer stops a specified container, respecting the given timeout.
 	//
-	// It ensures the container is no longer running.
-	StopContainer(container types.Container, timeout time.Duration) error
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to stop.
+	//   - timeout: Duration to wait before forcing stop.
+	//
+	// Returns:
+	//   - error: Non-nil if stop fails, nil on success.
+	StopContainer(ctx context.Context, container types.Container, timeout time.Duration) error
 
 	// StopAndRemoveContainer stops and removes a specified container, respecting the given timeout.
 	//
-	// It ensures the container is no longer running or present on the host.
-	StopAndRemoveContainer(container types.Container, timeout time.Duration) error
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to stop and remove.
+	//   - timeout: Duration to wait before forcing stop.
+	//
+	// Returns:
+	//   - error: Non-nil if stop/removal fails, nil on success.
+	StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error
 
 	// StartContainer creates and starts a new container based on the provided container's configuration.
 	//
-	// Returns the new container's ID or an error if creation or startup fails.
-	StartContainer(container types.Container) (types.ContainerID, error)
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Source container to replicate.
+	//
+	// Returns:
+	//   - types.ContainerID: ID of the new container.
+	//   - error: Non-nil if creation/start fails, nil on success.
+	StartContainer(ctx context.Context, container types.Container) (types.ContainerID, error)
 
 	// RenameContainer renames an existing container to the specified new name.
 	//
-	// Returns an error if the rename operation fails.
-	RenameContainer(container types.Container, newName string) error
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to rename.
+	//   - newName: New name for the container.
+	//
+	// Returns:
+	//   - error: Non-nil if rename fails, nil on success.
+	RenameContainer(ctx context.Context, container types.Container, newName string) error
 
 	// IsContainerStale checks if a container's image is outdated compared to the latest available version.
 	//
-	// Returns whether the container is stale, the latest image ID, and any error encountered.
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to check.
+	//   - params: Update parameters for staleness check.
+	//
+	// Returns:
+	//   - bool: True if image is stale, false otherwise.
+	//   - types.ImageID: Latest image ID.
+	//   - error: Non-nil if check fails, nil on success.
 	IsContainerStale(
+		ctx context.Context,
 		container types.Container,
 		params types.UpdateParams,
 	) (bool, types.ImageID, error)
 
 	// ExecuteCommand runs a command inside a container and returns whether to skip updates based on the result.
 	//
-	// The timeout specifies how long to wait for the command to complete.
-	// UID and GID specify the user to run the command as, defaulting to container's configured user.
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to execute command in.
+	//   - command: Command to execute.
+	//   - timeout: Minutes to wait before timeout (0 for no timeout).
+	//   - uid: UID to run command as (-1 to use container default).
+	//   - gid: GID to run command as (-1 to use container default).
+	//
+	// Returns:
+	//   - bool: True if updates should be skipped, false otherwise.
+	//   - error: Non-nil if execution fails, nil on success.
 	ExecuteCommand(
+		ctx context.Context,
 		container types.Container,
 		command string,
 		timeout int,
@@ -105,44 +163,72 @@ type Client interface {
 	// RemoveImageByID deletes an image from the Docker host by its ID.
 	//
 	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
 	//   - imageID: ID of the image to remove.
 	//   - imageName: Name of the image to remove (for logging purposes).
 	//
-	// Returns an error if the removal fails.
-	RemoveImageByID(imageID types.ImageID, imageName string) error
+	// Returns:
+	//   - error: Non-nil if removal fails, nil on success.
+	RemoveImageByID(ctx context.Context, imageID types.ImageID, imageName string) error
 
 	// WarnOnHeadPullFailed determines whether to log a warning when a HEAD request fails during image pulls.
 	//
 	// The decision is based on the configured warning strategy and container context.
+	//
+	// Parameters:
+	//   - container: Container to evaluate.
+	//
+	// Returns:
+	//   - bool: True if warning is needed, false otherwise.
 	WarnOnHeadPullFailed(container types.Container) bool
 
 	// GetVersion returns the client's API version.
+	//
+	// Returns:
+	//   - string: Docker API version (e.g., "1.44").
 	GetVersion() string
 
 	// GetInfo returns system information from the Docker daemon.
 	//
-	// Returns system-wide information about the Docker installation.
-	GetInfo() (map[string]any, error)
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//
+	// Returns:
+	//   - map[string]any: System information.
+	//   - error: Non-nil if retrieval fails, nil on success.
+	GetInfo(ctx context.Context) (map[string]any, error)
 
 	// WaitForContainerHealthy waits for a container to become healthy or times out.
 	//
-	// It polls the container's health status until it reports "healthy" or the timeout is reached.
-	// If the container has no health check configured, it returns immediately.
-	WaitForContainerHealthy(containerID types.ContainerID, timeout time.Duration) error
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - containerID: ID of the container to wait for.
+	//   - timeout: Maximum duration to wait for health.
+	//
+	// Returns:
+	//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
+	WaitForContainerHealthy(ctx context.Context, containerID types.ContainerID, timeout time.Duration) error
 
 	// UpdateContainer updates the configuration of an existing container.
 	//
-	// It modifies container settings such as restart policy using the Docker API ContainerUpdate.
-	UpdateContainer(container types.Container, config dockerContainer.UpdateConfig) error
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to update.
+	//   - config: Update configuration containing the changes to apply.
+	//
+	// Returns:
+	//   - error: Non-nil if update fails, nil on success.
+	UpdateContainer(ctx context.Context, container types.Container, config dockerContainer.UpdateConfig) error
 
 	// RemoveContainer removes a container from the Docker host.
 	//
 	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
 	//   - container: Container to remove.
 	//
 	// Returns:
 	//   - error: Non-nil if removal fails, nil on success.
-	RemoveContainer(container types.Container) error
+	RemoveContainer(ctx context.Context, container types.Container) error
 }
 
 // client is the concrete implementation of the Client interface.
@@ -253,14 +339,15 @@ func NewClient(opts ClientOptions) Client {
 // ListContainers retrieves a list of containers, optionally filtered.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - filter: Optional filters to apply to container list. Multiple filters are combined with logical AND.
 //
 // Returns:
 //   - []types.Container: List of matching containers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c client) ListContainers(filter ...types.Filter) ([]types.Container, error) {
+func (c client) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
-	isPodman := c.getPodmanFlag()
+	isPodman := c.getPodmanFlag(ctx)
 
 	var containerFilter types.Filter
 
@@ -284,7 +371,7 @@ func (c client) ListContainers(filter ...types.Filter) ([]types.Container, error
 	}
 
 	// Attempt to list source containers and handle errors by logging and returning them.
-	containers, err := ListSourceContainers(c.api, c.ClientOptions, containerFilter, isPodman)
+	containers, err := ListSourceContainers(ctx, c.api, c.ClientOptions, containerFilter, isPodman)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
 
@@ -299,14 +386,15 @@ func (c client) ListContainers(filter ...types.Filter) ([]types.Container, error
 // GetContainer fetches detailed information about a specific container by its ID.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - containerID: ID of the container to retrieve.
 //
 // Returns:
 //   - types.Container: Container details if found.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c client) GetContainer(containerID types.ContainerID) (types.Container, error) {
+func (c client) GetContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error) {
 	// Retrieve container details using helper function.
-	container, err := GetSourceContainer(c.api, containerID)
+	container, err := GetSourceContainer(ctx, c.api, containerID)
 	if err != nil {
 		logrus.WithError(err).
 			WithField("container_id", containerID).
@@ -323,15 +411,16 @@ func (c client) GetContainer(containerID types.ContainerID) (types.Container, er
 // GetCurrentWatchtowerContainer retrieves container information for the specified container ID, skipping image inspection.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - containerID: ID of the container to retrieve.
 //
 // Returns:
 //   - types.Container: Container with imageInfo set to nil.
 //   - error: Non-nil if inspection fails, nil on success.
 func (c client) GetCurrentWatchtowerContainer(
+	ctx context.Context,
 	containerID types.ContainerID,
 ) (types.Container, error) {
-	ctx := context.Background()
 	clog := logrus.WithField("container_id", containerID)
 
 	clog.Debug("Inspecting current Watchtower container")
@@ -351,14 +440,15 @@ func (c client) GetCurrentWatchtowerContainer(
 // StopContainer stops a specified container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Container to stop.
 //   - timeout: Duration to wait before forcing stop.
 //
 // Returns:
 //   - error: Non-nil if stop fails, nil on success.
-func (c client) StopContainer(container types.Container, timeout time.Duration) error {
+func (c client) StopContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
 	// Stop container using helper function.
-	err := StopSourceContainer(c.api, container, timeout)
+	err := StopSourceContainer(ctx, c.api, container, timeout)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"container": container.Name(),
@@ -379,14 +469,15 @@ func (c client) StopContainer(container types.Container, timeout time.Duration) 
 // StopAndRemoveContainer stops and removes a specified container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Container to stop and remove.
 //   - timeout: Duration to wait before forcing stop.
 //
 // Returns:
 //   - error: Non-nil if stop/removal fails, nil on success.
-func (c client) StopAndRemoveContainer(container types.Container, timeout time.Duration) error {
+func (c client) StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
 	// Stop and remove container using helper function with volume option.
-	err := StopAndRemoveSourceContainer(c.api, container, timeout, c.RemoveVolumes)
+	err := StopAndRemoveSourceContainer(ctx, c.api, container, timeout, c.RemoveVolumes)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"container": container.Name(),
@@ -407,18 +498,19 @@ func (c client) StopAndRemoveContainer(container types.Container, timeout time.D
 // StartContainer creates and starts a new container based on an existing container's configuration.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Source container to replicate.
 //
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation/start fails, nil on success.
-func (c client) StartContainer(container types.Container) (types.ContainerID, error) {
+func (c client) StartContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
-	isPodman := c.getPodmanFlag()
+	isPodman := c.getPodmanFlag(ctx)
 
 	clientVersion := c.GetVersion()
 
@@ -430,6 +522,7 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 
 	// Start new container with selected config.
 	newID, err := StartTargetContainer(
+		ctx,
 		c.api,
 		container,
 		networkConfig,
@@ -456,16 +549,17 @@ func (c client) StartContainer(container types.Container) (types.ContainerID, er
 // UpdateContainer updates the configuration of an existing container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Container to update.
 //   - config: Update configuration containing the changes to apply.
 //
 // Returns:
 //   - error: Non-nil if update fails, nil on success.
 func (c client) UpdateContainer(
+	ctx context.Context,
 	container types.Container,
 	config dockerContainer.UpdateConfig,
 ) error {
-	ctx := context.Background()
 	clog := logrus.WithField("container_id", container.ID())
 
 	clog.Debug("Updating container configuration")
@@ -485,12 +579,12 @@ func (c client) UpdateContainer(
 // RemoveContainer removes a container from the Docker host.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Container to remove.
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c client) RemoveContainer(container types.Container) error {
-	ctx := context.Background()
+func (c client) RemoveContainer(ctx context.Context, container types.Container) error {
 	clog := logrus.WithFields(logrus.Fields{
 		"container": container.Name(),
 		"id":        container.ID().ShortID(),
@@ -521,14 +615,15 @@ func (c client) RemoveContainer(container types.Container) error {
 // RenameContainer renames an existing container to a new name.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Container to rename.
 //   - newName: New name for the container.
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
-func (c client) RenameContainer(container types.Container, newName string) error {
+func (c client) RenameContainer(ctx context.Context, container types.Container, newName string) error {
 	// Perform rename using helper function.
-	err := RenameTargetContainer(c.api, container, newName)
+	err := RenameTargetContainer(ctx, c.api, container, newName)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"container": container.Name(),
@@ -578,13 +673,14 @@ func (c client) WarnOnHeadPullFailed(container types.Container) bool {
 //   - types.ImageID: Latest image ID.
 //   - error: Non-nil if check fails, nil on success.
 func (c client) IsContainerStale(
+	ctx context.Context,
 	container types.Container,
 	params types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	// Use image client to perform staleness check.
 	imgClient := newImageClient(c.api)
 
-	stale, newestImage, err := imgClient.IsContainerStale(container, params, c.WarnOnHeadFailed)
+	stale, newestImage, err := imgClient.IsContainerStale(ctx, container, params, c.WarnOnHeadFailed)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"container": container.Name(),
@@ -605,6 +701,7 @@ func (c client) IsContainerStale(
 // ExecuteCommand runs a command inside a container and evaluates its result.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - container: Container to execute command in.
 //   - command: Command to execute.
 //   - timeout: Minutes to wait before timeout (0 for no timeout).
@@ -615,6 +712,7 @@ func (c client) IsContainerStale(
 //   - bool: True if updates should be skipped, false otherwise.
 //   - error: Non-nil if execution fails, nil on success.
 func (c client) ExecuteCommand(
+	ctx context.Context,
 	container types.Container,
 	command string,
 	timeout int,
@@ -624,15 +722,15 @@ func (c client) ExecuteCommand(
 	clog := logrus.WithField("container_id", container.ID())
 
 	var (
-		ctx    context.Context
-		cancel context.CancelFunc
+		execCtx    context.Context
+		cancelFunc context.CancelFunc
 	)
 
 	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Minute)
-		defer cancel()
+		execCtx, cancelFunc = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
+		defer cancelFunc()
 	} else {
-		ctx = context.Background()
+		execCtx = ctx
 	}
 
 	// Generate JSON metadata for the container.
@@ -670,7 +768,7 @@ func (c client) ExecuteCommand(
 	}
 
 	// Create the exec instance.
-	exec, err := c.api.ContainerExecCreate(ctx, string(container.ID()), execConfig)
+	exec, err := c.api.ContainerExecCreate(execCtx, string(container.ID()), execConfig)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to create exec instance")
 
@@ -763,11 +861,15 @@ func generateContainerMetadata(container types.Container) (string, error) {
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c client) RemoveImageByID(imageID types.ImageID, imageName string) error {
+func (c client) RemoveImageByID(
+	ctx context.Context,
+	imageID types.ImageID,
+	imageName string,
+) error {
 	// Use image client to remove the image.
 	imgClient := newImageClient(c.api)
 
-	err := imgClient.RemoveImageByID(imageID, imageName)
+	err := imgClient.RemoveImageByID(ctx, imageID, imageName)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"image_id":   imageID,
@@ -795,12 +897,13 @@ func (c client) GetVersion() string {
 
 // GetInfo returns system information from the Docker daemon.
 //
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
 // Returns:
 //   - map[string]interface{}: System information.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c client) GetInfo() (map[string]any, error) {
-	ctx := context.Background()
-
+func (c client) GetInfo(ctx context.Context) (map[string]any, error) {
 	info, err := c.api.Info(ctx)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to get system info")
@@ -829,10 +932,11 @@ func (c client) GetInfo() (map[string]any, error) {
 // Returns:
 //   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
 func (c client) WaitForContainerHealthy(
+	ctx context.Context,
 	containerID types.ContainerID,
 	timeout time.Duration,
 ) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	clog := logrus.WithField("container_id", containerID)
@@ -884,10 +988,13 @@ func (c client) WaitForContainerHealthy(
 
 // detectPodman determines if the container runtime is Podman using multiple detection methods.
 //
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
 //   - error: Non-nil if detection fails, nil on success.
-func (c client) detectPodman() (bool, error) {
+func (c client) detectPodman(ctx context.Context) (bool, error) {
 	// Check for Podman marker file
 	_, err := c.Fs.Stat("/run/.containerenv")
 	if err == nil {
@@ -912,7 +1019,7 @@ func (c client) detectPodman() (bool, error) {
 	}
 
 	// Fallback to API-based detection
-	info, err := c.GetInfo()
+	info, err := c.GetInfo(ctx)
 	if err != nil {
 		logrus.WithError(err).
 			Debug("Failed to get system info for Podman detection, assuming Docker")
@@ -939,16 +1046,19 @@ func (c client) detectPodman() (bool, error) {
 
 // getPodmanFlag determines if Podman detection is needed and performs it.
 //
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
-func (c client) getPodmanFlag() bool {
+func (c client) getPodmanFlag(ctx context.Context) bool {
 	// Only perform detection in auto mode; otherwise, assume Docker
 	if c.CPUCopyMode != CPUCopyModeAuto {
 		return false
 	}
 
 	// Attempt to detect Podman using various methods (marker files, env vars, API info)
-	isPodman, err := c.detectPodman()
+	isPodman, err := c.detectPodman(ctx)
 	if err != nil {
 		// On detection failure, fall back to assuming Docker
 		logrus.WithError(err).Debug("Failed to detect container runtime, falling back to Docker")

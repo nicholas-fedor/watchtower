@@ -47,6 +47,7 @@ type imageClient struct {
 // It skips pulling if NoPull is set, otherwise pulls and compares images.
 //
 // Parameters:
+//   - ctx: Context for operation control.
 //   - sourceContainer: Container to check.
 //   - params: Update parameters (e.g., NoPull flag).
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
@@ -56,11 +57,11 @@ type imageClient struct {
 //   - types.ImageID: Latest image ID (or current if not pulled).
 //   - error: Non-nil if pull or inspection fails, nil on success or skipped.
 func (c imageClient) IsContainerStale(
+	ctx context.Context,
 	sourceContainer types.Container,
 	params types.UpdateParams,
 	warnOnHeadFailed WarningStrategy,
 ) (bool, types.ImageID, error) {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"image":     sourceContainer.ImageName(),
@@ -190,12 +191,13 @@ func (c imageClient) PullImage(
 // It removes the image with force and pruning, logging details if debug enabled.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - imageID: ID of the image to remove.
 //   - imageName: Name of the image to remove (for logging purposes).
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) error {
+func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID, imageName string) error {
 	clog := logrus.WithFields(logrus.Fields{
 		"image_id":   imageID.ShortID(),
 		"image_name": imageName,
@@ -204,7 +206,7 @@ func (c imageClient) RemoveImageByID(imageID types.ImageID, imageName string) er
 
 	// Perform image removal with force and pruning.
 	items, err := c.api.ImageRemove(
-		context.Background(),
+		ctx,
 		string(imageID),
 		dockerImage.RemoveOptions{
 			Force:         true,

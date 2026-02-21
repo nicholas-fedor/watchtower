@@ -1339,6 +1339,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("disables memory swappiness when flag is true", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1357,6 +1358,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("logs MAC address details", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1375,6 +1377,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("uses full network config for API >= 1.44", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1397,6 +1400,7 @@ var _ = ginkgo.Describe("Container", func() {
 				return dockerContainer.CreateResponse{}, createErr
 			}
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1416,6 +1420,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("logs successful container creation", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1439,6 +1444,7 @@ var _ = ginkgo.Describe("Container", func() {
 			)
 			networkConfig = getNetworkConfig(container, "1.44")
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1461,6 +1467,7 @@ var _ = ginkgo.Describe("Container", func() {
 				return startErr
 			}
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1480,6 +1487,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("logs successful container start", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1505,6 +1513,7 @@ var _ = ginkgo.Describe("Container", func() {
 			)
 			networkConfig = getNetworkConfig(container, "1.23")
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1540,6 +1549,7 @@ var _ = ginkgo.Describe("Container", func() {
 				return nil
 			}
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,

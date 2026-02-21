@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("the client", func() {
 					), // Simulate successful removal
 				)
 				// Execute StopAndRemoveContainer and verify no error occurs.
-				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -101,7 +101,7 @@ var _ = ginkgo.Describe("the client", func() {
 					), // Removal fails gracefully
 				)
 				// Execute StopAndRemoveContainer and verify no error occurs.
-				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -124,7 +124,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute StopContainer and verify the error is propagated.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).
 					To(gomega.MatchError(gomega.ContainSubstring("failed to stop container: Error response from daemon: server error")))
 			})
@@ -148,7 +148,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute StopAndRemoveContainer and verify the stop error is propagated.
-				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).
 					To(gomega.MatchError(gomega.ContainSubstring("failed to stop container: Error response from daemon: stop error")))
 			})
@@ -170,7 +170,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute StopAndRemoveContainer and verify the removal error is propagated.
-				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).
 					To(gomega.MatchError(gomega.ContainSubstring("failed to remove container: Error response from daemon: server error")))
 			})
@@ -191,7 +191,7 @@ var _ = ginkgo.Describe("the client", func() {
 					), // Simulate successful removal
 				)
 				// Execute StopAndRemoveContainer and verify no error occurs.
-				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("the client", func() {
 					StopContainerHandler(cid, mockContainer.Found),
 				)
 				// Execute StopAndRemoveContainer and verify no error occurs.
-				err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -232,7 +232,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute StopContainer and verify no error occurs.
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -244,7 +244,7 @@ var _ = ginkgo.Describe("the client", func() {
 					WithContainerState(dockerContainer.State{Running: false}),
 				)
 				// Execute StopContainer and verify no error occurs (no API calls expected).
-				err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+				err := client{api: docker}.StopContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				// Verify no requests were made to the mock server.
 				gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
@@ -267,7 +267,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute RemoveContainer and verify no error occurs.
-				err := client{api: docker}.RemoveContainer(mockedContainer)
+				err := client{api: docker}.RemoveContainer(context.Background(), mockedContainer)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -285,7 +285,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute RemoveContainer and verify no error occurs.
-				err := client{api: docker}.RemoveContainer(mockedContainer)
+				err := client{api: docker}.RemoveContainer(context.Background(), mockedContainer)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		})
@@ -303,7 +303,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Execute RemoveContainer and verify the error is propagated.
-				err := client{api: docker}.RemoveContainer(mockedContainer)
+				err := client{api: docker}.RemoveContainer(context.Background(), mockedContainer)
 				gomega.Expect(err).
 					To(gomega.MatchError(gomega.ContainSubstring("failed to remove container")))
 			})
@@ -327,7 +327,7 @@ var _ = ginkgo.Describe("the client", func() {
 					ClientOptions: ClientOptions{},
 				}
 				// Execute ListContainers and verify results.
-				containers, err := client.ListContainers(filters.NoFilter)
+				containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.HaveLen(2))
 			})
@@ -349,7 +349,7 @@ var _ = ginkgo.Describe("the client", func() {
 					ClientOptions: ClientOptions{},
 				}
 				// Execute ListContainers and verify empty result.
-				containers, err := client.ListContainers(filter)
+				containers, err := client.ListContainers(context.Background(), filter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.BeEmpty())
 			})
@@ -370,7 +370,7 @@ var _ = ginkgo.Describe("the client", func() {
 					ClientOptions: ClientOptions{},
 				}
 				// Execute ListContainers with Watchtower filter and verify result.
-				containers, err := client.ListContainers(filters.WatchtowerContainersFilter)
+				containers, err := client.ListContainers(context.Background(), filters.WatchtowerContainersFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(containers).
 					To(gomega.ConsistOf(withContainerImageName(gomega.Equal("nickfedor/watchtower:latest"))))
@@ -395,7 +395,7 @@ var _ = ginkgo.Describe("the client", func() {
 					ClientOptions: ClientOptions{IncludeStopped: true},
 				}
 				// Execute ListContainers and verify stopped containers are included.
-				containers, err := client.ListContainers(filters.NoFilter)
+				containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.ContainElement(havingRunningState(false)))
 			})
@@ -419,7 +419,7 @@ var _ = ginkgo.Describe("the client", func() {
 					ClientOptions: ClientOptions{IncludeRestarting: true},
 				}
 				// Execute ListContainers and verify restarting containers are included.
-				containers, err := client.ListContainers(filters.NoFilter)
+				containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(containers).To(gomega.ContainElement(havingRestartingState(true)))
 			})
@@ -440,7 +440,7 @@ var _ = ginkgo.Describe("the client", func() {
 					ClientOptions: ClientOptions{IncludeRestarting: false},
 				}
 				// Execute ListContainers and verify no restarting containers are included.
-				containers, err := client.ListContainers(filters.NoFilter)
+				containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(containers).NotTo(gomega.ContainElement(havingRestartingState(true)))
 			})
@@ -462,7 +462,7 @@ var _ = ginkgo.Describe("the client", func() {
 				}
 				// Apply two filters: one for name "portainer" and one that always passes
 				nameFilter := filters.FilterByNames([]string{"portainer"}, filters.NoFilter)
-				containers, err := client.ListContainers(nameFilter, filters.NoFilter)
+				containers, err := client.ListContainers(context.Background(), nameFilter, filters.NoFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Should return only the "portainer" container
 				gomega.Expect(containers).To(gomega.HaveLen(1))
@@ -488,7 +488,7 @@ var _ = ginkgo.Describe("the client", func() {
 					[]string{"watchtower-running"},
 					filters.NoFilter,
 				)
-				containers, err := client.ListContainers(portainerFilter, watchtowerFilter)
+				containers, err := client.ListContainers(context.Background(), portainerFilter, watchtowerFilter)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Should return empty since no container can be both "portainer" and "watchtower-running" named
 				gomega.Expect(containers).To(gomega.BeEmpty())
@@ -508,7 +508,7 @@ var _ = ginkgo.Describe("the client", func() {
 						ClientOptions: ClientOptions{},
 					}
 					// Execute GetContainer and verify network mode resolution.
-					container, err := client.GetContainer(consumerContainerRef.ContainerID())
+					container, err := client.GetContainer(context.Background(), consumerContainerRef.ContainerID())
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					networkMode := container.ContainerInfo().HostConfig.NetworkMode
@@ -529,7 +529,7 @@ var _ = ginkgo.Describe("the client", func() {
 						ClientOptions: ClientOptions{},
 					}
 					// Execute GetContainer and verify fallback to container ID.
-					container, err := client.GetContainer(consumerContainerRef.ContainerID())
+					container, err := client.GetContainer(context.Background(), consumerContainerRef.ContainerID())
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					networkMode := container.ContainerInfo().HostConfig.NetworkMode
@@ -567,7 +567,7 @@ var _ = ginkgo.Describe("the client", func() {
 						)
 
 						client := client{api: docker}
-						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
+						err := client.WaitForContainerHealthy(context.Background(), types.ContainerID(cid), 5*time.Second)
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					})
 				})
@@ -714,7 +714,7 @@ var _ = ginkgo.Describe("the client", func() {
 						)
 
 						client := client{api: docker}
-						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
+						err := client.WaitForContainerHealthy(context.Background(), types.ContainerID(cid), 5*time.Second)
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					})
 				})
@@ -751,7 +751,7 @@ var _ = ginkgo.Describe("the client", func() {
 						)
 
 						client := client{api: docker}
-						err := client.WaitForContainerHealthy(types.ContainerID(cid), 5*time.Second)
+						err := client.WaitForContainerHealthy(context.Background(), types.ContainerID(cid), 5*time.Second)
 						gomega.Expect(err).To(gomega.HaveOccurred())
 						gomega.Expect(err.Error()).
 							To(gomega.ContainSubstring("health check failed"))
@@ -772,7 +772,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag()
+					result := testClient.getPodmanFlag(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -789,7 +789,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag()
+					result := testClient.getPodmanFlag(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -812,7 +812,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag()
+					result := testClient.getPodmanFlag(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -835,7 +835,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag()
+					result := testClient.getPodmanFlag(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -858,7 +858,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag()
+					result := testClient.getPodmanFlag(context.Background())
 					gomega.Expect(result).To(gomega.BeFalse())
 				})
 
@@ -882,7 +882,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag()
+					result := testClient.getPodmanFlag(context.Background())
 					gomega.Expect(result).To(gomega.BeFalse())
 					gomega.Eventually(logbuf).
 						Should(gbytes.Say("Failed to detect container runtime, falling back to Docker"))
@@ -899,7 +899,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag()
+					result := testClient.getPodmanFlag(context.Background())
 					gomega.Expect(result).To(gomega.BeFalse())
 					// No API calls should have been made
 					gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
@@ -1026,10 +1026,10 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Get the container first
-				container, err := client.GetContainer(containerID)
+				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Execute command and verify log output includes container id.
-				_, err = client.ExecuteCommand(container, cmd, 1, 0, 0)
+				_, err = client.ExecuteCommand(context.Background(), container, cmd, 1, 0, 0)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Eventually(logbuf).Should(gbytes.Say("container_id=ex-cont-id"))
 			})
@@ -1149,10 +1149,10 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 				// Get the container first
-				container, err := client.GetContainer(containerID)
+				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// Execute command and verify skip update is true
-				skipUpdate, err := client.ExecuteCommand(container, cmd, 1, 0, 0)
+				skipUpdate, err := client.ExecuteCommand(context.Background(), container, cmd, 1, 0, 0)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(skipUpdate).To(gomega.BeTrue())
 				gomega.Eventually(logbuf).Should(gbytes.Say("container_id=ex-cont-id"))
@@ -1196,7 +1196,7 @@ var _ = ginkgo.Describe("the client", func() {
 			// Create client instance.
 			client := client{api: docker, ClientOptions: ClientOptions{}}
 			// Execute ListContainers and verify empty result with warning log.
-			containers, err := client.ListContainers(filters.NoFilter)
+			containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.BeEmpty())
 			gomega.Eventually(logbuf).
@@ -1216,7 +1216,7 @@ var _ = ginkgo.Describe("the client", func() {
 			// Create client instance.
 			client := client{api: docker, ClientOptions: ClientOptions{}}
 			// Execute ListContainers and verify error is returned.
-			containers, err := client.ListContainers(filters.NoFilter)
+			containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.BeNil())
 		})
@@ -1234,7 +1234,7 @@ var _ = ginkgo.Describe("the client", func() {
 			// Create client instance.
 			client := client{api: docker, ClientOptions: ClientOptions{}}
 			// Execute ListContainers and verify error is returned.
-			containers, err := client.ListContainers(filters.NoFilter)
+			containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.BeNil())
 		})
@@ -1263,7 +1263,7 @@ var _ = ginkgo.Describe("the client", func() {
 			// Create client instance.
 			client := client{api: docker, ClientOptions: ClientOptions{}}
 			// Execute ListContainers and verify error is returned.
-			containers, err := client.ListContainers(filters.NoFilter)
+			containers, err := client.ListContainers(context.Background(), filters.NoFilter)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.BeNil())
 		})
@@ -1380,7 +1380,7 @@ var _ = ginkgo.Describe("the client", func() {
 				defer resetLogrus()
 
 				client := client{api: docker, ClientOptions: ClientOptions{}}
-				containers, err := client.ListContainers()
+				containers, err := client.ListContainers(context.Background())
 
 				// Verify no error is returned and only valid containers are included
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1438,7 +1438,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			info, err := testClient.GetInfo()
+			info, err := testClient.GetInfo(context.Background())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(info).NotTo(gomega.BeNil())
 			gomega.Expect(info["Name"]).To(gomega.Equal("docker-server"))
@@ -1473,7 +1473,7 @@ var _ = ginkgo.Describe("the client", func() {
 			defer restore()
 			// Create client that expects TLS but gets HTTP
 			failingClient := NewClient(ClientOptions{})
-			_, err := failingClient.GetInfo()
+			_, err := failingClient.GetInfo(context.Background())
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get system info"))
 		})
@@ -1492,7 +1492,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			info, err := testClient.GetInfo()
+			info, err := testClient.GetInfo(context.Background())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(info).To(gomega.HaveKeyWithValue("Name", "test-docker"))
 			gomega.Expect(info).To(gomega.HaveKeyWithValue("ServerVersion", "25.0.0"))
@@ -1663,7 +1663,7 @@ func TestStopAndRemoveContainer_ContainerStillExistsAfterStopping(t *testing.T) 
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopAndRemoveContainer and verify no error occurs.
-		err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+		err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1690,7 +1690,7 @@ func TestStopAndRemoveContainer_ContainerDoesNotExistAfterStopping(t *testing.T)
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopAndRemoveContainer and verify no error occurs.
-		err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+		err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -1735,7 +1735,7 @@ func TestStopContainer_StoppingFailsWithUnexpectedError(t *testing.T) {
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopContainer and verify the error is propagated.
-		err := client{api: docker}.StopContainer(mockedContainer, time.Second)
+		err := client{api: docker}.StopContainer(context.Background(), mockedContainer, time.Second)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1791,7 +1791,7 @@ func TestStopAndRemoveContainer_RemovalFailsWithUnexpectedError(t *testing.T) {
 			WithContainerState(dockerContainer.State{Running: true}),
 		)
 		// Execute StopAndRemoveContainer and verify the removal error is propagated.
-		err := client{api: docker}.StopAndRemoveContainer(mockedContainer, time.Second)
+		err := client{api: docker}.StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1851,6 +1851,7 @@ func TestStopContainer_ContainerFailsToStopWithinTimeout(t *testing.T) {
 		err := client{
 			api: docker,
 		}.StopAndRemoveContainer(
+			context.Background(),
 			mockedContainer,
 			1*time.Second,
 		)
@@ -1917,7 +1918,7 @@ func TestWaitForContainerHealthy_Timeout(t *testing.T) {
 
 		client := client{api: docker}
 
-		err := client.WaitForContainerHealthy(types.ContainerID(cid), 0)
+		err := client.WaitForContainerHealthy(context.Background(), types.ContainerID(cid), 0)
 		if err == nil {
 			t.Fatal("expected timeout error, got nil")
 		}

@@ -21,6 +21,7 @@ import (
 // For modern API versions (>= 1.44) or single networks, it attaches all networks at creation.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Interface for container operations (Operations).
 //   - sourceContainer: Source container to replicate.
 //   - networkConfig: Network configuration to apply to the new container.
@@ -35,6 +36,7 @@ import (
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation or start fails, nil on success.
 func StartTargetContainer(
+	ctx context.Context,
 	api Operations,
 	sourceContainer types.Container,
 	networkConfig *dockerNetwork.NetworkingConfig,
@@ -45,7 +47,6 @@ func StartTargetContainer(
 	cpuCopyMode string,
 	isPodman bool,
 ) (types.ContainerID, error) {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"id":        sourceContainer.ID().ShortID(),
@@ -252,6 +253,7 @@ func attachNetworks(
 // RenameTargetContainer renames an existing container to the specified target name in Watchtower.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Interface for container operations (Operations).
 //   - targetContainer: Container to be renamed.
 //   - targetName: New name for the container.
@@ -259,11 +261,11 @@ func attachNetworks(
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
 func RenameTargetContainer(
+	ctx context.Context,
 	api Operations,
 	targetContainer types.Container,
 	targetName string,
 ) error {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container":   targetContainer.Name(),
 		"id":          targetContainer.ID().ShortID(),

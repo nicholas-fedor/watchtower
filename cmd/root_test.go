@@ -983,8 +983,8 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 	mockClient := mockContainer.NewMockClient(t)
 	mockContainer := mockTypes.NewMockContainer(t)
 
-	// Set up mock expectations for ListContainers called without filter arguments
-	mockClient.EXPECT().ListContainers().Return([]types.Container{mockContainer}, nil).Once()
+	// Set up mock expectations for ListContainers called with context
+	mockClient.EXPECT().ListContainers(context.Background()).Return([]types.Container{mockContainer}, nil).Once()
 
 	// Set up container mock to return the expected hostname
 	mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -995,8 +995,8 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 	expectedID := types.ContainerID("test-container-id")
 	mockContainer.EXPECT().ID().Return(expectedID).Once()
 
-	// Execute the function that calls ListContainers without filter
-	resultID, err := container.GetContainerIDFromHostname(mockClient)
+	// Execute the function that calls ListContainers with context
+	resultID, err := container.GetContainerIDFromHostname(context.Background(), mockClient)
 
 	// Assert results
 	require.NoError(t, err)

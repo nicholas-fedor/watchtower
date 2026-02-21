@@ -51,11 +51,11 @@ func (ds DependencySorter) Sort(containers []types.Container) error {
 		watchtowerContainers    []types.Container
 	)
 
-	for _, container := range containers {
-		if container.IsWatchtower() {
-			watchtowerContainers = append(watchtowerContainers, container)
+	for _, c := range containers {
+		if c.IsWatchtower() {
+			watchtowerContainers = append(watchtowerContainers, c)
 		} else {
-			nonWatchtowerContainers = append(nonWatchtowerContainers, container)
+			nonWatchtowerContainers = append(nonWatchtowerContainers, c)
 		}
 	}
 

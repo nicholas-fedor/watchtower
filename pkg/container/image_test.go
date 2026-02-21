@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("the client", func() {
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 
-				gomega.Expect(c.RemoveImageByID(types.ImageID(imageA), "test-image")).
+				gomega.Expect(c.RemoveImageByID(context.Background(), types.ImageID(imageA), "test-image")).
 					To(gomega.Succeed())
 				shortA := types.ImageID(imageA).ShortID()
 				shortAParent := types.ImageID(imageAParent).ShortID()
@@ -113,7 +113,7 @@ var _ = ginkgo.Describe("the client", func() {
 				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(nil))
 
 				c := client{api: docker}
-				err := c.RemoveImageByID(types.ImageID(image), "test-image")
+				err := c.RemoveImageByID(context.Background(), types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
 			})
 		})
@@ -148,6 +148,7 @@ var _ = ginkgo.Describe("the client", func() {
 				defer resetLogrus()
 
 				stale, latestID, err := c.IsContainerStale(
+					context.Background(),
 					container,
 					types.UpdateParams{NoPull: true},
 				)
@@ -189,6 +190,7 @@ var _ = ginkgo.Describe("the client", func() {
 				defer resetLogrus()
 
 				stale, latestID, err := c.IsContainerStale(
+					context.Background(),
 					container,
 					types.UpdateParams{NoPull: true},
 				)
@@ -230,6 +232,7 @@ var _ = ginkgo.Describe("the client", func() {
 				defer resetLogrus()
 
 				stale, latestID, err := c.IsContainerStale(
+					context.Background(),
 					container,
 					types.UpdateParams{NoPull: true},
 				)
