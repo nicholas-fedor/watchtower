@@ -1535,7 +1535,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 	})
 
 	ginkgo.When("context cancellation during retry delay", func() {
-		ginkgo.It("should return immediately when context is cancelled during retry delay", func() {
+		ginkgo.It("should return immediately when context is canceled during retry delay", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			excessContainer := createMockContainer(
@@ -1557,7 +1557,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				map[string]string{},
 			)
 
-			// Create a cancelled context
+			// Create a canceled context
 			ctx, cancel := context.WithCancel(context.Background())
 			// Cancel immediately to simulate cancellation during retry delay
 			cancel()
@@ -1578,7 +1578,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("context cancelled during retry delay"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("context canceled during retry delay"))
 			gomega.Expect(removed).To(gomega.Equal(0))
 		})
 
@@ -1625,11 +1625,11 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("context cancelled during retry delay"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("context canceled during retry delay"))
 			gomega.Expect(removed).To(gomega.Equal(0))
 		})
 
-		ginkgo.It("should proceed with retry after delay when context is not cancelled", func() {
+		ginkgo.It("should proceed with retry after delay when context is not canceled", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			excessContainer := createMockContainer(
@@ -1674,7 +1674,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 			gomega.Expect(removed).To(gomega.Equal(1))
 		})
 
-		ginkgo.It("should retry multiple times before succeeding when context is not cancelled", func() {
+		ginkgo.It("should retry multiple times before succeeding when context is not canceled", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			excessContainer := createMockContainer(
@@ -1719,7 +1719,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 			gomega.Expect(removed).To(gomega.Equal(1))
 		})
 
-		ginkgo.It("should fail after max attempts when context is never cancelled", func() {
+		ginkgo.It("should fail after max attempts when context is never canceled", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			excessContainer := createMockContainer(

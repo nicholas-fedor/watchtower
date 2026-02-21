@@ -1044,7 +1044,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
-		// Create a cancellable context for shutdown
+		// Create a cancelable context for shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 
 		// Start runUpgradesOnSchedule in a goroutine
@@ -1110,20 +1110,20 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 	})
 }
 
-// TestValidateRollingRestartDependenciesAcceptsCancellableContext verifies that
-// actions.ValidateRollingRestartDependencies properly accepts and uses a cancellable context.
-func TestValidateRollingRestartDependenciesAcceptsCancellableContext(t *testing.T) {
+// TestValidateRollingRestartDependenciesAcceptsCancelableContext verifies that
+// actions.ValidateRollingRestartDependencies properly accepts and uses a cancelable context.
+func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T) {
 	// Create a mock client
 	mockClient := mockContainer.NewMockClient(t)
 
 	// Create a filter that accepts all containers
 	filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
 
-	// Test with cancellable context - context should not be cancelled
-	t.Run("cancellable context without cancellation", func(t *testing.T) {
+	// Test with cancelable context - context should not be canceled
+	t.Run("cancelable context without cancellation", func(t *testing.T) {
 		ctx := t.Context()
 
-		// Mock expects ListContainers to be called with the cancellable context
+		// Mock expects ListContainers to be called with the cancelable context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]types.Container{}, nil).Once()
 
 		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
@@ -1132,14 +1132,14 @@ func TestValidateRollingRestartDependenciesAcceptsCancellableContext(t *testing.
 		mockClient.AssertExpectations(t)
 	})
 
-	// Test that cancelled context is properly propagated
-	t.Run("cancelled context is propagated to client", func(t *testing.T) {
+	// Test that canceled context is properly propagated
+	t.Run("canceled context is propagated to client", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// Cancel immediately
 		cancel()
 
-		// Mock expects ListContainers to be called with cancelled context
+		// Mock expects ListContainers to be called with canceled context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.Canceled).Once()
 
 		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
@@ -1172,7 +1172,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancellableContext(t *testing.
 }
 
 // TestCreateSignalContext verifies that the signal-aware context is properly created
-// and can be cancelled via the stop function.
+// and can be canceled via the stop function.
 func TestCreateSignalContext(t *testing.T) {
 	// Save original and restore after test
 	originalCreateSignalContext := createSignalContext
@@ -1188,7 +1188,7 @@ func TestCreateSignalContext(t *testing.T) {
 		assert.Contains(t, signals, os.Interrupt, "Should include SIGINT")
 		assert.Contains(t, signals, syscall.SIGTERM, "Should include SIGTERM")
 
-		// Return a context that's cancelled via the cancel function
+		// Return a context that's canceled via the cancel function
 		return context.WithCancel(ctx)
 	}
 
@@ -1295,7 +1295,7 @@ func TestSignalContextWithMultipleSignals(t *testing.T) {
 }
 
 // TestSignalContextGracefulShutdown verifies that the context supports graceful
-// shutdown by not completing until explicitly cancelled.
+// shutdown by not completing until explicitly canceled.
 func TestSignalContextGracefulShutdown(t *testing.T) {
 	// Save original and restore after test
 	originalCreateSignalContext := createSignalContext

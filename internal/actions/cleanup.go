@@ -372,7 +372,7 @@ func removeExcessContainers(
 				case <-time.After(removalRetryDelay):
 					// continue to next retry attempt
 				case <-ctx.Done():
-					return 0, fmt.Errorf("context cancelled during retry delay: %w", ctx.Err())
+					return 0, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
 				}
 			}
 		}

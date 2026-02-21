@@ -1194,8 +1194,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				// Verify that the error wraps context cancellation
 				gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue())
-				// Verify error message contains "cancelled" (early check in Update uses "update cancelled")
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cancelled"))
+				// Verify error message contains "canceled" (early check in Update uses "update canceled")
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("canceled"))
 			})
 
 			ginkgo.It("should handle context cancellation with timeout during rolling restart", func() {
@@ -1255,9 +1255,9 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				// Verify that the error wraps context cancellation or deadline exceeded
 				gomega.Expect(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)).To(gomega.BeTrue())
-				// Verify error message contains "cancelled" or similar
+				// Verify error message contains "canceled" or similar
 				gomega.Expect(err.Error()).To(gomega.SatisfyAny(
-					gomega.ContainSubstring("cancelled"),
+					gomega.ContainSubstring("canceled"),
 					gomega.ContainSubstring("deadline"),
 				))
 			})

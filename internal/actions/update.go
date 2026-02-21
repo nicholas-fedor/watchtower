@@ -55,7 +55,7 @@ func Update(
 	// Check for context cancellation early
 	select {
 	case <-ctx.Done():
-		return nil, nil, fmt.Errorf("update cancelled: %w", ctx.Err())
+		return nil, nil, fmt.Errorf("update canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -420,7 +420,7 @@ func Update(
 		case <-time.After(delay):
 		case <-ctx.Done():
 			logrus.WithError(ctx.Err()).
-				Debug("Context cancelled during pull-failure delay; skipping remaining delay")
+				Debug("Context canceled during pull-failure delay; skipping remaining delay")
 		}
 	}
 
@@ -900,7 +900,7 @@ func performRollingRestart(
 		// Check for context cancellation to enable prompt exit when context is canceled.
 		select {
 		case <-ctx.Done():
-			return failed, fmt.Errorf("rolling restart cancelled: %w", ctx.Err())
+			return failed, fmt.Errorf("rolling restart canceled: %w", ctx.Err())
 		default:
 		}
 

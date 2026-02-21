@@ -166,7 +166,7 @@ var (
 	// createSignalContext is a function variable for creating a signal-aware context.
 	//
 	// It wraps signal.NotifyContext to allow overriding in tests for testing signal handling behavior.
-	// The function creates a context that is cancelled when the specified signals (SIGINT, SIGTERM) are received.
+	// The function creates a context that is canceled when the specified signals (SIGINT, SIGTERM) are received.
 	createSignalContext = signal.NotifyContext
 
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
@@ -543,7 +543,7 @@ func runMain(cfg types.RunConfig) int {
 		return metric
 	}
 
-	// Create a context that is automatically cancelled on SIGINT/SIGTERM signals,
+	// Create a context that is automatically canceled on SIGINT/SIGTERM signals,
 	// enabling graceful shutdown of the API, scheduler, and validation operations.
 	// The stop function is returned but not needed as the context automatically
 	// handles cleanup when the program exits.

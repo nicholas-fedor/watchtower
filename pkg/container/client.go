@@ -1193,7 +1193,7 @@ func (c client) waitForExecOrTimeout(
 			case <-time.After(1 * time.Second):
 				continue
 			case <-execCtx.Done():
-				return false, fmt.Errorf("exec cancelled: %w", execCtx.Err())
+				return false, fmt.Errorf("exec canceled: %w", execCtx.Err())
 			}
 		}
 

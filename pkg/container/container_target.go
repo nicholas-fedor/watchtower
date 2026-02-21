@@ -16,7 +16,7 @@ import (
 
 const (
 	// cleanupTimeout is the timeout for cleanup operations (e.g., container remove).
-	// Using a dedicated timeout ensures cleanup completes even if the parent context is cancelled.
+	// Using a dedicated timeout ensures cleanup completes even if the parent context is canceled.
 	cleanupTimeout = 10 * time.Second
 )
 

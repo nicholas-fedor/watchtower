@@ -1572,8 +1572,8 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.Describe("Context Propagation for Cleanup", func() {
-			ginkgo.It("performs cleanup with non-cancelled context when parent context is cancelled after rename failure", func() {
-				// Create a cancelled parent context
+			ginkgo.It("performs cleanup with non-canceled context when parent context is canceled after rename failure", func() {
+				// Create a canceled parent context
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately to simulate parent cancellation
 
@@ -1583,15 +1583,15 @@ var _ = ginkgo.Describe("Container", func() {
 					return renameErr
 				}
 
-				// Verify cleanup receives a non-cancelled context
+				// Verify cleanup receives a non-canceled context
 				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
 					// Track that removeFunc was invoked
 					client.removeFuncCalled.Store(true)
 
-					// The cleanup context should NOT be cancelled even though parent was cancelled
+					// The cleanup context should NOT be canceled even though parent was canceled
 					select {
 					case <-cleanupCtx.Done():
-						ginkgo.Fail("Cleanup context should not be cancelled - context.WithoutCancel should preserve the context")
+						ginkgo.Fail("Cleanup context should not be canceled - context.WithoutCancel should preserve the context")
 					default:
 					}
 
@@ -1618,7 +1618,7 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue(), "removeFunc was not invoked - cleanup was not executed")
 			})
 
-			ginkgo.It("performs cleanup with non-cancelled context when parent context is cancelled after network attachment failure", func() {
+			ginkgo.It("performs cleanup with non-canceled context when parent context is canceled after network attachment failure", func() {
 				// Set up container with multiple networks for legacy API path
 				container = MockContainer(
 					WithNetworkMode("bridge"),
@@ -1627,7 +1627,7 @@ var _ = ginkgo.Describe("Container", func() {
 				)
 				networkConfig = getNetworkConfig(container, "1.23")
 
-				// Create a cancelled parent context
+				// Create a canceled parent context
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately to simulate parent cancellation
 
@@ -1637,15 +1637,15 @@ var _ = ginkgo.Describe("Container", func() {
 					return connectErr
 				}
 
-				// Verify cleanup receives a non-cancelled context
+				// Verify cleanup receives a non-canceled context
 				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
 					// Track that removeFunc was invoked
 					client.removeFuncCalled.Store(true)
 
-					// The cleanup context should NOT be cancelled even though parent was cancelled
+					// The cleanup context should NOT be canceled even though parent was canceled
 					select {
 					case <-cleanupCtx.Done():
-						ginkgo.Fail("Cleanup context should not be cancelled - context.WithoutCancel should preserve the context")
+						ginkgo.Fail("Cleanup context should not be canceled - context.WithoutCancel should preserve the context")
 					default:
 					}
 

@@ -41,7 +41,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 		case <-time.After(updateWaitTimeout):
 			logrus.Warn("Timeout waiting for running update to finish, proceeding with shutdown.")
 		case <-ctx.Done():
-			logrus.Warn("Context cancelled while waiting for running update.")
+			logrus.Warn("Context canceled while waiting for running update.")
 		}
 	} else {
 		logrus.Debug("No update running, lock available.")

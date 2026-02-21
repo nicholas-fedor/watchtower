@@ -236,11 +236,11 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
 	// Cancel immediately
-	cancelledCtx, cancelFunc := context.WithCancel(ctx)
+	canceledCtx, cancelFunc := context.WithCancel(ctx)
 	cancelFunc()
 
 	err := scheduling.RunUpgradesOnSchedule(
-		cancelledCtx,
+		canceledCtx,
 		cmd,
 		filters.NoFilter,
 		"test filter",

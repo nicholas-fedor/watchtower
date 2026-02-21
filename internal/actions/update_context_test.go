@@ -19,17 +19,17 @@ var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("handling context cancellation and timeout scenarios", func() {
 		ginkgo.It("should handle context cancellation during container listing", func() {
 			client := mockActions.CreateMockClient(getCommonTestData(), false, false)
-			cancelledCtx, cancel := context.WithCancel(context.Background())
+			canceledCtx, cancel := context.WithCancel(context.Background())
 			cancel() // Cancel the context immediately
 
 			report, cleanupImageInfos, err := actions.Update(
-				cancelledCtx,
+				canceledCtx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("update cancelled"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("update canceled"))
 			gomega.Expect(report).To(gomega.BeNil())
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
@@ -110,8 +110,8 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 			t.Fatal("expected error")
 		}
 
-		if !strings.Contains(err.Error(), "update cancelled") {
-			t.Fatalf("expected 'update cancelled', got %s", err.Error())
+		if !strings.Contains(err.Error(), "update canceled") {
+			t.Fatalf("expected 'update canceled', got %s", err.Error())
 		}
 
 		if report != nil {
@@ -127,11 +127,11 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		client := mockActions.CreateMockClient(getCommonTestData(), false, false)
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		canceledCtx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel the context immediately
 
 		report, cleanupImageInfos, err := actions.Update(
-			cancelledCtx,
+			canceledCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 		)
@@ -142,8 +142,8 @@ func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 			t.Fatal("expected error")
 		}
 
-		if !strings.Contains(err.Error(), "update cancelled") {
-			t.Fatalf("expected 'update cancelled', got %s", err.Error())
+		if !strings.Contains(err.Error(), "update canceled") {
+			t.Fatalf("expected 'update canceled', got %s", err.Error())
 		}
 
 		if report != nil {
@@ -219,14 +219,14 @@ func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 			"test-container-03": true,
 		}
 
-		// Create client with pre-cancelled context
-		cancelledCtx, cancel := context.WithCancel(context.Background())
+		// Create client with pre-canceled context
+		canceledCtx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
 
-		client := mockActions.CreateMockClientWithContext(cancelledCtx, testData, false, false)
+		client := mockActions.CreateMockClientWithContext(canceledCtx, testData, false, false)
 
 		_, _, err := actions.Update(
-			cancelledCtx,
+			canceledCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 		)
@@ -297,7 +297,7 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 			name:                 "ListContainers context error",
 			errorToReturn:        context.Canceled,
 			containerStaleness:   nil,
-			expectedErrorPattern: "update cancelled",
+			expectedErrorPattern: "update canceled",
 		},
 		{
 			name:                 "StopContainer context error",
@@ -385,7 +385,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 			},
 		},
 		{
-			name: "WithCancel context immediately cancelled",
+			name: "WithCancel context immediately canceled",
 			contextSetup: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
@@ -454,7 +454,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 				}
 
 				// For background context, error is nil (already asserted above)
-				// For cancelled/expired contexts, error is expected
+				// For canceled/expired contexts, error is expected
 				if tc.name != "Background context should work" {
 					if err == nil {
 						t.Fatalf("Expected error for %s context, but got nil", tc.name)
@@ -465,7 +465,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 						!strings.Contains(err.Error(), "cancel") &&
 						!strings.Contains(err.Error(), "deadline") &&
 						!strings.Contains(err.Error(), "timeout") &&
-						!strings.Contains(err.Error(), "update cancelled") {
+						!strings.Contains(err.Error(), "update canceled") {
 						t.Fatalf("expected error to contain context-related keyword, got: %s", err)
 					}
 				}
