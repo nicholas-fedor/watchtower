@@ -1154,6 +1154,9 @@ func TestValidateRollingRestartDependenciesAcceptsCancellableContext(t *testing.
 		// Wait for context to timeout
 		time.Sleep(time.Millisecond)
 
+		// Verify context has expired before proceeding
+		require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+
 		// Mock expects ListContainers to be called with timed out context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
 
