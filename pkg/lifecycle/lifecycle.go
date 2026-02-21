@@ -11,6 +11,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// checkCommandTimeout is the timeout in minutes for check commands (pre/post check hooks).
+const checkCommandTimeout = 1
+
 // Errors for lifecycle hook execution.
 var (
 	// errPreUpdateFailed indicates a failure in executing the pre-update command.
@@ -109,7 +112,7 @@ func ExecutePreCheckCommand(ctx context.Context, client container.Client, contai
 	// unlike update commands which may perform complex operations and use configurable timeouts.
 	clog.WithField("command", command).Debug("Executing pre-check command")
 
-	_, err := client.ExecuteCommand(ctx, container, command, 1, effectiveUID, effectiveGID)
+	_, err := client.ExecuteCommand(ctx, container, command, checkCommandTimeout, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Pre-check command failed")
 	}
@@ -150,7 +153,7 @@ func ExecutePostCheckCommand(ctx context.Context, client container.Client, conta
 	// unlike update commands which may perform complex operations and use configurable timeouts.
 	clog.WithField("command", command).Debug("Executing post-check command")
 
-	_, err := client.ExecuteCommand(ctx, container, command, 1, effectiveUID, effectiveGID)
+	_, err := client.ExecuteCommand(ctx, container, command, checkCommandTimeout, effectiveUID, effectiveGID)
 	if err != nil {
 		clog.WithError(err).Debug("Post-check command failed")
 	}
