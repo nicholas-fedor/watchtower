@@ -210,13 +210,13 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 // is properly handled when starting containers.
 func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Create test data with no staleness (containers are fresh, will be started after stop)
+		// Create test data with stale containers (containers need to be stopped and restarted)
 		testData := getCommonTestData()
-		// Ensure no staleness by default (no containers are stale)
+		// Mark containers as stale so they will be stopped and restarted
 		testData.Staleness = map[string]bool{
-			"test-container-01": false,
-			"test-container-02": false,
-			"test-container-03": false,
+			"test-container-01": true,
+			"test-container-02": true,
+			"test-container-03": true,
 		}
 
 		// Create client with pre-cancelled context

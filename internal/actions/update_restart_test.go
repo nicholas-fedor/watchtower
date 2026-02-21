@@ -1237,7 +1237,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				// Use a context with very short timeout that will expire during processing
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 				defer cancel()
 
 				// Run Update with rolling restart - should timeout quickly

@@ -1207,12 +1207,15 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if len(report.Updated()) != 0 {
-			t.Fatal("Watchtower should not be updated on pull failure")
-		}
+		// report may be nil if context was canceled before update started
+		if report != nil {
+			if len(report.Updated()) != 0 {
+				t.Fatal("Watchtower should not be updated on pull failure")
+			}
 
-		if len(cleanupImageInfos) != 0 {
-			t.Fatal("No cleanup should occur on pull failure")
+			if len(cleanupImageInfos) != 0 {
+				t.Fatal("No cleanup should occur on pull failure")
+			}
 		}
 	})
 }

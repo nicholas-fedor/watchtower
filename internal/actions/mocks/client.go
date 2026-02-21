@@ -90,7 +90,7 @@ func CreateMockClientWithContext(
 // ListContainers returns containers from TestData, optionally filtered.
 func (client MockClient) ListContainers(_ context.Context, filter ...types.Filter) ([]types.Container, error) {
 	// Simulate mid-operation delay for context cancellation testing
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	if client.ctx != nil {
 		select {
@@ -128,7 +128,7 @@ func (client MockClient) StopContainer(_ context.Context, c types.Container, _ t
 	client.TestData.StopContainerCount++
 
 	// Simulate mid-operation delay for context cancellation testing
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	if client.ctx != nil {
 		select {
@@ -276,7 +276,7 @@ func (client MockClient) IsContainerStale(
 	client.TestData.IsContainerStaleCount++
 
 	// Simulate mid-operation delay for context cancellation testing
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	if client.ctx != nil {
 		select {
