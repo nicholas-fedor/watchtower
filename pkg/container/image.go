@@ -227,38 +227,50 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 
 	// Log removal details if debug is enabled.
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		deleted := strings.Builder{}
-		untagged := strings.Builder{}
-
-		for _, item := range items {
-			if item.Deleted != "" {
-				if deleted.Len() > 0 {
-					deleted.WriteString(", ")
-				}
-
-				deleted.WriteString(types.ImageID(item.Deleted).ShortID())
-			}
-
-			if item.Untagged != "" {
-				if untagged.Len() > 0 {
-					untagged.WriteString(", ")
-				}
-
-				untagged.WriteString(types.ImageID(item.Untagged).ShortID())
-			}
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"deleted":    deleted.String(),
-			"image_id":   imageID.ShortID(),
-			"image_name": imageName,
-			"untagged":   untagged.String(),
-		}).Debug("Image removal details")
+		logImageRemovalDetails(items, imageID, imageName)
 	}
 
 	clog.Debug("Cleaned up old image")
 
 	return nil
+}
+
+// logImageRemovalDetails logs detailed information about image removal.
+//
+// It builds strings of deleted and untagged image IDs and logs them at debug level.
+//
+// Parameters:
+//   - items: Response items from the image removal operation.
+//   - imageID: ID of the image that was removed.
+//   - imageName: Name of the image that was removed.
+func logImageRemovalDetails(items []dockerImage.DeleteResponse, imageID types.ImageID, imageName string) {
+	deleted := strings.Builder{}
+	untagged := strings.Builder{}
+
+	for _, item := range items {
+		if item.Deleted != "" {
+			if deleted.Len() > 0 {
+				deleted.WriteString(", ")
+			}
+
+			deleted.WriteString(types.ImageID(item.Deleted).ShortID())
+		}
+
+		if item.Untagged != "" {
+			if untagged.Len() > 0 {
+				untagged.WriteString(", ")
+			}
+
+			untagged.WriteString(types.ImageID(item.Untagged).ShortID())
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"deleted":    deleted.String(),
+		"image_id":   imageID.ShortID(),
+		"image_name": imageName,
+		"untagged":   untagged.String(),
+	}).Debug("Image removal details")
 }
 
 // newImageClient creates a new imageClient instance.
