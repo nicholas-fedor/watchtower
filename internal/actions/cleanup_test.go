@@ -1533,6 +1533,234 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 			gomega.Expect(removeInfos).To(gomega.BeEmpty())
 		})
 	})
+
+	ginkgo.When("context cancellation during retry delay", func() {
+		ginkgo.It("should return immediately when context is cancelled during retry delay", func() {
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			excessContainer := createMockContainer(
+				"excess",
+				"excess",
+				"image1",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{},
+			)
+			currentContainer := createMockContainer(
+				"current",
+				"current",
+				"image2",
+				true,
+				false,
+				time.Now(),
+				map[string]string{},
+			)
+
+			// Create a cancelled context
+			ctx, cancel := context.WithCancel(context.Background())
+			// Cancel immediately to simulate cancellation during retry delay
+			cancel()
+
+			// First call fails, triggering retry with context cancellation
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
+				Return(errors.New("container stop failed")).
+				Times(1)
+
+			removed, err := removeExcessContainers(
+				ctx,
+				mockClient,
+				[]types.Container{excessContainer},
+				false,
+				currentContainer,
+				nil,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("context cancelled during retry delay"))
+			gomega.Expect(removed).To(gomega.Equal(0))
+		})
+
+		ginkgo.It("should return immediately when context times out during retry delay", func() {
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			excessContainer := createMockContainer(
+				"excess",
+				"excess",
+				"image1",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{},
+			)
+			currentContainer := createMockContainer(
+				"current",
+				"current",
+				"image2",
+				true,
+				false,
+				time.Now(),
+				map[string]string{},
+			)
+
+			// Create a context with very short timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+			defer cancel()
+
+			// Wait for context to expire (ensuring it expires during retry delay)
+			// First call fails, triggering retry with expired context
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
+				Return(errors.New("container stop failed")).
+				Times(1)
+
+			removed, err := removeExcessContainers(
+				ctx,
+				mockClient,
+				[]types.Container{excessContainer},
+				false,
+				currentContainer,
+				nil,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("context cancelled during retry delay"))
+			gomega.Expect(removed).To(gomega.Equal(0))
+		})
+
+		ginkgo.It("should proceed with retry after delay when context is not cancelled", func() {
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			excessContainer := createMockContainer(
+				"excess",
+				"excess",
+				"image1",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{},
+			)
+			currentContainer := createMockContainer(
+				"current",
+				"current",
+				"image2",
+				true,
+				false,
+				time.Now(),
+				map[string]string{},
+			)
+
+			// First call fails, second call succeeds after retry delay
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
+				Return(errors.New("container stop failed")).
+				Times(1)
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
+				Return(nil).
+				Times(1)
+
+			removed, err := removeExcessContainers(
+				context.Background(),
+				mockClient,
+				[]types.Container{excessContainer},
+				false,
+				currentContainer,
+				nil,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(removed).To(gomega.Equal(1))
+		})
+
+		ginkgo.It("should retry multiple times before succeeding when context is not cancelled", func() {
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			excessContainer := createMockContainer(
+				"excess",
+				"excess",
+				"image1",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{},
+			)
+			currentContainer := createMockContainer(
+				"current",
+				"current",
+				"image2",
+				true,
+				false,
+				time.Now(),
+				map[string]string{},
+			)
+
+			// First two attempts fail, third attempt succeeds
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
+				Return(errors.New("container stop failed")).
+				Times(2)
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
+				Return(nil).
+				Times(1)
+
+			removed, err := removeExcessContainers(
+				context.Background(),
+				mockClient,
+				[]types.Container{excessContainer},
+				false,
+				currentContainer,
+				nil,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(removed).To(gomega.Equal(1))
+		})
+
+		ginkgo.It("should fail after max attempts when context is never cancelled", func() {
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			excessContainer := createMockContainer(
+				"excess",
+				"excess",
+				"image1",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{},
+			)
+			currentContainer := createMockContainer(
+				"current",
+				"current",
+				"image2",
+				true,
+				false,
+				time.Now(),
+				map[string]string{},
+			)
+
+			// All three attempts fail
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
+				Return(errors.New("container stop failed")).
+				Times(3)
+
+			removed, err := removeExcessContainers(
+				context.Background(),
+				mockClient,
+				[]types.Container{excessContainer},
+				false,
+				currentContainer,
+				nil,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("1 of 1 instances failed to stop"))
+			gomega.Expect(removed).To(gomega.Equal(0))
+		})
+	})
 })
 
 var _ = ginkgo.Describe("containerNames", func() {

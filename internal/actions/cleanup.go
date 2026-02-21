@@ -368,7 +368,12 @@ func removeExcessContainers(
 			}).Debug("Failed to stop and remove container")
 
 			if attempt < maxRemovalAttempts-1 {
-				time.Sleep(removalRetryDelay)
+				select {
+				case <-time.After(removalRetryDelay):
+					// continue to next retry attempt
+				case <-ctx.Done():
+					return 0, fmt.Errorf("context cancelled during retry delay: %w", ctx.Err())
+				}
 			}
 		}
 
