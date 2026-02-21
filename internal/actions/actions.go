@@ -561,29 +561,29 @@ func sendSplitNotifications(
 			Debug("Split notifications: sending report notifications for updated containers")
 
 		// Send individual report notifications for each updated container
-		for _, c := range result.Updated() {
+		for _, report := range result.Updated() {
 			// Skip nil container reports
-			if c == nil {
+			if report == nil {
 				logrus.Debug("Encountered nil updated container report, skipping")
 
 				continue
 			}
 
 			// Skip containers with empty names
-			if strings.TrimSpace(c.Name()) == "" {
-				logrus.WithField("container_id", c.ID().ShortID()).
+			if strings.TrimSpace(report.Name()) == "" {
+				logrus.WithField("container_id", report.ID().ShortID()).
 					Debug("Encountered container with empty name, skipping notification")
 
 				continue
 			}
 
-			containerID := string(c.ID())
+			containerID := string(report.ID())
 			if notified[containerID] {
 				// Skip notification if already sent for this container ID
 				continue
 			}
 
-			singleContainerReport := buildSingleContainerReport(c, result)
+			singleContainerReport := buildSingleContainerReport(report, result)
 			if notifier.ShouldSendNotification(singleContainerReport) {
 				notifier.SendNotification(singleContainerReport)
 			}
