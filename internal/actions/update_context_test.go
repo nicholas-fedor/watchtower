@@ -266,14 +266,8 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 
 		synctest.Wait()
 
-		// This is a smoke test to verify the update operation tolerates a zero-timeout context.
-		// No strict assertions are made on err, report, or cleanupImageInfos because the timeout
-		// behavior may be non-deterministic depending on implementation details. The context may
-		// expire before or during operations, resulting in varying outcomes. This test serves as
-		// a safety check to ensure the code doesn't panic when handling immediate timeouts.
-		if err == nil {
-			t.Logf("Warning: expected error due to timeout, but got none")
-		}
+		// Smoke test: ensure no panic occurs when handling zero-timeout context
+		_ = err
 	})
 }
 
@@ -316,12 +310,18 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 
 				// Set the error to return based on test case
 				switch {
-				case tc.name == "ListContainers context error":
+				case strings.Contains(tc.name, "ListContainers"):
 					client.TestData.ListContainersError = tc.errorToReturn
 				case strings.Contains(tc.name, "StopContainer"):
 					client.TestData.StopContainerError = tc.errorToReturn
 				case strings.Contains(tc.name, "StartContainer"):
 					client.TestData.StartContainerError = tc.errorToReturn
+				default:
+					// Clear all error fields for unknown test cases to prevent stale errors
+					// from previous test runs affecting the current test
+					client.TestData.ListContainersError = nil
+					client.TestData.StopContainerError = nil
+					client.TestData.StartContainerError = nil
 				}
 
 				report, cleanupImageInfos, err := actions.Update(
@@ -459,7 +459,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 						!strings.Contains(err.Error(), "deadline") &&
 						!strings.Contains(err.Error(), "timeout") &&
 						!strings.Contains(err.Error(), "update cancelled") {
-						t.Logf("Got error: %s", err.Error())
+						t.Fatalf("expected error to contain context-related keyword, got: %s", err)
 					}
 				}
 
