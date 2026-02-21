@@ -151,13 +151,13 @@ func (client MockClient) StopContainer(_ context.Context, c types.Container, _ t
 
 // StopAndRemoveContainer simulates stopping and removing a container by calling StopContainer followed by RemoveContainer.
 // It properly simulates the stop-and-remove operation sequence while respecting error conditions.
-func (client MockClient) StopAndRemoveContainer(_ context.Context, c types.Container, timeout time.Duration) error {
-	err := client.StopContainer(context.Background(), c, timeout)
+func (client MockClient) StopAndRemoveContainer(ctx context.Context, c types.Container, timeout time.Duration) error {
+	err := client.StopContainer(ctx, c, timeout)
 	if err != nil {
 		return err
 	}
 
-	return client.RemoveContainer(context.Background(), c)
+	return client.RemoveContainer(ctx, c)
 }
 
 // IsContainerRunning checks if a container is running based on the Stopped map.
