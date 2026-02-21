@@ -223,23 +223,23 @@ func buildDependencyGraph(
 	}
 
 	// Check for identifier collisions
-	for identifier, containers := range tempMap {
-		if len(containers) > 1 {
+	for identifier, dupContainers := range tempMap {
+		if len(dupContainers) > 1 {
 			logrus.Errorf(
 				"Identifier collision detected: '%s' used by multiple containers: %v",
 				identifier,
-				containers,
+				dupContainers,
 			)
 
 			return nil, nil, nil, nil, IdentifierCollisionError{
 				DuplicateIdentifier: identifier,
-				AffectedContainers:  containers,
+				AffectedContainers:  dupContainers,
 			}
 		}
 		// No collision, populate maps
-		containerMap[identifier] = containers[0]
+		containerMap[identifier] = dupContainers[0]
 		indegree[identifier] = 0
-		normalizedMap[containers[0]] = identifier
+		normalizedMap[dupContainers[0]] = identifier
 	}
 
 	// Build the graph by processing container links (dependencies)
