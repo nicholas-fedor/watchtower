@@ -14,10 +14,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
@@ -1102,5 +1104,63 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 		// Ensure the manual update completes
 		<-updateFinished
+	})
+}
+
+// TestValidateRollingRestartDependenciesAcceptsCancellableContext verifies that
+// actions.ValidateRollingRestartDependencies properly accepts and uses a cancellable context.
+func TestValidateRollingRestartDependenciesAcceptsCancellableContext(t *testing.T) {
+	// Create a mock client
+	mockClient := mockContainer.NewMockClient(t)
+
+	// Create a filter that accepts all containers
+	filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
+
+	// Test with cancellable context - context should not be cancelled
+	t.Run("cancellable context without cancellation", func(t *testing.T) {
+		ctx := t.Context()
+
+		// Mock expects ListContainers to be called with the cancellable context
+		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]types.Container{}, nil).Once()
+
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+
+		require.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	// Test that cancelled context is properly propagated
+	t.Run("cancelled context is propagated to client", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Cancel immediately
+		cancel()
+
+		// Mock expects ListContainers to be called with cancelled context
+		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.Canceled).Once()
+
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+
+		// The function should return the error from ListContainers
+		require.Error(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	// Test with timeout context
+	t.Run("timeout context is propagated to client", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+		defer cancel()
+
+		// Wait for context to timeout
+		time.Sleep(time.Millisecond)
+
+		// Mock expects ListContainers to be called with timed out context
+		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
+
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+
+		// The function should return the error from ListContainers
+		require.Error(t, err)
+		mockClient.AssertExpectations(t)
 	})
 }

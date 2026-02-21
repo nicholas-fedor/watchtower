@@ -535,10 +535,15 @@ func runMain(cfg types.RunConfig) int {
 		return metric
 	}
 
+	// Create a cancellable context for managing API and scheduler shutdown,
+	// as well as validation operations that may need cancellation.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
 	if rollingRestart {
-		err := actions.ValidateRollingRestartDependencies(context.Background(), client, cfg.Filter)
+		err := actions.ValidateRollingRestartDependencies(ctx, client, cfg.Filter)
 		if err != nil {
 			logNotify("Rolling restart compatibility validation failed", err)
 
@@ -568,7 +573,7 @@ func runMain(cfg types.RunConfig) int {
 			MonitorOnly:    monitorOnly,
 			SkipSelfUpdate: false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
 		}
-		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, params)
+		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
 
@@ -582,7 +587,7 @@ func runMain(cfg types.RunConfig) int {
 				},
 			}
 
-			err := client.UpdateContainer(context.Background(), currentWatchtowerContainer, updateConfig)
+			err := client.UpdateContainer(ctx, currentWatchtowerContainer, updateConfig)
 			if err != nil {
 				logrus.WithError(err).
 					Warn("Failed to update restart policy to 'no' for current container")
@@ -601,7 +606,7 @@ func runMain(cfg types.RunConfig) int {
 
 	// Check for and cleanup excess Watchtower instances within scope.
 	totalRemovedInstances, err := actions.RemoveExcessWatchtowerInstances(
-		context.Background(),
+		ctx,
 		client,
 		cleanup,
 		scope,
@@ -632,10 +637,6 @@ func runMain(cfg types.RunConfig) int {
 
 		logrus.Debug("Disabled update-on-start due to cleanup of excess Watchtower instances")
 	}
-
-	// Create a cancellable context for managing API and scheduler shutdown.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Configure and start the HTTP API, handling any startup errors.
 	err = api.SetupAndStartAPI(
