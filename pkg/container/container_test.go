@@ -1570,5 +1570,99 @@ var _ = ginkgo.Describe("Container", func() {
 			gomega.Expect(logOutput.String()).
 				To(gomega.ContainSubstring("Failed to attach additional network"))
 		})
+
+		ginkgo.Describe("Context Propagation for Cleanup", func() {
+			ginkgo.It("performs cleanup with non-cancelled context when parent context is cancelled after rename failure", func() {
+				// Create a cancelled parent context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately to simulate parent cancellation
+
+				// Set up rename to fail, triggering cleanup path
+				renameErr := errors.New("rename failed")
+				client.renameFunc = func(_ context.Context, _, _ string) error {
+					return renameErr
+				}
+
+				// Verify cleanup receives a non-cancelled context
+				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+					// The cleanup context should NOT be cancelled even though parent was cancelled
+					select {
+					case <-cleanupCtx.Done():
+						ginkgo.Fail("Cleanup context should not be cancelled - context.WithoutCancel should preserve the context")
+					default:
+					}
+
+					return nil
+				}
+
+				newID, err := StartTargetContainer(
+					ctx,
+					client,
+					container,
+					networkConfig,
+					true,
+					"1.44",
+					flags.DockerAPIMinVersion,
+					false,
+					"auto",
+					false,
+				)
+				gomega.Expect(newID).To(gomega.BeEmpty())
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("rename failed"))
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Failed to rename container"))
+			})
+
+			ginkgo.It("performs cleanup with non-cancelled context when parent context is cancelled after network attachment failure", func() {
+				// Set up container with multiple networks for legacy API path
+				container = MockContainer(
+					WithNetworkMode("bridge"),
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworks("network1", "network2"),
+				)
+				networkConfig = getNetworkConfig(container, "1.23")
+
+				// Create a cancelled parent context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately to simulate parent cancellation
+
+				// Set up network connect to fail, triggering cleanup path
+				connectErr := errors.New("network connect failed")
+				client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) error {
+					return connectErr
+				}
+
+				// Verify cleanup receives a non-cancelled context
+				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+					// The cleanup context should NOT be cancelled even though parent was cancelled
+					select {
+					case <-cleanupCtx.Done():
+						ginkgo.Fail("Cleanup context should not be cancelled - context.WithoutCancel should preserve the context")
+					default:
+					}
+
+					return nil
+				}
+
+				newID, err := StartTargetContainer(
+					ctx,
+					client,
+					container,
+					networkConfig,
+					true,
+					"1.23",
+					flags.DockerAPIMinVersion,
+					false,
+					"auto",
+					false,
+				)
+				gomega.Expect(newID).To(gomega.BeEmpty())
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("network connect failed"))
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Failed to attach additional network"))
+			})
+		})
 	})
 })

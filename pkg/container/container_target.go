@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
@@ -11,6 +12,12 @@ import (
 	dockerNetwork "github.com/docker/docker/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+const (
+	// cleanupTimeout is the timeout for cleanup operations (e.g., container remove).
+	// Using a dedicated timeout ensures cleanup completes even if the parent context is cancelled.
+	cleanupTimeout = 10 * time.Second
 )
 
 // StartTargetContainer creates and starts a new container based on the source container’s configuration.
@@ -124,9 +131,13 @@ func StartTargetContainer(
 	err = api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name())
 	if err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
+
 		// Clean up the created container to avoid orphaned resources
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+		defer cancel()
+
 		rmErr := api.ContainerRemove(
-			ctx,
+			cleanupCtx,
 			createdContainer.ID,
 			dockerContainer.RemoveOptions{Force: true},
 		)
@@ -149,8 +160,11 @@ func StartTargetContainer(
 		)
 		if err != nil {
 			// Clean up the created container to avoid orphaned resources.
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+			defer cancel()
+
 			rmErr := api.ContainerRemove(
-				ctx,
+				cleanupCtx,
 				createdContainer.ID,
 				dockerContainer.RemoveOptions{Force: true},
 			)
