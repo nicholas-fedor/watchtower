@@ -104,7 +104,9 @@ func ExecutePreCheckCommand(ctx context.Context, client container.Client, contai
 		return
 	}
 
-	// Execute command with default timeout.
+	// Execute command with fixed short timeout (1 minute).
+	// Check commands are lightweight health checks that should complete quickly,
+	// unlike update commands which may perform complex operations and use configurable timeouts.
 	clog.WithField("command", command).Debug("Executing pre-check command")
 
 	_, err := client.ExecuteCommand(ctx, container, command, 1, effectiveUID, effectiveGID)
@@ -143,7 +145,9 @@ func ExecutePostCheckCommand(ctx context.Context, client container.Client, conta
 		return
 	}
 
-	// Execute command with default timeout.
+	// Execute command with fixed short timeout (1 minute).
+	// Check commands are lightweight health checks that should complete quickly,
+	// unlike update commands which may perform complex operations and use configurable timeouts.
 	clog.WithField("command", command).Debug("Executing post-check command")
 
 	_, err := client.ExecuteCommand(ctx, container, command, 1, effectiveUID, effectiveGID)
