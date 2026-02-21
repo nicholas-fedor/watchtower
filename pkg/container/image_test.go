@@ -118,6 +118,47 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 	})
+	ginkgo.When("the context is canceled", func() {
+		ginkgo.Describe("IsContainerStale", func() {
+			ginkgo.It("should return context.Canceled error", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+
+				// Create a canceled context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately
+
+				c := client{api: docker}
+
+				_, _, err := c.IsContainerStale(
+					ctx,
+					container,
+					types.UpdateParams{NoPull: true},
+				)
+				gomega.Expect(err).To(gomega.MatchError(context.Canceled))
+			})
+		})
+		ginkgo.Describe("RemoveImageByID", func() {
+			ginkgo.It("should return context.Canceled error", func() {
+				imageID := util.GenerateRandomSHA256()
+
+				// Create a canceled context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately
+
+				c := client{api: docker}
+
+				err := c.RemoveImageByID(ctx, types.ImageID(imageID), "test-image")
+				gomega.Expect(err).To(gomega.MatchError(context.Canceled))
+			})
+		})
+	})
 	ginkgo.When("checking container staleness with no-pull", func() {
 		ginkgo.When("no newer local image exists", func() {
 			ginkgo.It("should return false and current image ID", func() {
