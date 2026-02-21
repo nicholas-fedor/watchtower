@@ -721,8 +721,8 @@ func linkedIdentifierMarkedForRestart(
 
 // getProject extracts the project name from a container's compose project label.
 func getProject(c types.Container) string {
-	if container, ok := c.(*container.Container); ok {
-		if info := container.ContainerInfo(); info != nil && info.Config != nil {
+	if monitoredContainer, ok := c.(*container.Container); ok {
+		if info := monitoredContainer.ContainerInfo(); info != nil && info.Config != nil {
 			project := compose.GetProjectName(info.Config.Labels)
 			if project != "" {
 				return project
