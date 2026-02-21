@@ -258,7 +258,10 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 
 		client := mockActions.CreateMockClientWithContext(shortCtx, testData, false, false)
 
-		_, _, err := actions.Update(
+		// Capture start time to verify the call completes within a reasonable bound
+		start := time.Now()
+
+		report, _, err := actions.Update(
 			shortCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -266,8 +269,18 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 
 		synctest.Wait()
 
+		elapsed := time.Since(start)
+
 		// Smoke test: ensure no panic occurs when handling zero-timeout context
-		_ = err
+		// Verify the call completed within a reasonable time bound (not hanging)
+		if elapsed > 5*time.Second {
+			t.Fatalf("Update call took too long (%v), expected to complete quickly with zero-timeout context", elapsed)
+		}
+
+		// Assert that at least one of the outputs is non-nil
+		if err == nil && report == nil {
+			t.Fatalf("Expected either error or report to be non-nil, got err=%v and report=%v", err, report)
+		}
 	})
 }
 
@@ -316,12 +329,6 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 					client.TestData.StopContainerError = tc.errorToReturn
 				case strings.Contains(tc.name, "StartContainer"):
 					client.TestData.StartContainerError = tc.errorToReturn
-				default:
-					// Clear all error fields for unknown test cases to prevent stale errors
-					// from previous test runs affecting the current test
-					client.TestData.ListContainersError = nil
-					client.TestData.StopContainerError = nil
-					client.TestData.StartContainerError = nil
 				}
 
 				report, cleanupImageInfos, err := actions.Update(
