@@ -299,12 +299,16 @@ func WithAutoRemove(autoRemove bool) MockContainerUpdate {
 
 // MockClient is a mock implementation of the Operations interface for testing container operations.
 type MockClient struct {
-	createFunc       func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerContainer.CreateResponse, error)
-	startFunc        func(context.Context, string, dockerContainer.StartOptions) error
-	removeFunc       func(context.Context, string, dockerContainer.RemoveOptions) error
-	connectFunc      func(context.Context, string, string, *dockerNetwork.EndpointSettings) error
-	renameFunc       func(context.Context, string, string) error
-	removeFuncCalled atomic.Bool
+	createFunc        func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerContainer.CreateResponse, error)
+	startFunc         func(context.Context, string, dockerContainer.StartOptions) error
+	removeFunc        func(context.Context, string, dockerContainer.RemoveOptions) error
+	connectFunc       func(context.Context, string, string, *dockerNetwork.EndpointSettings) error
+	renameFunc        func(context.Context, string, string) error
+	removeFuncCalled  atomic.Bool
+	createFuncCalled  atomic.Bool
+	startFuncCalled   atomic.Bool
+	connectFuncCalled atomic.Bool
+	renameFuncCalled  atomic.Bool
 }
 
 // ContainerCreate mocks the creation of a new container.
@@ -328,6 +332,8 @@ func (m *MockClient) ContainerCreate(
 	platform *ocispec.Platform,
 	containerName string,
 ) (dockerContainer.CreateResponse, error) {
+	m.createFuncCalled.Store(true)
+
 	if m.createFunc != nil {
 		return m.createFunc(ctx, config, hostConfig, networkingConfig, platform, containerName)
 	}
@@ -349,6 +355,8 @@ func (m *MockClient) ContainerStart(
 	containerID string,
 	options dockerContainer.StartOptions,
 ) error {
+	m.startFuncCalled.Store(true)
+
 	if m.startFunc != nil {
 		return m.startFunc(ctx, containerID, options)
 	}
@@ -370,6 +378,8 @@ func (m *MockClient) ContainerRemove(
 	containerID string,
 	options dockerContainer.RemoveOptions,
 ) error {
+	m.removeFuncCalled.Store(true)
+
 	if m.removeFunc != nil {
 		return m.removeFunc(ctx, containerID, options)
 	}
@@ -392,6 +402,8 @@ func (m *MockClient) NetworkConnect(
 	networkID, containerID string,
 	config *dockerNetwork.EndpointSettings,
 ) error {
+	m.connectFuncCalled.Store(true)
+
 	if m.connectFunc != nil {
 		return m.connectFunc(ctx, networkID, containerID, config)
 	}
@@ -412,6 +424,8 @@ func (m *MockClient) ContainerRename(
 	ctx context.Context,
 	containerID, newContainerName string,
 ) error {
+	m.renameFuncCalled.Store(true)
+
 	if m.renameFunc != nil {
 		return m.renameFunc(ctx, containerID, newContainerName)
 	}
