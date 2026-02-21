@@ -28,6 +28,13 @@ import (
 const (
 	// CPUCopyModeAuto indicates automatic detection of container runtime for CPU copying behavior.
 	CPUCopyModeAuto = "auto"
+
+	// DaemonInitTimeout is the default timeout for Docker daemon initialization operations.
+	// This timeout applies to initial connection, ping, API version negotiation, and
+	// server version retrieval during client initialization.
+	// The value is 30 seconds, which should be sufficient for most Docker daemon
+	// initialization scenarios while preventing indefinite hangs.
+	DaemonInitTimeout = 30 * time.Second
 )
 
 // Errors for container health operations.
@@ -264,7 +271,9 @@ type ClientOptions struct {
 // Returns:
 //   - Client: Initialized client instance (exits on failure).
 func NewClient(opts ClientOptions) Client {
-	ctx := context.Background()
+	// Use a timeout context for Docker daemon initialization to prevent indefinite hangs.
+	ctx, cancel := context.WithTimeout(context.Background(), DaemonInitTimeout)
+	defer cancel()
 
 	// Initialize client with autonegotiation, ignoring DOCKER_API_VERSION initially.
 	cli, err := dockerClient.NewClientWithOpts(

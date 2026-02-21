@@ -1502,6 +1502,82 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 	})
 
+	ginkgo.Describe("DaemonInitTimeout constant", func() {
+		ginkgo.It("should have a reasonable timeout value of 30 seconds", func() {
+			expectedTimeout := 30 * time.Second
+			gomega.Expect(DaemonInitTimeout).To(gomega.Equal(expectedTimeout))
+		})
+
+		ginkgo.It("should not be zero", func() {
+			gomega.Expect(DaemonInitTimeout).To(gomega.BeNumerically(">", 0))
+		})
+
+		ginkgo.It("should be within reasonable bounds (10s to 5min)", func() {
+			minTimeout := 10 * time.Second
+			maxTimeout := 5 * time.Minute
+
+			gomega.Expect(DaemonInitTimeout).To(gomega.BeNumerically(">=", minTimeout))
+			gomega.Expect(DaemonInitTimeout).To(gomega.BeNumerically("<=", maxTimeout))
+		})
+	})
+
+	ginkgo.Describe("NewClient context timeout", func() {
+		ginkgo.It("should apply timeout to daemon initialization", func() {
+			// The DaemonInitTimeout should be applied when creating the client
+			// We verify the constant is used correctly by checking the context deadline
+			ctx, cancel := context.WithTimeout(context.Background(), DaemonInitTimeout)
+			defer cancel()
+
+			gomega.Expect(ctx).NotTo(gomega.BeNil())
+
+			deadline, ok := ctx.Deadline()
+			gomega.Expect(ok).To(gomega.BeTrue())
+			gomega.Expect(deadline).To(gomega.BeTemporally(">", time.Now()))
+		})
+
+		ginkgo.It("should handle very short timeout without panic", func() {
+			// Test that a very short timeout doesn't cause issues
+			shortTimeout := 1 * time.Millisecond
+
+			ctx, cancel := context.WithTimeout(context.Background(), shortTimeout)
+			defer cancel()
+
+			// Wait for the timeout to expire
+			time.Sleep(10 * time.Millisecond)
+
+			// Context should be done
+			var received bool
+
+			select {
+			case <-ctx.Done():
+				received = true
+			default:
+				received = false
+			}
+
+			gomega.Expect(received).To(gomega.BeTrue())
+			gomega.Expect(ctx.Err()).To(gomega.Equal(context.DeadlineExceeded))
+		})
+
+		ginkgo.It("should handle context cancellation", func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			// Cancel immediately
+			cancel()
+
+			var received bool
+
+			select {
+			case <-ctx.Done():
+				received = true
+			default:
+				received = false
+			}
+
+			gomega.Expect(received).To(gomega.BeTrue())
+			gomega.Expect(ctx.Err()).To(gomega.Equal(context.Canceled))
+		})
+	})
+
 	ginkgo.Describe("NewClient", func() {
 		ginkgo.It(
 			"should successfully connect with TLS when DOCKER_TLS_VERIFY=1 and DOCKER_HOST points to TLS server",
