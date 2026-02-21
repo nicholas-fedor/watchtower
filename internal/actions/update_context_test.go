@@ -446,8 +446,14 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 					}
 				}
 
-				// For cancelled/expired contexts, error or failure is expected
-				if err != nil {
+				// For background context, error is nil (already asserted above)
+				// For cancelled/expired contexts, error is expected
+				if tc.name != "Background context should work" {
+					if err == nil {
+						t.Fatalf("Expected error for %s context, but got nil", tc.name)
+					}
+
+					// Verify the error message contains context-related keywords
 					if !strings.Contains(err.Error(), "context") &&
 						!strings.Contains(err.Error(), "cancel") &&
 						!strings.Contains(err.Error(), "deadline") &&
@@ -457,6 +463,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 					}
 				}
 
+				// Keep cleanupImageInfos for potential cleanup assertions
 				_ = cleanupImageInfos
 			})
 		})
