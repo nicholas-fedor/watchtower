@@ -1585,6 +1585,9 @@ var _ = ginkgo.Describe("Container", func() {
 
 				// Verify cleanup receives a non-cancelled context
 				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+					// Track that removeFunc was invoked
+					client.removeFuncCalled.Store(true)
+
 					// The cleanup context should NOT be cancelled even though parent was cancelled
 					select {
 					case <-cleanupCtx.Done():
@@ -1612,6 +1615,7 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("rename failed"))
 				gomega.Expect(logOutput.String()).
 					To(gomega.ContainSubstring("Failed to rename container"))
+				gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue(), "removeFunc was not invoked - cleanup was not executed")
 			})
 
 			ginkgo.It("performs cleanup with non-cancelled context when parent context is cancelled after network attachment failure", func() {
@@ -1635,6 +1639,9 @@ var _ = ginkgo.Describe("Container", func() {
 
 				// Verify cleanup receives a non-cancelled context
 				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+					// Track that removeFunc was invoked
+					client.removeFuncCalled.Store(true)
+
 					// The cleanup context should NOT be cancelled even though parent was cancelled
 					select {
 					case <-cleanupCtx.Done():
@@ -1662,6 +1669,7 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("network connect failed"))
 				gomega.Expect(logOutput.String()).
 					To(gomega.ContainSubstring("Failed to attach additional network"))
+				gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue(), "removeFunc was not invoked - cleanup was not executed")
 			})
 		})
 	})

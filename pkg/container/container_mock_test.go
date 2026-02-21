@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -298,11 +299,12 @@ func WithAutoRemove(autoRemove bool) MockContainerUpdate {
 
 // MockClient is a mock implementation of the Operations interface for testing container operations.
 type MockClient struct {
-	createFunc  func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerContainer.CreateResponse, error)
-	startFunc   func(context.Context, string, dockerContainer.StartOptions) error
-	removeFunc  func(context.Context, string, dockerContainer.RemoveOptions) error
-	connectFunc func(context.Context, string, string, *dockerNetwork.EndpointSettings) error
-	renameFunc  func(context.Context, string, string) error
+	createFunc       func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerContainer.CreateResponse, error)
+	startFunc        func(context.Context, string, dockerContainer.StartOptions) error
+	removeFunc       func(context.Context, string, dockerContainer.RemoveOptions) error
+	connectFunc      func(context.Context, string, string, *dockerNetwork.EndpointSettings) error
+	renameFunc       func(context.Context, string, string) error
+	removeFuncCalled atomic.Bool
 }
 
 // ContainerCreate mocks the creation of a new container.
