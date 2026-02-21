@@ -2,6 +2,7 @@ package actions_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -1133,6 +1134,181 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(duration).To(gomega.BeNumerically("<", 2*time.Second))
 				},
 			)
+		})
+
+		ginkgo.When("testing context cancellation in rolling restart", func() {
+			ginkgo.It("should return early with context cancellation error when context is canceled before processing", func() {
+				// Create multiple containers that would need rolling restart
+				container1 := mockActions.CreateMockContainerWithConfig(
+					"container-1",
+					"/container-1",
+					"image-1:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				container2 := mockActions.CreateMockContainerWithConfig(
+					"container-2",
+					"/container-2",
+					"image-2:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{container1, container2},
+						Staleness: map[string]bool{
+							"container-1": true,
+							"container-2": true,
+						},
+					},
+					false,
+					false,
+				)
+
+				// Create a canceled context - this will trigger the early context cancellation check in Update
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately
+
+				// Run Update with rolling restart and canceled context
+				_, _, err := actions.Update(
+					ctx,
+					client,
+					types.UpdateParams{
+						Cleanup:        true,
+						RollingRestart: true,
+						CPUCopyMode:    "auto",
+					},
+				)
+
+				// Verify that an error is returned
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				// Verify that the error wraps context cancellation
+				gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue())
+				// Verify error message contains "cancelled" (early check in Update uses "update cancelled")
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cancelled"))
+			})
+
+			ginkgo.It("should handle context cancellation with timeout during rolling restart", func() {
+				// Create multiple containers - all stale so they all go through rolling restart
+				container1 := mockActions.CreateMockContainerWithConfig(
+					"container-1",
+					"/container-1",
+					"image-1:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				container2 := mockActions.CreateMockContainerWithConfig(
+					"container-2",
+					"/container-2",
+					"image-2:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1), // stale
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{container1, container2},
+						Staleness: map[string]bool{
+							"container-1": true,
+							"container-2": true,
+						},
+					},
+					false,
+					false,
+				)
+
+				// Use a context with very short timeout that will expire during processing
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+				defer cancel()
+
+				// Run Update with rolling restart - should timeout quickly
+				_, _, err := actions.Update(
+					ctx,
+					client,
+					types.UpdateParams{
+						Cleanup:        true,
+						RollingRestart: true,
+						CPUCopyMode:    "auto",
+					},
+				)
+
+				// Verify that an error is returned
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				// Verify that the error wraps context cancellation or deadline exceeded
+				gomega.Expect(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)).To(gomega.BeTrue())
+				// Verify error message contains "cancelled" or similar
+				gomega.Expect(err.Error()).To(gomega.SatisfyAny(
+					gomega.ContainSubstring("cancelled"),
+					gomega.ContainSubstring("deadline"),
+				))
+			})
+
+			ginkgo.It("should properly wrap context cancellation error with additional context", func() {
+				// Create a single container for rolling restart
+				container := mockActions.CreateMockContainerWithConfig(
+					"test-container",
+					"/test-container",
+					"test-image:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{container},
+						Staleness: map[string]bool{
+							"test-container": true,
+						},
+					},
+					false,
+					false,
+				)
+
+				// Create a canceled context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				// Run Update with rolling restart
+				_, _, err := actions.Update(
+					ctx,
+					client,
+					types.UpdateParams{
+						Cleanup:        true,
+						RollingRestart: true,
+						CPUCopyMode:    "auto",
+					},
+				)
+
+				// Verify error is returned
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				// Verify error wraps context.Canceled
+				gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue())
+				// Verify the error message includes "cancelled"
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cancelled"))
+			})
 		})
 
 		ginkgo.When("testing restart ordering functionality", func() {

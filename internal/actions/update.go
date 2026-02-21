@@ -358,16 +358,19 @@ func Update(
 
 	if config.RollingRestart {
 		// Apply rolling restarts for all containers in dependency order.
-		progress.UpdateFailed(
-			performRollingRestart(
-				ctx,
-				allContainersToRestart,
-				client,
-				config,
-				&cleanupImageInfos,
-				progress,
-			),
+		rollingFailed, rollingErr := performRollingRestart(
+			ctx,
+			allContainersToRestart,
+			client,
+			config,
+			&cleanupImageInfos,
+			progress,
 		)
+		progress.UpdateFailed(rollingFailed)
+
+		if rollingErr != nil {
+			return progress.Report(), cleanupImageInfos, rollingErr
+		}
 	} else {
 		// Mark containers to update for update in progress
 		for _, c := range allContainersToRestart {
@@ -861,6 +864,8 @@ func isInvalidImageName(name string) bool {
 //
 // It processes containers sequentially in forward order, stopping and restarting each as needed,
 // collecting cleaned image info for stale containers only to ensure proper cleanup.
+// The function checks for context cancellation at the start of each iteration to enable
+// prompt exit when the context is canceled.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
@@ -872,6 +877,7 @@ func isInvalidImageName(name string) bool {
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
+//   - error: Non-nil if context was canceled, nil otherwise.
 func performRollingRestart(
 	ctx context.Context,
 	containers []types.Container,
@@ -879,7 +885,7 @@ func performRollingRestart(
 	config types.UpdateParams,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *session.Progress,
-) map[types.ContainerID]error {
+) (map[types.ContainerID]error, error) {
 	failed := make(map[types.ContainerID]error, len(containers))
 
 	containerNames := make([]string, len(containers))
@@ -891,6 +897,13 @@ func performRollingRestart(
 
 	// Process containers in forward order to respect dependency chains.
 	for i := range containers {
+		// Check for context cancellation to enable prompt exit when context is canceled.
+		select {
+		case <-ctx.Done():
+			return failed, fmt.Errorf("rolling restart cancelled: %w", ctx.Err())
+		default:
+		}
+
 		c := containers[i]
 		if !c.ToRestart() {
 			continue
@@ -960,7 +973,7 @@ func performRollingRestart(
 		}
 	}
 
-	return failed
+	return failed, nil
 }
 
 // stopContainersInReversedOrder stops containers in reverse order.
