@@ -95,14 +95,14 @@ func TestExecutePreChecks(t *testing.T) {
 			expectedLogMsg: "Listing containers for pre-checks",
 		},
 	}
-	for _, testClient := range tests {
-		t.Run(testClient.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			hook := test.NewGlobal()
 
 			logrus.SetLevel(logrus.DebugLevel)
 
 			client := mockContainer.NewMockClient(t)
-			testClient.setupClient(client)
+			tt.setupClient(client)
 			hook.Reset()
 
 			ExecutePreChecks(context.Background(), client, types.UpdateParams{
@@ -112,20 +112,20 @@ func TestExecutePreChecks(t *testing.T) {
 				LifecycleGID:   0,
 			})
 
-			assert.Len(t, hook.Entries, testClient.expectedLogs, "log entry count mismatch")
+			assert.Len(t, hook.Entries, tt.expectedLogs, "log entry count mismatch")
 
 			if len(hook.Entries) > 0 {
 				assert.Contains(
 					t,
 					hook.Entries[0].Message,
-					testClient.expectedLogMsg,
+					tt.expectedLogMsg,
 					"first log message mismatch",
 				)
 			} else {
 				t.Errorf(
 					"No log entries captured; expected %d with message %q",
-					testClient.expectedLogs,
-					testClient.expectedLogMsg,
+					tt.expectedLogs,
+					tt.expectedLogMsg,
 				)
 			}
 
@@ -166,14 +166,14 @@ func TestExecutePostChecks(t *testing.T) {
 			expectedLogMsg: "Listing containers for post-checks",
 		},
 	}
-	for _, testClient := range tests {
-		t.Run(testClient.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			hook := test.NewGlobal()
 
 			logrus.SetLevel(logrus.DebugLevel)
 
 			client := mockContainer.NewMockClient(t)
-			testClient.setupClient(client)
+			tt.setupClient(client)
 			hook.Reset()
 
 			ExecutePostChecks(context.Background(), client, types.UpdateParams{
@@ -183,15 +183,15 @@ func TestExecutePostChecks(t *testing.T) {
 				LifecycleGID:   0,
 			})
 
-			assert.Len(t, hook.Entries, testClient.expectedLogs)
+			assert.Len(t, hook.Entries, tt.expectedLogs)
 
 			if len(hook.Entries) > 0 {
-				assert.Contains(t, hook.Entries[0].Message, testClient.expectedLogMsg)
+				assert.Contains(t, hook.Entries[0].Message, tt.expectedLogMsg)
 			} else {
 				t.Errorf(
 					"No log entries captured; expected %d with message %q",
-					testClient.expectedLogs,
-					testClient.expectedLogMsg,
+					tt.expectedLogs,
+					tt.expectedLogMsg,
 				)
 			}
 
@@ -254,30 +254,30 @@ func TestExecutePreCheckCommand(t *testing.T) {
 			expectedLogMsg: "Executing pre-check command",
 		},
 	}
-	for _, testClient := range tests {
-		t.Run(testClient.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			hook := test.NewGlobal()
 
 			logrus.SetLevel(logrus.DebugLevel)
 
 			client := mockContainer.NewMockClient(t)
-			if testClient.setupClient != nil {
-				testClient.setupClient(client)
+			if tt.setupClient != nil {
+				tt.setupClient(client)
 			}
 
 			hook.Reset()
 
-			ExecutePreCheckCommand(context.Background(), client, testClient.container, 0, 0)
+			ExecutePreCheckCommand(context.Background(), client, tt.container, 0, 0)
 
-			assert.Len(t, hook.Entries, testClient.expectedLogs)
+			assert.Len(t, hook.Entries, tt.expectedLogs)
 
 			if len(hook.Entries) > 0 {
-				assert.Contains(t, hook.LastEntry().Message, testClient.expectedLogMsg)
+				assert.Contains(t, hook.LastEntry().Message, tt.expectedLogMsg)
 			} else {
 				t.Errorf(
 					"No log entries captured; expected %d with message %q",
-					testClient.expectedLogs,
-					testClient.expectedLogMsg,
+					tt.expectedLogs,
+					tt.expectedLogMsg,
 				)
 			}
 
@@ -340,30 +340,30 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			expectedLogMsg: "Executing post-check command",
 		},
 	}
-	for _, testClient := range tests {
-		t.Run(testClient.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			hook := test.NewGlobal()
 
 			logrus.SetLevel(logrus.DebugLevel)
 
 			client := mockContainer.NewMockClient(t)
-			if testClient.setupClient != nil {
-				testClient.setupClient(client)
+			if tt.setupClient != nil {
+				tt.setupClient(client)
 			}
 
 			hook.Reset()
 
-			ExecutePostCheckCommand(context.Background(), client, testClient.container, 0, 0)
+			ExecutePostCheckCommand(context.Background(), client, tt.container, 0, 0)
 
-			assert.Len(t, hook.Entries, testClient.expectedLogs)
+			assert.Len(t, hook.Entries, tt.expectedLogs)
 
 			if len(hook.Entries) > 0 {
-				assert.Contains(t, hook.LastEntry().Message, testClient.expectedLogMsg)
+				assert.Contains(t, hook.LastEntry().Message, tt.expectedLogMsg)
 			} else {
 				t.Errorf(
 					"No log entries captured; expected %d with message %q",
-					testClient.expectedLogs,
-					testClient.expectedLogMsg,
+					tt.expectedLogs,
+					tt.expectedLogMsg,
 				)
 			}
 
@@ -588,27 +588,27 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			expectedLogMsg: "Executing post-update command",
 		},
 	}
-	for _, testClient := range tests {
-		t.Run(testClient.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			hook := test.NewGlobal()
 
 			logrus.SetLevel(logrus.DebugLevel)
 
 			client := mockContainer.NewMockClient(t)
-			testClient.setupClient(client)
+			tt.setupClient(client)
 			hook.Reset()
 
-			ExecutePostUpdateCommand(context.Background(), client, testClient.containerID, 0, 0)
+			ExecutePostUpdateCommand(context.Background(), client, tt.containerID, 0, 0)
 
-			assert.Len(t, hook.Entries, testClient.expectedLogs)
+			assert.Len(t, hook.Entries, tt.expectedLogs)
 
 			if len(hook.Entries) > 0 {
-				assert.Contains(t, hook.LastEntry().Message, testClient.expectedLogMsg)
+				assert.Contains(t, hook.LastEntry().Message, tt.expectedLogMsg)
 			} else {
 				t.Errorf(
 					"No log entries captured; expected %d with message %q",
-					testClient.expectedLogs,
-					testClient.expectedLogMsg,
+					tt.expectedLogs,
+					tt.expectedLogMsg,
 				)
 			}
 
