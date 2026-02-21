@@ -4,7 +4,9 @@ import (
 	"context"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -160,6 +162,12 @@ var (
 	// It is initialized to time.Sleep by default, providing a way to mock sleep behavior during testing
 	// to avoid delays in unit tests or control timing in integration tests.
 	sleepFunc = time.Sleep
+
+	// createSignalContext is a function variable for creating a signal-aware context.
+	//
+	// It wraps signal.NotifyContext to allow overriding in tests for testing signal handling behavior.
+	// The function creates a context that is cancelled when the specified signals (SIGINT, SIGTERM) are received.
+	createSignalContext = signal.NotifyContext
 
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
 	//
@@ -535,10 +543,12 @@ func runMain(cfg types.RunConfig) int {
 		return metric
 	}
 
-	// Create a cancellable context for managing API and scheduler shutdown,
-	// as well as validation operations that may need cancellation.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Create a context that is automatically cancelled on SIGINT/SIGTERM signals,
+	// enabling graceful shutdown of the API, scheduler, and validation operations.
+	// The stop function is returned but not needed as the context automatically
+	// handles cleanup when the program exits.
+	ctx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.

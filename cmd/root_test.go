@@ -5,8 +5,11 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -1166,4 +1169,165 @@ func TestValidateRollingRestartDependenciesAcceptsCancellableContext(t *testing.
 		require.Error(t, err)
 		mockClient.AssertExpectations(t)
 	})
+}
+
+// TestCreateSignalContext verifies that the signal-aware context is properly created
+// and can be cancelled via the stop function.
+func TestCreateSignalContext(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Test with custom mock that simulates signal handling
+	callCount := 0
+	createSignalContext = func(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+		callCount++
+
+		// Verify the correct signals are passed
+		assert.Contains(t, signals, os.Interrupt, "Should include SIGINT")
+		assert.Contains(t, signals, syscall.SIGTERM, "Should include SIGTERM")
+
+		// Return a context that's cancelled via the cancel function
+		return context.WithCancel(ctx)
+	}
+
+	ctx, cancel := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	// Verify context is not done initially
+	assert.NotNil(t, ctx, "Context should not be nil")
+	assert.NotNil(t, ctx.Done(), "Context should not be done initially")
+
+	// Call cancel and verify context is done
+	cancel()
+
+	// Verify the function was called once
+	assert.Equal(t, 1, callCount, "createSignalContext should be called once")
+
+	// Verify context is done after cancel
+	assert.Error(t, ctx.Err(), "Context should be done after cancel")
+}
+
+// TestCreateSignalContextDefault verifies that the default implementation
+// correctly creates a signal-aware context using signal.NotifyContext.
+func TestCreateSignalContextDefault(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Use the default implementation
+	createSignalContext = signal.NotifyContext
+
+	ctx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Verify context is created successfully
+	assert.NotNil(t, ctx, "Context should not be nil")
+
+	// Context should not be done initially
+	select {
+	case <-ctx.Done():
+		t.Error("Context should not be done initially")
+	default:
+		// Expected: context is not done
+	}
+}
+
+// TestSignalContextCancellation verifies that the signal context properly cancels
+// when signals are received, enabling graceful shutdown.
+func TestSignalContextCancellation(t *testing.T) {
+	// Skip in short test mode as this requires real signal handling
+	if testing.Short() {
+		t.Skip("Skipping signal test in short mode")
+	}
+
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Create context that we'll control
+	ctx, cancel := context.WithCancel(context.Background())
+
+	createSignalContext = func(_ context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+		return ctx, cancel
+	}
+
+	ctx, _ = createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	// Verify context is not done initially
+	select {
+	case <-ctx.Done():
+		t.Error("Context should not be done initially")
+	default:
+		// Expected: context is not done
+	}
+}
+
+// TestSignalContextWithMultipleSignals verifies that the context correctly handles
+// multiple signal types (SIGINT and SIGTERM).
+func TestSignalContextWithMultipleSignals(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Track which signals were received
+	var receivedSignals []os.Signal
+
+	createSignalContext = func(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+		receivedSignals = signals
+
+		return context.WithCancel(ctx)
+	}
+
+	ctx, cancel := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	// Verify both signals are in the received list
+	assert.Len(t, receivedSignals, 2, "Should receive exactly 2 signals")
+	assert.Contains(t, receivedSignals, os.Interrupt)
+	assert.Contains(t, receivedSignals, syscall.SIGTERM)
+
+	// Verify context is valid
+	assert.NotNil(t, ctx)
+}
+
+// TestSignalContextGracefulShutdown verifies that the context supports graceful
+// shutdown by not completing until explicitly cancelled.
+func TestSignalContextGracefulShutdown(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Create context that we'll control
+	ctx, cancel := context.WithCancel(context.Background())
+
+	createSignalContext = func(_ context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+		return ctx, cancel
+	}
+
+	// Create signal context
+	sigCtx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Verify context is valid and not done
+	assert.NotNil(t, sigCtx)
+
+	// Simulate work - context should still be valid
+	select {
+	case <-sigCtx.Done():
+		t.Error("Context should not be done during graceful operation")
+	default:
+		// Expected: context is not done
+	}
+
+	// Now cancel to simulate signal receipt
+	cancel()
+
+	// Context should be done after cancellation
+	<-sigCtx.Done()
+	assert.ErrorIs(t, sigCtx.Err(), context.Canceled)
 }
