@@ -19,6 +19,46 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// createStaleContainersForTest creates two stale containers and returns them along with TestData.
+// This is a helper function used by tests that need to set up containers for rolling restart scenarios.
+func createStaleContainersForTest() *mockActions.TestData {
+	container1 := mockActions.CreateMockContainerWithConfig(
+		"container-1",
+		"/container-1",
+		"image-1:latest",
+		true,
+		false,
+		time.Now().AddDate(0, 0, -1),
+		&dockerContainer.Config{
+			Labels:       map[string]string{},
+			ExposedPorts: map[nat.Port]struct{}{},
+		},
+	)
+
+	container2 := mockActions.CreateMockContainerWithConfig(
+		"container-2",
+		"/container-2",
+		"image-2:latest",
+		true,
+		false,
+		time.Now().AddDate(0, 0, -1),
+		&dockerContainer.Config{
+			Labels:       map[string]string{},
+			ExposedPorts: map[nat.Port]struct{}{},
+		},
+	)
+
+	testData := &mockActions.TestData{
+		Containers: []types.Container{container1, container2},
+		Staleness: map[string]bool{
+			"container-1": true,
+			"container-2": true,
+		},
+	}
+
+	return testData
+}
+
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("restarting stale Watchtower containers in non-rolling mode", func() {
 		ginkgo.It("should restart stale Watchtower containers even if stop is skipped", func() {
@@ -1139,38 +1179,10 @@ var _ = ginkgo.Describe("the update action", func() {
 		ginkgo.When("testing context cancellation in rolling restart", func() {
 			ginkgo.It("should return early with context cancellation error when context is canceled before processing", func() {
 				// Create multiple containers that would need rolling restart
-				container1 := mockActions.CreateMockContainerWithConfig(
-					"container-1",
-					"/container-1",
-					"image-1:latest",
-					true,
-					false,
-					time.Now().AddDate(0, 0, -1),
-					&dockerContainer.Config{
-						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
-					})
-
-				container2 := mockActions.CreateMockContainerWithConfig(
-					"container-2",
-					"/container-2",
-					"image-2:latest",
-					true,
-					false,
-					time.Now().AddDate(0, 0, -1),
-					&dockerContainer.Config{
-						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
-					})
+				testData := createStaleContainersForTest()
 
 				client := mockActions.CreateMockClient(
-					&mockActions.TestData{
-						Containers: []types.Container{container1, container2},
-						Staleness: map[string]bool{
-							"container-1": true,
-							"container-2": true,
-						},
-					},
+					testData,
 					false,
 					false,
 				)
@@ -1200,44 +1212,17 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			ginkgo.It("should handle context cancellation with timeout during rolling restart", func() {
 				// Create multiple containers - all stale so they all go through rolling restart
-				container1 := mockActions.CreateMockContainerWithConfig(
-					"container-1",
-					"/container-1",
-					"image-1:latest",
-					true,
-					false,
-					time.Now().AddDate(0, 0, -1),
-					&dockerContainer.Config{
-						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
-					})
-
-				container2 := mockActions.CreateMockContainerWithConfig(
-					"container-2",
-					"/container-2",
-					"image-2:latest",
-					true,
-					false,
-					time.Now().AddDate(0, 0, -1), // stale
-					&dockerContainer.Config{
-						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
-					})
+				testData := createStaleContainersForTest()
 
 				client := mockActions.CreateMockClient(
-					&mockActions.TestData{
-						Containers: []types.Container{container1, container2},
-						Staleness: map[string]bool{
-							"container-1": true,
-							"container-2": true,
-						},
-					},
+					testData,
 					false,
 					false,
 				)
 
-				// Use a context with very short timeout that will expire during processing
-				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+				// Use a context with an already-expired deadline to deterministically trigger context cancellation.
+				// This is more reliable than a short timeout which may expire before Update runs.
+				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-1*time.Hour))
 				defer cancel()
 
 				// Run Update with rolling restart - should timeout quickly
