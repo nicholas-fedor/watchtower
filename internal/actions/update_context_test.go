@@ -212,15 +212,11 @@ func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Create test data with no staleness (containers are fresh, will be started after stop)
 		testData := getCommonTestData()
-		// Mark all containers as stale so they get stopped and restarted
-		for k := range testData.Staleness {
-			testData.Staleness[k] = true
-		}
-		// Ensure no staleness by default (all containers will be updated)
+		// Ensure no staleness by default (no containers are stale)
 		testData.Staleness = map[string]bool{
-			"test-container-01": true,
-			"test-container-02": true,
-			"test-container-03": true,
+			"test-container-01": false,
+			"test-container-02": false,
+			"test-container-03": false,
 		}
 
 		// Create client with pre-cancelled context
@@ -276,7 +272,11 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 
 		synctest.Wait()
 
-		// Context should be cancelled/timed out
+		// This is a smoke test to verify the update operation tolerates a zero-timeout context.
+		// No strict assertions are made on err, report, or cleanupImageInfos because the timeout
+		// behavior may be non-deterministic depending on implementation details. The context may
+		// expire before or during operations, resulting in varying outcomes. This test serves as
+		// a safety check to ensure the code doesn't panic when handling immediate timeouts.
 		if err == nil {
 			t.Logf("Warning: expected error due to timeout, but got none")
 		}
@@ -325,10 +325,13 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 				client := mockActions.CreateMockClient(testData, false, false)
 
 				// Set the error to return based on test case
-				if tc.name == "ListContainers context error" {
+				switch {
+				case tc.name == "ListContainers context error":
 					client.TestData.ListContainersError = tc.errorToReturn
-				} else if strings.Contains(tc.name, "StopContainer") {
+				case strings.Contains(tc.name, "StopContainer"):
 					client.TestData.StopContainerError = tc.errorToReturn
+				case strings.Contains(tc.name, "StartContainer"):
+					client.TestData.StartContainerError = tc.errorToReturn
 				}
 
 				report, cleanupImageInfos, err := actions.Update(

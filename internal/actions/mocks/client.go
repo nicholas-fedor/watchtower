@@ -40,6 +40,7 @@ type TestData struct {
 	IsContainerStaleError        error                                 // Error to return from IsContainerStale (for testing).
 	ListContainersError          error                                 // Error to return from ListContainers (for testing).
 	StopContainerError           error                                 // Error to return from StopContainer (for testing).
+	StartContainerError          error                                 // Error to return from StartContainer (for testing).
 	UpdateContainerError         error                                 // Error to return from UpdateContainer (for testing).
 	StopContainerFailCount       int                                   // Number of times StopContainer should fail before succeeding.
 	RemoveImageError             error                                 // Error to return from RemoveImageByID (for testing).
@@ -165,10 +166,16 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 	return !client.Stopped[string(c.ID())]
 }
 
-// StartContainer simulates starting a container, returning the container's ID and no error.
+// StartContainer simulates starting a container, returning the container's ID.
 // It provides a minimal implementation for testing purposes.
+// Returns the configured StartContainerError if set.
 func (client MockClient) StartContainer(_ context.Context, c types.Container) (types.ContainerID, error) {
 	client.TestData.StartContainerCount++
+
+	if client.TestData.StartContainerError != nil {
+		return "", client.TestData.StartContainerError
+	}
+
 	client.TestData.StartOrder = append(client.TestData.StartOrder, c.Name())
 
 	return c.ID(), nil
