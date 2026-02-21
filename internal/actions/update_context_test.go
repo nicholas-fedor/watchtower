@@ -225,7 +225,7 @@ func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 
 		client := mockActions.CreateMockClientWithContext(cancelledCtx, testData, false, false)
 
-		report, cleanupImageInfos, err := actions.Update(
+		_, _, err := actions.Update(
 			cancelledCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -236,12 +236,6 @@ func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 		// The update should complete with an error related to context cancellation
 		if err != nil && !strings.Contains(err.Error(), "context") && !strings.Contains(err.Error(), "cancel") {
 			t.Fatalf("expected context-related error, got: %s", err.Error())
-		}
-
-		// Report might be nil or have failures depending on when cancellation occurred
-		if report != nil {
-			// Some operations may have been attempted before cancellation was detected
-			_ = cleanupImageInfos
 		}
 	})
 }
@@ -264,7 +258,7 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 
 		client := mockActions.CreateMockClientWithContext(shortCtx, testData, false, false)
 
-		report, cleanupImageInfos, err := actions.Update(
+		_, _, err := actions.Update(
 			shortCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -280,10 +274,6 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 		if err == nil {
 			t.Logf("Warning: expected error due to timeout, but got none")
 		}
-
-		// Report might be nil or have failures
-		_ = report
-		_ = cleanupImageInfos
 	})
 }
 
@@ -355,7 +345,11 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 					// Update completed, check that cleanup was attempted
 					if len(tc.containerStaleness) > 0 {
 						// Some containers should have been processed
-						_ = len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
+						totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
+						if totalProcessed != len(tc.containerStaleness) {
+							t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
+								len(tc.containerStaleness), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
+						}
 					}
 				}
 
