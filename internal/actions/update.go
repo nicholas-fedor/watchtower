@@ -1290,13 +1290,21 @@ func restartStaleContainer(
 	client container.Client,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
-	// Create a detached context with timeout to survive parent context cancellation.
+	// Create a detached context to survive parent context cancellation.
 	// This ensures container cleanup and update operations complete even if the
 	// parent context is canceled during the restart process.
-	detachedCtx, cancelDetached := context.WithTimeout(
-		context.Background(),
-		config.Timeout,
+	// If config.Timeout <= 0, use a non-deadline context; otherwise, apply the timeout.
+	var (
+		detachedCtx    context.Context
+		cancelDetached context.CancelFunc
 	)
+
+	if config.Timeout <= 0 {
+		detachedCtx, cancelDetached = context.WithCancel(context.Background())
+	} else {
+		detachedCtx, cancelDetached = context.WithTimeout(context.Background(), config.Timeout)
+	}
+
 	defer cancelDetached()
 
 	fields := logrus.Fields{
