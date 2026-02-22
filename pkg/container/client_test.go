@@ -908,6 +908,226 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 	})
 
+	// Test suite for detectPodmanByMarker helper function.
+	ginkgo.Describe("detectPodmanByMarker", func() {
+		ginkgo.It("should return true when Podman marker file exists", func() {
+			memFs := afero.NewMemMapFs()
+			afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
+			testClient := client{
+				ClientOptions: ClientOptions{
+					Fs: memFs,
+				},
+			}
+			result, err := testClient.detectPodmanByMarker()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return false when Docker marker file exists", func() {
+			memFs := afero.NewMemMapFs()
+			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
+			testClient := client{
+				ClientOptions: ClientOptions{
+					Fs: memFs,
+				},
+			}
+			result, err := testClient.detectPodmanByMarker()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return false when neither marker file exists", func() {
+			memFs := afero.NewMemMapFs()
+			testClient := client{
+				ClientOptions: ClientOptions{
+					Fs: memFs,
+				},
+			}
+			result, err := testClient.detectPodmanByMarker()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return true when Podman marker exists alongside Docker marker", func() {
+			memFs := afero.NewMemMapFs()
+			afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
+			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
+			testClient := client{
+				ClientOptions: ClientOptions{
+					Fs: memFs,
+				},
+			}
+			result, err := testClient.detectPodmanByMarker()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+	})
+
+	// Test suite for checkDockerMarker helper function.
+	ginkgo.Describe("checkDockerMarker", func() {
+		ginkgo.It("should return true when Docker marker file exists", func() {
+			memFs := afero.NewMemMapFs()
+			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
+			testClient := client{
+				ClientOptions: ClientOptions{
+					Fs: memFs,
+				},
+			}
+			result, err := testClient.checkDockerMarker()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return false when Docker marker file does not exist", func() {
+			memFs := afero.NewMemMapFs()
+			testClient := client{
+				ClientOptions: ClientOptions{
+					Fs: memFs,
+				},
+			}
+			result, err := testClient.checkDockerMarker()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+	})
+
+	// Test suite for detectPodmanByEnv helper function.
+	ginkgo.Describe("detectPodmanByEnv", func() {
+		ginkgo.It("should return true when CONTAINER is podman", func() {
+			restore := withEnvVars(map[string]string{"CONTAINER": "podman"})
+			defer restore()
+
+			testClient := client{}
+			result := testClient.detectPodmanByEnv()
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return true when CONTAINER is oci", func() {
+			restore := withEnvVars(map[string]string{"CONTAINER": "oci"})
+			defer restore()
+
+			testClient := client{}
+			result := testClient.detectPodmanByEnv()
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return false when CONTAINER is docker", func() {
+			restore := withEnvVars(map[string]string{"CONTAINER": "docker"})
+			defer restore()
+
+			testClient := client{}
+			result := testClient.detectPodmanByEnv()
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return false when CONTAINER is other", func() {
+			restore := withEnvVars(map[string]string{"CONTAINER": "other"})
+			defer restore()
+
+			testClient := client{}
+			result := testClient.detectPodmanByEnv()
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return false when CONTAINER is not set", func() {
+			os.Unsetenv("CONTAINER")
+
+			testClient := client{}
+			result := testClient.detectPodmanByEnv()
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return false when CONTAINER is empty", func() {
+			restore := withEnvVars(map[string]string{"CONTAINER": ""})
+			defer restore()
+
+			testClient := client{}
+			result := testClient.detectPodmanByEnv()
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+	})
+
+	// Test suite for detectPodmanByAPI helper function.
+	ginkgo.Describe("detectPodmanByAPI", func() {
+		ginkgo.It("should return true when API returns Name podman", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/info$")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"Name": "podman",
+					}),
+				),
+			)
+
+			testClient := client{api: docker}
+			result, err := testClient.detectPodmanByAPI(context.Background())
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return true when API returns ServerVersion containing podman", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/info$")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"ServerVersion": "podman/4.0.0",
+					}),
+				),
+			)
+
+			testClient := client{api: docker}
+			result, err := testClient.detectPodmanByAPI(context.Background())
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return false when API returns neither podman Name nor ServerVersion", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/info$")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"Name":            "docker",
+						"ServerVersion":   "20.10.0",
+						"OperatingSystem": "linux",
+					}),
+				),
+			)
+
+			testClient := client{api: docker}
+			result, err := testClient.detectPodmanByAPI(context.Background())
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return error when API call fails", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/info$")),
+					ghttp.RespondWith(http.StatusInternalServerError, "server error"),
+				),
+			)
+
+			testClient := client{api: docker}
+			result, err := testClient.detectPodmanByAPI(context.Background())
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should return false when API returns empty response", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/info$")),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{}),
+				),
+			)
+
+			testClient := client{api: docker}
+			result, err := testClient.detectPodmanByAPI(context.Background())
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(result).To(gomega.BeFalse())
+		})
+	})
+
 	// Test suite for executing commands in a container.
 	ginkgo.Describe("ExecuteCommand", func() {
 		ginkgo.When("logging", func() {
