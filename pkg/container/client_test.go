@@ -1140,111 +1140,12 @@ var _ = ginkgo.Describe("the client", func() {
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 
-				user := ""
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "ex-exec-id"
 				cmd := "exec-cmd"
-				// Set up mock server handlers for GetContainer and exec operations.
-				mockServer.AppendHandlers(
-					// Handler for ContainerInspect (GetContainer)
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(
-								fmt.Sprintf(`^/v[0-9.]+/containers/%v/json$`, containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.InspectResponse{
-								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-									ID:    string(containerID),
-									Name:  "/test-container",
-									Image: "test-image:latest",
-									State: &dockerContainer.State{
-										Status: "running",
-									},
-									HostConfig: &dockerContainer.HostConfig{},
-								},
-								Config: &dockerContainer.Config{
-									Image:  "test-image:latest",
-									Labels: map[string]string{},
-								},
-							},
-						),
-					),
-					// Handler for ImageInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(`^/v[0-9.]+/images/test-image:latest/json$`),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerImage.InspectResponse{
-								ID: "test-image-id",
-							},
-						),
-					),
-					// Handler for ContainerExecCreate
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(
-								fmt.Sprintf(`^/v[0-9.]+/containers/%v/exec$`, containerID),
-							),
-						),
-						ghttp.VerifyJSONRepresenting(dockerContainer.ExecOptions{
-							User:   user,
-							Detach: true,
-							Tty:    true,
-							Cmd: []string{
-								"sh",
-								"-c",
-								cmd,
-							},
-							Env: []string{
-								"WT_CONTAINER={\"name\":\"test-container\",\"id\":\"ex-cont-id\",\"image_name\":\"test-image:latest\",\"stop_signal\":\"SIGTERM\",\"labels\":{}}",
-							},
-						}),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.CommitResponse{ID: execID},
-						),
-					),
-					// Handler for ContainerExecStart
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(fmt.Sprintf(`^/v[0-9.]+/exec/%v/start$`, execID)),
-						),
-						ghttp.VerifyJSONRepresenting(dockerContainer.ExecStartOptions{
-							Tty: true,
-						}),
-						ghttp.RespondWith(http.StatusOK, nil),
-					),
-					// Handler for ContainerExecInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(`^/v[0-9.]+/exec/ex-exec-id/json$`),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerBackend.ExecInspect{
-								ID:       execID,
-								Running:  false,
-								ExitCode: nil,
-								ProcessConfig: &dockerBackend.ExecProcessConfig{
-									Entrypoint: "sh",
-									Arguments:  []string{"-c", cmd},
-									User:       user,
-								},
-								ContainerID: string(containerID),
-							},
-						),
-					),
-				)
+				// Set up mock server handlers for ExecuteCommand.
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 0, false, false)
+
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1263,111 +1164,12 @@ var _ = ginkgo.Describe("the client", func() {
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 
-				user := ""
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "ex-exec-id"
 				cmd := "exec-cmd"
-				// Set up mock server handlers for GetContainer and exec operations.
-				mockServer.AppendHandlers(
-					// Handler for ContainerInspect (GetContainer)
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/json$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.InspectResponse{
-								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-									ID:    string(containerID),
-									Name:  "/test-container",
-									Image: "test-image:latest",
-									State: &dockerContainer.State{
-										Status: "running",
-									},
-									HostConfig: &dockerContainer.HostConfig{},
-								},
-								Config: &dockerContainer.Config{
-									Image:  "test-image:latest",
-									Labels: map[string]string{},
-								},
-							},
-						),
-					),
-					// Handler for ImageInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerImage.InspectResponse{
-								ID: "test-image-id",
-							},
-						),
-					),
-					// Handler for ContainerExecCreate
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/exec$", containerID),
-							),
-						),
-						ghttp.VerifyJSONRepresenting(dockerContainer.ExecOptions{
-							User:   user,
-							Detach: true,
-							Tty:    true,
-							Cmd: []string{
-								"sh",
-								"-c",
-								cmd,
-							},
-							Env: []string{
-								"WT_CONTAINER={\"name\":\"test-container\",\"id\":\"ex-cont-id\",\"image_name\":\"test-image:latest\",\"stop_signal\":\"SIGTERM\",\"labels\":{}}",
-							},
-						}),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.CommitResponse{ID: execID},
-						),
-					),
-					// Handler for ContainerExecStart
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%v/start$", execID)),
-						),
-						ghttp.VerifyJSONRepresenting(dockerContainer.ExecStartOptions{
-							Tty: true,
-						}),
-						ghttp.RespondWith(http.StatusOK, nil),
-					),
-					// Handler for ContainerExecInspect with exit code 75
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp("^/v[0-9.]+/exec/ex-exec-id/json$"),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerBackend.ExecInspect{
-								ID:       execID,
-								Running:  false,
-								ExitCode: &[]int{75}[0],
-								ProcessConfig: &dockerBackend.ExecProcessConfig{
-									Entrypoint: "sh",
-									Arguments:  []string{"-c", cmd},
-									User:       user,
-								},
-								ContainerID: string(containerID),
-							},
-						),
-					),
-				)
+				// Set up mock server handlers for ExecuteCommand.
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 75, false, false)
+
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1392,90 +1194,9 @@ var _ = ginkgo.Describe("the client", func() {
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "success-exec-id"
 				cmd := "success-cmd"
-				// Set up mock server handlers for GetContainer and exec operations.
-				mockServer.AppendHandlers(
-					// Handler for ContainerInspect (GetContainer)
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/json$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.InspectResponse{
-								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-									ID:    string(containerID),
-									Name:  "/test-container",
-									Image: "test-image:latest",
-									State: &dockerContainer.State{
-										Status: "running",
-									},
-									HostConfig: &dockerContainer.HostConfig{},
-								},
-								Config: &dockerContainer.Config{
-									Image:  "test-image:latest",
-									Labels: map[string]string{},
-								},
-							},
-						),
-					),
-					// Handler for ImageInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerImage.InspectResponse{
-								ID: "test-image-id",
-							},
-						),
-					),
-					// Handler for ContainerExecCreate
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/exec$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.CommitResponse{ID: execID},
-						),
-					),
-					// Handler for ContainerExecStart
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%v/start$", execID)),
-						),
-						ghttp.RespondWith(http.StatusOK, nil),
-					),
-					// Handler for ContainerExecInspect with exit code 0
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%s/json$", execID)),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerBackend.ExecInspect{
-								ID:       execID,
-								Running:  false,
-								ExitCode: &[]int{0}[0],
-								ProcessConfig: &dockerBackend.ExecProcessConfig{
-									Entrypoint: "sh",
-									Arguments:  []string{"-c", cmd},
-								},
-								ContainerID: string(containerID),
-							},
-						),
-					),
-				)
+				// Set up mock server handlers for ExecuteCommand.
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 0, false, false)
+
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1496,91 +1217,8 @@ var _ = ginkgo.Describe("the client", func() {
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "failure-exec-id"
 				cmd := "failure-cmd"
-				exitCode := 1
-				// Set up mock server handlers for GetContainer and exec operations.
-				mockServer.AppendHandlers(
-					// Handler for ContainerInspect (GetContainer)
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/json$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.InspectResponse{
-								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-									ID:    string(containerID),
-									Name:  "/test-container",
-									Image: "test-image:latest",
-									State: &dockerContainer.State{
-										Status: "running",
-									},
-									HostConfig: &dockerContainer.HostConfig{},
-								},
-								Config: &dockerContainer.Config{
-									Image:  "test-image:latest",
-									Labels: map[string]string{},
-								},
-							},
-						),
-					),
-					// Handler for ImageInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerImage.InspectResponse{
-								ID: "test-image-id",
-							},
-						),
-					),
-					// Handler for ContainerExecCreate
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/exec$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.CommitResponse{ID: execID},
-						),
-					),
-					// Handler for ContainerExecStart
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%v/start$", execID)),
-						),
-						ghttp.RespondWith(http.StatusOK, nil),
-					),
-					// Handler for ContainerExecInspect with non-zero exit code
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%s/json$", execID)),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerBackend.ExecInspect{
-								ID:       execID,
-								Running:  false,
-								ExitCode: &exitCode,
-								ProcessConfig: &dockerBackend.ExecProcessConfig{
-									Entrypoint: "sh",
-									Arguments:  []string{"-c", cmd},
-								},
-								ContainerID: string(containerID),
-							},
-						),
-					),
-				)
+				// Set up mock server handlers for ExecuteCommand.
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 1, false, false)
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1600,59 +1238,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 				containerID := types.ContainerID("ex-cont-id")
 				cmd := "create-fail-cmd"
-				// Set up mock server handlers for GetContainer and exec operations.
-				mockServer.AppendHandlers(
-					// Handler for ContainerInspect (GetContainer)
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/json$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.InspectResponse{
-								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-									ID:    string(containerID),
-									Name:  "/test-container",
-									Image: "test-image:latest",
-									State: &dockerContainer.State{
-										Status: "running",
-									},
-									HostConfig: &dockerContainer.HostConfig{},
-								},
-								Config: &dockerContainer.Config{
-									Image:  "test-image:latest",
-									Labels: map[string]string{},
-								},
-							},
-						),
-					),
-					// Handler for ImageInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerImage.InspectResponse{
-								ID: "test-image-id",
-							},
-						),
-					),
-					// Handler for ContainerExecCreate - returns error
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/exec$", containerID),
-							),
-						),
-						ghttp.RespondWith(http.StatusInternalServerError, "exec create failed"),
-					),
-				)
+				// Set up mock server handlers for ExecuteCommand.
+				setupExecMockHandlers(mockServer, string(containerID), "", cmd, 0, 0, 0, true, false)
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1673,70 +1260,8 @@ var _ = ginkgo.Describe("the client", func() {
 				containerID := types.ContainerID("ex-cont-id")
 				execID := "start-fail-exec-id"
 				cmd := "start-fail-cmd"
-				// Set up mock server handlers for GetContainer and exec operations.
-				mockServer.AppendHandlers(
-					// Handler for ContainerInspect (GetContainer)
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/json$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.InspectResponse{
-								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-									ID:    string(containerID),
-									Name:  "/test-container",
-									Image: "test-image:latest",
-									State: &dockerContainer.State{
-										Status: "running",
-									},
-									HostConfig: &dockerContainer.HostConfig{},
-								},
-								Config: &dockerContainer.Config{
-									Image:  "test-image:latest",
-									Labels: map[string]string{},
-								},
-							},
-						),
-					),
-					// Handler for ImageInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerImage.InspectResponse{
-								ID: "test-image-id",
-							},
-						),
-					),
-					// Handler for ContainerExecCreate
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/exec$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.CommitResponse{ID: execID},
-						),
-					),
-					// Handler for ContainerExecStart - returns error
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%v/start$", execID)),
-						),
-						ghttp.RespondWith(http.StatusInternalServerError, "exec start failed"),
-					),
-				)
+				// Set up mock server handlers for ExecuteCommand.
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 0, false, true)
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1759,104 +1284,8 @@ var _ = ginkgo.Describe("the client", func() {
 				cmd := "uid-gid-cmd"
 				uid := 1000
 				gid := 1000
-				// Set up mock server handlers for GetContainer and exec operations.
-				mockServer.AppendHandlers(
-					// Handler for ContainerInspect (GetContainer)
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/json$", containerID),
-							),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.InspectResponse{
-								ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-									ID:    string(containerID),
-									Name:  "/test-container",
-									Image: "test-image:latest",
-									State: &dockerContainer.State{
-										Status: "running",
-									},
-									HostConfig: &dockerContainer.HostConfig{},
-								},
-								Config: &dockerContainer.Config{
-									Image:  "test-image:latest",
-									Labels: map[string]string{},
-								},
-							},
-						),
-					),
-					// Handler for ImageInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerImage.InspectResponse{
-								ID: "test-image-id",
-							},
-						),
-					),
-					// Handler for ContainerExecCreate - verify User field
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(
-								fmt.Sprintf("^/v[0-9.]+/containers/%v/exec$", containerID),
-							),
-						),
-						ghttp.VerifyJSONRepresenting(dockerContainer.ExecOptions{
-							User:   "1000:1000",
-							Detach: true,
-							Tty:    true,
-							Cmd: []string{
-								"sh",
-								"-c",
-								cmd,
-							},
-							Env: []string{
-								"WT_CONTAINER={\"name\":\"test-container\",\"id\":\"ex-cont-id\",\"image_name\":\"test-image:latest\",\"stop_signal\":\"SIGTERM\",\"labels\":{}}",
-							},
-						}),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerContainer.CommitResponse{ID: execID},
-						),
-					),
-					// Handler for ContainerExecStart
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"POST",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%v/start$", execID)),
-						),
-						ghttp.RespondWith(http.StatusOK, nil),
-					),
-					// Handler for ContainerExecInspect
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest(
-							"GET",
-							gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%s/json$", execID)),
-						),
-						ghttp.RespondWithJSONEncoded(
-							http.StatusOK,
-							dockerBackend.ExecInspect{
-								ID:       execID,
-								Running:  false,
-								ExitCode: &[]int{0}[0],
-								ProcessConfig: &dockerBackend.ExecProcessConfig{
-									Entrypoint: "sh",
-									Arguments:  []string{"-c", cmd},
-									User:       "1000:1000",
-								},
-								ContainerID: string(containerID),
-							},
-						),
-					),
-				)
+				// Set up mock server handlers for ExecuteCommand.
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, uid, gid, 0, false, false)
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2651,6 +2080,190 @@ func TestStopContainer_ContainerFailsToStopWithinTimeout(t *testing.T) {
 			)
 		}
 	})
+}
+
+// setupExecMockHandlers sets up mock handlers for ExecuteCommand tests.
+// It registers 5 handlers: ContainerInspect, ImageInspect, ContainerExecCreate,
+// ContainerExecStart, and ContainerExecInspect.
+//
+// Parameters:
+//   - mockServer: The test HTTP server
+//   - containerID: Container ID for ContainerInspect
+//   - execID: Exec ID returned by ContainerExecCreate
+//   - cmd: Command to execute
+//   - uid: UID value (0 for no UID)
+//   - gid: GID value (0 for no GID)
+//   - exitCode: Exit code to return (0 for success case)
+//   - execCreateError: If true, make ContainerExecCreate return 500 error
+//   - execStartError: If true, make ContainerExecStart return 500 error
+func setupExecMockHandlers(
+	mockServer *ghttp.Server,
+	containerID string,
+	execID string,
+	cmd string,
+	uid int,
+	gid int,
+	exitCode int,
+	execCreateError bool,
+	execStartError bool,
+) {
+	// Hardcoded image name used by all tests
+	imageName := "test-image:latest"
+
+	// Determine the user string - use uid/gid if provided
+	execUser := ""
+	if uid != 0 && gid != 0 {
+		execUser = fmt.Sprintf("%d:%d", uid, gid)
+	}
+
+	// Build the WT_CONTAINER environment variable
+	wgContainerEnv := fmt.Sprintf(
+		"WT_CONTAINER={\"name\":\"test-container\",\"id\":\"%s\",\"image_name\":\"%s\",\"stop_signal\":\"SIGTERM\",\"labels\":{}}",
+		containerID, imageName,
+	)
+
+	mockServer.AppendHandlers(
+		// Handler for ContainerInspect (GetContainer)
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest(
+				"GET",
+				gomega.MatchRegexp(
+					fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", containerID),
+				),
+			),
+			ghttp.RespondWithJSONEncoded(
+				http.StatusOK,
+				dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						ID:    containerID,
+						Name:  "/test-container",
+						Image: imageName,
+						State: &dockerContainer.State{
+							Status: "running",
+						},
+						HostConfig: &dockerContainer.HostConfig{},
+					},
+					Config: &dockerContainer.Config{
+						Image:  imageName,
+						Labels: map[string]string{},
+					},
+				},
+			),
+		),
+		// Handler for ImageInspect
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest(
+				"GET",
+				gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/images/%s/json$", imageName)),
+			),
+			ghttp.RespondWithJSONEncoded(
+				http.StatusOK,
+				dockerImage.InspectResponse{
+					ID: "test-image-id",
+				},
+			),
+		),
+	)
+
+	// Handle execCreateError case - only 3 handlers needed
+	if execCreateError {
+		mockServer.AppendHandlers(
+			// Handler for ContainerExecCreate - returns error
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest(
+					"POST",
+					gomega.MatchRegexp(
+						fmt.Sprintf("^/v[0-9.]+/containers/%s/exec$", containerID),
+					),
+				),
+				ghttp.RespondWith(http.StatusInternalServerError, "exec create failed"),
+			),
+		)
+
+		return
+	}
+
+	// ContainerExecCreate handler (success case)
+	mockServer.AppendHandlers(
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest(
+				"POST",
+				gomega.MatchRegexp(
+					fmt.Sprintf("^/v[0-9.]+/containers/%s/exec$", containerID),
+				),
+			),
+			// Only verify JSON if user is specified
+			ghttp.VerifyJSONRepresenting(dockerContainer.ExecOptions{
+				User:   execUser,
+				Detach: true,
+				Tty:    true,
+				Cmd: []string{
+					"sh",
+					"-c",
+					cmd,
+				},
+				Env: []string{
+					wgContainerEnv,
+				},
+			}),
+			ghttp.RespondWithJSONEncoded(
+				http.StatusOK,
+				dockerContainer.CommitResponse{ID: execID},
+			),
+		),
+	)
+
+	// Handle execStartError case
+	if execStartError {
+		mockServer.AppendHandlers(
+			// Handler for ContainerExecStart - returns error
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest(
+					"POST",
+					gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%s/start$", execID)),
+				),
+				ghttp.RespondWith(http.StatusInternalServerError, "exec start failed"),
+			),
+		)
+
+		return
+	}
+
+	// ContainerExecStart and ContainerExecInspect handlers (success case)
+	mockServer.AppendHandlers(
+		// Handler for ContainerExecStart
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest(
+				"POST",
+				gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%s/start$", execID)),
+			),
+			ghttp.VerifyJSONRepresenting(dockerContainer.ExecStartOptions{
+				Tty: true,
+			}),
+			ghttp.RespondWith(http.StatusOK, nil),
+		),
+		// Handler for ContainerExecInspect
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest(
+				"GET",
+				gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%s/json$", execID)),
+			),
+			ghttp.RespondWithJSONEncoded(
+				http.StatusOK,
+				dockerBackend.ExecInspect{
+					ID:       execID,
+					Running:  false,
+					ExitCode: &exitCode,
+					ProcessConfig: &dockerBackend.ExecProcessConfig{
+						Entrypoint: "sh",
+						Arguments:  []string{"-c", cmd},
+						User:       execUser,
+					},
+					ContainerID: containerID,
+				},
+			),
+		),
+	)
 }
 
 // captureLogrus captures logrus output in a buffer for testing.
