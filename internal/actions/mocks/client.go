@@ -208,7 +208,11 @@ func (client MockClient) StartContainer(ctx context.Context, c types.Container) 
 
 // RenameContainer simulates renaming a container, incrementing the RenameContainerCount.
 // It returns nil to indicate success without modifying any state.
-func (client MockClient) RenameContainer(_ context.Context, _ types.Container, _ string) error {
+func (client MockClient) RenameContainer(ctx context.Context, _ types.Container, _ string) error {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return err
+	}
+
 	client.TestData.RenameContainerCount++
 
 	return nil
@@ -216,7 +220,11 @@ func (client MockClient) RenameContainer(_ context.Context, _ types.Container, _
 
 // UpdateContainer simulates updating a container's configuration.
 // It increments the UpdateContainerCount and returns the configured error if set.
-func (client MockClient) UpdateContainer(_ context.Context, _ types.Container, _ dockerContainer.UpdateConfig) error {
+func (client MockClient) UpdateContainer(ctx context.Context, _ types.Container, _ dockerContainer.UpdateConfig) error {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return err
+	}
+
 	client.TestData.UpdateContainerCount++
 
 	return client.TestData.UpdateContainerError
@@ -224,7 +232,11 @@ func (client MockClient) UpdateContainer(_ context.Context, _ types.Container, _
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
 // It simulates image cleanup and returns configured error if set or if image ID is in FailedImageIDs, nil otherwise.
-func (client MockClient) RemoveImageByID(_ context.Context, imageID types.ImageID, _ string) error {
+func (client MockClient) RemoveImageByID(ctx context.Context, imageID types.ImageID, _ string) error {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return err
+	}
+
 	client.TestData.TriedToRemoveImageCount++
 	if slices.Contains(client.TestData.FailedImageIDs, imageID) {
 		return client.TestData.RemoveImageError
@@ -267,13 +279,17 @@ var errCommandFailed = errors.New("command exited with non-zero code")
 // It returns a SkipUpdate boolean indicating whether to skip the update and an error if the command fails.
 // The method uses predefined command behaviors to mimic real execution outcomes.
 func (client MockClient) ExecuteCommand(
-	_ context.Context,
+	ctx context.Context,
 	_ types.Container,
 	command string,
 	_ int,
 	_ int,
 	_ int,
 ) (bool, error) {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return false, err
+	}
+
 	switch command {
 	case "/PreUpdateReturn0.sh":
 		return false, nil // Command succeeds (exit 0), no skip.
@@ -325,7 +341,11 @@ func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {
 
 // WaitForContainerHealthy simulates waiting for a container to become healthy.
 // It increments the count and returns nil to indicate success.
-func (client MockClient) WaitForContainerHealthy(_ context.Context, _ types.ContainerID, _ time.Duration) error {
+func (client MockClient) WaitForContainerHealthy(ctx context.Context, _ types.ContainerID, _ time.Duration) error {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return err
+	}
+
 	client.TestData.WaitForContainerHealthyCount++
 
 	return nil
@@ -333,13 +353,21 @@ func (client MockClient) WaitForContainerHealthy(_ context.Context, _ types.Cont
 
 // RemoveContainer simulates removing a container.
 // It returns nil to indicate success.
-func (client MockClient) RemoveContainer(_ context.Context, _ types.Container) error {
+func (client MockClient) RemoveContainer(ctx context.Context, _ types.Container) error {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // GetInfo returns mock system information for testing.
 // It provides a basic map with mock Docker/Podman info.
-func (client MockClient) GetInfo(_ context.Context) (map[string]any, error) {
+func (client MockClient) GetInfo(ctx context.Context) (map[string]any, error) {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return nil, err
+	}
+
 	return map[string]any{
 		"Name":          "docker",
 		"ServerVersion": "1.50",

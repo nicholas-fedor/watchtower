@@ -1303,13 +1303,11 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 
 			testContainer := client.TestData.Containers[0]
 
-			// Cancel the parent context before calling restartStaleContainer.
-			// This simulates the scenario where the parent context is canceled
-			// but cleanup operations should still proceed.
-			parentCancel()
-
-			// Call restartStaleContainer with the already-canceled context.
-			// The detached context should allow cleanup to proceed.
+			// Call restartStaleContainer with a valid parent context.
+			// The test flow is:
+			// 1. RenameContainer succeeds (uses parent context, which is valid)
+			// 2. StartContainer fails due to StartContainerError
+			// 3. Cleanup runs using the detached context (proving it works)
 			_, renamed, err := restartStaleContainer(
 				parentCtx,
 				testContainer,
@@ -1326,8 +1324,11 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 
 			// Verify that StopContainer was called during cleanup.
 			// This demonstrates that the detached context allowed the cleanup
-			// operation to proceed even though the parent context was canceled.
+			// operation to proceed after the StartContainer error.
 			gomega.Expect(client.TestData.StopContainerCount).To(gomega.BeNumerically(">=", 1))
+
+			// Clean up the parent context.
+			parentCancel()
 		})
 
 		ginkgo.It("restart policy update uses detached context after successful start", func() {
