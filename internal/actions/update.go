@@ -926,7 +926,12 @@ func performRollingRestart(
 		if err != nil {
 			failed[c.ID()] = err
 		} else {
-			newContainerID, renamed, err := restartStaleContainer(ctx, c, client, config)
+			newContainerID, renamed, err := restartStaleContainer(
+				ctx,
+				c,
+				client,
+				config,
+			)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -1193,7 +1198,12 @@ func restartContainersInSortedOrder(
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
 		if c.IsWatchtower() || wasStopped {
-			newContainerID, renamed, err := restartStaleContainer(ctx, c, client, config)
+			newContainerID, renamed, err := restartStaleContainer(
+				ctx,
+				c,
+				client,
+				config,
+			)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -1280,6 +1290,15 @@ func restartStaleContainer(
 	client container.Client,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
+	// Create a detached context with timeout to survive parent context cancellation.
+	// This ensures container cleanup and update operations complete even if the
+	// parent context is canceled during the restart process.
+	detachedCtx, cancelDetached := context.WithTimeout(
+		context.Background(),
+		config.Timeout,
+	)
+	defer cancelDetached()
+
 	fields := logrus.Fields{
 		"container": sourceContainer.Name(),
 		"image":     sourceContainer.ImageName(),
@@ -1354,7 +1373,8 @@ func restartStaleContainer(
 			if renamed && sourceContainer.IsWatchtower() {
 				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
 
-				cleanupErr := client.StopAndRemoveContainer(ctx, sourceContainer, config.Timeout)
+				//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+				cleanupErr := client.StopAndRemoveContainer(detachedCtx, sourceContainer, config.Timeout)
 				if cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
@@ -1390,7 +1410,9 @@ func restartStaleContainer(
 			},
 		}
 		// Update the renamed Watchtower container's restart policy.
-		err := client.UpdateContainer(ctx, sourceContainer, updateConfig)
+		//
+		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+		err := client.UpdateContainer(detachedCtx, sourceContainer, updateConfig)
 		if err != nil {
 			logrus.WithError(err).
 				WithFields(fields).
