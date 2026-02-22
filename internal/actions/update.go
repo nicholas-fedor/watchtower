@@ -107,15 +107,13 @@ func Update(
 	// Skip monitored containers that reference themselves as dependencies
 	// via the Watchtower depends-on label.
 	for _, monitoredContainer := range filteredContainers {
-		if c, ok := monitoredContainer.(*container.Container); ok {
-			if hasSelfDependency(c) {
-				progress.AddSkipped(monitoredContainer, errSelfDependency, config)
-				logrus.Warnf(
-					"Skipping container update (self-dependency): %s (%s)",
-					monitoredContainer.Name(),
-					monitoredContainer.ID().ShortID(),
-				)
-			}
+		if hasSelfDependency(monitoredContainer) {
+			progress.AddSkipped(monitoredContainer, errSelfDependency, config)
+			logrus.Warnf(
+				"Skipping container update (self-dependency): %s (%s)",
+				monitoredContainer.Name(),
+				monitoredContainer.ID().ShortID(),
+			)
 		}
 	}
 
