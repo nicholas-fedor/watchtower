@@ -26,7 +26,8 @@ import (
 
 // Constants for CPUCopyMode values.
 const (
-	// CPUCopyModeAuto indicates automatic detection of container runtime for CPU copying behavior.
+	// CPUCopyModeAuto indicates automatic detection of container runtime for
+	// CPU copying behavior.
 	CPUCopyModeAuto = "auto"
 
 	// DaemonInitTimeout is the default timeout for Docker daemon initialization operations.
@@ -47,7 +48,8 @@ var (
 
 // Client defines the interface for interacting with the Docker API within Watchtower.
 //
-// It provides methods for managing containers, images, and executing commands, abstracting the underlying Docker client operations.
+// It provides methods for managing containers, images, and executing commands,
+// abstracting the underlying Docker client operations.
 type Client interface {
 	// ListContainers retrieves a list of containers, optionally filtered.
 	//
@@ -73,7 +75,8 @@ type Client interface {
 	//   - error: Non-nil if retrieval fails, nil on success.
 	GetContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error)
 
-	// GetCurrentWatchtowerContainer retrieves minimal container information for the specified container ID, skipping image inspection.
+	// GetCurrentWatchtowerContainer retrieves minimal container information
+	// for the specified container ID, skipping image inspection.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
@@ -95,7 +98,8 @@ type Client interface {
 	//   - error: Non-nil if stop fails, nil on success.
 	StopContainer(ctx context.Context, container types.Container, timeout time.Duration) error
 
-	// StopAndRemoveContainer stops and removes a specified container, respecting the given timeout.
+	// StopAndRemoveContainer stops and removes a specified container,
+	// respecting the given timeout.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
@@ -106,7 +110,8 @@ type Client interface {
 	//   - error: Non-nil if stop/removal fails, nil on success.
 	StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error
 
-	// StartContainer creates and starts a new container based on the provided container's configuration.
+	// StartContainer creates and starts a new container based on the provided
+	// container's configuration.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
@@ -128,7 +133,8 @@ type Client interface {
 	//   - error: Non-nil if rename fails, nil on success.
 	RenameContainer(ctx context.Context, container types.Container, newName string) error
 
-	// IsContainerStale checks if a container's image is outdated compared to the latest available version.
+	// IsContainerStale checks if a container's image is outdated compared to
+	// the latest available version.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
@@ -145,7 +151,8 @@ type Client interface {
 		params types.UpdateParams,
 	) (bool, types.ImageID, error)
 
-	// ExecuteCommand runs a command inside a container and returns whether to skip updates based on the result.
+	// ExecuteCommand runs a command inside a container and returns whether
+	// to skip updates based on the result.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
@@ -207,13 +214,20 @@ type Client interface {
 
 	// WaitForContainerHealthy waits for a container to become healthy or times out.
 	//
+	// The timeout parameter controls the maximum wait duration:
+	//   - timeout > 0: Wait up to the specified duration for the container to become healthy.
+	//   - timeout <= 0: Wait indefinitely until the container becomes healthy, unhealthy,
+	//     or the context is cancelled.
+	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
 	//   - containerID: ID of the container to wait for.
-	//   - timeout: Maximum duration to wait for health.
+	//   - timeout: Maximum duration to wait for health. Zero or negative values cause
+	//     indefinite waiting.
 	//
 	// Returns:
-	//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
+	//   - error: Non-nil if timeout is reached, container becomes unhealthy, or inspection
+	//     fails; nil if healthy or no health check is configured.
 	WaitForContainerHealthy(ctx context.Context, containerID types.ContainerID, timeout time.Duration) error
 
 	// UpdateContainer updates the configuration of an existing container.
@@ -263,7 +277,8 @@ type ClientOptions struct {
 
 // NewClient initializes a new Client instance for Docker API interactions.
 //
-// It configures the client using environment variables (e.g., DOCKER_HOST, DOCKER_API_VERSION) and validates the API version, falling back to autonegotiation if necessary.
+// It configures the client using environment variables (e.g., DOCKER_HOST, DOCKER_API_VERSION)
+// and validates the API version, falling back to autonegotiation if necessary.
 //
 // Parameters:
 //   - opts: Options to customize container management behavior.
@@ -272,7 +287,10 @@ type ClientOptions struct {
 //   - Client: Initialized client instance (exits on failure).
 func NewClient(opts ClientOptions) Client {
 	// Use a timeout context for Docker daemon initialization to prevent indefinite hangs.
-	ctx, cancel := context.WithTimeout(context.Background(), DaemonInitTimeout)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		DaemonInitTimeout,
+	)
 	defer cancel()
 
 	// Initialize client with autonegotiation, ignoring DOCKER_API_VERSION initially.
@@ -380,7 +398,13 @@ func (c client) ListContainers(ctx context.Context, filter ...types.Filter) ([]t
 	}
 
 	// Attempt to list source containers and handle errors by logging and returning them.
-	containers, err := ListSourceContainers(ctx, c.api, c.ClientOptions, containerFilter, isPodman)
+	containers, err := ListSourceContainers(
+		ctx,
+		c.api,
+		c.ClientOptions,
+		containerFilter,
+		isPodman,
+	)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
 
@@ -417,7 +441,8 @@ func (c client) GetContainer(ctx context.Context, containerID types.ContainerID)
 	return container, nil
 }
 
-// GetCurrentWatchtowerContainer retrieves container information for the specified container ID, skipping image inspection.
+// GetCurrentWatchtowerContainer retrieves container information for the
+// specified container ID, skipping image inspection.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -434,7 +459,10 @@ func (c client) GetCurrentWatchtowerContainer(
 
 	clog.Debug("Inspecting current Watchtower container")
 
-	containerInfo, err := c.api.ContainerInspect(ctx, string(containerID))
+	containerInfo, err := c.api.ContainerInspect(
+		ctx,
+		string(containerID),
+	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to inspect current Watchtower container")
 
@@ -486,7 +514,13 @@ func (c client) StopContainer(ctx context.Context, container types.Container, ti
 //   - error: Non-nil if stop/removal fails, nil on success.
 func (c client) StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
 	// Stop and remove container using helper function with volume option.
-	err := StopAndRemoveSourceContainer(ctx, c.api, container, timeout, c.RemoveVolumes)
+	err := StopAndRemoveSourceContainer(
+		ctx,
+		c.api,
+		container,
+		timeout,
+		c.RemoveVolumes,
+	)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"container": container.Name(),
@@ -504,7 +538,8 @@ func (c client) StopAndRemoveContainer(ctx context.Context, container types.Cont
 	return nil
 }
 
-// StartContainer creates and starts a new container based on an existing container's configuration.
+// StartContainer creates and starts a new container based on an
+// existing container's configuration.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -573,7 +608,11 @@ func (c client) UpdateContainer(
 
 	clog.Debug("Updating container configuration")
 
-	_, err := c.api.ContainerUpdate(ctx, string(container.ID()), config)
+	_, err := c.api.ContainerUpdate(
+		ctx,
+		string(container.ID()),
+		config,
+	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to update container")
 
@@ -601,9 +640,13 @@ func (c client) RemoveContainer(ctx context.Context, container types.Container) 
 
 	clog.Debug("Removing container")
 
-	err := c.api.ContainerRemove(ctx, string(container.ID()), dockerContainer.RemoveOptions{
-		Force: true,
-	})
+	err := c.api.ContainerRemove(
+		ctx,
+		string(container.ID()),
+		dockerContainer.RemoveOptions{
+			Force: true,
+		},
+	)
 	if err != nil && !cerrdefs.IsNotFound(err) {
 		clog.WithError(err).Debug("Failed to remove container")
 
@@ -689,7 +732,12 @@ func (c client) IsContainerStale(
 	// Use image client to perform staleness check.
 	imgClient := newImageClient(c.api)
 
-	stale, newestImage, err := imgClient.IsContainerStale(ctx, container, params, c.WarnOnHeadFailed)
+	stale, newestImage, err := imgClient.IsContainerStale(
+		ctx,
+		container,
+		params,
+		c.WarnOnHeadFailed,
+	)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"container": container.Name(),
@@ -766,7 +814,11 @@ func (c client) ExecuteCommand(
 
 	// Create the exec instance using the parent context.
 	// Timeout management is handled by waitForExecOrTimeout.
-	exec, err := c.api.ContainerExecCreate(ctx, string(container.ID()), execConfig)
+	exec, err := c.api.ContainerExecCreate(
+		ctx,
+		string(container.ID()),
+		execConfig,
+	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to create exec instance")
 
@@ -792,7 +844,12 @@ func (c client) ExecuteCommand(
 	}
 
 	// Wait for completion and evaluate result.
-	skipUpdate, err := c.waitForExecOrTimeout(ctx, exec.ID, output, timeout)
+	skipUpdate, err := c.waitForExecOrTimeout(
+		ctx,
+		exec.ID,
+		output,
+		timeout,
+	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to inspect exec instance")
 
@@ -923,18 +980,35 @@ func (c client) GetInfo(ctx context.Context) (map[string]any, error) {
 
 // WaitForContainerHealthy waits for a container to become healthy or times out.
 //
+// The timeout parameter controls the maximum wait duration:
+//   - timeout > 0: Wait up to the specified duration for the container to become healthy.
+//   - timeout <= 0: Wait indefinitely until the container becomes healthy, unhealthy,
+//     or the context is cancelled.
+//
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - containerID: ID of the container to wait for.
-//   - timeout: Maximum duration to wait for health.
+//   - timeout: Maximum duration to wait for health. Zero or negative values cause
+//     indefinite waiting.
 //
 // Returns:
-//   - error: Non-nil if timeout is reached or inspection fails, nil if healthy or no health check.
+//   - error: Non-nil if timeout is reached, container becomes unhealthy, or inspection
+//     fails; nil if healthy or no health check is configured.
 func (c client) WaitForContainerHealthy(
 	ctx context.Context,
 	containerID types.ContainerID,
 	timeout time.Duration,
 ) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	// Guard against zero/negative timeouts by using a non-deadline context.
+	// This allows the function to poll at least once rather than immediately timing out.
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+
 	defer cancel()
 
 	clog := logrus.WithField("container_id", containerID)
@@ -950,7 +1024,10 @@ func (c client) WaitForContainerHealthy(
 			return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
 		case <-ticker.C:
 			// Inspect the container to check health status
-			inspect, err := c.api.ContainerInspect(ctx, string(containerID))
+			inspect, err := c.api.ContainerInspect(
+				ctx,
+				string(containerID),
+			)
 			if err != nil {
 				clog.WithError(err).Debug("Failed to inspect container for health check")
 
@@ -984,7 +1061,8 @@ func (c client) WaitForContainerHealthy(
 	}
 }
 
-// detectPodman determines if the container runtime is Podman using multiple detection methods.
+// detectPodman determines if the container runtime is Podman using
+// multiple detection methods.
 //
 // It iterates through detection helpers in priority order, returning as soon as one
 // helper indicates Podman/Docker or an error occurs.
@@ -1128,7 +1206,10 @@ func (c client) detectPodmanByAPI(ctx context.Context) (bool, error) {
 
 	// Check ServerVersion field
 	if serverVersion, exists := info["ServerVersion"]; exists {
-		if sv, ok := serverVersion.(string); ok && strings.Contains(strings.ToLower(sv), "podman") {
+		if sv, ok := serverVersion.(string); ok && strings.Contains(
+			strings.ToLower(sv),
+			"podman",
+		) {
 			logrus.Debug("Detected Podman via API ServerVersion field")
 
 			return true, nil
@@ -1153,7 +1234,8 @@ func (c client) getPodmanFlag(ctx context.Context) bool {
 		return false
 	}
 
-	// Attempt to detect Podman using various methods (marker files, env vars, API info)
+	// Attempt to detect Podman using various methods
+	// (marker files, env vars, API info)
 	isPodman, err := c.detectPodman(ctx)
 	if err != nil {
 		// On detection failure, fall back to assuming Docker
@@ -1255,7 +1337,10 @@ func (c client) waitForExecOrTimeout(
 
 	// Set up context with timeout if specified.
 	if timeout > 0 {
-		execCtx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
+		execCtx, cancel = context.WithTimeout(
+			ctx,
+			time.Duration(timeout)*time.Minute,
+		)
 		defer cancel()
 	} else {
 		execCtx = ctx

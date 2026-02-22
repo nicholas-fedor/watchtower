@@ -2653,66 +2653,6 @@ func TestStopContainer_ContainerFailsToStopWithinTimeout(t *testing.T) {
 	})
 }
 
-func TestWaitForContainerHealthy_Timeout(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		mockedContainer := MockContainer()
-		cid := mockedContainer.ContainerInfo().ID
-
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == pingPath {
-				w.WriteHeader(http.StatusOK)
-
-				return
-			}
-
-			if strings.Contains(r.URL.Path, "/version") {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"ApiVersion": "1.40", "Version": "20.10.0"}`))
-
-				return
-			}
-
-			if strings.Contains(r.URL.Path, fmt.Sprintf("/containers/%s/json", cid)) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-
-				response := dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						ID: cid,
-						State: &dockerContainer.State{
-							Status: "running",
-							Health: &dockerContainer.Health{Status: "starting"},
-						},
-					},
-					Config: &dockerContainer.Config{},
-				}
-				json.NewEncoder(w).Encode(response)
-
-				return
-			}
-
-			w.WriteHeader(http.StatusNotFound)
-		}))
-		defer server.Close()
-
-		docker, _ := dockerClient.NewClientWithOpts(
-			dockerClient.WithHost(server.URL),
-			dockerClient.WithHTTPClient(server.Client()))
-
-		client := client{api: docker}
-
-		err := client.WaitForContainerHealthy(context.Background(), types.ContainerID(cid), 0)
-		if err == nil {
-			t.Fatal("expected timeout error, got nil")
-		}
-
-		if !strings.Contains(err.Error(), "timeout") {
-			t.Fatalf("expected error to contain 'timeout', got %q", err.Error())
-		}
-	})
-}
-
 // captureLogrus captures logrus output in a buffer for testing.
 //
 // Parameters:
