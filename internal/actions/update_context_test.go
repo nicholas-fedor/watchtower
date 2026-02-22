@@ -354,8 +354,6 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 
 	t.Run("StopContainer context error", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			expectedErrorPattern := ""
-
 			report, cleanupImageInfos, err := runErrorPropagationTest(
 				context.DeadlineExceeded,
 				allStale,
@@ -364,35 +362,30 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 
 			synctest.Wait()
 
-			if expectedErrorPattern != "" && err != nil {
-				if !strings.Contains(err.Error(), expectedErrorPattern) &&
-					!strings.Contains(err.Error(), "context") {
-					t.Fatalf("expected error containing '%s' or 'context', got: %s",
-						expectedErrorPattern, err.Error())
+			// Validate error is context-related or nil
+			if err != nil && !strings.Contains(err.Error(), "context") &&
+				!strings.Contains(err.Error(), "deadline") {
+				t.Fatalf("expected context-related error, got: %s", err.Error())
+			}
+
+			// Validate report processing counts match expected
+			if report != nil && len(allStale) > 0 {
+				totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
+				if totalProcessed != len(allStale) {
+					t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
+						len(allStale), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
 				}
 			}
 
-			// For non-cancellation errors, update should complete with report
-			if err == nil && report != nil {
-				// Update completed, check that cleanup was attempted
-				if len(allStale) > 0 {
-					// Some containers should have been processed
-					totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
-					if totalProcessed != len(allStale) {
-						t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
-							len(allStale), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
-					}
-				}
+			// Verify cleanupImageInfos is handled
+			if cleanupImageInfos == nil {
+				t.Fatal("expected cleanupImageInfos to be non-nil")
 			}
-
-			_ = cleanupImageInfos
 		})
 	})
 
 	t.Run("StartContainer context error", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			expectedErrorPattern := ""
-
 			report, cleanupImageInfos, err := runErrorPropagationTest(
 				context.Canceled,
 				allStale,
@@ -401,28 +394,25 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 
 			synctest.Wait()
 
-			if expectedErrorPattern != "" && err != nil {
-				if !strings.Contains(err.Error(), expectedErrorPattern) &&
-					!strings.Contains(err.Error(), "context") {
-					t.Fatalf("expected error containing '%s' or 'context', got: %s",
-						expectedErrorPattern, err.Error())
+			// Validate error is context-related or nil
+			if err != nil && !strings.Contains(err.Error(), "context") &&
+				!strings.Contains(err.Error(), "cancel") {
+				t.Fatalf("expected context-related error, got: %s", err.Error())
+			}
+
+			// Validate report processing counts match expected
+			if report != nil && len(allStale) > 0 {
+				totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
+				if totalProcessed != len(allStale) {
+					t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
+						len(allStale), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
 				}
 			}
 
-			// For non-cancellation errors, update should complete with report
-			if err == nil && report != nil {
-				// Update completed, check that cleanup was attempted
-				if len(allStale) > 0 {
-					// Some containers should have been processed
-					totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
-					if totalProcessed != len(allStale) {
-						t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
-							len(allStale), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
-					}
-				}
+			// Verify cleanupImageInfos is handled
+			if cleanupImageInfos == nil {
+				t.Fatal("expected cleanupImageInfos to be non-nil")
 			}
-
-			_ = cleanupImageInfos
 		})
 	})
 }
