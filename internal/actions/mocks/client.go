@@ -190,14 +190,28 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 // StartContainer simulates starting a container, returning the container's ID.
 // It provides a minimal implementation for testing purposes.
 // Returns the configured StartContainerError if set.
-func (client MockClient) StartContainer(_ context.Context, c types.Container) (types.ContainerID, error) {
+func (client MockClient) StartContainer(ctx context.Context, c types.Container) (types.ContainerID, error) {
 	client.TestData.StartContainerCount++
 
 	// Simulate latency for context cancellation testing when configured
 	if client.TestData.SimulatedLatency > 0 {
-		time.Sleep(client.TestData.SimulatedLatency)
+		select {
+		case <-time.After(client.TestData.SimulatedLatency):
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-client.ctx.Done():
+			return "", client.ctx.Err()
+		}
 	}
 
+	// Check passed context for cancellation
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+	}
+
+	// Also check client.ctx for backward compatibility
 	if client.ctx != nil {
 		select {
 		case <-client.ctx.Done():
