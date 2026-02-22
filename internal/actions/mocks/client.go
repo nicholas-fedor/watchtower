@@ -209,11 +209,11 @@ func (client MockClient) StartContainer(ctx context.Context, c types.Container) 
 // RenameContainer simulates renaming a container, incrementing the RenameContainerCount.
 // It returns nil to indicate success without modifying any state.
 func (client MockClient) RenameContainer(ctx context.Context, _ types.Container, _ string) error {
+	client.TestData.RenameContainerCount++
+
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return err
 	}
-
-	client.TestData.RenameContainerCount++
 
 	return nil
 }
@@ -221,11 +221,11 @@ func (client MockClient) RenameContainer(ctx context.Context, _ types.Container,
 // UpdateContainer simulates updating a container's configuration.
 // It increments the UpdateContainerCount and returns the configured error if set.
 func (client MockClient) UpdateContainer(ctx context.Context, _ types.Container, _ dockerContainer.UpdateConfig) error {
+	client.TestData.UpdateContainerCount++
+
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return err
 	}
-
-	client.TestData.UpdateContainerCount++
 
 	return client.TestData.UpdateContainerError
 }
@@ -233,11 +233,12 @@ func (client MockClient) UpdateContainer(ctx context.Context, _ types.Container,
 // RemoveImageByID increments the count of image removal attempts in TestData.
 // It simulates image cleanup and returns configured error if set or if image ID is in FailedImageIDs, nil otherwise.
 func (client MockClient) RemoveImageByID(ctx context.Context, imageID types.ImageID, _ string) error {
+	client.TestData.TriedToRemoveImageCount++
+
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return err
 	}
 
-	client.TestData.TriedToRemoveImageCount++
 	if slices.Contains(client.TestData.FailedImageIDs, imageID) {
 		return client.TestData.RemoveImageError
 	}
@@ -342,11 +343,11 @@ func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {
 // WaitForContainerHealthy simulates waiting for a container to become healthy.
 // It increments the count and returns nil to indicate success.
 func (client MockClient) WaitForContainerHealthy(ctx context.Context, _ types.ContainerID, _ time.Duration) error {
+	client.TestData.WaitForContainerHealthyCount++
+
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return err
 	}
-
-	client.TestData.WaitForContainerHealthyCount++
 
 	return nil
 }
