@@ -1002,6 +1002,12 @@ func stopContainersInReversedOrder(
 	// Stop containers in reverse order to avoid breaking dependencies.
 	for i := len(containers) - 1; i >= 0; i-- {
 		c := containers[i]
+
+		// Check for context cancellation to avoid additional work when context is canceled.
+		if ctx.Err() != nil {
+			return failed, stopped
+		}
+
 		fields := logrus.Fields{
 			"container": c.Name(),
 			"image":     c.ImageName(),
@@ -1153,6 +1159,11 @@ func restartContainersInSortedOrder(
 
 	// Restart containers in sorted order to respect dependency chains.
 	for _, c := range containers {
+		// Check for context cancellation to avoid additional work when context is canceled.
+		if ctx.Err() != nil {
+			return failed
+		}
+
 		if !c.ToRestart() {
 			continue
 		}

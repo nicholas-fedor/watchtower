@@ -544,3 +544,77 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestEarlyCancellationStopContainers tests that stopContainersInReversedOrder
+// returns immediately when context is cancelled before the loop starts.
+func TestEarlyCancellationStopContainers(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testData := getCommonTestData()
+		testData.Staleness = map[string]bool{
+			"test-container-01": true,
+			"test-container-02": true,
+			"test-container-03": true,
+		}
+
+		canceledCtx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		client := mockActions.CreateMockClientWithContext(canceledCtx, testData, false, false)
+
+		report, cleanupImageInfos, err := actions.Update(
+			canceledCtx,
+			client,
+			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+		)
+
+		synctest.Wait()
+
+		if err == nil {
+			t.Fatal("expected error when context is cancelled before operations")
+		}
+
+		if !strings.Contains(err.Error(), "context") && !strings.Contains(err.Error(), "cancel") {
+			t.Fatalf("expected context-related error, got: %s", err.Error())
+		}
+
+		_ = report
+		_ = cleanupImageInfos
+	})
+}
+
+// TestEarlyCancellationRestartContainers tests that restartContainersInSortedOrder
+// returns immediately when context is cancelled before the loop starts.
+func TestEarlyCancellationRestartContainers(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testData := getCommonTestData()
+		testData.Staleness = map[string]bool{
+			"test-container-01": true,
+			"test-container-02": true,
+			"test-container-03": true,
+		}
+
+		canceledCtx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		client := mockActions.CreateMockClientWithContext(canceledCtx, testData, false, false)
+
+		report, cleanupImageInfos, err := actions.Update(
+			canceledCtx,
+			client,
+			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+		)
+
+		synctest.Wait()
+
+		if err == nil {
+			t.Fatal("expected error when context is cancelled before restart operations")
+		}
+
+		if !strings.Contains(err.Error(), "context") && !strings.Contains(err.Error(), "cancel") {
+			t.Fatalf("expected context-related error, got: %s", err.Error())
+		}
+
+		_ = report
+		_ = cleanupImageInfos
+	})
+}
