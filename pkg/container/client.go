@@ -730,18 +730,6 @@ func (c client) ExecuteCommand(
 ) (bool, error) {
 	clog := logrus.WithField("container_id", container.ID())
 
-	var (
-		execCtx    context.Context
-		cancelFunc context.CancelFunc
-	)
-
-	if timeout > 0 {
-		execCtx, cancelFunc = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
-		defer cancelFunc()
-	} else {
-		execCtx = ctx
-	}
-
 	// Generate JSON metadata for the container.
 	metadataJSON, err := generateContainerMetadata(container)
 	if err != nil {
@@ -776,8 +764,9 @@ func (c client) ExecuteCommand(
 		User:   user,
 	}
 
-	// Create the exec instance.
-	exec, err := c.api.ContainerExecCreate(execCtx, string(container.ID()), execConfig)
+	// Create the exec instance using the parent context.
+	// Timeout management is handled by waitForExecOrTimeout.
+	exec, err := c.api.ContainerExecCreate(ctx, string(container.ID()), execConfig)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to create exec instance")
 
