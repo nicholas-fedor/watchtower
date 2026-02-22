@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"os/signal"
@@ -331,8 +332,15 @@ func preRun(cmd *cobra.Command, _ []string) {
 		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
 	})
 
+	// Create a timeout-bound context for Docker API lookups to prevent hanging indefinitely.
+	// This ensures the container ID lookup fails fast if the Docker API is unresponsive.
+	const containerLookupTimeout = 5 * time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), containerLookupTimeout)
+	defer cancel()
+
 	// Retrieve and store the current container ID for use throughout the application.
-	currentWatchtowerContainerID, err = container.GetCurrentContainerID(context.Background(), client)
+	currentWatchtowerContainerID, err = container.GetCurrentContainerID(ctx, client)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to get current container ID")
 
@@ -342,11 +350,18 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Retrieve the current Watchtower container.
 	if currentWatchtowerContainerID != "" {
 		currentWatchtowerContainer, err = client.GetCurrentWatchtowerContainer(
-			context.Background(),
+			ctx,
 			currentWatchtowerContainerID,
 		)
 		if err != nil {
 			logrus.WithError(err).Debug("Failed to get the current Watchtower Container")
+
+			// Handle context deadline exceeded or cancellation
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				currentWatchtowerContainerID = ""
+			}
+
+			currentWatchtowerContainer = nil
 		}
 	}
 
