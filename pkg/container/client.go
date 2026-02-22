@@ -42,6 +42,8 @@ const (
 var (
 	// errHealthCheckTimeout indicates that waiting for a container to become healthy timed out.
 	errHealthCheckTimeout = errors.New("timeout waiting for container to become healthy")
+	// errHealthCheckCanceled indicates that waiting for a container to become healthy was canceled.
+	errHealthCheckCanceled = errors.New("context canceled while waiting for container to become healthy")
 	// errHealthCheckFailed indicates that a container's health check failed.
 	errHealthCheckFailed = errors.New("container health check failed")
 )
@@ -1031,9 +1033,16 @@ func (c client) WaitForContainerHealthy(
 	for {
 		select {
 		case <-ctx.Done():
-			clog.Warn("Timeout waiting for container to become healthy")
+			// Distinguish between timeout and cancellation for clearer diagnostics
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				clog.Warn("Timeout waiting for container to become healthy")
 
-			return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
+				return fmt.Errorf("%w: %s", errHealthCheckTimeout, containerID)
+			}
+			// Context was cancelled (e.g., graceful shutdown, parent cancellation)
+			clog.Debug("Context canceled while waiting for container to become healthy")
+
+			return fmt.Errorf("%w: %s", errHealthCheckCanceled, containerID)
 		case <-ticker.C:
 			// Inspect the container to check health status
 			inspect, err := c.api.ContainerInspect(
