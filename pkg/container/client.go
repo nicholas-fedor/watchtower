@@ -46,6 +46,18 @@ var (
 	errHealthCheckFailed = errors.New("container health check failed")
 )
 
+// Runtime represents the type of container runtime detected.
+type Runtime int
+
+const (
+	// RuntimeUnknown indicates no container runtime has been detected.
+	RuntimeUnknown Runtime = iota
+	// RuntimeDocker indicates Docker is the container runtime.
+	RuntimeDocker
+	// RuntimePodman indicates Podman is the container runtime.
+	RuntimePodman
+)
+
 // Client defines the interface for interacting with the Docker API within Watchtower.
 //
 // It provides methods for managing containers, images, and executing commands,
@@ -374,7 +386,7 @@ func NewClient(opts ClientOptions) Client {
 //   - error: Non-nil if listing fails, nil on success.
 func (c client) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
-	isPodman := c.getPodmanFlag(ctx)
+	isPodman := c.getRuntime(ctx)
 
 	var containerFilter types.Filter
 
@@ -554,7 +566,7 @@ func (c client) StartContainer(ctx context.Context, container types.Container) (
 		"image":     container.ImageName(),
 	}
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
-	isPodman := c.getPodmanFlag(ctx)
+	isPodman := c.getRuntime(ctx)
 
 	clientVersion := c.GetVersion()
 
@@ -1061,8 +1073,7 @@ func (c client) WaitForContainerHealthy(
 	}
 }
 
-// detectPodman determines if the container runtime is Podman using
-// multiple detection methods.
+// detectRuntime determines the container runtime using multiple detection methods.
 //
 // It iterates through detection helpers in priority order, returning as soon as one
 // helper indicates Podman/Docker or an error occurs.
@@ -1073,99 +1084,76 @@ func (c client) WaitForContainerHealthy(
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
 //   - error: Non-nil if detection fails, nil on success.
-func (c client) detectPodman(ctx context.Context) (bool, error) {
+func (c client) detectRuntime(ctx context.Context) (bool, error) {
 	// Priority 1: Check for marker files (Podman or Docker)
-	isPodman, err := c.detectPodmanByMarker()
+	runtime, err := c.detectRuntimeByMarker()
 	if err != nil {
 		return false, err
 	}
 
-	if isPodman {
+	// Handle the detected runtime from marker files
+	switch runtime {
+	case RuntimePodman:
 		return true, nil
-	}
-
-	// If marker indicates Docker, return false (not Podman)
-	// Otherwise continue to next detection method
-	gotResult, _ := c.checkDockerMarker()
-	if gotResult {
+	case RuntimeDocker:
 		return false, nil
+	case RuntimeUnknown:
+		// Continue to next detection method
+	default:
+		// Continue to next detection method
 	}
 
 	// Priority 2: Check CONTAINER environment variable
-	if c.detectPodmanByEnv() {
+	if c.detectRuntimeByEnv() {
 		return true, nil
 	}
 
 	// Priority 3: API-based detection
-	return c.detectPodmanByAPI(ctx)
+	return c.detectRuntimeByAPI(ctx)
 }
 
-// detectPodmanByMarker checks for container runtime marker files.
+// detectRuntimeByMarker checks for container runtime marker files.
 //
 // It first checks for Podman's marker file, then checks for Docker's marker file.
-// The function returns (true, nil) if Podman is detected, (false, nil) if Docker
-// is detected, and (false, error) if neither marker file exists.
 //
 // Parameters:
 //   - c: The client instance for filesystem access.
 //
 // Returns:
-//   - bool: True if Podman marker found, false if Docker marker found or no marker found.
+//   - Runtime: The detected container runtime (RuntimePodman, RuntimeDocker, or RuntimeUnknown).
 //   - error: Non-nil if checking fails, nil on success.
-func (c client) detectPodmanByMarker() (bool, error) {
+func (c client) detectRuntimeByMarker() (Runtime, error) {
 	// Check for Podman marker file
 	_, err := c.Fs.Stat("/run/.containerenv")
 	if err == nil {
 		logrus.Debug("Detected Podman via marker file /run/.containerenv")
 
-		return true, nil
+		return RuntimePodman, nil
 	}
 
 	// Check for Docker marker file
-	hasDockerMarker, dockerErr := c.checkDockerMarker()
-	if dockerErr != nil {
-		return false, dockerErr
-	}
-
-	if hasDockerMarker {
+	_, err = c.Fs.Stat("/.dockerenv")
+	if err == nil {
 		logrus.Debug("Detected Docker via marker file /.dockerenv")
 
-		return false, nil
-	}
-
-	// No marker files found
-	return false, nil
-}
-
-// checkDockerMarker checks for Docker's marker file.
-//
-// Parameters:
-//   - c: The client instance for filesystem access.
-//
-// Returns:
-//   - bool: True if Docker marker file exists.
-//   - error: Error if stat fails (excluding file not found).
-func (c client) checkDockerMarker() (bool, error) {
-	_, err := c.Fs.Stat("/.dockerenv")
-	if err == nil {
-		return true, nil
+		return RuntimeDocker, nil
 	}
 
 	if os.IsNotExist(err) {
-		return false, nil
+		// No marker files found
+		return RuntimeUnknown, nil
 	}
 
-	return false, fmt.Errorf("failed to check Docker marker file: %w", err)
+	// Error checking marker files
+	return RuntimeUnknown, fmt.Errorf("failed to check container runtime marker files: %w", err)
 }
 
-// detectPodmanByEnv checks the CONTAINER environment variable for Podman indicators.
-//
 // It checks if the CONTAINER environment variable is set to "podman" or "oci",
 // both of which indicate Podman is the container runtime.
 //
 // Returns:
 //   - bool: True if CONTAINER env var indicates Podman, false otherwise.
-func (c client) detectPodmanByEnv() bool {
+func (c client) detectRuntimeByEnv() bool {
 	container := os.Getenv("CONTAINER")
 	if container == "podman" || container == "oci" {
 		logrus.Debug("Detected Podman via CONTAINER environment variable")
@@ -1176,7 +1164,7 @@ func (c client) detectPodmanByEnv() bool {
 	return false
 }
 
-// detectPodmanByAPI uses the Docker API to detect if the runtime is Podman.
+// detectRuntimeByAPI uses the Docker API to detect if the runtime is Podman.
 //
 // It queries the system info endpoint and checks the Name and ServerVersion
 // fields for Podman indicators.
@@ -1188,7 +1176,7 @@ func (c client) detectPodmanByEnv() bool {
 // Returns:
 //   - bool: True if Podman is detected via API, false otherwise.
 //   - error: Non-nil if API call fails, nil on success.
-func (c client) detectPodmanByAPI(ctx context.Context) (bool, error) {
+func (c client) detectRuntimeByAPI(ctx context.Context) (bool, error) {
 	info, err := c.GetInfo(ctx)
 	if err != nil {
 		logrus.WithError(err).
@@ -1221,14 +1209,14 @@ func (c client) detectPodmanByAPI(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-// getPodmanFlag determines if Podman detection is needed and performs it.
+// getRuntime determines if Podman detection is needed and performs it.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
-func (c client) getPodmanFlag(ctx context.Context) bool {
+func (c client) getRuntime(ctx context.Context) bool {
 	// Only perform detection in auto mode; otherwise, assume Docker
 	if c.CPUCopyMode != CPUCopyModeAuto {
 		return false
@@ -1236,7 +1224,7 @@ func (c client) getPodmanFlag(ctx context.Context) bool {
 
 	// Attempt to detect Podman using various methods
 	// (marker files, env vars, API info)
-	isPodman, err := c.detectPodman(ctx)
+	isPodman, err := c.detectRuntime(ctx)
 	if err != nil {
 		// On detection failure, fall back to assuming Docker
 		logrus.WithError(err).Debug("Failed to detect container runtime, falling back to Docker")

@@ -760,7 +760,7 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 
-		ginkgo.Describe("getPodmanFlag", func() {
+		ginkgo.Describe("getRuntime", func() {
 			ginkgo.When("CPUCopyMode is auto", func() {
 				ginkgo.It("should detect Podman via marker file", func() {
 					memFs := afero.NewMemMapFs()
@@ -772,7 +772,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag(context.Background())
+					result := testClient.getRuntime(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -789,7 +789,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag(context.Background())
+					result := testClient.getRuntime(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -812,7 +812,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag(context.Background())
+					result := testClient.getRuntime(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -835,7 +835,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag(context.Background())
+					result := testClient.getRuntime(context.Background())
 					gomega.Expect(result).To(gomega.BeTrue())
 				})
 
@@ -858,7 +858,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag(context.Background())
+					result := testClient.getRuntime(context.Background())
 					gomega.Expect(result).To(gomega.BeFalse())
 				})
 
@@ -882,7 +882,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag(context.Background())
+					result := testClient.getRuntime(context.Background())
 					gomega.Expect(result).To(gomega.BeFalse())
 					gomega.Eventually(logbuf).
 						Should(gbytes.Say("Failed to detect container runtime, falling back to Docker"))
@@ -899,7 +899,7 @@ var _ = ginkgo.Describe("the client", func() {
 							Fs:          memFs,
 						},
 					}
-					result := testClient.getPodmanFlag(context.Background())
+					result := testClient.getRuntime(context.Background())
 					gomega.Expect(result).To(gomega.BeFalse())
 					// No API calls should have been made
 					gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
@@ -908,9 +908,9 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 	})
 
-	// Test suite for detectPodmanByMarker helper function.
-	ginkgo.Describe("detectPodmanByMarker", func() {
-		ginkgo.It("should return true when Podman marker file exists", func() {
+	// Test suite for detectRuntimeByMarker helper function.
+	ginkgo.Describe("detectRuntimeByMarker", func() {
+		ginkgo.It("should return RuntimePodman when Podman marker file exists", func() {
 			memFs := afero.NewMemMapFs()
 			afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
 			testClient := client{
@@ -918,12 +918,12 @@ var _ = ginkgo.Describe("the client", func() {
 					Fs: memFs,
 				},
 			}
-			result, err := testClient.detectPodmanByMarker()
+			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.BeTrue())
+			gomega.Expect(result).To(gomega.Equal(RuntimePodman))
 		})
 
-		ginkgo.It("should return false when Docker marker file exists", func() {
+		ginkgo.It("should return RuntimeDocker when Docker marker file exists", func() {
 			memFs := afero.NewMemMapFs()
 			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
 			testClient := client{
@@ -931,24 +931,24 @@ var _ = ginkgo.Describe("the client", func() {
 					Fs: memFs,
 				},
 			}
-			result, err := testClient.detectPodmanByMarker()
+			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.BeFalse())
+			gomega.Expect(result).To(gomega.Equal(RuntimeDocker))
 		})
 
-		ginkgo.It("should return false when neither marker file exists", func() {
+		ginkgo.It("should return RuntimeUnknown when neither marker file exists", func() {
 			memFs := afero.NewMemMapFs()
 			testClient := client{
 				ClientOptions: ClientOptions{
 					Fs: memFs,
 				},
 			}
-			result, err := testClient.detectPodmanByMarker()
+			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.BeFalse())
+			gomega.Expect(result).To(gomega.Equal(RuntimeUnknown))
 		})
 
-		ginkgo.It("should return true when Podman marker exists alongside Docker marker", func() {
+		ginkgo.It("should return RuntimePodman when Podman marker exists alongside Docker marker", func() {
 			memFs := afero.NewMemMapFs()
 			afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
 			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
@@ -957,48 +957,19 @@ var _ = ginkgo.Describe("the client", func() {
 					Fs: memFs,
 				},
 			}
-			result, err := testClient.detectPodmanByMarker()
+			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.BeTrue())
+			gomega.Expect(result).To(gomega.Equal(RuntimePodman))
 		})
 	})
 
-	// Test suite for checkDockerMarker helper function.
-	ginkgo.Describe("checkDockerMarker", func() {
-		ginkgo.It("should return true when Docker marker file exists", func() {
-			memFs := afero.NewMemMapFs()
-			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
-			testClient := client{
-				ClientOptions: ClientOptions{
-					Fs: memFs,
-				},
-			}
-			result, err := testClient.checkDockerMarker()
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.BeTrue())
-		})
-
-		ginkgo.It("should return false when Docker marker file does not exist", func() {
-			memFs := afero.NewMemMapFs()
-			testClient := client{
-				ClientOptions: ClientOptions{
-					Fs: memFs,
-				},
-			}
-			result, err := testClient.checkDockerMarker()
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(result).To(gomega.BeFalse())
-		})
-	})
-
-	// Test suite for detectPodmanByEnv helper function.
-	ginkgo.Describe("detectPodmanByEnv", func() {
+	ginkgo.Describe("detectRuntimeByEnv", func() {
 		ginkgo.It("should return true when CONTAINER is podman", func() {
 			restore := withEnvVars(map[string]string{"CONTAINER": "podman"})
 			defer restore()
 
 			testClient := client{}
-			result := testClient.detectPodmanByEnv()
+			result := testClient.detectRuntimeByEnv()
 			gomega.Expect(result).To(gomega.BeTrue())
 		})
 
@@ -1007,7 +978,7 @@ var _ = ginkgo.Describe("the client", func() {
 			defer restore()
 
 			testClient := client{}
-			result := testClient.detectPodmanByEnv()
+			result := testClient.detectRuntimeByEnv()
 			gomega.Expect(result).To(gomega.BeTrue())
 		})
 
@@ -1016,7 +987,7 @@ var _ = ginkgo.Describe("the client", func() {
 			defer restore()
 
 			testClient := client{}
-			result := testClient.detectPodmanByEnv()
+			result := testClient.detectRuntimeByEnv()
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
@@ -1025,7 +996,7 @@ var _ = ginkgo.Describe("the client", func() {
 			defer restore()
 
 			testClient := client{}
-			result := testClient.detectPodmanByEnv()
+			result := testClient.detectRuntimeByEnv()
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
@@ -1033,7 +1004,7 @@ var _ = ginkgo.Describe("the client", func() {
 			os.Unsetenv("CONTAINER")
 
 			testClient := client{}
-			result := testClient.detectPodmanByEnv()
+			result := testClient.detectRuntimeByEnv()
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 
@@ -1042,13 +1013,13 @@ var _ = ginkgo.Describe("the client", func() {
 			defer restore()
 
 			testClient := client{}
-			result := testClient.detectPodmanByEnv()
+			result := testClient.detectRuntimeByEnv()
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
 	})
 
-	// Test suite for detectPodmanByAPI helper function.
-	ginkgo.Describe("detectPodmanByAPI", func() {
+	// Test suite for detectRuntimeByAPI helper function.
+	ginkgo.Describe("detectRuntimeByAPI", func() {
 		ginkgo.It("should return true when API returns Name podman", func() {
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -1060,7 +1031,7 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			testClient := client{api: docker}
-			result, err := testClient.detectPodmanByAPI(context.Background())
+			result, err := testClient.detectRuntimeByAPI(context.Background())
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.BeTrue())
 		})
@@ -1076,7 +1047,7 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			testClient := client{api: docker}
-			result, err := testClient.detectPodmanByAPI(context.Background())
+			result, err := testClient.detectRuntimeByAPI(context.Background())
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.BeTrue())
 		})
@@ -1094,7 +1065,7 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			testClient := client{api: docker}
-			result, err := testClient.detectPodmanByAPI(context.Background())
+			result, err := testClient.detectRuntimeByAPI(context.Background())
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
@@ -1108,7 +1079,7 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			testClient := client{api: docker}
-			result, err := testClient.detectPodmanByAPI(context.Background())
+			result, err := testClient.detectRuntimeByAPI(context.Background())
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
@@ -1122,7 +1093,7 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			testClient := client{api: docker}
-			result, err := testClient.detectPodmanByAPI(context.Background())
+			result, err := testClient.detectRuntimeByAPI(context.Background())
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(result).To(gomega.BeFalse())
 		})
