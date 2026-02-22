@@ -92,7 +92,13 @@ func CreateMockClientWithContext(
 func (client MockClient) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
 	// Simulate latency for context cancellation testing when configured
 	if client.TestData.SimulatedLatency > 0 {
-		time.Sleep(client.TestData.SimulatedLatency)
+		select {
+		case <-time.After(client.TestData.SimulatedLatency):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-client.ctx.Done():
+			return nil, client.ctx.Err()
+		}
 	}
 
 	// Check passed context for cancellation
@@ -140,7 +146,13 @@ func (client MockClient) StopContainer(ctx context.Context, c types.Container, _
 
 	// Simulate latency for context cancellation testing when configured
 	if client.TestData.SimulatedLatency > 0 {
-		time.Sleep(client.TestData.SimulatedLatency)
+		select {
+		case <-time.After(client.TestData.SimulatedLatency):
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-client.ctx.Done():
+			return client.ctx.Err()
+		}
 	}
 
 	// Check passed context for cancellation
@@ -325,7 +337,13 @@ func (client MockClient) IsContainerStale(
 
 	// Simulate latency for context cancellation testing when configured
 	if client.TestData.SimulatedLatency > 0 {
-		time.Sleep(client.TestData.SimulatedLatency)
+		select {
+		case <-time.After(client.TestData.SimulatedLatency):
+		case <-ctx.Done():
+			return false, "", ctx.Err()
+		case <-client.ctx.Done():
+			return false, "", client.ctx.Err()
+		}
 	}
 
 	// Check passed context for cancellation
