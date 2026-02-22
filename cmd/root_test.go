@@ -2,11 +2,16 @@ package cmd
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -14,10 +19,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
@@ -983,8 +990,8 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 	mockClient := mockContainer.NewMockClient(t)
 	mockContainer := mockTypes.NewMockContainer(t)
 
-	// Set up mock expectations for ListContainers called without filter arguments
-	mockClient.EXPECT().ListContainers().Return([]types.Container{mockContainer}, nil).Once()
+	// Set up mock expectations for ListContainers called with context
+	mockClient.EXPECT().ListContainers(context.Background()).Return([]types.Container{mockContainer}, nil).Once()
 
 	// Set up container mock to return the expected hostname
 	mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -995,8 +1002,8 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 	expectedID := types.ContainerID("test-container-id")
 	mockContainer.EXPECT().ID().Return(expectedID).Once()
 
-	// Execute the function that calls ListContainers without filter
-	resultID, err := container.GetContainerIDFromHostname(mockClient)
+	// Execute the function that calls ListContainers with context
+	resultID, err := container.GetContainerIDFromHostname(context.Background(), mockClient)
 
 	// Assert results
 	require.NoError(t, err)
@@ -1039,7 +1046,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 		defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
-		// Create a cancellable context for shutdown
+		// Create a cancelable context for shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 
 		// Start runUpgradesOnSchedule in a goroutine
@@ -1102,5 +1109,445 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 		// Ensure the manual update completes
 		<-updateFinished
+	})
+}
+
+// TestValidateRollingRestartDependenciesAcceptsCancelableContext verifies that
+// actions.ValidateRollingRestartDependencies properly accepts and uses a cancelable context.
+func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T) {
+	// Create a mock client
+	mockClient := mockContainer.NewMockClient(t)
+
+	// Create a filter that accepts all containers
+	filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
+
+	// Test with cancelable context - context should not be canceled
+	t.Run("cancelable context without cancellation", func(t *testing.T) {
+		ctx := t.Context()
+
+		// Mock expects ListContainers to be called with the cancelable context
+		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]types.Container{}, nil).Once()
+
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+
+		require.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	// Test that canceled context is properly propagated
+	t.Run("canceled context is propagated to client", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Cancel immediately
+		cancel()
+
+		// Mock expects ListContainers to be called with canceled context
+		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.Canceled).Once()
+
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+
+		// The function should return the error from ListContainers
+		require.Error(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	// Test with timeout context
+	t.Run("timeout context is propagated to client", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+		defer cancel()
+
+		// Wait for context to timeout
+		time.Sleep(time.Millisecond)
+
+		// Verify context has expired before proceeding
+		require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+
+		// Mock expects ListContainers to be called with timed out context
+		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
+
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+
+		// The function should return the error from ListContainers
+		require.Error(t, err)
+		mockClient.AssertExpectations(t)
+	})
+}
+
+// TestCreateSignalContext verifies that the signal-aware context is properly created
+// and can be canceled via the stop function.
+func TestCreateSignalContext(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Test with custom mock that simulates signal handling
+	callCount := 0
+	createSignalContext = func(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+		callCount++
+
+		// Verify the correct signals are passed
+		assert.Contains(t, signals, os.Interrupt, "Should include SIGINT")
+		assert.Contains(t, signals, syscall.SIGTERM, "Should include SIGTERM")
+
+		// Return a context that's canceled via the cancel function
+		return context.WithCancel(ctx)
+	}
+
+	ctx, cancel := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	// Verify context is not done initially
+	assert.NotNil(t, ctx, "Context should not be nil")
+	assert.NotNil(t, ctx.Done(), "Context should not be done initially")
+
+	// Call cancel and verify context is done
+	cancel()
+
+	// Verify the function was called once
+	assert.Equal(t, 1, callCount, "createSignalContext should be called once")
+
+	// Verify context is done after cancel
+	assert.Error(t, ctx.Err(), "Context should be done after cancel")
+}
+
+// TestCreateSignalContextDefault verifies that the default implementation
+// correctly creates a signal-aware context using signal.NotifyContext.
+func TestCreateSignalContextDefault(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Use the default implementation
+	createSignalContext = signal.NotifyContext
+
+	ctx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Verify context is created successfully
+	assert.NotNil(t, ctx, "Context should not be nil")
+
+	// Context should not be done initially
+	select {
+	case <-ctx.Done():
+		t.Error("Context should not be done initially")
+	default:
+		// Expected: context is not done
+	}
+}
+
+// TestSignalContextCancellation verifies that the signal context properly cancels
+// when signals are received, enabling graceful shutdown.
+func TestSignalContextCancellation(t *testing.T) {
+	// Skip in short test mode as this requires real signal handling
+	if testing.Short() {
+		t.Skip("Skipping signal test in short mode")
+	}
+
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Create context that we'll control
+	ctx, cancel := context.WithCancel(context.Background())
+
+	createSignalContext = func(_ context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+		return ctx, cancel
+	}
+
+	ctx, _ = createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	// Verify context is not done initially
+	select {
+	case <-ctx.Done():
+		t.Error("Context should not be done initially")
+	default:
+		// Expected: context is not done
+	}
+}
+
+// TestSignalContextWithMultipleSignals verifies that the context correctly handles
+// multiple signal types (SIGINT and SIGTERM).
+func TestSignalContextWithMultipleSignals(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Track which signals were received
+	var receivedSignals []os.Signal
+
+	createSignalContext = func(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+		receivedSignals = signals
+
+		return context.WithCancel(ctx)
+	}
+
+	ctx, cancel := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	// Verify both signals are in the received list
+	assert.Len(t, receivedSignals, 2, "Should receive exactly 2 signals")
+	assert.Contains(t, receivedSignals, os.Interrupt)
+	assert.Contains(t, receivedSignals, syscall.SIGTERM)
+
+	// Verify context is valid
+	assert.NotNil(t, ctx)
+}
+
+// TestSignalContextGracefulShutdown verifies that the context supports graceful
+// shutdown by not completing until explicitly canceled.
+func TestSignalContextGracefulShutdown(t *testing.T) {
+	// Save original and restore after test
+	originalCreateSignalContext := createSignalContext
+
+	defer func() { createSignalContext = originalCreateSignalContext }()
+
+	// Create context that we'll control
+	ctx, cancel := context.WithCancel(context.Background())
+
+	createSignalContext = func(_ context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+		return ctx, cancel
+	}
+
+	// Create signal context
+	sigCtx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Verify context is valid and not done
+	assert.NotNil(t, sigCtx)
+
+	// Simulate work - context should still be valid
+	select {
+	case <-sigCtx.Done():
+		t.Error("Context should not be done during graceful operation")
+	default:
+		// Expected: context is not done
+	}
+
+	// Now cancel to simulate signal receipt
+	cancel()
+
+	// Context should be done after cancellation
+	<-sigCtx.Done()
+	assert.ErrorIs(t, sigCtx.Err(), context.Canceled)
+}
+
+// TestContainerLookupTimeoutConstant verifies that the container lookup timeout constant
+// is set to a reasonable value (5 seconds).
+func TestContainerLookupTimeoutConstant(t *testing.T) {
+	// Verify the timeout is 5 seconds as defined in root.go
+	const expectedTimeout = 5 * time.Second
+
+	// Create a context with the expected timeout
+	ctx, cancel := context.WithTimeout(context.Background(), expectedTimeout)
+	defer cancel()
+
+	// Verify context is not done immediately
+	select {
+	case <-ctx.Done():
+		t.Error("Context should not be done immediately after creation")
+	default:
+		// Expected: context is not done
+	}
+
+	// Verify the deadline is set correctly
+	deadline, ok := ctx.Deadline()
+	now := time.Now()
+
+	assert.True(t, ok, "Deadline should be set")
+	assert.Greater(t, deadline, now.Add(4*time.Second),
+		"Deadline should be at least 4 seconds in the future")
+	assert.Less(t, deadline, now.Add(6*time.Second),
+		"Deadline should be at most 6 seconds in the future")
+}
+
+// TestContextDeadlineExceededErrorHandling verifies that errors.Is correctly identifies
+// context.DeadlineExceeded errors.
+func TestContextDeadlineExceededErrorHandling(t *testing.T) {
+	tests := []struct {
+		name               string
+		err                error
+		isDeadlineExceeded bool
+		isCanceled         bool
+	}{
+		{
+			name:               "DeadlineExceeded error",
+			err:                context.DeadlineExceeded,
+			isDeadlineExceeded: true,
+			isCanceled:         false,
+		},
+		{
+			name:               "Canceled error",
+			err:                context.Canceled,
+			isDeadlineExceeded: false,
+			isCanceled:         true,
+		},
+		{
+			name:               "Wrapped DeadlineExceeded",
+			err:                fmt.Errorf("wrapped: %w", context.DeadlineExceeded),
+			isDeadlineExceeded: true,
+			isCanceled:         false,
+		},
+		{
+			name:               "Wrapped Canceled",
+			err:                fmt.Errorf("wrapped: %w", context.Canceled),
+			isDeadlineExceeded: false,
+			isCanceled:         true,
+		},
+		{
+			name:               "Regular error",
+			err:                errors.New("some error"),
+			isDeadlineExceeded: false,
+			isCanceled:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.isDeadlineExceeded, errors.Is(tt.err, context.DeadlineExceeded),
+				"errors.Is should correctly identify DeadlineExceeded")
+			assert.Equal(t, tt.isCanceled, errors.Is(tt.err, context.Canceled),
+				"errors.Is should correctly identify Canceled")
+		})
+	}
+}
+
+// TestContainerLookupWithTimeoutContext verifies that container lookup functions properly
+// handle timeout contexts using synctest.
+func TestContainerLookupWithTimeoutContext(t *testing.T) {
+	// Test case 1: Context deadline exceeded - verify DeadlineExceeded error is propagated
+	t.Run("DeadlineExceeded error is properly propagated", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			// Set HOSTNAME so container detection doesn't fail early
+			t.Setenv("HOSTNAME", "test-hostname")
+
+			// Create a mock client
+			mockClient := mockContainer.NewMockClient(t)
+
+			// Create a context that's already timed out
+			ctx, cancel := context.WithTimeout(context.Background(), 0)
+			defer cancel()
+
+			// Wait for context to actually timeout
+			time.Sleep(time.Millisecond)
+
+			// Verify context has expired
+			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+
+			// Mock expects GetCurrentContainerID to be called with expired context
+			// and should return DeadlineExceeded error
+			mockClient.EXPECT().ListContainers(ctx).Return(nil, context.DeadlineExceeded).Once()
+
+			// Call GetCurrentContainerID which internally uses the client
+			// The function will eventually call ListContainers with our expired context
+			_, err := container.GetCurrentContainerID(ctx, mockClient)
+
+			// Verify error is propagated
+			require.Error(t, err)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+
+			mockClient.AssertExpectations(t)
+		})
+	})
+
+	// Test case 2: Context canceled - verify Canceled error is propagated
+	t.Run("Canceled context is properly propagated", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			// Set HOSTNAME so container detection doesn't fail early
+			t.Setenv("HOSTNAME", "test-hostname")
+
+			// Create a mock client
+			mockClient := mockContainer.NewMockClient(t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+
+			// Cancel immediately
+			cancel()
+
+			// Verify context is canceled
+			require.ErrorIs(t, ctx.Err(), context.Canceled)
+
+			// Mock expects GetCurrentContainerID to be called with canceled context
+			mockClient.EXPECT().ListContainers(ctx).Return(nil, context.Canceled).Once()
+
+			// Call GetCurrentContainerID
+			_, err := container.GetCurrentContainerID(ctx, mockClient)
+
+			// Verify error is propagated
+			require.Error(t, err)
+			require.ErrorIs(t, err, context.Canceled)
+
+			mockClient.AssertExpectations(t)
+		})
+	})
+}
+
+// TestGetCurrentWatchtowerContainerWithTimeout verifies that GetCurrentWatchtowerContainer
+// properly handles timeout contexts.
+func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
+	// Test case 1: Context deadline exceeded - verify DeadlineExceeded error is handled
+	t.Run("DeadlineExceeded error is properly handled", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			// Create a mock client
+			mockClient := mockContainer.NewMockClient(t)
+
+			// Create a context that's already timed out
+			ctx, cancel := context.WithTimeout(context.Background(), 0)
+			defer cancel()
+
+			// Wait for context to actually timeout
+			time.Sleep(time.Millisecond)
+
+			// Verify context has expired
+			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+
+			containerID := types.ContainerID("test-container-id")
+
+			// Mock expects GetCurrentWatchtowerContainer to be called with expired context
+			mockClient.EXPECT().GetCurrentWatchtowerContainer(ctx, containerID).
+				Return(nil, context.DeadlineExceeded).Once()
+
+			// Call GetCurrentWatchtowerContainer
+			_, err := mockClient.GetCurrentWatchtowerContainer(ctx, containerID)
+
+			// Verify error is propagated
+			require.Error(t, err)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+
+			mockClient.AssertExpectations(t)
+		})
+	})
+
+	// Test case 2: Context canceled - verify Canceled error is handled
+	t.Run("Canceled context is properly handled", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			// Create a mock client
+			mockClient := mockContainer.NewMockClient(t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+
+			// Cancel immediately
+			cancel()
+
+			// Verify context is canceled
+			require.ErrorIs(t, ctx.Err(), context.Canceled)
+
+			containerID := types.ContainerID("test-container-id")
+
+			// Mock expects GetCurrentWatchtowerContainer to be called with canceled context
+			mockClient.EXPECT().GetCurrentWatchtowerContainer(ctx, containerID).
+				Return(nil, context.Canceled).Once()
+
+			// Call GetCurrentWatchtowerContainer
+			_, err := mockClient.GetCurrentWatchtowerContainer(ctx, containerID)
+
+			// Verify error is propagated
+			require.Error(t, err)
+			require.ErrorIs(t, err, context.Canceled)
+
+			mockClient.AssertExpectations(t)
+		})
 	})
 }

@@ -3,11 +3,14 @@ package actions
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
@@ -52,7 +55,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 			RunOnce: true,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(renamed).To(gomega.BeFalse())
 		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(0))
@@ -87,7 +90,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 			RunOnce: false,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(renamed).To(gomega.BeTrue())
 		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(1))
@@ -1168,5 +1171,788 @@ var _ = ginkgo.Describe("emptyReport", func() {
 	ginkgo.It("All() should return nil", func() {
 		report := emptyReport{}
 		gomega.Expect(report.All()).To(gomega.BeNil())
+	})
+})
+
+// logCapture captures logrus output for testing purposes.
+type logCapture struct {
+	entries []logEntry
+}
+
+// logEntry represents a single captured log entry.
+type logEntry struct {
+	level   logrus.Level
+	message string
+	fields  logrus.Fields
+}
+
+// Write implements io.Writer to capture log output.
+func (lc *logCapture) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+// Hooks returns logrus hooks for capturing logs.
+func (lc *logCapture) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+// Fire captures the log entry.
+func (lc *logCapture) Fire(entry *logrus.Entry) error {
+	lc.entries = append(lc.entries, logEntry{
+		level:   entry.Level,
+		message: entry.Message,
+		fields:  entry.Data,
+	})
+
+	return nil
+}
+
+// stopContainersTestCase represents a test case for stopContainersInReversedOrder cancellation.
+type stopContainersTestCase struct {
+	name                string
+	numContainers       int
+	cancelAtIndex       int    // Index at which to cancel (from end, -1 means no cancellation)
+	expectedStopped     int    // Number of containers that should be stopped
+	expectedSkipped     int    // Number of containers that should be skipped
+	expectedLogMessages int    // Expected number of log messages for skipped containers
+	description         string // Human-readable description
+}
+
+// TestDetachedContextDeadline tests the detached context creation logic in restartStaleContainer.
+// These tests verify that the detached context is created correctly based on the Timeout config value:
+// - When Timeout > 0: context has a deadline
+// - When Timeout <= 0: context has no deadline.
+var _ = ginkgo.Describe("DetachedContext", func() {
+	// TestDetachedContextDeadlineCase represents a test case for detached context deadline behavior.
+	type TestDetachedContextDeadlineCase struct {
+		name           string
+		timeout        time.Duration
+		expectDeadline bool
+		description    string
+	}
+
+	ginkgo.Describe("restartStaleContainer detached context deadline", func() {
+		testCases := []TestDetachedContextDeadlineCase{
+			{
+				name:           "positive timeout creates context with deadline",
+				timeout:        30 * time.Second,
+				expectDeadline: true,
+				description:    "When Timeout > 0, the detached context should have a deadline set",
+			},
+			{
+				name:           "zero timeout creates context without deadline",
+				timeout:        0,
+				expectDeadline: false,
+				description:    "When Timeout is zero, the detached context should not have a deadline",
+			},
+			{
+				name:           "negative timeout creates context without deadline",
+				timeout:        -1 * time.Second,
+				expectDeadline: false,
+				description:    "When Timeout is negative, the detached context should not have a deadline",
+			},
+		}
+
+		for _, tc := range testCases {
+			ginkgo.It(tc.name, func() {
+				// Create a mock client with a Watchtower container that will trigger
+				// the restart policy update path where the detached context is used.
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{
+							mockActions.CreateMockContainerWithConfig(
+								"watchtower",
+								"/watchtower",
+								"watchtower:latest",
+								true,
+								false,
+								time.Now(),
+								&dockerContainer.Config{
+									Labels: map[string]string{
+										"com.centurylinklabs.watchtower": "true",
+									},
+								}),
+						},
+						Staleness: map[string]bool{
+							"watchtower": true,
+						},
+					},
+					false,
+					false,
+				)
+
+				// Configure params with the test timeout value.
+				// RunOnce is false to enable the rename path which uses the detached context.
+				params := types.UpdateParams{
+					Timeout: tc.timeout,
+					RunOnce: false,
+				}
+
+				testContainer := client.TestData.Containers[0]
+
+				// Call restartStaleContainer which creates and uses the detached context.
+				newID, renamed, err := restartStaleContainer(
+					context.Background(),
+					testContainer,
+					client,
+					params,
+				)
+
+				// Verify the operation succeeded.
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(renamed).To(gomega.BeTrue())
+				gomega.Expect(newID).NotTo(gomega.BeEmpty())
+
+				// Verify UpdateContainer was called (this uses the detached context).
+				// The detached context is used for updating the restart policy of the
+				// renamed Watchtower container.
+				gomega.Expect(client.TestData.UpdateContainerCount).To(gomega.Equal(1))
+			})
+		}
+	})
+
+	ginkgo.Describe("restartStaleContainer detached context survival", func() {
+		ginkgo.It("cleanup operations complete when parent context is canceled during execution", func() {
+			// Create a parent context that we will cancel while restartStaleContainer is running.
+			parentCtx, parentCancel := context.WithCancel(context.Background())
+
+			// Create a mock client with a Watchtower container.
+			// Configure StartContainerError to trigger the cleanup path.
+			// Add simulated latency to allow time for operations to complete.
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+					StartContainerError: errors.New("simulated start failure"),
+					SimulatedLatency:    5 * time.Millisecond, // Allow time for operations
+				},
+				false,
+				false,
+			)
+
+			params := types.UpdateParams{
+				Timeout: 0, // No deadline on detached context
+				RunOnce: false,
+			}
+
+			testContainer := client.TestData.Containers[0]
+
+			// Run restartStaleContainer in a goroutine so we can cancel the parent context
+			// while it's still executing.
+			var (
+				err     error
+				renamed bool
+				wg      sync.WaitGroup
+			)
+
+			wg.Go(func() {
+				// Call restartStaleContainer with the parent context.
+				// The test flow is:
+				// 1. RenameContainer succeeds (uses parent context)
+				// 2. StartContainer fails due to StartContainerError
+				// 3. Cleanup runs using the detached context (should survive parent cancellation)
+				_, renamed, err = restartStaleContainer(
+					parentCtx,
+					testContainer,
+					client,
+					params,
+				)
+			})
+
+			// Wait for StartContainer to be called (which means RenameContainer has completed)
+			// before canceling the parent context. This ensures we cancel at the right moment -
+			// after rename succeeds but during/after start fails.
+			for client.TestData.StartContainerCount == 0 {
+				time.Sleep(1 * time.Millisecond)
+			}
+
+			// Cancel the parent context after StartContainer has been called.
+			// The detached context should allow cleanup to proceed even though
+			// the parent context is canceled.
+			parentCancel()
+
+			// Wait for the goroutine to complete.
+			wg.Wait()
+
+			// The operation should fail due to StartContainer error, but the
+			// cleanup (StopAndRemoveContainer) should have been attempted
+			// using the detached context, which survives parent cancellation.
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
+			gomega.Expect(renamed).To(gomega.BeTrue())
+
+			// Verify that StopContainer was called during cleanup.
+			// This demonstrates that the detached context allowed the cleanup
+			// operation to proceed even though the parent context was canceled.
+			gomega.Expect(client.TestData.StopContainerCount).To(gomega.BeNumerically(">=", 1))
+		})
+
+		ginkgo.It("cleanup operations complete when parent context is already canceled", func() {
+			// Create a parent context that is already canceled.
+			parentCtx, parentCancel := context.WithCancel(context.Background())
+			parentCancel() // Cancel immediately before calling restartStaleContainer
+
+			// Create a mock client with a Watchtower container.
+			// Configure StartContainerError to trigger the cleanup path.
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+					StartContainerError: errors.New("simulated start failure"),
+				},
+				false,
+				false,
+			)
+
+			params := types.UpdateParams{
+				Timeout: 0, // No deadline on detached context
+				RunOnce: false,
+			}
+
+			testContainer := client.TestData.Containers[0]
+
+			// Call restartStaleContainer with an already-canceled parent context.
+			// The RenameContainer operation should fail because the parent context is canceled.
+			_, renamed, err := restartStaleContainer(
+				parentCtx,
+				testContainer,
+				client,
+				params,
+			)
+
+			// The operation should fail at RenameContainer due to parent context cancellation.
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to rename Watchtower container"))
+			gomega.Expect(renamed).To(gomega.BeFalse())
+
+			// RenameContainer should have been attempted but failed due to context cancellation.
+			gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(1))
+		})
+
+		ginkgo.It("restart policy update uses detached context after successful start", func() {
+			// This test verifies that UpdateContainer (restart policy update) uses
+			// the detached context, not the parent context. Since StartContainer
+			// uses the parent context, we cannot cancel it before calling
+			// restartStaleContainer. Instead, we verify that UpdateContainer is
+			// called after a successful start, demonstrating the detached context
+			// is properly created and used.
+
+			// Create a mock client with a Watchtower container that succeeds.
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			// Use a timeout of 0 to create a detached context without deadline.
+			params := types.UpdateParams{
+				Timeout: 0,
+				RunOnce: false,
+			}
+
+			testContainer := client.TestData.Containers[0]
+
+			// Call restartStaleContainer with a background context.
+			newID, renamed, err := restartStaleContainer(
+				context.Background(),
+				testContainer,
+				client,
+				params,
+			)
+
+			// The operation should succeed completely.
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(renamed).To(gomega.BeTrue())
+			gomega.Expect(newID).NotTo(gomega.BeEmpty())
+
+			// Verify that both StartContainer and UpdateContainer were called.
+			// UpdateContainer uses the detached context for the restart policy update.
+			gomega.Expect(client.TestData.StartContainerCount).To(gomega.Equal(1))
+			gomega.Expect(client.TestData.UpdateContainerCount).To(gomega.Equal(1))
+		})
+	})
+})
+
+// Tests for stopContainersInReversedOrder cancellation handling.
+// These tests verify that when context cancellation occurs during container stopping:
+// 1. All remaining containers are logged with appropriate fields
+// 2. All remaining containers are added to the failed map with wrapped errors
+// 3. Edge cases (cancellation at start, middle, end) are handled correctly.
+//
+// Important: When context is canceled at index i, the function adds containers
+// from i-1 down to 0 to the failed map. The current container at index i is NOT
+// processed (neither stopped nor added to failed).
+var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
+	ginkgo.When("context is canceled during iteration", func() {
+		// Table-driven tests for various cancellation scenarios.
+		// Note: When context is already canceled at the start of iteration (i = len-1),
+		// containers from i-1 down to 0 are added to failed, but the container at i is not.
+		testCases := []stopContainersTestCase{
+			{
+				name:                "cancellation_at_start_all_skipped",
+				numContainers:       3,
+				cancelAtIndex:       0, // Context already canceled - at i=2, containers 1,0 are skipped
+				expectedStopped:     0,
+				expectedSkipped:     2, // containers 1 and 0 are added to failed
+				expectedLogMessages: 2,
+				description:         "When context is canceled at the start, remaining containers should be skipped",
+			},
+			{
+				name:                "cancellation_in_middle_partial_skip",
+				numContainers:       5,
+				cancelAtIndex:       0, // Context already canceled - at i=4, containers 3,2,1,0 are skipped
+				expectedStopped:     0,
+				expectedSkipped:     4, // containers 3,2,1,0 are added to failed
+				expectedLogMessages: 4,
+				description:         "When context is canceled mid-iteration, remaining containers should be skipped",
+			},
+			{
+				name:                "cancellation_at_end_no_skip",
+				numContainers:       3,
+				cancelAtIndex:       -1, // No cancellation
+				expectedStopped:     3,
+				expectedSkipped:     0,
+				expectedLogMessages: 0,
+				description:         "When no cancellation occurs, all containers should be stopped",
+			},
+			{
+				name:                "single_container_canceled",
+				numContainers:       1,
+				cancelAtIndex:       0, // Context already canceled - at i=0, no containers to skip (j starts at -1)
+				expectedStopped:     0,
+				expectedSkipped:     0, // No containers added to failed (j loop doesn't execute)
+				expectedLogMessages: 0,
+				description:         "Single container scenario with cancellation",
+			},
+			{
+				name:                "single_container_not_canceled",
+				numContainers:       1,
+				cancelAtIndex:       -1, // No cancellation
+				expectedStopped:     1,
+				expectedSkipped:     0,
+				expectedLogMessages: 0,
+				description:         "Single container scenario without cancellation",
+			},
+		}
+
+		for _, tc := range testCases {
+			ginkgo.It(tc.name, func() {
+				ginkgo.By(tc.description)
+
+				// Create mock containers with ToRestart set to true.
+				containers := make([]types.Container, tc.numContainers)
+				for i := range tc.numContainers {
+					containerID := fmt.Sprintf("container-%d", i)
+					containerName := fmt.Sprintf("/container-%d", i)
+					imageName := fmt.Sprintf("image-%d:latest", i)
+
+					c := mockActions.CreateMockContainerWithConfig(
+						containerID,
+						containerName,
+						imageName,
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						},
+					)
+					// Mark container for restart so it will be processed.
+					c.SetStale(true)
+					containers[i] = c
+				}
+
+				// Create mock client.
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness:  make(map[string]bool),
+					},
+					false,
+					false,
+				)
+
+				// Mark all containers as stale.
+				for i := range tc.numContainers {
+					client.TestData.Staleness[fmt.Sprintf("container-%d", i)] = true
+				}
+
+				// Set up log capture to verify log messages.
+				logHook := &logCapture{entries: make([]logEntry, 0)}
+				logrus.AddHook(logHook)
+
+				defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
+
+				// Create context - either canceled or not based on test case.
+				ctx := context.Background()
+				if tc.cancelAtIndex >= 0 {
+					// Create an already-canceled context to simulate cancellation.
+					canceledCtx, cancel := context.WithCancel(context.Background())
+					cancel() // Cancel immediately
+
+					ctx = canceledCtx
+				}
+
+				// Call stopContainersInReversedOrder.
+				failed, stopped := stopContainersInReversedOrder(
+					ctx,
+					containers,
+					client,
+					types.UpdateParams{},
+				)
+
+				// Verify the number of stopped containers.
+				gomega.Expect(stopped).
+					To(gomega.HaveLen(tc.expectedStopped), "Expected %d stopped containers", tc.expectedStopped)
+
+				// Verify the number of failed containers.
+				gomega.Expect(failed).
+					To(gomega.HaveLen(tc.expectedSkipped), "Expected %d failed containers", tc.expectedSkipped)
+
+				// Verify log messages for skipped containers.
+				skippedLogCount := 0
+
+				for _, entry := range logHook.entries {
+					if entry.message == "Skipped container stop due to context cancellation" {
+						skippedLogCount++
+
+						// Verify log fields contain expected keys.
+						gomega.Expect(entry.fields).To(gomega.HaveKey("container"))
+						gomega.Expect(entry.fields).To(gomega.HaveKey("image"))
+						gomega.Expect(entry.fields).To(gomega.HaveKey("container_id"))
+					}
+				}
+
+				gomega.Expect(skippedLogCount).
+					To(gomega.Equal(tc.expectedLogMessages), "Expected %d log messages for skipped containers", tc.expectedLogMessages)
+			})
+		}
+	})
+
+	ginkgo.When("context is canceled mid-iteration", func() {
+		ginkgo.It("should add remaining containers to failed map with wrapped error", func() {
+			// Create 4 containers.
+			// When context is already canceled at the start:
+			// - At i=3, ctx.Err() != nil, so containers 2,1,0 are added to failed
+			// - Container 3 is NOT processed (neither stopped nor failed)
+			containers := make([]types.Container, 4)
+
+			for i := range 4 {
+				containerID := fmt.Sprintf("container-%d", i)
+				containerName := fmt.Sprintf("/container-%d", i)
+				imageName := fmt.Sprintf("image-%d:latest", i)
+
+				c := mockActions.CreateMockContainerWithConfig(
+					containerID,
+					containerName,
+					imageName,
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+						"container-3": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			// Create a canceled context.
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// Call stopContainersInReversedOrder.
+			failed, stopped := stopContainersInReversedOrder(
+				canceledCtx,
+				containers,
+				client,
+				types.UpdateParams{},
+			)
+
+			// 3 containers should be in failed map (containers 0, 1, 2).
+			gomega.Expect(failed).To(gomega.HaveLen(3))
+			gomega.Expect(stopped).To(gomega.BeEmpty())
+
+			// Verify containers 0, 1, 2 are in failed map with wrapped error.
+			for i := range 3 {
+				containerID := types.ContainerID(fmt.Sprintf("container-%d", i))
+				err, exists := failed[containerID]
+				gomega.Expect(exists).To(gomega.BeTrue(), "Container %d should be in failed map", i)
+
+				// Verify error message contains "stop skipped".
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("stop skipped"))
+
+				// Verify error wraps context.Canceled.
+				gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue(),
+					"Error should wrap context.Canceled")
+			}
+
+			// Container 3 should NOT be in failed map (it was the current container when context was checked).
+			_, exists := failed[types.ContainerID("container-3")]
+			gomega.Expect(exists).To(gomega.BeFalse(), "Container 3 should NOT be in failed map")
+		})
+
+		ginkgo.It("should log each skipped container with correct fields", func() {
+			// Create containers.
+			// When context is already canceled at the start:
+			// - At i=2, ctx.Err() != nil, so containers 1,0 are logged and added to failed
+			// - Container 2 is NOT processed
+			containers := make([]types.Container, 3)
+			expectedNames := []string{"container-0", "container-1"} // Only 0 and 1 are logged
+
+			for i := range 3 {
+				c := mockActions.CreateMockContainerWithConfig(
+					fmt.Sprintf("container-%d", i),
+					fmt.Sprintf("/container-%d", i),
+					fmt.Sprintf("image-%d:latest", i),
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			// Set up log capture.
+			logHook := &logCapture{entries: make([]logEntry, 0)}
+			logrus.AddHook(logHook)
+
+			defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
+
+			// Create a canceled context.
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// Call stopContainersInReversedOrder.
+			_, _ = stopContainersInReversedOrder(
+				canceledCtx,
+				containers,
+				client,
+				types.UpdateParams{},
+			)
+
+			// Verify log entries contain expected container details.
+			loggedNames := make(map[string]bool)
+
+			for _, entry := range logHook.entries {
+				if entry.message == "Skipped container stop due to context cancellation" {
+					if containerName, ok := entry.fields["container"]; ok {
+						loggedNames[containerName.(string)] = true
+					}
+
+					// Verify all expected fields are present.
+					gomega.Expect(entry.fields).To(gomega.HaveKey("container"))
+					gomega.Expect(entry.fields).To(gomega.HaveKey("image"))
+					gomega.Expect(entry.fields).To(gomega.HaveKey("container_id"))
+				}
+			}
+
+			// Verify containers 0 and 1 were logged (container 2 was the current one when canceled).
+			for _, name := range expectedNames {
+				gomega.Expect(loggedNames).To(gomega.HaveKey(name),
+					"Container %s should have been logged", name)
+			}
+
+			// Container 2 should NOT be logged.
+			gomega.Expect(loggedNames).NotTo(gomega.HaveKey("container-2"),
+				"Container 2 should NOT have been logged")
+
+			// Verify we got the expected number of log messages.
+			gomega.Expect(loggedNames).To(gomega.HaveLen(2))
+		})
+	})
+
+	ginkgo.When("context is not canceled", func() {
+		ginkgo.It("should process all containers without adding to failed map", func() {
+			// Create containers.
+			containers := make([]types.Container, 3)
+
+			for i := range 3 {
+				c := mockActions.CreateMockContainerWithConfig(
+					fmt.Sprintf("container-%d", i),
+					fmt.Sprintf("/container-%d", i),
+					fmt.Sprintf("image-%d:latest", i),
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			// Set up log capture.
+			logHook := &logCapture{entries: make([]logEntry, 0)}
+			logrus.AddHook(logHook)
+
+			defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
+
+			// Call with valid context.
+			failed, stopped := stopContainersInReversedOrder(
+				context.Background(),
+				containers,
+				client,
+				types.UpdateParams{},
+			)
+
+			// All containers should be stopped, none failed.
+			gomega.Expect(stopped).To(gomega.HaveLen(3))
+			gomega.Expect(failed).To(gomega.BeEmpty())
+
+			// Verify no "Skipped container stop" log messages.
+			for _, entry := range logHook.entries {
+				gomega.Expect(entry.message).
+					NotTo(gomega.Equal("Skipped container stop due to context cancellation"))
+			}
+		})
+	})
+
+	ginkgo.When("containers are processed in reverse order", func() {
+		ginkgo.It("should stop containers from last to first", func() {
+			// Create containers.
+			containers := make([]types.Container, 3)
+
+			for i := range 3 {
+				c := mockActions.CreateMockContainerWithConfig(
+					fmt.Sprintf("container-%d", i),
+					fmt.Sprintf("/container-%d", i),
+					fmt.Sprintf("image-%d:latest", i),
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+					},
+					StopOrder: []string{},
+				},
+				false,
+				false,
+			)
+
+			// Call with valid context.
+			_, _ = stopContainersInReversedOrder(
+				context.Background(),
+				containers,
+				client,
+				types.UpdateParams{},
+			)
+
+			// Verify stop order is reverse (container-2, container-1, container-0).
+			gomega.Expect(client.TestData.StopOrder).To(gomega.HaveLen(3))
+			gomega.Expect(client.TestData.StopOrder[0]).To(gomega.Equal("container-2"))
+			gomega.Expect(client.TestData.StopOrder[1]).To(gomega.Equal("container-1"))
+			gomega.Expect(client.TestData.StopOrder[2]).To(gomega.Equal("container-0"))
+		})
 	})
 })

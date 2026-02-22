@@ -1020,7 +1020,7 @@ func (b blockingRouter) Send(_ string, _ *types.Params) []error {
 	case <-b.unlock:
 		b.sent <- true
 	case <-b.ctx.Done():
-		// Cancelled, don't send
+		// canceled, don't send
 	}
 
 	return nil

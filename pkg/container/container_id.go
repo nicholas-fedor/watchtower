@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"fmt"
 	"iter"
 	"os"
@@ -45,7 +46,7 @@ var (
 // Returns:
 //   - types.ContainerID: The detected container ID if successful
 //   - error: Non-nil if all detection methods fail, containing the last error encountered
-func GetCurrentContainerID(client Client) (types.ContainerID, error) {
+func GetCurrentContainerID(ctx context.Context, client Client) (types.ContainerID, error) {
 	// Collect errors from failed detection attempts for final error reporting
 	var errs []error
 
@@ -80,7 +81,7 @@ func GetCurrentContainerID(client Client) (types.ContainerID, error) {
 	// Third attempt: Hostname matching - fallback using Docker API
 	logrus.Debug("Attempting to get current container ID using hostname matching")
 
-	containerID, err = GetContainerIDFromHostname(client)
+	containerID, err = GetContainerIDFromHostname(ctx, client)
 	if err == nil {
 		logrus.WithField("container_id", containerID).
 			Debug("Successfully detected container ID using hostname matching")
@@ -228,19 +229,19 @@ func ParseContainerIDFromCgroupString(cgroupString string) (types.ContainerID, e
 
 // GetContainerIDFromHostname retrieves the container ID by matching the HOSTNAME env var.
 // Uses Docker API to list containers and find matching hostname.
-func GetContainerIDFromHostname(client Client) (types.ContainerID, error) {
+func GetContainerIDFromHostname(ctx context.Context, client Client) (types.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
 		return "", ErrContainerIDNotFound
 	}
 
-	containers, err := client.ListContainers()
+	containers, err := client.ListContainers(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to list all containers: %w", err)
 	}
 
-	for _, container := range containers {
-		containerInfo := container.ContainerInfo()
+	for _, c := range containers {
+		containerInfo := c.ContainerInfo()
 		if containerInfo == nil {
 			logrus.Debug("Container info is nil, skipping hostname check")
 
@@ -254,7 +255,7 @@ func GetContainerIDFromHostname(client Client) (types.ContainerID, error) {
 		}
 
 		if containerInfo.Config.Hostname == hostname {
-			return container.ID(), nil
+			return c.ID(), nil
 		}
 	}
 

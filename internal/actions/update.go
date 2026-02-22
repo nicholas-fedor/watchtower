@@ -55,7 +55,7 @@ func Update(
 	// Check for context cancellation early
 	select {
 	case <-ctx.Done():
-		return nil, nil, fmt.Errorf("update cancelled: %w", ctx.Err())
+		return nil, nil, fmt.Errorf("update canceled: %w", ctx.Err())
 	default:
 	}
 
@@ -63,7 +63,7 @@ func Update(
 	logrus.Debug("Starting container update check")
 
 	// Fetch all containers for monitoring
-	allContainers, err := client.ListContainers(filters.NoFilter)
+	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -80,7 +80,7 @@ func Update(
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if config.LifecycleHooks {
 		logrus.Debug("Executing pre-check lifecycle hooks")
-		lifecycle.ExecutePreChecks(client, config)
+		lifecycle.ExecutePreChecks(ctx, client, config)
 	}
 
 	// Filter containers based on the provided filter (e.g., all, specific names).
@@ -104,18 +104,16 @@ func Update(
 		"filter":     fmt.Sprintf("%T", config.Filter),
 	}).Debug("Retrieved containers for update check")
 
-	// Skip containers that reference themselves as dependencies
+	// Skip monitored containers that reference themselves as dependencies
 	// via the Watchtower depends-on label.
 	for _, monitoredContainer := range filteredContainers {
-		if cont, ok := monitoredContainer.(*container.Container); ok {
-			if hasSelfDependency(cont) {
-				progress.AddSkipped(monitoredContainer, errSelfDependency, config)
-				logrus.Warnf(
-					"Skipping container update (self-dependency): %s (%s)",
-					monitoredContainer.Name(),
-					monitoredContainer.ID().ShortID(),
-				)
-			}
+		if hasSelfDependency(monitoredContainer) {
+			progress.AddSkipped(monitoredContainer, errSelfDependency, config)
+			logrus.Warnf(
+				"Skipping container update (self-dependency): %s (%s)",
+				monitoredContainer.Name(),
+				monitoredContainer.ID().ShortID(),
+			)
 		}
 	}
 
@@ -191,7 +189,7 @@ func Update(
 			stale = false
 			newestImage = sourceContainer.ImageID()
 		} else {
-			stale, newestImage, err = client.IsContainerStale(sourceContainer, config)
+			stale, newestImage, err = client.IsContainerStale(ctx, sourceContainer, config)
 		}
 
 		// Determine if the container should be updated based on staleness and config.
@@ -358,15 +356,19 @@ func Update(
 
 	if config.RollingRestart {
 		// Apply rolling restarts for all containers in dependency order.
-		progress.UpdateFailed(
-			performRollingRestart(
-				allContainersToRestart,
-				client,
-				config,
-				&cleanupImageInfos,
-				progress,
-			),
+		rollingFailed, rollingErr := performRollingRestart(
+			ctx,
+			allContainersToRestart,
+			client,
+			config,
+			&cleanupImageInfos,
+			progress,
 		)
+		progress.UpdateFailed(rollingFailed)
+
+		if rollingErr != nil {
+			return progress.Report(), cleanupImageInfos, rollingErr
+		}
 	} else {
 		// Mark containers to update for update in progress
 		for _, c := range allContainersToRestart {
@@ -377,6 +379,7 @@ func Update(
 
 		// Stop and restart containers in batches, respecting dependency order.
 		failedStop, stoppedImages = stopContainersInReversedOrder(
+			ctx,
 			allContainersToRestart,
 			client,
 			config,
@@ -384,6 +387,7 @@ func Update(
 		progress.UpdateFailed(failedStop)
 
 		failedStart = restartContainersInSortedOrder(
+			ctx,
 			allContainersToRestart,
 			client,
 			config,
@@ -397,7 +401,7 @@ func Update(
 	// Run post-check lifecycle hooks if enabled to finalize the update process.
 	if config.LifecycleHooks {
 		logrus.Debug("Executing post-check lifecycle hooks")
-		lifecycle.ExecutePostChecks(client, config)
+		lifecycle.ExecutePostChecks(ctx, client, config)
 	}
 
 	// Add safeguard delay if Watchtower self-update pull failed to prevent rapid restarts.
@@ -414,7 +418,7 @@ func Update(
 		case <-time.After(delay):
 		case <-ctx.Done():
 			logrus.WithError(ctx.Err()).
-				Debug("Context cancelled during pull-failure delay; skipping remaining delay")
+				Debug("Context canceled during pull-failure delay; skipping remaining delay")
 		}
 	}
 
@@ -584,8 +588,8 @@ func linkedIdentifierMarkedForRestart(
 	allContainers []types.Container,
 ) string {
 	nameToContainer := make(map[string]types.Container, len(allContainers))
-	for _, cont := range allContainers {
-		nameToContainer[cont.Name()] = cont
+	for _, c := range allContainers {
+		nameToContainer[c.Name()] = c
 	}
 
 	dependentProject := getProject(dependentContainer)
@@ -718,8 +722,8 @@ func linkedIdentifierMarkedForRestart(
 
 // getProject extracts the project name from a container's compose project label.
 func getProject(c types.Container) string {
-	if cont, ok := c.(*container.Container); ok {
-		if info := cont.ContainerInfo(); info != nil && info.Config != nil {
+	if monitoredContainer, ok := c.(*container.Container); ok {
+		if info := monitoredContainer.ContainerInfo(); info != nil && info.Config != nil {
 			project := compose.GetProjectName(info.Config.Labels)
 			if project != "" {
 				return project
@@ -858,8 +862,11 @@ func isInvalidImageName(name string) bool {
 //
 // It processes containers sequentially in forward order, stopping and restarting each as needed,
 // collecting cleaned image info for stale containers only to ensure proper cleanup.
+// The function checks for context cancellation at the start of each iteration to enable
+// prompt exit when the context is canceled.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - containers: List of containers to update or restart.
 //   - client: Container client for Docker operations.
 //   - config: Update options controlling restart behavior.
@@ -868,13 +875,15 @@ func isInvalidImageName(name string) bool {
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
+//   - error: Non-nil if context was canceled, nil otherwise.
 func performRollingRestart(
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	config types.UpdateParams,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *session.Progress,
-) map[types.ContainerID]error {
+) (map[types.ContainerID]error, error) {
 	failed := make(map[types.ContainerID]error, len(containers))
 
 	containerNames := make([]string, len(containers))
@@ -886,6 +895,13 @@ func performRollingRestart(
 
 	// Process containers in forward order to respect dependency chains.
 	for i := range containers {
+		// Check for context cancellation to enable prompt exit when context is canceled.
+		select {
+		case <-ctx.Done():
+			return failed, fmt.Errorf("rolling restart canceled: %w", ctx.Err())
+		default:
+		}
+
 		c := containers[i]
 		if !c.ToRestart() {
 			continue
@@ -904,11 +920,16 @@ func performRollingRestart(
 		}
 
 		// Stop the container, handling any errors.
-		err := stopStaleContainer(c, client, config)
+		err := stopStaleContainer(ctx, c, client, config)
 		if err != nil {
 			failed[c.ID()] = err
 		} else {
-			newContainerID, renamed, err := restartStaleContainer(c, client, config)
+			newContainerID, renamed, err := restartStaleContainer(
+				ctx,
+				c,
+				client,
+				config,
+			)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -925,6 +946,7 @@ func performRollingRestart(
 
 				// Wait for the container to become healthy if it has a health check
 				waitErr := client.WaitForContainerHealthy(
+					ctx,
 					newContainerID,
 					defaultHealthCheckTimeout,
 				)
@@ -954,7 +976,7 @@ func performRollingRestart(
 		}
 	}
 
-	return failed
+	return failed, nil
 }
 
 // stopContainersInReversedOrder stops containers in reverse order.
@@ -963,6 +985,7 @@ func performRollingRestart(
 // respecting dependency order.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - containers: List of containers to stop.
 //   - client: Container client for Docker operations.
 //   - config: Update options specifying stop timeout and other behaviors.
@@ -971,6 +994,7 @@ func performRollingRestart(
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed stops.
 //   - []types.RemovedImageInfo: Slice of cleaned image info for stopped containers.
 func stopContainersInReversedOrder(
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	config types.UpdateParams,
@@ -981,12 +1005,30 @@ func stopContainersInReversedOrder(
 	// Stop containers in reverse order to avoid breaking dependencies.
 	for i := len(containers) - 1; i >= 0; i-- {
 		c := containers[i]
+
+		// Check for context cancellation to avoid additional work when context is canceled.
+		// Iterate remaining containers to log and track them as failed before returning.
+		if ctx.Err() != nil {
+			// Handle remaining containers that were not processed due to cancellation.
+			for j := i - 1; j >= 0; j-- {
+				skipped := containers[j]
+				logrus.WithFields(logrus.Fields{
+					"container":    skipped.Name(),
+					"image":        skipped.ImageName(),
+					"container_id": skipped.ID().ShortID(),
+				}).Info("Skipped container stop due to context cancellation")
+				failed[skipped.ID()] = fmt.Errorf("stop skipped: %w", ctx.Err())
+			}
+
+			return failed, stopped
+		}
+
 		fields := logrus.Fields{
 			"container": c.Name(),
 			"image":     c.ImageName(),
 		}
 
-		err := stopStaleContainer(c, client, config)
+		err := stopStaleContainer(ctx, c, client, config)
 		if err != nil {
 			failed[c.ID()] = err
 		} else {
@@ -1013,6 +1055,7 @@ func stopContainersInReversedOrder(
 // and stops the container with the specified timeout.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - container: Container to stop.
 //   - client: Container client for Docker operations.
 //   - config: Update options specifying stop timeout and lifecycle hooks.
@@ -1020,6 +1063,7 @@ func stopContainersInReversedOrder(
 // Returns:
 //   - error: Non-nil if stop fails, nil on success or if skipped.
 func stopStaleContainer(
+	ctx context.Context,
 	container types.Container,
 	client container.Client,
 	config types.UpdateParams,
@@ -1058,6 +1102,7 @@ func stopStaleContainer(
 	// Execute pre-update lifecycle hooks if enabled, checking for skip conditions.
 	if config.LifecycleHooks {
 		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(
+			ctx,
 			client,
 			container,
 			config.LifecycleUID,
@@ -1077,7 +1122,7 @@ func stopStaleContainer(
 	}
 
 	// Stop the container with the configured timeout.
-	err := client.StopAndRemoveContainer(container, config.Timeout)
+	err := client.StopAndRemoveContainer(ctx, container, config.Timeout)
 	if err != nil {
 		// Check if the container is already gone (e.g., "No such container" error).
 		// Treat this as non-fatal, similar to RemoveExcessWatchtowerInstances.
@@ -1104,6 +1149,7 @@ func stopStaleContainer(
 // tracking any restart failures.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - containers: List of containers to restart.
 //   - client: Container client for Docker operations.
 //   - config: Update options controlling restart behavior.
@@ -1114,6 +1160,7 @@ func stopStaleContainer(
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed restarts.
 func restartContainersInSortedOrder(
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	config types.UpdateParams,
@@ -1127,6 +1174,11 @@ func restartContainersInSortedOrder(
 
 	// Restart containers in sorted order to respect dependency chains.
 	for _, c := range containers {
+		// Check for context cancellation to avoid additional work when context is canceled.
+		if ctx.Err() != nil {
+			return failed
+		}
+
 		if !c.ToRestart() {
 			continue
 		}
@@ -1139,8 +1191,8 @@ func restartContainersInSortedOrder(
 		// Check if container was previously stopped by looking in stoppedImages slice.
 		wasStopped := false
 
-		for _, stopped := range stoppedImages {
-			if stopped.ContainerID == c.ID() {
+		for _, sc := range stoppedImages {
+			if sc.ContainerID == c.ID() {
 				wasStopped = true
 
 				break
@@ -1156,7 +1208,12 @@ func restartContainersInSortedOrder(
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
 		// Otherwise, restart only containers that were previously stopped.
 		if c.IsWatchtower() || wasStopped {
-			newContainerID, renamed, err := restartStaleContainer(c, client, config)
+			newContainerID, renamed, err := restartStaleContainer(
+				ctx,
+				c,
+				client,
+				config,
+			)
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
@@ -1228,6 +1285,7 @@ func addCleanupImageInfo(
 // and runs post-update hooks.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - sourceContainer: Container to restart.
 //   - client: Container client for Docker operations.
 //   - config: Update options controlling restart and lifecycle hooks.
@@ -1237,10 +1295,28 @@ func addCleanupImageInfo(
 //   - bool: True if the container was renamed, false otherwise.
 //   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
+	ctx context.Context,
 	sourceContainer types.Container,
 	client container.Client,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
+	// Create a detached context to survive parent context cancellation.
+	// This ensures container cleanup and update operations complete even if the
+	// parent context is canceled during the restart process.
+	// If config.Timeout <= 0, use a non-deadline context; otherwise, apply the timeout.
+	var (
+		detachedCtx    context.Context
+		cancelDetached context.CancelFunc
+	)
+
+	if config.Timeout <= 0 {
+		detachedCtx, cancelDetached = context.WithCancel(context.Background())
+	} else {
+		detachedCtx, cancelDetached = context.WithTimeout(context.Background(), config.Timeout)
+	}
+
+	defer cancelDetached()
+
 	fields := logrus.Fields{
 		"container": sourceContainer.Name(),
 		"image":     sourceContainer.ImageName(),
@@ -1255,7 +1331,7 @@ func restartStaleContainer(
 	if sourceContainer.IsWatchtower() && !config.RunOnce {
 		newName := "watchtower-old-" + sourceContainer.ID().ShortID()
 
-		err := client.RenameContainer(sourceContainer, newName)
+		err := client.RenameContainer(ctx, sourceContainer, newName)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"container": sourceContainer.Name(),
@@ -1274,16 +1350,16 @@ func restartStaleContainer(
 
 	// For Watchtower self-updates, accumulate container ID chain in labels.
 	if sourceContainer.IsWatchtower() {
-		if cont, ok := sourceContainer.(*container.Container); ok {
-			containerInfo := cont.ContainerInfo()
+		if c, ok := sourceContainer.(*container.Container); ok {
+			containerInfo := c.ContainerInfo()
 			if containerInfo != nil && containerInfo.Config != nil {
-				existingChain, _ := cont.GetContainerChain()
+				existingChain, _ := c.GetContainerChain()
 
 				var newChain string
 				if existingChain != "" {
-					newChain = existingChain + "," + string(cont.ID())
+					newChain = existingChain + "," + string(c.ID())
 				} else {
-					newChain = string(cont.ID())
+					newChain = string(c.ID())
 				}
 
 				if containerInfo.Config.Labels == nil {
@@ -1306,7 +1382,7 @@ func restartStaleContainer(
 		var err error
 
 		// Start the new container.
-		newContainerID, err = client.StartContainer(sourceContainer)
+		newContainerID, err = client.StartContainer(ctx, sourceContainer)
 		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
 
@@ -1315,7 +1391,8 @@ func restartStaleContainer(
 			if renamed && sourceContainer.IsWatchtower() {
 				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
 
-				cleanupErr := client.StopAndRemoveContainer(sourceContainer, config.Timeout)
+				//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+				cleanupErr := client.StopAndRemoveContainer(detachedCtx, sourceContainer, config.Timeout)
 				if cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
@@ -1330,6 +1407,7 @@ func restartStaleContainer(
 		if sourceContainer.ToRestart() && config.LifecycleHooks {
 			logrus.WithFields(fields).Debug("Executing post-update command")
 			lifecycle.ExecutePostUpdateCommand(
+				ctx,
 				client,
 				newContainerID,
 				config.LifecycleUID,
@@ -1350,7 +1428,9 @@ func restartStaleContainer(
 			},
 		}
 		// Update the renamed Watchtower container's restart policy.
-		err := client.UpdateContainer(sourceContainer, updateConfig)
+		//
+		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+		err := client.UpdateContainer(detachedCtx, sourceContainer, updateConfig)
 		if err != nil {
 			logrus.WithError(err).
 				WithFields(fields).

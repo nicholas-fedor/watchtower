@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -36,7 +37,11 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 				var cleanupImageIDs []types.RemovedImageInfo
 
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					ctx,
 					mockClient,
 					false,
 					"",
@@ -76,7 +81,11 @@ var _ = ginkgo.Describe("the actions package", func() {
 
 				var cleanupImageIDs []types.RemovedImageInfo
 
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					ctx,
 					client,
 					false,
 					"",
@@ -135,7 +144,11 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should stop all but the latest one", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					ctx,
 					client,
 					false,
 					"",
@@ -155,7 +168,11 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should collect image IDs and clean up when cleanup is enabled", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					ctx,
 					client,
 					true,
 					"",
@@ -217,7 +234,11 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should stop the old instance and clean up its image", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					ctx,
 					client,
 					true,
 					"",
@@ -302,7 +323,11 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should only clean up unscoped instances when scope is empty", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					ctx,
 					client,
 					false,
 					"",
@@ -328,7 +353,11 @@ var _ = ginkgo.Describe("the actions package", func() {
 			ginkgo.It("should clean up within scoped instances when scope is specified", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
 				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+					ctx,
 					client,
 					false,
 					"prod",

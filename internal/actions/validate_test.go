@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"errors"
 
 	"github.com/onsi/ginkgo/v2"
@@ -27,9 +28,9 @@ var _ = ginkgo.Describe("ValidateRollingRestartDependencies", func() {
 	ginkgo.When("ListContainers fails", func() {
 		ginkgo.It("should return wrapped error", func() {
 			expectedErr := errors.New("list containers failed")
-			mockClient.EXPECT().ListContainers(mock.Anything).Return(nil, expectedErr)
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, expectedErr)
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err).
@@ -39,9 +40,9 @@ var _ = ginkgo.Describe("ValidateRollingRestartDependencies", func() {
 
 	ginkgo.When("no containers are found", func() {
 		ginkgo.It("should return nil", func() {
-			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil)
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
@@ -55,12 +56,12 @@ var _ = ginkgo.Describe("ValidateRollingRestartDependencies", func() {
 			mockContainer1.EXPECT().Links().Return([]string{})
 			mockContainer2.EXPECT().Links().Return([]string{})
 
-			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
 				mockContainer1,
 				mockContainer2,
 			}, nil)
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
@@ -75,12 +76,12 @@ var _ = ginkgo.Describe("ValidateRollingRestartDependencies", func() {
 			mockContainer2.EXPECT().Links().Return([]string{"db", "redis"})
 			mockContainer2.EXPECT().Name().Return("web-container")
 
-			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
 				mockContainer1,
 				mockContainer2,
 			}, nil)
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).
@@ -105,7 +106,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 			container.EXPECT().Links().Return([]string{}) // No links for validation
 
 			mockClient.EXPECT().
-				ListContainers(mock.Anything).
+				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{container}, nil)
 
 			// Create unscoped filter (empty scope should default to unscoped)
@@ -118,7 +119,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 				return false
 			}
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
@@ -135,7 +136,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 			container2.EXPECT().Scope().Return("invalid$scope@123", true).Maybe() // Malformed scope
 			container2.EXPECT().Links().Return([]string{})
 
-			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
 				container1,
 				container2,
 			}, nil)
@@ -147,7 +148,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 				return scope == "invalid$scope@123"
 			}
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
@@ -164,7 +165,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 			container.EXPECT().Links().Return([]string{})
 
 			mockClient.EXPECT().
-				ListContainers(mock.Anything).
+				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{container}, nil)
 
 			// Filter that expects trimmed scope
@@ -174,7 +175,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 				return scope == "  spaced scope  " // Exact match including spaces
 			}
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
@@ -190,7 +191,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 			container.EXPECT().Links().Return([]string{})        // No validation issues
 
 			mockClient.EXPECT().
-				ListContainers(mock.Anything).
+				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{container}, nil)
 
 			// Filter that handles missing scopes
@@ -200,7 +201,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 				return !hasScope // Include containers without scope labels
 			}
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
@@ -217,7 +218,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 			container2.EXPECT().Scope().Return("consistent-scope", true).Maybe()
 			container2.EXPECT().Links().Return([]string{})
 
-			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
 				container1,
 				container2,
 			}, nil)
@@ -229,7 +230,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 				return hasScope && scope == "consistent-scope"
 			}
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
@@ -244,7 +245,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 			container.EXPECT().Links().Return([]string{})
 
 			mockClient.EXPECT().
-				ListContainers(mock.Anything).
+				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{container}, nil)
 
 			// Filter that detects empty scope labels
@@ -254,7 +255,7 @@ var _ = ginkgo.Describe("Scope Validation Error Cases", func() {
 				return hasScope && scope == "" // Allow empty scoped containers
 			}
 
-			err := ValidateRollingRestartDependencies(mockClient, filter)
+			err := ValidateRollingRestartDependencies(context.Background(), mockClient, filter)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})

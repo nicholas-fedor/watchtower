@@ -338,7 +338,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 			}).Trace("Calling Router.Send with message")
 
 			if !notifier.sendWithCancellation(msg) {
-				LocalLog.Debug("Context cancelled during message send")
+				LocalLog.Debug("Context canceled during message send")
 
 				return
 			}
@@ -377,7 +377,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					}).Trace("Calling Router.Send with message during shutdown")
 
 					if !notifier.sendWithCancellation(msg) {
-						LocalLog.Debug("Context cancelled during shutdown message send")
+						LocalLog.Debug("Context canceled during shutdown message send")
 
 						return
 					}
@@ -389,8 +389,8 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				}
 			}
 		case <-notifier.ctx.Done():
-			// Context cancelled
-			LocalLog.Debug("Context cancelled, stopping notification goroutine")
+			// Context canceled
+			LocalLog.Debug("Context canceled, stopping notification goroutine")
 
 			return
 		}
@@ -562,7 +562,7 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 //   - msg: Message to send.
 //
 // Returns:
-//   - bool: True if sent successfully, false if cancelled.
+//   - bool: True if sent successfully, false if canceled.
 func (n *shoutrrrTypeNotifier) sendWithCancellation(msg string) bool {
 	sendCh := make(chan []error, 1)
 
