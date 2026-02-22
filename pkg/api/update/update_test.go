@@ -407,42 +407,27 @@ var _ = ginkgo.Describe("Update Handler", func() {
 	})
 })
 
-func TestQueueConcurrentRequests(t *testing.T) {
+// TestFullUpdateReturns429WhenLocked verifies that a full update request
+// returns 429 Too Many Requests when the lock is already held.
+func TestFullUpdateReturns429WhenLocked(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Use a custom lock to control concurrency.
+		// Create a lock channel with capacity 1 but don't put a value in it,
+		// so it starts in the "locked" state.
 		customLock := make(chan bool, 1)
-		customLock <- true
-
-		var called atomic.Int32
+		// Lock is empty = held by something else.
 
 		handler := update.New(func(_ []string) *metrics.Metric {
-			called.Add(1)
+			t.Error("update function should not be called when lock is unavailable")
 
-			time.Sleep(50 * time.Millisecond) // Short delay to simulate work.
-
-			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
+			return &metrics.Metric{}
 		}, customLock)
 
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
-
-		// Start first request in goroutine.
-		go func() {
-			localReq := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
-			localRec := httptest.NewRecorder()
-			handler.Handle(localRec, localReq)
-
-			if localRec.Code != http.StatusOK {
-				t.Errorf("expected status 200, got %d", localRec.Code)
-			}
-		}()
-
-		// Wait briefly, then start second request.
-		time.Sleep(10 * time.Millisecond)
 		handler.Handle(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Errorf("expected status 200, got %d", rec.Code)
+		if rec.Code != http.StatusTooManyRequests {
+			t.Errorf("expected status 429, got %d", rec.Code)
 		}
 
 		if rec.Header().Get("Content-Type") != "application/json" {
@@ -452,16 +437,152 @@ func TestQueueConcurrentRequests(t *testing.T) {
 			)
 		}
 
+		if rec.Header().Get("Retry-After") != "30" {
+			t.Errorf(
+				"expected Retry-After 30, got %s",
+				rec.Header().Get("Retry-After"),
+			)
+		}
+
 		var response map[string]any
 
 		err := json.Unmarshal(rec.Body.Bytes(), &response)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		// Both should have been called sequentially.
-		if called.Load() != 2 {
-			t.Errorf("expected 2 calls, got %d", called.Load())
+		errMsg, ok := response["error"].(string)
+		if !ok || errMsg != "another update is already running" {
+			t.Errorf("unexpected error message: %v", response["error"])
+		}
+	})
+}
+
+// TestTargetedUpdateBlocksWhenLocked verifies that a targeted update (with image
+// query params) blocks until the lock is available instead of returning 429.
+func TestTargetedUpdateBlocksWhenLocked(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		customLock := make(chan bool, 1)
+		// Lock starts empty (held).
+
+		var called atomic.Int32
+
+		handler := update.New(func(images []string) *metrics.Metric {
+			called.Add(1)
+
+			if len(images) != 1 || images[0] != "myimage:latest" {
+				t.Errorf("unexpected images: %v", images)
+			}
+
+			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+		}, customLock)
+
+		done := make(chan int, 1)
+
+		// Start the targeted request in a goroutine - it should block.
+		go func() {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/v1/update?image=myimage:latest", nil)
+			handler.Handle(rec, req)
+
+			done <- rec.Code
+		}()
+
+		// Give the goroutine time to start and block.
+		time.Sleep(10 * time.Millisecond)
+
+		// The update function should not have been called yet.
+		if called.Load() != 0 {
+			t.Error("update function should not be called while lock is held")
+		}
+
+		// Release the lock.
+		customLock <- true
+
+		synctest.Wait()
+
+		// Now the request should complete.
+		code := <-done
+		if code != http.StatusOK {
+			t.Errorf("expected status 200 for targeted update, got %d", code)
+		}
+
+		if called.Load() != 1 {
+			t.Errorf("expected 1 call, got %d", called.Load())
+		}
+	})
+}
+
+// TestQueueConcurrentFullUpdates verifies that concurrent full update requests
+// return 429 when the lock is held, rather than queuing indefinitely.
+func TestQueueConcurrentFullUpdates(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		customLock := make(chan bool, 1)
+		customLock <- true
+
+		var called atomic.Int32
+
+		handler := update.New(func(_ []string) *metrics.Metric {
+			called.Add(1)
+			time.Sleep(50 * time.Millisecond) // Simulate work.
+
+			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
+		}, customLock)
+
+		// Collect results from concurrent requests.
+		results := make(chan int, 2)
+
+		// First request should acquire the lock and succeed.
+		go func() {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+			handler.Handle(rec, req)
+
+			results <- rec.Code
+		}()
+
+		// Wait for first request to acquire lock.
+		time.Sleep(10 * time.Millisecond)
+
+		// Second request should get 429 since the first is still running.
+		go func() {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+			handler.Handle(rec, req)
+
+			results <- rec.Code
+		}()
+
+		synctest.Wait()
+
+		// Collect both results.
+		// One should be 200, the other 429.
+		codes := []int{<-results, <-results}
+
+		has200 := false
+		has429 := false
+
+		for _, c := range codes {
+			if c == http.StatusOK {
+				has200 = true
+			}
+
+			if c == http.StatusTooManyRequests {
+				has429 = true
+			}
+		}
+
+		if !has200 {
+			t.Error("expected one request to return 200")
+		}
+
+		if !has429 {
+			t.Error("expected one request to return 429")
+		}
+
+		// Only the first request should have called the update function.
+		if called.Load() != 1 {
+			t.Errorf("expected 1 call, got %d", called.Load())
 		}
 	})
 }
@@ -493,7 +614,7 @@ func TestHandleConcurrentRequests(t *testing.T) {
 					bytes.NewBufferString("test body"),
 				)
 				handler.Handle(localRec, localReq)
-				// All should succeed with 200.
+				// All should succeed with 200 since there are enough lock slots.
 				if localRec.Code != http.StatusOK {
 					t.Errorf("expected status 200, got %d", localRec.Code)
 				}
@@ -505,7 +626,7 @@ func TestHandleConcurrentRequests(t *testing.T) {
 		if calledCount.Load() != 3 {
 			t.Errorf("expected 3 calls, got %d", calledCount.Load())
 		}
-		// All updates execute concurrently.
+		// All updates execute concurrently since the lock has capacity 10.
 	})
 }
 
@@ -574,7 +695,11 @@ func TestConcurrentRequests(t *testing.T) {
 		}
 		handler := update.New(mockUpdateFn, nil)
 
-		// Simulate 3 concurrent requests
+		// With a lock of capacity 1, only one request succeeds;
+		// the rest get 429.
+		successCount := atomic.Int32{}
+		rejectedCount := atomic.Int32{}
+
 		for range 3 {
 			go func() {
 				localRec := httptest.NewRecorder()
@@ -585,16 +710,31 @@ func TestConcurrentRequests(t *testing.T) {
 				)
 				handler.Handle(localRec, localReq)
 
-				if localRec.Code != http.StatusOK {
-					t.Errorf("expected status 200, got %d", localRec.Code)
+				switch localRec.Code {
+				case http.StatusOK:
+					successCount.Add(1)
+				case http.StatusTooManyRequests:
+					rejectedCount.Add(1)
+				default:
+					t.Errorf("unexpected status code: %d", localRec.Code)
 				}
 			}()
 		}
 
 		synctest.Wait()
 
-		if calledCount.Load() != 3 {
-			t.Errorf("expected 3 calls, got %d", calledCount.Load())
+		// With a capacity-1 lock, exactly one request succeeds.
+		if successCount.Load() != 1 {
+			t.Errorf("expected exactly 1 successful request, got %d", successCount.Load())
+		}
+
+		if rejectedCount.Load() != 2 {
+			t.Errorf("expected 2 rejected requests, got %d", rejectedCount.Load())
+		}
+
+		total := successCount.Load() + rejectedCount.Load()
+		if total != 3 {
+			t.Errorf("expected 3 total responses, got %d", total)
 		}
 	})
 }
