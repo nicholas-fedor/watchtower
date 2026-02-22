@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("the client", func() {
 		containerKnown := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
 
 		ginkgo.When(`warn on head failure is set to "always"`, func() {
-			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAlways}}
+			c := &client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAlways}}
 
 			ginkgo.It("should always return true", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeTrue())
@@ -49,7 +49,7 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 		ginkgo.When(`warn on head failure is set to "auto"`, func() {
-			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAuto}}
+			c := &client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnAuto}}
 
 			ginkgo.It("should return false for unknown repos", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeFalse())
@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 		ginkgo.When(`warn on head failure is set to "never"`, func() {
-			c := client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnNever}}
+			c := &client{ClientOptions: ClientOptions{WarnOnHeadFailed: WarnNever}}
 
 			ginkgo.It("should never return true", func() {
 				gomega.Expect(c.WarnOnHeadPullFailed(containerUnknown)).To(gomega.BeFalse())
@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("the client", func() {
 				images := map[string][]string{imageA: {imageAParent}}
 				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(images))
 
-				c := client{api: docker}
+				c := &client{api: docker}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("the client", func() {
 
 				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(nil))
 
-				c := client{api: docker}
+				c := &client{api: docker}
 				err := c.RemoveImageByID(context.Background(), types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
 			})
@@ -134,7 +134,7 @@ var _ = ginkgo.Describe("the client", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 
-				c := client{api: docker}
+				c := &client{api: docker}
 
 				_, _, err := c.IsContainerStale(
 					ctx,
@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("the client", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 
-				c := client{api: docker}
+				c := &client{api: docker}
 
 				err := c.RemoveImageByID(ctx, types.ImageID(imageID), "test-image")
 				gomega.Expect(err).To(gomega.MatchError(context.Canceled))
@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := client{api: docker}
+				c := &client{api: docker}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
@@ -225,7 +225,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := client{api: docker}
+				c := &client{api: docker}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
@@ -267,7 +267,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := client{api: docker}
+				c := &client{api: docker}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()

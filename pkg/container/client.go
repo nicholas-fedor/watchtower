@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -273,6 +274,11 @@ type client struct {
 	ClientOptions
 
 	api dockerClient.APIClient
+
+	// runtimeOnce ensures the container runtime is detected only once.
+	runtimeOnce sync.Once
+	// isPodman caches the result of Podman runtime detection.
+	isPodman bool
 }
 
 // ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
@@ -386,9 +392,11 @@ func NewClient(opts ClientOptions) Client {
 // Returns:
 //   - []types.Container: List of matching containers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c client) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
+func (c *client) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
-	isPodman := c.getRuntime(ctx)
+	//
+	//nolint:contextcheck // getRuntime uses context.Background() internally for cached detection
+	isPodman := c.getRuntime()
 
 	var containerFilter types.Filter
 
@@ -439,7 +447,7 @@ func (c client) ListContainers(ctx context.Context, filter ...types.Filter) ([]t
 // Returns:
 //   - types.Container: Container details if found.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c client) GetContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error) {
+func (c *client) GetContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error) {
 	// Retrieve container details using helper function.
 	container, err := GetSourceContainer(ctx, c.api, containerID)
 	if err != nil {
@@ -465,7 +473,7 @@ func (c client) GetContainer(ctx context.Context, containerID types.ContainerID)
 // Returns:
 //   - types.Container: Container with imageInfo set to nil.
 //   - error: Non-nil if inspection fails, nil on success.
-func (c client) GetCurrentWatchtowerContainer(
+func (c *client) GetCurrentWatchtowerContainer(
 	ctx context.Context,
 	containerID types.ContainerID,
 ) (types.Container, error) {
@@ -497,7 +505,7 @@ func (c client) GetCurrentWatchtowerContainer(
 //
 // Returns:
 //   - error: Non-nil if stop fails, nil on success.
-func (c client) StopContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
+func (c *client) StopContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
 	// Stop container using helper function.
 	err := StopSourceContainer(ctx, c.api, container, timeout)
 	if err != nil {
@@ -526,7 +534,7 @@ func (c client) StopContainer(ctx context.Context, container types.Container, ti
 //
 // Returns:
 //   - error: Non-nil if stop/removal fails, nil on success.
-func (c client) StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
+func (c *client) StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
 	// Stop and remove container using helper function with volume option.
 	err := StopAndRemoveSourceContainer(
 		ctx,
@@ -562,13 +570,15 @@ func (c client) StopAndRemoveContainer(ctx context.Context, container types.Cont
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation/start fails, nil on success.
-func (c client) StartContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
+func (c *client) StartContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
-	isPodman := c.getRuntime(ctx)
+	//
+	//nolint:contextcheck // getRuntime uses context.Background() internally for cached detection
+	isPodman := c.getRuntime()
 
 	clientVersion := c.GetVersion()
 
@@ -613,7 +623,7 @@ func (c client) StartContainer(ctx context.Context, container types.Container) (
 //
 // Returns:
 //   - error: Non-nil if update fails, nil on success.
-func (c client) UpdateContainer(
+func (c *client) UpdateContainer(
 	ctx context.Context,
 	container types.Container,
 	config dockerContainer.UpdateConfig,
@@ -646,7 +656,7 @@ func (c client) UpdateContainer(
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c client) RemoveContainer(ctx context.Context, container types.Container) error {
+func (c *client) RemoveContainer(ctx context.Context, container types.Container) error {
 	clog := logrus.WithFields(logrus.Fields{
 		"container": container.Name(),
 		"id":        container.ID().ShortID(),
@@ -687,7 +697,7 @@ func (c client) RemoveContainer(ctx context.Context, container types.Container) 
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
-func (c client) RenameContainer(ctx context.Context, container types.Container, newName string) error {
+func (c *client) RenameContainer(ctx context.Context, container types.Container, newName string) error {
 	// Perform rename using helper function.
 	err := RenameTargetContainer(ctx, c.api, container, newName)
 	if err != nil {
@@ -714,7 +724,7 @@ func (c client) RenameContainer(ctx context.Context, container types.Container, 
 //
 // Returns:
 //   - bool: True if warning is needed, false otherwise.
-func (c client) WarnOnHeadPullFailed(container types.Container) bool {
+func (c *client) WarnOnHeadPullFailed(container types.Container) bool {
 	// Apply warning strategy based on configuration.
 	if c.WarnOnHeadFailed == WarnAlways {
 		return true
@@ -738,7 +748,7 @@ func (c client) WarnOnHeadPullFailed(container types.Container) bool {
 //   - bool: True if stale, false otherwise.
 //   - types.ImageID: Latest image ID.
 //   - error: Non-nil if check fails, nil on success.
-func (c client) IsContainerStale(
+func (c *client) IsContainerStale(
 	ctx context.Context,
 	container types.Container,
 	params types.UpdateParams,
@@ -782,7 +792,7 @@ func (c client) IsContainerStale(
 // Returns:
 //   - bool: True if updates should be skipped, false otherwise.
 //   - error: Non-nil if execution fails, nil on success.
-func (c client) ExecuteCommand(
+func (c *client) ExecuteCommand(
 	ctx context.Context,
 	container types.Container,
 	command string,
@@ -930,7 +940,7 @@ func generateContainerMetadata(container types.Container) (string, error) {
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c client) RemoveImageByID(
+func (c *client) RemoveImageByID(
 	ctx context.Context,
 	imageID types.ImageID,
 	imageName string,
@@ -960,7 +970,7 @@ func (c client) RemoveImageByID(
 //
 // Returns:
 //   - string: Docker API version (e.g., "1.44").
-func (c client) GetVersion() string {
+func (c *client) GetVersion() string {
 	return strings.Trim(c.api.ClientVersion(), "\"")
 }
 
@@ -972,7 +982,7 @@ func (c client) GetVersion() string {
 // Returns:
 //   - map[string]interface{}: System information.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c client) GetInfo(ctx context.Context) (map[string]any, error) {
+func (c *client) GetInfo(ctx context.Context) (map[string]any, error) {
 	info, err := c.api.Info(ctx)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to get system info")
@@ -1008,7 +1018,7 @@ func (c client) GetInfo(ctx context.Context) (map[string]any, error) {
 // Returns:
 //   - error: Non-nil if timeout is reached, container becomes unhealthy, or inspection
 //     fails; nil if healthy or no health check is configured.
-func (c client) WaitForContainerHealthy(
+func (c *client) WaitForContainerHealthy(
 	ctx context.Context,
 	containerID types.ContainerID,
 	timeout time.Duration,
@@ -1093,7 +1103,7 @@ func (c client) WaitForContainerHealthy(
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
 //   - error: Non-nil if detection fails, nil on success.
-func (c client) detectRuntime(ctx context.Context) (bool, error) {
+func (c *client) detectRuntime(ctx context.Context) (bool, error) {
 	// Priority 1: Check for marker files (Podman or Docker)
 	runtime, err := c.detectRuntimeByMarker()
 	if err != nil {
@@ -1133,7 +1143,7 @@ func (c client) detectRuntime(ctx context.Context) (bool, error) {
 // Returns:
 //   - Runtime: The detected container runtime (RuntimePodman, RuntimeDocker, or RuntimeUnknown).
 //   - error: Non-nil if checking fails with a non-NotExist error, nil on success.
-func (c client) detectRuntimeByMarker() (Runtime, error) {
+func (c *client) detectRuntimeByMarker() (Runtime, error) {
 	// Check for Podman marker file
 	_, podmanErr := c.Fs.Stat("/run/.containerenv")
 	if podmanErr == nil {
@@ -1189,7 +1199,7 @@ func (c client) detectRuntimeByMarker() (Runtime, error) {
 //
 // Returns:
 //   - bool: True if CONTAINER env var indicates Podman, false otherwise.
-func (c client) detectRuntimeByEnv() bool {
+func (c *client) detectRuntimeByEnv() bool {
 	container := os.Getenv("CONTAINER")
 	if container == "podman" || container == "oci" {
 		logrus.Debug("Detected Podman via CONTAINER environment variable")
@@ -1212,7 +1222,7 @@ func (c client) detectRuntimeByEnv() bool {
 // Returns:
 //   - bool: True if Podman is detected via API, false otherwise.
 //   - error: Non-nil if API call fails, nil on success.
-func (c client) detectRuntimeByAPI(ctx context.Context) (bool, error) {
+func (c *client) detectRuntimeByAPI(ctx context.Context) (bool, error) {
 	info, err := c.GetInfo(ctx)
 	if err != nil {
 		logrus.WithError(err).
@@ -1247,29 +1257,38 @@ func (c client) detectRuntimeByAPI(ctx context.Context) (bool, error) {
 
 // getRuntime determines if Podman detection is needed and performs it.
 //
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
+// The result is cached after the first detection to avoid repeated API calls
+// and filesystem checks on every ListContainers and StartContainer invocation.
+// The runtime is assumed to not change during the lifetime of the client.
 //
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
-func (c client) getRuntime(ctx context.Context) bool {
+func (c *client) getRuntime() bool {
 	// Only perform detection in auto mode; otherwise, assume Docker
 	if c.CPUCopyMode != CPUCopyModeAuto {
 		return false
 	}
 
-	// Attempt to detect Podman using various methods
-	// (marker files, env vars, API info)
-	isPodman, err := c.detectRuntime(ctx)
-	if err != nil {
-		// On detection failure, fall back to assuming Docker
-		logrus.WithError(err).Debug("Failed to detect container runtime, falling back to Docker")
+	// Perform detection exactly once using sync.Once for thread safety.
+	// We use context.Background() for the detection to ensure the cached
+	// result doesn't depend on a potentially cancelled caller context.
+	c.runtimeOnce.Do(func() {
+		// Attempt to detect Podman using various methods
+		// (marker files, env vars, API info)
+		isPodman, err := c.detectRuntime(context.Background())
+		if err != nil {
+			// On detection failure, fall back to assuming Docker
+			logrus.WithError(err).Debug("Failed to detect container runtime, falling back to Docker")
 
-		return false
-	}
+			c.isPodman = false
 
-	// Return the detection result
-	return isPodman
+			return
+		}
+
+		c.isPodman = isPodman
+	})
+
+	return c.isPodman
 }
 
 // captureExecOutput attaches to an exec instance and captures its output.
@@ -1281,7 +1300,7 @@ func (c client) getRuntime(ctx context.Context) bool {
 // Returns:
 //   - string: Captured output if successful.
 //   - error: Non-nil if attachment or reading fails, nil on success.
-func (c client) captureExecOutput(ctx context.Context, execID string) (string, error) {
+func (c *client) captureExecOutput(ctx context.Context, execID string) (string, error) {
 	clog := logrus.WithField("exec_id", execID)
 
 	// Attach to the exec instance for output.
@@ -1345,7 +1364,7 @@ func (c client) captureExecOutput(ctx context.Context, execID string) (string, e
 // Returns:
 //   - bool: True if updates should be skipped (exit code 75), false otherwise.
 //   - error: Non-nil if inspection fails or command errors, nil on success.
-func (c client) waitForExecOrTimeout(
+func (c *client) waitForExecOrTimeout(
 	ctx context.Context,
 	execID string,
 	execOutput string,
