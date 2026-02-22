@@ -1007,7 +1007,19 @@ func stopContainersInReversedOrder(
 		c := containers[i]
 
 		// Check for context cancellation to avoid additional work when context is canceled.
+		// Iterate remaining containers to log and track them as failed before returning.
 		if ctx.Err() != nil {
+			// Handle remaining containers that were not processed due to cancellation.
+			for j := i - 1; j >= 0; j-- {
+				skipped := containers[j]
+				logrus.WithFields(logrus.Fields{
+					"container":    skipped.Name(),
+					"image":        skipped.ImageName(),
+					"container_id": skipped.ID().ShortID(),
+				}).Info("Skipped container stop due to context cancellation")
+				failed[skipped.ID()] = fmt.Errorf("stop skipped: %w", ctx.Err())
+			}
+
 			return failed, stopped
 		}
 
