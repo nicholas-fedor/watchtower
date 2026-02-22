@@ -287,86 +287,144 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 	})
 }
 
+// runErrorPropagationTest is a helper function that sets up a mock client with
+// configurable error injection and runs the Update action for testing error propagation.
+func runErrorPropagationTest(
+	terrorToReturn error,
+	containerStaleness map[string]bool,
+	targetOperation string,
+) (types.Report, []types.RemovedImageInfo, error) {
+	testData := getCommonTestData()
+	testData.Staleness = containerStaleness
+
+	client := mockActions.CreateMockClient(testData, false, false)
+
+	// Inject the appropriate error based on targetOperation
+	switch targetOperation {
+	case "ListContainers":
+		client.TestData.ListContainersError = terrorToReturn
+	case "StopContainer":
+		client.TestData.StopContainerError = terrorToReturn
+	case "StartContainer":
+		client.TestData.StartContainerError = terrorToReturn
+	}
+
+	report, cleanupImageInfos, err := actions.Update(
+		context.Background(),
+		client,
+		types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+	)
+
+	return report, cleanupImageInfos, err
+}
+
 // TestUpdateAction_ErrorPropagationContextErrors tests that errors from client operations
 // are properly propagated through the update process.
 func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
-	tests := []struct {
-		name                 string
-		errorToReturn        error
-		containerStaleness   map[string]bool
-		expectedErrorPattern string
-	}{
-		{
-			name:                 "ListContainers context error",
-			errorToReturn:        context.Canceled,
-			containerStaleness:   nil,
-			expectedErrorPattern: "update canceled",
-		},
-		{
-			name:                 "StopContainer context error",
-			errorToReturn:        context.DeadlineExceeded,
-			containerStaleness:   map[string]bool{"test-container-01": true, "test-container-02": true, "test-container-03": true},
-			expectedErrorPattern: "", // May not produce error, but should handle gracefully
-		},
-		{
-			name:                 "StartContainer context error",
-			errorToReturn:        context.Canceled,
-			containerStaleness:   map[string]bool{"test-container-01": true, "test-container-02": true, "test-container-03": true},
-			expectedErrorPattern: "",
-		},
+	allStale := map[string]bool{
+		"test-container-01": true,
+		"test-container-02": true,
+		"test-container-03": true,
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				testData := getCommonTestData()
-				testData.Staleness = tc.containerStaleness
+	t.Run("ListContainers context error", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			expectedErrorPattern := "update canceled"
 
-				client := mockActions.CreateMockClient(testData, false, false)
+			report, cleanupImageInfos, err := runErrorPropagationTest(
+				context.Canceled,
+				nil,
+				"ListContainers",
+			)
 
-				// Set the error to return based on test case
-				switch {
-				case strings.Contains(tc.name, "ListContainers"):
-					client.TestData.ListContainersError = tc.errorToReturn
-				case strings.Contains(tc.name, "StopContainer"):
-					client.TestData.StopContainerError = tc.errorToReturn
-				case strings.Contains(tc.name, "StartContainer"):
-					client.TestData.StartContainerError = tc.errorToReturn
+			synctest.Wait()
+
+			if expectedErrorPattern != "" && err != nil {
+				if !strings.Contains(err.Error(), expectedErrorPattern) &&
+					!strings.Contains(err.Error(), "context") {
+					t.Fatalf("expected error containing '%s' or 'context', got: %s",
+						expectedErrorPattern, err.Error())
 				}
+			}
 
-				report, cleanupImageInfos, err := actions.Update(
-					context.Background(),
-					client,
-					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
-				)
-
-				synctest.Wait()
-
-				if tc.expectedErrorPattern != "" && err != nil {
-					if !strings.Contains(err.Error(), tc.expectedErrorPattern) &&
-						!strings.Contains(err.Error(), "context") {
-						t.Fatalf("expected error containing '%s' or 'context', got: %s",
-							tc.expectedErrorPattern, err.Error())
-					}
-				}
-
-				// For non-cancellation errors, update should complete with report
-				if err == nil && report != nil {
-					// Update completed, check that cleanup was attempted
-					if len(tc.containerStaleness) > 0 {
-						// Some containers should have been processed
-						totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
-						if totalProcessed != len(tc.containerStaleness) {
-							t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
-								len(tc.containerStaleness), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
-						}
-					}
-				}
-
-				_ = cleanupImageInfos
-			})
+			_ = cleanupImageInfos
+			_ = report
 		})
-	}
+	})
+
+	t.Run("StopContainer context error", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			expectedErrorPattern := ""
+
+			report, cleanupImageInfos, err := runErrorPropagationTest(
+				context.DeadlineExceeded,
+				allStale,
+				"StopContainer",
+			)
+
+			synctest.Wait()
+
+			if expectedErrorPattern != "" && err != nil {
+				if !strings.Contains(err.Error(), expectedErrorPattern) &&
+					!strings.Contains(err.Error(), "context") {
+					t.Fatalf("expected error containing '%s' or 'context', got: %s",
+						expectedErrorPattern, err.Error())
+				}
+			}
+
+			// For non-cancellation errors, update should complete with report
+			if err == nil && report != nil {
+				// Update completed, check that cleanup was attempted
+				if len(allStale) > 0 {
+					// Some containers should have been processed
+					totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
+					if totalProcessed != len(allStale) {
+						t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
+							len(allStale), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
+					}
+				}
+			}
+
+			_ = cleanupImageInfos
+		})
+	})
+
+	t.Run("StartContainer context error", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			expectedErrorPattern := ""
+
+			report, cleanupImageInfos, err := runErrorPropagationTest(
+				context.Canceled,
+				allStale,
+				"StartContainer",
+			)
+
+			synctest.Wait()
+
+			if expectedErrorPattern != "" && err != nil {
+				if !strings.Contains(err.Error(), expectedErrorPattern) &&
+					!strings.Contains(err.Error(), "context") {
+					t.Fatalf("expected error containing '%s' or 'context', got: %s",
+						expectedErrorPattern, err.Error())
+				}
+			}
+
+			// For non-cancellation errors, update should complete with report
+			if err == nil && report != nil {
+				// Update completed, check that cleanup was attempted
+				if len(allStale) > 0 {
+					// Some containers should have been processed
+					totalProcessed := len(report.Updated()) + len(report.Failed()) + len(report.Skipped())
+					if totalProcessed != len(allStale) {
+						t.Fatalf("expected %d processed containers, got %d (updated: %d, failed: %d, skipped: %d)",
+							len(allStale), totalProcessed, len(report.Updated()), len(report.Failed()), len(report.Skipped()))
+					}
+				}
+			}
+
+			_ = cleanupImageInfos
+		})
+	})
 }
 
 // TestUpdateAction_ContextEdgeCases tests edge cases with context handling.
