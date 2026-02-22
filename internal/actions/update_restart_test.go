@@ -100,14 +100,14 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
-			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(0), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
-			gomega.Expect(client.TestData.StartContainerCount).
-				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
-			gomega.Expect(client.TestData.RenameContainerCount).
-				To(gomega.Equal(1), "RenameContainer should be called once")
-			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(1), "IsContainerStale should be called once for Watchtower")
+			gomega.Expect(client.TestData.StopContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
+			gomega.Expect(client.TestData.StartContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "StartContainer should be called for Watchtower restart")
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "RenameContainer should be called once")
+			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+				To(gomega.Equal(int32(1)), "IsContainerStale should be called once for Watchtower")
 		})
 	})
 
@@ -1097,7 +1097,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 					gomega.Expect(report.Restarted()).To(gomega.HaveLen(1))
 					gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
-					gomega.Expect(client.TestData.WaitForContainerHealthyCount).To(gomega.Equal(2))
+					gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).To(gomega.Equal(int32(2)))
 				},
 			)
 
@@ -1168,8 +1168,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					// Verify completion and reasonable performance
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(report.Updated()).To(gomega.HaveLen(numContainers))
-					gomega.Expect(client.TestData.WaitForContainerHealthyCount).
-						To(gomega.Equal(numContainers))
+					gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).
+						To(gomega.Equal(int32(numContainers)))
 					// Performance should be reasonable (less than 2 seconds for 10 containers)
 					gomega.Expect(duration).To(gomega.BeNumerically("<", 2*time.Second))
 				},

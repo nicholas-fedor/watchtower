@@ -1002,7 +1002,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
 
 				// Verify rolling restart was used (WaitForContainerHealthy called)
-				gomega.Expect(client.TestData.WaitForContainerHealthyCount).To(gomega.Equal(3))
+				gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).To(gomega.Equal(int32(3)))
 
 				// Verify cleanup occurred for all updated containers
 				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(3))
@@ -1568,7 +1568,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(4))
 
 			// Verify rolling restart was used for all containers
-			gomega.Expect(client.TestData.WaitForContainerHealthyCount).To(gomega.Equal(4))
+			gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).To(gomega.Equal(int32(4)))
 
 			// Verify cleanup occurred for all updated containers
 			gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(4))

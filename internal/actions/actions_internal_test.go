@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(renamed).To(gomega.BeFalse())
-		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(0))
+		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
 		gomega.Expect(newID).NotTo(gomega.BeEmpty())
 	})
 
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(renamed).To(gomega.BeTrue())
-		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(1))
+		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(1)))
 		gomega.Expect(newID).NotTo(gomega.BeEmpty())
 	})
 })
@@ -248,7 +248,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
-		gomega.Expect(client.TestData.StartContainerCount).To(gomega.Equal(1))
+		gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(1)))
 	})
 
 	ginkgo.It("should propagate RunOnce mode and skip Watchtower self-update", func() {
@@ -287,8 +287,8 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
-		gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(0))
-		gomega.Expect(client.TestData.StartContainerCount).To(gomega.Equal(0))
+		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
+		gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
 	})
 
 	ginkgo.It("should call UpdateContainer for Watchtower restart policy changes", func() {
@@ -326,7 +326,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
-		gomega.Expect(client.TestData.UpdateContainerCount).To(gomega.Equal(1))
+		gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
 	})
 })
 
@@ -1306,7 +1306,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 				// Verify UpdateContainer was called (this uses the detached context).
 				// The detached context is used for updating the restart policy of the
 				// renamed Watchtower container.
-				gomega.Expect(client.TestData.UpdateContainerCount).To(gomega.Equal(1))
+				gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
 			})
 		}
 	})
@@ -1377,7 +1377,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			// Wait for StartContainer to be called (which means RenameContainer has completed)
 			// before canceling the parent context. This ensures we cancel at the right moment -
 			// after rename succeeds but during/after start fails.
-			for client.TestData.StartContainerCount == 0 {
+			for client.TestData.StartContainerCount.Load() == 0 {
 				time.Sleep(1 * time.Millisecond)
 			}
 
@@ -1399,7 +1399,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			// Verify that StopContainer was called during cleanup.
 			// This demonstrates that the detached context allowed the cleanup
 			// operation to proceed even though the parent context was canceled.
-			gomega.Expect(client.TestData.StopContainerCount).To(gomega.BeNumerically(">=", 1))
+			gomega.Expect(client.TestData.StopContainerCount.Load()).To(gomega.BeNumerically(">=", int32(1)))
 		})
 
 		ginkgo.It("cleanup operations complete when parent context is already canceled", func() {
@@ -1456,7 +1456,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			gomega.Expect(renamed).To(gomega.BeFalse())
 
 			// RenameContainer should have been attempted but failed due to context cancellation.
-			gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(1))
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(1)))
 		})
 
 		ginkgo.It("restart policy update uses detached context after successful start", func() {
@@ -1515,8 +1515,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 
 			// Verify that both StartContainer and UpdateContainer were called.
 			// UpdateContainer uses the detached context for the restart policy update.
-			gomega.Expect(client.TestData.StartContainerCount).To(gomega.Equal(1))
-			gomega.Expect(client.TestData.UpdateContainerCount).To(gomega.Equal(1))
+			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
 		})
 	})
 })

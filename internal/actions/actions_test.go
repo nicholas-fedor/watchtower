@@ -1342,10 +1342,10 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			// Verify cleanup isolation - each client should only attempt cleanup for containers in its scope
 			// Since each client has separate TestData, the counts should reflect independent operations
-			gomega.Expect(clientA.TestData.TriedToRemoveImageCount).
-				To(gomega.BeNumerically(">=", 0))
-			gomega.Expect(clientB.TestData.TriedToRemoveImageCount).
-				To(gomega.BeNumerically(">=", 0))
+			gomega.Expect(clientA.TestData.TriedToRemoveImageCount.Load()).
+				To(gomega.BeNumerically(">=", int32(0)))
+			gomega.Expect(clientB.TestData.TriedToRemoveImageCount.Load()).
+				To(gomega.BeNumerically(">=", int32(0)))
 		})
 
 		ginkgo.It(
