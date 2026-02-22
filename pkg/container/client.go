@@ -1124,37 +1124,64 @@ func (c client) detectRuntime(ctx context.Context) (bool, error) {
 // detectRuntimeByMarker checks for container runtime marker files.
 //
 // It first checks for Podman's marker file, then checks for Docker's marker file.
+// If either check returns a non-NotExist error (e.g., permission denied), an error
+// is returned with details about which path failed.
 //
 // Parameters:
 //   - c: The client instance for filesystem access.
 //
 // Returns:
 //   - Runtime: The detected container runtime (RuntimePodman, RuntimeDocker, or RuntimeUnknown).
-//   - error: Non-nil if checking fails, nil on success.
+//   - error: Non-nil if checking fails with a non-NotExist error, nil on success.
 func (c client) detectRuntimeByMarker() (Runtime, error) {
 	// Check for Podman marker file
-	_, err := c.Fs.Stat("/run/.containerenv")
-	if err == nil {
+	_, podmanErr := c.Fs.Stat("/run/.containerenv")
+	if podmanErr == nil {
 		logrus.Debug("Detected Podman via marker file /run/.containerenv")
 
 		return RuntimePodman, nil
 	}
 
 	// Check for Docker marker file
-	_, err = c.Fs.Stat("/.dockerenv")
-	if err == nil {
+	_, dockerErr := c.Fs.Stat("/.dockerenv")
+	if dockerErr == nil {
 		logrus.Debug("Detected Docker via marker file /.dockerenv")
 
 		return RuntimeDocker, nil
 	}
 
-	if os.IsNotExist(err) {
-		// No marker files found
+	// Both checks failed - determine if it's due to missing files or actual errors
+	podmanNotExist := errors.Is(podmanErr, os.ErrNotExist)
+	dockerNotExist := errors.Is(dockerErr, os.ErrNotExist)
+
+	// If both files simply don't exist, that's expected (not an error)
+	if podmanNotExist && dockerNotExist {
 		return RuntimeUnknown, nil
 	}
 
-	// Error checking marker files
-	return RuntimeUnknown, fmt.Errorf("failed to check container runtime marker files: %w", err)
+	// At least one check returned a non-NotExist error (e.g., permission denied)
+	// Build an informative error message
+	switch {
+	case !podmanNotExist && dockerNotExist:
+		// Podman check failed with non-NotExist error
+		return RuntimeUnknown, fmt.Errorf(
+			"failed to check Podman marker file /run/.containerenv: %w",
+			podmanErr,
+		)
+	case podmanNotExist && !dockerNotExist:
+		// Docker check failed with non-NotExist error
+		return RuntimeUnknown, fmt.Errorf(
+			"failed to check Docker marker file /.dockerenv: %w",
+			dockerErr,
+		)
+	default:
+		// Both checks failed with non-NotExist errors
+		return RuntimeUnknown, fmt.Errorf(
+			"failed to check marker files: /run/.containerenv: %w, /.dockerenv: %w",
+			podmanErr,
+			dockerErr,
+		)
+	}
 }
 
 // It checks if the CONTAINER environment variable is set to "podman" or "oci",
