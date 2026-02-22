@@ -89,12 +89,20 @@ func CreateMockClientWithContext(
 }
 
 // ListContainers returns containers from TestData, optionally filtered.
-func (client MockClient) ListContainers(_ context.Context, filter ...types.Filter) ([]types.Container, error) {
+func (client MockClient) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
 	// Simulate latency for context cancellation testing when configured
 	if client.TestData.SimulatedLatency > 0 {
 		time.Sleep(client.TestData.SimulatedLatency)
 	}
 
+	// Check passed context for cancellation
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	// Also check client.ctx for backward compatibility
 	if client.ctx != nil {
 		select {
 		case <-client.ctx.Done():
@@ -127,7 +135,7 @@ func (client MockClient) ListContainers(_ context.Context, filter ...types.Filte
 // StopContainer simulates stopping a container by marking it in the Stopped map.
 // It records the container’s ID as stopped, increments the StopContainerCount,
 // and returns nil for simplicity.
-func (client MockClient) StopContainer(_ context.Context, c types.Container, _ time.Duration) error {
+func (client MockClient) StopContainer(ctx context.Context, c types.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount++
 
 	// Simulate latency for context cancellation testing when configured
@@ -135,6 +143,14 @@ func (client MockClient) StopContainer(_ context.Context, c types.Container, _ t
 		time.Sleep(client.TestData.SimulatedLatency)
 	}
 
+	// Check passed context for cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	// Also check client.ctx for backward compatibility
 	if client.ctx != nil {
 		select {
 		case <-client.ctx.Done():
@@ -176,6 +192,19 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 // Returns the configured StartContainerError if set.
 func (client MockClient) StartContainer(_ context.Context, c types.Container) (types.ContainerID, error) {
 	client.TestData.StartContainerCount++
+
+	// Simulate latency for context cancellation testing when configured
+	if client.TestData.SimulatedLatency > 0 {
+		time.Sleep(client.TestData.SimulatedLatency)
+	}
+
+	if client.ctx != nil {
+		select {
+		case <-client.ctx.Done():
+			return "", client.ctx.Err()
+		default:
+		}
+	}
 
 	if client.TestData.StartContainerError != nil {
 		return "", client.TestData.StartContainerError
@@ -274,7 +303,7 @@ func (client MockClient) ExecuteCommand(
 // It returns true if the container’s name isn’t explicitly marked as fresh, along with an empty ImageID and no error.
 // If IsContainerStaleError is set, it returns that error instead.
 func (client MockClient) IsContainerStale(
-	_ context.Context,
+	ctx context.Context,
 	container types.Container,
 	_ types.UpdateParams,
 ) (bool, types.ImageID, error) {
@@ -285,6 +314,14 @@ func (client MockClient) IsContainerStale(
 		time.Sleep(client.TestData.SimulatedLatency)
 	}
 
+	// Check passed context for cancellation
+	select {
+	case <-ctx.Done():
+		return false, "", ctx.Err()
+	default:
+	}
+
+	// Also check client.ctx for backward compatibility
 	if client.ctx != nil {
 		select {
 		case <-client.ctx.Done():
