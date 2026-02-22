@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/docker/go-connections/nat"
@@ -1311,9 +1312,100 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 	})
 
 	ginkgo.Describe("restartStaleContainer detached context survival", func() {
-		ginkgo.It("cleanup operations complete when parent context is canceled", func() {
-			// Create a parent context that we will cancel.
+		ginkgo.It("cleanup operations complete when parent context is canceled during execution", func() {
+			// Create a parent context that we will cancel while restartStaleContainer is running.
 			parentCtx, parentCancel := context.WithCancel(context.Background())
+
+			// Create a mock client with a Watchtower container.
+			// Configure StartContainerError to trigger the cleanup path.
+			// Add simulated latency to allow time for operations to complete.
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+					StartContainerError: errors.New("simulated start failure"),
+					SimulatedLatency:    5 * time.Millisecond, // Allow time for operations
+				},
+				false,
+				false,
+			)
+
+			params := types.UpdateParams{
+				Timeout: 0, // No deadline on detached context
+				RunOnce: false,
+			}
+
+			testContainer := client.TestData.Containers[0]
+
+			// Run restartStaleContainer in a goroutine so we can cancel the parent context
+			// while it's still executing.
+			var (
+				err     error
+				renamed bool
+				wg      sync.WaitGroup
+			)
+
+			wg.Go(func() {
+				// Call restartStaleContainer with the parent context.
+				// The test flow is:
+				// 1. RenameContainer succeeds (uses parent context)
+				// 2. StartContainer fails due to StartContainerError
+				// 3. Cleanup runs using the detached context (should survive parent cancellation)
+				_, renamed, err = restartStaleContainer(
+					parentCtx,
+					testContainer,
+					client,
+					params,
+				)
+			})
+
+			// Wait for StartContainer to be called (which means RenameContainer has completed)
+			// before canceling the parent context. This ensures we cancel at the right moment -
+			// after rename succeeds but during/after start fails.
+			for client.TestData.StartContainerCount == 0 {
+				time.Sleep(1 * time.Millisecond)
+			}
+
+			// Cancel the parent context after StartContainer has been called.
+			// The detached context should allow cleanup to proceed even though
+			// the parent context is canceled.
+			parentCancel()
+
+			// Wait for the goroutine to complete.
+			wg.Wait()
+
+			// The operation should fail due to StartContainer error, but the
+			// cleanup (StopAndRemoveContainer) should have been attempted
+			// using the detached context, which survives parent cancellation.
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
+			gomega.Expect(renamed).To(gomega.BeTrue())
+
+			// Verify that StopContainer was called during cleanup.
+			// This demonstrates that the detached context allowed the cleanup
+			// operation to proceed even though the parent context was canceled.
+			gomega.Expect(client.TestData.StopContainerCount).To(gomega.BeNumerically(">=", 1))
+		})
+
+		ginkgo.It("cleanup operations complete when parent context is already canceled", func() {
+			// Create a parent context that is already canceled.
+			parentCtx, parentCancel := context.WithCancel(context.Background())
+			parentCancel() // Cancel immediately before calling restartStaleContainer
 
 			// Create a mock client with a Watchtower container.
 			// Configure StartContainerError to trigger the cleanup path.
@@ -1349,11 +1441,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 
 			testContainer := client.TestData.Containers[0]
 
-			// Call restartStaleContainer with a valid parent context.
-			// The test flow is:
-			// 1. RenameContainer succeeds (uses parent context, which is valid)
-			// 2. StartContainer fails due to StartContainerError
-			// 3. Cleanup runs using the detached context (proving it works)
+			// Call restartStaleContainer with an already-canceled parent context.
+			// The RenameContainer operation should fail because the parent context is canceled.
 			_, renamed, err := restartStaleContainer(
 				parentCtx,
 				testContainer,
@@ -1361,20 +1450,13 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 				params,
 			)
 
-			// The operation should fail due to StartContainer error, but the
-			// cleanup (StopAndRemoveContainer) should have been attempted
-			// using the detached context.
+			// The operation should fail at RenameContainer due to parent context cancellation.
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
-			gomega.Expect(renamed).To(gomega.BeTrue())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to rename Watchtower container"))
+			gomega.Expect(renamed).To(gomega.BeFalse())
 
-			// Verify that StopContainer was called during cleanup.
-			// This demonstrates that the detached context allowed the cleanup
-			// operation to proceed after the StartContainer error.
-			gomega.Expect(client.TestData.StopContainerCount).To(gomega.BeNumerically(">=", 1))
-
-			// Clean up the parent context.
-			parentCancel()
+			// RenameContainer should have been attempted but failed due to context cancellation.
+			gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(1))
 		})
 
 		ginkgo.It("restart policy update uses detached context after successful start", func() {
