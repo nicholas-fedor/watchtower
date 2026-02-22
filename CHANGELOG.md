@@ -8,6 +8,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update goreleaser/goreleaser-action digest to ff4cb9c by @renovate[bot] in [#1338](https://github.com/nicholas-fedor/watchtower/pull/1338)
+- Update orhun/git-cliff-action digest to c93ef52 by @renovate[bot] in [#1336](https://github.com/nicholas-fedor/watchtower/pull/1336)
+- Update github/codeql-action digest to 89a39a4 by @renovate[bot] in [#1334](https://github.com/nicholas-fedor/watchtower/pull/1334)
+- Resolve golangci-lint false positives by @nicholas-fedor in [#1331](https://github.com/nicholas-fedor/watchtower/pull/1331)
+- Update golangci/golangci-lint-action digest to 17a5bf4 by @renovate[bot] in [#1328](https://github.com/nicholas-fedor/watchtower/pull/1328)
+
+### Fixed
+
+- Log container startup failures at warning level by @nicholas-fedor in [#1332](https://github.com/nicholas-fedor/watchtower/pull/1332)
+
+## [1.14.2] - 2026-02-17
+
+### Changed
+
+- Exclude unsupported architectures from goreleaser configurations by @nicholas-fedor in [#1326](https://github.com/nicholas-fedor/watchtower/pull/1326)
+- Update bug report template by @nicholas-fedor in [#1305](https://github.com/nicholas-fedor/watchtower/pull/1305)
+- Improve digest matching efficiency and reliability by @nicholas-fedor in [#1289](https://github.com/nicholas-fedor/watchtower/pull/1289)
+- Cache HTTP client for registry authentication requests by @nicholas-fedor in [#1287](https://github.com/nicholas-fedor/watchtower/pull/1287)
+
+### Chores
+
+- Update golangci-lint config and format test files by @nicholas-fedor in [#1323](https://github.com/nicholas-fedor/watchtower/pull/1323)
+- Update golangci/golangci-lint-action digest to fce8c98 by @renovate[bot] in [#1322](https://github.com/nicholas-fedor/watchtower/pull/1322)
+- Update crazy-max/ghaction-import-gpg digest to 5a30dd9 by @renovate[bot] in [#1320](https://github.com/nicholas-fedor/watchtower/pull/1320)
+- Update crazy-max/ghaction-import-gpg digest to ad49e30 by @renovate[bot] in [#1319](https://github.com/nicholas-fedor/watchtower/pull/1319)
+- Update actions/attest-build-provenance digest to 02a49bd by @renovate[bot] in [#1316](https://github.com/nicholas-fedor/watchtower/pull/1316)
+- Update github/codeql-action digest to 9e907b5 by @renovate[bot] in [#1315](https://github.com/nicholas-fedor/watchtower/pull/1315)
+- Update cimg/go docker tag to v1.26.0 by @renovate[bot] in [#1313](https://github.com/nicholas-fedor/watchtower/pull/1313)
+- Update securego/gosec action to v2.23.0 by @renovate[bot] in [#1312](https://github.com/nicholas-fedor/watchtower/pull/1312)
+- Update nicholas-fedor/go-proxy-pull-action digest to 95b3e6c by @renovate[bot] in [#1311](https://github.com/nicholas-fedor/watchtower/pull/1311)
+- Update golang docker tag to v1.26.0 by @renovate[bot] in [#1310](https://github.com/nicholas-fedor/watchtower/pull/1310)
+- Update dependency go to v1.26.0 by @renovate[bot] in [#1309](https://github.com/nicholas-fedor/watchtower/pull/1309)
+- Update golang:alpine docker digest to d4c4845 by @renovate[bot] in [#1308](https://github.com/nicholas-fedor/watchtower/pull/1308)
+- Update module golang.org/x/text to v0.34.0 by @renovate[bot] in [#1303](https://github.com/nicholas-fedor/watchtower/pull/1303)
+- Update goreleaser/goreleaser-action digest to ec59f47 by @renovate[bot] in [#1302](https://github.com/nicholas-fedor/watchtower/pull/1302)
+- Delete FUNDING.yml by @nicholas-fedor in [#1298](https://github.com/nicholas-fedor/watchtower/pull/1298)
+- Add FUNDING.yml by @nicholas-fedor in [#1297](https://github.com/nicholas-fedor/watchtower/pull/1297)
+- Update nicholas-fedor/go-proxy-pull-action digest to f0551db by @renovate[bot] in [#1296](https://github.com/nicholas-fedor/watchtower/pull/1296)
+- Update golang:1.25.7-alpine3.22 docker digest to 20c8a94 by @renovate[bot] in [#1295](https://github.com/nicholas-fedor/watchtower/pull/1295)
+- Update golang:alpine docker digest to f6751d8 by @renovate[bot] in [#1294](https://github.com/nicholas-fedor/watchtower/pull/1294)
+- Update github/codeql-action digest to 45cbd0c by @renovate[bot] in [#1293](https://github.com/nicholas-fedor/watchtower/pull/1293)
+- Update cimg/go docker tag to v1.25.7 by @renovate[bot] in [#1291](https://github.com/nicholas-fedor/watchtower/pull/1291)
+- Update nicholas-fedor/go-proxy-pull-action digest to 9c51cce by @renovate[bot] in [#1288](https://github.com/nicholas-fedor/watchtower/pull/1288)
+- Update golang docker tag to v1.25.7 by @renovate[bot] in [#1286](https://github.com/nicholas-fedor/watchtower/pull/1286)
+- Update golang:alpine docker digest to f4622e3 by @renovate[bot] in [#1285](https://github.com/nicholas-fedor/watchtower/pull/1285)
+- Update dependency go to v1.25.7 by @renovate[bot] in [#1284](https://github.com/nicholas-fedor/watchtower/pull/1284)
+- Update nicholas-fedor/go-proxy-pull-action digest to 998d963 by @renovate[bot] in [#1283](https://github.com/nicholas-fedor/watchtower/pull/1283)
+- Update cimg/go:1.25.6 docker digest to 81789fa by @renovate[bot] in [#1281](https://github.com/nicholas-fedor/watchtower/pull/1281)
+- Update actions/checkout digest to de0fac2 by @renovate[bot] in [#1280](https://github.com/nicholas-fedor/watchtower/pull/1280)
+
+### Fixed
+
+- Update DNS error pattern in digest test by @nicholas-fedor in [#1324](https://github.com/nicholas-fedor/watchtower/pull/1324)
+- Add service-only matching for cross-project dependencies by @nicholas-fedor in [#1307](https://github.com/nicholas-fedor/watchtower/pull/1307)
+
+## [1.14.1] - 2026-02-03
+
 ### Changed
 
 - Extract getRawLabelValue to eliminate code duplication by @nicholas-fedor in [#1277](https://github.com/nicholas-fedor/watchtower/pull/1277)
@@ -2619,7 +2678,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.2...HEAD)
+- [1.14.2](https://github.com/nicholas-fedor/watchtower/compare/v1.14.1...v1.14.2)
+- [1.14.1](https://github.com/nicholas-fedor/watchtower/compare/v1.14.0...v1.14.1)
 - [1.14.0](https://github.com/nicholas-fedor/watchtower/compare/v1.13.1...v1.14.0)
 - [1.13.1](https://github.com/nicholas-fedor/watchtower/compare/v1.13.0...v1.13.1)
 - [1.13.0](https://github.com/nicholas-fedor/watchtower/compare/v1.12.5...v1.13.0)
