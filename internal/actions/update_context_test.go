@@ -290,7 +290,7 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 // runErrorPropagationTest is a helper function that sets up a mock client with
 // configurable error injection and runs the Update action for testing error propagation.
 func runErrorPropagationTest(
-	terrorToReturn error,
+	errorToReturn error,
 	containerStaleness map[string]bool,
 	targetOperation string,
 ) (types.Report, []types.RemovedImageInfo, error) {
@@ -302,11 +302,11 @@ func runErrorPropagationTest(
 	// Inject the appropriate error based on targetOperation
 	switch targetOperation {
 	case "ListContainers":
-		client.TestData.ListContainersError = terrorToReturn
+		client.TestData.ListContainersError = errorToReturn
 	case "StopContainer":
-		client.TestData.StopContainerError = terrorToReturn
+		client.TestData.StopContainerError = errorToReturn
 	case "StartContainer":
-		client.TestData.StartContainerError = terrorToReturn
+		client.TestData.StartContainerError = errorToReturn
 	}
 
 	report, cleanupImageInfos, err := actions.Update(
