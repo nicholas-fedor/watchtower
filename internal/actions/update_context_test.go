@@ -159,7 +159,10 @@ func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		client := mockActions.CreateMockClientWithContext(ctx, getCommonTestData(), false, false)
+		testData := getCommonTestData()
+		// Set simulated latency to allow operations to start before cancellation
+		testData.SimulatedLatency = 10 * time.Millisecond
+		client := mockActions.CreateMockClientWithContext(ctx, testData, false, false)
 
 		// Start update in a goroutine
 		done := make(chan struct{})
@@ -369,9 +372,10 @@ func TestUpdateAction_ErrorPropagationContextErrors(t *testing.T) {
 // TestUpdateAction_ContextEdgeCases tests edge cases with context handling.
 func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 	tests := []struct {
-		name            string
-		contextSetup    func() (context.Context, context.CancelFunc)
-		staleContainers map[string]bool
+		name             string
+		contextSetup     func() (context.Context, context.CancelFunc)
+		staleContainers  map[string]bool
+		simulatedLatency time.Duration // Optional latency for context timeout testing
 	}{
 		{
 			name: "Background context should work",
@@ -420,6 +424,8 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 				"test-container-02": true,
 				"test-container-03": true,
 			},
+			// Set simulated latency to allow timeout to expire during operations
+			simulatedLatency: 5 * time.Millisecond,
 		},
 	}
 
@@ -428,6 +434,10 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				testData := getCommonTestData()
 				testData.Staleness = tc.staleContainers
+				// Apply simulated latency if specified (for context timeout testing)
+				if tc.simulatedLatency > 0 {
+					testData.SimulatedLatency = tc.simulatedLatency
+				}
 
 				ctx, cancel := tc.contextSetup()
 				defer cancel()

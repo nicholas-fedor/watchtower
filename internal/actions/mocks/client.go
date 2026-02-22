@@ -47,6 +47,7 @@ type TestData struct {
 	FailedImageIDs               []types.ImageID                       // List of image IDs that should fail removal.
 	StopOrder                    []string                              // Order in which containers were stopped.
 	StartOrder                   []string                              // Order in which containers were started.
+	SimulatedLatency             time.Duration                         // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -89,8 +90,10 @@ func CreateMockClientWithContext(
 
 // ListContainers returns containers from TestData, optionally filtered.
 func (client MockClient) ListContainers(_ context.Context, filter ...types.Filter) ([]types.Container, error) {
-	// Simulate mid-operation delay for context cancellation testing
-	time.Sleep(20 * time.Millisecond)
+	// Simulate latency for context cancellation testing when configured
+	if client.TestData.SimulatedLatency > 0 {
+		time.Sleep(client.TestData.SimulatedLatency)
+	}
 
 	if client.ctx != nil {
 		select {
@@ -127,8 +130,10 @@ func (client MockClient) ListContainers(_ context.Context, filter ...types.Filte
 func (client MockClient) StopContainer(_ context.Context, c types.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount++
 
-	// Simulate mid-operation delay for context cancellation testing
-	time.Sleep(20 * time.Millisecond)
+	// Simulate latency for context cancellation testing when configured
+	if client.TestData.SimulatedLatency > 0 {
+		time.Sleep(client.TestData.SimulatedLatency)
+	}
 
 	if client.ctx != nil {
 		select {
@@ -275,8 +280,10 @@ func (client MockClient) IsContainerStale(
 ) (bool, types.ImageID, error) {
 	client.TestData.IsContainerStaleCount++
 
-	// Simulate mid-operation delay for context cancellation testing
-	time.Sleep(20 * time.Millisecond)
+	// Simulate latency for context cancellation testing when configured
+	if client.TestData.SimulatedLatency > 0 {
+		time.Sleep(client.TestData.SimulatedLatency)
+	}
 
 	if client.ctx != nil {
 		select {
