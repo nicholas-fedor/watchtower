@@ -1414,8 +1414,9 @@ func restartStaleContainer(
 		// Run post-update lifecycle hooks for restarting containers if enabled.
 		if sourceContainer.ToRestart() && config.LifecycleHooks {
 			logrus.WithFields(fields).Debug("Executing post-update command")
+			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
 			lifecycle.ExecutePostUpdateCommand(
-				ctx,
+				detachedCtx,
 				client,
 				newContainerID,
 				config.LifecycleUID,
