@@ -2,6 +2,7 @@ package actions_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,6 +18,46 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// createStaleContainersForTest creates two stale containers and returns them along with TestData.
+// This is a helper function used by tests that need to set up containers for rolling restart scenarios.
+func createStaleContainersForTest() *mockActions.TestData {
+	container1 := mockActions.CreateMockContainerWithConfig(
+		"container-1",
+		"/container-1",
+		"image-1:latest",
+		true,
+		false,
+		time.Now().AddDate(0, 0, -1),
+		&dockerContainer.Config{
+			Labels:       map[string]string{},
+			ExposedPorts: map[nat.Port]struct{}{},
+		},
+	)
+
+	container2 := mockActions.CreateMockContainerWithConfig(
+		"container-2",
+		"/container-2",
+		"image-2:latest",
+		true,
+		false,
+		time.Now().AddDate(0, 0, -1),
+		&dockerContainer.Config{
+			Labels:       map[string]string{},
+			ExposedPorts: map[nat.Port]struct{}{},
+		},
+	)
+
+	testData := &mockActions.TestData{
+		Containers: []types.Container{container1, container2},
+		Staleness: map[string]bool{
+			"container-1": true,
+			"container-2": true,
+		},
+	}
+
+	return testData
+}
 
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("restarting stale Watchtower containers in non-rolling mode", func() {
@@ -59,14 +100,14 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
-			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(0), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
-			gomega.Expect(client.TestData.StartContainerCount).
-				To(gomega.Equal(1), "StartContainer should be called for Watchtower restart")
-			gomega.Expect(client.TestData.RenameContainerCount).
-				To(gomega.Equal(1), "RenameContainer should be called once")
-			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(1), "IsContainerStale should be called once for Watchtower")
+			gomega.Expect(client.TestData.StopContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
+			gomega.Expect(client.TestData.StartContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "StartContainer should be called for Watchtower restart")
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "RenameContainer should be called once")
+			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+				To(gomega.Equal(int32(1)), "IsContainerStale should be called once for Watchtower")
 		})
 	})
 
@@ -1056,7 +1097,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 					gomega.Expect(report.Restarted()).To(gomega.HaveLen(1))
 					gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
-					gomega.Expect(client.TestData.WaitForContainerHealthyCount).To(gomega.Equal(2))
+					gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).To(gomega.Equal(int32(2)))
 				},
 			)
 
@@ -1127,12 +1168,84 @@ var _ = ginkgo.Describe("the update action", func() {
 					// Verify completion and reasonable performance
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					gomega.Expect(report.Updated()).To(gomega.HaveLen(numContainers))
-					gomega.Expect(client.TestData.WaitForContainerHealthyCount).
-						To(gomega.Equal(numContainers))
+					gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).
+						To(gomega.Equal(int32(numContainers)))
 					// Performance should be reasonable (less than 2 seconds for 10 containers)
 					gomega.Expect(duration).To(gomega.BeNumerically("<", 2*time.Second))
 				},
 			)
+		})
+
+		ginkgo.When("testing context cancellation in rolling restart", func() {
+			ginkgo.It("should return early with context cancellation error when context is canceled before processing", func() {
+				// Create multiple containers that would need rolling restart
+				testData := createStaleContainersForTest()
+
+				client := mockActions.CreateMockClient(
+					testData,
+					false,
+					false,
+				)
+
+				// Create a canceled context - this will trigger the early context cancellation check in Update
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately
+
+				// Run Update with rolling restart and canceled context
+				_, _, err := actions.Update(
+					ctx,
+					client,
+					types.UpdateParams{
+						Cleanup:        true,
+						RollingRestart: true,
+						CPUCopyMode:    "auto",
+					},
+				)
+
+				// Verify that an error is returned
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				// Verify that the error wraps context cancellation
+				gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue())
+				// Verify error message contains "canceled" (early check in Update uses "update canceled")
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("canceled"))
+			})
+
+			ginkgo.It("should handle context cancellation with timeout during rolling restart", func() {
+				// Create multiple containers - all stale so they all go through rolling restart
+				testData := createStaleContainersForTest()
+
+				client := mockActions.CreateMockClient(
+					testData,
+					false,
+					false,
+				)
+
+				// Use a context with an already-expired deadline to deterministically trigger context cancellation.
+				// This is more reliable than a short timeout which may expire before Update runs.
+				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-1*time.Hour))
+				defer cancel()
+
+				// Run Update with rolling restart - should timeout quickly
+				_, _, err := actions.Update(
+					ctx,
+					client,
+					types.UpdateParams{
+						Cleanup:        true,
+						RollingRestart: true,
+						CPUCopyMode:    "auto",
+					},
+				)
+
+				// Verify that an error is returned
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				// Verify that the error wraps context cancellation or deadline exceeded
+				gomega.Expect(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)).To(gomega.BeTrue())
+				// Verify error message contains "canceled" or similar
+				gomega.Expect(err.Error()).To(gomega.SatisfyAny(
+					gomega.ContainSubstring("canceled"),
+					gomega.ContainSubstring("deadline"),
+				))
+			})
 		})
 
 		ginkgo.When("testing restart ordering functionality", func() {

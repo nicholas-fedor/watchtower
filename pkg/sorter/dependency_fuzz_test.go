@@ -367,11 +367,11 @@ func isRealCycle(containers []types.Container, circularErr CircularReferenceErro
 	// Create a map from normalized identifier to container for efficient lookup
 	containerMap := make(map[string]types.Container)
 
-	for _, cont := range containers {
+	for _, c := range containers {
 		normalizedIdentifier := util.NormalizeContainerName(
-			container.ResolveContainerIdentifier(cont),
+			container.ResolveContainerIdentifier(c),
 		)
-		containerMap[normalizedIdentifier] = cont
+		containerMap[normalizedIdentifier] = c
 	}
 
 	// Check each consecutive pair in the cycle path (excluding the closing duplicate)

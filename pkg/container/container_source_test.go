@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -126,7 +127,7 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			)
 			mockServer.AppendHandlers(mockInspects(testContainerID)...)
 
-			containers, err := ListSourceContainers(docker, ClientOptions{}, nil)
+			containers, err := ListSourceContainers(context.Background(), docker, ClientOptions{}, nil)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.HaveLen(1))
 		})
@@ -140,6 +141,7 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			mockServer.AppendHandlers(mockInspects(testContainerID)...)
 
 			containers, err := ListSourceContainers(
+				context.Background(),
 				docker,
 				ClientOptions{IncludeStopped: true},
 				nil,
@@ -157,6 +159,7 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			mockServer.AppendHandlers(mockInspects(testContainerID)...)
 
 			containers, err := ListSourceContainers(
+				context.Background(),
 				docker,
 				ClientOptions{IncludeRestarting: true},
 				nil,
@@ -173,7 +176,7 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			)
 			mockServer.AppendHandlers(mockInspects(testContainerID)...)
 
-			containers, err := ListSourceContainers(docker, ClientOptions{}, filters.NoFilter)
+			containers, err := ListSourceContainers(context.Background(), docker, ClientOptions{}, filters.NoFilter)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.HaveLen(1))
 		})
@@ -322,7 +325,7 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 				),
 			)
 
-			container, err := GetSourceContainer(docker, types.ContainerID(containerID))
+			container, err := GetSourceContainer(context.Background(), docker, types.ContainerID(containerID))
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(container).ToNot(gomega.BeNil())
 			gomega.Expect(container.ID()).To(gomega.Equal(types.ContainerID(containerID)))
@@ -370,7 +373,7 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 				),
 			)
 
-			container, err := GetSourceContainer(docker, types.ContainerID(containerID))
+			container, err := GetSourceContainer(context.Background(), docker, types.ContainerID(containerID))
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(container).ToNot(gomega.BeNil())
 			gomega.Expect(container.ID()).To(gomega.Equal(types.ContainerID(containerID)))
@@ -431,7 +434,7 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 				),
 			)
 
-			container, err := GetSourceContainer(docker, types.ContainerID(containerID))
+			container, err := GetSourceContainer(context.Background(), docker, types.ContainerID(containerID))
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(container).ToNot(gomega.BeNil())
 			gomega.Expect(container.ContainerInfo().HostConfig.NetworkMode).
@@ -454,7 +457,7 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 				),
 			)
 
-			container, err := GetSourceContainer(docker, types.ContainerID(containerID))
+			container, err := GetSourceContainer(context.Background(), docker, types.ContainerID(containerID))
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to inspect container"))
 			gomega.Expect(container).To(gomega.BeNil())
@@ -476,7 +479,7 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 				),
 			)
 
-			container, err := GetSourceContainer(docker, types.ContainerID(containerID))
+			container, err := GetSourceContainer(context.Background(), docker, types.ContainerID(containerID))
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to inspect container"))
 			gomega.Expect(container).To(gomega.BeNil())
@@ -498,7 +501,7 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 				),
 			)
 
-			container, err := GetSourceContainer(docker, types.ContainerID(containerID))
+			container, err := GetSourceContainer(context.Background(), docker, types.ContainerID(containerID))
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to inspect container"))
 			gomega.Expect(container).To(gomega.BeNil())
@@ -560,7 +563,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 					),
 				)
 
-				err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, false)
+				err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, false)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		},
@@ -599,7 +602,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 					),
 				)
 
-				err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, true)
+				err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, true)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})
 		},
@@ -622,7 +625,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				),
 			)
 
-			err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, false)
+			err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, false)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to stop container"))
 		})
@@ -655,7 +658,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				),
 			)
 
-			err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, false)
+			err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, false)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to remove container"))
 		})
@@ -679,7 +682,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				),
 			)
 
-			err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, true)
+			err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, true)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			// Should not have made a DELETE request since AutoRemove is true
 			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(1))
@@ -707,7 +710,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				),
 			)
 
-			err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, true)
+			err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, true)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
@@ -745,7 +748,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				),
 			)
 
-			err := StopAndRemoveSourceContainer(docker, container, timeout, false)
+			err := StopAndRemoveSourceContainer(context.Background(), docker, container, timeout, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
@@ -774,7 +777,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				),
 			)
 
-			err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, false)
+			err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
@@ -796,7 +799,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				),
 			)
 
-			err := StopAndRemoveSourceContainer(docker, container, 10*time.Second, false)
+			err := StopAndRemoveSourceContainer(context.Background(), docker, container, 10*time.Second, false)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to stop container"))
 		})
@@ -1744,7 +1747,7 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 			resetLogrus, logbuf := captureLogrus(logrus.InfoLevel)
 			defer resetLogrus()
 
-			err := StopSourceContainer(docker, container, 10*time.Second)
+			err := StopSourceContainer(context.Background(), docker, container, 10*time.Second)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(logbuf).Should(gbytes.Say("Stopping linked container"))
 		})
@@ -1767,7 +1770,7 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 				),
 			)
 
-			err := StopSourceContainer(docker, container, 10*time.Second)
+			err := StopSourceContainer(context.Background(), docker, container, 10*time.Second)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
@@ -1789,7 +1792,7 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 				),
 			)
 
-			err := StopSourceContainer(docker, container, 10*time.Second)
+			err := StopSourceContainer(context.Background(), docker, container, 10*time.Second)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to stop container"))
 		})
@@ -1822,7 +1825,7 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 				),
 			)
 
-			err := StopSourceContainer(docker, container, timeout)
+			err := StopSourceContainer(context.Background(), docker, container, timeout)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
@@ -1833,7 +1836,7 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 				WithContainerState(dockerContainer.State{Running: false}),
 			)
 
-			err := StopSourceContainer(docker, container, 10*time.Second)
+			err := StopSourceContainer(context.Background(), docker, container, 10*time.Second)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
 		})

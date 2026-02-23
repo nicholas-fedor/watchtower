@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ const maxRemovalAttempts = 3
 // Removal operations respect scope boundaries to prevent cross-scope interference.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - cleanupImages: Remove images if true.
 //   - watchtowerScope: Scope to filter Watchtower instances.
@@ -42,6 +44,7 @@ const maxRemovalAttempts = 3
 //   - int: Number of removed Watchtower instances.
 //   - error: Non-nil if removal fails, nil if single instance or successful removal.
 func RemoveExcessWatchtowerInstances(
+	ctx context.Context,
 	client container.Client,
 	cleanupImages bool,
 	scope string,
@@ -61,7 +64,7 @@ func RemoveExcessWatchtowerInstances(
 	}).Debug("Starting removal of excess Watchtower instances")
 
 	// List all containers to find excess instances
-	allContainers, err := client.ListContainers(filters.NoFilter)
+	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
 	if err != nil {
 		return 0, fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -82,6 +85,7 @@ func RemoveExcessWatchtowerInstances(
 
 	// Stop and remove the excess containers, collecting removed image info if removal is enabled
 	removed, err := removeExcessContainers(
+		ctx,
 		client,
 		excessWatchtowerContainers,
 		cleanupImages,
@@ -233,10 +237,10 @@ func getChainedContainers(
 
 	// Filter containers that are in the chain, present on the host, and not the current container.
 	// Chained containers are parent containers that must be removed regardless of scope.
-	for _, cont := range allContainers {
-		if _, exists := containerChainMap[string(cont.ID())]; exists &&
-			cont.ID() != currentContainer.ID() {
-			chainedContainers = append(chainedContainers, cont)
+	for _, c := range allContainers {
+		if _, exists := containerChainMap[string(c.ID())]; exists &&
+			c.ID() != currentContainer.ID() {
+			chainedContainers = append(chainedContainers, c)
 		}
 	}
 
@@ -261,17 +265,17 @@ func getChainedContainers(
 //   - []types.Container: Deduplicated slice of containers to remove.
 func addExcessContainers(excessContainers, chainContainers []types.Container) []types.Container {
 	containersToRemoveMap := make(map[types.ContainerID]types.Container)
-	for _, container := range excessContainers {
-		containersToRemoveMap[container.ID()] = container
+	for _, c := range excessContainers {
+		containersToRemoveMap[c.ID()] = c
 	}
 
-	for _, container := range chainContainers {
-		containersToRemoveMap[container.ID()] = container
+	for _, c := range chainContainers {
+		containersToRemoveMap[c.ID()] = c
 	}
 
 	containersToRemove := make([]types.Container, 0, len(containersToRemoveMap))
-	for _, container := range containersToRemoveMap {
-		containersToRemove = append(containersToRemove, container)
+	for _, c := range containersToRemoveMap {
+		containersToRemove = append(containersToRemove, c)
 	}
 
 	return containersToRemove
@@ -284,6 +288,7 @@ func addExcessContainers(excessContainers, chainContainers []types.Container) []
 // Excludes the current running container from removal and manages image cleanup based on removal success.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - excessWatchtowerContainers: Slice of Watchtower containers to stop and remove.
 //   - cleanupImages: Remove images if true.
@@ -294,6 +299,7 @@ func addExcessContainers(excessContainers, chainContainers []types.Container) []
 //   - int: Number of successfully removed containers.
 //   - error: Non-nil if any container removal failed or insufficient removals occurred.
 func removeExcessContainers(
+	ctx context.Context,
 	client container.Client,
 	excessWatchtowerContainers []types.Container,
 	cleanupImages bool,
@@ -332,7 +338,7 @@ func removeExcessContainers(
 				"max_attempts": maxRemovalAttempts,
 			}).Debug("Attempting to stop and remove container")
 
-			err := client.StopAndRemoveContainer(c, stopContainerTimeout)
+			err := client.StopAndRemoveContainer(ctx, c, stopContainerTimeout)
 			if err == nil {
 				logrus.WithFields(logrus.Fields{
 					"container_id": string(c.ID()),
@@ -362,7 +368,12 @@ func removeExcessContainers(
 			}).Debug("Failed to stop and remove container")
 
 			if attempt < maxRemovalAttempts-1 {
-				time.Sleep(removalRetryDelay)
+				select {
+				case <-time.After(removalRetryDelay):
+					// continue to next retry attempt
+				case <-ctx.Done():
+					return 0, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
+				}
 			}
 		}
 
@@ -393,7 +404,7 @@ func removeExcessContainers(
 	}
 
 	if cleanupImages {
-		removedInfos, err := RemoveImages(client, *collectedInfos)
+		removedInfos, err := RemoveImages(ctx, client, *collectedInfos)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"removed_images_count": len(removedInfos),
@@ -429,6 +440,7 @@ func removeExcessContainers(
 // If no images are provided, it returns an empty slice and no error.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - images: Slice of images to remove.
 //
@@ -436,6 +448,7 @@ func removeExcessContainers(
 //   - []RemovedImageInfo: Slice of successfully removed image info.
 //   - error: Non-nil if any image removal failed, nil otherwise.
 func RemoveImages(
+	ctx context.Context,
 	client container.Client,
 	images []types.RemovedImageInfo,
 ) ([]types.RemovedImageInfo, error) {
@@ -462,7 +475,7 @@ func RemoveImages(
 			"container_id": string(image.ContainerID),
 		}).Debug("Attempting to remove image")
 
-		err := client.RemoveImageByID(imageID, image.ImageName)
+		err := client.RemoveImageByID(ctx, imageID, image.ImageName)
 		if err != nil {
 			// Check if this is a "not found" error (expected when multiple instances remove the same image)
 			switch {

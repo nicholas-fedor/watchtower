@@ -871,13 +871,13 @@ var _ = ginkgo.Describe("Actions", func() {
 	ginkgo.Describe("performImageCleanup", func() {
 		ginkgo.It("should return empty slice when cleanup is disabled", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(client, false, []types.RemovedImageInfo{})
+			cleanedImages := performImageCleanup(context.Background(), client, false, []types.RemovedImageInfo{})
 			gomega.Expect(cleanedImages).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("should perform cleanup when cleanup is enabled", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(client, true, []types.RemovedImageInfo{
+			cleanedImages := performImageCleanup(context.Background(), client, true, []types.RemovedImageInfo{
 				{
 					ContainerName: "test-container",
 					ImageName:     "test-image:v1.0",
@@ -891,7 +891,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 		ginkgo.It("should return a valid slice when cleanup input is empty", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(client, true, []types.RemovedImageInfo{})
+			cleanedImages := performImageCleanup(context.Background(), client, true, []types.RemovedImageInfo{})
 			// Should return a valid slice even with empty input
 			gomega.Expect(cleanedImages).NotTo(gomega.BeNil())
 		})
@@ -1342,10 +1342,10 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			// Verify cleanup isolation - each client should only attempt cleanup for containers in its scope
 			// Since each client has separate TestData, the counts should reflect independent operations
-			gomega.Expect(clientA.TestData.TriedToRemoveImageCount).
-				To(gomega.BeNumerically(">=", 0))
-			gomega.Expect(clientB.TestData.TriedToRemoveImageCount).
-				To(gomega.BeNumerically(">=", 0))
+			gomega.Expect(clientA.TestData.TriedToRemoveImageCount.Load()).
+				To(gomega.BeNumerically(">=", int32(0)))
+			gomega.Expect(clientB.TestData.TriedToRemoveImageCount.Load()).
+				To(gomega.BeNumerically(">=", int32(0)))
 		})
 
 		ginkgo.It(

@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"errors"
 	"os"
 
@@ -306,7 +307,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 				setup()
 			}
 
-			got, err := GetContainerIDFromHostname(mockClient)
+			got, err := GetContainerIDFromHostname(context.Background(), mockClient)
 			if wantErr {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(got).To(gomega.BeEmpty())
@@ -334,7 +335,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 				},
 			)
 
-			mockClient.EXPECT().ListContainers().Return([]types.Container{mockContainer}, nil)
+			mockClient.EXPECT().ListContainers(context.Background()).Return([]types.Container{mockContainer}, nil)
 		}, types.ContainerID("hostname-container-id"), false, ""),
 		ginkgo.Entry("when no container with matching hostname is found", func() {
 			hostname := testHostname
@@ -351,7 +352,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 				},
 			)
 
-			mockClient.EXPECT().ListContainers().Return([]types.Container{mockContainer}, nil)
+			mockClient.EXPECT().ListContainers(context.Background()).Return([]types.Container{mockContainer}, nil)
 		}, types.ContainerID(""), true, "no container found with matching hostname"),
 		ginkgo.Entry("when HOSTNAME environment variable is not set", func() {
 			// HOSTNAME is not set (already unset in AfterEach)
@@ -364,7 +365,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 
 			expectedError := errors.New("failed to list containers")
 
-			mockClient.EXPECT().ListContainers().Return(nil, expectedError)
+			mockClient.EXPECT().ListContainers(context.Background()).Return(nil, expectedError)
 		}, types.ContainerID(""), true, "failed to list all containers"),
 		ginkgo.Entry("when container info is nil", func() {
 			hostname := testHostname
@@ -385,7 +386,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 			)
 
 			mockClient.EXPECT().
-				ListContainers().
+				ListContainers(context.Background()).
 				Return([]types.Container{mockContainerNilInfo, mockContainerMatching}, nil)
 		}, types.ContainerID("matching-container-id"), false, ""),
 		ginkgo.Entry("when container config is nil", func() {
@@ -410,7 +411,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 			)
 
 			mockClient.EXPECT().
-				ListContainers().
+				ListContainers(context.Background()).
 				Return([]types.Container{mockContainerNilConfig, mockContainerMatching}, nil)
 		}, types.ContainerID("matching-container-id"), false, ""),
 		ginkgo.Entry("when multiple containers exist but only one matches hostname", func() {
@@ -450,7 +451,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 			)
 
 			mockClient.EXPECT().
-				ListContainers().
+				ListContainers(context.Background()).
 				Return([]types.Container{mockContainer1, mockContainer2, mockContainerMatching, mockContainer3}, nil)
 		}, types.ContainerID("matching-container-id"), false, ""),
 	)
@@ -479,7 +480,7 @@ var _ = ginkgo.Describe("GetCurrentContainerID", func() {
 				setup()
 			}
 
-			id, err := GetCurrentContainerID(mockClient)
+			id, err := GetCurrentContainerID(context.Background(), mockClient)
 			if expectError {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(id).To(gomega.BeEmpty())
@@ -551,7 +552,7 @@ var _ = ginkgo.Describe("GetCurrentContainerID", func() {
 				)
 
 				mockClient.EXPECT().
-					ListContainers().
+					ListContainers(context.Background()).
 					Return([]types.Container{mockContainer}, nil).
 					Times(1)
 			},

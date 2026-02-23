@@ -23,13 +23,13 @@ func (ts TimeSorter) Sort(containers []types.Container) error {
 	parsedTimes := make([]time.Time, len(containers))
 	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	for i, container := range containers {
-		createdTime, err := time.Parse(time.RFC3339Nano, container.ContainerInfo().Created)
+	for i, c := range containers {
+		createdTime, err := time.Parse(time.RFC3339Nano, c.ContainerInfo().Created)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
-				"container_id": container.ID().ShortID(),
-				"name":         container.Name(),
-				"created":      container.ContainerInfo().Created,
+				"container_id": c.ID().ShortID(),
+				"name":         c.Name(),
+				"created":      c.ContainerInfo().Created,
 			}).WithError(err).Debug("Failed to parse created time, using far future time as fallback")
 
 			createdTime = farFuture

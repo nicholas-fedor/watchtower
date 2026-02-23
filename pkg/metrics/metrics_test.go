@@ -1167,12 +1167,12 @@ func TestMetrics_HandleUpdate_ContextCancellation(t *testing.T) {
 				)
 			}
 
-			// Verify that the context is indeed cancelled
+			// Verify that the context is indeed canceled
 			select {
 			case <-m.ctx.Done():
-				// Context is cancelled as expected
+				// Context is canceled as expected
 			default:
-				t.Error("Context was not cancelled")
+				t.Error("Context was not canceled")
 			}
 
 			// Verify that stopCh is still open (not closed by Shutdown method)

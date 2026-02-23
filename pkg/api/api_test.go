@@ -40,7 +40,7 @@ func TestAPI(t *testing.T) {
 	ginkgo.RunSpecs(t, "API Suite")
 }
 
-// TestAPI_ServerShutdown tests that the server shuts down cleanly when context is cancelled.
+// TestAPI_ServerShutdown tests that the server shuts down cleanly when context is canceled.
 func TestAPI_ServerShutdown(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")

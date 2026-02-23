@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -160,6 +163,12 @@ var (
 	// It is initialized to time.Sleep by default, providing a way to mock sleep behavior during testing
 	// to avoid delays in unit tests or control timing in integration tests.
 	sleepFunc = time.Sleep
+
+	// createSignalContext is a function variable for creating a signal-aware context.
+	//
+	// It wraps signal.NotifyContext to allow overriding in tests for testing signal handling behavior.
+	// The function creates a context that is canceled when the specified signals (SIGINT, SIGTERM) are received.
+	createSignalContext = signal.NotifyContext
 
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
 	//
@@ -323,8 +332,15 @@ func preRun(cmd *cobra.Command, _ []string) {
 		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
 	})
 
+	// Create a timeout-bound context for Docker API lookups to prevent hanging indefinitely.
+	// This ensures the container ID lookup fails fast if the Docker API is unresponsive.
+	const containerLookupTimeout = 5 * time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), containerLookupTimeout)
+	defer cancel()
+
 	// Retrieve and store the current container ID for use throughout the application.
-	currentWatchtowerContainerID, err = container.GetCurrentContainerID(client)
+	currentWatchtowerContainerID, err = container.GetCurrentContainerID(ctx, client)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to get current container ID")
 
@@ -334,10 +350,18 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Retrieve the current Watchtower container.
 	if currentWatchtowerContainerID != "" {
 		currentWatchtowerContainer, err = client.GetCurrentWatchtowerContainer(
+			ctx,
 			currentWatchtowerContainerID,
 		)
 		if err != nil {
 			logrus.WithError(err).Debug("Failed to get the current Watchtower Container")
+
+			// Handle context deadline exceeded or cancellation
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				currentWatchtowerContainerID = ""
+			}
+
+			currentWatchtowerContainer = nil
 		}
 	}
 
@@ -363,8 +387,8 @@ func preRun(cmd *cobra.Command, _ []string) {
 // This function bridges flag parsing and the application’s primary workflow.
 //
 // Parameters:
-//   - c: The cobra.Command instance being executed, providing access to parsed flags.
-//   - names: A slice of container names provided as positional arguments, used for filtering.
+//   - command: The cobra.Command instance being executed, providing access to parsed flags.
+//   - args: A slice of container names provided as positional arguments, used for filtering.
 func run(command *cobra.Command, args []string) {
 	logrus.WithField("positional_args", args).
 		Debug("Received positional arguments for container filtering")
@@ -534,10 +558,17 @@ func runMain(cfg types.RunConfig) int {
 		return metric
 	}
 
+	// Create a context that is automatically canceled on SIGINT/SIGTERM signals,
+	// enabling graceful shutdown of the API, scheduler, and validation operations.
+	// The stop function is returned but not needed as the context automatically
+	// handles cleanup when the program exits.
+	ctx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
 	if rollingRestart {
-		err := actions.ValidateRollingRestartDependencies(client, cfg.Filter)
+		err := actions.ValidateRollingRestartDependencies(ctx, client, cfg.Filter)
 		if err != nil {
 			logNotify("Rolling restart compatibility validation failed", err)
 
@@ -567,7 +598,7 @@ func runMain(cfg types.RunConfig) int {
 			MonitorOnly:    monitorOnly,
 			SkipSelfUpdate: false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
 		}
-		metric := runUpdatesWithNotifications(context.Background(), cfg.Filter, params)
+		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
 		notifier.Close()
 
@@ -581,7 +612,7 @@ func runMain(cfg types.RunConfig) int {
 				},
 			}
 
-			err := client.UpdateContainer(currentWatchtowerContainer, updateConfig)
+			err := client.UpdateContainer(ctx, currentWatchtowerContainer, updateConfig)
 			if err != nil {
 				logrus.WithError(err).
 					Warn("Failed to update restart policy to 'no' for current container")
@@ -600,6 +631,7 @@ func runMain(cfg types.RunConfig) int {
 
 	// Check for and cleanup excess Watchtower instances within scope.
 	totalRemovedInstances, err := actions.RemoveExcessWatchtowerInstances(
+		ctx,
 		client,
 		cleanup,
 		scope,
@@ -630,10 +662,6 @@ func runMain(cfg types.RunConfig) int {
 
 		logrus.Debug("Disabled update-on-start due to cleanup of excess Watchtower instances")
 	}
-
-	// Create a cancellable context for managing API and scheduler shutdown.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Configure and start the HTTP API, handling any startup errors.
 	err = api.SetupAndStartAPI(

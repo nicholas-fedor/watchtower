@@ -34,8 +34,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ContainerName", "test-container-03")))
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).
-					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
+				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
 			})
 		})
 
@@ -70,8 +70,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("unique-fake-image:latest"))))
 				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(2))
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).
-					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
+				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
 			})
 		})
 
@@ -89,8 +89,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image1:latest"))))
 				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).
-					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
+				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
 			})
 		})
 
@@ -112,10 +112,10 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
 				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).
-					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
-				gomega.Expect(client.TestData.WaitForContainerHealthyCount).
-					To(gomega.Equal(3), "WaitForContainerHealthy should be called for each updated container")
+				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
+				gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).
+					To(gomega.Equal(int32(3)), "WaitForContainerHealthy should be called for each updated container")
 			})
 		})
 
@@ -134,8 +134,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image1:latest"))))
 				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
-				gomega.Expect(client.TestData.TriedToRemoveImageCount).
-					To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
+				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
 			})
 		})
 	})

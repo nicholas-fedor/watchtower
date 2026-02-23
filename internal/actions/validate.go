@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -16,16 +17,17 @@ import (
 // a rolling restart update policy.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - filter: Container filter to select relevant containers.
 //
 // Returns:
 //   - error: Non-nil if dependencies conflict with rolling restarts, nil otherwise.
-func ValidateRollingRestartDependencies(client container.Client, filter types.Filter) error {
+func ValidateRollingRestartDependencies(ctx context.Context, client container.Client, filter types.Filter) error {
 	logrus.Debug("Performing pre-update rolling restart dependency validation")
 
 	// Obtain the list of filtered containers.
-	containers, err := client.ListContainers(filter)
+	containers, err := client.ListContainers(ctx, filter)
 	// Handle errors obtaining the list of containers.
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")

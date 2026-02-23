@@ -58,16 +58,16 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for renamed Watchtower container")
-			gomega.Expect(client.TestData.TriedToRemoveImageCount).
-				To(gomega.Equal(0), "RemoveImageByID should not be called during Update")
-			gomega.Expect(client.TestData.RenameContainerCount).
-				To(gomega.Equal(1), "RenameContainer should be called once")
-			gomega.Expect(client.TestData.UpdateContainerCount).
-				To(gomega.Equal(1), "UpdateContainer should be called once for old Watchtower")
-			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(0), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
-			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(1), "IsContainerStale should be called once for Watchtower")
+			gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+				To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "RenameContainer should be called once")
+			gomega.Expect(client.TestData.UpdateContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "UpdateContainer should be called once for old Watchtower")
+			gomega.Expect(client.TestData.StopContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
+			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+				To(gomega.Equal(int32(1)), "IsContainerStale should be called once for Watchtower")
 		})
 
 		ginkgo.It("should skip rename with no-restart for Watchtower", func() {
@@ -113,8 +113,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.BeEmpty(), "No containers should be updated with no-restart")
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No images should be collected for cleanup")
-			gomega.Expect(client.TestData.RenameContainerCount).
-				To(gomega.Equal(0), "RenameContainer should not be called with no-restart")
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "RenameContainer should not be called with no-restart")
 		})
 
 		ginkgo.It("should not rename Watchtower container in run-once mode", func() {
@@ -159,10 +159,10 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.BeEmpty(), "Watchtower should not be updated in run-once mode")
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No images should be collected for cleanup")
-			gomega.Expect(client.TestData.RenameContainerCount).
-				To(gomega.Equal(0), "RenameContainer should not be called in run-once mode")
-			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(1), "IsContainerStale should be called once to pull the image")
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "RenameContainer should not be called in run-once mode")
+			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+				To(gomega.Equal(int32(1)), "IsContainerStale should be called once to pull the image")
 		})
 
 		ginkgo.It("should not clean up unscoped instances when scope is specified", func() {
@@ -203,6 +203,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			var cleanupImageInfos []types.RemovedImageInfo
 
 			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				context.Background(),
 				client,
 				true, // cleanup=true
 				"prod",
@@ -211,12 +212,12 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
-			gomega.Expect(client.TestData.StopContainerCount).
-				To(gomega.Equal(0), "StopContainer should not be called for unscoped container")
+			gomega.Expect(client.TestData.StopContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "StopContainer should not be called for unscoped container")
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup should occur for unscoped container")
-			gomega.Expect(client.TestData.TriedToRemoveImageCount).
-				To(gomega.Equal(0), "RemoveImageByID should not be called for unscoped container")
+			gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+				To(gomega.Equal(int32(0)), "RemoveImageByID should not be called for unscoped container")
 		})
 
 		ginkgo.It("should not perform cleanup when currentContainer is nil", func() {
@@ -252,6 +253,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			var cleanupImageInfos []types.RemovedImageInfo
 
 			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				context.Background(),
 				client,
 				true,
 				"",
@@ -262,7 +264,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup when no current container")
-			gomega.Expect(client.TestData.TriedToRemoveImageCount).To(gomega.Equal(0))
+			gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).To(gomega.Equal(int32(0)))
 		})
 
 		ginkgo.It("should accumulate container IDs in container-chain label", func() {
@@ -403,7 +405,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 				gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
-				gomega.Expect(client.TestData.RenameContainerCount).To(gomega.Equal(1))
+				gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(1)))
 
 				// Check that scope label is preserved after rename operation
 				updatedContainer := client.TestData.Containers[0]
@@ -855,8 +857,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					To(gomega.HaveLen(1), "Only regular container should be updated")
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.HaveLen(1), "Only regular container cleanup")
-				gomega.Expect(client.TestData.IsContainerStaleCount).
-					To(gomega.Equal(1), "IsContainerStale should be called only for regular container")
+				gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+					To(gomega.Equal(int32(1)), "IsContainerStale should be called only for regular container")
 			},
 		)
 
@@ -901,8 +903,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.BeEmpty(), "Watchtower should not be updated")
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty(), "No cleanup for skipped Watchtower")
-			gomega.Expect(client.TestData.IsContainerStaleCount).
-				To(gomega.Equal(0), "IsContainerStale should not be called for Watchtower")
+			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+				To(gomega.Equal(int32(0)), "IsContainerStale should not be called for Watchtower")
 		})
 
 		ginkgo.It(
@@ -953,8 +955,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					To(gomega.BeEmpty(), "No cleanup should occur for skipped Watchtower")
 				// IsContainerStale should NOT be called because staleness check is skipped
 				// when SkipSelfUpdate=true for Watchtower containers
-				gomega.Expect(client.TestData.IsContainerStaleCount).
-					To(gomega.Equal(0), "IsContainerStale should not be called for Watchtower when SkipSelfUpdate=true")
+				gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+					To(gomega.Equal(int32(0)), "IsContainerStale should not be called for Watchtower when SkipSelfUpdate=true")
 			},
 		)
 
@@ -1016,8 +1018,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.HaveLen(1), "Regular container cleanup")
 				// IsContainerStale should be called only for regular container
-				gomega.Expect(client.TestData.IsContainerStaleCount).
-					To(gomega.Equal(1), "IsContainerStale should be called only for regular container")
+				gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+					To(gomega.Equal(int32(1)), "IsContainerStale should be called only for regular container")
 			},
 		)
 
@@ -1070,8 +1072,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.BeEmpty(), "No cleanup should occur on pull failure")
 				// IsContainerStale should be called (unlike SkipSelfUpdate=true)
-				gomega.Expect(client.TestData.IsContainerStaleCount).
-					To(gomega.Equal(1), "IsContainerStale should be called when SkipSelfUpdate=false")
+				gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+					To(gomega.Equal(int32(1)), "IsContainerStale should be called when SkipSelfUpdate=false")
 			},
 		)
 	})
@@ -1205,12 +1207,15 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if len(report.Updated()) != 0 {
-			t.Fatal("Watchtower should not be updated on pull failure")
-		}
+		// report may be nil if context was canceled before update started
+		if report != nil {
+			if len(report.Updated()) != 0 {
+				t.Fatal("Watchtower should not be updated on pull failure")
+			}
 
-		if len(cleanupImageInfos) != 0 {
-			t.Fatal("No cleanup should occur on pull failure")
+			if len(cleanupImageInfos) != 0 {
+				t.Fatal("No cleanup should occur on pull failure")
+			}
 		}
 	})
 }
