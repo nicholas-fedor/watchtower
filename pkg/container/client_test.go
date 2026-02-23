@@ -1124,7 +1124,7 @@ var _ = ginkgo.Describe("the client", func() {
 				execID := "ex-exec-id"
 				cmd := "exec-cmd"
 				// Set up mock server handlers for ExecuteCommand.
-				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 0, false, false)
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, -1, -1, 0, false, false)
 
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
@@ -1148,7 +1148,7 @@ var _ = ginkgo.Describe("the client", func() {
 				execID := "ex-exec-id"
 				cmd := "exec-cmd"
 				// Set up mock server handlers for ExecuteCommand.
-				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 75, false, false)
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, -1, -1, 75, false, false)
 
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
@@ -1175,7 +1175,7 @@ var _ = ginkgo.Describe("the client", func() {
 				execID := "success-exec-id"
 				cmd := "success-cmd"
 				// Set up mock server handlers for ExecuteCommand.
-				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 0, false, false)
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, -1, -1, 0, false, false)
 
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
@@ -1198,7 +1198,7 @@ var _ = ginkgo.Describe("the client", func() {
 				execID := "failure-exec-id"
 				cmd := "failure-cmd"
 				// Set up mock server handlers for ExecuteCommand.
-				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 1, false, false)
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, -1, -1, 1, false, false)
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1219,7 +1219,7 @@ var _ = ginkgo.Describe("the client", func() {
 				containerID := types.ContainerID("ex-cont-id")
 				cmd := "create-fail-cmd"
 				// Set up mock server handlers for ExecuteCommand.
-				setupExecMockHandlers(mockServer, string(containerID), "", cmd, 0, 0, 0, true, false)
+				setupExecMockHandlers(mockServer, string(containerID), "", cmd, -1, -1, 0, true, false)
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1241,7 +1241,7 @@ var _ = ginkgo.Describe("the client", func() {
 				execID := "start-fail-exec-id"
 				cmd := "start-fail-cmd"
 				// Set up mock server handlers for ExecuteCommand.
-				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, 0, 0, 0, false, true)
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, -1, -1, 0, false, true)
 				// Get the container first
 				container, err := client.GetContainer(context.Background(), containerID)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2071,11 +2071,15 @@ func TestStopContainer_ContainerFailsToStopWithinTimeout(t *testing.T) {
 //   - containerID: Container ID for ContainerInspect
 //   - execID: Exec ID returned by ContainerExecCreate
 //   - cmd: Command to execute
-//   - uid: UID value (0 for no UID)
-//   - gid: GID value (0 for no GID)
+//   - uid: UID value (negative values indicate no UID specified)
+//   - gid: GID value (negative values indicate no GID specified)
 //   - exitCode: Exit code to return (0 for success case)
 //   - execCreateError: If true, make ContainerExecCreate return 500 error
 //   - execStartError: If true, make ContainerExecStart return 500 error
+//
+// The uid/gid parameters use negative values as sentinels to indicate "no user specified".
+// This allows 0:0 (root) to be properly tested as a valid user specification.
+// When both uid and gid are non-negative, they are formatted as "uid:gid" for the exec user.
 func setupExecMockHandlers(
 	mockServer *ghttp.Server,
 	containerID string,
@@ -2090,9 +2094,9 @@ func setupExecMockHandlers(
 	// Hardcoded image name used by all tests
 	imageName := "test-image:latest"
 
-	// Determine the user string - use uid/gid if provided
+	// Determine the user string - use uid/gid if provided (non-negative values)
 	execUser := ""
-	if uid != 0 && gid != 0 {
+	if uid >= 0 && gid >= 0 {
 		execUser = fmt.Sprintf("%d:%d", uid, gid)
 	}
 
