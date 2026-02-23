@@ -1186,12 +1186,7 @@ type logEntry struct {
 	fields  logrus.Fields
 }
 
-// Write implements io.Writer to capture log output.
-func (lc *logCapture) Write(p []byte) (int, error) {
-	return len(p), nil
-}
-
-// Hooks returns logrus hooks for capturing logs.
+// Levels returns logrus levels for capturing logs.
 func (lc *logCapture) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
