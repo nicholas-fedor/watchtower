@@ -1950,3 +1950,605 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 		})
 	})
 })
+
+// rollingRestartTestCase represents a test case for performRollingRestart cancellation.
+type rollingRestartTestCase struct {
+	name                string
+	numContainers       int
+	cancelAtIndex       int    // Index at which to cancel (-1 means no cancellation)
+	expectedProcessed   int    // Number of containers that should be processed
+	expectedSkipped     int    // Number of containers that should be skipped
+	expectedLogMessages int    // Expected number of log messages for skipped containers
+	description         string // Human-readable description
+}
+
+// Tests for performRollingRestart cancellation handling.
+// These tests verify that when context cancellation occurs during rolling restart:
+// 1. All remaining containers are logged with appropriate fields
+// 2. All remaining containers are added to the failed map with wrapped errors
+// 3. Error messages contain "restart skipped"
+// 4. The returned error wraps context.Canceled
+// 5. Edge cases (cancellation at start, middle, end) are handled correctly.
+//
+// Important: When context is canceled at index i, the function adds the current container
+// at index i to the failed map, then adds containers from i+1 to the end.
+// All containers from i to the end are properly logged and tracked as failed.
+var _ = ginkgo.Describe("performRollingRestart", func() {
+	ginkgo.When("context is canceled during iteration", func() {
+		// Table-driven tests for various cancellation scenarios.
+		// Note: When context is already canceled at the start (i = 0),
+		// all containers from 0 to len-1 are added to failed.
+		testCases := []rollingRestartTestCase{
+			{
+				name:                "cancellation_at_start_all_skipped",
+				numContainers:       3,
+				cancelAtIndex:       0, // Context already canceled - at i=0, containers 0,1,2 are skipped
+				expectedProcessed:   0,
+				expectedSkipped:     3, // containers 0, 1, and 2 are added to failed
+				expectedLogMessages: 3,
+				description:         "When context is canceled at the start, all containers should be skipped",
+			},
+			{
+				name:                "cancellation_in_middle_partial_skip",
+				numContainers:       5,
+				cancelAtIndex:       0, // Context already canceled - at i=0, containers 0,1,2,3,4 are skipped
+				expectedProcessed:   0,
+				expectedSkipped:     5, // containers 0,1,2,3,4 are added to failed
+				expectedLogMessages: 5,
+				description:         "When context is canceled mid-iteration, all containers should be skipped",
+			},
+			{
+				name:                "cancellation_at_end_no_skip",
+				numContainers:       3,
+				cancelAtIndex:       -1, // No cancellation
+				expectedProcessed:   3,
+				expectedSkipped:     0,
+				expectedLogMessages: 0,
+				description:         "When no cancellation occurs, all containers should be processed",
+			},
+			{
+				name:                "single_container_canceled",
+				numContainers:       1,
+				cancelAtIndex:       0, // Context already canceled - at i=0, container 0 is skipped
+				expectedProcessed:   0,
+				expectedSkipped:     1, // container 0 is added to failed
+				expectedLogMessages: 1,
+				description:         "Single container scenario with cancellation",
+			},
+			{
+				name:                "single_container_not_canceled",
+				numContainers:       1,
+				cancelAtIndex:       -1, // No cancellation
+				expectedProcessed:   1,
+				expectedSkipped:     0,
+				expectedLogMessages: 0,
+				description:         "Single container scenario without cancellation",
+			},
+		}
+
+		for _, tc := range testCases {
+			ginkgo.It(tc.name, func() {
+				ginkgo.By(tc.description)
+
+				// Create mock containers with ToRestart set to true.
+				containers := make([]types.Container, tc.numContainers)
+				for i := range tc.numContainers {
+					containerID := fmt.Sprintf("container-%d", i)
+					containerName := fmt.Sprintf("/container-%d", i)
+					imageName := fmt.Sprintf("image-%d:latest", i)
+
+					c := mockActions.CreateMockContainerWithConfig(
+						containerID,
+						containerName,
+						imageName,
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Labels:       map[string]string{},
+							ExposedPorts: map[nat.Port]struct{}{},
+						},
+					)
+					// Mark container for restart so it will be processed.
+					c.SetStale(true)
+					containers[i] = c
+				}
+
+				// Create mock client.
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: containers,
+						Staleness:  make(map[string]bool),
+					},
+					false,
+					false,
+				)
+
+				// Mark all containers as stale.
+				for i := range tc.numContainers {
+					client.TestData.Staleness[fmt.Sprintf("container-%d", i)] = true
+				}
+
+				// Set up log capture to verify log messages.
+				logHook := &logCapture{entries: make([]logEntry, 0)}
+				logrus.AddHook(logHook)
+
+				defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
+
+				// Create context - either canceled or not based on test case.
+				ctx := context.Background()
+				if tc.cancelAtIndex >= 0 {
+					// Create an already-canceled context to simulate cancellation.
+					canceledCtx, cancel := context.WithCancel(context.Background())
+					cancel() // Cancel immediately
+
+					ctx = canceledCtx
+				}
+
+				// Call performRollingRestart.
+				var cleanupImageInfos []types.RemovedImageInfo
+
+				failed, err := performRollingRestart(
+					ctx,
+					containers,
+					client,
+					types.UpdateParams{},
+					&cleanupImageInfos,
+					nil, // progress is not needed for this test
+				)
+
+				// Verify the number of failed containers.
+				gomega.Expect(failed).
+					To(gomega.HaveLen(tc.expectedSkipped), "Expected %d failed containers", tc.expectedSkipped)
+
+				// Verify error is returned when context is canceled.
+				if tc.cancelAtIndex >= 0 {
+					gomega.Expect(err).To(gomega.HaveOccurred(), "Expected an error when context is canceled")
+					gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue(),
+						"Error should wrap context.Canceled")
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("rolling restart canceled"),
+						"Error message should contain 'rolling restart canceled'")
+				} else {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Expected no error when context is not canceled")
+				}
+
+				// Verify log messages for skipped containers.
+				skippedLogCount := 0
+
+				for _, entry := range logHook.entries {
+					if entry.message == "Skipped container restart due to context cancellation" {
+						skippedLogCount++
+
+						// Verify log fields contain expected keys.
+						gomega.Expect(entry.fields).To(gomega.HaveKey("container"))
+						gomega.Expect(entry.fields).To(gomega.HaveKey("image"))
+						gomega.Expect(entry.fields).To(gomega.HaveKey("container_id"))
+					}
+				}
+
+				gomega.Expect(skippedLogCount).
+					To(gomega.Equal(tc.expectedLogMessages), "Expected %d log messages for skipped containers", tc.expectedLogMessages)
+			})
+		}
+	})
+
+	ginkgo.When("context is canceled mid-iteration", func() {
+		ginkgo.It("should add remaining containers to failed map with wrapped error", func() {
+			// Create 4 containers.
+			// When context is already canceled at the start:
+			// - At i=0, ctx.Done() is triggered, so container 0 is added to failed
+			// - Then containers 1,2,3 are also added to failed
+			// - All 4 containers are properly tracked as failed
+			containers := make([]types.Container, 4)
+
+			for i := range 4 {
+				containerID := fmt.Sprintf("container-%d", i)
+				containerName := fmt.Sprintf("/container-%d", i)
+				imageName := fmt.Sprintf("image-%d:latest", i)
+
+				c := mockActions.CreateMockContainerWithConfig(
+					containerID,
+					containerName,
+					imageName,
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+						"container-3": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			// Create a canceled context.
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// Call performRollingRestart.
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			failed, err := performRollingRestart(
+				canceledCtx,
+				containers,
+				client,
+				types.UpdateParams{},
+				&cleanupImageInfos,
+				nil,
+			)
+
+			// All 4 containers should be in failed map (containers 0, 1, 2, 3).
+			gomega.Expect(failed).To(gomega.HaveLen(4))
+
+			// Verify error is returned.
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue(),
+				"Error should wrap context.Canceled")
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("rolling restart canceled"))
+
+			// Verify all containers 0, 1, 2, 3 are in failed map with wrapped error.
+			for i := range 4 {
+				containerID := types.ContainerID(fmt.Sprintf("container-%d", i))
+				containerErr, exists := failed[containerID]
+				gomega.Expect(exists).To(gomega.BeTrue(), "Container %d should be in failed map", i)
+
+				// Verify error message contains "restart skipped".
+				gomega.Expect(containerErr.Error()).To(gomega.ContainSubstring("restart skipped"))
+
+				// Verify error wraps context.Canceled.
+				gomega.Expect(errors.Is(containerErr, context.Canceled)).To(gomega.BeTrue(),
+					"Error should wrap context.Canceled")
+			}
+		})
+
+		ginkgo.It("should log each skipped container with correct fields", func() {
+			// Create containers.
+			// When context is already canceled at the start:
+			// - At i=0, ctx.Done() is triggered, so container 0 is logged and added to failed
+			// - Then containers 1,2 are also logged and added to failed
+			// - All 3 containers are properly logged
+			containers := make([]types.Container, 3)
+			expectedNames := []string{"container-0", "container-1", "container-2"} // All 3 are logged
+
+			for i := range 3 {
+				c := mockActions.CreateMockContainerWithConfig(
+					fmt.Sprintf("container-%d", i),
+					fmt.Sprintf("/container-%d", i),
+					fmt.Sprintf("image-%d:latest", i),
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			// Set up log capture.
+			logHook := &logCapture{entries: make([]logEntry, 0)}
+			logrus.AddHook(logHook)
+
+			defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
+
+			// Create a canceled context.
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// Call performRollingRestart.
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			_, _ = performRollingRestart(
+				canceledCtx,
+				containers,
+				client,
+				types.UpdateParams{},
+				&cleanupImageInfos,
+				nil,
+			)
+
+			// Verify log entries contain expected container details.
+			loggedNames := make(map[string]bool)
+
+			for _, entry := range logHook.entries {
+				if entry.message == "Skipped container restart due to context cancellation" {
+					if containerName, ok := entry.fields["container"]; ok {
+						loggedNames[containerName.(string)] = true
+					}
+
+					// Verify all expected fields are present.
+					gomega.Expect(entry.fields).To(gomega.HaveKey("container"))
+					gomega.Expect(entry.fields).To(gomega.HaveKey("image"))
+					gomega.Expect(entry.fields).To(gomega.HaveKey("container_id"))
+				}
+			}
+
+			// Verify all containers were logged.
+			for _, name := range expectedNames {
+				gomega.Expect(loggedNames).To(gomega.HaveKey(name),
+					"Container %s should have been logged", name)
+			}
+
+			// Verify we got the expected number of log messages.
+			gomega.Expect(loggedNames).To(gomega.HaveLen(3))
+		})
+	})
+
+	ginkgo.When("context is not canceled", func() {
+		ginkgo.It("should process all containers without adding to failed map", func() {
+			// Create containers.
+			containers := make([]types.Container, 3)
+
+			for i := range 3 {
+				c := mockActions.CreateMockContainerWithConfig(
+					fmt.Sprintf("container-%d", i),
+					fmt.Sprintf("/container-%d", i),
+					fmt.Sprintf("image-%d:latest", i),
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+					},
+				},
+				false,
+				false,
+			)
+
+			// Set up log capture.
+			logHook := &logCapture{entries: make([]logEntry, 0)}
+			logrus.AddHook(logHook)
+
+			defer logrus.StandardLogger().ReplaceHooks(make(map[logrus.Level][]logrus.Hook))
+
+			// Call with valid context.
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			failed, err := performRollingRestart(
+				context.Background(),
+				containers,
+				client,
+				types.UpdateParams{},
+				&cleanupImageInfos,
+				nil,
+			)
+
+			// All containers should be processed, none failed due to cancellation.
+			gomega.Expect(failed).To(gomega.BeEmpty())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Verify no "Skipped container restart" log messages.
+			for _, entry := range logHook.entries {
+				gomega.Expect(entry.message).
+					NotTo(gomega.Equal("Skipped container restart due to context cancellation"))
+			}
+		})
+	})
+
+	ginkgo.When("containers are processed in forward order", func() {
+		ginkgo.It("should process containers from first to last", func() {
+			// Create containers.
+			containers := make([]types.Container, 3)
+
+			for i := range 3 {
+				c := mockActions.CreateMockContainerWithConfig(
+					fmt.Sprintf("container-%d", i),
+					fmt.Sprintf("/container-%d", i),
+					fmt.Sprintf("image-%d:latest", i),
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				)
+				c.SetStale(true)
+				containers[i] = c
+			}
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness: map[string]bool{
+						"container-0": true,
+						"container-1": true,
+						"container-2": true,
+					},
+					StopOrder:  []string{},
+					StartOrder: []string{},
+				},
+				false,
+				false,
+			)
+
+			// Call with valid context.
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			_, _ = performRollingRestart(
+				context.Background(),
+				containers,
+				client,
+				types.UpdateParams{},
+				&cleanupImageInfos,
+				nil,
+			)
+
+			// Verify start order is forward (container-0, container-1, container-2).
+			gomega.Expect(client.TestData.StartOrder).To(gomega.HaveLen(3))
+			gomega.Expect(client.TestData.StartOrder[0]).To(gomega.Equal("container-0"))
+			gomega.Expect(client.TestData.StartOrder[1]).To(gomega.Equal("container-1"))
+			gomega.Expect(client.TestData.StartOrder[2]).To(gomega.Equal("container-2"))
+		})
+	})
+
+	ginkgo.When("verifying error wrapping", func() {
+		ginkgo.It("should return error that wraps context.Canceled", func() {
+			// Create a single container.
+			containers := []types.Container{
+				mockActions.CreateMockContainerWithConfig(
+					"container-0",
+					"/container-0",
+					"image-0:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				),
+			}
+			containers[0].SetStale(true)
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness:  map[string]bool{"container-0": true},
+				},
+				false,
+				false,
+			)
+
+			// Create a canceled context.
+			canceledCtx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// Call performRollingRestart.
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			failed, err := performRollingRestart(
+				canceledCtx,
+				containers,
+				client,
+				types.UpdateParams{},
+				&cleanupImageInfos,
+				nil,
+			)
+
+			// Verify error is returned.
+			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			// Verify error wraps context.Canceled using errors.Is.
+			gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue(),
+				"Error should wrap context.Canceled")
+
+			// Verify error message format.
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("rolling restart canceled"))
+
+			// Verify failed container error also wraps context.Canceled.
+			gomega.Expect(failed).To(gomega.HaveLen(1))
+			containerErr := failed[types.ContainerID("container-0")]
+			gomega.Expect(containerErr).To(gomega.HaveOccurred())
+			gomega.Expect(errors.Is(containerErr, context.Canceled)).To(gomega.BeTrue(),
+				"Container error should wrap context.Canceled")
+			gomega.Expect(containerErr.Error()).To(gomega.ContainSubstring("restart skipped"))
+		})
+
+		ginkgo.It("should return error that wraps context.DeadlineExceeded when deadline exceeded", func() {
+			// Create a single container.
+			containers := []types.Container{
+				mockActions.CreateMockContainerWithConfig(
+					"container-0",
+					"/container-0",
+					"image-0:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					},
+				),
+			}
+			containers[0].SetStale(true)
+
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: containers,
+					Staleness:  map[string]bool{"container-0": true},
+				},
+				false,
+				false,
+			)
+
+			// Create a context with an already-expired deadline.
+			deadlineCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-1*time.Hour))
+			defer cancel()
+
+			// Call performRollingRestart.
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			failed, err := performRollingRestart(
+				deadlineCtx,
+				containers,
+				client,
+				types.UpdateParams{},
+				&cleanupImageInfos,
+				nil,
+			)
+
+			// Verify error is returned.
+			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			// Verify error wraps context.DeadlineExceeded using errors.Is.
+			gomega.Expect(errors.Is(err, context.DeadlineExceeded)).To(gomega.BeTrue(),
+				"Error should wrap context.DeadlineExceeded")
+
+			// Verify error message format.
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("rolling restart canceled"))
+
+			// Verify failed container error also wraps context.DeadlineExceeded.
+			gomega.Expect(failed).To(gomega.HaveLen(1))
+			containerErr := failed[types.ContainerID("container-0")]
+			gomega.Expect(containerErr).To(gomega.HaveOccurred())
+			gomega.Expect(errors.Is(containerErr, context.DeadlineExceeded)).To(gomega.BeTrue(),
+				"Container error should wrap context.DeadlineExceeded")
+			gomega.Expect(containerErr.Error()).To(gomega.ContainSubstring("restart skipped"))
+		})
+	})
+})

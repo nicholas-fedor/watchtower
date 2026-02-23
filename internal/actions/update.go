@@ -898,6 +898,26 @@ func performRollingRestart(
 		// Check for context cancellation to enable prompt exit when context is canceled.
 		select {
 		case <-ctx.Done():
+			// Handle the current container that was not processed due to cancellation.
+			c := containers[i]
+			logrus.WithFields(logrus.Fields{
+				"container":    c.Name(),
+				"image":        c.ImageName(),
+				"container_id": c.ID().ShortID(),
+			}).Info("Skipped container restart due to context cancellation")
+			failed[c.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
+
+			// Handle remaining containers that were not processed due to cancellation.
+			for j := i + 1; j < len(containers); j++ {
+				skipped := containers[j]
+				logrus.WithFields(logrus.Fields{
+					"container":    skipped.Name(),
+					"image":        skipped.ImageName(),
+					"container_id": skipped.ID().ShortID(),
+				}).Info("Skipped container restart due to context cancellation")
+				failed[skipped.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
+			}
+
 			return failed, fmt.Errorf("rolling restart canceled: %w", ctx.Err())
 		default:
 		}
