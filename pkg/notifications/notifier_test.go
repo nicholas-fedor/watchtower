@@ -27,6 +27,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				"shoutrrr",
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			notifier := notifications.NewNotifier(command)
 
 			gomega.Expect(notifier.GetNames()).To(gomega.BeEmpty())
@@ -41,6 +42,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"test.host",
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 				data := notifications.GetTemplateData(command)
 				title := data.Title
 				gomega.Expect(title).To(gomega.Equal("Watchtower updates on test.host"))
@@ -112,16 +114,17 @@ var _ = ginkgo.Describe("notifications", func() {
 					"5",
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 				delay := notifications.GetDelay(command, time.Duration(0))
-				gomega.Expect(delay).To(gomega.Equal(time.Duration(5) * time.Second))
+				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
 		ginkgo.When("legacy delay is defined", func() {
 			ginkgo.It("should use the specified legacy delay", func() {
 				command := cmd.NewRootCommand()
 				flags.RegisterNotificationFlags(command)
-				delay := notifications.GetDelay(command, time.Duration(5)*time.Second)
-				gomega.Expect(delay).To(gomega.Equal(time.Duration(5) * time.Second))
+				delay := notifications.GetDelay(command, 5*time.Second)
+				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
 		ginkgo.When("legacy delay and delay is defined", func() {
@@ -136,15 +139,43 @@ var _ = ginkgo.Describe("notifications", func() {
 						"0",
 					})
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					delay := notifications.GetDelay(command, time.Duration(7)*time.Second)
-					gomega.Expect(delay).To(gomega.Equal(time.Duration(7) * time.Second))
+
+					delay := notifications.GetDelay(command, 7*time.Second)
+					gomega.Expect(delay).To(gomega.Equal(7 * time.Second))
 				},
 			)
+		})
+		ginkgo.When("notification template file is specified", func() {
+			ginkgo.It("should load template from file", func() {
+				content := "{{.Data.Host}} updated"
+				tmpFile, err := os.CreateTemp("", "template")
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				defer os.Remove(tmpFile.Name())
+
+				_, err = tmpFile.WriteString(content)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				tmpFile.Close()
+
+				command := cmd.NewRootCommand()
+				flags.RegisterNotificationFlags(command)
+
+				err = command.ParseFlags([]string{
+					"--notification-url",
+					"logger://",
+					"--notification-template-file",
+					tmpFile.Name(),
+				})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				notifier := notifications.NewNotifier(command)
+				gomega.Expect(notifier).NotTo(gomega.BeNil())
+				gomega.Expect(notifier.GetNames()).To(gomega.ContainElement("logger"))
+			})
 		})
 	})
 	ginkgo.Describe("the slack notifier", func() {
 		// builderFn := notifications.NewSlackNotifier
-
 		ginkgo.When("passing a discord url to the slack notifier", func() {
 			command := cmd.NewRootCommand()
 			flags.RegisterNotificationFlags(command)
@@ -209,7 +240,7 @@ var _ = ginkgo.Describe("notifications", func() {
 						color,
 						username,
 					)
-					expectedDelay := time.Duration(7) * time.Second
+					expectedDelay := 7 * time.Second
 					args := []string{
 						"--notifications",
 						"slack",
@@ -230,6 +261,7 @@ var _ = ginkgo.Describe("notifications", func() {
 		ginkgo.When("converting a slack service config into a shoutrrr url", func() {
 			command := cmd.NewRootCommand()
 			flags.RegisterNotificationFlags(command)
+
 			username := "containrrrbot"
 			tokenA := "AAAAAAAAA"
 			tokenB := "BBBBBBBBB"
@@ -255,7 +287,7 @@ var _ = ginkgo.Describe("notifications", func() {
 						color,
 						url.QueryEscape(iconURL),
 					)
-					expectedDelay := time.Duration(7) * time.Second
+					expectedDelay := 7 * time.Second
 
 					args := []string{
 						"--notifications",
@@ -357,6 +389,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				notifier := notifications.NewNotifier(command)
 				names := notifier.GetNames()
 				gomega.Expect(names).To(gomega.ContainElement("gotify"))
+
 				urls := notifier.GetURLs()
 				gomega.Expect(urls).
 					To(gomega.ContainElement(gomega.ContainSubstring("gotify://gotify.example.com/test-token")))
@@ -377,12 +410,14 @@ var _ = ginkgo.Describe("notifications", func() {
 				gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
 
 				logrus.SetLevel(logrus.TraceLevel)
+
 				logrus.SetOutput(io.Discard)
 				defer logrus.SetOutput(os.Stderr)
 
 				notifier := notifications.NewNotifier(command)
 				names := notifier.GetNames()
 				gomega.Expect(names).To(gomega.ContainElement("gotify"))
+
 				urls := notifier.GetURLs()
 				gomega.Expect(urls).
 					To(gomega.ContainElement(gomega.ContainSubstring("gotify://gotify.example.com/test-token")))
@@ -450,7 +485,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"mail@example.com",
 					"Plain",
 				)
-				expectedDelay := time.Duration(7) * time.Second
+				expectedDelay := 7 * time.Second
 
 				args := []string{
 					"--notifications",
@@ -483,7 +518,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					toAddress,
 					"Plain",
 				)
-				expectedDelay := time.Duration(7) * time.Second
+				expectedDelay := 7 * time.Second
 
 				args := []string{
 					"--notifications",

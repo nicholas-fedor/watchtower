@@ -1,10 +1,10 @@
-// Package flags manages command-line flags and environment variables for Watchtower configuration.
 package flags
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -64,6 +64,7 @@ func RegisterDockerFlags(rootCmd *cobra.Command) {
 		strings.Trim(envString("DOCKER_API_VERSION"), "\""),
 		"api version to use by docker client (omit for autonegotiation)",
 	)
+	flags.StringP("cert-path", "", envString("DOCKER_CERT_PATH"), "Path to TLS certificates")
 }
 
 // RegisterSystemFlags adds Watchtower flow control flags to the root command.
@@ -129,8 +130,9 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	flags.StringSliceP(
 		"disable-containers",
 		"x",
-		// Due to issue spf13/viper#380, can't use viper.GetStringSlice:
-		regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_DISABLE_CONTAINERS"), -1),
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_DISABLE_CONTAINERS"), -1),
+		),
 		"Comma-separated list of containers to explicitly exclude from watching.")
 
 	flags.StringP(
@@ -327,8 +329,11 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 	flags.StringSliceP(
 		"notifications",
 		"n",
-		envStringSlice("WATCHTOWER_NOTIFICATIONS"),
-		"Notification types to send (valid: email, slack, msteams, gotify, shoutrrr)")
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATIONS"), -1),
+		),
+		"Notification types to send (valid: email, slack, msteams, gotify, shoutrrr)",
+	)
 
 	flags.String(
 		"notifications-level",
@@ -469,10 +474,16 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		envString("WATCHTOWER_NOTIFICATION_TEMPLATE"),
 		"The shoutrrr text/template for the messages")
 
+	flags.String(
+		"notification-template-file",
+		envString("WATCHTOWER_NOTIFICATION_TEMPLATE_FILE"),
+		"Path to a file containing the Shoutrrr text/template for the messages")
+
 	flags.StringArray(
 		"notification-url",
-		envStringSlice("WATCHTOWER_NOTIFICATION_URL"),
-		"The shoutrrr URL to send notifications to")
+		filterEmptyStrings(splitNotificationValues(envString("WATCHTOWER_NOTIFICATION_URL"))),
+		"The shoutrrr URL to send notifications to",
+	)
 
 	flags.Bool("notification-report",
 		envBool("WATCHTOWER_NOTIFICATION_REPORT"),
@@ -518,19 +529,6 @@ func envString(key string) string {
 	return viper.GetString(key)
 }
 
-// envStringSlice fetches a string slice from an environment variable.
-//
-// Parameters:
-//   - key: Environment variable key.
-//
-// Returns:
-//   - []string: Values or empty slice if unset.
-func envStringSlice(key string) []string {
-	viper.MustBindEnv(key)
-
-	return viper.GetStringSlice(key)
-}
-
 // envInt fetches an integer from an environment variable.
 //
 // Parameters:
@@ -568,6 +566,125 @@ func envDuration(key string) time.Duration {
 	viper.MustBindEnv(key)
 
 	return viper.GetDuration(key)
+}
+
+// filterEmptyStrings removes empty or whitespace-only strings from a slice.
+//
+// Parameters:
+//   - ss: Slice of strings.
+//
+// Returns:
+//   - []string: Filtered slice without empty or whitespace-only strings.
+func filterEmptyStrings(ss []string) []string {
+	var res []string
+
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			res = append(res, s)
+		}
+	}
+
+	return res
+}
+
+// splitNotificationValues parses a string containing notification URLs separated by commas or spaces.
+//
+// Parameters:
+//   - value: A string containing one or more notification URLs separated by commas or spaces.
+//
+// Returns:
+//   - []string: A slice of parsed notification URLs. Invalid URLs are included in the result but logged as warnings.
+func splitNotificationValues(value string) []string {
+	// Define delimiter types to track how parts were separated (comma or space)
+	type delimiterType int
+
+	const (
+		delimiterComma delimiterType = iota
+		delimiterSpace
+	)
+
+	// Struct to hold a part and its delimiter type
+	type splitPart struct {
+		text      string
+		delimiter delimiterType
+	}
+
+	// Manual scanner to split on commas and spaces, tracking delimiter types
+	// Prepare variables for the manual scanning process
+	var (
+		parts   []splitPart
+		current strings.Builder
+	)
+
+	lastDelimiter := delimiterSpace // Default for first part
+
+	// Scan the input string character by character to identify delimiters and build parts
+	for _, char := range value {
+		switch char {
+		case ',':
+			// Encountered comma: finalize current part and set delimiter to comma
+			if current.Len() > 0 {
+				parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
+				current.Reset()
+			}
+
+			lastDelimiter = delimiterComma
+		case ' ':
+			// Encountered space: finalize current part and set delimiter to space
+			// Note: consecutive spaces are handled by trimming later
+			if current.Len() > 0 {
+				parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
+				current.Reset()
+			}
+
+			lastDelimiter = delimiterSpace
+		default:
+			// Append non-delimiter character to current part
+			current.WriteRune(char)
+		}
+	}
+
+	// Add the last part if any
+	if current.Len() > 0 {
+		parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
+	}
+
+	// Process parts: trim spaces and handle recombination
+	// Initialize result slice to hold processed parts
+	var result []string
+
+	// Iterate through each split part to trim whitespace and apply recombination logic
+	for _, part := range parts {
+		part.text = strings.TrimSpace(part.text)
+		if part.text == "" {
+			continue
+		}
+
+		// Recombination logic: only for comma delimiters
+		// Conditionally recombine comma-delimited parts that don't contain '://'
+		// (indicating not a complete URL) with the previous part
+		if part.delimiter == delimiterComma && len(result) > 0 &&
+			!strings.Contains(part.text, "://") {
+			result[len(result)-1] = result[len(result)-1] + "," + part.text
+		} else {
+			result = append(result, part.text)
+		}
+	}
+
+	// Validate URLs and log warnings for invalid ones
+	// Prepare final result slice with capacity for all results
+	final := make([]string, 0, len(result))
+	// Validate each URL string using net/url.Parse
+	for _, urlStr := range result {
+		_, err := url.Parse(urlStr)
+		if err != nil {
+			logrus.Warnf("Invalid notification URL '%s': %v", urlStr, err)
+		}
+
+		final = append(final, urlStr)
+	}
+
+	return final
 }
 
 // SetDefaults sets default environment variable values.
@@ -627,23 +744,57 @@ func EnvConfig(cmd *cobra.Command) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
+	certPath, err := flags.GetString("cert-path")
+	if err != nil {
+		logrus.WithError(err).WithField("flag", "cert-path").Debug("Failed to get cert-path flag")
+
+		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
+	}
+
+	// Convert tcp:// to https:// when TLS is enabled
+	if tls && strings.HasPrefix(host, "tcp://") {
+		host = strings.Replace(host, "tcp://", "https://", 1)
+	}
+
+	// Warn about mismatched TLS settings
+	if tls {
+		if strings.HasPrefix(host, "http://") {
+			logrus.Warn(
+				"TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
+			)
+		} else if strings.HasPrefix(host, "unix://") {
+			logrus.Warn(
+				"TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.",
+			)
+		}
+	}
+
 	// Set environment variables.
-	if err := setEnvOptStr("DOCKER_HOST", host); err != nil {
+	err = setEnvOptStr("DOCKER_HOST", host)
+	if err != nil {
 		return err
 	}
 
-	if err := setEnvOptBool("DOCKER_TLS_VERIFY", tls); err != nil {
+	err = setEnvOptBool("DOCKER_TLS_VERIFY", tls)
+	if err != nil {
 		return err
 	}
 
-	if err := setEnvOptStr("DOCKER_API_VERSION", version); err != nil {
+	err = setEnvOptStr("DOCKER_API_VERSION", version)
+	if err != nil {
+		return err
+	}
+
+	err = setEnvOptStr("DOCKER_CERT_PATH", certPath)
+	if err != nil {
 		return err
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"host":    host,
-		"tls":     tls,
-		"version": version,
+		"host":     host,
+		"tls":      tls,
+		"version":  version,
+		"certPath": certPath,
 	}).Debug("Configured Docker environment variables")
 
 	return nil
@@ -709,12 +860,13 @@ func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
 //
 // Returns:
 //   - error: Non-nil if set fails, nil if skipped or successful.
-func setEnvOptStr(env string, opt string) error {
+func setEnvOptStr(env, opt string) error {
 	if opt == "" || opt == os.Getenv(env) {
 		return nil
 	}
 
-	if err := os.Setenv(env, opt); err != nil {
+	err := os.Setenv(env, opt)
+	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"env":   env,
 			"value": opt,
@@ -764,7 +916,8 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 
 	// Process each secret flag.
 	for _, secret := range secrets {
-		if err := getSecretFromFile(flags, secret); err != nil {
+		err := getSecretFromFile(flags, secret)
+		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"flag": secret,
 			}).Fatal("Failed to load secret from file")
@@ -799,17 +952,19 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 
 					return fmt.Errorf("%w: %w", errOpenFileFailed, err)
 				}
-				defer file.Close()
+
+				defer func() { _ = file.Close() }()
 
 				scanner := bufio.NewScanner(file)
 				for scanner.Scan() {
-					line := scanner.Text()
+					line := strings.TrimSpace(scanner.Text())
 					if line != "" {
 						values = append(values, line)
 					}
 				}
 
-				if err := scanner.Err(); err != nil {
+				err = scanner.Err()
+				if err != nil {
 					logrus.WithFields(fields).
 						WithField("file", value).
 						WithError(err).
@@ -826,7 +981,8 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 			}
 		}
 
-		if err := sliceValue.Replace(values); err != nil {
+		err := sliceValue.Replace(values)
+		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to replace slice value in flag")
 
 			return fmt.Errorf("%w: %w", errReplaceSliceFailed, err)
@@ -848,7 +1004,8 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 			return fmt.Errorf("%w: %w", errReadFileFailed, err)
 		}
 
-		if err := flags.Set(secret, strings.TrimSpace(string(content))); err != nil {
+		err = flags.Set(secret, strings.TrimSpace(string(content)))
+		if err != nil {
 			logrus.WithFields(fields).WithError(err).Debug("Failed to set flag from file contents")
 
 			return fmt.Errorf("%w: %w", errSetFlagFailed, err)
@@ -874,6 +1031,7 @@ func isFilePath(path string) bool {
 		return false
 	}
 
+	//nolint:gosec // G703: Path traversal via taint analysis - validating user-provided path exists
 	_, err := os.Stat(path)
 
 	return !errors.Is(err, os.ErrNotExist)
@@ -897,7 +1055,8 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 			logrus.WithField("version", porcelain).Fatal("Unknown porcelain version, supported: v1")
 		}
 
-		if err := appendFlagValue(flags, "notification-url", "logger://"); err != nil {
+		err := appendFlagValue(flags, "notification-url", "logger://")
+		if err != nil {
 			logrus.WithError(err).Debug("Failed to append notification-url")
 		}
 
@@ -933,7 +1092,9 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 		interval, _ := flags.GetInt("interval")
 
 		scheduleValue := fmt.Sprintf("@every %ds", interval)
-		if err := flags.Set("schedule", scheduleValue); err != nil {
+
+		err := flags.Set("schedule", scheduleValue)
+		if err != nil {
 			logrus.WithError(err).
 				WithField("interval", interval).
 				Debug("Failed to set schedule from interval")
@@ -947,13 +1108,15 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 
 	// Adjust log level for debug/trace.
 	if flagIsEnabled(flags, "debug") {
-		if err := flags.Set("log-level", "debug"); err != nil {
+		err := flags.Set("log-level", "debug")
+		if err != nil {
 			logrus.WithError(err).Debug("Failed to set debug log level")
 		}
 	}
 
 	if flagIsEnabled(flags, "trace") {
-		if err := flags.Set("log-level", "trace"); err != nil {
+		err := flags.Set("log-level", "trace")
+		if err != nil {
 			logrus.WithError(err).Debug("Failed to set trace log level")
 		}
 	}
@@ -981,7 +1144,8 @@ func SetupLogging(flags *pflag.FlagSet) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
-	if err := configureLogFormat(logFormat, noColor); err != nil {
+	err = configureLogFormat(logFormat, noColor)
+	if err != nil {
 		return err
 	}
 
@@ -1082,7 +1246,8 @@ func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error 
 
 	if flagValues, ok := flag.Value.(pflag.SliceValue); ok {
 		for _, value := range values {
-			if err := flagValues.Append(value); err != nil {
+			err := flagValues.Append(value)
+			if err != nil {
 				logrus.WithError(err).WithFields(logrus.Fields{
 					"flag":  name,
 					"value": value,
@@ -1104,12 +1269,13 @@ func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error 
 //   - flags: Flag set.
 //   - name: Flag name.
 //   - value: Default value.
-func setFlagIfDefault(flags *pflag.FlagSet, name string, value string) {
+func setFlagIfDefault(flags *pflag.FlagSet, name, value string) {
 	if flags.Changed(name) {
 		return
 	}
 
-	if err := flags.Set(name, value); err != nil {
+	err := flags.Set(name, value)
+	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"flag":  name,
 			"value": value,

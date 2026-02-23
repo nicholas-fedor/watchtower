@@ -24,6 +24,8 @@ const (
 	noPullLabel = "com.centurylinklabs.watchtower.no-pull"
 	// dependsOnLabel lists container names this container depends on, comma-separated.
 	dependsOnLabel = "com.centurylinklabs.watchtower.depends-on"
+	// ContainerChainLabel accumulates container IDs across Watchtower self-updates, comma-separated.
+	ContainerChainLabel = "com.centurylinklabs.watchtower.container-chain"
 	// zodiacLabel stores the original image name for Zodiac compatibility.
 	zodiacLabel = "com.centurylinklabs.zodiac.original-image"
 	// scope defines a unique monitoring scope for this Watchtower instance.
@@ -54,7 +56,7 @@ const (
 //
 // Returns:
 //   - string: Pre-check command or empty if unset.
-func (c Container) GetLifecyclePreCheckCommand() string {
+func (c *Container) GetLifecyclePreCheckCommand() string {
 	return c.getLabelValueOrEmpty(preCheckLabel)
 }
 
@@ -62,7 +64,7 @@ func (c Container) GetLifecyclePreCheckCommand() string {
 //
 // Returns:
 //   - string: Post-check command or empty if unset.
-func (c Container) GetLifecyclePostCheckCommand() string {
+func (c *Container) GetLifecyclePostCheckCommand() string {
 	return c.getLabelValueOrEmpty(postCheckLabel)
 }
 
@@ -70,7 +72,7 @@ func (c Container) GetLifecyclePostCheckCommand() string {
 //
 // Returns:
 //   - string: Pre-update command or empty if unset.
-func (c Container) GetLifecyclePreUpdateCommand() string {
+func (c *Container) GetLifecyclePreUpdateCommand() string {
 	return c.getLabelValueOrEmpty(preUpdateLabel)
 }
 
@@ -78,7 +80,7 @@ func (c Container) GetLifecyclePreUpdateCommand() string {
 //
 // Returns:
 //   - string: Post-update command or empty if unset.
-func (c Container) GetLifecyclePostUpdateCommand() string {
+func (c *Container) GetLifecyclePostUpdateCommand() string {
 	return c.getLabelValueOrEmpty(postUpdateLabel)
 }
 
@@ -88,7 +90,7 @@ func (c Container) GetLifecyclePostUpdateCommand() string {
 //
 // Returns:
 //   - int: Timeout in minutes.
-func (c Container) PreUpdateTimeout() int {
+func (c *Container) PreUpdateTimeout() int {
 	clog := logrus.WithField("container", c.Name())
 	val := c.getLabelValueOrEmpty(preUpdateTimeoutLabel)
 
@@ -125,7 +127,7 @@ func (c Container) PreUpdateTimeout() int {
 //
 // Returns:
 //   - int: Timeout in minutes.
-func (c Container) PostUpdateTimeout() int {
+func (c *Container) PostUpdateTimeout() int {
 	clog := logrus.WithField("container", c.Name())
 	val := c.getLabelValueOrEmpty(postUpdateTimeoutLabel)
 
@@ -165,7 +167,7 @@ func (c Container) PostUpdateTimeout() int {
 // Returns:
 //   - int: ID value if set and valid.
 //   - bool: True if label is present and valid, false otherwise.
-func (c Container) getLifecycleID(label, idType string) (int, bool) {
+func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 	clog := logrus.WithField("container", c.Name())
 	rawString, ok := c.getLabelValue(label)
 
@@ -223,7 +225,7 @@ func (c Container) getLifecycleID(label, idType string) (int, bool) {
 // Returns:
 //   - int: UID value if set and valid.
 //   - bool: True if label is present and valid, false otherwise.
-func (c Container) GetLifecycleUID() (int, bool) {
+func (c *Container) GetLifecycleUID() (int, bool) {
 	return c.getLifecycleID(lifecycleUIDLabel, "UID")
 }
 
@@ -232,7 +234,7 @@ func (c Container) GetLifecycleUID() (int, bool) {
 // Returns:
 //   - int: GID value if set and valid.
 //   - bool: True if label is present and valid, false otherwise.
-func (c Container) GetLifecycleGID() (int, bool) {
+func (c *Container) GetLifecycleGID() (int, bool) {
 	return c.getLifecycleID(lifecycleGIDLabel, "GID")
 }
 
@@ -241,7 +243,7 @@ func (c Container) GetLifecycleGID() (int, bool) {
 // Returns:
 //   - bool: True if enabled, false otherwise.
 //   - bool: True if label is set, false if absent/invalid.
-func (c Container) Enabled() (bool, bool) {
+func (c *Container) Enabled() (bool, bool) {
 	clog := logrus.WithField("container", c.Name())
 	rawBool, ok := c.getLabelValue(enableLabel)
 
@@ -280,7 +282,7 @@ func (c Container) Enabled() (bool, bool) {
 //
 // Returns:
 //   - bool: True if monitor-only, false otherwise.
-func (c Container) IsMonitorOnly(params types.UpdateParams) bool {
+func (c *Container) IsMonitorOnly(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.MonitorOnly, monitorOnlyLabel, params.LabelPrecedence)
 }
 
@@ -293,7 +295,7 @@ func (c Container) IsMonitorOnly(params types.UpdateParams) bool {
 //
 // Returns:
 //   - bool: True if no-pull, false otherwise.
-func (c Container) IsNoPull(params types.UpdateParams) bool {
+func (c *Container) IsNoPull(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
 }
 
@@ -302,7 +304,7 @@ func (c Container) IsNoPull(params types.UpdateParams) bool {
 // Returns:
 //   - string: Scope value if set, empty otherwise.
 //   - bool: True if label is set, false if absent.
-func (c Container) Scope() (string, bool) {
+func (c *Container) Scope() (string, bool) {
 	clog := logrus.WithField("container", c.Name())
 	rawString, ok := c.getLabelValue(scope)
 
@@ -320,11 +322,55 @@ func (c Container) Scope() (string, bool) {
 	return rawString, true
 }
 
+// GetEffectiveScope determines the effective operational scope by prioritizing explicit scope
+// over scope derived from the container's label. This is crucial for self-update scenarios where
+// a new Watchtower instance needs to inherit the same scope as the instance being replaced
+// to maintain proper isolation and prevent cross-scope interference during the update process.
+//
+// Parameters:
+//   - container: The current Watchtower container.
+//   - currentScope: The explicit scope value (takes priority if non-empty).
+//
+// Returns:
+//   - string: The effective scope.
+//   - error: Non-nil if derivation fails.
+func GetEffectiveScope(container types.Container, currentScope string) (string, error) {
+	// Skip derivation if scope is already explicitly set.
+	if currentScope != "" {
+		return currentScope, nil
+	}
+
+	// Container not available.
+	if container == nil {
+		return "", fmt.Errorf("%w", errCurrentContainerNotCached)
+	}
+
+	// Extract the scope label from the container.
+	if derivedScope, ok := container.Scope(); ok && derivedScope != "" {
+		logrus.WithFields(logrus.Fields{
+			"derived_scope": derivedScope,
+		}).Debug("Derived operational scope from current container's scope label")
+
+		return derivedScope, nil
+	}
+
+	return currentScope, nil
+}
+
+// GetContainerChain returns the container chain label value.
+//
+// Returns:
+//   - string: The label value or empty if absent.
+//   - bool: True if the label is present, false otherwise.
+func (c *Container) GetContainerChain() (string, bool) {
+	return c.getLabelValue(ContainerChainLabel)
+}
+
 // IsWatchtower identifies if this is the Watchtower container.
 //
 // Returns:
 //   - bool: True if watchtower label is "true", false otherwise.
-func (c Container) IsWatchtower() bool {
+func (c *Container) IsWatchtower() bool {
 	clog := logrus.WithField("container", c.Name())
 	isWatchtower := ContainsWatchtowerLabel(c.containerInfo.Config.Labels)
 	clog.WithField("is_watchtower", isWatchtower).Debug("Checked if container is Watchtower")
@@ -336,7 +382,7 @@ func (c Container) IsWatchtower() bool {
 //
 // Returns:
 //   - string: Signal value, defaulting to "SIGTERM" if unset.
-func (c Container) StopSignal() string {
+func (c *Container) StopSignal() string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Check label first
@@ -365,6 +411,27 @@ func (c Container) StopSignal() string {
 	return "SIGTERM"
 }
 
+// StopTimeout returns the container's configured stop timeout in seconds.
+//
+// Returns:
+//   - *int: Timeout in seconds if set, nil if unset.
+func (c *Container) StopTimeout() *int {
+	clog := logrus.WithField("container", c.Name())
+
+	// Check Config
+	if c.containerInfo != nil && c.containerInfo.Config != nil &&
+		c.containerInfo.Config.StopTimeout != nil {
+		timeout := *c.containerInfo.Config.StopTimeout
+		clog.WithField("timeout", timeout).Debug("Retrieved stop timeout from Config")
+
+		return &timeout
+	}
+
+	clog.Debug("Stop timeout not set in container config")
+
+	return nil
+}
+
 // ContainsWatchtowerLabel checks if the container is Watchtower.
 //
 // Parameters:
@@ -373,70 +440,96 @@ func (c Container) StopSignal() string {
 // Returns:
 //   - bool: True if watchtower label is "true", false otherwise.
 func ContainsWatchtowerLabel(labels map[string]string) bool {
+	if labels == nil {
+		return false
+	}
+
 	val, ok := labels[watchtowerLabel]
+	logrus.WithFields(logrus.Fields{"label": watchtowerLabel, "val": val, "ok": ok}).
+		Debug("Checking watchtower label")
 
 	return ok && val == "true"
 }
 
-// getLabelValueOrEmpty retrieves a label’s value or empty string.
+// getRawLabelValue retrieves a raw label value.
+//
+// Parameters:
+//   - label: The label key to retrieve the value from.
+//
+// Returns:
+//   - string: Label value if present.
+//   - bool: True if label exists and is accessible, false otherwise.
+func (c *Container) getRawLabelValue(label string) (string, bool) {
+	if c.containerInfo == nil || c.containerInfo.Config == nil ||
+		c.containerInfo.Config.Labels == nil {
+		return "", false
+	}
+
+	val, ok := c.containerInfo.Config.Labels[label]
+
+	return val, ok
+}
+
+// getLabelValueOrEmpty retrieves a label's value or empty string.
 //
 // Returns:
 //   - string: Label value or empty if absent.
-func (c Container) getLabelValueOrEmpty(label string) string {
-	var clog *logrus.Entry
-	if c.containerInfo == nil || c.containerInfo.Config == nil {
-		clog = logrus.WithField("container", "<unknown>")
-	} else {
-		clog = logrus.WithField("container", c.Name())
-	}
+func (c *Container) getLabelValueOrEmpty(label string) string {
+	val, ok := c.getRawLabelValue(label)
+	if !ok {
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			var clog *logrus.Entry
+			if c.containerInfo == nil || c.containerInfo.Config == nil {
+				clog = logrus.WithField("container", "<unknown>")
+			} else {
+				clog = logrus.WithField("container", c.Name())
+			}
 
-	// Check for nil metadata.
-	if c.containerInfo == nil || c.containerInfo.Config == nil ||
-		c.containerInfo.Config.Labels == nil {
-		clog.WithField("label", label).Debug("No labels available")
+			if c.containerInfo == nil || c.containerInfo.Config == nil ||
+				c.containerInfo.Config.Labels == nil {
+				clog.WithField("label", label).Debug("No labels available")
+			} else {
+				clog.WithField("label", label).Debug("Label not found")
+			}
+		}
 
 		return ""
 	}
 
-	// Return label value if present.
-	if val, ok := c.containerInfo.Config.Labels[label]; ok {
-		return val
-	}
-
-	clog.WithField("label", label).Debug("Label not found")
-
-	return ""
+	return val
 }
 
-// getLabelValue fetches a label’s value and presence.
+// getLabelValue fetches a label's value and presence.
 //
 // Returns:
 //   - string: Label value if present.
 //   - bool: True if label exists, false otherwise.
-func (c Container) getLabelValue(label string) (string, bool) {
-	clog := logrus.WithField("container", c.Name())
+func (c *Container) getLabelValue(label string) (string, bool) {
+	val, ok := c.getRawLabelValue(label)
+	if !ok {
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
 
-	// Check for nil metadata.
-	if c.containerInfo == nil || c.containerInfo.Config == nil ||
-		c.containerInfo.Config.Labels == nil {
-		clog.WithField("label", label).Debug("No labels available")
+			if c.containerInfo == nil || c.containerInfo.Config == nil ||
+				c.containerInfo.Config.Labels == nil {
+				clog.WithField("label", label).Debug("No labels available")
+			} else {
+				clog.WithField("label", label).Debug("Label not found")
+			}
+		}
 
 		return "", false
 	}
 
-	// Return value and presence.
-	if val, ok := c.containerInfo.Config.Labels[label]; ok {
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		clog := logrus.WithField("container", c.Name())
 		clog.WithFields(logrus.Fields{
 			"label": label,
 			"value": val,
 		}).Debug("Retrieved label value")
-
-		return val, true
 	}
 
-	clog.WithField("label", label).Debug("Label not found")
-
-	return "", false
+	return val, true
 }
 
 // getBoolLabelValue parses a label as a boolean.
@@ -444,50 +537,56 @@ func (c Container) getLabelValue(label string) (string, bool) {
 // Returns:
 //   - bool: Parsed value if valid.
 //   - error: Non-nil if parsing fails or label is absent, nil on success.
-func (c Container) getBoolLabelValue(label string) (bool, error) {
-	clog := logrus.WithField("container", c.Name())
-
-	// Check for nil metadata.
-	if c.containerInfo == nil || c.containerInfo.Config == nil ||
-		c.containerInfo.Config.Labels == nil {
-		clog.WithField("label", label).Debug("No labels available")
-
-		return false, errLabelNotFound
-	}
-
-	// Fetch label value.
-	strVal, ok := c.containerInfo.Config.Labels[label]
+func (c *Container) getBoolLabelValue(label string) (bool, error) {
+	strVal, ok := c.getRawLabelValue(label)
 	if !ok {
-		clog.WithField("label", label).Debug("Label not found")
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
+
+			if c.containerInfo == nil || c.containerInfo.Config == nil ||
+				c.containerInfo.Config.Labels == nil {
+				clog.WithField("label", label).Debug("No labels available")
+			} else {
+				clog.WithField("label", label).Debug("Label not found")
+			}
+		}
 
 		return false, errLabelNotFound
 	}
 
-	// Parse as boolean.
 	// Treat empty string as false to handle cases where label is explicitly set to empty
 	if strVal == "" {
-		clog.WithFields(logrus.Fields{
-			"label": label,
-			"value": strVal,
-		}).Debug("Treating empty string as false for boolean label")
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
+			clog.WithFields(logrus.Fields{
+				"label": label,
+				"value": strVal,
+			}).Debug("Treating empty string as false for boolean label")
+		}
 
 		return false, nil
 	}
 
 	value, err := strconv.ParseBool(strVal)
 	if err != nil {
-		clog.WithError(err).WithFields(logrus.Fields{
-			"label": label,
-			"value": strVal,
-		}).Warn("Failed to parse boolean label value")
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			clog := logrus.WithField("container", c.Name())
+			clog.WithError(err).WithFields(logrus.Fields{
+				"label": label,
+				"value": strVal,
+			}).Warn("Failed to parse boolean label value")
+		}
 
 		return false, fmt.Errorf("%w: %s=%q", err, label, strVal)
 	}
 
-	clog.WithFields(logrus.Fields{
-		"label": label,
-		"value": value,
-	}).Debug("Parsed boolean label value")
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		clog := logrus.WithField("container", c.Name())
+		clog.WithFields(logrus.Fields{
+			"label": label,
+			"value": value,
+		}).Debug("Parsed boolean label value")
+	}
 
 	return value, nil
 }
@@ -503,7 +602,7 @@ func (c Container) getBoolLabelValue(label string) (bool, error) {
 //
 // Returns:
 //   - bool: Resolved boolean value.
-func (c Container) getContainerOrGlobalBool(
+func (c *Container) getContainerOrGlobalBool(
 	globalVal bool,
 	label string,
 	contPrecedence bool,

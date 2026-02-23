@@ -20,7 +20,7 @@ jobs:
     docker:
       # Specify the version you desire here
       # See: https://circleci.com/developer/images/image/cimg/go
-      - image: cimg/go:1.25.5@sha256:a6a90eb6730a2cf943ae7bf331af21c9475f67368de9a813bc7cc27107c153aa
+      - image: cimg/go:1.26.0@sha256:95d91fc301c705755c8aafb5a70388b0c43b6d6fb0e2df64f32d5d8e9ed8ad7e
 
     # Add steps to the job
     # See: https://circleci.com/docs/jobs-steps/#steps-overview & https://circleci.com/docs/configuration-reference/#steps

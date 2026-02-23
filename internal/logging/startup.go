@@ -176,7 +176,7 @@ func LogScheduleInfo(log *logrus.Entry, c *cobra.Command, sched time.Time, updat
 	if runOnce {
 		// Warn if disregarding update-on-start when already performing on-time update
 		if updateOnStartVal {
-			log.Warn("Run once enabled: Disregarding redundant update on start")
+			log.Warn("Run once mode: Disregarding update on start")
 		} else {
 			log.Info("Running a one time update")
 		}

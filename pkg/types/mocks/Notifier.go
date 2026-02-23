@@ -327,6 +327,57 @@ func (_c *MockNotifier_SendNotification_Call) RunAndReturn(run func(reportType t
 	return _c
 }
 
+// ShouldSendNotification provides a mock function for the type MockNotifier
+func (_mock *MockNotifier) ShouldSendNotification(report types.Report) bool {
+	ret := _mock.Called(report)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ShouldSendNotification")
+	}
+
+	var r0 bool
+	if returnFunc, ok := ret.Get(0).(func(types.Report) bool); ok {
+		r0 = returnFunc(report)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	return r0
+}
+
+// MockNotifier_ShouldSendNotification_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ShouldSendNotification'
+type MockNotifier_ShouldSendNotification_Call struct {
+	*mock.Call
+}
+
+// ShouldSendNotification is a helper method to define mock.On call
+//   - report types.Report
+func (_e *MockNotifier_Expecter) ShouldSendNotification(report interface{}) *MockNotifier_ShouldSendNotification_Call {
+	return &MockNotifier_ShouldSendNotification_Call{Call: _e.mock.On("ShouldSendNotification", report)}
+}
+
+func (_c *MockNotifier_ShouldSendNotification_Call) Run(run func(report types.Report)) *MockNotifier_ShouldSendNotification_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.Report
+		if args[0] != nil {
+			arg0 = args[0].(types.Report)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNotifier_ShouldSendNotification_Call) Return(b bool) *MockNotifier_ShouldSendNotification_Call {
+	_c.Call.Return(b)
+	return _c
+}
+
+func (_c *MockNotifier_ShouldSendNotification_Call) RunAndReturn(run func(report types.Report) bool) *MockNotifier_ShouldSendNotification_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StartNotification provides a mock function for the type MockNotifier
 func (_mock *MockNotifier) StartNotification(suppressSummary bool) {
 	_mock.Called(suppressSummary)

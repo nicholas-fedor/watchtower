@@ -53,12 +53,12 @@ Watchtower supports the following architectures for its Docker images:
 The full documentation is available at <https://watchtower.nickfedor.com/>.
 
 ## Star History
-<!-- markdownlint-disable -->
-<a href="https://www.star-history.com/">
+
+<a href="https://www.star-history.com/#nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=timeline&theme=dark&logscale&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left" />
  </picture>
 </a>
 <!-- markdownlint-restore -->
@@ -194,6 +194,13 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center"><a href="https://github.com/andriibratanin"><img src="https://avatars.githubusercontent.com/u/20169213?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Andrii Bratanin</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=andriibratanin" title="Documentation">📖</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/rosscado"><img src="https://avatars1.githubusercontent.com/u/16578183?v=4?s=100" width="100px;" alt="Ross Cadogan"/><br /><sub><b>Ross Cadogan</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=rosscado" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/stffabi"><img src="https://avatars0.githubusercontent.com/u/9464631?v=4?s=100" width="100px;" alt="stffabi"/><br /><sub><b>stffabi</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=stffabi" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/yubiuser"><img src="https://avatars.githubusercontent.com/u/26622301?v=4?s=100" width="100px;" alt="yubiuser"/><br /><sub><b>yubiuser</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=yubiuser" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/RoboMagus"><img src="https://avatars.githubusercontent.com/u/68224306?v=4?s=100" width="100px;" alt="RoboMagus"/><br /><sub><b>RoboMagus</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=RoboMagus" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/AzariasB"><img src="https://avatars.githubusercontent.com/u/10064282?v=4?s=100" width="100px;" alt="AzariasB"/><br /><sub><b>AzariasB</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=AzariasB" title="Documentation">📖</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ApprenticeofEnder"><img src="https://avatars.githubusercontent.com/u/32110856?v=4?s=100" width="100px;" alt="ApprenticeofEnder"/><br /><sub><b>ApprenticeofEnder</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=ApprenticeofEnder" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/skylenet"><img src="https://avatars.githubusercontent.com/u/1500888?v=4?s=100" width="100px;" alt="skylenet"/><br /><sub><b>skylenet</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=skylenet" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

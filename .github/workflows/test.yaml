@@ -19,12 +19,12 @@ jobs:
           - ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
+        uses: actions/setup-go@a5f9b05d2d216f63e13859e0d847461041025775
         with:
           go-version-file: "go.mod"
           cache: true
@@ -38,6 +38,6 @@ jobs:
           go test -race -p 1 -coverprofile="coverage.out" ./...
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@96b38e9e60ee60a8c3911f4612407bba2f9195fb
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

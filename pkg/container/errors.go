@@ -4,16 +4,6 @@ import (
 	"errors"
 )
 
-// Errors for container ID retrieval operations in cgroup_id.go.
-var (
-	// errNoValidContainerID indicates no valid Docker container ID was found in the cgroup data.
-	errNoValidContainerID = errors.New("no valid docker container ID found in input")
-	// errReadCgroupFile indicates a failure to read the cgroup file for the current process.
-	errReadCgroupFile = errors.New("failed to read cgroup file")
-	// errExtractContainerID indicates a failure to extract a container ID from the cgroup data.
-	errExtractContainerID = errors.New("failed to extract container ID")
-)
-
 // Errors for client operations in client.go.
 var (
 	// errCreateExecFailed indicates a failure to create an exec instance in a container.
@@ -46,6 +36,8 @@ var (
 	errUnexpectedMacInHost = errors.New("unexpected MAC address in host network config")
 	// errNoMacInNonHost indicates no MAC address was found in a non-host network configuration where one is expected.
 	errNoMacInNonHost = errors.New("no MAC address found in non-host network config")
+	// errNilSourceEndpoint indicates a nil source endpoint was provided.
+	errNilSourceEndpoint = errors.New("nil source endpoint provided")
 )
 
 // Errors for container start and rename operations in container_target.go.
@@ -66,6 +58,10 @@ var (
 	errNoContainerInfo = errors.New("no container info available")
 	// errInvalidConfig indicates the container’s configuration is invalid for recreation.
 	errInvalidConfig = errors.New("invalid container configuration")
+	// ErrUnexpectedContainerType indicates an unexpected container type was encountered.
+	ErrUnexpectedContainerType = errors.New("unexpected container type")
+	// errCurrentContainerNotCached indicates the current container is not cached for scope derivation.
+	errCurrentContainerNotCached = errors.New("current container not cached for scope derivation")
 )
 
 // Errors for image operations in image.go.
@@ -86,4 +82,22 @@ var (
 var (
 	// errLabelNotFound indicates a requested label is not present in the container’s metadata.
 	errLabelNotFound = errors.New("label not found")
+)
+
+// Errors for container ID detection operations in container_id.go.
+var (
+	// errReadMountinfoFile indicates a failure to read the mountinfo file for the current process.
+	errReadMountinfoFile = errors.New("failed to read mountinfo file")
+	// errExtractContainerIDFromMountinfo indicates a failure to extract a container ID from mountinfo data.
+	errExtractContainerIDFromMountinfo = errors.New("failed to extract container ID from mountinfo")
+	// errReadCgroupFile indicates a failure to read the cgroup file for the current process.
+	errReadCgroupFile = errors.New("failed to read cgroup file")
+	// errExtractContainerID indicates a failure to extract a container ID from the cgroup data.
+	errExtractContainerID = errors.New("failed to extract container ID")
+	// errNoValidContainerID indicates no valid Docker container ID was found in the input data.
+	errNoValidContainerID = errors.New("no valid docker container ID found in input")
+	// ErrContainerIDNotFound indicates the container ID could not be found using hostname matching.
+	ErrContainerIDNotFound = errors.New("HOSTNAME environment variable is not set")
+	// errNoContainerWithHostname indicates no container was found with the matching hostname.
+	errNoContainerWithHostname = errors.New("no container found with matching hostname")
 )

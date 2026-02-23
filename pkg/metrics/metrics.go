@@ -1,13 +1,13 @@
-// Package metrics provides functionality for tracking and exposing Watchtower scan metrics.
-// It integrates with Prometheus to monitor container scan outcomes, including scanned, updated, and failed counts.
 package metrics
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -16,22 +16,28 @@ var metrics *Metrics
 
 // Metric holds data points from a Watchtower scan.
 type Metric struct {
-	Scanned int // Number of containers scanned.
-	Updated int // Number of containers updated (excludes stale).
-	Failed  int // Number of containers failed.
+	Scanned   int // Number of containers scanned.
+	Updated   int // Number of containers updated (excludes stale).
+	Failed    int // Number of containers failed.
+	Restarted int // Number of containers restarted due to linked dependencies.
 }
 
 // Metrics handles processing and exposing scan metrics.
 type Metrics struct {
-	channel      chan *Metric       // Channel for queuing metrics.
-	scanned      prometheus.Gauge   // Gauge for scanned containers.
-	updated      prometheus.Gauge   // Gauge for updated containers.
-	failed       prometheus.Gauge   // Gauge for failed containers.
-	total        prometheus.Counter // Counter for total scans.
-	skipped      prometheus.Counter // Counter for skipped scans.
-	dropped      prometheus.Counter // Counter for dropped metrics.
-	stopCh       chan struct{}      // Channel for shutdown signaling.
-	shutdownOnce sync.Once          // Ensures shutdown is called only once.
+	channel        chan *Metric       // Channel for queuing metrics.
+	scanned        prometheus.Gauge   // Gauge for scanned containers.
+	updated        prometheus.Gauge   // Gauge for updated containers.
+	failed         prometheus.Gauge   // Gauge for failed containers.
+	restarted      prometheus.Gauge   // Gauge for restarted containers.
+	restartedTotal prometheus.Counter // Counter for total restarted containers.
+	total          prometheus.Counter // Counter for total scans.
+	skipped        prometheus.Counter // Counter for skipped scans.
+	dropped        prometheus.Counter // Counter for dropped metrics.
+	stopCh         chan struct{}      // Channel for shutdown signaling.
+	shutdownOnce   sync.Once          // Ensures shutdown is called only once.
+	//nolint:containedctx
+	ctx    context.Context    // Context for cancellation.
+	cancel context.CancelFunc // Cancel function for the context.
 }
 
 // NewWithRegistry creates a new Metrics handler with a custom Prometheus registry.
@@ -44,6 +50,9 @@ type Metrics struct {
 func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 	// channelBufferSize sets the metrics channel capacity.
 	const channelBufferSize = 10
+
+	// Create context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Initialize metrics with Prometheus gauges and counters.
 	metrics := &Metrics{
@@ -59,6 +68,14 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 			Name: "watchtower_containers_failed",
 			Help: "Number of containers where update failed during the last scan",
 		}),
+		restarted: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_containers_restarted",
+			Help: "Number of containers restarted due to linked dependencies during the last scan",
+		}),
+		restartedTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "watchtower_containers_restarted_total",
+			Help: "Total number of containers restarted due to linked dependencies",
+		}),
 		total: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "watchtower_scans_total",
 			Help: "Number of scans since the watchtower started",
@@ -73,6 +90,8 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		}),
 		channel: make(chan *Metric, channelBufferSize),
 		stopCh:  make(chan struct{}),
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 
 	// Register the metrics with the provided registry.
@@ -81,16 +100,21 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		metrics.scanned,
 		metrics.updated,
 		metrics.failed,
+		metrics.restarted,
+		metrics.restartedTotal,
 		metrics.total,
 		metrics.skipped,
 		metrics.dropped,
 	}
 	for _, m := range metricsList {
-		if err := registry.Register(m); err != nil {
+		err := registry.Register(m)
+		if err != nil {
 			alreadyRegisteredError := &prometheus.AlreadyRegisteredError{}
 			if errors.As(err, &alreadyRegisteredError) {
 				return nil, fmt.Errorf("failed to register metric: %w", err)
 			}
+
+			logrus.WithError(err).Warn("failed to register metric")
 		}
 	}
 
@@ -108,10 +132,15 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 // Returns:
 //   - *Metric: New metric instance.
 func NewMetric(report types.Report) *Metric {
+	if report == nil {
+		panic("NewMetric: report is nil")
+	}
+
 	return &Metric{
-		Scanned: len(report.Scanned()),
-		Updated: len(report.Updated()), // Only count actually updated containers.
-		Failed:  len(report.Failed()),
+		Scanned:   len(report.Scanned()),
+		Updated:   len(report.Updated()), // Only count actually updated containers.
+		Failed:    len(report.Failed()),
+		Restarted: len(report.Restarted()),
 	}
 }
 
@@ -166,11 +195,12 @@ func (m *Metrics) RegisterScan(metric *Metric) {
 }
 
 // Shutdown gracefully stops the metrics processing goroutine.
-// It closes the stopCh channel to signal the goroutine to exit.
+// It closes the stopCh channel and cancels the context to signal the goroutine to exit.
 // This method is idempotent and can be called multiple times safely.
 func (m *Metrics) Shutdown() {
 	m.shutdownOnce.Do(func() {
 		close(m.stopCh)
+		m.cancel()
 	})
 }
 
@@ -191,6 +221,7 @@ func (m *Metrics) HandleUpdate() {
 				m.scanned.Set(0)
 				m.updated.Set(0)
 				m.failed.Set(0)
+				m.restarted.Set(0)
 
 				continue
 			}
@@ -199,7 +230,11 @@ func (m *Metrics) HandleUpdate() {
 			m.scanned.Set(float64(change.Scanned))
 			m.updated.Set(float64(change.Updated))
 			m.failed.Set(float64(change.Failed))
+			m.restarted.Set(float64(change.Restarted))
+			m.restartedTotal.Add(float64(change.Restarted))
 		case <-m.stopCh:
+			return
+		case <-m.ctx.Done():
 			return
 		}
 	}

@@ -1,5 +1,3 @@
-// Package notifications provides mechanisms for sending notifications via various services.
-// This file implements the core notifier creation and configuration logic.
 package notifications
 
 import (
@@ -42,7 +40,21 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 	// Extract notification settings.
 	reportTemplate, _ := flag.GetBool("notification-report")
 	stdout, _ := flag.GetBool("notification-log-stdout")
+
 	tplString, _ := flag.GetString("notification-template")
+	if tplFile, _ := flag.GetString("notification-template-file"); tplFile != "" {
+		content, err := os.ReadFile(tplFile)
+		if err != nil {
+			clog.WithError(err).
+				WithField("file", tplFile).
+				Fatal("Failed to read notification template file")
+		}
+
+		tplString = string(content)
+
+		clog.WithField("file", tplFile).Debug("Loaded notification template from file")
+	}
+
 	urls, _ := flag.GetStringArray("notification-url")
 
 	data := GetTemplateData(c)
@@ -183,7 +195,7 @@ func GetDelay(c *cobra.Command, legacyDelay time.Duration) time.Duration {
 //
 // Returns:
 //   - string: Formatted title.
-func GetTitle(hostname string, tag string) string {
+func GetTitle(hostname, tag string) string {
 	clog := logrus.WithFields(logrus.Fields{
 		"hostname": hostname,
 		"tag":      tag,

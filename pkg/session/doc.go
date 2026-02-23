@@ -1,6 +1,6 @@
 // Package session manages container states and reporting during a Watchtower update session.
 // It tracks container progress, categorizes outcomes, and generates reports for scanned, updated,
-// failed, skipped, stale, and fresh containers.
+// failed, skipped, stale, fresh, and restarted containers.
 //
 // Key components:
 //   - State: Enum for container states (e.g., Updated, Failed).

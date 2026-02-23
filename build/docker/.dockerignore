@@ -10,8 +10,8 @@
 .all-contributorsrc
 .codecov.yaml
 .github/
-.golangci.yaml
-.mockery.yaml
+build/mockery/*
+build/golangci-lint/*
 
 # Ignore documentation and examples
 *.md

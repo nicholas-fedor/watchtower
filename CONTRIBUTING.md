@@ -50,21 +50,26 @@ cd watchtower
 ## Linting
 
 Watchtower uses [Golangci-lint](https://golangci-lint.run/) to help maintain code quality.
-It uses a `.golangci.yaml` configuration file in the root directory.
-It can be installed locally using the following [instructions](https://golangci-lint.run/welcome/install/#local-installation).
+The configuration file can be found at `build/golangci-lint/golangci-lint.yaml`.
+It can be installed locally using the following [instructions](https://golangci-lint.run/docs/welcome/install/local/).
 
-To use the linter, run the following from the root directory:
+The preferred method of using the linter is via the Makefile using the following command:
 
 ```bash
-golangci-lint run
+make lint
 ```
+
+This runs Golangci-lint while also invoking the following flags:
+
+* `--fix` - automatically fixes issues where possible
+* `--config build/golangci-lint/golangci-lint.yaml` - specifies the configuration file to use
 
 ## Formatting
 
-Please format your code with
+Golangci-lint can also be used to format the codebase using the following Makefile target:
 
 ```bash
-go fmt ./...
+make fmt
 ```
 
 ## Testing
@@ -72,21 +77,28 @@ go fmt ./...
 ### Mocking
 
 [Mockery](https://vektra.github.io/mockery/latest/) is used to generate mock implementations of interfaces.
-It is configured using the `.mockery.yaml` file located in the project's root directory.
+It is configured using the `build/mockery/mockery.yaml` file.
 
 To generate new mock implementations of Watchtower's interfaces, run the following from the root directory:
 
 ```bash
-mockery
+make mocks
 ```
 
 ### Executing Unit Tests
 
-To execute Watchtower's unit tests, run the following from the root directory:
+To execute Watchtower's unit tests, run the following Makefile target from the root directory:
 
 ```bash
-go test ./... -v
+make test
 ```
+
+This will run the `go test` command with the following flags:
+
+* `-timeout 30s` - sets the timeout for the tests to 30 seconds
+* `-v` - enables verbose output
+* `-coverprofile coverage.out` - generates a coverage profile
+* `-covermode atomic` - sets the cover mode to atomic
 
 ## Building
 

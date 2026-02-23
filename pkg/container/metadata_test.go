@@ -1,11 +1,10 @@
-// Package container provides functionality for managing Docker containers within Watchtower.
-// This file contains methods and helpers for accessing and interpreting container metadata,
-// focusing on labels that configure Watchtower behavior and lifecycle hooks.
-// These methods operate on the Container type defined in dockerContainer.go.
 package container
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 
@@ -15,12 +14,12 @@ import (
 func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want string
 	}{
 		{
 			name: "PreCheckLabelSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -36,7 +35,7 @@ func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 		},
 		{
 			name: "PreCheckLabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -49,11 +48,11 @@ func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 			want: "",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.GetLifecyclePreCheckCommand(); got != tt.want {
-				t.Errorf("Container.GetLifecyclePreCheckCommand() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.GetLifecyclePreCheckCommand()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -61,12 +60,12 @@ func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want string
 	}{
 		{
 			name: "PostCheckLabelSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -82,7 +81,7 @@ func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 		},
 		{
 			name: "PostCheckLabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -95,11 +94,11 @@ func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 			want: "",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.GetLifecyclePostCheckCommand(); got != tt.want {
-				t.Errorf("Container.GetLifecyclePostCheckCommand() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.GetLifecyclePostCheckCommand()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -107,12 +106,12 @@ func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 func TestContainer_GetLifecyclePreUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want string
 	}{
 		{
 			name: "PreUpdateLabelSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -128,7 +127,7 @@ func TestContainer_GetLifecyclePreUpdateCommand(t *testing.T) {
 		},
 		{
 			name: "PreUpdateLabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -141,11 +140,11 @@ func TestContainer_GetLifecyclePreUpdateCommand(t *testing.T) {
 			want: "",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.GetLifecyclePreUpdateCommand(); got != tt.want {
-				t.Errorf("Container.GetLifecyclePreUpdateCommand() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.GetLifecyclePreUpdateCommand()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -153,12 +152,12 @@ func TestContainer_GetLifecyclePreUpdateCommand(t *testing.T) {
 func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want string
 	}{
 		{
 			name: "PostUpdateLabelSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -174,7 +173,7 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 		},
 		{
 			name: "PostUpdateLabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -187,11 +186,11 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 			want: "",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.GetLifecyclePostUpdateCommand(); got != tt.want {
-				t.Errorf("Container.GetLifecyclePostUpdateCommand() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.GetLifecyclePostUpdateCommand()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -199,12 +198,12 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 func TestContainer_PreUpdateTimeout(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want int
 	}{
 		{
 			name: "ValidTimeout",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -220,7 +219,7 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 		},
 		{
 			name: "InvalidTimeout",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -236,7 +235,7 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 		},
 		{
 			name: "TimeoutNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -249,11 +248,11 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 			want: 1,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.PreUpdateTimeout(); got != tt.want {
-				t.Errorf("Container.PreUpdateTimeout() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.PreUpdateTimeout()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -261,12 +260,12 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 func TestContainer_PostUpdateTimeout(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want int
 	}{
 		{
 			name: "ValidTimeout",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -282,7 +281,7 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 		},
 		{
 			name: "InvalidTimeout",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -298,7 +297,7 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 		},
 		{
 			name: "TimeoutNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -311,11 +310,11 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 			want: 1,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.PostUpdateTimeout(); got != tt.want {
-				t.Errorf("Container.PostUpdateTimeout() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.PostUpdateTimeout()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -323,13 +322,13 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 func TestContainer_Enabled(t *testing.T) {
 	tests := []struct {
 		name  string
-		c     Container
+		c     *Container
 		want  bool
 		want1 bool
 	}{
 		{
 			name: "EnabledTrue",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -346,7 +345,7 @@ func TestContainer_Enabled(t *testing.T) {
 		},
 		{
 			name: "EnabledFalse",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -363,7 +362,7 @@ func TestContainer_Enabled(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -378,7 +377,7 @@ func TestContainer_Enabled(t *testing.T) {
 		},
 		{
 			name: "InvalidValue",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -397,13 +396,8 @@ func TestContainer_Enabled(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := tt.c.Enabled()
-			if got != tt.want {
-				t.Errorf("Container.Enabled() got = %v, want %v", got, tt.want)
-			}
-
-			if got1 != tt.want1 {
-				t.Errorf("Container.Enabled() got1 = %v, want %v", got1, tt.want1)
-			}
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want1, got1)
 		})
 	}
 }
@@ -415,13 +409,13 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		args args
 		want bool
 	}{
 		{
 			name: "LabelTruePrecedence",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -443,7 +437,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 		},
 		{
 			name: "GlobalTrueNoPrecedence",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -465,7 +459,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -485,9 +479,8 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.IsMonitorOnly(tt.args.params); got != tt.want {
-				t.Errorf("Container.IsMonitorOnly() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.IsMonitorOnly(tt.args.params)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -499,13 +492,13 @@ func TestContainer_IsNoPull(t *testing.T) {
 
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		args args
 		want bool
 	}{
 		{
 			name: "LabelTruePrecedence",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -527,7 +520,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 		},
 		{
 			name: "GlobalTrueNoPrecedence",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -549,7 +542,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -569,9 +562,8 @@ func TestContainer_IsNoPull(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.IsNoPull(tt.args.params); got != tt.want {
-				t.Errorf("Container.IsNoPull() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.IsNoPull(tt.args.params)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -579,13 +571,13 @@ func TestContainer_IsNoPull(t *testing.T) {
 func TestContainer_Scope(t *testing.T) {
 	tests := []struct {
 		name  string
-		c     Container
+		c     *Container
 		want  string
 		want1 bool
 	}{
 		{
 			name: "ScopeSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -602,7 +594,7 @@ func TestContainer_Scope(t *testing.T) {
 		},
 		{
 			name: "ScopeNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -619,13 +611,8 @@ func TestContainer_Scope(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := tt.c.Scope()
-			if got != tt.want {
-				t.Errorf("Container.Scope() got = %v, want %v", got, tt.want)
-			}
-
-			if got1 != tt.want1 {
-				t.Errorf("Container.Scope() got1 = %v, want %v", got1, tt.want1)
-			}
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want1, got1)
 		})
 	}
 }
@@ -633,12 +620,12 @@ func TestContainer_Scope(t *testing.T) {
 func TestContainer_IsWatchtower(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want bool
 	}{
 		{
 			name: "IsWatchtowerTrue",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -654,7 +641,7 @@ func TestContainer_IsWatchtower(t *testing.T) {
 		},
 		{
 			name: "IsWatchtowerFalse",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -670,7 +657,7 @@ func TestContainer_IsWatchtower(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -685,9 +672,8 @@ func TestContainer_IsWatchtower(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.IsWatchtower(); got != tt.want {
-				t.Errorf("Container.IsWatchtower() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.IsWatchtower()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -695,12 +681,12 @@ func TestContainer_IsWatchtower(t *testing.T) {
 func TestContainer_StopSignal(t *testing.T) {
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		want string
 	}{
 		{
 			name: "SignalSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -716,7 +702,7 @@ func TestContainer_StopSignal(t *testing.T) {
 		},
 		{
 			name: "SignalNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -731,11 +717,80 @@ func TestContainer_StopSignal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.StopSignal(); got != tt.want {
-				t.Errorf("Container.StopSignal() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.StopSignal()
+			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestContainer_StopTimeout_WhenSet verifies StopTimeout returns the configured value.
+func TestContainer_StopTimeout_WhenSet(t *testing.T) {
+	timeout60 := 60
+	c := &Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config: &dockerContainer.Config{
+				StopTimeout: &timeout60,
+				Labels:      map[string]string{},
+			},
+		},
+	}
+
+	got := c.StopTimeout()
+	assert.NotNil(t, got)
+	assert.Equal(t, timeout60, *got)
+}
+
+// TestContainer_StopTimeout_WhenSetToZero verifies StopTimeout returns zero when configured as zero.
+func TestContainer_StopTimeout_WhenSetToZero(t *testing.T) {
+	timeout0 := 0
+	c := &Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config: &dockerContainer.Config{
+				StopTimeout: &timeout0,
+				Labels:      map[string]string{},
+			},
+		},
+	}
+
+	got := c.StopTimeout()
+	assert.NotNil(t, got)
+	assert.Equal(t, timeout0, *got)
+}
+
+// TestContainer_StopTimeout_WhenNotSet verifies StopTimeout returns nil when not configured.
+func TestContainer_StopTimeout_WhenNotSet(t *testing.T) {
+	c := &Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+		},
+	}
+
+	got := c.StopTimeout()
+	assert.Nil(t, got)
+}
+
+// TestContainer_StopTimeout_NilContainerInfo verifies StopTimeout returns nil for nil containerInfo.
+func TestContainer_StopTimeout_NilContainerInfo(t *testing.T) {
+	c := &Container{containerInfo: nil}
+
+	got := c.StopTimeout()
+	assert.Nil(t, got)
+}
+
+// TestContainer_StopTimeout_NilConfig verifies StopTimeout returns nil for nil Config.
+func TestContainer_StopTimeout_NilConfig(t *testing.T) {
+	c := &Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Config:            nil,
+		},
+	}
+
+	got := c.StopTimeout()
+	assert.Nil(t, got)
 }
 
 func TestContainsWatchtowerLabel(t *testing.T) {
@@ -773,12 +828,18 @@ func TestContainsWatchtowerLabel(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "LabelsNil",
+			args: args{
+				labels: nil,
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ContainsWatchtowerLabel(tt.args.labels); got != tt.want {
-				t.Errorf("ContainsWatchtowerLabel() = %v, want %v", got, tt.want)
-			}
+			got := ContainsWatchtowerLabel(tt.args.labels)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -790,13 +851,13 @@ func TestContainer_getLabelValueOrEmpty(t *testing.T) {
 
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		args args
 		want string
 	}{
 		{
 			name: "LabelSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -813,7 +874,7 @@ func TestContainer_getLabelValueOrEmpty(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -829,9 +890,8 @@ func TestContainer_getLabelValueOrEmpty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.getLabelValueOrEmpty(tt.args.label); got != tt.want {
-				t.Errorf("Container.getLabelValueOrEmpty() = %v, want %v", got, tt.want)
-			}
+			got := tt.c.getLabelValueOrEmpty(tt.args.label)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -843,14 +903,14 @@ func TestContainer_getLabelValue(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		c     Container
+		c     *Container
 		args  args
 		want  string
 		want1 bool
 	}{
 		{
 			name: "LabelSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -868,7 +928,7 @@ func TestContainer_getLabelValue(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -886,13 +946,8 @@ func TestContainer_getLabelValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := tt.c.getLabelValue(tt.args.label)
-			if got != tt.want {
-				t.Errorf("Container.getLabelValue() got = %v, want %v", got, tt.want)
-			}
-
-			if got1 != tt.want1 {
-				t.Errorf("Container.getLabelValue() got1 = %v, want %v", got1, tt.want1)
-			}
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want1, got1)
 		})
 	}
 }
@@ -904,14 +959,14 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		c       Container
+		c       *Container
 		args    args
 		want    bool
 		wantErr bool
 	}{
 		{
 			name: "TrueValue",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -929,7 +984,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 		},
 		{
 			name: "FalseValue",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -947,7 +1002,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 		},
 		{
 			name: "InvalidValue",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -965,7 +1020,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -981,7 +1036,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 		},
 		{
 			name: "EmptyStringValue",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1001,15 +1056,13 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.c.getBoolLabelValue(tt.args.label)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Container.getBoolLabelValue() error = %v, wantErr %v", err, tt.wantErr)
-
-				return
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 
-			if got != tt.want {
-				t.Errorf("Container.getBoolLabelValue() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -1017,13 +1070,13 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 func TestContainer_GetLifecycleUID(t *testing.T) {
 	tests := []struct {
 		name  string
-		c     Container
+		c     *Container
 		want  int
 		want1 bool
 	}{
 		{
 			name: "UIDSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1040,7 +1093,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 		},
 		{
 			name: "UIDNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1055,7 +1108,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 		},
 		{
 			name: "InvalidUID",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1072,7 +1125,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 		},
 		{
 			name: "NegativeUID",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1089,7 +1142,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 		},
 		{
 			name: "TooLargeUID",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1108,13 +1161,8 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := tt.c.GetLifecycleUID()
-			if got != tt.want {
-				t.Errorf("Container.GetLifecycleUID() got = %v, want %v", got, tt.want)
-			}
-
-			if got1 != tt.want1 {
-				t.Errorf("Container.GetLifecycleUID() got1 = %v, want %v", got1, tt.want1)
-			}
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want1, got1)
 		})
 	}
 }
@@ -1122,13 +1170,13 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 func TestContainer_GetLifecycleGID(t *testing.T) {
 	tests := []struct {
 		name  string
-		c     Container
+		c     *Container
 		want  int
 		want1 bool
 	}{
 		{
 			name: "GIDSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1145,7 +1193,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 		},
 		{
 			name: "GIDNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1160,7 +1208,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 		},
 		{
 			name: "InvalidGID",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1177,7 +1225,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 		},
 		{
 			name: "NegativeGID",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1194,7 +1242,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 		},
 		{
 			name: "TooLargeGID",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1213,13 +1261,8 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := tt.c.GetLifecycleGID()
-			if got != tt.want {
-				t.Errorf("Container.GetLifecycleGID() got = %v, want %v", got, tt.want)
-			}
-
-			if got1 != tt.want1 {
-				t.Errorf("Container.GetLifecycleGID() got1 = %v, want %v", got1, tt.want1)
-			}
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want1, got1)
 		})
 	}
 }
@@ -1233,13 +1276,13 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 
 	tests := []struct {
 		name string
-		c    Container
+		c    *Container
 		args args
 		want bool
 	}{
 		{
 			name: "LabelTruePrecedence",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1260,7 +1303,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 		},
 		{
 			name: "LabelFalseNoPrecedence",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1281,7 +1324,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 		},
 		{
 			name: "LabelNotSet",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1299,7 +1342,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 		},
 		{
 			name: "InvalidLabel",
-			c: Container{
+			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
 					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						Name: "/test-container",
@@ -1320,9 +1363,291 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.getContainerOrGlobalBool(tt.args.globalVal, tt.args.label, tt.args.contPrecedence); got != tt.want {
-				t.Errorf("Container.getContainerOrGlobalBool() = %v, want %v", got, tt.want)
+			got := tt.c.getContainerOrGlobalBool(
+				tt.args.globalVal,
+				tt.args.label,
+				tt.args.contPrecedence,
+			)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestContainer_GetContainerChain(t *testing.T) {
+	tests := []struct {
+		name  string
+		c     *Container
+		want  string
+		want1 bool
+	}{
+		{
+			name: "ContainerChainSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							ContainerChainLabel: "chain-value",
+						},
+					},
+				},
+			},
+			want:  "chain-value",
+			want1: true,
+		},
+		{
+			name: "ContainerChainNotSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want:  "",
+			want1: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := tt.c.GetContainerChain()
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want1, got1)
+		})
+	}
+}
+
+func TestGetEffectiveScope(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialScope  string
+		container     *Container
+		expectedScope string
+		expectedError bool
+	}{
+		{
+			name:          "scope already set - should return initial scope",
+			initialScope:  "preset",
+			container:     nil,
+			expectedScope: "preset",
+			expectedError: false,
+		},
+		{
+			name:         "container has no scope label - should return initial scope",
+			initialScope: "",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedScope: "",
+			expectedError: false,
+		},
+		{
+			name:         "container has empty scope label - should return initial scope",
+			initialScope: "",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							scope: "",
+						},
+					},
+				},
+			},
+			expectedScope: "",
+			expectedError: false,
+		},
+		{
+			name:         "container has valid scope label - should return derived scope",
+			initialScope: "",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							scope: "production",
+						},
+					},
+				},
+			},
+			expectedScope: "production",
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Execute function under test
+			result, err := GetEffectiveScope(tt.container, tt.initialScope)
+
+			// Assert results
+			if tt.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
+
+			assert.Equal(t, tt.expectedScope, result)
+		})
+	}
+}
+
+func TestGetEffectiveScope_NilContainer(t *testing.T) {
+	_, err := GetEffectiveScope(nil, "")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errCurrentContainerNotCached)
+}
+
+func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialScope  string
+		container     *Container
+		expectedScope string
+		expectedError bool
+		description   string
+	}{
+		{
+			name:         "explicit_none_scope_inheritance",
+			initialScope: "",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							scope: "none",
+						},
+					},
+				},
+			},
+			expectedScope: "none",
+			expectedError: false,
+			description:   "container with explicit 'none' scope should inherit it when initial scope is empty",
+		},
+		{
+			name:         "explicit_none_scope_precedence",
+			initialScope: "preset",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							scope: "none",
+						},
+					},
+				},
+			},
+			expectedScope: "preset",
+			expectedError: false,
+			description:   "explicit initial scope should take precedence over container's 'none' scope",
+		},
+		{
+			name:         "implicit_unscoped_defaults_to_empty",
+			initialScope: "",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			expectedScope: "",
+			expectedError: false,
+			description:   "truly unscoped container should return empty scope when no initial scope set",
+		},
+		{
+			name:         "explicit_empty_scope_vs_none_scope",
+			initialScope: "",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							scope: "", // explicitly empty
+						},
+					},
+				},
+			},
+			expectedScope: "",
+			expectedError: false,
+			description:   "explicitly empty scope label should not be inherited, returning initial empty scope",
+		},
+		{
+			name:         "transition_from_scoped_to_none",
+			initialScope: "",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							scope: "none", // transitioning to none
+						},
+					},
+				},
+			},
+			expectedScope: "none",
+			expectedError: false,
+			description:   "container transitioning from scoped to 'none' should inherit the 'none' scope",
+		},
+		{
+			name:         "none_scope_with_initial_scope_set",
+			initialScope: "production",
+			container: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							scope: "none",
+						},
+					},
+				},
+			},
+			expectedScope: "production",
+			expectedError: false,
+			description:   "initial scope takes precedence even when container has 'none' scope",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := GetEffectiveScope(tt.container, tt.initialScope)
+
+			if tt.expectedError {
+				require.Error(t, err, tt.description)
+			} else {
+				require.NoError(t, err, tt.description)
+			}
+
+			assert.Equal(t, tt.expectedScope, result, tt.description)
 		})
 	}
 }

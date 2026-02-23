@@ -10,36 +10,40 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerFiltersType "github.com/docker/docker/api/types/filters"
-	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerFilters "github.com/docker/docker/api/types/filters"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 	dockerAPIVersion "github.com/docker/docker/api/types/versions"
 	dockerClient "github.com/docker/docker/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // defaultStopSignal is the default signal for stopping containers ("SIGTERM").
 const defaultStopSignal = "SIGTERM"
 
-// ListSourceContainers retrieves a list of containers from the Docker host.
+// ListSourceContainers retrieves a list of containers from the container runtime host.
 //
 // It filters containers based on options and a provided filter function.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - opts: Client options for filtering.
 //   - filter: Function to filter containers.
+//   - isPodmanOptional: Optional variadic flag indicating Podman runtime (defaults to false).
 //
 // Returns:
 //   - []types.Container: Filtered list of containers.
 //   - error: Non-nil if listing fails, nil on success.
 func ListSourceContainers(
+	ctx context.Context,
 	api dockerClient.APIClient,
 	opts ClientOptions,
 	filter types.Filter,
+	isPodmanOptional ...bool,
 ) ([]types.Container, error) {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"include_stopped":    opts.IncludeStopped,
 		"include_restarting": opts.IncludeRestarting,
@@ -47,22 +51,37 @@ func ListSourceContainers(
 
 	clog.Debug("Retrieving container list")
 
+	// Determine if the container runtime is Podman; default to false (Docker) if not specified.
+	isPodman := false
+	if len(isPodmanOptional) > 0 {
+		isPodman = isPodmanOptional[0]
+	}
+
 	// Build filter arguments for container states.
-	filterArgs := dockerFiltersType.NewArgs()
-	filterArgs.Add("status", "running")
+	filterArgs := buildListFilterArgs(opts, isPodman)
+	clog.WithFields(logrus.Fields{
+		"custom_filter_provided": filter != nil,
+		"filter_args":            filterArgs,
+	}).Debug("Built filter arguments")
 
-	if opts.IncludeStopped {
-		filterArgs.Add("status", "created")
-		filterArgs.Add("status", "exited")
-	}
+	// Fetch containers with status filters always applied based on ClientOptions.
+	listOptions := dockerContainer.ListOptions{Filters: filterArgs}
 
-	if opts.IncludeRestarting {
-		filterArgs.Add("status", "restarting")
-	}
+	clog.Debug("API status filters applied based on ClientOptions")
 
-	// Fetch containers with applied filters.
-	containers, err := api.ContainerList(ctx, dockerContainerType.ListOptions{Filters: filterArgs})
+	containers, err := api.ContainerList(ctx, listOptions)
 	if err != nil {
+		// Log detailed error information for debugging
+		clog.WithFields(logrus.Fields{
+			"error":        err,
+			"error_type":   fmt.Sprintf("%T", err),
+			"endpoint":     "/containers/json",
+			"api_version":  strings.Trim(api.ClientVersion(), "\""),
+			"docker_host":  os.Getenv("DOCKER_HOST"),
+			"list_options": fmt.Sprintf("%+v", listOptions),
+		}).Debug("ContainerList API call failed")
+
+		// Handle 404 responses from Docker API
 		if strings.Contains(err.Error(), "page not found") {
 			clog.WithFields(logrus.Fields{
 				"error":       err,
@@ -83,12 +102,29 @@ func ListSourceContainers(
 	hostContainers := []types.Container{}
 
 	for _, runningContainer := range containers {
-		container, err := GetSourceContainer(api, types.ContainerID(runningContainer.ID))
+		container, err := GetSourceContainer(ctx, api, types.ContainerID(runningContainer.ID))
 		if err != nil {
+			// Log detailed error information for debugging container inspect failures
+			logrus.WithFields(logrus.Fields{
+				"container_id": runningContainer.ID,
+				"error":        err,
+				"error_type":   fmt.Sprintf("%T", err),
+				"api_version":  strings.Trim(api.ClientVersion(), "\""),
+				"docker_host":  os.Getenv("DOCKER_HOST"),
+			}).Debug("Failed to inspect individual container during list")
+
+			// Handle race condition where containers disappear between API calls
+			if cerrdefs.IsNotFound(err) {
+				logrus.WithField("container_id", runningContainer.ID).
+					Debug("Container no longer exists")
+
+				continue
+			}
+
 			return nil, err // Logged in GetSourceContainer
 		}
 
-		if filter(container) {
+		if filter == nil || filter(container) {
 			hostContainers = append(hostContainers, container)
 		}
 	}
@@ -103,6 +139,7 @@ func ListSourceContainers(
 // It resolves network mode if it references another container.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - containerID: ID of the container to inspect.
 //
@@ -110,10 +147,10 @@ func ListSourceContainers(
 //   - types.Container: Container object if successful.
 //   - error: Non-nil if inspection fails, nil on success.
 func GetSourceContainer(
+	ctx context.Context,
 	api dockerClient.APIClient,
 	containerID types.ContainerID,
 ) (types.Container, error) {
-	ctx := context.Background()
 	clog := logrus.WithField("container_id", containerID)
 
 	clog.Debug("Inspecting container")
@@ -121,6 +158,14 @@ func GetSourceContainer(
 	// Inspect the container to get its details.
 	containerInfo, err := api.ContainerInspect(ctx, string(containerID))
 	if err != nil {
+		// Log detailed error information for debugging
+		clog.WithFields(logrus.Fields{
+			"error":       err,
+			"error_type":  fmt.Sprintf("%T", err),
+			"api_version": strings.Trim(api.ClientVersion(), "\""),
+			"docker_host": os.Getenv("DOCKER_HOST"),
+		}).Debug("ContainerInspect API call failed")
+
 		clog.WithError(err).Debug("Failed to inspect container")
 
 		return nil, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
@@ -132,14 +177,16 @@ func GetSourceContainer(
 		parentContainer, err := api.ContainerInspect(ctx, netContainerID)
 		if err != nil {
 			clog.WithError(err).WithFields(logrus.Fields{
-				"container":         containerInfo.Name,
+				"container":         util.NormalizeContainerName(containerInfo.Name),
 				"network_container": netContainerID,
 			}).Warn("Unable to resolve network container")
 		} else {
-			containerInfo.HostConfig.NetworkMode = dockerContainerType.NetworkMode("container:" + parentContainer.Name)
+			containerInfo.HostConfig.NetworkMode = dockerContainer.NetworkMode(
+				"container:" + parentContainer.Name,
+			)
 			clog.WithFields(logrus.Fields{
-				"container":         containerInfo.Name,
-				"network_container": parentContainer.Name,
+				"container":         util.NormalizeContainerName(containerInfo.Name),
+				"network_container": util.NormalizeContainerName(parentContainer.Name),
 			}).Debug("Resolved network container name")
 		}
 	}
@@ -157,26 +204,25 @@ func GetSourceContainer(
 	return NewContainer(&containerInfo, &imageInfo), nil
 }
 
-// StopSourceContainer stops and removes the specified container using the Docker API's StopContainer method.
+// StopSourceContainer stops the specified container using the Docker API's StopContainer method.
 //
 // It checks if the container is running, sends the configured stop signal (defaulting to SIGTERM if unset),
-// waits for the specified timeout for graceful shutdown, and removes the container with optional volume cleanup.
+// and waits for the specified timeout for graceful shutdown, forcing termination with SIGKILL if necessary.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client for interacting with the Docker daemon.
-//   - sourceContainer: Container object to stop and remove, containing metadata like name and ID.
+//   - sourceContainer: Container object to stop, containing metadata like name and ID.
 //   - timeout: Duration to wait for graceful shutdown before forcing termination with SIGKILL.
-//   - removeVolumes: Boolean indicating whether to remove associated volumes during container removal.
 //
 // Returns:
-//   - error: Non-nil if stopping or removing the container fails, nil on successful completion.
+//   - error: Non-nil if stopping the container fails, nil on successful completion.
 func StopSourceContainer(
+	ctx context.Context,
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
 	timeout time.Duration,
-	removeVolumes bool,
 ) error {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"id":        sourceContainer.ID().ShortID(),
@@ -185,42 +231,97 @@ func StopSourceContainer(
 	// Check if the container is running to determine if a stop operation is needed.
 	if !sourceContainer.IsRunning() {
 		// Log that the container is not running, so no stop attempt is required.
-		clog.Debug("Container is not running, proceeding directly to removal check")
-	} else {
-		// Retrieve the container's configured stop signal, falling back to SIGTERM if not specified.
-		signal := sourceContainer.StopSignal()
-		if signal == "" {
-			// Use default SIGTERM signal if no custom signal is provided.
-			signal = defaultStopSignal
-		}
+		clog.Debug("Container is not running, no stop operation needed")
 
-		// Log the stop attempt with the signal and configured timeout for clarity.
+		return nil
+	}
+
+	// Use container's configured timeout if available and valid, otherwise use passed parameter.
+	// A timeout of 0 is valid in Docker (means no grace period - immediate SIGKILL after stop signal).
+	effectiveTimeout := timeout
+	if containerTimeout := sourceContainer.StopTimeout(); containerTimeout != nil &&
+		*containerTimeout >= 0 {
+		effectiveTimeout = time.Duration(*containerTimeout) * time.Second
 		clog.WithFields(logrus.Fields{
-			"signal":  signal,
-			"timeout": timeout,
-		}).Info("Stopping container")
+			"container_timeout": effectiveTimeout,
+			"default_timeout":   timeout,
+		}).Debug("Using container-specific stop timeout")
+	}
 
-		// Record the start time to measure elapsed duration for the stop operation.
-		startTime := time.Now()
+	// Retrieve the container's configured stop signal, falling back to SIGTERM if not specified.
+	signal := sourceContainer.StopSignal()
+	if signal == "" {
+		// Use default SIGTERM signal if no custom signal is provided.
+		signal = defaultStopSignal
+	}
 
-		// Convert timeout from time.Duration to seconds for Docker API's StopContainer.
-		timeoutSeconds := int(timeout / time.Second)
+	// Log the stop attempt with the signal and configured timeout for clarity.
+	message := "Stopping container"
+	if sourceContainer.IsLinkedToRestarting() {
+		message = "Stopping linked container"
+	}
 
-		// Call the Docker API's StopContainer with the stop signal and timeout in seconds.
-		// The API sends the signal (SIGTERM or custom), waits for the timeout, and sends SIGKILL if needed.
-		err := api.ContainerStop(ctx, string(sourceContainer.ID()), dockerContainerType.StopOptions{
-			Signal:  signal,
-			Timeout: &timeoutSeconds,
-		})
-		if err != nil {
-			// Log the failure with elapsed time and error details for debugging.
-			clog.WithError(err).WithField("elapsed", time.Since(startTime)).Error("Failed to stop container")
-			// Wrap the error with a specific Watchtower error type for consistent error handling.
-			return fmt.Errorf("%w: %w", errStopContainerFailed, err)
-		}
+	clog.WithFields(logrus.Fields{
+		"signal":  signal,
+		"timeout": effectiveTimeout,
+	}).Info(message)
 
-		// Log successful stop with elapsed time to confirm the operation's duration.
-		clog.WithField("elapsed", time.Since(startTime)).Debug("Container stopped successfully")
+	// Record the start time to measure elapsed duration for the stop operation.
+	startTime := time.Now()
+
+	// Convert timeout from time.Duration to seconds for Docker API's StopContainer.
+	timeoutSeconds := int(effectiveTimeout / time.Second)
+
+	// Call the Docker API's StopContainer with the stop signal and timeout in seconds.
+	// The API sends the signal (SIGTERM or custom), waits for the timeout, and sends SIGKILL if needed.
+	err := api.ContainerStop(ctx, string(sourceContainer.ID()), dockerContainer.StopOptions{
+		Signal:  signal,
+		Timeout: &timeoutSeconds,
+	})
+	if err != nil {
+		// Log the failure with elapsed time and error details for debugging.
+		clog.WithError(err).
+			WithField("elapsed", time.Since(startTime)).
+			Error("Failed to stop container")
+		// Wrap the error with a specific Watchtower error type for consistent error handling.
+		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
+	}
+
+	// Log successful stop with elapsed time to confirm the operation's duration.
+	clog.WithField("elapsed", time.Since(startTime)).Debug("Container stopped successfully")
+
+	return nil
+}
+
+// StopAndRemoveSourceContainer stops and removes the specified container using the Docker API.
+//
+// It first stops the container if running, then removes it with optional volume cleanup.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client for interacting with the Docker daemon.
+//   - sourceContainer: Container object to stop and remove, containing metadata like name and ID.
+//   - timeout: Duration to wait for graceful shutdown before forcing termination with SIGKILL.
+//   - removeVolumes: Boolean indicating whether to remove associated volumes during container removal.
+//
+// Returns:
+//   - error: Non-nil if stopping or removing the container fails, nil on successful completion.
+func StopAndRemoveSourceContainer(
+	ctx context.Context,
+	api dockerClient.APIClient,
+	sourceContainer types.Container,
+	timeout time.Duration,
+	removeVolumes bool,
+) error {
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"id":        sourceContainer.ID().ShortID(),
+	})
+
+	// Stop the container first
+	err := StopSourceContainer(ctx, api, sourceContainer, timeout)
+	if err != nil {
+		return err
 	}
 
 	// Check if the container has AutoRemove enabled in its HostConfig, which automatically removes
@@ -241,7 +342,7 @@ func StopSourceContainer(
 
 	// Call the Docker API's ContainerRemove to delete the container, forcing termination of any
 	// lingering processes (via SIGKILL if needed) and removing volumes if specified.
-	err := api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainerType.RemoveOptions{
+	err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerContainer.RemoveOptions{
 		Force:         true,          // Ensure any lingering processes are terminated before removal.
 		RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
 	})
@@ -269,6 +370,33 @@ func StopSourceContainer(
 	return nil
 }
 
+// buildListFilterArgs builds filter arguments for retrieving container states.
+//
+// It uses client options to determine which statuses to include.
+//
+// Parameters:
+//   - opts: Client options for filtering.
+//
+// Returns:
+//   - dockerFiltersType.Args: Arguments for filtering Docker containers
+func buildListFilterArgs(opts ClientOptions, isPodman bool) dockerFilters.Args {
+	filterArgs := dockerFilters.NewArgs()
+
+	filterArgs.Add("status", "running")
+
+	if opts.IncludeStopped {
+		filterArgs.Add("status", "created")
+		filterArgs.Add("status", "exited")
+	}
+
+	// Podman doesn't have the "restarting" status
+	if opts.IncludeRestarting && !isPodman {
+		filterArgs.Add("status", "restarting")
+	}
+
+	return filterArgs
+}
+
 // getNetworkConfig extracts and sanitizes the network configuration from a container.
 //
 // It handles all network modes, including host, and supports both legacy and modern API versions.
@@ -282,7 +410,7 @@ func StopSourceContainer(
 func getNetworkConfig(
 	sourceContainer types.Container,
 	clientVersion string,
-) *dockerNetworkType.NetworkingConfig {
+) *dockerNetwork.NetworkingConfig {
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"id":        sourceContainer.ID().ShortID(),
@@ -312,24 +440,39 @@ func getNetworkConfig(
 	// Process each network endpoint
 	for networkName, sourceEndpoint := range containerInfo.NetworkSettings.Networks {
 		if sourceEndpoint == nil {
-			clog.WithField("network", networkName).Warn("Skipping nil endpoint")
+			clog.WithField("network", networkName).Debug("Skipping nil endpoint")
 
 			continue
 		}
 
-		targetEndpoint := processEndpoint(
+		targetEndpoint, err := processEndpoint(
 			sourceEndpoint,
 			sourceContainer.ID(),
 			clientVersion,
 			isHostNetwork,
 		)
+		if err != nil {
+			clog.WithError(err).
+				WithField("network", networkName).
+				Debug("Failed to process endpoint")
+
+			continue
+		}
+
 		config.EndpointsConfig[networkName] = targetEndpoint
 
 		clog.WithField("network", networkName).Debug("Added endpoint to network config")
 	}
 
 	// Validate MAC addresses, passing sourceContainer for state checking
-	if err := validateMacAddresses(config, sourceContainer.ID(), clientVersion, isHostNetwork, sourceContainer); err != nil {
+	err := validateMacAddresses(
+		config,
+		sourceContainer.ID(),
+		clientVersion,
+		isHostNetwork,
+		sourceContainer,
+	)
+	if err != nil {
 		clog.WithError(err).Debug("MAC address validation issue")
 	}
 
@@ -340,15 +483,15 @@ func getNetworkConfig(
 //
 // Returns:
 //   - *dockerNetworkType.NetworkingConfig: Empty configuration with initialized EndpointsConfig.
-func newEmptyNetworkConfig() *dockerNetworkType.NetworkingConfig {
-	return &dockerNetworkType.NetworkingConfig{
-		EndpointsConfig: make(map[string]*dockerNetworkType.EndpointSettings),
+func newEmptyNetworkConfig() *dockerNetwork.NetworkingConfig {
+	return &dockerNetwork.NetworkingConfig{
+		EndpointsConfig: make(map[string]*dockerNetwork.EndpointSettings),
 	}
 }
 
 // processEndpoint sanitizes a single network endpoint for the target container.
 //
-// It filters aliases, copies IPAM config, and handles MAC addresses based on API version and network mode.
+// It filters aliases, copies IPAM config, and handles MAC addresses based on API version and network mode. Returns an error if sourceEndpoint is nil.
 //
 // Parameters:
 //   - sourceEndpoint: Source endpoint to process.
@@ -357,13 +500,18 @@ func newEmptyNetworkConfig() *dockerNetworkType.NetworkingConfig {
 //   - isHostNetwork: Whether the container uses host network mode.
 //
 // Returns:
-//   - *dockerNetworkType.EndpointSettings: Sanitized endpoint settings.
+//   - *dockerNetwork.EndpointSettings: Sanitized endpoint settings.
+//   - error: Non-nil if sourceEndpoint is nil, nil otherwise.
 func processEndpoint(
-	sourceEndpoint *dockerNetworkType.EndpointSettings,
+	sourceEndpoint *dockerNetwork.EndpointSettings,
 	containerID types.ContainerID,
 	clientVersion string,
 	isHostNetwork bool,
-) *dockerNetworkType.EndpointSettings {
+) (*dockerNetwork.EndpointSettings, error) {
+	if sourceEndpoint == nil {
+		return nil, errNilSourceEndpoint
+	}
+
 	clog := logrus.WithFields(logrus.Fields{
 		"container": containerID.ShortID(),
 		"version":   clientVersion,
@@ -389,7 +537,7 @@ func processEndpoint(
 
 	// Copy IPAM config if present and not in host mode.
 	if sourceEndpoint.IPAMConfig != nil && !isHostNetwork {
-		targetEndpoint.IPAMConfig = &dockerNetworkType.EndpointIPAMConfig{
+		targetEndpoint.IPAMConfig = &dockerNetwork.EndpointIPAMConfig{
 			IPv4Address:  sourceEndpoint.IPAMConfig.IPv4Address,
 			IPv6Address:  sourceEndpoint.IPAMConfig.IPv6Address,
 			LinkLocalIPs: sourceEndpoint.IPAMConfig.LinkLocalIPs,
@@ -417,7 +565,7 @@ func processEndpoint(
 		}
 	}
 
-	return targetEndpoint
+	return targetEndpoint, nil
 }
 
 // validateMacAddresses verifies the presence of MAC addresses in a container's network configuration
@@ -439,7 +587,7 @@ func processEndpoint(
 //     or host mode, or missing MAC addresses in running containers with modern APIs. Returns nil
 //     for non-critical cases, such as non-running containers or expected absence of MAC addresses.
 func validateMacAddresses(
-	config *dockerNetworkType.NetworkingConfig,
+	config *dockerNetwork.NetworkingConfig,
 	containerID types.ContainerID,
 	clientVersion string,
 	isHostNetwork bool,
@@ -450,6 +598,21 @@ func validateMacAddresses(
 		"container": containerID.ShortID(),
 		"version":   clientVersion,
 	})
+
+	// Handle nil network configuration by checking if the container is running and not in host network mode.
+	if config == nil {
+		clog.Debug("Nil network configuration provided")
+		// Check if the container is running and not in host network mode.
+		isRunning := sourceContainer.IsRunning()
+		// If the container is running and not in host network mode, and the API version is >= 1.44, return an error.
+		if !dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork && isRunning {
+			// Log a warning for running containers with missing network configuration in modern APIs.
+			return errNoMacInNonHost
+		}
+
+		// For non-running containers or host network mode, return nil as no validation is needed.
+		return nil
+	}
 
 	// Scan network endpoints to check for MAC address presence.
 	// A MAC address is expected for running containers in non-host networks with modern API versions.
@@ -462,7 +625,7 @@ func validateMacAddresses(
 			clog.WithFields(logrus.Fields{
 				"network":     networkName,
 				"mac_address": endpoint.MacAddress,
-			}).Debug("Found MAC address in config")
+			}).Debug("MAC address found in network configuration")
 		}
 	}
 
@@ -488,7 +651,7 @@ func validateMacAddresses(
 			return fmt.Errorf("%w: API version %s", errUnexpectedMacInLegacy, clientVersion)
 		}
 		// No MAC address in legacy config is expected; log at debug level and return no error.
-		clog.Debug("No MAC address in legacy config, as expected")
+		clog.Debug("No MAC address in legacy API configuration (expected)")
 
 		return nil
 	}
@@ -502,7 +665,7 @@ func validateMacAddresses(
 			return errUnexpectedMacInHost
 		}
 		// No MAC address in host mode is correct; log at debug level and return no error.
-		clog.Debug("No MAC address in host network mode, as expected")
+		clog.Debug("No MAC address in host network mode (expected)")
 
 		return nil
 	}
@@ -511,26 +674,24 @@ func validateMacAddresses(
 	// MAC addresses are expected for running containers but not for non-running ones.
 	if !foundMac {
 		if !isRunning {
-			// Non-running containers (e.g., created, exited) typically lack MAC addresses because their network interfaces
-			// are inactive. Log at debug level to avoid user-facing warnings, as this is expected behavior.
+			// Non-running containers (e.g., created, exited) typically lack MAC addresses
+			// because their network interfaces are inactive.
 			clog.WithField("state", containerState).
-				Debug("No MAC address found for non-running container")
+				Debug("No MAC address for non-running container (expected)")
 
 			return nil
 		}
-		// Running containers without MAC addresses in modern APIs may indicate a configuration issue or lack of support
-		// for MAC preservation. Log a warning to alert users and return an error for further handling.
-		clog.WithField("state", containerState).Warnf(
-			"Negotiated API version %s is at least 1.44 but no MAC address found; preservation may not be supported",
-			clientVersion,
-		)
+		// Running containers should have MAC addresses, but absence may indicate
+		// either a lack of support or a configuration issue.
+		clog.WithField("state", containerState).
+			Debug("No MAC address found in non-host network config")
 
 		return errNoMacInNonHost
 	}
 
 	// MAC address found in a running container with a modern API; this is the expected case.
 	// Log at debug level to confirm successful validation.
-	clog.Debug("Verified MAC address presence")
+	clog.Debug("MAC address validation passed")
 
 	return nil
 }
@@ -564,7 +725,7 @@ func filterAliases(aliases []string, shortID string) []string {
 //   - minSupportedVersion: Minimum API version for MAC preservation.
 //   - isHostNetwork: Whether the container uses host network mode.
 func debugLogMacAddress(
-	networkConfig *dockerNetworkType.NetworkingConfig,
+	networkConfig *dockerNetwork.NetworkingConfig,
 	containerID types.ContainerID,
 	clientVersion string,
 	minSupportedVersion string,
@@ -579,20 +740,27 @@ func debugLogMacAddress(
 	// Check for MAC addresses in the config.
 	foundMac := false
 
-	for networkName, endpoint := range networkConfig.EndpointsConfig {
-		if endpoint.MacAddress != "" {
-			clog.WithFields(logrus.Fields{
-				"network":     networkName,
-				"mac_address": endpoint.MacAddress,
-			}).Debug("Found MAC address in config")
+	// Iterate through network endpoints to find MAC addresses.
+	if networkConfig != nil {
+		// Iterate through network endpoints to find MAC addresses.
+		for networkName, endpoint := range networkConfig.EndpointsConfig {
+			// Check if the endpoint has a MAC address.
+			if endpoint.MacAddress != "" {
+				clog.WithFields(logrus.Fields{
+					"network":     networkName,
+					"mac_address": endpoint.MacAddress,
+				}).Debug("Found MAC address in config")
 
-			foundMac = true
+				// Set flag to indicate MAC address was found.
+				foundMac = true
+			}
 		}
 	}
 
 	// Log based on API version, MAC presence, and network mode.
 	switch {
-	case dockerAPIVersion.LessThan(clientVersion, minSupportedVersion): // API < v1.44
+	// API < v1.44, MAC present
+	case dockerAPIVersion.LessThan(clientVersion, minSupportedVersion):
 		if foundMac {
 			clog.Debug("Unexpected MAC address in legacy config")
 
@@ -600,6 +768,7 @@ func debugLogMacAddress(
 		}
 
 		clog.Debug("No MAC address in legacy config, Docker will handle")
+	// API < v1.44, MAC present
 	case dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork:
 		if foundMac {
 			clog.Debug("Unexpected MAC address in legacy config")
@@ -608,11 +777,40 @@ func debugLogMacAddress(
 		}
 
 		clog.Debug("No MAC address in legacy config, as expected")
-	case foundMac: // API >= v1.44, MAC present
+	// API < v1.44, MAC present
+	case foundMac:
 		clog.Debug("Verified MAC address configuration")
-	case !isHostNetwork: // API >= v1.44, no MAC, non-host network
+	// API >= v1.44, no MAC, non-host network
+	case !isHostNetwork:
 		clog.Debug("No MAC address found in config")
-	default: // API >= v1.44, no MAC, host network
+	// API >= v1.44, no MAC, host network
+	default:
 		clog.Debug("No MAC address in host network mode, as expected")
 	}
+}
+
+// IsWatchtowerParent checks if the current container ID exists in the comma-separated container-chain label values.
+//
+// It handles edge cases like empty chain or invalid IDs by returning false appropriately.
+// The chain values are trimmed of whitespace before comparison.
+//
+// Parameters:
+//   - currentID: The container ID to check for in the chain.
+//   - chain: Comma-separated string of container IDs from the container-chain label.
+//
+// Returns:
+//   - bool: True if currentID is found in the chain, false otherwise.
+func IsWatchtowerParent(currentID types.ContainerID, chain string) bool {
+	if currentID == "" || chain == "" {
+		return false
+	}
+
+	ids := strings.SplitSeq(chain, ",")
+	for id := range ids {
+		if strings.TrimSpace(id) == string(currentID) {
+			return true
+		}
+	}
+
+	return false
 }

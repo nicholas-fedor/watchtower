@@ -102,6 +102,8 @@ func (p *PreviewData) AddFromState(state State) {
 		p.report.failed = append(p.report.failed, status)
 	case SkippedState:
 		p.report.skipped = append(p.report.skipped, status)
+	case RestartedState:
+		p.report.restarted = append(p.report.restarted, status)
 	case StaleState:
 		p.report.stale = append(p.report.stale, status)
 	case FreshState:
@@ -181,7 +183,7 @@ func (p *PreviewData) randomEntry(arr []string) string {
 func (p *PreviewData) generateName() string {
 	index := p.containerCount
 	if index < len(containerNames) {
-		return "/" + containerNames[index] // Use base name
+		return containerNames[index] // Use base name
 	}
 
 	suffix := index / len(
@@ -189,7 +191,7 @@ func (p *PreviewData) generateName() string {
 	) // Calculate suffix for uniqueness
 	index %= len(containerNames) // Wrap around array
 
-	return "/" + containerNames[index] + strconv.FormatInt(int64(suffix), 10) // Append suffix
+	return containerNames[index] + strconv.FormatInt(int64(suffix), 10) // Append suffix
 }
 
 // generateImageName creates an image name based on a container name.

@@ -3,14 +3,21 @@ package container
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/versions"
 	"github.com/sirupsen/logrus"
 
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+const (
+	// cleanupTimeout is the timeout for cleanup operations (e.g., container remove).
+	// Using a dedicated timeout ensures cleanup completes even if the parent context is canceled.
+	cleanupTimeout = 10 * time.Second
 )
 
 // StartTargetContainer creates and starts a new container based on the source container’s configuration.
@@ -21,6 +28,7 @@ import (
 // For modern API versions (>= 1.44) or single networks, it attaches all networks at creation.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Interface for container operations (Operations).
 //   - sourceContainer: Source container to replicate.
 //   - networkConfig: Network configuration to apply to the new container.
@@ -35,9 +43,10 @@ import (
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation or start fails, nil on success.
 func StartTargetContainer(
+	ctx context.Context,
 	api Operations,
 	sourceContainer types.Container,
-	networkConfig *dockerNetworkType.NetworkingConfig,
+	networkConfig *dockerNetwork.NetworkingConfig,
 	reviveStopped bool,
 	clientVersion string,
 	minSupportedVersion string,
@@ -45,7 +54,6 @@ func StartTargetContainer(
 	cpuCopyMode string,
 	isPodman bool,
 ) (types.ContainerID, error) {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"id":        sourceContainer.ID().ShortID(),
@@ -120,10 +128,20 @@ func StartTargetContainer(
 	// Rename the container to the correct name to avoid conflicts during self-update
 	clog.Debug("Renaming container to correct name")
 
-	if err := api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name()); err != nil {
+	err = api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name())
+	if err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
+
 		// Clean up the created container to avoid orphaned resources
-		if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainerType.RemoveOptions{Force: true}); rmErr != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+		defer cancel()
+
+		rmErr := api.ContainerRemove(
+			cleanupCtx,
+			createdContainer.ID,
+			dockerContainer.RemoveOptions{Force: true},
+		)
+		if rmErr != nil {
 			clog.WithError(rmErr).Warn("Failed to clean up container after rename error")
 		}
 
@@ -132,9 +150,25 @@ func StartTargetContainer(
 
 	// Attach additional networks for legacy API if needed.
 	if versions.LessThan(clientVersion, "1.44") && len(networkConfig.EndpointsConfig) > 1 {
-		if err := attachNetworks(ctx, api, createdContainer.ID, networkConfig, createNetworkConfig, clog); err != nil {
+		err := attachNetworks(
+			ctx,
+			api,
+			createdContainer.ID,
+			networkConfig,
+			createNetworkConfig,
+			clog,
+		)
+		if err != nil {
 			// Clean up the created container to avoid orphaned resources.
-			if rmErr := api.ContainerRemove(ctx, createdContainer.ID, dockerContainerType.RemoveOptions{Force: true}); rmErr != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+			defer cancel()
+
+			rmErr := api.ContainerRemove(
+				cleanupCtx,
+				createdContainer.ID,
+				dockerContainer.RemoveOptions{Force: true},
+			)
+			if rmErr != nil {
 				clog.WithError(rmErr).
 					Warn("Failed to clean up container after network attachment error")
 			}
@@ -154,7 +188,12 @@ func StartTargetContainer(
 	// Start the newly created container.
 	clog.WithField("new_id", createdContainerID).Debug("Starting new container")
 
-	if err := api.ContainerStart(ctx, createdContainer.ID, dockerContainerType.StartOptions{}); err != nil {
+	err = api.ContainerStart(
+		ctx,
+		createdContainer.ID,
+		dockerContainer.StartOptions{},
+	)
+	if err != nil {
 		clog.WithError(err).
 			WithField("new_id", createdContainerID).
 			Debug("Failed to start new container")
@@ -163,7 +202,12 @@ func StartTargetContainer(
 	}
 
 	// Log detailed start message
-	clog.WithField("new_id", createdContainerID.ShortID()).Info("Started new container")
+	message := "Started new container"
+	if sourceContainer.IsLinkedToRestarting() {
+		message = "Started linked container"
+	}
+
+	clog.WithField("new_id", createdContainerID.ShortID()).Info(message)
 
 	return createdContainerID, nil
 }
@@ -187,8 +231,8 @@ func attachNetworks(
 	ctx context.Context,
 	api Operations,
 	containerID string,
-	networkConfig *dockerNetworkType.NetworkingConfig,
-	initialNetworkConfig *dockerNetworkType.NetworkingConfig,
+	networkConfig *dockerNetwork.NetworkingConfig,
+	initialNetworkConfig *dockerNetwork.NetworkingConfig,
 	clog *logrus.Entry,
 ) error {
 	// Identify the initial network used during creation to skip it.
@@ -204,7 +248,8 @@ func attachNetworks(
 		if name != initialNetworkName && name != "" {
 			clog.WithField("network", name).Debug("Attaching additional network to container")
 
-			if err := api.NetworkConnect(ctx, name, containerID, endpoint); err != nil {
+			err := api.NetworkConnect(ctx, name, containerID, endpoint)
+			if err != nil {
 				clog.WithError(err).
 					WithField("network", name).
 					Error("Failed to attach additional network")
@@ -222,6 +267,7 @@ func attachNetworks(
 // RenameTargetContainer renames an existing container to the specified target name in Watchtower.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeout control.
 //   - api: Interface for container operations (Operations).
 //   - targetContainer: Container to be renamed.
 //   - targetName: New name for the container.
@@ -229,11 +275,11 @@ func attachNetworks(
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
 func RenameTargetContainer(
+	ctx context.Context,
 	api Operations,
 	targetContainer types.Container,
 	targetName string,
 ) error {
-	ctx := context.Background()
 	clog := logrus.WithFields(logrus.Fields{
 		"container":   targetContainer.Name(),
 		"id":          targetContainer.ID().ShortID(),
@@ -243,7 +289,8 @@ func RenameTargetContainer(
 	// Attempt to rename the container.
 	clog.Debug("Renaming container")
 
-	if err := api.ContainerRename(ctx, string(targetContainer.ID()), targetName); err != nil {
+	err := api.ContainerRename(ctx, string(targetContainer.ID()), targetName)
+	if err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 
 		return fmt.Errorf("%w: %w", errRenameContainerFailed, err)
@@ -259,7 +306,7 @@ func RenameTargetContainer(
 // It handles Podman compatibility by filtering NanoCpus when necessary.
 // Modes: "auto" (detect Podman and filter), "full" (copy all), "none" (strip all).
 func handleCPUSettings(
-	hostConfig *dockerContainerType.HostConfig,
+	hostConfig *dockerContainer.HostConfig,
 	cpuCopyMode string,
 	isPodman bool,
 	clog *logrus.Entry,

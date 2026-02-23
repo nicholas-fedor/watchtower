@@ -11,6 +11,7 @@ var _ = ginkgo.Describe("Registry credential helpers", func() {
 	ginkgo.Describe("EncodedAuth", func() {
 		ginkgo.It("should return repo credentials from env when set", func() {
 			var err error
+
 			expected := "eyJ1c2VybmFtZSI6IndhdGNodG93ZXItdXNlciIsInBhc3N3b3JkIjoid2F0Y2h0b3dlci1wYXNzIn0="
 
 			err = os.Setenv("REPO_USER", "watchtower-user")

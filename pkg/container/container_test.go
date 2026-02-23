@@ -5,21 +5,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
-	dockerContainerType "github.com/docker/docker/api/types/container"
-	dockerImageType "github.com/docker/docker/api/types/image"
-	dockerMountType "github.com/docker/docker/api/types/mount"
-	dockerNetworkType "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerImage "github.com/docker/docker/api/types/image"
+	dockerMount "github.com/docker/docker/api/types/mount"
+	dockerNetwork "github.com/docker/docker/api/types/network"
 	dockerNat "github.com/docker/go-connections/nat"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
+
+// testContainerName is used for testing self-referencing dependency scenarios.
+const testContainerName = "gluetun"
+
+// webContainerName is used for testing filterSelfReferences scenarios.
+const webContainerName = "web"
 
 var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Configuration Validation", func() {
@@ -76,7 +85,7 @@ var _ = ginkgo.Describe("Container", func() {
 	ginkgo.Describe("Create Configuration", func() {
 		ginkgo.Context("when container and image healthcheck configs are identical", func() {
 			ginkgo.It("returns an empty healthcheck config", func() {
-				tests := []dockerContainerType.HealthConfig{
+				tests := []dockerContainer.HealthConfig{
 					{Test: []string{"/usr/bin/sleep", "1s"}},
 					{Timeout: 30},
 					{StartPeriod: 30},
@@ -88,21 +97,21 @@ var _ = ginkgo.Describe("Container", func() {
 						WithImageHealthcheck(healthConfig),
 					)
 					gomega.Expect(c.GetCreateConfig().Healthcheck).
-						To(gomega.Equal(&dockerContainerType.HealthConfig{}))
+						To(gomega.Equal(&dockerContainer.HealthConfig{}))
 				}
 			})
 		})
 
 		ginkgo.It("returns container healthcheck when configs differ", func() {
 			c := MockContainer(
-				WithHealthcheck(dockerContainerType.HealthConfig{
+				WithHealthcheck(dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
 					StartPeriod: 10,
 					Retries:     2,
 				}),
-				WithImageHealthcheck(dockerContainerType.HealthConfig{
+				WithImageHealthcheck(dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "10s"},
 					Interval:    10,
 					Timeout:     60,
@@ -111,7 +120,7 @@ var _ = ginkgo.Describe("Container", func() {
 				}),
 			)
 			gomega.Expect(c.GetCreateConfig().Healthcheck).
-				To(gomega.Equal(&dockerContainerType.HealthConfig{
+				To(gomega.Equal(&dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
@@ -121,7 +130,7 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.It("handles empty container healthcheck config without panic", func() {
-			c := MockContainer(WithImageHealthcheck(dockerContainerType.HealthConfig{
+			c := MockContainer(WithImageHealthcheck(dockerContainer.HealthConfig{
 				Test:        []string{"/usr/bin/sleep", "10s"},
 				Interval:    10,
 				Timeout:     60,
@@ -132,7 +141,7 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 
 		ginkgo.It("handles empty image healthcheck config without panic", func() {
-			c := MockContainer(WithHealthcheck(dockerContainerType.HealthConfig{
+			c := MockContainer(WithHealthcheck(dockerContainer.HealthConfig{
 				Test:        []string{"/usr/bin/sleep", "1s"},
 				Interval:    30,
 				Timeout:     30,
@@ -140,13 +149,43 @@ var _ = ginkgo.Describe("Container", func() {
 				Retries:     2,
 			}))
 			gomega.Expect(c.GetCreateConfig().Healthcheck).
-				To(gomega.Equal(&dockerContainerType.HealthConfig{
+				To(gomega.Equal(&dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
 					StartPeriod: 10,
 					Retries:     2,
 				}))
+		})
+
+		ginkgo.Context("UTS mode hostname handling", func() {
+			ginkgo.It("clears hostname when UTS mode is non-empty", func() {
+				c := MockContainer(
+					WithUTSMode("host"),
+					WithHostname("test-hostname"),
+				)
+				config := c.GetCreateConfig()
+				gomega.Expect(config.Hostname).
+					To(gomega.Equal(""), "Hostname should be cleared when UTS mode is set")
+			})
+
+			ginkgo.It("preserves hostname when UTS mode is empty", func() {
+				c := MockContainer(
+					WithUTSMode(""),
+					WithHostname("test-hostname"),
+				)
+				config := c.GetCreateConfig()
+				gomega.Expect(config.Hostname).
+					To(gomega.Equal("test-hostname"), "Hostname should be preserved when UTS mode is empty")
+			})
+		})
+
+		ginkgo.It("returns minimal config when containerInfo is nil", func() {
+			c := MockContainer(WithImageName("test-image"))
+			c.containerInfo = nil
+			config := c.GetCreateConfig()
+			gomega.Expect(config.Image).To(gomega.Equal("unknown:latest"))
+			gomega.Expect(config).To(gomega.Equal(&dockerContainer.Config{Image: "unknown:latest"}))
 		})
 	})
 
@@ -277,16 +316,92 @@ var _ = ginkgo.Describe("Container", func() {
 				imageID := container.ImageID()
 				gomega.Expect(imageID).To(gomega.Equal(types.ImageID("")))
 			})
-
-			ginkgo.It("returns empty string for SafeImageID when imageInfo is nil", func() {
-				container = MockContainer(WithPortBindings())
-				container.imageInfo = nil
-				imageID := container.SafeImageID()
-				gomega.Expect(imageID).To(gomega.Equal(types.ImageID("")))
-			})
 		})
 
 		ginkgo.Context("fetching container links", func() {
+			ginkgo.When("compose depends-on label is present", func() {
+				ginkgo.It("returns single dependent container", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.HaveLen(1),
+					))
+				})
+
+				ginkgo.It("returns multiple dependent containers", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres,redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("trims whitespace from service names", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": " postgres , redis ",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("normalizes container names with slashes", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						compose.ComposeDependsOnLabel: "/postgres,/redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+					))
+				})
+
+				ginkgo.It(
+					"watchtower depends-on label takes precedence over compose depends_on",
+					func() {
+						container = MockContainer(WithLabels(map[string]string{
+							"com.docker.compose.depends_on":             "postgres",
+							"com.centurylinklabs.watchtower.depends-on": "redis",
+						}))
+						links := container.Links()
+						gomega.Expect(links).To(gomega.SatisfyAll(
+							gomega.ContainElement("redis"),
+							gomega.Not(gomega.ContainElement("postgres")),
+							gomega.HaveLen(1),
+						))
+					},
+				)
+
+				ginkgo.It("returns empty links for blank compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "",
+					}))
+					gomega.Expect(container.Links()).To(gomega.BeEmpty())
+				})
+
+				ginkgo.It("parses colon-separated service:condition:required format", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres:service_started:required,redis:service_healthy",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.HaveLen(2),
+					))
+				})
+			})
+
 			ginkgo.When("depends-on label is present", func() {
 				ginkgo.It("returns single dependent container", func() {
 					container = MockContainer(WithLabels(map[string]string{
@@ -294,7 +409,7 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
+						gomega.ContainElement("postgres"),
 						gomega.HaveLen(1),
 					))
 				})
@@ -305,20 +420,20 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 						gomega.HaveLen(2),
 					))
 				})
 
 				ginkgo.It("normalizes container names with slashes", func() {
 					container = MockContainer(WithLabels(map[string]string{
-						"com.centurylinklabs.watchtower.depends-on": "/postgres,redis",
+						"com.centurylinklabs.watchtower.depends-on": "/postgres,/redis",
 					}))
 					links := container.Links()
 					gomega.Expect(links).To(gomega.SatisfyAll(
-						gomega.ContainElement("/postgres"),
-						gomega.ContainElement("/redis"),
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
 					))
 				})
 
@@ -328,9 +443,151 @@ var _ = ginkgo.Describe("Container", func() {
 					}))
 					gomega.Expect(container.Links()).To(gomega.BeEmpty())
 				})
+
+				ginkgo.It(
+					"does not prefix container names with project name for cross-project dependencies",
+					func() {
+						container = MockContainer(WithLabels(map[string]string{
+							"com.docker.compose.project":                "myproject",
+							"com.centurylinklabs.watchtower.depends-on": "otherproject-db,external-service",
+						}))
+						links := container.Links()
+						gomega.Expect(links).To(gomega.SatisfyAll(
+							gomega.ContainElement("otherproject-db"),
+							gomega.ContainElement("external-service"),
+							gomega.HaveLen(2),
+						))
+						// Verify that links are NOT prefixed with the container's own project name
+						gomega.Expect(links).
+							To(gomega.Not(gomega.ContainElement("myproject-otherproject-db")))
+						gomega.Expect(links).
+							To(gomega.Not(gomega.ContainElement("myproject-external-service")))
+					},
+				)
+
+				ginkgo.It("handles cross-project dependencies with single container", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.project":                "webapp",
+						"com.centurylinklabs.watchtower.depends-on": "database",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("database"),
+						gomega.HaveLen(1),
+					))
+					// Verify no project prefix is added
+					gomega.Expect(links).To(gomega.Not(gomega.ContainElement("webapp-database")))
+				})
+
+				ginkgo.It("supports cross-project dependencies without project labels", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "standalone-db,external-api",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("standalone-db"),
+						gomega.ContainElement("external-api"),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It("handles self-referencing dependencies gracefully", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "postgres,test-watchtower,redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("postgres"),
+						gomega.ContainElement("redis"),
+						gomega.Not(gomega.ContainElement("test-watchtower")),
+						gomega.HaveLen(2),
+					))
+				})
+
+				ginkgo.It(
+					"does not create self-reference when container name matches dependency",
+					func() {
+						// Create a container named testContainerName with depends-on: testContainerName
+						container = MockContainer(WithLabels(map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": testContainerName,
+						}))
+						// Rename container to testContainerName (default is "test-watchtower")
+						container.containerInfo.Name = testContainerName
+						container.normalizedName = testContainerName
+
+						links := container.Links()
+						gomega.Expect(links).To(gomega.BeEmpty(),
+							"Container with name matching dependency should not include self in links")
+					},
+				)
+
+				ginkgo.It("filters self-references from compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": testContainerName,
+					}))
+					container.containerInfo.Name = testContainerName
+					container.normalizedName = testContainerName
+
+					links := container.Links()
+					gomega.Expect(links).To(gomega.BeEmpty(),
+						"Compose depends-on with self-reference should be filtered out")
+				})
+
+				ginkgo.DescribeTable(
+					"parses malformed watchtower labels",
+					func(label string, expected []string) {
+						container = MockContainer(WithLabels(map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": label,
+						}))
+						links := container.Links()
+						gomega.Expect(links).To(gomega.Equal(expected))
+					},
+					ginkgo.Entry(
+						"empty entries",
+						",postgres,,redis,",
+						[]string{"postgres", "redis"},
+					),
+					ginkgo.Entry(
+						"extra spaces",
+						" postgres , redis ",
+						[]string{"postgres", "redis"},
+					),
+					ginkgo.Entry("empty string", "", []string{}),
+					ginkgo.Entry(
+						"multiple dependencies",
+						"postgres,redis,mysql",
+						[]string{"postgres", "redis", "mysql"},
+					),
+				)
+
+				ginkgo.It("normalizes invalid container name dependencies", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": "postgres db, redis",
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.Equal([]string{"postgres db", "redis"}))
+				})
+
+				ginkgo.It("handles very long dependency lists", func() {
+					// Generate 100 dependencies
+					var deps []string
+					for i := 1; i <= 100; i++ {
+						deps = append(deps, fmt.Sprintf("dep%d", i))
+					}
+
+					label := strings.Join(deps, ",")
+					container = MockContainer(WithLabels(map[string]string{
+						"com.centurylinklabs.watchtower.depends-on": label,
+					}))
+					links := container.Links()
+					gomega.Expect(links).To(gomega.HaveLen(100))
+					gomega.Expect(links).To(gomega.ContainElement("dep1"))
+					gomega.Expect(links).To(gomega.ContainElement("dep50"))
+					gomega.Expect(links).To(gomega.ContainElement("dep100"))
+				})
 			})
 
-			ginkgo.It("returns links from host config when depends-on label is absent", func() {
+			ginkgo.It("returns links from host config when depends-on labels are absent", func() {
 				container = MockContainer(WithLinks([]string{
 					"redis:test-watchtower",
 					"postgres:test-watchtower",
@@ -342,6 +599,76 @@ var _ = ginkgo.Describe("Container", func() {
 					gomega.HaveLen(2),
 				))
 			})
+
+			ginkgo.It("warns and skips invalid link format without colon", func() {
+				logOutput := &bytes.Buffer{}
+				originalOutput := logrus.StandardLogger().Out
+				originalLevel := logrus.GetLevel()
+
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.WarnLevel)
+
+				defer func() {
+					logrus.SetOutput(originalOutput)
+					logrus.SetLevel(originalLevel)
+				}()
+
+				container = MockContainer(WithLinks([]string{"invalidlink"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.BeEmpty())
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Invalid link format in host config, expected 'name:alias'"))
+			})
+
+			ginkgo.It("warns and skips link with empty container name", func() {
+				logOutput := &bytes.Buffer{}
+				originalOutput := logrus.StandardLogger().Out
+				originalLevel := logrus.GetLevel()
+
+				logrus.SetOutput(logOutput)
+				logrus.SetLevel(logrus.WarnLevel)
+
+				defer func() {
+					logrus.SetOutput(originalOutput)
+					logrus.SetLevel(originalLevel)
+				}()
+
+				container = MockContainer(WithLinks([]string{":alias"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.BeEmpty())
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Invalid link format in host config, missing container name"))
+			})
+
+			ginkgo.It("normalizes container names with leading slashes", func() {
+				container = MockContainer(WithLinks([]string{"/redis:test-watchtower"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("redis"))
+			})
+
+			ginkgo.It("does not prefix already prefixed container names", func() {
+				container = MockContainer(
+					WithLinks([]string{"myproject-redis:test-watchtower"}),
+					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
+				)
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("myproject-redis"))
+			})
+
+			ginkgo.It("does not prefix when project name is empty", func() {
+				container = MockContainer(WithLinks([]string{"redis:test-watchtower"}))
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("redis"))
+			})
+
+			ginkgo.It("includes network mode dependencies", func() {
+				container = MockContainer(
+					WithNetworkMode("container:other"),
+					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
+				)
+				links := container.Links()
+				gomega.Expect(links).To(gomega.ContainElement("myproject-other"))
+			})
 		})
 
 		ginkgo.It("returns pre and post update timeout values", func() {
@@ -351,6 +678,283 @@ var _ = ginkgo.Describe("Container", func() {
 			}))
 			gomega.Expect(container.PreUpdateTimeout()).To(gomega.Equal(3))
 			gomega.Expect(container.PostUpdateTimeout()).To(gomega.Equal(5))
+		})
+	})
+
+	ginkgo.Describe("ResolveContainerIdentifier", func() {
+		ginkgo.It("returns service name when compose service label is present", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service": "web-service",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("web-service"))
+		})
+
+		ginkgo.It("returns container name when compose service label is absent", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"other.label": "value",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when labels are empty", func() {
+			container := MockContainer(WithLabels(map[string]string{}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when labels are nil", func() {
+			container := MockContainer(WithLabels(nil))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns service name when compose service label has value", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service": "api",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("api"))
+		})
+
+		ginkgo.It("handles multiple labels with service name present", func() {
+			container := MockContainer(WithLabels(map[string]string{
+				"com.docker.compose.service":     "db-service",
+				"com.docker.compose.project":     "myproject",
+				"com.centurylinklabs.watchtower": "true",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("myproject-db-service"))
+		})
+
+		ginkgo.It("returns container name when ContainerInfo returns nil", func() {
+			container := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			container.EXPECT().ContainerInfo().Return(nil)
+			container.EXPECT().Name().Return("test-watchtower")
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name when ContainerInfo.Config is nil", func() {
+			container := MockContainer(WithLabels(map[string]string{}))
+			container.containerInfo.Config = nil
+			identifier := ResolveContainerIdentifier(container)
+			gomega.Expect(identifier).To(gomega.Equal("test-watchtower"))
+		})
+
+		ginkgo.It("returns container name for replica containers", func() {
+			mockContainer := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.service":     "web",
+						"com.docker.compose.project":     "myproject",
+						"com.docker.compose.version":     "3.8",
+						"com.docker.compose.config-hash": "abc123",
+					},
+				},
+			})
+			mockContainer.EXPECT().Name().Return("myproject-web-1")
+			result := ResolveContainerIdentifier(mockContainer)
+			gomega.Expect(result).To(gomega.Equal("myproject-web-1"))
+		})
+
+		ginkgo.DescribeTable("replica container identifiers",
+			func(name string, labels map[string]string, expected, description string) {
+				container := MockContainer(WithLabels(labels))
+				container.containerInfo.Name = name
+				container.normalizedName = name
+				result := ResolveContainerIdentifier(container)
+				gomega.Expect(result).To(gomega.Equal(expected), "Test case: %s", description)
+			},
+			ginkgo.Entry(
+				"single replica returns unique name",
+				"myproject-web-1",
+				map[string]string{
+					"com.docker.compose.service":          "web",
+					"com.docker.compose.project":          "myproject",
+					"com.docker.compose.container-number": "1",
+				},
+				"myproject-web-1",
+				"Replica should return full name to ensure uniqueness",
+			),
+			ginkgo.Entry(
+				"multiple replicas with different numbers",
+				"myproject-web-2",
+				map[string]string{
+					"com.docker.compose.service":          "web",
+					"com.docker.compose.project":          "myproject",
+					"com.docker.compose.container-number": "2",
+				},
+				"myproject-web-2",
+				"Each replica should have unique identifier",
+			),
+			ginkgo.Entry(
+				"replica without container number label",
+				"app-db-3",
+				map[string]string{
+					"com.docker.compose.service": "db",
+					"com.docker.compose.project": "app",
+				},
+				"app-db-3",
+				"Should return full name even without container number to avoid collisions",
+			),
+			ginkgo.Entry(
+				"non-replica with container number",
+				"mydb",
+				map[string]string{
+					"com.docker.compose.service":          "db",
+					"com.docker.compose.project":          "my",
+					"com.docker.compose.container-number": "1",
+				},
+				"my-db-1",
+				"Non-replica should use project-service-number format",
+			),
+			ginkgo.Entry(
+				"replica with missing service label",
+				"myproject-orphan-1",
+				map[string]string{
+					"com.docker.compose.project": "myproject",
+				},
+				"myproject-orphan-1",
+				"Container with project prefix but no service should return full name",
+			),
+			ginkgo.Entry(
+				"container with service but no project",
+				"unknown-web-2",
+				map[string]string{
+					"com.docker.compose.service": "web",
+				},
+				"web",
+				"Non-replica container with service label returns service name",
+			),
+			ginkgo.Entry(
+				"collision prevention for replicas",
+				"test-app-1",
+				map[string]string{
+					"com.docker.compose.service":          "app",
+					"com.docker.compose.project":          "test",
+					"com.docker.compose.container-number": "1",
+				},
+				"test-app-1",
+				"Should return unique name instead of potentially colliding 'test-app'",
+			),
+			ginkgo.Entry(
+				"collision prevention for replicas with same number",
+				"prod-api-1",
+				map[string]string{
+					"com.docker.compose.service":          "api",
+					"com.docker.compose.project":          "prod",
+					"com.docker.compose.container-number": "1",
+				},
+				"prod-api-1",
+				"Multiple replicas with same number should still be unique",
+			),
+		)
+
+		ginkgo.Describe("replica collision scenarios", func() {
+			ginkgo.It("prevents collision between replicas without unique identifiers", func() {
+				// Without replica logic, both would return "myapp-service"
+				replica1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replica1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "service",
+							"com.docker.compose.project": "myapp",
+						},
+					},
+				})
+				replica1.EXPECT().Name().Return("myapp-service-1")
+
+				replica2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replica2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service": "service",
+							"com.docker.compose.project": "myapp",
+						},
+					},
+				})
+				replica2.EXPECT().Name().Return("myapp-service-2")
+
+				id1 := ResolveContainerIdentifier(replica1)
+				id2 := ResolveContainerIdentifier(replica2)
+
+				gomega.Expect(id1).To(gomega.Equal("myapp-service-1"))
+				gomega.Expect(id2).To(gomega.Equal("myapp-service-2"))
+				gomega.Expect(id1).ToNot(gomega.Equal(id2))
+			})
+
+			ginkgo.It("handles replicas with and without container number labels", func() {
+				replicaWithNumber := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replicaWithNumber.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.service":          "worker",
+							"com.docker.compose.project":          "queue",
+							"com.docker.compose.container-number": "5",
+						},
+					},
+				})
+				replicaWithNumber.EXPECT().Name().Return("queue-worker-5")
+
+				replicaWithoutNumber := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+				replicaWithoutNumber.EXPECT().
+					ContainerInfo().
+					Return(&dockerContainer.InspectResponse{
+						Config: &dockerContainer.Config{
+							Labels: map[string]string{
+								"com.docker.compose.service": "worker",
+								"com.docker.compose.project": "queue",
+							},
+						},
+					})
+				replicaWithoutNumber.EXPECT().Name().Return("queue-worker-6")
+
+				idWith := ResolveContainerIdentifier(replicaWithNumber)
+				idWithout := ResolveContainerIdentifier(replicaWithoutNumber)
+
+				gomega.Expect(idWith).To(gomega.Equal("queue-worker-5"))
+				gomega.Expect(idWithout).To(gomega.Equal("queue-worker-6"))
+			})
+		})
+
+		ginkgo.Describe("filterSelfReferences", func() {
+			ginkgo.It("filters out basic self-references from links", func() {
+				links := []string{"db", webContainerName, "cache"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache"}))
+			})
+
+			ginkgo.It("filters out multiple self-references", func() {
+				links := []string{"first", webContainerName, "second", webContainerName, "third"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"first", "second", "third"}))
+			})
+
+			ginkgo.It("returns empty slice when all links are self-references", func() {
+				links := []string{webContainerName}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.BeEmpty())
+			})
+
+			ginkgo.It("preserves order of non-self links", func() {
+				links := []string{"db", webContainerName, "cache", webContainerName, "redis"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache", "redis"}))
+			})
+
+			ginkgo.It("returns original slice unchanged when no self-references exist", func() {
+				links := []string{"db", "cache"}
+				containerName := webContainerName
+				result := filterSelfReferences(links, containerName)
+				gomega.Expect(result).To(gomega.Equal([]string{"db", "cache"}))
+			})
 		})
 	})
 
@@ -418,517 +1022,6 @@ var _ = ginkgo.Describe("Container", func() {
 		})
 	})
 
-	ginkgo.Describe("Network Configuration", func() {
-		var logOutput *bytes.Buffer
-
-		ginkgo.BeforeEach(func() {
-			logOutput = &bytes.Buffer{}
-			logrus.SetOutput(logOutput)
-			logrus.SetLevel(logrus.DebugLevel)
-		})
-
-		ginkgo.Context("using bridge network mode", func() {
-			ginkgo.It("preserves IP and MAC addresses for running containers", func() {
-				container := MockContainer(
-					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"bridge": {
-							IPAddress:  "172.17.0.2",
-							MacAddress: "02:42:ac:11:00:02",
-							Aliases:    nil,
-							DNSNames:   nil,
-						},
-					}),
-				)
-
-				config := getNetworkConfig(container, "1.44")
-				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
-				endpoint := config.EndpointsConfig["bridge"]
-				gomega.Expect(endpoint.Aliases).To(gomega.BeEmpty(), "Aliases should not be set")
-				gomega.Expect(endpoint.DNSNames).To(gomega.BeEmpty(), "DNSNames should not be set")
-				gomega.Expect(endpoint.IPAddress).To(gomega.Equal("172.17.0.2"))
-				gomega.Expect(endpoint.MacAddress).To(gomega.Equal("02:42:ac:11:00:02"))
-				gomega.Expect(logOutput.String()).
-					To(gomega.ContainSubstring("Found MAC address in config"))
-			})
-
-			ginkgo.It("logs warning for missing MAC address in running containers", func() {
-				logrus.SetLevel(logrus.WarnLevel)
-				container := MockContainer(
-					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"bridge": {
-							IPAddress:  "172.17.0.2",
-							MacAddress: "",
-							Aliases:    nil,
-							DNSNames:   nil,
-						},
-					}),
-				)
-
-				config := getNetworkConfig(container, "1.49")
-				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"Negotiated API version 1.49 is at least 1.44 but no MAC address found; preservation may not be supported",
-				))
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=running"))
-			})
-
-			ginkgo.Context("for non-running containers", func() {
-				ginkgo.It("logs debug message for missing MAC address in created state", func() {
-					container := MockContainer(
-						WithNetworkMode("bridge"),
-						WithContainerState(
-							dockerContainerType.State{Running: false, Status: "created"},
-						),
-						WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-							"bridge": {
-								IPAddress:  "",
-								MacAddress: "",
-								Aliases:    nil,
-								DNSNames:   nil,
-							},
-						}),
-					)
-
-					config := getNetworkConfig(container, "1.49")
-					gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
-					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-						"No MAC address found for non-running container"))
-					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=created"))
-					gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
-						"Negotiated API version 1.49 is at least 1.44 but no MAC address found"))
-				})
-
-				ginkgo.It("logs debug message for missing MAC address in exited state", func() {
-					container := MockContainer(
-						WithNetworkMode("bridge"),
-						WithContainerState(
-							dockerContainerType.State{Running: false, Status: "exited"},
-						),
-						WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-							"bridge": {
-								IPAddress:  "",
-								MacAddress: "",
-								Aliases:    nil,
-								DNSNames:   nil,
-							},
-						}),
-					)
-
-					config := getNetworkConfig(container, "1.49")
-					gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
-					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-						"No MAC address found for non-running container"))
-					gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=exited"))
-					gomega.Expect(logOutput.String()).NotTo(gomega.ContainSubstring(
-						"Negotiated API version 1.49 is at least 1.44 but no MAC address found"))
-				})
-			})
-		})
-
-		ginkgo.Context("using host network mode", func() {
-			ginkgo.It("includes host endpoint with no aliases or DNS names", func() {
-				container := MockContainer(
-					WithNetworkMode("host"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"host": {
-							IPAddress:  "",
-							MacAddress: "",
-							Aliases:    nil,
-							DNSNames:   nil,
-						},
-					}),
-				)
-
-				logrus.WithFields(logrus.Fields{
-					"network_mode": container.containerInfo.HostConfig.NetworkMode,
-					"network_mode_type": fmt.Sprintf(
-						"%T",
-						container.containerInfo.HostConfig.NetworkMode,
-					),
-					"network_mode_str": string(container.containerInfo.HostConfig.NetworkMode),
-					"test":             "host_network_mode",
-				}).Debug("Test network mode check")
-
-				config := getNetworkConfig(container, "1.44")
-				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("host"))
-				endpoint := config.EndpointsConfig["host"]
-				gomega.Expect(endpoint.Aliases).
-					To(gomega.BeEmpty(), "Aliases should not be set for host mode")
-				gomega.Expect(endpoint.DNSNames).
-					To(gomega.BeEmpty(), "DNSNames should not be set for host mode")
-				gomega.Expect(endpoint.IPAddress).To(gomega.BeEmpty())
-				gomega.Expect(endpoint.MacAddress).To(gomega.BeEmpty())
-				gomega.Expect(container.containerInfo.HostConfig.NetworkMode).To(gomega.Equal(
-					dockerContainerType.NetworkMode("host")))
-			})
-
-			ginkgo.It("clears non-empty aliases and DNS names", func() {
-				container := MockContainer(
-					WithNetworkMode("host"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"host": {
-							IPAddress:  "192.168.1.1",
-							MacAddress: "02:42:ac:11:00:02",
-							Aliases:    []string{"test-alias"},
-							DNSNames:   []string{"test-dns"},
-						},
-					}),
-				)
-
-				config := getNetworkConfig(container, "1.44")
-				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("host"))
-				endpoint := config.EndpointsConfig["host"]
-				gomega.Expect(endpoint.Aliases).
-					To(gomega.BeEmpty(), "Aliases should be cleared for host mode")
-				gomega.Expect(endpoint.DNSNames).
-					To(gomega.BeEmpty(), "DNSNames should be cleared for host mode")
-				gomega.Expect(endpoint.IPAddress).
-					To(gomega.BeEmpty(), "IPAddress should be cleared for host mode")
-				gomega.Expect(endpoint.MacAddress).
-					To(gomega.BeEmpty(), "MacAddress should be cleared for host mode")
-			})
-
-			ginkgo.It("logs no MAC address for host mode in debugLogMacAddress", func() {
-				container := MockContainer(
-					WithNetworkMode("host"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"host": {
-							IPAddress:  "",
-							MacAddress: "",
-							Aliases:    nil,
-							DNSNames:   nil,
-						},
-					}),
-				)
-
-				config := getNetworkConfig(container, "1.44")
-				debugLogMacAddress(
-					config,
-					types.ContainerID("test-id"),
-					"1.44",
-					flags.DockerAPIMinVersion,
-					true,
-				)
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"No MAC address in host network mode, as expected"))
-			})
-		})
-
-		ginkgo.Context("using legacy API version (< 1.44)", func() {
-			ginkgo.It("clears MAC address and DNS names", func() {
-				container := MockContainer(
-					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"bridge": {
-							IPAddress:  "172.17.0.2",
-							MacAddress: "02:42:ac:11:00:02",
-							Aliases:    []string{"old-alias"},
-							DNSNames:   []string{"old-dns"},
-						},
-					}),
-				)
-
-				config := getNetworkConfig(container, "1.43")
-				gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
-				endpoint := config.EndpointsConfig["bridge"]
-				gomega.Expect(endpoint.IPAddress).
-					To(gomega.BeEmpty(), "IPAddress should be cleared for legacy API")
-				gomega.Expect(endpoint.MacAddress).
-					To(gomega.BeEmpty(), "MAC address should be cleared for legacy API")
-				gomega.Expect(endpoint.Aliases).
-					To(gomega.ContainElement("old-alias"), "Aliases should be preserved")
-				gomega.Expect(endpoint.DNSNames).
-					To(gomega.BeEmpty(), "DNSNames should be cleared for legacy API")
-			})
-
-			ginkgo.It("logs no MAC address in debugLogMacAddress", func() {
-				container := MockContainer(
-					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"bridge": {
-							IPAddress:  "172.17.0.2",
-							MacAddress: "02:42:ac:11:00:02",
-						},
-					}),
-				)
-
-				config := getNetworkConfig(container, "1.43")
-				debugLogMacAddress(
-					config,
-					types.ContainerID("test-id"),
-					"1.43",
-					flags.DockerAPIMinVersion,
-					false,
-				)
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"No MAC address in legacy config, as expected"))
-			})
-		})
-
-		ginkgo.Context("with multiple networks", func() {
-			ginkgo.BeforeEach(func() {
-				logrus.SetLevel(logrus.DebugLevel)
-			})
-
-			ginkgo.It(
-				"preserves all networks and clears MAC addresses for legacy API (< 1.44)",
-				func() {
-					container := MockContainer(
-						WithNetworkMode("bridge"),
-						WithContainerState(
-							dockerContainerType.State{Running: true, Status: "running"},
-						),
-						WithNetworks("network1", "network2"),
-						WithImageName("test-image:latest"),
-					)
-
-					config := getNetworkConfig(container, "1.43")
-					gomega.Expect(config.EndpointsConfig).
-						To(gomega.HaveKey("network1"), "Should include first network")
-					gomega.Expect(config.EndpointsConfig).
-						To(gomega.HaveKey("network2"), "Should include second network")
-					gomega.Expect(config.EndpointsConfig["network1"].MacAddress).
-						To(gomega.BeEmpty(),
-							"MAC address should be cleared for network1")
-					gomega.Expect(config.EndpointsConfig["network2"].MacAddress).
-						To(gomega.BeEmpty(),
-							"MAC address should be cleared for network2")
-					gomega.Expect(config.EndpointsConfig["network1"].Aliases).
-						To(gomega.ContainElement("test-watchtower"),
-							"Aliases should match mock setup for network1")
-					gomega.Expect(config.EndpointsConfig["network2"].Aliases).
-						To(gomega.ContainElement("test-watchtower"),
-							"Aliases should match mock setup for network2")
-					gomega.Expect(logOutput.String()).
-						To(gomega.ContainSubstring("No MAC address in legacy config, as expected"))
-				},
-			)
-
-			ginkgo.It(
-				"preserves all networks with IP and MAC addresses for modern API (>= 1.44)",
-				func() {
-					container := MockContainer(
-						WithNetworkMode("bridge"),
-						WithContainerState(
-							dockerContainerType.State{Running: true, Status: "running"},
-						),
-						WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-							"network1": {
-								NetworkID:  "network_network1_id",
-								IPAddress:  "172.17.0.2",
-								MacAddress: "02:42:ac:11:00:02",
-								Aliases:    []string{"test-watchtower"},
-							},
-							"network2": {
-								NetworkID:  "network_network2_id",
-								IPAddress:  "172.18.0.2",
-								MacAddress: "02:42:ac:12:00:02",
-								Aliases:    []string{"test-watchtower"},
-							},
-						}),
-						WithImageName("test-image:latest"),
-					)
-
-					config := getNetworkConfig(container, "1.44")
-					gomega.Expect(config.EndpointsConfig).
-						To(gomega.HaveKey("network1"), "Should include first network")
-					gomega.Expect(config.EndpointsConfig).
-						To(gomega.HaveKey("network2"), "Should include second network")
-					gomega.Expect(config.EndpointsConfig["network1"].IPAddress).
-						To(gomega.Equal("172.17.0.2"),
-							"IPAddress should be preserved for network1")
-					gomega.Expect(config.EndpointsConfig["network1"].MacAddress).
-						To(gomega.Equal("02:42:ac:11:00:02"),
-							"MAC address should be preserved for network1")
-					gomega.Expect(config.EndpointsConfig["network2"].IPAddress).
-						To(gomega.Equal("172.18.0.2"),
-							"IPAddress should be preserved for network2")
-					gomega.Expect(config.EndpointsConfig["network2"].MacAddress).
-						To(gomega.Equal("02:42:ac:12:00:02"),
-							"MAC address should be preserved for network2")
-					gomega.Expect(config.EndpointsConfig["network1"].Aliases).
-						To(gomega.ContainElement("test-watchtower"),
-							"Aliases should match mock setup for network1")
-					gomega.Expect(config.EndpointsConfig["network2"].Aliases).
-						To(gomega.ContainElement("test-watchtower"),
-							"Aliases should match mock setup for network2")
-					gomega.Expect(logOutput.String()).
-						To(gomega.ContainSubstring("Found MAC address in config"))
-				},
-			)
-
-			ginkgo.It("returns empty config when network settings are empty", func() {
-				container := MockContainer(
-					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{}),
-					WithImageName("test-image:latest"),
-				)
-
-				config := getNetworkConfig(container, "1.44")
-				gomega.Expect(config.EndpointsConfig).
-					To(gomega.BeEmpty(), "Network config should have no endpoints")
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"Negotiated API version 1.44 is at least 1.44 but no MAC address found"))
-				gomega.Expect(logOutput.String()).
-					To(gomega.ContainSubstring("no MAC address found in non-host network config"))
-			})
-
-			ginkgo.It("returns empty config when network settings are nil", func() {
-				container := MockContainer(
-					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithImageName("test-image:latest"),
-					func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
-						c.NetworkSettings = nil
-					},
-				)
-
-				config := getNetworkConfig(container, "1.44")
-				gomega.Expect(config.EndpointsConfig).
-					To(gomega.BeEmpty(), "Network config should have no endpoints")
-				gomega.Expect(logOutput.String()).
-					To(gomega.ContainSubstring("No network settings available"))
-			})
-		})
-	})
-
-	ginkgo.Describe("MAC Address Validation", func() {
-		var logOutput *bytes.Buffer
-
-		ginkgo.BeforeEach(func() {
-			logOutput = &bytes.Buffer{}
-			logrus.SetOutput(logOutput)
-			logrus.SetLevel(logrus.WarnLevel)
-		})
-
-		ginkgo.It(
-			"returns error and logs warning for running container with no MAC address",
-			func() {
-				container := MockContainer(
-					WithNetworkMode("bridge"),
-					WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-					WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-						"bridge": {MacAddress: ""},
-					}),
-				)
-
-				config := &dockerNetworkType.NetworkingConfig{
-					EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
-						"bridge": {MacAddress: ""},
-					},
-				}
-
-				err := validateMacAddresses(config, container.ID(), "1.49", false, container)
-				gomega.Expect(err).To(gomega.Equal(errNoMacInNonHost))
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-					"Negotiated API version 1.49 is at least 1.44 but no MAC address found"))
-				gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=running"))
-			},
-		)
-
-		ginkgo.It("returns nil and logs debug for created container with no MAC address", func() {
-			logrus.SetLevel(logrus.DebugLevel)
-			container := MockContainer(
-				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: false, Status: "created"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-					"bridge": {MacAddress: ""},
-				}),
-			)
-
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
-					"bridge": {MacAddress: ""},
-				},
-			}
-
-			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-				"No MAC address found for non-running container"))
-			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=created"))
-		})
-
-		ginkgo.It("returns nil and logs debug for exited container with no MAC address", func() {
-			logrus.SetLevel(logrus.DebugLevel)
-			container := MockContainer(
-				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: false, Status: "exited"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-					"bridge": {MacAddress: ""},
-				}),
-			)
-
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
-					"bridge": {MacAddress: ""},
-				},
-			}
-
-			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-				"No MAC address found for non-running container"))
-			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=exited"))
-		})
-
-		ginkgo.It("returns nil and logs debug for running container with MAC address", func() {
-			logrus.SetLevel(logrus.DebugLevel)
-			container := MockContainer(
-				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
-					"bridge": {MacAddress: "02:42:ac:11:00:02"},
-				}),
-			)
-
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
-					"bridge": {MacAddress: "02:42:ac:11:00:02"},
-				},
-			}
-
-			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(logOutput.String()).
-				To(gomega.ContainSubstring("Found MAC address in config"))
-			gomega.Expect(logOutput.String()).
-				To(gomega.ContainSubstring("Verified MAC address presence"))
-		})
-
-		ginkgo.It("returns nil and logs debug for nil container state", func() {
-			logrus.SetLevel(logrus.DebugLevel)
-			container := MockContainer(
-				WithNetworkMode("bridge"),
-				func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
-					c.State = nil
-				},
-			)
-
-			config := &dockerNetworkType.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetworkType.EndpointSettings{
-					"bridge": {MacAddress: ""},
-				},
-			}
-
-			err := validateMacAddresses(config, container.ID(), "1.49", false, container)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring(
-				"No MAC address found for non-running container"))
-			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("state=unknown"))
-		})
-	})
-
 	ginkgo.Describe("Memory Swappiness Configuration", func() {
 		var (
 			logOutput               *bytes.Buffer
@@ -940,10 +1033,11 @@ var _ = ginkgo.Describe("Container", func() {
 
 		// WithMemorySwappiness configures the container's MemorySwappiness value.
 		WithMemorySwappiness := func(swappiness int64) MockContainerUpdate {
-			return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+			return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 				if c.HostConfig == nil {
-					c.HostConfig = &dockerContainerType.HostConfig{}
+					c.HostConfig = &dockerContainer.HostConfig{}
 				}
+
 				c.HostConfig.MemorySwappiness = &swappiness
 			}
 		}
@@ -952,15 +1046,16 @@ var _ = ginkgo.Describe("Container", func() {
 			logOutput = &bytes.Buffer{}
 			logrus.SetOutput(logOutput)
 			logrus.SetLevel(logrus.DebugLevel)
+
 			mockContainer = MockContainer(WithMemorySwappiness(defaultMemorySwappiness))
-			inspectResponse := dockerContainerType.InspectResponse{
-				ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+			inspectResponse := dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 					ID:         containerID,
-					Name:       "/" + containerName,
+					Name:       containerName,
 					HostConfig: mockContainer.GetCreateHostConfig(),
-					State:      &dockerContainerType.State{Running: true},
+					State:      &dockerContainer.State{Running: true},
 				},
-				Config: &dockerContainerType.Config{},
+				Config: &dockerContainer.Config{},
 			}
 			mockContainer.containerInfo = &inspectResponse
 		})
@@ -975,6 +1070,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 			if disableMemorySwappiness {
 				hostConfig.MemorySwappiness = nil
+
 				clog.Debug("Disabled memory swappiness for Podman compatibility")
 			}
 
@@ -994,6 +1090,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 			if disableMemorySwappiness {
 				hostConfig.MemorySwappiness = nil
+
 				clog.Debug("Disabled memory swappiness for Podman compatibility")
 			}
 
@@ -1017,11 +1114,12 @@ var _ = ginkgo.Describe("Container", func() {
 			)
 
 			// WithCPUSettings configures the container's CPU settings.
-			WithCPUSettings := func(nanoCPUs int64, cpuShares int64, cpuQuota int64, cpuPeriod int64, cpusetCpus string, cpusetMems string) MockContainerUpdate {
-				return func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+			WithCPUSettings := func(nanoCPUs, cpuShares, cpuQuota, cpuPeriod int64, cpusetCpus, cpusetMems string) MockContainerUpdate {
+				return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					if c.HostConfig == nil {
-						c.HostConfig = &dockerContainerType.HostConfig{}
+						c.HostConfig = &dockerContainer.HostConfig{}
 					}
+
 					c.HostConfig.NanoCPUs = nanoCPUs
 					c.HostConfig.CPUShares = cpuShares
 					c.HostConfig.CPUQuota = cpuQuota
@@ -1035,6 +1133,7 @@ var _ = ginkgo.Describe("Container", func() {
 				logOutput = &bytes.Buffer{}
 				logrus.SetOutput(logOutput)
 				logrus.SetLevel(logrus.DebugLevel)
+
 				mockContainer = MockContainer(
 					WithCPUSettings(
 						defaultNanoCPUs,
@@ -1045,14 +1144,14 @@ var _ = ginkgo.Describe("Container", func() {
 						defaultCpusetMems,
 					),
 				)
-				inspectResponse := dockerContainerType.InspectResponse{
-					ContainerJSONBase: &dockerContainerType.ContainerJSONBase{
+				inspectResponse := dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
 						ID:         containerID,
-						Name:       "/" + containerName,
+						Name:       containerName,
 						HostConfig: mockContainer.GetCreateHostConfig(),
-						State:      &dockerContainerType.State{Running: true},
+						State:      &dockerContainer.State{Running: true},
 					},
-					Config: &dockerContainerType.Config{},
+					Config: &dockerContainer.Config{},
 				}
 				mockContainer.containerInfo = &inspectResponse
 			})
@@ -1174,22 +1273,22 @@ var _ = ginkgo.Describe("Container", func() {
 
 	ginkgo.Describe("Host Config Creation", func() {
 		ginkgo.It("preserves volume mount subpath in host config", func() {
-			volumeMount := dockerMountType.Mount{
-				Type:   dockerMountType.TypeVolume,
+			volumeMount := dockerMount.Mount{
+				Type:   dockerMount.TypeVolume,
 				Source: "test_volume",
 				Target: "/config/nest",
-				VolumeOptions: &dockerMountType.VolumeOptions{
+				VolumeOptions: &dockerMount.VolumeOptions{
 					Subpath: "ha/nest",
 				},
 			}
 
-			container := MockContainer(WithMounts([]dockerMountType.Mount{volumeMount}))
+			container := MockContainer(WithMounts([]dockerMount.Mount{volumeMount}))
 			hostConfig := container.GetCreateHostConfig()
 
 			gomega.Expect(hostConfig.Mounts).To(gomega.HaveLen(1), "Expected exactly one mount")
 			mount := hostConfig.Mounts[0]
 			gomega.Expect(mount.Type).
-				To(gomega.Equal(dockerMountType.TypeVolume), "Mount type should be volume")
+				To(gomega.Equal(dockerMount.TypeVolume), "Mount type should be volume")
 			gomega.Expect(mount.Source).To(gomega.Equal("test_volume"), "Mount source should match")
 			gomega.Expect(mount.Target).
 				To(gomega.Equal("/config/nest"), "Mount target should match")
@@ -1206,7 +1305,7 @@ var _ = ginkgo.Describe("Container", func() {
 			logOutput               *bytes.Buffer
 			client                  *MockClient
 			container               *Container
-			networkConfig           *dockerNetworkType.NetworkingConfig
+			networkConfig           *dockerNetwork.NetworkingConfig
 			defaultMemorySwappiness int64 = 60
 		)
 
@@ -1218,8 +1317,8 @@ var _ = ginkgo.Describe("Container", func() {
 			client = &MockClient{}
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
-				WithNetworkSettings(map[string]*dockerNetworkType.EndpointSettings{
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						NetworkID:  "network_bridge_id",
 						IPAddress:  "172.17.0.2",
@@ -1227,10 +1326,11 @@ var _ = ginkgo.Describe("Container", func() {
 						Aliases:    []string{"test-watchtower"},
 					},
 				}),
-				func(c *dockerContainerType.InspectResponse, _ *dockerImageType.InspectResponse) {
+				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					if c.HostConfig == nil {
-						c.HostConfig = &dockerContainerType.HostConfig{}
+						c.HostConfig = &dockerContainer.HostConfig{}
 					}
+
 					c.HostConfig.MemorySwappiness = &defaultMemorySwappiness
 				},
 			)
@@ -1239,6 +1339,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("disables memory swappiness when flag is true", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1257,6 +1358,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("logs MAC address details", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1275,6 +1377,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("uses full network config for API >= 1.44", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1293,10 +1396,11 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("handles ContainerCreate failure", func() {
 			createErr := errors.New("create failed")
-			client.createFunc = func(_ context.Context, _ *dockerContainerType.Config, _ *dockerContainerType.HostConfig, _ *dockerNetworkType.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainerType.CreateResponse, error) {
-				return dockerContainerType.CreateResponse{}, createErr
+			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainer.CreateResponse, error) {
+				return dockerContainer.CreateResponse{}, createErr
 			}
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1316,6 +1420,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("logs successful container creation", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1335,10 +1440,11 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.It("skips starting stopped container when reviveStopped is false", func() {
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: false, Status: "exited"}),
+				WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
 			)
 			networkConfig = getNetworkConfig(container, "1.44")
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1357,10 +1463,11 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("handles ContainerStart failure", func() {
 			startErr := errors.New("start failed")
-			client.startFunc = func(_ context.Context, _ string, _ dockerContainerType.StartOptions) error {
+			client.startFunc = func(_ context.Context, _ string, _ dockerContainer.StartOptions) error {
 				return startErr
 			}
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1380,6 +1487,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 		ginkgo.It("logs successful container start", func() {
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1400,11 +1508,12 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.It("attaches multiple networks for legacy API and handles success", func() {
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 				WithNetworks("network1", "network2"),
 			)
 			networkConfig = getNetworkConfig(container, "1.23")
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1428,18 +1537,19 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.It("attaches multiple networks for legacy API and handles failure", func() {
 			container = MockContainer(
 				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainerType.State{Running: true, Status: "running"}),
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 				WithNetworks("network1", "network2"),
 			)
 			networkConfig = getNetworkConfig(container, "1.23")
 			connectErr := errors.New("network connect failed")
-			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetworkType.EndpointSettings) error {
+			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) error {
 				return connectErr
 			}
-			client.removeFunc = func(_ context.Context, _ string, _ dockerContainerType.RemoveOptions) error {
+			client.removeFunc = func(_ context.Context, _ string, _ dockerContainer.RemoveOptions) error {
 				return nil
 			}
 			newID, err := StartTargetContainer(
+				context.Background(),
 				client,
 				container,
 				networkConfig,
@@ -1459,6 +1569,108 @@ var _ = ginkgo.Describe("Container", func() {
 				To(gomega.ContainSubstring("Attaching additional network to container"))
 			gomega.Expect(logOutput.String()).
 				To(gomega.ContainSubstring("Failed to attach additional network"))
+		})
+
+		ginkgo.Describe("Context Propagation for Cleanup", func() {
+			ginkgo.It("performs cleanup with non-canceled context when parent context is canceled after rename failure", func() {
+				// Create a canceled parent context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately to simulate parent cancellation
+
+				// Set up rename to fail, triggering cleanup path
+				renameErr := errors.New("rename failed")
+				client.renameFunc = func(_ context.Context, _, _ string) error {
+					return renameErr
+				}
+
+				// Verify cleanup receives a non-canceled context
+				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+					// Track that removeFunc was invoked
+					client.removeFuncCalled.Store(true)
+
+					// The cleanup context should NOT be canceled even though parent was canceled
+					select {
+					case <-cleanupCtx.Done():
+						ginkgo.Fail("Cleanup context should not be canceled - context.WithoutCancel should preserve the context")
+					default:
+					}
+
+					return nil
+				}
+
+				newID, err := StartTargetContainer(
+					ctx,
+					client,
+					container,
+					networkConfig,
+					true,
+					"1.44",
+					flags.DockerAPIMinVersion,
+					false,
+					"auto",
+					false,
+				)
+				gomega.Expect(newID).To(gomega.BeEmpty())
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("rename failed"))
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Failed to rename container"))
+				gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue(), "removeFunc was not invoked - cleanup was not executed")
+			})
+
+			ginkgo.It("performs cleanup with non-canceled context when parent context is canceled after network attachment failure", func() {
+				// Set up container with multiple networks for legacy API path
+				container = MockContainer(
+					WithNetworkMode("bridge"),
+					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+					WithNetworks("network1", "network2"),
+				)
+				networkConfig = getNetworkConfig(container, "1.23")
+
+				// Create a canceled parent context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately to simulate parent cancellation
+
+				// Set up network connect to fail, triggering cleanup path
+				connectErr := errors.New("network connect failed")
+				client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) error {
+					return connectErr
+				}
+
+				// Verify cleanup receives a non-canceled context
+				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+					// Track that removeFunc was invoked
+					client.removeFuncCalled.Store(true)
+
+					// The cleanup context should NOT be canceled even though parent was canceled
+					select {
+					case <-cleanupCtx.Done():
+						ginkgo.Fail("Cleanup context should not be canceled - context.WithoutCancel should preserve the context")
+					default:
+					}
+
+					return nil
+				}
+
+				newID, err := StartTargetContainer(
+					ctx,
+					client,
+					container,
+					networkConfig,
+					true,
+					"1.23",
+					flags.DockerAPIMinVersion,
+					false,
+					"auto",
+					false,
+				)
+				gomega.Expect(newID).To(gomega.BeEmpty())
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("network connect failed"))
+				gomega.Expect(logOutput.String()).
+					To(gomega.ContainSubstring("Failed to attach additional network"))
+				gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue(), "removeFunc was not invoked - cleanup was not executed")
+			})
 		})
 	})
 })

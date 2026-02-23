@@ -15,6 +15,32 @@ Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE
              Default: See default templates below
 ```
 
+### Notification Template File
+
+Sets the path to a file containing the Go template used for formatting notification messages.
+
+```text
+            Argument: --notification-template-file
+Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE_FILE
+                Type: String
+             Default: (empty)
+```
+
+When both `--notification-template` and `--notification-template-file` are specified, the file-based template takes precedence over the inline template.
+
+#### Examples
+
+Create a template file named `custom-template.txt` with your desired template content, then mount it into the container and specify the path:
+
+```bash
+docker run -d \
+  --name watchtower \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /path/to/custom-template.txt:/custom-template.txt \
+  -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
+  nickfedor/watchtower:latest
+```
+
 ### Notification Report
 
 Enables the session report as the notification template data, including container statuses and logs.
@@ -44,6 +70,8 @@ Simple templates are used when `--notification-report` is not set, formatting in
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
+    Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}
@@ -74,6 +102,8 @@ The [Template Preview Tool](../template-preview/index.md) uses a `notifications.
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
+    Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}
@@ -95,12 +125,15 @@ When `--notification-report` is set, the template processes a `notifications.Dat
 ```go title="Default Report Template"
 {{- if .Report -}}
   {{- with .Report -}}
-    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-    {{- if ( or .Updated .Failed ) -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+    {{- if ( or .Updated .Restarted .Failed ) -}}
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
       {{- end -}}
       {{- range .Fresh}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
+      {{- end -}}
+      {{- range .Restarted}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
       {{- end -}}
       {{- range .Skipped}}
@@ -133,12 +166,15 @@ Logs:
       -e WATCHTOWER_NOTIFICATION_TEMPLATE="\
     {{- if .Report -}}
       {{- with .Report -}}
-    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-    {{- if ( or .Updated .Failed ) -}}
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+    {{- if ( or .Updated .Restarted .Failed ) -}}
           {{- range .Updated -}}
     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
           {{- end -}}
           {{- range .Fresh -}}
+    - {{.Name}} ({{.ImageName}}): {{.State}}
+          {{- end -}}
+          {{- range .Restarted -}}
     - {{.Name}} ({{.ImageName}}): {{.State}}
           {{- end -}}
           {{- range .Skipped -}}
@@ -175,12 +211,15 @@ Logs:
           WATCHTOWER_NOTIFICATION_TEMPLATE: |
             {{- if .Report -}}
               {{- with .Report -}}
-            {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Failed}} Failed
-            {{- if ( or .Updated .Failed ) -}}
+            {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+            {{- if ( or .Updated .Restarted .Failed ) -}}
                 {{- range .Updated -}}
             - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
                 {{- end -}}
                 {{- range .Fresh -}}
+            - {{.Name}} ({{.ImageName}}): {{.State}}
+                {{- end -}}
+                {{- range .Restarted -}}
             - {{.Name}} ({{.ImageName}}): {{.State}}
                 {{- end -}}
                 {{- range .Skipped -}}
@@ -199,11 +238,12 @@ Logs:
             {{- end -}}
     ```
 <!-- markdownlint-restore -->
-Example output for a session with one updated container and one error log:
+Example output for a session with one updated container, one restarted container, and one error log:
 
 ```text
-5 Scanned, 1 Updated, 0 Failed
+5 Scanned, 1 Updated, 1 Restarted, 0 Failed
 - /container (repo/image:latest): abcdef12 updated to 34567890
+- /restarted-container (repo/image:latest): Restarted
 
 Logs:
 2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.

@@ -6,7 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 )
 
@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("Registry", func() {
 })
 
 func testContainerWithImage(imageName string) bool {
-	container := mocks.CreateMockContainer("", "", imageName, time.Now())
+	container := mockActions.CreateMockContainer("", "", imageName, time.Now())
 
 	return registry.WarnOnAPIConsumption(container)
 }

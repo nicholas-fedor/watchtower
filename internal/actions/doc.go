@@ -3,7 +3,7 @@
 //
 // Key components:
 //   - Update: Scans and updates containers based on parameters.
-//   - CheckForSanity: Validates environment for rolling restarts.
+//   - ValidateRollingRestartDependencies: Validates environment for rolling restarts.
 //   - CheckForMultipleWatchtowerInstances: Ensures single Watchtower instance.
 //   - RunUpdatesWithNotifications: Performs container updates and sends notifications about the results.
 //   - CleanupImages: Removes specified image IDs from the Docker environment.
@@ -15,7 +15,8 @@
 //	if err != nil {
 //	    logrus.WithError(err).Error("Update failed")
 //	}
-//	if err := actions.CheckForSanity(client, filter, true); err != nil {
+//	err = actions.ValidateRollingRestartDependencies(client, filter)
+//	if err != nil {
 //	    logrus.WithError(err).Error("Sanity check failed")
 //	}
 //	params := actions.RunUpdatesWithNotificationsParams{
@@ -38,5 +39,6 @@
 //	}
 //	metric := actions.RunUpdatesWithNotifications(params)
 //
-// The package integrates with the container package for Docker operations, session package for update reporting, sorter package for container ordering, and lifecycle package for pre/post-update hooks, using logrus for logging operations and errors.
+// The package integrates with the container package for Docker operations, session package for update reporting, sorter package for container ordering, and lifecycle package for pre/post-update
+// hooks, using logrus for logging operations and errors.
 package actions

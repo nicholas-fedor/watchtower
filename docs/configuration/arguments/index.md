@@ -161,13 +161,11 @@ Triggers a single update attempt for specified containers and exits immediately.
 Environment Variable: WATCHTOWER_RUN_ONCE
                 Type: Boolean
              Default: false
-!!! Warning
-    When using `--run-once` with Docker Compose or similar orchestration tools, ensure your container's restart policy is compatible. Using `restart: unless-stopped` or similar policies may cause restart loops after Watchtower exits successfully. Consider using `restart: "no"` or `--rm` with `docker run` for one-time updates.
 ```
 
-!!! Note
-    Enables debug output during execution, suitable for interactive use.
-    Use with `--rm` to remove the Watchtower container after completion.
+!!! Note "Watchtower automatically sets its own restart policy to "no" in run-once mode to prevent unwanted restarts."
+
+!!! Note "Use with `--rm` to remove the Watchtower container after completion."
 
 ### Update on Start
 
@@ -309,6 +307,9 @@ Environment Variable: WATCHTOWER_ROLLING_RESTART
     This is typically negligible for homelab setups but monitor disk space on resource-constrained hosts.
 
     If a container fails to become healthy within 5 minutes, Watchtower logs a warning but continues with the next container to avoid blocking the entire update process.
+
+!!! Warning "This functionality is currently not supported when used in combination with linked-containers."
+     This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.
 
 ### Cleanup Old Images
 
@@ -756,13 +757,30 @@ Environment Variable: WATCHTOWER_HTTP_API_PORT
 
 Configures the notification service URL.
 Can reference a file for sensitive values.
+Supports multiple URLs via comma-separated values or multiple flags.
 
 ```text
              Argument: --notification-url
-Environment Variable: WATCHTOWER_NOTIFICATION_URL
-                 Type: String
-              Default: None
+ Environment Variable: WATCHTOWER_NOTIFICATION_URL
+                  Type: String (comma-separated or multiple flags)
+               Default: None
 ```
+
+!!! Note "Multiple Notification URLs"
+    To send notifications to multiple services simultaneously, you can:
+
+    - Use comma-separated URLs: `--notification-url="discord://xxx,telegram://yyy"`
+    - Specify the flag multiple times: `--notification-url=discord://xxx --notification-url=telegram://yyy`
+    - Use YAML arrays in Docker Compose (recommended)
+
+    See [Configuring Multiple Notification URLs](../../notifications/overview/index.md#using_multiple_notification_services) for detailed examples.
+
+!!! Note "CLI Flags vs Environment Variables"
+    The CLI flag can be called multiple times as CLI arguments; however, defining the environment variable multiple times will NOT work and only the last value will be used.
+
+    This is because CLI flags use a StringArray type that supports multiple invocations,  while environment variables are simple key-value pairs that get overwritten when defined multiple times.
+
+    For environment variables, use comma-separated values or YAML arrays instead.
 
 ### Notification Split by Container
 
@@ -825,6 +843,17 @@ Can reference a file for security.
 Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
                 Type: String
              Default: None
+```
+
+### Notification Template File
+
+Specifies the path to a file containing the Shoutrrr text/template for notification messages.
+
+```text
+             Argument: --notification-template-file
+ Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE_FILE
+                 Type: String
+              Default: None
 ```
 
 ### Disable Startup Message

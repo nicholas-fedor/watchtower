@@ -1,7 +1,7 @@
 // Package digest provides functionality for retrieving and comparing Docker image digests in Watchtower.
 // It enables the update process by fetching digests from container registries using HTTP requests,
 // comparing them with local image digests, and handling authentication transformations to ensure compatibility
-// with various registry authentication schemes. This package is integral to determining whether a container’s
+// with various registry authentication schemes. This package is integral to determining whether a container's
 // image is stale and requires an update.
 package digest
 
@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -23,28 +24,25 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// ContentDigestHeader is the HTTP header key used to retrieve the digest from a registry’s response.
+// ContentDigestHeader is the HTTP header key used to retrieve the digest from a registry's response.
 // This header, typically "Docker-Content-Digest", contains the digest value (e.g., "sha256:abc...") for an image manifest,
 // allowing Watchtower to compare or fetch it without downloading the full manifest body.
 const ContentDigestHeader = "Docker-Content-Digest"
-
-const (
-	// minDigestParts defines the minimum number of parts expected when splitting a digest string.
-	// A valid digest typically has two parts: a prefix (e.g., "sha256") and a hash value (e.g., "abc..."), separated by a colon.
-	// This constant ensures digest strings are well-formed before comparison or processing.
-	minDigestParts = 2
-)
 
 // UserAgent is the User-Agent header value used in HTTP requests to identify Watchtower as the client.
 // It can be customized at build time using linker flags (e.g., -ldflags "-X ...UserAgent=Watchtower/v1.0").
 // If not set during the build, it defaults to "Watchtower/unknown", providing a fallback identifier for registry requests.
 var UserAgent = "Watchtower/unknown"
 
+// inspectMutex synchronizes access to ImageInspector operations to ensure thread safety
+// during concurrent digest fetching operations.
+var inspectMutex sync.Mutex
+
 // Errors for digest retrieval operations.
 var (
 	// errMissingImageInfo indicates the container lacks image metadata, preventing digest operations.
 	errMissingImageInfo = errors.New("container image info missing")
-	// errInvalidRegistryResponse indicates the registry’s HEAD response lacks a digest or is malformed.
+	// errInvalidRegistryResponse indicates the registry's HEAD response lacks a digest or is malformed.
 	errInvalidRegistryResponse = errors.New("registry responded with invalid HEAD request")
 	// errFailedGetToken indicates a failure to obtain an authentication token from the registry.
 	errFailedGetToken = errors.New("failed to get token")
@@ -69,9 +67,9 @@ func NormalizeDigest(digest string) string {
 	// List of prefixes to strip from the digest.
 	prefixes := []string{"sha256:"}
 	for _, prefix := range prefixes {
-		if strings.HasPrefix(digest, prefix) {
+		if after, ok := strings.CutPrefix(digest, prefix); ok {
 			// Trim the prefix to get the raw digest value.
-			normalized := strings.TrimPrefix(digest, prefix)
+			normalized := after
 			logrus.WithFields(logrus.Fields{
 				"original":   digest,
 				"normalized": normalized,
@@ -85,10 +83,11 @@ func NormalizeDigest(digest string) string {
 	return digest
 }
 
-// CompareDigest checks whether a container’s current image digest matches the latest from its registry.
+// CompareDigest checks whether a container's current image digest matches the latest from its registry.
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
+//   - inspector: Image inspector for checking if image is locally built.
 //   - container: Container whose digest is being compared.
 //   - registryAuth: Base64-encoded auth string.
 //
@@ -97,6 +96,7 @@ func NormalizeDigest(digest string) string {
 //   - error: Non-nil if operation fails, nil on success.
 func CompareDigest(
 	ctx context.Context,
+	inspector types.ImageInspector,
 	container types.Container,
 	registryAuth string,
 ) (bool, error) {
@@ -113,7 +113,7 @@ func CompareDigest(
 	}
 
 	// Fetch the latest digest from the registry using a HEAD request for efficiency.
-	remoteDigest, err := fetchDigest(ctx, container, registryAuth, http.MethodHead)
+	remoteDigest, err := fetchDigest(ctx, inspector, container, registryAuth, http.MethodHead)
 	if err != nil {
 		return false, err
 	}
@@ -122,18 +122,14 @@ func CompareDigest(
 	if remoteDigest == "" {
 		logrus.WithFields(fields).Debug("HEAD request returned empty digest, falling back to GET")
 
-		remoteDigest, err = FetchDigest(ctx, container, registryAuth)
+		remoteDigest, err = FetchDigest(ctx, inspector, container, registryAuth)
 		if err != nil {
 			return false, err
 		}
 	}
 
-	logrus.WithFields(fields).
-		WithField("remote_digest", remoteDigest).
-		Debug("Fetched remote digest")
-
-	// Compare the fetched remote digest with the container’s local digests.
-	matches := digestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
+	// Compare the fetched remote digest with the container's local digests.
+	matches := DigestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
 	logrus.WithFields(fields).WithField("matches", matches).Debug("Completed digest comparison")
 
 	return matches, nil
@@ -144,18 +140,24 @@ func CompareDigest(
 // HEAD requests are unsupported. The digest is extracted from the response headers and normalized for consistency.
 //
 // Parameters:
-//   - ctx: The context controlling the request’s lifecycle, enabling cancellation or timeouts.
+//   - ctx: The context controlling the request's lifecycle, enabling cancellation or timeouts.
+//   - inspector: Image inspector for checking if image is locally built.
 //   - container: The container whose image digest is being fetched, providing the image name and reference.
 //   - authToken: A base64-encoded authentication string for registry access.
 //
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if successful.
 //   - error: An error if the request fails or digest header is missing, nil if successful.
-func FetchDigest(ctx context.Context, container types.Container, authToken string) (string, error) {
-	return fetchDigest(ctx, container, authToken, http.MethodGet)
+func FetchDigest(
+	ctx context.Context,
+	inspector types.ImageInspector,
+	container types.Container,
+	authToken string,
+) (string, error) {
+	return fetchDigest(ctx, inspector, container, authToken, http.MethodGet)
 }
 
-// buildManifestURL constructs and validates the manifest URL for a container.
+// BuildManifestURL constructs and validates the manifest URL for a container.
 //
 // It determines the appropriate scheme based on WATCHTOWER_REGISTRY_TLS_SKIP,
 // builds the initial manifest URL using the container's image information,
@@ -171,7 +173,7 @@ func FetchDigest(ctx context.Context, container types.Container, authToken strin
 //   - string: The original host extracted from the URL (before override).
 //   - *url.URL: Parsed URL object.
 //   - error: Non-nil if URL construction or validation fails, nil on success.
-func buildManifestURL(
+func BuildManifestURL(
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
@@ -237,43 +239,182 @@ func buildManifestURL(
 	return manifestURL, originalHost, parsedURL, nil
 }
 
-// makeManifestRequest creates an HTTP request for fetching the manifest with proper headers and authentication.
+// fetchDigest retrieves an image digest using the specified HTTP method.
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
+//   - inspector: Image inspector for checking if image is locally built.
+//   - container: Container whose digest is being retrieved.
+//   - registryAuth: Base64-encoded auth string.
 //   - method: HTTP method ("HEAD" or "GET").
-//   - manifestURL: The URL to request the manifest from.
-//   - token: Authentication token (empty if not required).
 //
 // Returns:
-//   - *http.Request: The constructed HTTP request.
-//   - error: Non-nil if request creation fails, nil on success.
-func makeManifestRequest(
+//   - string: Normalized digest.
+//   - error: Non-nil if operation fails, nil on success.
+func fetchDigest(
 	ctx context.Context,
-	method, manifestURL, token string,
-) (*http.Request, error) {
-	// Construct the HTTP request with the appropriate method, headers, and context.
-	req, err := http.NewRequestWithContext(ctx, method, manifestURL, nil)
+	inspector types.ImageInspector,
+	container types.Container,
+	registryAuth string,
+	method string,
+) (string, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+
+	// Inspect the image to check if it's locally built (no RepoDigests).
+	// Synchronize access to prevent race conditions in concurrent operations.
+	inspectMutex.Lock()
+
+	inspect, _, err := inspector.ImageInspectWithRaw(ctx, container.ImageName())
+
+	inspectMutex.Unlock()
+
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFailedCreateRequest, err)
+		logrus.WithError(err).WithFields(fields).Debug("Failed to inspect image")
+
+		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
 	}
 
-	// Set headers only if a token is provided.
-	if token != "" {
-		req.Header.Set("Authorization", token)
+	// Skip digest fetching for locally built images (empty RepoDigests).
+	if len(inspect.RepoDigests) == 0 {
+		logrus.WithFields(fields).Debug("Skipping digest fetch for locally built image")
+
+		return "", nil
 	}
 
-	// Set Accept header for Docker Distribution API manifest requests, supporting v1, v2, OCI v1, and OCI index.
-	req.Header.Set(
-		"Accept",
-		"application/vnd.docker.distribution.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json",
+	// Transform the provided auth string into a usable format for registry authentication.
+	registryAuth = auth.TransformAuth(registryAuth)
+
+	// Create an authentication client for registry requests.
+	client := auth.NewAuthClient()
+
+	// Build initial manifest URL to get original host
+	_, originalHost, _, err := BuildManifestURL(container, "")
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+
+		return "", err
+	}
+
+	logrus.WithFields(fields).
+		WithField("original_host", originalHost).
+		Debug("Extracted original host from manifest URL")
+
+	// Obtain an authentication token and challenge host for the registry.
+	token, challengeHost, redirected, err := auth.GetToken(ctx, container, registryAuth, client)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
+
+		return "", fmt.Errorf("%w: %w", errFailedGetToken, err)
+	}
+
+	// If no token is returned, authentication is not required.
+	if token == "" {
+		logrus.WithFields(fields).Debug("No authentication required, proceeding with request")
+	} else {
+		logrus.WithFields(fields).
+			WithField("challenge_host", challengeHost).
+			WithField("redirected", redirected).
+			Debug("Received challenge host and redirect flag from GetToken")
+	}
+
+	// Build the manifest URL, using challenge host when redirected
+	var (
+		manifestURL string
+		parsedURL   *url.URL
 	)
-	req.Header.Set("User-Agent", UserAgent)
 
-	return req, nil
+	if challengeHost != "" && challengeHost != originalHost && redirected {
+		manifestURL, _, parsedURL, err = BuildManifestURL(container, challengeHost)
+	} else {
+		manifestURL, _, parsedURL, err = BuildManifestURL(container, "")
+	}
+
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+
+		return "", err
+	}
+
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"method": method,
+		"url":    manifestURL,
+	}).Debug("Fetching digest")
+
+	// Create the HTTP request for the manifest.
+	req, err := makeManifestRequest(ctx, method, manifestURL, token)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
+			"method": method,
+			"url":    manifestURL,
+		}).Debug("Failed to create request")
+
+		return "", err
+	}
+
+	// Execute the initial request.
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
+			"method": method,
+			"url":    manifestURL,
+		}).Debug("Failed to execute request")
+
+		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	// Handle the manifest response, checking for redirects and extracting digest.
+	digest, updatedURL, retry, err := HandleManifestResponse(
+		resp,
+		method,
+		originalHost,
+		challengeHost,
+		redirected,
+		parsedURL,
+		parsedURL.Host,
+	)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).WithField("status", resp.Status).
+			Debug("Failed to handle manifest response")
+
+		return "", err
+	}
+
+	if retry && updatedURL != "" {
+		logrus.WithFields(fields).
+			WithField("retry_url", updatedURL).
+			Debug("Retrying manifest request with updated URL")
+
+		digest, err = retryManifestRequest(
+			ctx,
+			method,
+			updatedURL,
+			token,
+			originalHost,
+			challengeHost,
+			redirected,
+			parsedURL,
+			client,
+		)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithField("retry_url", updatedURL).
+				Debug("Failed to retry manifest request")
+
+			return "", err
+		}
+	}
+
+	logrus.WithFields(fields).WithField("remote_digest", digest).
+		Debug("Fetched remote digest")
+
+	return digest, nil
 }
 
-// handleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
+// HandleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
 //
 // It checks for redirects, updates the manifest URL if necessary, and extracts the digest
 // from the response headers or body based on the request method.
@@ -292,7 +433,7 @@ func makeManifestRequest(
 //   - string: Updated manifest URL if redirected, otherwise empty.
 //   - bool: Whether a retry is needed.
 //   - error: Non-nil if processing or extraction fails, nil on success.
-func handleManifestResponse(
+func HandleManifestResponse(
 	resp *http.Response,
 	method, originalHost, challengeHost string,
 	redirected bool,
@@ -334,6 +475,10 @@ func handleManifestResponse(
 			parsedURL.Host = challengeHost
 			manifestURL = parsedURL.String()
 
+			logrus.WithFields(fields).
+				WithField("retry_url", manifestURL).
+				Debug("Setting retry due to HEAD failure on original host")
+
 			return "", manifestURL, true, nil
 		}
 
@@ -363,6 +508,10 @@ func handleManifestResponse(
 
 				parsedURL.Host = redirectURL.Host
 				manifestURL = parsedURL.String()
+
+				logrus.WithFields(fields).
+					WithField("retry_url", manifestURL).
+					Debug("Setting retry due to redirect")
 
 				return "", manifestURL, true, nil
 			}
@@ -400,6 +549,10 @@ func handleManifestResponse(
 			parsedURL.Host = originalHost
 			manifestURL = parsedURL.String()
 
+			logrus.WithFields(fields).
+				WithField("retry_url", manifestURL).
+				Debug("Setting retry due to 401/404 on redirected host")
+
 			return "", manifestURL, true, nil
 		}
 
@@ -412,6 +565,10 @@ func handleManifestResponse(
 
 			parsedURL.Host = challengeHost
 			manifestURL = parsedURL.String()
+
+			logrus.WithFields(fields).
+				WithField("retry_url", manifestURL).
+				Debug("Setting retry due to 401/404 on original host with challenge host")
 
 			return "", manifestURL, true, nil
 		}
@@ -432,13 +589,13 @@ func handleManifestResponse(
 	logrus.WithFields(fields).Debug("Extracting digest")
 
 	if method == http.MethodHead {
-		digest, err = extractHeadDigest(resp)
+		digest, err = ExtractHeadDigest(resp)
 	} else {
 		digest, err = ExtractGetDigest(resp)
 	}
 
 	if err != nil {
-		logrus.WithFields(fields).WithError(err).Debug("Failed to extract digest")
+		logrus.WithError(err).WithFields(fields).Debug("Failed to extract digest")
 
 		return "", "", false, err
 	}
@@ -450,147 +607,7 @@ func handleManifestResponse(
 	return digest, "", false, nil
 }
 
-// retryManifestRequest performs a retry request to the manifest URL with updated host.
-//
-// Parameters:
-//   - ctx: Context for request lifecycle control.
-//   - method: HTTP method ("HEAD" or "GET").
-//   - manifestURL: The updated manifest URL to retry.
-//   - token: Authentication token.
-//   - client: The authentication client to use for the request.
-//
-// Returns:
-//   - *http.Response: The response from the retry request.
-//   - error: Non-nil if the retry request fails, nil on success.
-
-// fetchDigest retrieves an image digest using the specified HTTP method.
-//
-// Parameters:
-//   - ctx: Context for request lifecycle control.
-//   - container: Container whose digest is being retrieved.
-//   - registryAuth: Base64-encoded auth string.
-//   - method: HTTP method ("HEAD" or "GET").
-//
-// Returns:
-//   - string: Normalized digest.
-//   - error: Non-nil if operation fails, nil on success.
-func fetchDigest(
-	ctx context.Context,
-	container types.Container,
-	registryAuth string,
-	method string,
-) (string, error) {
-	fields := logrus.Fields{
-		"container": container.Name(),
-		"image":     container.ImageName(),
-	}
-
-	// Transform the provided auth string into a usable format for registry authentication.
-	registryAuth = auth.TransformAuth(registryAuth)
-
-	// Create an authentication client for registry requests.
-	client := auth.NewAuthClient()
-
-	// Build initial manifest URL to get original host
-	_, originalHost, _, err := buildManifestURL(container, "")
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
-
-		return "", err
-	}
-
-	logrus.WithFields(fields).
-		WithField("original_host", originalHost).
-		Debug("Extracted original host from manifest URL")
-
-	// Obtain an authentication token and challenge host for the registry.
-	token, challengeHost, redirected, err := auth.GetToken(ctx, container, registryAuth, client)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
-
-		return "", fmt.Errorf("%w: %w", errFailedGetToken, err)
-	}
-
-	// If no token is returned, authentication is not required.
-	if token == "" {
-		logrus.WithFields(fields).Debug("No authentication required, proceeding with request")
-	} else {
-		logrus.WithFields(fields).
-			WithField("challenge_host", challengeHost).
-			WithField("redirected", redirected).
-			Debug("Received challenge host and redirect flag from GetToken")
-	}
-
-	// Build the manifest URL, using challenge host when redirected
-	var (
-		manifestURL string
-		parsedURL   *url.URL
-	)
-
-	if challengeHost != "" && challengeHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = buildManifestURL(container, challengeHost)
-	} else {
-		manifestURL, _, parsedURL, err = buildManifestURL(container, "")
-	}
-
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
-
-		return "", err
-	}
-
-	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"method": method,
-		"url":    manifestURL,
-	}).Debug("Fetching digest")
-
-	// Create the HTTP request for the manifest.
-	req, err := makeManifestRequest(ctx, method, manifestURL, token)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
-			"method": method,
-			"url":    manifestURL,
-		}).Debug("Failed to create request")
-
-		return "", err
-	}
-
-	// Execute the initial request.
-	resp, err := client.Do(req)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
-			"method": method,
-			"url":    manifestURL,
-		}).Debug("Failed to execute request")
-
-		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
-	}
-	defer resp.Body.Close()
-
-	// Handle the manifest response, checking for redirects and extracting digest.
-	digest, _, _, err := handleManifestResponse(
-		resp,
-		method,
-		originalHost,
-		challengeHost,
-		redirected,
-		parsedURL,
-		parsedURL.Host,
-	)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).WithField("status", resp.Status).
-			Debug("Failed to handle manifest response")
-
-		return "", err
-	}
-
-	logrus.WithFields(fields).WithField("remote_digest", digest).
-		Debug("Fetched remote digest")
-
-	return digest, nil
-}
-
-// extractHeadDigest extracts the image digest from a HEAD response’s headers.
+// ExtractHeadDigest extracts the image digest from a HEAD response's headers.
 //
 // It retrieves the digest from the "Docker-Content-Digest" header, normalizing it for comparison,
 // and validates its presence to ensure a valid response from the registry.
@@ -601,7 +618,7 @@ func fetchDigest(
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if present.
 //   - error: An error if the digest is missing or the response is invalid, nil if successful.
-func extractHeadDigest(resp *http.Response) (string, error) {
+func ExtractHeadDigest(resp *http.Response) (string, error) {
 	// Retrieve the digest from the standard header.
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest == "" {
@@ -629,7 +646,7 @@ func extractHeadDigest(resp *http.Response) (string, error) {
 	return normalizedDigest, nil
 }
 
-// ExtractGetDigest extracts the image digest from a GET response’s headers or body.
+// ExtractGetDigest extracts the image digest from a GET response's headers or body.
 //
 // It first tries to retrieve the digest from the "Docker-Content-Digest" header.
 // If the header is missing, it falls back to parsing the response body as a JSON
@@ -702,8 +719,8 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 			Digest string `json:"digest"`
 		}
 		// Attempt to unmarshal the response body as JSON.
-		var jsonErr error
-		if jsonErr = json.Unmarshal(bodyBytes, &manifest); jsonErr == nil {
+		jsonErr := json.Unmarshal(bodyBytes, &manifest)
+		if jsonErr == nil {
 			// JSON unmarshaling succeeded, check if digest field contains a value.
 			if manifest.Digest != "" {
 				// Successfully parsed JSON manifest with digest field populated.
@@ -752,41 +769,149 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 	return normalizedDigest, nil
 }
 
-// digestsMatch compares a list of local digests with a remote digest to determine if there’s a match.
+// DigestsMatch compares a list of local digests with a remote digest to determine if there's a match.
+//
 // It normalizes both the remote digest and each local digest, checking for equality to confirm
-// whether the container’s image is up-to-date with the registry’s latest version.
+// whether the container's image is up-to-date with the registry's latest version.
 //
 // Parameters:
-//   - localDigests: A slice of local digests from the container’s image info (e.g., "sha256:abc...").
+//   - localDigests: A slice of local digests from the container's image info (e.g., "sha256:abc...").
 //   - remoteDigest: The digest fetched from the registry (e.g., "sha256:abc..." or raw hash).
 //
 // Returns:
 //   - bool: True if any normalized local digest matches the normalized remote digest, false otherwise.
-func digestsMatch(localDigests []string, remoteDigest string) bool {
+func DigestsMatch(localDigests []string, remoteDigest string) bool {
 	// Normalize the remote digest once for efficiency.
 	normalizedRemoteDigest := NormalizeDigest(remoteDigest)
 
+	logrus.WithFields(logrus.Fields{
+		"local_digests": localDigests,
+		"remote_digest": normalizedRemoteDigest,
+	}).Debug("Comparing digests")
+
 	for _, digest := range localDigests {
-		// Split digest into repo and hash parts (e.g., "repo@sha256:abc").
-		parts := strings.Split(digest, "@")
-		if len(parts) < minDigestParts {
-			continue // Skip malformed digests.
+		// Cut the digest into repo and hash parts (e.g., "repo@sha256:abc").
+		repo, after, found := strings.Cut(digest, "@")
+
+		// Skip malformed digests without @ separator.
+		if !found {
+			logrus.WithFields(logrus.Fields{
+				"digest": digest,
+			}).Debug("Skipping malformed digest without @ separator")
+
+			continue
 		}
 
-		// Normalize the local digest’s hash part.
-		normalizedLocalDigest := NormalizeDigest(parts[1])
-		logrus.WithFields(logrus.Fields{
-			"local_digest":  normalizedLocalDigest,
-			"remote_digest": normalizedRemoteDigest,
-		}).Debug("Comparing digests")
+		// Handle case where digest starts with "@" (e.g., "@sha256:abc123")
+		// This is a valid format that Docker may report in some contexts.
+		if repo == "" {
+			logrus.WithFields(logrus.Fields{
+				"digest":        digest,
+				"remote_digest": normalizedRemoteDigest,
+			}).Debug("Local digest has empty repo prefix, comparing only digest part")
+		}
+
+		// Remove the sha256: prefix, if needed.
+		normalizedLocalDigest := NormalizeDigest(after)
 
 		// Return true on the first match.
 		if normalizedLocalDigest == normalizedRemoteDigest {
-			logrus.Debug("Found digest match")
+			logrus.WithFields(logrus.Fields{
+				"local_digest":  digest,
+				"remote_digest": normalizedRemoteDigest,
+			}).Debug("Found digest match")
 
 			return true
 		}
 	}
 
 	return false
+}
+
+// makeManifestRequest creates an HTTP request for fetching the manifest with proper headers and authentication.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - method: HTTP method ("HEAD" or "GET").
+//   - manifestURL: The URL to request the manifest from.
+//   - token: Authentication token (empty if not required).
+//
+// Returns:
+//   - *http.Request: The constructed HTTP request.
+//   - error: Non-nil if request creation fails, nil on success.
+func makeManifestRequest(
+	ctx context.Context,
+	method, manifestURL, token string,
+) (*http.Request, error) {
+	// Construct the HTTP request with the appropriate method, headers, and context.
+	req, err := http.NewRequestWithContext(ctx, method, manifestURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedCreateRequest, err)
+	}
+
+	// Set headers only if a token is provided.
+	if token != "" {
+		req.Header.Set("Authorization", token)
+	}
+
+	// Set Accept header for Docker Distribution API manifest requests, supporting v1, v2, OCI v1, and OCI index.
+	req.Header.Set(
+		"Accept",
+		"application/vnd.docker.distribution.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json",
+	)
+	req.Header.Set("User-Agent", UserAgent)
+
+	return req, nil
+}
+
+// retryManifestRequest performs a retry request to the manifest URL with updated host and returns the digest.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - method: HTTP method ("HEAD" or "GET").
+//   - updatedURL: The updated manifest URL to retry.
+//   - token: Authentication token.
+//   - originalHost: The original host.
+//   - challengeHost: The challenge host.
+//   - redirected: Whether authentication was redirected.
+//   - parsedURL: Parsed URL object.
+//   - client: The HTTP client to use for the request.
+//
+// Returns:
+//   - string: The extracted digest.
+//   - error: Non-nil if the retry request fails, nil on success.
+func retryManifestRequest(
+	ctx context.Context,
+	method, updatedURL, token string,
+	originalHost, challengeHost string,
+	redirected bool,
+	parsedURL *url.URL,
+	client auth.Client,
+) (string, error) {
+	req, err := makeManifestRequest(ctx, method, updatedURL, token)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	digest, _, _, err := HandleManifestResponse(
+		resp,
+		method,
+		originalHost,
+		challengeHost,
+		redirected,
+		parsedURL,
+		parsedURL.Host,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return digest, nil
 }

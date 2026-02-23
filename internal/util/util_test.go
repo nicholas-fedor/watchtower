@@ -1,4 +1,3 @@
-// Package util provides tests for utility functions used in Watchtower operations.
 package util
 
 import (
@@ -107,30 +106,6 @@ func TestGenerateRandomPrefixedSHA256(t *testing.T) {
 
 	result := GenerateRandomPrefixedSHA256()
 	assert.Regexp(t, "sha256:[0-9|a-f]{64}", result)
-}
-
-// TestRandName verifies that RandName generates a valid random container name.
-// It ensures the name is 32 characters long and contains only alphabetic characters.
-func TestRandName(t *testing.T) {
-	t.Parallel()
-
-	name := RandName()
-
-	// Check length is exactly 32 characters.
-	assert.Len(
-		t,
-		name,
-		randomNameLength,
-		"RandName should generate a %d-character name",
-		randomNameLength,
-	)
-
-	// Check that the name matches the expected pattern of only letters.
-	assert.Regexp(t, "^[a-zA-Z]+$", name, "RandName should contain only alphabetic characters")
-
-	// Verify uniqueness by generating another name and checking they differ.
-	anotherName := RandName()
-	assert.NotEqual(t, name, anotherName, "RandName should generate unique names")
 }
 
 // TestMinInt_FirstSmaller verifies that MinInt returns the smaller value when the first argument is smaller.

@@ -150,7 +150,6 @@ Temporary Items
 .docker/
 Dockerfile.dev
 docker-compose.override.yml
-*.log
 volumes/
 
 # General temporary files
@@ -162,7 +161,6 @@ volumes/
 *.swp
 *.rej
 *.*~
-*.log
 *.pid
 *.seed
 *.pid.lock
@@ -200,5 +198,11 @@ test-reports/
 
 # All-contributors
 .all-contributors/
+
+# Logs
 /Logs
+*.log
+
+# TODO
+TODO/
 TODO.md

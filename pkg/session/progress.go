@@ -12,7 +12,7 @@ type Progress map[types.ContainerID]*ContainerStatus
 // UpdateFromContainer creates a status from container data.
 //
 // Parameters:
-//   - cont: Container to update from.
+//   - container: Container to update from.
 //   - newImage: Latest image ID.
 //   - state: Container state.
 //   - params: Update parameters for monitor-only check.
@@ -20,25 +20,25 @@ type Progress map[types.ContainerID]*ContainerStatus
 // Returns:
 //   - *ContainerStatus: Updated status.
 func UpdateFromContainer(
-	cont types.Container,
+	container types.Container,
 	newImage types.ImageID,
 	state State,
 	params types.UpdateParams,
 ) *ContainerStatus {
 	update := &ContainerStatus{
-		containerID:    cont.ID(),
-		oldImage:       cont.SafeImageID(),
+		containerID:    container.ID(),
+		oldImage:       container.ImageID(),
 		newImage:       newImage,
-		containerName:  cont.Name(),
-		imageName:      cont.ImageName(),
+		containerName:  container.Name(),
+		imageName:      container.ImageName(),
 		containerError: nil,
 		state:          state,
-		monitorOnly:    cont.IsMonitorOnly(params),
+		monitorOnly:    container.IsMonitorOnly(params),
 		newContainerID: "",
 	}
 	logrus.WithFields(logrus.Fields{
-		"container_id": cont.ID().ShortID(),
-		"name":         cont.Name(),
+		"container_id": container.ID().ShortID(),
+		"name":         container.Name(),
 		"state":        update.State(),
 	}).Debug("Updated container status from container")
 
@@ -48,34 +48,34 @@ func UpdateFromContainer(
 // AddSkipped adds a container as skipped with an error.
 //
 // Parameters:
-//   - cont: Container to add.
+//   - container: Container to add.
 //   - err: Skip reason error.
 //   - params: Update parameters for monitor-only check.
-func (m Progress) AddSkipped(cont types.Container, err error, params types.UpdateParams) {
-	update := UpdateFromContainer(cont, cont.SafeImageID(), SkippedState, params)
+func (m Progress) AddSkipped(container types.Container, err error, params types.UpdateParams) {
+	update := UpdateFromContainer(container, container.ImageID(), SkippedState, params)
 	update.containerError = err
 	m.Add(update)
 	logrus.WithFields(logrus.Fields{
-		"container_id": cont.ID().ShortID(),
-		"name":         cont.Name(),
+		"container_id": container.ID().ShortID(),
+		"name":         container.Name(),
 	}).WithError(err).Debug("Added container as skipped")
 }
 
 // AddScanned adds a container as scanned with a new image.
 //
 // Parameters:
-//   - cont: Container to add.
+//   - container: Container to add.
 //   - newImage: Latest image ID.
 //   - params: Update parameters for monitor-only check.
 func (m Progress) AddScanned(
-	cont types.Container,
+	container types.Container,
 	newImage types.ImageID,
 	params types.UpdateParams,
 ) {
-	m.Add(UpdateFromContainer(cont, newImage, ScannedState, params))
+	m.Add(UpdateFromContainer(container, newImage, ScannedState, params))
 	logrus.WithFields(logrus.Fields{
-		"container_id": cont.ID().ShortID(),
-		"name":         cont.Name(),
+		"container_id": container.ID().ShortID(),
+		"name":         container.Name(),
 		"new_image":    newImage.ShortID(),
 	}).Debug("Added container as scanned")
 }
@@ -85,14 +85,21 @@ func (m Progress) AddScanned(
 // Parameters:
 //   - failures: Map of container IDs to errors.
 func (m Progress) UpdateFailed(failures map[types.ContainerID]error) {
-	for id, err := range failures {
-		update := m[id]
+	for containerID, err := range failures {
+		update, exists := m[containerID]
+		if !exists {
+			logrus.WithField("container_id", containerID.ShortID()).
+				Debug("Container not found in progress map, cannot mark as failed")
+
+			continue
+		}
+
 		update.containerError = err
 		update.state = FailedState
 		logrus.WithFields(logrus.Fields{
-			"container_id": id.ShortID(),
+			"container_id": containerID.ShortID(),
 			"name":         update.Name(),
-		}).WithError(err).Debug("Updated container state to failed")
+		}).WithError(err).Warn("Updated container state to failed")
 	}
 }
 
@@ -114,12 +121,57 @@ func (m Progress) Add(update *ContainerStatus) {
 // Parameters:
 //   - containerID: ID of container to mark.
 func (m Progress) MarkForUpdate(containerID types.ContainerID) {
-	update := m[containerID]
+	update, exists := m[containerID]
+	if !exists {
+		logrus.WithField("container_id", containerID.ShortID()).
+			Debug("Attempted to mark non-existent container for update")
+
+		return
+	}
+
 	update.state = UpdatedState
 	logrus.WithFields(logrus.Fields{
 		"container_id": containerID.ShortID(),
 		"name":         update.Name(),
 	}).Debug("Marked container for update")
+}
+
+// MarkRestarted sets a container’s state to restarted.
+//
+// Parameters:
+//   - containerID: ID of container to mark.
+func (m Progress) MarkRestarted(containerID types.ContainerID) {
+	update, exists := m[containerID]
+	if !exists {
+		logrus.WithField("container_id", containerID.ShortID()).
+			Debug("Attempted to mark non-existent container as restarted")
+
+		return
+	}
+
+	update.state = RestartedState
+	logrus.WithFields(logrus.Fields{
+		"container_id": containerID.ShortID(),
+		"name":         update.Name(),
+	}).Debug("Marked container as restarted")
+}
+
+// Restarted returns all containers marked as restarted.
+//
+// Returns:
+//   - []types.ContainerReport: List of restarted containers.
+func (m Progress) Restarted() []types.ContainerReport {
+	var restarted []types.ContainerReport
+
+	for _, update := range m {
+		if update.state == RestartedState {
+			restarted = append(restarted, update)
+		}
+	}
+
+	logrus.WithField("count", len(restarted)).Debug("Retrieved restarted containers")
+
+	return restarted
 }
 
 // Report generates a report from the progress data.

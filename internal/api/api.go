@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	pkgApi "github.com/nicholas-fedor/watchtower/pkg/api"
+	"github.com/nicholas-fedor/watchtower/pkg/api"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -44,6 +44,7 @@ func GetAPIAddr(host, port string) string {
 //   - enableUpdateAPI: Enables the HTTP update API endpoint.
 //   - enableMetricsAPI: Enables the HTTP metrics API endpoint.
 //   - unblockHTTPAPI: Allows periodic polling alongside the HTTP API.
+//   - noStartupMessage: Suppresses startup messages if true.
 //   - filter: The types.Filter determining which containers are targeted for updates.
 //   - command: The cobra.Command instance representing the executed command.
 //   - filterDesc: A human-readable description of the applied filter.
@@ -63,40 +64,44 @@ func GetAPIAddr(host, port string) string {
 func SetupAndStartAPI(
 	ctx context.Context,
 	apiHost, apiPort, apiToken string,
-	enableUpdateAPI, enableMetricsAPI, unblockHTTPAPI bool,
+	enableUpdateAPI, enableMetricsAPI, unblockHTTPAPI, noStartupMessage bool,
 	filter types.Filter,
 	command *cobra.Command,
 	filterDesc string,
 	updateLock chan bool,
 	cleanup bool,
+	monitorOnly bool,
 	client container.Client,
 	notifier types.Notifier,
 	scope string,
 	version string,
-	runUpdatesWithNotifications func(types.Filter, bool) *metrics.Metric,
+	runUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric,
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
-	server ...pkgApi.HTTPServer,
+	server ...api.HTTPServer,
 ) error {
 	// Get the formatted HTTP api address string.
 	address := GetAPIAddr(apiHost, apiPort)
 
 	// Initialize the HTTP API with the configured authentication token and address.
-	var httpAPI *pkgApi.API
+	var httpAPI *api.API
 	if len(server) > 0 {
-		httpAPI = pkgApi.New(apiToken, address, server[0])
+		httpAPI = api.New(apiToken, address, server[0])
 	} else {
-		httpAPI = pkgApi.New(apiToken, address)
+		httpAPI = api.New(apiToken, address)
 	}
 
 	// Register the update API endpoint if enabled, linking it to the update handler.
 	if enableUpdateAPI {
 		updateHandler := update.New(func(images []string) *metrics.Metric {
-			metric := runUpdatesWithNotifications(
-				filterByImage(images, filter),
-				cleanup,
-			)
+			params := types.UpdateParams{
+				Cleanup:        cleanup,
+				RunOnce:        true,
+				MonitorOnly:    monitorOnly,
+				SkipSelfUpdate: false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
+			}
+			metric := runUpdatesWithNotifications(ctx, filterByImage(images, filter), params)
 			defaultMetrics().RegisterScan(metric)
 
 			return metric
@@ -124,7 +129,12 @@ func SetupAndStartAPI(
 	}
 
 	// Start the API server, logging errors unless it's a clean shutdown.
-	if err := httpAPI.Start(ctx, enableUpdateAPI && !unblockHTTPAPI); err != nil &&
+	err := httpAPI.Start(
+		ctx,
+		enableUpdateAPI && !unblockHTTPAPI,
+		noStartupMessage,
+	)
+	if err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
 		logrus.WithError(err).Error("Failed to start API")
 

@@ -10,12 +10,13 @@ import (
 type State string
 
 const (
-	ScannedState State = "scanned"
-	UpdatedState State = "updated"
-	FailedState  State = "failed"
-	SkippedState State = "skipped"
-	StaleState   State = "stale"
-	FreshState   State = "fresh"
+	ScannedState   State = "scanned"
+	UpdatedState   State = "updated"
+	FailedState    State = "failed"
+	SkippedState   State = "skipped"
+	RestartedState State = "restarted"
+	StaleState     State = "stale"
+	FreshState     State = "fresh"
 )
 
 // StatesFromString parses a string of state characters and returns a slice of the corresponding report states.
@@ -32,6 +33,8 @@ func StatesFromString(str string) []State {
 			states = append(states, FailedState)
 		case 'k':
 			states = append(states, SkippedState)
+		case 'r':
+			states = append(states, RestartedState)
 		case 't':
 			states = append(states, StaleState)
 		case 'f':
@@ -45,12 +48,13 @@ func StatesFromString(str string) []State {
 }
 
 type report struct {
-	scanned []types.ContainerReport
-	updated []types.ContainerReport
-	failed  []types.ContainerReport
-	skipped []types.ContainerReport
-	stale   []types.ContainerReport
-	fresh   []types.ContainerReport
+	scanned   []types.ContainerReport
+	updated   []types.ContainerReport
+	failed    []types.ContainerReport
+	skipped   []types.ContainerReport
+	stale     []types.ContainerReport
+	fresh     []types.ContainerReport
+	restarted []types.ContainerReport
 }
 
 func (r *report) Scanned() []types.ContainerReport {
@@ -77,6 +81,10 @@ func (r *report) Fresh() []types.ContainerReport {
 	return r.fresh
 }
 
+func (r *report) Restarted() []types.ContainerReport {
+	return r.restarted
+}
+
 func (r *report) All() []types.ContainerReport {
 	allLen := len(
 		r.scanned,
@@ -90,6 +98,8 @@ func (r *report) All() []types.ContainerReport {
 		r.stale,
 	) + len(
 		r.fresh,
+	) + len(
+		r.restarted,
 	)
 	all := make([]types.ContainerReport, 0, allLen)
 
@@ -107,6 +117,7 @@ func (r *report) All() []types.ContainerReport {
 	}
 
 	appendUnique(r.updated)
+	appendUnique(r.restarted)
 	appendUnique(r.failed)
 	appendUnique(r.skipped)
 	appendUnique(r.stale)

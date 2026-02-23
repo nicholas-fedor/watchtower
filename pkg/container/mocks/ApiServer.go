@@ -9,12 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
+
+	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerFilters "github.com/docker/docker/api/types/filters"
+	dockerImage "github.com/docker/docker/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -28,6 +29,7 @@ const (
 // Returns the file contents or an error if the file isn’t found.
 func getMockJSONFile(relPath string) ([]byte, error) {
 	absPath, _ := filepath.Abs(relPath)
+
 	buf, err := os.ReadFile(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("mock JSON file %q not found: %w", absPath, err)
@@ -36,7 +38,7 @@ func getMockJSONFile(relPath string) ([]byte, error) {
 	return buf, nil
 }
 
-// Expects the file to exist at the given relative path; fails the test otherwise.
+// RespondWithJSONFile expects the file to exist at the given relative path; fails the test otherwise.
 func RespondWithJSONFile(
 	relPath string,
 	statusCode int,
@@ -81,8 +83,8 @@ func GetContainerHandlers(containerRefs ...*ContainerRef) []http.HandlerFunc {
 }
 
 // Adds each status as a filter key for Docker API compatibility.
-func createFilterArgs(statuses []string) filters.Args {
-	args := filters.NewArgs()
+func createFilterArgs(statuses []string) dockerFilters.Args {
+	args := dockerFilters.NewArgs()
 	for _, status := range statuses {
 		args.Add("status", status)
 	}
@@ -204,7 +206,7 @@ func getContainerHandler(containerID string, responseHandler http.HandlerFunc) h
 // Returns a 404 if containerInfo is nil; otherwise, serves the provided info.
 func GetContainerHandler(
 	containerID string,
-	containerInfo *container.InspectResponse,
+	containerInfo *dockerContainer.InspectResponse,
 ) http.HandlerFunc {
 	responseHandler := containerNotFoundResponse(containerID)
 	if containerInfo != nil {
@@ -215,7 +217,7 @@ func GetContainerHandler(
 }
 
 // Serves the provided image info as a JSON response.
-func GetImageHandler(imageInfo *image.InspectResponse) http.HandlerFunc {
+func GetImageHandler(imageInfo *dockerImage.InspectResponse) http.HandlerFunc {
 	return getImageHandler(
 		types.ImageID(imageInfo.ID),
 		ghttp.RespondWithJSONEncoded(http.StatusOK, imageInfo),
@@ -239,15 +241,15 @@ func ListContainersHandler(statuses ...string) http.HandlerFunc {
 }
 
 // Loads mock data from containers.json and filters it according to the provided args.
-func respondWithFilteredContainers(filters filters.Args) http.HandlerFunc {
+func respondWithFilteredContainers(filters dockerFilters.Args) http.HandlerFunc {
 	containersJSON, err := getMockJSONFile("./mocks/data/containers.json")
 	gomega.ExpectWithOffset(assertionOffset, err).
 		ShouldNot(gomega.HaveOccurred())
 		// Offset for nested call depth
 
-	var filteredContainers []container.Summary
+	var filteredContainers []dockerContainer.Summary
 
-	var containers []container.Summary
+	var containers []dockerContainer.Summary
 
 	gomega.ExpectWithOffset(assertionOffset, json.Unmarshal(containersJSON, &containers)).
 		To(gomega.Succeed())
@@ -325,12 +327,12 @@ func RemoveImageHandler(imagesWithParents map[string][]string) http.HandlerFunc 
 
 			targetImage := parts[len(parts)-1]
 			if parents, found := imagesWithParents[targetImage]; found {
-				items := []image.DeleteResponse{
+				items := []dockerImage.DeleteResponse{
 					{Untagged: targetImage},
 					{Deleted: targetImage},
 				}
 				for _, parent := range parents {
-					items = append(items, image.DeleteResponse{Deleted: parent})
+					items = append(items, dockerImage.DeleteResponse{Deleted: parent})
 				}
 
 				ghttp.RespondWithJSONEncoded(http.StatusOK, items)(w, r)

@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	actionMocks "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 )
 
@@ -23,13 +23,13 @@ func TestStartupLogging(t *testing.T) {
 var _ = ginkgo.Describe("WriteStartupMessage", func() {
 	var (
 		cmd    *cobra.Command
-		client actionMocks.MockClient
+		client mockActions.MockClient
 		buffer *bytes.Buffer
 	)
 
 	ginkgo.BeforeEach(func() {
 		cmd = &cobra.Command{}
-		client = actionMocks.CreateMockClient(&actionMocks.TestData{}, false, false)
+		client = mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 		buffer = &bytes.Buffer{}
 		logrus.SetOutput(buffer)
 	})
@@ -80,6 +80,28 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		gomega.Expect(buffer.String()).To(gomega.BeEmpty())
 	})
 
+	ginkgo.It(
+		"should suppress startup messages including HTTP API when no-startup-message is set",
+		func() {
+			cmd.PersistentFlags().Bool("no-startup-message", true, "")
+			cmd.PersistentFlags().Bool("http-api-update", true, "")
+
+			logging.WriteStartupMessage(
+				cmd,
+				time.Time{},
+				"Watching all containers",
+				"",
+				client,
+				nil,
+				"v1.0.0",
+				nil, // read from flags
+			)
+
+			// Should not log to buffer when suppressed, even with HTTP API enabled
+			gomega.Expect(buffer.String()).To(gomega.BeEmpty())
+		},
+	)
+
 	ginkgo.It("should log scope information when provided", func() {
 		cmd.PersistentFlags().Bool("no-startup-message", false, "")
 		cmd.PersistentFlags().Bool("http-api-update", false, "")
@@ -101,6 +123,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 
 	ginkgo.It("should warn about trace logging", func() {
 		originalLevel := logrus.GetLevel()
+
 		logrus.SetLevel(logrus.TraceLevel)
 		defer logrus.SetLevel(originalLevel)
 
@@ -193,6 +216,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 
 	ginkgo.It("should log one-time update", func() {
 		cmd.PersistentFlags().Bool("run-once", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
@@ -204,17 +228,19 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	ginkgo.It("should log flag conflict when both run-once and update-on-start are set", func() {
 		cmd.PersistentFlags().Bool("run-once", true, "")
 		cmd.PersistentFlags().Bool("update-on-start", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
 
 		output := buffer.String()
 		gomega.Expect(output).
-			To(gomega.ContainSubstring("Run once enabled: Disregarding redundant update on start"))
+			To(gomega.ContainSubstring("Run once mode: Disregarding update on start"))
 	})
 
 	ginkgo.It("should log update on start", func() {
 		cmd.PersistentFlags().Bool("update-on-start", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
@@ -226,6 +252,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	ginkgo.It("should log HTTP API without periodic polls", func() {
 		cmd.PersistentFlags().Bool("http-api-update", true, "")
 		cmd.PersistentFlags().Bool("http-api-periodic-polls", false, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
@@ -238,6 +265,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	ginkgo.It("should log HTTP API with periodic polls", func() {
 		cmd.PersistentFlags().Bool("http-api-update", true, "")
 		cmd.PersistentFlags().Bool("http-api-periodic-polls", true, "")
+
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
 		logging.LogScheduleInfo(logger, cmd, time.Time{}, nil)
