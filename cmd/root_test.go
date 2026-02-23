@@ -377,18 +377,14 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 
 		// Simulate scheduled update (longer duration)
 		go func() {
-			select {
-			case v := <-updateLock:
-				t.Log("Scheduled: acquired lock")
-				close(scheduledStarted)
-				synctest.Wait() // Simulate scheduled update work
-				close(scheduledCompleted)
-				t.Log("Scheduled: releasing lock")
+			v := <-updateLock
+			t.Log("Scheduled: acquired lock")
+			close(scheduledStarted)
+			synctest.Wait() // Simulate scheduled update work
+			close(scheduledCompleted)
+			t.Log("Scheduled: releasing lock")
 
-				updateLock <- v
-			default:
-				t.Error("Scheduled update should have acquired the lock")
-			}
+			updateLock <- v
 		}()
 
 		// Wait for scheduled update to start
@@ -452,18 +448,14 @@ func TestConcurrentScheduledAndTargetedAPIUpdate(t *testing.T) {
 
 		// Simulate scheduled update (longer duration)
 		go func() {
-			select {
-			case v := <-updateLock:
-				t.Log("Scheduled: acquired lock")
-				close(scheduledStarted)
-				synctest.Wait() // Simulate scheduled update work
-				close(scheduledCompleted)
-				t.Log("Scheduled: releasing lock")
+			v := <-updateLock
+			t.Log("Scheduled: acquired lock")
+			close(scheduledStarted)
+			synctest.Wait() // Simulate scheduled update work
+			close(scheduledCompleted)
+			t.Log("Scheduled: releasing lock")
 
-				updateLock <- v
-			default:
-				t.Error("Scheduled update should have acquired the lock")
-			}
+			updateLock <- v
 		}()
 
 		// Wait for scheduled update to start

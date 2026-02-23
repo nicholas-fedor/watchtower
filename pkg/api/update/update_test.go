@@ -690,6 +690,7 @@ func TestConcurrentRequests(t *testing.T) {
 
 		mockUpdateFn := func(_ []string) *metrics.Metric {
 			calledCount.Add(1)
+			time.Sleep(time.Second) // Hold the lock so concurrent requests see it as busy.
 
 			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
 		}
