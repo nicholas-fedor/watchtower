@@ -1001,7 +1001,16 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 
 		ginkgo.It("should return false when CONTAINER is not set", func() {
+			// Save original state and ensure CONTAINER is not set
+			orig, exists := os.LookupEnv("CONTAINER")
+
 			os.Unsetenv("CONTAINER")
+
+			defer func() {
+				if exists {
+					os.Setenv("CONTAINER", orig)
+				}
+			}()
 
 			testClient := &client{}
 			result := testClient.detectRuntimeByEnv()
