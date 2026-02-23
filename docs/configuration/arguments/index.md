@@ -762,8 +762,8 @@ Supports multiple URLs via comma-separated values or multiple flags.
 ```text
              Argument: --notification-url
  Environment Variable: WATCHTOWER_NOTIFICATION_URL
-                  Type: String (comma-separated or multiple flags)
-               Default: None
+                 Type: String (comma-separated or multiple flags)
+              Default: None
 ```
 
 !!! Note "Multiple Notification URLs"
@@ -877,7 +877,7 @@ Sets the timeout (e.g., `30s`) before forcibly stopping a container during updat
             Argument: --stop-timeout
 Environment Variable: WATCHTOWER_TIMEOUT
                 Type: Duration
-              Default: 30s
+             Default: 30s
 ```
 
 ### Lifecycle UID
@@ -888,7 +888,7 @@ Sets the default user ID to run lifecycle hooks as when no container-specific UI
             Argument: --lifecycle-uid
 Environment Variable: WATCHTOWER_LIFECYCLE_UID
                 Type: Integer
-              Default: None
+             Default: None
 ```
 
 !!! Note
@@ -904,7 +904,7 @@ Sets the default group ID to run lifecycle hooks as when no container-specific G
             Argument: --lifecycle-gid
 Environment Variable: WATCHTOWER_LIFECYCLE_GID
                 Type: Integer
-              Default: None
+             Default: None
 ```
 
 !!! Note
