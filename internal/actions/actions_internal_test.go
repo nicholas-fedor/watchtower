@@ -1527,32 +1527,32 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 // 2. All remaining containers are added to the failed map with wrapped errors
 // 3. Edge cases (cancellation at start, middle, end) are handled correctly.
 //
-// Important: When context is canceled at index i, the function adds containers
-// from i-1 down to 0 to the failed map. The current container at index i is NOT
-// processed (neither stopped nor added to failed).
+// Important: When context is canceled at index i, the function adds the current container
+// at index i to the failed map, then adds containers from i-1 down to 0.
+// All containers from i down to 0 are properly logged and tracked as failed.
 var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 	ginkgo.When("context is canceled during iteration", func() {
 		// Table-driven tests for various cancellation scenarios.
 		// Note: When context is already canceled at the start of iteration (i = len-1),
-		// containers from i-1 down to 0 are added to failed, but the container at i is not.
+		// all containers from i down to 0 are added to failed.
 		testCases := []stopContainersTestCase{
 			{
 				name:                "cancellation_at_start_all_skipped",
 				numContainers:       3,
-				cancelAtIndex:       0, // Context already canceled - at i=2, containers 1,0 are skipped
+				cancelAtIndex:       0, // Context already canceled - at i=2, containers 2,1,0 are skipped
 				expectedStopped:     0,
-				expectedSkipped:     2, // containers 1 and 0 are added to failed
-				expectedLogMessages: 2,
-				description:         "When context is canceled at the start, remaining containers should be skipped",
+				expectedSkipped:     3, // containers 2, 1, and 0 are added to failed
+				expectedLogMessages: 3,
+				description:         "When context is canceled at the start, all containers should be skipped",
 			},
 			{
 				name:                "cancellation_in_middle_partial_skip",
 				numContainers:       5,
-				cancelAtIndex:       0, // Context already canceled - at i=4, containers 3,2,1,0 are skipped
+				cancelAtIndex:       0, // Context already canceled - at i=4, containers 4,3,2,1,0 are skipped
 				expectedStopped:     0,
-				expectedSkipped:     4, // containers 3,2,1,0 are added to failed
-				expectedLogMessages: 4,
-				description:         "When context is canceled mid-iteration, remaining containers should be skipped",
+				expectedSkipped:     5, // containers 4,3,2,1,0 are added to failed
+				expectedLogMessages: 5,
+				description:         "When context is canceled mid-iteration, all containers should be skipped",
 			},
 			{
 				name:                "cancellation_at_end_no_skip",
@@ -1566,10 +1566,10 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 			{
 				name:                "single_container_canceled",
 				numContainers:       1,
-				cancelAtIndex:       0, // Context already canceled - at i=0, no containers to skip (j starts at -1)
+				cancelAtIndex:       0, // Context already canceled - at i=0, container 0 is skipped
 				expectedStopped:     0,
-				expectedSkipped:     0, // No containers added to failed (j loop doesn't execute)
-				expectedLogMessages: 0,
+				expectedSkipped:     1, // container 0 is added to failed
+				expectedLogMessages: 1,
 				description:         "Single container scenario with cancellation",
 			},
 			{
@@ -1682,8 +1682,9 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 		ginkgo.It("should add remaining containers to failed map with wrapped error", func() {
 			// Create 4 containers.
 			// When context is already canceled at the start:
-			// - At i=3, ctx.Err() != nil, so containers 2,1,0 are added to failed
-			// - Container 3 is NOT processed (neither stopped nor failed)
+			// - At i=3, ctx.Err() != nil, so container 3 is added to failed
+			// - Then containers 2,1,0 are also added to failed
+			// - All 4 containers are properly tracked as failed
 			containers := make([]types.Container, 4)
 
 			for i := range 4 {
@@ -1733,12 +1734,12 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 				types.UpdateParams{},
 			)
 
-			// 3 containers should be in failed map (containers 0, 1, 2).
-			gomega.Expect(failed).To(gomega.HaveLen(3))
+			// All 4 containers should be in failed map (containers 0, 1, 2, 3).
+			gomega.Expect(failed).To(gomega.HaveLen(4))
 			gomega.Expect(stopped).To(gomega.BeEmpty())
 
-			// Verify containers 0, 1, 2 are in failed map with wrapped error.
-			for i := range 3 {
+			// Verify all containers 0, 1, 2, 3 are in failed map with wrapped error.
+			for i := range 4 {
 				containerID := types.ContainerID(fmt.Sprintf("container-%d", i))
 				err, exists := failed[containerID]
 				gomega.Expect(exists).To(gomega.BeTrue(), "Container %d should be in failed map", i)
@@ -1750,19 +1751,16 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 				gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue(),
 					"Error should wrap context.Canceled")
 			}
-
-			// Container 3 should NOT be in failed map (it was the current container when context was checked).
-			_, exists := failed[types.ContainerID("container-3")]
-			gomega.Expect(exists).To(gomega.BeFalse(), "Container 3 should NOT be in failed map")
 		})
 
 		ginkgo.It("should log each skipped container with correct fields", func() {
 			// Create containers.
 			// When context is already canceled at the start:
-			// - At i=2, ctx.Err() != nil, so containers 1,0 are logged and added to failed
-			// - Container 2 is NOT processed
+			// - At i=2, ctx.Err() != nil, so container 2 is logged and added to failed
+			// - Then containers 1,0 are also logged and added to failed
+			// - All 3 containers are properly logged
 			containers := make([]types.Container, 3)
-			expectedNames := []string{"container-0", "container-1"} // Only 0 and 1 are logged
+			expectedNames := []string{"container-0", "container-1", "container-2"} // All 3 are logged
 
 			for i := range 3 {
 				c := mockActions.CreateMockContainerWithConfig(
@@ -1828,18 +1826,14 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 				}
 			}
 
-			// Verify containers 0 and 1 were logged (container 2 was the current one when canceled).
+			// Verify all containers were logged.
 			for _, name := range expectedNames {
 				gomega.Expect(loggedNames).To(gomega.HaveKey(name),
 					"Container %s should have been logged", name)
 			}
 
-			// Container 2 should NOT be logged.
-			gomega.Expect(loggedNames).NotTo(gomega.HaveKey("container-2"),
-				"Container 2 should NOT have been logged")
-
 			// Verify we got the expected number of log messages.
-			gomega.Expect(loggedNames).To(gomega.HaveLen(2))
+			gomega.Expect(loggedNames).To(gomega.HaveLen(3))
 		})
 	})
 
