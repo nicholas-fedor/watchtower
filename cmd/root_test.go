@@ -378,6 +378,7 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 		// Simulate scheduled update (longer duration)
 		go func() {
 			v := <-updateLock
+
 			t.Log("Scheduled: acquired lock")
 			close(scheduledStarted)
 			synctest.Wait() // Simulate scheduled update work
@@ -449,6 +450,7 @@ func TestConcurrentScheduledAndTargetedAPIUpdate(t *testing.T) {
 		// Simulate scheduled update (longer duration)
 		go func() {
 			v := <-updateLock
+
 			t.Log("Scheduled: acquired lock")
 			close(scheduledStarted)
 			synctest.Wait() // Simulate scheduled update work

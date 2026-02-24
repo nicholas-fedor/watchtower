@@ -694,48 +694,74 @@ func TestConcurrentRequests(t *testing.T) {
 
 			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
 		}
-		handler := update.New(mockUpdateFn, nil)
+
+		customLock := make(chan bool, 1)
+		customLock <- true
+
+		handler := update.New(mockUpdateFn, customLock)
 
 		// With a lock of capacity 1, only one request succeeds;
 		// the rest get 429.
-		successCount := atomic.Int32{}
-		rejectedCount := atomic.Int32{}
+		results := make(chan int, 3)
 
-		for range 3 {
+		// Start first request and let it acquire the lock.
+		go func() {
+			localRec := httptest.NewRecorder()
+			localReq := httptest.NewRequest(
+				http.MethodPost,
+				"/v1/update",
+				nil,
+			)
+			handler.Handle(localRec, localReq)
+
+			results <- localRec.Code
+		}()
+
+		// Give the first goroutine time to acquire the lock and start sleeping.
+		time.Sleep(10 * time.Millisecond)
+
+		// Now fire the remaining requests; they should all get 429.
+		for range 2 {
 			go func() {
 				localRec := httptest.NewRecorder()
 				localReq := httptest.NewRequest(
 					http.MethodPost,
 					"/v1/update",
-					bytes.NewBufferString("test body"),
+					nil,
 				)
 				handler.Handle(localRec, localReq)
 
-				switch localRec.Code {
-				case http.StatusOK:
-					successCount.Add(1)
-				case http.StatusTooManyRequests:
-					rejectedCount.Add(1)
-				default:
-					t.Errorf("unexpected status code: %d", localRec.Code)
-				}
+				results <- localRec.Code
 			}()
 		}
 
-		synctest.Wait()
+		// Advance fake time past the 1-second sleep so the first goroutine completes.
+		time.Sleep(2 * time.Second)
+
+		// Collect all results.
+		successCount := 0
+		rejectedCount := 0
+
+		for range 3 {
+			code := <-results
+
+			switch code {
+			case http.StatusOK:
+				successCount++
+			case http.StatusTooManyRequests:
+				rejectedCount++
+			default:
+				t.Errorf("unexpected status code: %d", code)
+			}
+		}
 
 		// With a capacity-1 lock, exactly one request succeeds.
-		if successCount.Load() != 1 {
-			t.Errorf("expected exactly 1 successful request, got %d", successCount.Load())
+		if successCount != 1 {
+			t.Errorf("expected exactly 1 successful request, got %d", successCount)
 		}
 
-		if rejectedCount.Load() != 2 {
-			t.Errorf("expected 2 rejected requests, got %d", rejectedCount.Load())
-		}
-
-		total := successCount.Load() + rejectedCount.Load()
-		if total != 3 {
-			t.Errorf("expected 3 total responses, got %d", total)
+		if rejectedCount != 2 {
+			t.Errorf("expected 2 rejected requests, got %d", rejectedCount)
 		}
 	})
 }
