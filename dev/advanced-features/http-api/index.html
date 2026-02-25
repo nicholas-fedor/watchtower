@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../../assets/media/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
     
     
       
@@ -1129,6 +1129,50 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#http_status_codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Status Codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error_response_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Response Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#concurrency_behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_429_response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example 429 Response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1523,6 +1567,50 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#http_status_codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP Status Codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error_response_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Response Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#concurrency_behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_429_response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example 429 Response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1749,6 +1837,75 @@
 <li><code>timestamp</code>: UTC timestamp when the response was generated (RFC3339 format)</li>
 <li><code>api_version</code>: API version identifier</li>
 </ul>
+<h4 id="http_status_codes">HTTP Status Codes<a class="headerlink" href="#http_status_codes" title="Permanent link">&para;</a></h4>
+<p>The <code>/v1/update</code> endpoint returns the following HTTP status codes:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Status Code</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">200</td>
+<td style="text-align: left;">Update completed successfully</td>
+</tr>
+<tr>
+<td style="text-align: center;">429</td>
+<td style="text-align: left;">Another update is already in progress (full updates only)</td>
+</tr>
+<tr>
+<td style="text-align: center;">500</td>
+<td style="text-align: left;">Internal server error during request processing</td>
+</tr>
+</tbody>
+</table>
+<h4 id="error_response_format">Error Response Format<a class="headerlink" href="#error_response_format" title="Permanent link">&para;</a></h4>
+<p>When an error occurs, the API returns a JSON response with the following structure:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;another update is already running&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">&quot;api_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-01-20T11:30:45Z&quot;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Error Response Fields:</strong></p>
+<ul>
+<li><code>error</code>: A human-readable error message describing what went wrong</li>
+<li><code>api_version</code>: API version identifier</li>
+<li><code>timestamp</code>: UTC timestamp when the error response was generated (RFC3339 format)</li>
+</ul>
+<h4 id="concurrency_behavior">Concurrency Behavior<a class="headerlink" href="#concurrency_behavior" title="Permanent link">&para;</a></h4>
+<p>The <code>/v1/update</code> endpoint handles concurrent requests differently based on whether targeted or full updates are being performed:</p>
+<p><strong>Full Updates (no <code>?image=</code> parameter):</strong></p>
+<ul>
+<li>Returns HTTP 429 immediately if another update is already in progress</li>
+<li>Includes a <code>Retry-After: 30</code> header suggesting when to retry the request</li>
+<li>Does not block or wait for the existing update to complete</li>
+</ul>
+<p><strong>Targeted Updates (with <code>?image=</code> parameter):</strong></p>
+<ul>
+<li>Blocks until the update lock is available</li>
+<li>Waits for any in-progress update to complete before proceeding</li>
+<li>Does not return HTTP 429</li>
+</ul>
+<p>This behavior ensures that full updates (which may be resource-intensive) are not queued up, while targeted updates (which are typically faster) can wait for their turn.</p>
+<h4 id="example_429_response">Example 429 Response<a class="headerlink" href="#example_429_response" title="Permanent link">&para;</a></h4>
+<p>The following example shows what happens when a full update is requested while another update is already running:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-i<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
+</code></pre></div>
+<p>Response:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">429</span> <span class="ne">Too Many Requests</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="na">Retry-After</span><span class="o">:</span> <span class="l">30</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">{</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;another update is already running&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">&quot;api_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-01-20T11:30:45Z&quot;</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+</code></pre></div>
+<p>The client should wait at least 30 seconds (as indicated by the <code>Retry-After</code> header) before attempting another request.</p>
 <h4 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h4>
 <h5 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h5>
 <p>Watchtower uses token-based, header authentication for the HTTP API.</p>
@@ -1764,56 +1921,56 @@ The host must be a valid IP address (IPv4 or IPv6).</p>
 <ul>
 <li>Listen on all interfaces on port 8080 (default):</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>--http-api-port<span class="o">=</span><span class="m">8080</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>--http-api-port<span class="o">=</span><span class="m">8080</span>
 </code></pre></div>
 <ul>
 <li>Listen on localhost only on port 8080:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>--http-api-host<span class="o">=</span><span class="m">127</span>.0.0.1<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">8080</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>--http-api-host<span class="o">=</span><span class="m">127</span>.0.0.1<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">8080</span>
 </code></pre></div>
 <ul>
 <li>Listen on a specific IP and port:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>--http-api-host<span class="o">=</span><span class="m">192</span>.168.1.100<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">9090</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>--http-api-host<span class="o">=</span><span class="m">192</span>.168.1.100<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">9090</span>
 </code></pre></div>
 <h4 id="image_parameter_usage">Image Parameter Usage<a class="headerlink" href="#image_parameter_usage" title="Permanent link">&para;</a></h4>
 <p>Watchtower supports using the <code>image</code> URL query parameter to filter updates for only certain images.</p>
 <h5 id="no_image_filtering">No Image Filtering<a class="headerlink" href="#no_image_filtering" title="Permanent link">&para;</a></h5>
 <p>The following <code>curl</code> command would trigger an update of all container images monitored by Watchtower:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
 </code></pre></div>
 <h5 id="image_filtering_with_tags">Image Filtering with Tags<a class="headerlink" href="#image_filtering_with_tags" title="Permanent link">&para;</a></h5>
 <p>You can specify image tags to target containers running a specific version (e.g., <code>foo/bar:1.0</code>).</p>
 <p>For example, to update only containers using <code>foo/bar:1.0</code> and <code>foo/baz:latest</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar:1.0,foo/baz:latest
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar:1.0,foo/baz:latest
 </code></pre></div>
 <h5 id="image_filtering_without_tags">Image Filtering without Tags<a class="headerlink" href="#image_filtering_without_tags" title="Permanent link">&para;</a></h5>
 <p>If no tag is provided, Watchtower matches containers regardless of their tag.</p>
 <p>The following <code>curl</code> command would trigger an update for the images <code>foo/bar</code> and <code>foo/baz</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar,foo/baz
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar,foo/baz
 </code></pre></div>
 <h4 id="scheduled_updates">Scheduled Updates<a class="headerlink" href="#scheduled_updates" title="Permanent link">&para;</a></h4>
 <p>By default, enabling this mode prevents periodic polls (i.e. <a href="../../configuration/arguments/#schedule">scheduled</a> or <a href="../../configuration/arguments/#poll_interval">interval</a> polling).
 Use the <a href="../../configuration/arguments/#http_api_periodic_polls">HTTP API Periodic Polls</a> configuration option to allow both API-triggered and scheduled updates.</p>
 <h4 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h4>
-<div class="highlight"><span class="filename">Example Docker Compose Configuration</span><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">app-monitored-by-watchtower</span><span class="p">:</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--http-api-update --http-api-metrics</span>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=mytoken</span>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
-<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080:8080</span>
-<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<div class="highlight"><span class="filename">Example Docker Compose Configuration</span><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">app-monitored-by-watchtower</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--http-api-update --http-api-metrics</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=mytoken</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080:8080</span>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -1841,7 +1998,7 @@ Use the <a href="../../configuration/arguments/#http_api_periodic_polls">HTTP AP
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 13, 2025 16:19:07 UTC"><span class="timeago" datetime="2025-12-13T16:19:07+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 13, 2025 16:19:07 UTC">2025-12-13</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="February 25, 2026 00:39:06 UTC"><span class="timeago" datetime="2026-02-25T00:39:06+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="February 25, 2026 00:39:06 UTC">2026-02-25</span>
   </span>
 
     
