@@ -58,6 +58,76 @@ Restarted containers represent containers that were restarted because they have 
 - `timestamp`: UTC timestamp when the response was generated (RFC3339 format)
 - `api_version`: API version identifier
 
+#### HTTP Status Codes
+
+The `/v1/update` endpoint returns the following HTTP status codes:
+
+| Status Code | Description                                               |
+|:-----------:|:----------------------------------------------------------|
+|     200     | Update completed successfully                             |
+|     429     | Another update is already in progress (full updates only) |
+|     500     | Internal server error during request processing           |
+
+#### Error Response Format
+
+When an error occurs, the API returns a JSON response with the following structure:
+
+```json
+{
+  "error": "another update is already running",
+  "api_version": "v1",
+  "timestamp": "2025-01-20T11:30:45Z"
+}
+```
+
+**Error Response Fields:**
+
+- `error`: A human-readable error message describing what went wrong
+- `api_version`: API version identifier
+- `timestamp`: UTC timestamp when the error response was generated (RFC3339 format)
+
+#### Concurrency Behavior
+
+The `/v1/update` endpoint handles concurrent requests differently based on whether targeted or full updates are being performed:
+
+**Full Updates (no `?image=` parameter):**
+
+- Returns HTTP 429 immediately if another update is already in progress
+- Includes a `Retry-After: 30` header suggesting when to retry the request
+- Does not block or wait for the existing update to complete
+
+**Targeted Updates (with `?image=` parameter):**
+
+- Blocks until the update lock is available
+- Waits for any in-progress update to complete before proceeding
+- Does not return HTTP 429
+
+This behavior ensures that full updates (which may be resource-intensive) are not queued up, while targeted updates (which are typically faster) can wait for their turn.
+
+#### Example 429 Response
+
+The following example shows what happens when a full update is requested while another update is already running:
+
+```bash
+curl -i -H "Authorization: Bearer mytoken" localhost:8080/v1/update
+```
+
+Response:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+Retry-After: 30
+
+{
+  "error": "another update is already running",
+  "api_version": "v1",
+  "timestamp": "2025-01-20T11:30:45Z"
+}
+```
+
+The client should wait at least 30 seconds (as indicated by the `Retry-After` header) before attempting another request.
+
 #### Requirements
 
 ##### Authentication
