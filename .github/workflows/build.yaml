@@ -42,7 +42,7 @@ jobs:
           fetch-depth: 0 # Full history for GoReleaser versioning.
 
       - name: Set up Go
-        uses: actions/setup-go@a5f9b05d2d216f63e13859e0d847461041025775
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417
         with:
           go-version-file: "go.mod"
 
