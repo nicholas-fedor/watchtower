@@ -29,7 +29,7 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
       - name: Set up Go
-        uses: actions/setup-go@def8c394e3ad351a79bc93815e4a585520fe993b
+        uses: actions/setup-go@27fdb267c15a8835f1ead03dfa07f89be2bb741a
         with:
           go-version-file: "go.mod"
 
