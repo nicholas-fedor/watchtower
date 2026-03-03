@@ -8,12 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add veeceey as a contributor for code by @allcontributors[bot] in [#1341](https://github.com/nicholas-fedor/watchtower/pull/1341)
+
 ### Changed
 
 - Update api documentation with additional details by @nicholas-fedor in [#1342](https://github.com/nicholas-fedor/watchtower/pull/1342)
 
 ### Chores
 
+- Update transitive dependencies by @nicholas-fedor in [#1373](https://github.com/nicholas-fedor/watchtower/pull/1373)
+- Update docker/setup-buildx-action digest to 9cd4410 by @renovate[bot] in [#1372](https://github.com/nicholas-fedor/watchtower/pull/1372)
+- Update docker/login-action digest to b45d80f by @renovate[bot] in [#1371](https://github.com/nicholas-fedor/watchtower/pull/1371)
+- Update docker/login-action digest to cad8984 by @renovate[bot] in [#1370](https://github.com/nicholas-fedor/watchtower/pull/1370)
+- Update docker/setup-buildx-action digest to 1282d41 by @renovate[bot] in [#1368](https://github.com/nicholas-fedor/watchtower/pull/1368)
+- Update golangci/golangci-lint-action digest to b7bcab6 by @renovate[bot] in [#1367](https://github.com/nicholas-fedor/watchtower/pull/1367)
+- Update docker/setup-qemu-action digest to 1ea3db7 by @renovate[bot] in [#1366](https://github.com/nicholas-fedor/watchtower/pull/1366)
+- Update nicholas-fedor/govulncheck-action digest to 1ffd170 by @renovate[bot] in [#1365](https://github.com/nicholas-fedor/watchtower/pull/1365)
+- Update actions/setup-go digest to 27fdb26 by @renovate[bot] in [#1364](https://github.com/nicholas-fedor/watchtower/pull/1364)
+- Update github/codeql-action digest to c793b71 by @renovate[bot] in [#1363](https://github.com/nicholas-fedor/watchtower/pull/1363)
+- Update crazy-max/ghaction-import-gpg digest to 92a10f9 by @renovate[bot] in [#1362](https://github.com/nicholas-fedor/watchtower/pull/1362)
+- Update securego/gosec action to v2.24.7 by @renovate[bot] in [#1361](https://github.com/nicholas-fedor/watchtower/pull/1361)
+- Update peter-evans/create-pull-request digest to 3499eb6 by @renovate[bot] in [#1360](https://github.com/nicholas-fedor/watchtower/pull/1360)
+- Update goreleaser/goreleaser-action digest to 4be059c by @renovate[bot] in [#1359](https://github.com/nicholas-fedor/watchtower/pull/1359)
+- Update securego/gosec action to v2.24.6 by @renovate[bot] in [#1358](https://github.com/nicholas-fedor/watchtower/pull/1358)
+- Update securego/gosec action to v2.24.4 by @renovate[bot] in [#1357](https://github.com/nicholas-fedor/watchtower/pull/1357)
+- Update peter-evans/create-pull-request digest to 3f3b473 by @renovate[bot] in [#1356](https://github.com/nicholas-fedor/watchtower/pull/1356)
+- Update golangci/golangci-lint-action digest to b207e52 by @renovate[bot] in [#1355](https://github.com/nicholas-fedor/watchtower/pull/1355)
+- Update actions/attest-build-provenance digest to c5efebd by @renovate[bot] in [#1353](https://github.com/nicholas-fedor/watchtower/pull/1353)
+- Update securego/gosec action to v2.24.0 by @renovate[bot] in [#1352](https://github.com/nicholas-fedor/watchtower/pull/1352)
+- Update actions/attest-build-provenance digest to a2bbfa2 by @renovate[bot] in [#1351](https://github.com/nicholas-fedor/watchtower/pull/1351)
+- Update nicholas-fedor/govulncheck-action digest to c6b69a0 by @renovate[bot] in [#1350](https://github.com/nicholas-fedor/watchtower/pull/1350)
+- Update actions/setup-go digest to def8c39 by @renovate[bot] in [#1349](https://github.com/nicholas-fedor/watchtower/pull/1349)
+- Update actions/attest-build-provenance digest to 0856891 by @renovate[bot] in [#1348](https://github.com/nicholas-fedor/watchtower/pull/1348)
+- Update nicholas-fedor/govulncheck-action digest to 15fce97 by @renovate[bot] in [#1347](https://github.com/nicholas-fedor/watchtower/pull/1347)
+- Update actions/setup-go digest to 4b73464 by @renovate[bot] in [#1346](https://github.com/nicholas-fedor/watchtower/pull/1346)
+- Update indirect Go dependencies by @nicholas-fedor in [#1343](https://github.com/nicholas-fedor/watchtower/pull/1343)
+- Update golangci/golangci-lint-action digest to 02d66c3 by @renovate[bot] in [#1344](https://github.com/nicholas-fedor/watchtower/pull/1344)
 - Update cimg/go:1.26.0 docker digest to e82c772 by @renovate[bot] in [#1340](https://github.com/nicholas-fedor/watchtower/pull/1340)
 - Update goreleaser/goreleaser-action digest to 6c92f1d by @renovate[bot] in [#1339](https://github.com/nicholas-fedor/watchtower/pull/1339)
 - Update goreleaser/goreleaser-action digest to ff4cb9c by @renovate[bot] in [#1338](https://github.com/nicholas-fedor/watchtower/pull/1338)
