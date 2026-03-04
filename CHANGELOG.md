@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update docker/setup-qemu-action digest to ce36039 by @renovate[bot] in [#1379](https://github.com/nicholas-fedor/watchtower/pull/1379)
+
+## [1.14.3] - 2026-03-04
+
 ### Added
 
 - Add veeceey as a contributor for code by @allcontributors[bot] in [#1341](https://github.com/nicholas-fedor/watchtower/pull/1341)
@@ -2724,7 +2730,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.2...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.3...HEAD)
+- [1.14.3](https://github.com/nicholas-fedor/watchtower/compare/v1.14.2...v1.14.3)
 - [1.14.2](https://github.com/nicholas-fedor/watchtower/compare/v1.14.1...v1.14.2)
 - [1.14.1](https://github.com/nicholas-fedor/watchtower/compare/v1.14.0...v1.14.1)
 - [1.14.0](https://github.com/nicholas-fedor/watchtower/compare/v1.13.1...v1.14.0)
