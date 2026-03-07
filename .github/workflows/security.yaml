@@ -13,12 +13,6 @@ on:
       - go.mod
       - go.sum
 
-permissions:
-  contents: read
-  actions: read
-  pull-requests: read
-  security-events: write
-
 env:
   OUTPUT_FILE: results.sarif
 
@@ -26,20 +20,18 @@ jobs:
   gosec:
     name: Golang Security Checker
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout Source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Run Gosec Security Scanner
         uses: securego/gosec@bb17e422fc34bf4c0a2e5cab9d07dc45a68c040c # v2.24.7
         with:
           args: "-no-fail -fmt sarif -out results.sarif ./..."
-      # Gosec generates SARIF output where some rules (e.g., G704) are missing
-      # the 'relationships' field, causing GitHub CodeQL upload validation to fail.
-      # This step adds empty relationships arrays to rules that lack them.
-      - name: Fix gosec SARIF output
-        run: |
-          jq '(.runs[0].tool.driver.rules // []) |= map(if has("relationships") then .relationships = (.relationships // [] | map(select(. != null))) else . end)' results.sarif > results-fixed.sarif
-          mv results-fixed.sarif results.sarif
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98 # v4
         with:
@@ -49,6 +41,9 @@ jobs:
   govulncheck:
     name: govulncheck
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - id: govulncheck
         uses: nicholas-fedor/govulncheck-action@ac1aadb2de6d6c598286e6b50f7dfcfd8b5ac33e
@@ -56,7 +51,6 @@ jobs:
           output-format: sarif
           output-file: ${{ env.OUTPUT_FILE }}
           go-version-file: "go.mod"
-          go-version-input: ""
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98 # v4
