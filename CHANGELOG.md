@@ -8,8 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Refactor and cleanup security workflow by @nicholas-fedor in [#1397](https://github.com/nicholas-fedor/watchtower/pull/1397)
+
 ### Chores
 
+- Update nicholas-fedor/govulncheck-action digest to ac1aadb by @renovate[bot] in [#1396](https://github.com/nicholas-fedor/watchtower/pull/1396)
+- Update docker/setup-buildx-action digest to 8f54c6f by @renovate[bot] in [#1395](https://github.com/nicholas-fedor/watchtower/pull/1395)
+- Update golang docker tag to v1.26.1 by @renovate[bot] in [#1394](https://github.com/nicholas-fedor/watchtower/pull/1394)
+- Update dependency go to v1.26.1 by @renovate[bot] in [#1393](https://github.com/nicholas-fedor/watchtower/pull/1393)
+- Update nicholas-fedor/go-proxy-pull-action digest to 66b03fb by @renovate[bot] in [#1392](https://github.com/nicholas-fedor/watchtower/pull/1392)
+- Update golang:alpine docker digest to 2389ebf by @renovate[bot] in [#1391](https://github.com/nicholas-fedor/watchtower/pull/1391)
+- Update module github.com/docker/cli to v29.3.0+incompatible by @renovate[bot] in [#1390](https://github.com/nicholas-fedor/watchtower/pull/1390)
+- Update github/codeql-action digest to 0d579ff by @renovate[bot] in [#1389](https://github.com/nicholas-fedor/watchtower/pull/1389)
+- Update docker/login-action digest to db14339 by @renovate[bot] in [#1388](https://github.com/nicholas-fedor/watchtower/pull/1388)
+- Update peter-evans/create-pull-request digest to a45d1fb by @renovate[bot] in [#1387](https://github.com/nicholas-fedor/watchtower/pull/1387)
+- Update docker/setup-qemu-action digest to 72cd565 by @renovate[bot] in [#1386](https://github.com/nicholas-fedor/watchtower/pull/1386)
+- Update docker/setup-buildx-action digest to 2ae358d by @renovate[bot] in [#1385](https://github.com/nicholas-fedor/watchtower/pull/1385)
+- Update docker/login-action digest to e46b7e3 by @renovate[bot] in [#1384](https://github.com/nicholas-fedor/watchtower/pull/1384)
+- Update docker/setup-buildx-action digest to 28a438e by @renovate[bot] in [#1383](https://github.com/nicholas-fedor/watchtower/pull/1383)
+- Update actions/attest-build-provenance digest to 10334b5 by @renovate[bot] in [#1381](https://github.com/nicholas-fedor/watchtower/pull/1381)
 - Update docker/setup-qemu-action digest to ce36039 by @renovate[bot] in [#1379](https://github.com/nicholas-fedor/watchtower/pull/1379)
 
 ## [1.14.3] - 2026-03-04
