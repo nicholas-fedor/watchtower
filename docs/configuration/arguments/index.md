@@ -26,6 +26,9 @@ docker run --rm \
 
 This command triggers an update attempt for "nginx" and "redis" containers, displays debug output, and removes the Watchtower container upon completion. Without arguments, Watchtower monitors all running containers.
 
+!!! Note
+    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching) for details.
+
 ## Secrets/Files
 
 Certain flags support referencing a file, using its contents as the value, to securely handle sensitive data like passwords or tokens, avoiding exposure in configuration files or command lines.
@@ -406,6 +409,9 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
                 Type: Comma- or space-separated string list
              Default: None
 ```
+
+!!! Note
+    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex-pattern-matching) for details.
 
 ### Scope Filter
 
