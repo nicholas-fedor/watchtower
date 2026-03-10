@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../../assets/media/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -2959,6 +2959,10 @@ To limit monitoring to specific containers, provide their names as arguments whe
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span>nginx<span class="w"> </span>redis
 </code></pre></div>
 <p>This command triggers an update attempt for "nginx" and "redis" containers, displays debug output, and removes the Watchtower container upon completion. Without arguments, Watchtower monitors all running containers.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Regex patterns are supported. See <a href="../container-selection/#regex_pattern_matching">Regex Pattern Matching</a> for details.</p>
+</div>
 <h2 id="secretsfiles">Secrets/Files<a class="headerlink" href="#secretsfiles" title="Permanent link">&para;</a></h2>
 <p>Certain flags support referencing a file, using its contents as the value, to securely handle sensitive data like passwords or tokens, avoiding exposure in configuration files or command lines.</p>
 <table>
@@ -3270,6 +3274,10 @@ Without <code>--label-enable</code>, containers with this label set to <code>fal
 <a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>                Type: Comma- or space-separated string list
 <a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>             Default: None
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Regex patterns are supported. See <a href="../container-selection/#regex-pattern-matching">Regex Pattern Matching</a> for details.</p>
+</div>
 <h3 id="scope_filter">Scope Filter<a class="headerlink" href="#scope_filter" title="Permanent link">&para;</a></h3>
 <p>Monitors containers with a <code>com.centurylinklabs.watchtower.scope</code> label matching the specified value, enabling multiple Watchtower instances.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>            Argument: --scope
@@ -3690,7 +3698,7 @@ Do not use on the main command line.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 29, 2026 05:03:12 UTC"><span class="timeago" datetime="2026-01-29T05:03:12+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 29, 2026 05:03:12 UTC">2026-01-29</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 10, 2026 13:28:23 UTC"><span class="timeago" datetime="2026-03-10T13:28:23+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 10, 2026 13:28:23 UTC">2026-03-10</span>
   </span>
 
     

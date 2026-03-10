@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../../assets/media/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -814,6 +814,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#regex_pattern_matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regex Pattern Matching
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Regex Pattern Matching">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Syntax
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1336,6 +1375,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#regex_pattern_matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regex Pattern Matching
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Regex Pattern Matching">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Syntax
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1426,6 +1504,59 @@ A container is monitored if all criteria are met.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.monitor-only<span class="o">=</span><span class="nb">true</span><span class="w"> </span>someimage
 </code></pre></div>
 <p>When the label is specified on a container, Watchtower treats that container exactly as if <a href="../arguments/#monitor_only"><code>WATCHTOWER_MONITOR_ONLY</code></a> was set, but the effect is limited to the individual container.</p>
+<h2 id="regex_pattern_matching">Regex Pattern Matching<a class="headerlink" href="#regex_pattern_matching" title="Permanent link">&para;</a></h2>
+<p>Both container inclusion (positional arguments) and exclusion  (<a href="../arguments/#disable_specific_containers"><code>--disable-containers</code>/<code>WATCHTOWER_DISABLE_CONTAINERS</code></a>) support regular expression patterns for matching container names.</p>
+<div class="admonition note">
+<p class="admonition-title">Patterns are anchored to match the <strong>full container name</strong></p>
+<p>Use <code>.*</code> (period + asterisk) for wildcards instead of just an <code>*</code> (asterisk)</p>
+</div>
+<h3 id="syntax">Syntax<a class="headerlink" href="#syntax" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Patterns use <a href="https://pkg.go.dev/regexp/syntax">Go regex syntax</a></li>
+<li>Patterns are anchored to match the <strong>entire</strong> container name</li>
+<li>Invalid regex patterns fall back to literal string matching</li>
+</ul>
+<h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Matches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>container.*</code></td>
+<td>"container1", "container-abc", "mycontainer"</td>
+</tr>
+<tr>
+<td><code>.*-dev</code></td>
+<td>"web-dev", "api-dev", "db-dev"</td>
+</tr>
+<tr>
+<td><code>.*</code></td>
+<td>Any container name</td>
+</tr>
+<tr>
+<td><code>nginx|redis</code></td>
+<td>Either "nginx" or "redis"</td>
+</tr>
+<tr>
+<td><code>^web-.*$</code></td>
+<td>All containers starting with "web-"</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Exclude all containers starting with a specific prefix:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_DISABLE_CONTAINERS</span><span class="o">=</span><span class="s2">&quot;web-.*&quot;</span><span class="w"> </span>nickfedor/watchtower
+</code></pre></div>
+<ul>
+<li>Include only containers matching a pattern:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>watchtower<span class="w"> </span><span class="s2">&quot;db-.*&quot;</span><span class="w"> </span><span class="s2">&quot;cache-.*&quot;</span>
+</code></pre></div>
 
 
 
@@ -1448,7 +1579,7 @@ A container is monitored if all criteria are met.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 10, 2026 13:28:23 UTC"><span class="timeago" datetime="2026-03-10T13:28:23+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 10, 2026 13:28:23 UTC">2026-03-10</span>
   </span>
 
     
