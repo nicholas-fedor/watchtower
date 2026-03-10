@@ -85,3 +85,38 @@ docker run -d --label=com.centurylinklabs.watchtower.monitor-only=true someimage
 ```
 
 When the label is specified on a container, Watchtower treats that container exactly as if [`WATCHTOWER_MONITOR_ONLY`](../arguments/index.md#monitor_only) was set, but the effect is limited to the individual container.
+
+## Regex Pattern Matching
+
+Both container inclusion (positional arguments) and exclusion  ([`--disable-containers`/`WATCHTOWER_DISABLE_CONTAINERS`](../arguments/index.md#disable_specific_containers)) support regular expression patterns for matching container names.
+
+!!! Note "Patterns are anchored to match the **full container name**"
+    Use `.*` (period + asterisk) for wildcards instead of just an `*` (asterisk)
+
+### Syntax
+
+- Patterns use [Go regex syntax](https://pkg.go.dev/regexp/syntax)
+- Patterns are anchored to match the **entire** container name
+- Invalid regex patterns fall back to literal string matching
+
+### Examples
+
+| Pattern | Matches |
+|---------|---------|
+| `container.*` | "container1", "container-abc", "mycontainer" |
+| `.*-dev` | "web-dev", "api-dev", "db-dev" |
+| `.*` | Any container name |
+| `nginx|redis` | Either "nginx" or "redis" |
+| `^web-.*$` | All containers starting with "web-" |
+
+- Exclude all containers starting with a specific prefix:
+
+```bash
+docker run -d -e WATCHTOWER_DISABLE_CONTAINERS="web-.*" nickfedor/watchtower
+```
+
+- Include only containers matching a pattern:
+
+```bash
+watchtower "db-.*" "cache-.*"
+```
