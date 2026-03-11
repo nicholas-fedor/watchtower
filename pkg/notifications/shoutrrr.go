@@ -478,6 +478,14 @@ func (n *shoutrrrTypeNotifier) Close() {
 	n.closeOnce.Do(func() {
 		n.closed.Store(true)
 
+		// If no worker goroutine exists, skip waiting and cancel immediately.
+		if !n.receiving.Load() {
+			LocalLog.Debug("No notification worker running, canceling context immediately")
+			n.cancel()
+
+			return
+		}
+
 		// Signal goroutine to stop processing new messages.
 		if n.stop != nil {
 			LocalLog.Debug("Closing stop channel to signal shutdown")
@@ -499,11 +507,9 @@ func (n *shoutrrrTypeNotifier) Close() {
 		n.cancel()
 
 		// Wait for the goroutine to finish.
-		if n.receiving.Load() {
-			LocalLog.Debug("Waiting for the notification goroutine to finish")
+		LocalLog.Debug("Waiting for the notification goroutine to finish")
 
-			<-n.done
-		}
+		<-n.done
 	})
 }
 
