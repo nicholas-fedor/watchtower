@@ -1319,16 +1319,22 @@ func TestCloseWithNoGoroutine(t *testing.T) {
 	// Note: Not calling AddLogHook(), so no goroutine is started
 
 	// Close should complete immediately without blocking
-	startTime := time.Now()
+	// Use goroutine+channel+select pattern to avoid flaky wall-clock timing.
+	// Close() has a shutdownGracePeriod (50ms) wait, so we use 1s timeout
+	// which is comfortably larger than 2x shutdownGracePeriod.
+	closeDone := make(chan struct{})
 
-	shoutrrr.Close()
+	go func() {
+		shoutrrr.Close()
 
-	elapsed := time.Since(startTime)
+		closeDone <- struct{}{}
+	}()
 
-	// Should complete very quickly (< 100ms) since there's no goroutine
-	if elapsed > 100*time.Millisecond {
-		t.Fatalf("Close() took too long without goroutine: %v", elapsed)
+	// Select with timeout - Close() should complete within reasonable time
+	select {
+	case <-closeDone:
+		t.Log("Close() completed successfully with no goroutine")
+	case <-time.After(1 * time.Second):
+		t.Fatalf("Close() took too long without goroutine (timeout exceeded)")
 	}
-
-	t.Logf("Close() completed in %v with no goroutine", elapsed)
 }

@@ -326,7 +326,24 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 			}).Trace("Notification goroutine received message from channel")
 
 			LocalLog.WithField("message", msg).Debug("Sending notification")
-			time.Sleep(notifier.delay)
+
+			// Only delay if a positive delay is configured.
+			// Use a context-aware select to allow interruption when the context is canceled.
+			if notifier.delay > 0 {
+				timer := time.NewTimer(notifier.delay)
+
+				select {
+				case <-timer.C:
+					// Delay completed normally - stop the timer
+					timer.Stop()
+				case <-notifier.ctx.Done():
+					// Context canceled - stop the timer and return early
+					timer.Stop()
+					LocalLog.Debug("Context canceled during delay, skipping send")
+
+					return
+				}
+			}
 
 			// Diagnostic logging: Log attempt details before sending
 			LocalLog.WithFields(logrus.Fields{
@@ -452,32 +469,22 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	n.sendEntries(entries, report)
 }
 
-// Close stops queuing and waits for sends to complete.
+// Close gracefully shuts down the Shoutrrr notifier.
 //
-// It uses a shutdown sequence to prevent deadlocks:
-// 1. First, close the stop channel to signal the goroutine to stop processing new messages
-// 2. Then, wait briefly for in-flight messages to complete (allows error logging)
-// 3. Next, cancel the context to unblock any pending Router.Send() calls
-// 4. Finally, wait for the goroutine to finish
-//
-// This method is idempotent and can be called multiple times safely.
+// It signals the notification goroutine to stop, waits for in-flight messages
+// to complete within the grace period, cancels the context to unblock pending sends,
+// and ensures the goroutine has finished before returning.
 func (n *shoutrrrTypeNotifier) Close() {
 	n.closeOnce.Do(func() {
 		n.closed.Store(true)
 
-		// Phase 1: Close the stop channel to signal the goroutine to stop.
-		// This allows the goroutine to drain any remaining messages from the channel
-		// before we cancel the context.
+		// Signal goroutine to stop processing new messages.
 		if n.stop != nil {
 			LocalLog.Debug("Closing stop channel to signal shutdown")
 			close(n.stop)
 		}
 
-		// Phase 2: Wait briefly for in-flight messages to complete.
-		// This gives the goroutine time to process any messages already received
-		// from the channel and log their errors before we cancel the context.
-		// We wait on done channel with a short timeout - if it fires quickly,
-		// the goroutine finished naturally. If not, we proceed to cancel.
+		// Wait for in-flight messages to complete.
 		select {
 		case <-n.done:
 			LocalLog.Debug("Goroutine finished after stop channel closed")
@@ -487,13 +494,11 @@ func (n *shoutrrrTypeNotifier) Close() {
 			LocalLog.Debug("Timeout waiting for goroutine, proceeding with context cancellation")
 		}
 
-		// Phase 3: Cancel context to unblock any pending Router.Send() calls.
-		// This is critical - we must cancel after the brief wait, otherwise we can
-		// deadlock if Router.Send() blocks. The brief wait allows error logging to complete.
+		// Cancel context to unblock pending sends.
 		LocalLog.Debug("Canceling notification context to unblock pending sends")
 		n.cancel()
 
-		// Phase 4: Wait for the goroutine to finish.
+		// Wait for the goroutine to finish.
 		if n.receiving.Load() {
 			LocalLog.Debug("Waiting for the notification goroutine to finish")
 
