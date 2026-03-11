@@ -220,19 +220,9 @@ func EncodeCredentials(authConfig dockerConfig.AuthConfig) (string, error) {
 		"username": authConfig.Username,
 	}
 
-	// Create a local struct for JSON marshaling to produce the standard
-	// Docker auth format: {"username":"user","password":"pass"}
-	authJSON := struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}{
-		Username: authConfig.Username,
-		Password: authConfig.Password,
-	}
-
 	// Marshal the auth config to JSON.
 	//nolint:gosec // G117: This is the expected standard Docker auth format
-	buf, err := json.Marshal(authJSON)
+	buf, err := json.Marshal(authConfig)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to marshal auth config to JSON")
 
