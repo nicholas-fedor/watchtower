@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"text/template"
@@ -1106,4 +1107,228 @@ func getTemplatedResult(tplString string, legacy bool, data Data) string {
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 
 	return msg
+}
+
+// TestShutdownGracePeriodConstant verifies that the shutdownGracePeriod constant is set to 50ms.
+func TestShutdownGracePeriodConstant(t *testing.T) {
+	expectedGracePeriod := 50 * time.Millisecond
+	if shutdownGracePeriod != expectedGracePeriod {
+		t.Fatalf("expected shutdownGracePeriod to be %v, got %v", expectedGracePeriod, shutdownGracePeriod)
+	}
+}
+
+// TestCloseDoesNotHangWithBlockingRouter verifies that Close() completes without hanging
+// when the router is blocked. This tests that the context cancellation properly unblocks
+// the sendWithCancellation call.
+func TestCloseDoesNotHangWithBlockingRouter(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Set up logging
+		logBuffer := gbytes.NewBuffer()
+		logrus.SetOutput(logBuffer)
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableColors:    true,
+			DisableTimestamp: true,
+		})
+
+		// Create a notifier with a blocking router
+		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Wait for goroutine to be blocked
+		synctest.Wait()
+
+		// Verify router is blocked (not yet sent)
+		select {
+		case <-blockingRouter.sent:
+			t.Fatal("message should not have been sent yet")
+		default:
+			// Good - router is blocked
+		}
+
+		// Close should complete without hanging - use a goroutine since it may block briefly
+		closeDone := make(chan error, 1)
+
+		go func() {
+			shoutrrr.Close()
+
+			closeDone <- nil
+		}()
+
+		// Wait for Close to complete (should be fast with synctest)
+		select {
+		case <-closeDone:
+			// Good - Close completed
+			t.Log("Close() completed successfully")
+		case <-time.After(2 * time.Second):
+			t.Fatal("Close() hung - context cancellation did not unblock the goroutine")
+		}
+
+		// Verify context was canceled
+		select {
+		case <-shoutrrr.ctx.Done():
+			t.Log("Context was canceled")
+		default:
+			t.Fatal("expected context to be canceled")
+		}
+
+		// Clean up: unlock the router so the goroutine can exit gracefully
+		blockingRouter.unlock <- true
+
+		// Wait for the done channel to be signaled
+		synctest.Wait()
+
+		select {
+		case <-shoutrrr.done:
+			t.Log("Done channel was signaled")
+		default:
+			t.Fatal("expected done channel to be signaled")
+		}
+	})
+}
+
+// controlledRouter simulates a router that can be controlled via channels for testing.
+// It waits for a continue signal before sending, allowing deterministic testing.
+type controlledRouter struct {
+	continueCh chan struct{}
+	sent       chan bool
+	ctx        context.Context //nolint:containedctx
+}
+
+func (c *controlledRouter) Send(_ string, _ *types.Params) []error {
+	// Signal that we're waiting
+	// Wait for continue signal or context cancellation
+	select {
+	case <-c.continueCh:
+		c.sent <- true
+	case <-c.ctx.Done():
+		// canceled, don't send
+	}
+
+	return nil
+}
+
+// TestGracePeriodAllowsInFlightMessages verifies that in-flight messages have time to complete
+// before context is canceled during the shutdown grace period.
+func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Set up logging
+		logBuffer := gbytes.NewBuffer()
+		logrus.SetOutput(logBuffer)
+		logrus.SetLevel(logrus.TraceLevel)
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableColors:    true,
+			DisableTimestamp: true,
+		})
+
+		// Create a controlled router
+		ctx, cancel := context.WithCancel(context.Background())
+
+		controlledR := &controlledRouter{
+			continueCh: make(chan struct{}, 1),
+			sent:       make(chan bool, 1),
+			ctx:        ctx,
+		}
+
+		tpl, err := getShoutrrrTemplate("", true)
+		if err != nil {
+			cancel()
+			t.Fatal(err)
+		}
+
+		shoutrrr := &shoutrrrTypeNotifier{
+			template:       tpl,
+			messages:       make(chan string, 1),
+			done:           make(chan struct{}),
+			stop:           make(chan struct{}),
+			Router:         controlledR,
+			legacyTemplate: true,
+			params:         &types.Params{},
+			ctx:            ctx,
+			cancel:         cancel,
+			delay:          time.Duration(0),
+			receiving:      atomic.Bool{},
+		}
+		shoutrrr.receiving.Store(true)
+
+		// Start the notification goroutine
+		go sendNotifications(shoutrrr)
+
+		// Queue a message
+		shoutrrr.messages <- "test message"
+
+		// Wait for goroutine to be blocked in router.Send
+		synctest.Wait()
+
+		// Now call Close - this should trigger the grace period wait
+		// We let it proceed by signaling continueCh in a separate goroutine
+		go func() {
+			// Wait a bit to simulate the grace period passing
+			synctest.Wait()
+			// Then allow the message to be sent
+			controlledR.continueCh <- struct{}{}
+		}()
+
+		// Close should complete
+		shoutrrr.Close()
+
+		// Wait for done channel
+		synctest.Wait()
+
+		// Note: Close() already waits for done channel internally (line 500 in shoutrrr.go)
+		// so we don't need to wait for it here. Instead, we verify the message was sent.
+
+		// Verify the message was actually sent by checking controlledR.sent
+		timeout := 2 * time.Second
+		select {
+		case sent := <-controlledR.sent:
+			if !sent {
+				t.Fatal("expected message to be sent during grace period")
+			}
+
+			t.Log("Message was successfully sent during grace period")
+		case <-time.After(timeout):
+			t.Fatalf("expected sent channel to be signaled within %v timeout", timeout)
+		}
+	})
+}
+
+// TestCloseWithNoGoroutine verifies that Close() works correctly when the
+// notification goroutine was never started.
+func TestCloseWithNoGoroutine(t *testing.T) {
+	// Set up logging
+	logBuffer := gbytes.NewBuffer()
+	logrus.SetOutput(logBuffer)
+	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableColors:    true,
+		DisableTimestamp: true,
+	})
+
+	shoutrrr := createNotifier(
+		[]string{"logger://"},
+		allButTrace,
+		"",
+		true,
+		StaticData{},
+		false,
+		time.Duration(0),
+	)
+	// Note: Not calling AddLogHook(), so no goroutine is started
+
+	// Close should complete immediately without blocking
+	startTime := time.Now()
+
+	shoutrrr.Close()
+
+	elapsed := time.Since(startTime)
+
+	// Should complete very quickly (< 100ms) since there's no goroutine
+	if elapsed > 100*time.Millisecond {
+		t.Fatalf("Close() took too long without goroutine: %v", elapsed)
+	}
+
+	t.Logf("Close() completed in %v with no goroutine", elapsed)
 }

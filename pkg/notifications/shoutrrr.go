@@ -36,6 +36,10 @@ const maxURLLengthForLogging = 50
 // messageChannelBufferSize defines the buffer size for the notification message channel.
 const messageChannelBufferSize = 1000
 
+// shutdownGracePeriod defines the time to wait for in-flight messages to complete during shutdown.
+// This allows error logging to complete before canceling the context.
+const shutdownGracePeriod = 50 * time.Millisecond
+
 // LocalLog is a logrus logger that does not send entries as notifications.
 //
 // It’s used for internal logging to avoid notification loops.
@@ -450,23 +454,51 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 
 // Close stops queuing and waits for sends to complete.
 //
-// It closes the stop channel and blocks until done if a goroutine is running.
+// It uses a shutdown sequence to prevent deadlocks:
+// 1. First, close the stop channel to signal the goroutine to stop processing new messages
+// 2. Then, wait briefly for in-flight messages to complete (allows error logging)
+// 3. Next, cancel the context to unblock any pending Router.Send() calls
+// 4. Finally, wait for the goroutine to finish
+//
 // This method is idempotent and can be called multiple times safely.
 func (n *shoutrrrTypeNotifier) Close() {
 	n.closeOnce.Do(func() {
 		n.closed.Store(true)
 
+		// Phase 1: Close the stop channel to signal the goroutine to stop.
+		// This allows the goroutine to drain any remaining messages from the channel
+		// before we cancel the context.
 		if n.stop != nil {
+			LocalLog.Debug("Closing stop channel to signal shutdown")
 			close(n.stop)
 		}
 
+		// Phase 2: Wait briefly for in-flight messages to complete.
+		// This gives the goroutine time to process any messages already received
+		// from the channel and log their errors before we cancel the context.
+		// We wait on done channel with a short timeout - if it fires quickly,
+		// the goroutine finished naturally. If not, we proceed to cancel.
+		select {
+		case <-n.done:
+			LocalLog.Debug("Goroutine finished after stop channel closed")
+
+			return
+		case <-time.After(shutdownGracePeriod):
+			LocalLog.Debug("Timeout waiting for goroutine, proceeding with context cancellation")
+		}
+
+		// Phase 3: Cancel context to unblock any pending Router.Send() calls.
+		// This is critical - we must cancel after the brief wait, otherwise we can
+		// deadlock if Router.Send() blocks. The brief wait allows error logging to complete.
+		LocalLog.Debug("Canceling notification context to unblock pending sends")
+		n.cancel()
+
+		// Phase 4: Wait for the goroutine to finish.
 		if n.receiving.Load() {
 			LocalLog.Debug("Waiting for the notification goroutine to finish")
 
 			<-n.done
 		}
-
-		n.cancel()
 	})
 }
 
