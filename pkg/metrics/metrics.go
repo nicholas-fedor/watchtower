@@ -52,6 +52,7 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 	const channelBufferSize = 10
 
 	// Create context for cancellation
+	//nolint:gosec // G118: cancel is stored in Metrics struct and called during Shutdown()
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Initialize metrics with Prometheus gauges and counters.

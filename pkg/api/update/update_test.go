@@ -3,6 +3,7 @@ package update_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -423,7 +424,12 @@ func TestFullUpdateReturns429WhenLocked(t *testing.T) {
 		}, customLock)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodPost,
+			"/v1/update",
+			nil,
+		)
 		handler.Handle(rec, req)
 
 		if rec.Code != http.StatusTooManyRequests {
@@ -482,7 +488,12 @@ func TestTargetedUpdateBlocksWhenLocked(t *testing.T) {
 		// Start the targeted request in a goroutine - it should block.
 		go func() {
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/v1/update?image=myimage:latest", nil)
+			req := httptest.NewRequestWithContext(
+				context.Background(),
+				http.MethodPost,
+				"/v1/update?image=myimage:latest",
+				nil,
+			)
 			handler.Handle(rec, req)
 
 			done <- rec.Code
@@ -535,7 +546,12 @@ func TestQueueConcurrentFullUpdates(t *testing.T) {
 		// First request should acquire the lock and succeed.
 		go func() {
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+			req := httptest.NewRequestWithContext(
+				context.Background(),
+				http.MethodPost,
+				"/v1/update",
+				nil,
+			)
 			handler.Handle(rec, req)
 
 			results <- rec.Code
@@ -547,7 +563,12 @@ func TestQueueConcurrentFullUpdates(t *testing.T) {
 		// Second request should get 429 since the first is still running.
 		go func() {
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/v1/update", nil)
+			req := httptest.NewRequestWithContext(
+				context.Background(),
+				http.MethodPost,
+				"/v1/update",
+				nil,
+			)
 			handler.Handle(rec, req)
 
 			results <- rec.Code
@@ -608,7 +629,8 @@ func TestHandleConcurrentRequests(t *testing.T) {
 		for range 3 {
 			go func() {
 				localRec := httptest.NewRecorder()
-				localReq := httptest.NewRequest(
+				localReq := httptest.NewRequestWithContext(
+					context.Background(),
 					http.MethodPost,
 					"/v1/update",
 					bytes.NewBufferString("test body"),
@@ -651,7 +673,8 @@ func TestHandleConcurrentRequestsWithRestarted(t *testing.T) {
 		for range 5 {
 			go func() {
 				localRec := httptest.NewRecorder()
-				localReq := httptest.NewRequest(
+				localReq := httptest.NewRequestWithContext(
+					context.Background(),
 					http.MethodPost,
 					"/v1/update",
 					bytes.NewBufferString("test body"),
@@ -707,7 +730,8 @@ func TestConcurrentRequests(t *testing.T) {
 		// Start first request and let it acquire the lock.
 		go func() {
 			localRec := httptest.NewRecorder()
-			localReq := httptest.NewRequest(
+			localReq := httptest.NewRequestWithContext(
+				context.Background(),
 				http.MethodPost,
 				"/v1/update",
 				nil,
@@ -724,7 +748,8 @@ func TestConcurrentRequests(t *testing.T) {
 		for range 2 {
 			go func() {
 				localRec := httptest.NewRecorder()
-				localReq := httptest.NewRequest(
+				localReq := httptest.NewRequestWithContext(
+					context.Background(),
 					http.MethodPost,
 					"/v1/update",
 					nil,
