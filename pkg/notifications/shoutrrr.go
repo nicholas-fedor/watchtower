@@ -492,24 +492,17 @@ func (n *shoutrrrTypeNotifier) Close() {
 			close(n.stop)
 		}
 
-		// Wait for in-flight messages to complete.
-		select {
-		case <-n.done:
-			LocalLog.Debug("Goroutine finished after stop channel closed")
+		// Wait for the worker goroutine to exit by waiting on n.done channel.
+		LocalLog.Debug("Waiting for the notification goroutine to finish")
+		<-n.done
 
-			return
-		case <-time.After(shutdownGracePeriod):
-			LocalLog.Debug("Timeout waiting for goroutine, proceeding with context cancellation")
-		}
+		// Only AFTER the worker has exited, close n.messages channel.
+		LocalLog.Debug("Closing messages channel after worker exit")
+		close(n.messages)
 
-		// Cancel context to unblock pending sends.
+		// Cancel context to unblock any pending operations.
 		LocalLog.Debug("Canceling notification context to unblock pending sends")
 		n.cancel()
-
-		// Wait for the goroutine to finish.
-		LocalLog.Debug("Waiting for the notification goroutine to finish")
-
-		<-n.done
 	})
 }
 
@@ -708,31 +701,8 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 		return
 	}
 
-	// Log state check before queuing
-	closed := n.closed.Load()
-	LocalLog.WithFields(logrus.Fields{
-		"closed":        closed,
-		"receiving":     n.receiving.Load(),
-		"entries_count": len(entries),
-		"msg_length":    len(msg),
-	}).Debug("Checking notifier state before queuing message")
-
-	if closed {
-		LocalLog.WithFields(logrus.Fields{
-			"entries_count": len(entries),
-			"msg_length":    len(msg),
-		}).Debug("Notifier closed, skipping send")
-
-		return
-	}
-
-	// Log queuing attempt
-	LocalLog.WithFields(logrus.Fields{
-		"entries_count":     len(entries),
-		"msg_length":        len(msg),
-		"notification_type": shoutrrrType,
-	}).Debug("Queuing notification message to channel")
-
+	// Use select with non-blocking send to coordinate with shutdown.
+	// This ensures we can't enqueue messages after shutdown has begun.
 	select {
 	case n.messages <- msg:
 		// Message sent successfully to channel
@@ -742,17 +712,31 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 			"channel_status": "sent",
 		}).Debug("Successfully sent message to notification channel")
 	default:
-		// Channel is closed or full, skip sending
-		closedAfter := n.closed.Load()
-		if closedAfter {
+		// Non-blocking send failed - check if closed or done before returning.
+		// This check is done AFTER the send attempt to catch the race condition
+		// where Close() signaled stop but sendEntries was already in progress.
+		if n.closed.Load() {
 			LocalLog.WithFields(logrus.Fields{
 				"entries_count":  len(entries),
 				"msg_length":     len(msg),
 				"channel_status": "closed",
-			}).Debug("Channel closed, skipping send")
+			}).Debug("Notifier closed, skipping send")
 
 			return
-		} else {
+		}
+
+		// Check if worker goroutine has exited
+		select {
+		case <-n.done:
+			LocalLog.WithFields(logrus.Fields{
+				"entries_count":  len(entries),
+				"msg_length":     len(msg),
+				"channel_status": "worker_done",
+			}).Debug("Worker goroutine done, skipping send")
+
+			return
+		default:
+			// Channel is full (not closed, not done), apply backpressure
 			LocalLog.WithFields(logrus.Fields{
 				"entries_count":  len(entries),
 				"msg_length":     len(msg),
