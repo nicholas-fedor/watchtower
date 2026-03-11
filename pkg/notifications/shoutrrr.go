@@ -179,6 +179,7 @@ func createNotifier(
 	}
 
 	// Create context for cancellation
+	//nolint:gosec // G118: cancel is stored in struct and called in Close() method
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &shoutrrrTypeNotifier{
