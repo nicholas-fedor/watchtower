@@ -8,9 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Document regex pattern matching support by @nicholas-fedor in [#1404](https://github.com/nicholas-fedor/watchtower/pull/1404)
+- Refactor and cleanup security workflow by @nicholas-fedor in [#1397](https://github.com/nicholas-fedor/watchtower/pull/1397)
+
 ### Chores
 
+- Update peter-evans/create-pull-request digest to 36d7c84 by @renovate[bot] in [#1412](https://github.com/nicholas-fedor/watchtower/pull/1412)
+- Update OpenTelemetry and golang.org/x dependencies by @nicholas-fedor in [#1411](https://github.com/nicholas-fedor/watchtower/pull/1411)
+- Update module golang.org/x/text to v0.35.0 by @renovate[bot] in [#1410](https://github.com/nicholas-fedor/watchtower/pull/1410)
+- Update cimg/go:1.26.1 docker digest to ff658f9 by @renovate[bot] in [#1409](https://github.com/nicholas-fedor/watchtower/pull/1409)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.14.0 by @renovate[bot] in [#1407](https://github.com/nicholas-fedor/watchtower/pull/1407)
+- Update cimg/go:1.26.1 docker digest to d6efbd2 by @renovate[bot] in [#1406](https://github.com/nicholas-fedor/watchtower/pull/1406)
+- Update cimg/go docker tag to v1.26.1 by @renovate[bot] in [#1405](https://github.com/nicholas-fedor/watchtower/pull/1405)
+- Update docker/setup-qemu-action digest to a4bc6cd by @renovate[bot] in [#1401](https://github.com/nicholas-fedor/watchtower/pull/1401)
+- Update docker/setup-buildx-action digest to c8ad1c5 by @renovate[bot] in [#1400](https://github.com/nicholas-fedor/watchtower/pull/1400)
+- Update docker/login-action digest to 9fe7774 by @renovate[bot] in [#1399](https://github.com/nicholas-fedor/watchtower/pull/1399)
+- Update actions/setup-python digest to 28f2168 by @renovate[bot] in [#1398](https://github.com/nicholas-fedor/watchtower/pull/1398)
+- Update nicholas-fedor/govulncheck-action digest to ac1aadb by @renovate[bot] in [#1396](https://github.com/nicholas-fedor/watchtower/pull/1396)
+- Update docker/setup-buildx-action digest to 8f54c6f by @renovate[bot] in [#1395](https://github.com/nicholas-fedor/watchtower/pull/1395)
+- Update golang docker tag to v1.26.1 by @renovate[bot] in [#1394](https://github.com/nicholas-fedor/watchtower/pull/1394)
+- Update dependency go to v1.26.1 by @renovate[bot] in [#1393](https://github.com/nicholas-fedor/watchtower/pull/1393)
+- Update nicholas-fedor/go-proxy-pull-action digest to 66b03fb by @renovate[bot] in [#1392](https://github.com/nicholas-fedor/watchtower/pull/1392)
+- Update golang:alpine docker digest to 2389ebf by @renovate[bot] in [#1391](https://github.com/nicholas-fedor/watchtower/pull/1391)
+- Update module github.com/docker/cli to v29.3.0+incompatible by @renovate[bot] in [#1390](https://github.com/nicholas-fedor/watchtower/pull/1390)
+- Update github/codeql-action digest to 0d579ff by @renovate[bot] in [#1389](https://github.com/nicholas-fedor/watchtower/pull/1389)
+- Update docker/login-action digest to db14339 by @renovate[bot] in [#1388](https://github.com/nicholas-fedor/watchtower/pull/1388)
+- Update peter-evans/create-pull-request digest to a45d1fb by @renovate[bot] in [#1387](https://github.com/nicholas-fedor/watchtower/pull/1387)
+- Update docker/setup-qemu-action digest to 72cd565 by @renovate[bot] in [#1386](https://github.com/nicholas-fedor/watchtower/pull/1386)
+- Update docker/setup-buildx-action digest to 2ae358d by @renovate[bot] in [#1385](https://github.com/nicholas-fedor/watchtower/pull/1385)
+- Update docker/login-action digest to e46b7e3 by @renovate[bot] in [#1384](https://github.com/nicholas-fedor/watchtower/pull/1384)
+- Update docker/setup-buildx-action digest to 28a438e by @renovate[bot] in [#1383](https://github.com/nicholas-fedor/watchtower/pull/1383)
+- Update actions/attest-build-provenance digest to 10334b5 by @renovate[bot] in [#1381](https://github.com/nicholas-fedor/watchtower/pull/1381)
 - Update docker/setup-qemu-action digest to ce36039 by @renovate[bot] in [#1379](https://github.com/nicholas-fedor/watchtower/pull/1379)
+
+### Fixed
+
+- Improve graceful shutdown with context cancellation by @nicholas-fedor in [#1408](https://github.com/nicholas-fedor/watchtower/pull/1408)
 
 ## [1.14.3] - 2026-03-04
 
