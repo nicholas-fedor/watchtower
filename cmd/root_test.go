@@ -854,7 +854,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		// Track update calls from both instances
 		updateCallCount := int32(0)
 
-		var completed int32
+		var completed atomic.Int32
 
 		instance1Called := make(chan bool, 1)
 		instance2Called := make(chan bool, 1)
@@ -898,7 +898,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				nil,
 			)
 			assert.NoError(t, err)
-			atomic.AddInt32(&completed, 1)
+			completed.Add(1)
 			close(instance1Called)
 		}()
 
@@ -929,7 +929,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				nil,
 			)
 			assert.NoError(t, err)
-			atomic.AddInt32(&completed, 1)
+			completed.Add(1)
 			close(instance2Called)
 		}()
 
@@ -941,7 +941,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		assert.Equal(
 			t,
 			int32(2),
-			atomic.LoadInt32(&completed),
+			completed.Load(),
 			"Both instances should have shut down properly",
 		)
 
