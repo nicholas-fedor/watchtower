@@ -183,11 +183,11 @@ func RunUpgradesOnSchedule(
 	// If Watchtower has performed a self-cleanup, then prevent Watchtower
 	// from self-updating during the first update cycle.
 	if skipFirstRun {
-		var firstRun uint32 // atomic flag to track if this is the first run
+		var firstRun atomic.Uint32 // atomic flag to track if this is the first run
 
 		scheduledUpdateFunc = func() {
 			// Atomically check and set firstRun to ensure only the first execution skips self-update
-			skipWatchtowerSelfUpdate := atomic.CompareAndSwapUint32(&firstRun, 0, 1)
+			skipWatchtowerSelfUpdate := firstRun.CompareAndSwap(0, 1)
 			if skipWatchtowerSelfUpdate {
 				logrus.Debug(
 					"Skipping Watchtower self-update on first scheduled run due to cleanup",
