@@ -46,7 +46,7 @@ jobs:
       security-events: write
     steps:
       - id: govulncheck
-        uses: nicholas-fedor/govulncheck-action@4878bd2662232e5dac6408f44026e584ba0e3a66
+        uses: nicholas-fedor/govulncheck-action@b438bbbcb5a07abf8d322c367da4a3d45f99e183
         with:
           output-format: sarif
           output-file: ${{ env.OUTPUT_FILE }}
