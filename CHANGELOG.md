@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/setup-go digest to 4a36011 by @renovate[bot] in [#1423](https://github.com/nicholas-fedor/watchtower/pull/1423)
 - Update docker/dockerfile:1 docker digest to 4a43a54 by @renovate[bot] in [#1422](https://github.com/nicholas-fedor/watchtower/pull/1422)
 - Apply go modernize to use modern Go atomic types by @nicholas-fedor in [#1421](https://github.com/nicholas-fedor/watchtower/pull/1421)
 - Update nicholas-fedor/govulncheck-action digest to 4878bd2 by @renovate[bot] in [#1420](https://github.com/nicholas-fedor/watchtower/pull/1420)
