@@ -88,7 +88,13 @@ var _ = ginkgo.Describe("the client", func() {
 				imageA := util.GenerateRandomSHA256()
 				imageAParent := util.GenerateRandomSHA256()
 				images := map[string][]string{imageA: {imageAParent}}
-				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(images))
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp("/containers/json")),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainer.Summary{}),
+					),
+					mockContainer.RemoveImageHandler(images),
+				)
 
 				c := &client{api: docker}
 
@@ -110,11 +116,45 @@ var _ = ginkgo.Describe("the client", func() {
 			ginkgo.It("should return an error", func() {
 				image := util.GenerateRandomSHA256()
 
-				mockServer.AppendHandlers(mockContainer.RemoveImageHandler(nil))
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp("/containers/json")),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainer.Summary{}),
+					),
+					mockContainer.RemoveImageHandler(nil),
+				)
 
 				c := &client{api: docker}
 				err := c.RemoveImageByID(context.Background(), types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
+			})
+		})
+		ginkgo.When("image is used by an active container", func() {
+			ginkgo.It("should skip removal and not return an error", func() {
+				imageA := util.GenerateRandomSHA256()
+
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp("/containers/json")),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainer.Summary{
+							{
+								ImageID: imageA,
+								State:   "running",
+							},
+						}),
+					),
+				)
+
+				c := &client{api: docker}
+
+				resetLogrus, logbuf := captureLogrus(logrus.InfoLevel)
+				defer resetLogrus()
+
+				err := c.RemoveImageByID(context.Background(), types.ImageID(imageA), "test-image")
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Eventually(logbuf).
+					Should(gbytes.Say(`msg="Image in use by active container, skipping"`))
 			})
 		})
 	})
