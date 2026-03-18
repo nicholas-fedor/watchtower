@@ -15,6 +15,12 @@
       "semanticCommitType": "chore"
     },
     {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "semanticCommitType": "chore",
+      "enabled": true
+    },
+    {
       "description": "Automerge non-major updates",
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true
