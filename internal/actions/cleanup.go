@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -484,11 +485,11 @@ func RemoveImages(
 					"image_id":   imageID,
 					"image_name": image.ImageName,
 				}).Debug("Image already removed")
-			case cerrdefs.IsConflict(err):
+			case cerrdefs.IsConflict(err) || errors.Is(err, container.ErrImageInUse):
 				logrus.WithFields(logrus.Fields{
 					"image_id":   imageID,
 					"image_name": image.ImageName,
-				}).Debug("Image is in use by running container, skipping removal")
+				}).Debug("Image is in use by active container, skipping removal")
 			default:
 				logrus.WithError(err).WithFields(logrus.Fields{
 					"image_id":   imageID,

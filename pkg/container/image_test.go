@@ -130,7 +130,7 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 		ginkgo.When("image is used by an active container", func() {
-			ginkgo.It("should skip removal and not return an error", func() {
+			ginkgo.It("should skip removal and return ErrImageInUse", func() {
 				imageA := util.GenerateRandomSHA256()
 
 				mockServer.AppendHandlers(
@@ -147,14 +147,11 @@ var _ = ginkgo.Describe("the client", func() {
 
 				c := &client{api: docker}
 
-				resetLogrus, logbuf := captureLogrus(logrus.InfoLevel)
+				resetLogrus, _ := captureLogrus(logrus.InfoLevel)
 				defer resetLogrus()
 
 				err := c.RemoveImageByID(context.Background(), types.ImageID(imageA), "test-image")
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-				gomega.Eventually(logbuf).
-					Should(gbytes.Say(`msg="Image in use by active container, skipping"`))
+				gomega.Expect(err).To(gomega.MatchError(ErrImageInUse))
 			})
 		})
 	})

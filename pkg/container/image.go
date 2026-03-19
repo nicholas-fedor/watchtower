@@ -206,15 +206,13 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 
 	containers, err := c.api.ContainerList(ctx, dockerContainer.ListOptions{All: true})
 	if err != nil {
-		clog.WithError(err).Debug("Failed to list containers for image usage check")
-	} else {
-		for _, container := range containers {
-			state := container.State
-			if container.ImageID == string(imageID) && (state == "running" || state == "restarting" || state == "paused" || state == "created") {
-				clog.Info("Image in use by active container, skipping")
-
-				return nil
-			}
+		clog.WithError(err).Warn("Failed to list containers for image usage check, skipping removal")
+		return fmt.Errorf("cannot verify image usage: %w", err)
+	}
+	for _, container := range containers {
+		state := container.State
+		if container.ImageID == string(imageID) && (state == "running" || state == "restarting" || state == "paused" || state == "created") {
+			return ErrImageInUse
 		}
 	}
 
