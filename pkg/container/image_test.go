@@ -130,18 +130,65 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 		ginkgo.When("image is used by an active container", func() {
-			ginkgo.It("should skip removal and return ErrImageInUse", func() {
+			// Test cases for all active container states.
+			// These states are defined in pkg/container/image.go lines 216-217.
+			ginkgo.DescribeTable("should skip removal and return ErrImageInUse for each active state",
+				func(tc struct {
+					names string
+					state string
+				},
+				) {
+					imageA := util.GenerateRandomSHA256()
+
+					mockServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", gomega.MatchRegexp("/containers/json")),
+							ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainer.Summary{
+								{
+									ImageID: imageA,
+									State:   tc.state,
+								},
+							}),
+						),
+					)
+
+					c := &client{api: docker}
+
+					resetLogrus, _ := captureLogrus(logrus.InfoLevel)
+					defer resetLogrus()
+
+					err := c.RemoveImageByID(context.Background(), types.ImageID(imageA), "test-image")
+					gomega.Expect(err).To(gomega.MatchError(ErrImageInUse))
+				},
+				ginkgo.Entry("running", struct {
+					names string
+					state string
+				}{names: "running", state: "running"}),
+				ginkgo.Entry("restarting", struct {
+					names string
+					state string
+				}{names: "restarting", state: "restarting"}),
+				ginkgo.Entry("paused", struct {
+					names string
+					state string
+				}{names: "paused", state: "paused"}),
+				ginkgo.Entry("created", struct {
+					names string
+					state string
+				}{names: "created", state: "created"}),
+			)
+		})
+		ginkgo.When("ContainerList API fails", func() {
+			ginkgo.It("should return an error and not proceed with removal", func() {
 				imageA := util.GenerateRandomSHA256()
 
 				mockServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", gomega.MatchRegexp("/containers/json")),
-						ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainer.Summary{
-							{
-								ImageID: imageA,
-								State:   "running",
-							},
-						}),
+						ghttp.RespondWithJSONEncoded(
+							http.StatusInternalServerError,
+							map[string]string{"message": "Internal server error"},
+						),
 					),
 				)
 
@@ -151,7 +198,8 @@ var _ = ginkgo.Describe("the client", func() {
 				defer resetLogrus()
 
 				err := c.RemoveImageByID(context.Background(), types.ImageID(imageA), "test-image")
-				gomega.Expect(err).To(gomega.MatchError(ErrImageInUse))
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot verify image usage"))
 			})
 		})
 	})

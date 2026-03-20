@@ -213,7 +213,8 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 
 	for _, container := range containers {
 		state := container.State
-		if container.ImageID == string(imageID) && (state == "running" || state == "restarting" || state == "paused" || state == "created") {
+		if container.ImageID == string(imageID) &&
+			(state == dockerContainer.StateRunning || state == dockerContainer.StateRestarting || state == dockerContainer.StatePaused || state == dockerContainer.StateCreated) {
 			return ErrImageInUse
 		}
 	}
