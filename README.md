@@ -202,6 +202,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ApprenticeofEnder"><img src="https://avatars.githubusercontent.com/u/32110856?v=4?s=100" width="100px;" alt="ApprenticeofEnder"/><br /><sub><b>ApprenticeofEnder</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=ApprenticeofEnder" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/skylenet"><img src="https://avatars.githubusercontent.com/u/1500888?v=4?s=100" width="100px;" alt="skylenet"/><br /><sub><b>skylenet</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=skylenet" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/veeceey"><img src="https://avatars.githubusercontent.com/u/34209028?v=4?s=100" width="100px;" alt="Varun Chawla"/><br /><sub><b>Varun Chawla</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=veeceey" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LJspice"><img src="https://avatars.githubusercontent.com/u/8888722?v=4?s=100" width="100px;" alt="LJspice"/><br /><sub><b>LJspice</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=LJspice" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
