@@ -66,6 +66,8 @@ var (
 
 // Errors for image operations in image.go.
 var (
+	// ErrImageInUse indicates that the image is actively used by a container and cannot be removed.
+	ErrImageInUse = errors.New("image is actively used by a container")
 	// errPinnedImage indicates an attempt to pull an immutable (sha256-pinned) image.
 	errPinnedImage = errors.New("image is pinned with sha256, skipping pull")
 	// errInspectImageFailed indicates a failure to inspect an image from the Docker daemon.

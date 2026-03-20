@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
+	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerImage "github.com/docker/docker/api/types/image"
 	dockerClient "github.com/docker/docker/client"
 
@@ -202,6 +203,22 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 		"image_id":   imageID.ShortID(),
 		"image_name": imageName,
 	})
+
+	containers, err := c.api.ContainerList(ctx, dockerContainer.ListOptions{All: true})
+	if err != nil {
+		clog.WithError(err).Warn("Failed to list containers for image usage check, skipping removal")
+
+		return fmt.Errorf("cannot verify image usage: %w", err)
+	}
+
+	for _, container := range containers {
+		state := container.State
+		if container.ImageID == string(imageID) &&
+			(state == dockerContainer.StateRunning || state == dockerContainer.StateRestarting || state == dockerContainer.StatePaused || state == dockerContainer.StateCreated) {
+			return ErrImageInUse
+		}
+	}
+
 	clog.WithField("notify", "yes").Info("Removing image")
 
 	// Perform image removal with force and pruning.
