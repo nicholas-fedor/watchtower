@@ -37,6 +37,13 @@ var (
 	// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
 	client container.Client
 
+	// useComposeDependsOn is a flag that controls whether the Docker Compose depends_on label
+	// is processed for container dependency ordering.
+	//
+	// It is set in preRun via the --use-compose-depends-on flag or the WATCHTOWER_USE_COMPOSE_DEPENDS_ON environment variable,
+	// defaulting to true for backward compatibility.
+	useComposeDependsOn bool
+
 	// scheduleSpec holds the cron-formatted schedule string that dictates when periodic container updates occur.
 	//
 	// It is populated during preRun from the --schedule flag or the WATCHTOWER_SCHEDULE environment variable,
@@ -281,6 +288,9 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Enable/disable operational precedence of labels.
 	labelPrecedence, _ = flagsSet.GetBool("label-take-precedence")
+
+	// Enable/disable Docker Compose depends_on label processing.
+	useComposeDependsOn, _ = flagsSet.GetBool("use-compose-depends-on")
 
 	// Retrieve lifecycle UID and GID flags.
 	lifecycleUID, _ = flagsSet.GetInt("lifecycle-uid")
@@ -551,6 +561,7 @@ func runMain(cfg types.RunConfig) int {
 			RunOnce:                      params.RunOnce,               // Perform one-time update and exit
 			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
 			CurrentContainerID:           currentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
+			UseComposeDependsOn:          params.UseComposeDependsOn,   // Enable Docker Compose depends_on label processing
 		}
 
 		metric := actions.RunUpdatesWithNotifications(ctx, actionParams)
@@ -593,10 +604,11 @@ func runMain(cfg types.RunConfig) int {
 			nil, // read from flags
 		)
 		params := types.UpdateParams{
-			Cleanup:        cleanup,
-			RunOnce:        cfg.RunOnce,
-			MonitorOnly:    monitorOnly,
-			SkipSelfUpdate: false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
+			Cleanup:             cleanup,
+			RunOnce:             cfg.RunOnce,
+			MonitorOnly:         monitorOnly,
+			SkipSelfUpdate:      false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
+			UseComposeDependsOn: useComposeDependsOn,
 		}
 		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)

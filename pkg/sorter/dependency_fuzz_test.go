@@ -385,7 +385,7 @@ func isRealCycle(containers []types.Container, circularErr CircularReferenceErro
 			return false
 		}
 
-		links := fromContainer.Links()
+		links := fromContainer.Links(true)
 		found := slices.Contains(links, toName)
 
 		if !found {

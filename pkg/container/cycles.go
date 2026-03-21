@@ -181,7 +181,7 @@ func DetectCycles(containers []types.Container) map[string]bool {
 
 		// Get all dependencies (links) for this container
 		// c.Links() already returns normalized container names
-		links := c.Links()
+		links := c.Links(true)
 
 		// Translate each link target through the alias map to ensure canonical IDs
 		canonicalLinks := make([]string, 0, len(links))

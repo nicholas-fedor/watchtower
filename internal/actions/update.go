@@ -319,7 +319,7 @@ func Update(
 		}
 	} else {
 		// Mark containers linked to restarting ones for restart without updating.
-		UpdateImplicitRestart(allContainers, filteredContainers)
+		UpdateImplicitRestart(allContainers, filteredContainers, config.UseComposeDependsOn)
 	}
 
 	// Collect all containers to restart (updates and implicit restarts)
@@ -449,7 +449,7 @@ func hasSelfDependency(c types.Container) bool {
 // Parameters:
 //   - allContainers: List of all containers.
 //   - containers: List of containers to update.
-func UpdateImplicitRestart(allContainers, containers []types.Container) {
+func UpdateImplicitRestart(allContainers, containers []types.Container, useComposeDependsOn bool) {
 	logrus.Debug("Starting UpdateImplicitRestart")
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
@@ -471,8 +471,8 @@ func UpdateImplicitRestart(allContainers, containers []types.Container) {
 				continue // Skip already marked containers.
 			}
 
-			// c.Links() already returns normalized container names
-			links := c.Links()
+			links := c.Links(useComposeDependsOn)
+
 			containerIdentifier := container.ResolveContainerIdentifier(c)
 			logrus.WithFields(logrus.Fields{
 				"container":            c.Name(),

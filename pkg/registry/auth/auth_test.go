@@ -180,7 +180,7 @@ func (m mockContainer) Scope() (string, bool) {
 // Links returns a slice of container links. This method satisfies the types.Container
 // interface, returning an empty slice as a minimal stub since the auth package does not
 // use this data in these authentication-focused tests.
-func (m mockContainer) Links() []string {
+func (m mockContainer) Links(useComposeDependsOn bool) []string {
 	return []string{} // Minimal stub, not used in these tests
 }
 

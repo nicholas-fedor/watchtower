@@ -55,7 +55,21 @@ services:
     image: postgres
 ```
 
-The `com.docker.compose.depends_on` label is automatically set by Docker Compose and parsed by Watchtower to extract service names.
+The `com.docker.compose.depends_on` label is automatically set by Docker Compose and parsed by Watchtower to extract service names and support implicitly restarting linked services.
+
+!!! Important "Docker Compose depends_on Restart Behavior"
+    Docker Compose's [`depends_on`](https://docs.docker.com/reference/compose-file/services/#depends_on) has a `restart` attribute in the long-form syntax:
+
+    ```yaml
+    services:
+      web:
+        depends_on:
+          database:
+            condition: service_healthy
+            restart: true
+    ```
+
+    Watchtower does not support using this to control implicit restarts, because the short-form syntax defaults to `restart: false`.
 
 #### Docker Links and Network Mode
 
@@ -111,6 +125,36 @@ In most cases, no additional configuration is required. Watchtower automatically
 
 !!! Warning "Rolling restart is currently not supported when used in combination with linked-containers."
     This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.
+
+### Disable Docker Compose Depends-On
+
+If you want to disable automatic dependency detection from the Docker Compose `depends_on` configuration while preserving other dependency sources, use the  :
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower
+        environment:
+          - WATCHTOWER_USE_COMPOSE_DEPENDS_ON=false
+    ```
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        nickfedor/watchtower \
+        --use-compose-depends-on=false
+    ```
+
+This disables parsing of the `com.docker.compose.depends_on` label while still honoring:
+
+- Watchtower's explicit `com.centurylinklabs.watchtower.depends-on` label
+- Legacy Docker links
+- Network mode dependencies (`network_mode: service:container`)
 
 ### Explicit Dependencies
 

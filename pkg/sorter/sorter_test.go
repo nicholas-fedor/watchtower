@@ -106,7 +106,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().Links(true).Return([]string{"c2"})
 				c1.EXPECT().IsWatchtower().Return(false)
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -117,7 +117,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links().Return([]string(nil))
+				c2.EXPECT().Links(true).Return([]string(nil))
 				c2.EXPECT().IsWatchtower().Return(false)
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links().Return([]string{"c2", "c3"})
+				c1.EXPECT().Links(true).Return([]string{"c2", "c3"})
 				c1.EXPECT().IsWatchtower().Return(false)
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links().Return([]string{"c3"})
+				c2.EXPECT().Links(true).Return([]string{"c3"})
 				c2.EXPECT().IsWatchtower().Return(false)
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -158,7 +158,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c3.EXPECT().Name().Return("c3")
 				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
-				c3.EXPECT().Links().Return([]string(nil))
+				c3.EXPECT().Links(true).Return([]string(nil))
 				c3.EXPECT().IsWatchtower().Return(false)
 				c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -178,7 +178,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().Links(true).Return([]string{"c2"})
 				c1.EXPECT().IsWatchtower().Return(false)
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-				c2.EXPECT().Links().Return([]string{"c1"})
+				c2.EXPECT().Links(true).Return([]string{"c1"})
 				c2.EXPECT().IsWatchtower().Return(false)
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -208,7 +208,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().Links(true).Return([]string{"c2"})
 				c1.EXPECT().IsWatchtower().Return(false)
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c3.EXPECT().Name().Return("c3")
 				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
-				c3.EXPECT().Links().Return([]string(nil))
+				c3.EXPECT().Links(true).Return([]string(nil))
 				c3.EXPECT().IsWatchtower().Return(false)
 				c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -249,7 +249,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().Links(true).Return([]string{"c2"})
 				c1.EXPECT().IsWatchtower().Return(false)
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -260,7 +260,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links().Return([]string(nil))
+				c2.EXPECT().Links(true).Return([]string(nil))
 				c2.EXPECT().IsWatchtower().Return(false)
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -286,7 +286,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().Name().Return("c1")
 				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links().Return([]string{"c2"})
+				c1.EXPECT().Links(true).Return([]string{"c2"})
 				c1.EXPECT().IsWatchtower().Return(false)
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -301,7 +301,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().Name().Return("c2")
 				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links().Return([]string(nil))
+				c2.EXPECT().Links(true).Return([]string(nil))
 				c2.EXPECT().IsWatchtower().Return(false)
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 					Config: &dockerContainer.Config{
@@ -325,7 +325,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 					c := mockTypes.NewMockContainer(t)
 					c.EXPECT().Name().Return(name)
 					c.EXPECT().ID().Return(types.ContainerID(id))
-					c.EXPECT().Links().Return(links)
+					c.EXPECT().Links(true).Return(links)
 					c.EXPECT().IsWatchtower().Return(false)
 					c.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
 						Config: &dockerContainer.Config{

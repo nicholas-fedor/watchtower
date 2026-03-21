@@ -324,7 +324,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.HaveLen(1),
@@ -335,7 +335,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres,redis",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.ContainElement("redis"),
@@ -347,7 +347,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.docker.compose.depends_on": " postgres , redis ",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.ContainElement("redis"),
@@ -359,7 +359,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						compose.ComposeDependsOnLabel: "/postgres,/redis",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.ContainElement("redis"),
@@ -373,7 +373,7 @@ var _ = ginkgo.Describe("Container", func() {
 							"com.docker.compose.depends_on":             "postgres",
 							"com.centurylinklabs.watchtower.depends-on": "redis",
 						}))
-						links := container.Links()
+						links := container.Links(true)
 						gomega.Expect(links).To(gomega.SatisfyAll(
 							gomega.ContainElement("redis"),
 							gomega.Not(gomega.ContainElement("postgres")),
@@ -386,14 +386,14 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "",
 					}))
-					gomega.Expect(container.Links()).To(gomega.BeEmpty())
+					gomega.Expect(container.Links(true)).To(gomega.BeEmpty())
 				})
 
 				ginkgo.It("parses colon-separated service:condition:required format", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres:service_started:required,redis:service_healthy",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.ContainElement("redis"),
@@ -407,7 +407,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.HaveLen(1),
@@ -418,7 +418,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres,redis",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.ContainElement("redis"),
@@ -430,7 +430,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "/postgres,/redis",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.ContainElement("redis"),
@@ -441,7 +441,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "",
 					}))
-					gomega.Expect(container.Links()).To(gomega.BeEmpty())
+					gomega.Expect(container.Links(true)).To(gomega.BeEmpty())
 				})
 
 				ginkgo.It(
@@ -451,7 +451,7 @@ var _ = ginkgo.Describe("Container", func() {
 							"com.docker.compose.project":                "myproject",
 							"com.centurylinklabs.watchtower.depends-on": "otherproject-db,external-service",
 						}))
-						links := container.Links()
+						links := container.Links(true)
 						gomega.Expect(links).To(gomega.SatisfyAll(
 							gomega.ContainElement("otherproject-db"),
 							gomega.ContainElement("external-service"),
@@ -470,7 +470,7 @@ var _ = ginkgo.Describe("Container", func() {
 						"com.docker.compose.project":                "webapp",
 						"com.centurylinklabs.watchtower.depends-on": "database",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("database"),
 						gomega.HaveLen(1),
@@ -483,7 +483,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "standalone-db,external-api",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("standalone-db"),
 						gomega.ContainElement("external-api"),
@@ -495,7 +495,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres,test-watchtower,redis",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.SatisfyAll(
 						gomega.ContainElement("postgres"),
 						gomega.ContainElement("redis"),
@@ -515,7 +515,7 @@ var _ = ginkgo.Describe("Container", func() {
 						container.containerInfo.Name = testContainerName
 						container.normalizedName = testContainerName
 
-						links := container.Links()
+						links := container.Links(true)
 						gomega.Expect(links).To(gomega.BeEmpty(),
 							"Container with name matching dependency should not include self in links")
 					},
@@ -528,7 +528,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container.containerInfo.Name = testContainerName
 					container.normalizedName = testContainerName
 
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.BeEmpty(),
 						"Compose depends-on with self-reference should be filtered out")
 				})
@@ -539,7 +539,7 @@ var _ = ginkgo.Describe("Container", func() {
 						container = MockContainer(WithLabels(map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": label,
 						}))
-						links := container.Links()
+						links := container.Links(true)
 						gomega.Expect(links).To(gomega.Equal(expected))
 					},
 					ginkgo.Entry(
@@ -564,7 +564,7 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres db, redis",
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.Equal([]string{"postgres db", "redis"}))
 				})
 
@@ -579,11 +579,49 @@ var _ = ginkgo.Describe("Container", func() {
 					container = MockContainer(WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": label,
 					}))
-					links := container.Links()
+					links := container.Links(true)
 					gomega.Expect(links).To(gomega.HaveLen(100))
 					gomega.Expect(links).To(gomega.ContainElement("dep1"))
 					gomega.Expect(links).To(gomega.ContainElement("dep50"))
 					gomega.Expect(links).To(gomega.ContainElement("dep100"))
+				})
+			})
+
+			ginkgo.Context("when UseComposeDependsOn is disabled", func() {
+				ginkgo.It("returns empty links for compose depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres,redis",
+					}))
+					links := container.Links(false)
+					gomega.Expect(links).To(gomega.BeEmpty(),
+						"Compose depends-on should be ignored when disabled")
+				})
+
+				ginkgo.It("still returns links from watchtower depends-on label", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on":             "postgres",
+						"com.centurylinklabs.watchtower.depends-on": "redis",
+					}))
+					links := container.Links(false)
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("redis"),
+						gomega.Not(gomega.ContainElement("postgres")),
+						gomega.HaveLen(1),
+					))
+				})
+
+				ginkgo.It("returns links from host config when compose is disabled", func() {
+					container = MockContainer(WithLabels(map[string]string{
+						"com.docker.compose.depends_on": "postgres",
+					}), WithLinks([]string{
+						"redis:test-watchtower",
+					}))
+					links := container.Links(false)
+					gomega.Expect(links).To(gomega.SatisfyAll(
+						gomega.ContainElement("redis"),
+						gomega.Not(gomega.ContainElement("postgres")),
+						gomega.HaveLen(1),
+					))
 				})
 			})
 
@@ -592,7 +630,7 @@ var _ = ginkgo.Describe("Container", func() {
 					"redis:test-watchtower",
 					"postgres:test-watchtower",
 				}))
-				links := container.Links()
+				links := container.Links(true)
 				gomega.Expect(links).To(gomega.SatisfyAll(
 					gomega.ContainElement("redis"),
 					gomega.ContainElement("postgres"),
@@ -614,7 +652,7 @@ var _ = ginkgo.Describe("Container", func() {
 				}()
 
 				container = MockContainer(WithLinks([]string{"invalidlink"}))
-				links := container.Links()
+				links := container.Links(true)
 				gomega.Expect(links).To(gomega.BeEmpty())
 				gomega.Expect(logOutput.String()).
 					To(gomega.ContainSubstring("Invalid link format in host config, expected 'name:alias'"))
@@ -634,7 +672,7 @@ var _ = ginkgo.Describe("Container", func() {
 				}()
 
 				container = MockContainer(WithLinks([]string{":alias"}))
-				links := container.Links()
+				links := container.Links(true)
 				gomega.Expect(links).To(gomega.BeEmpty())
 				gomega.Expect(logOutput.String()).
 					To(gomega.ContainSubstring("Invalid link format in host config, missing container name"))
@@ -642,7 +680,7 @@ var _ = ginkgo.Describe("Container", func() {
 
 			ginkgo.It("normalizes container names with leading slashes", func() {
 				container = MockContainer(WithLinks([]string{"/redis:test-watchtower"}))
-				links := container.Links()
+				links := container.Links(true)
 				gomega.Expect(links).To(gomega.ContainElement("redis"))
 			})
 
@@ -651,13 +689,13 @@ var _ = ginkgo.Describe("Container", func() {
 					WithLinks([]string{"myproject-redis:test-watchtower"}),
 					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 				)
-				links := container.Links()
+				links := container.Links(true)
 				gomega.Expect(links).To(gomega.ContainElement("myproject-redis"))
 			})
 
 			ginkgo.It("does not prefix when project name is empty", func() {
 				container = MockContainer(WithLinks([]string{"redis:test-watchtower"}))
-				links := container.Links()
+				links := container.Links(true)
 				gomega.Expect(links).To(gomega.ContainElement("redis"))
 			})
 
@@ -666,7 +704,7 @@ var _ = ginkgo.Describe("Container", func() {
 					WithNetworkMode("container:other"),
 					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 				)
-				links := container.Links()
+				links := container.Links(true)
 				gomega.Expect(links).To(gomega.ContainElement("myproject-other"))
 			})
 		})

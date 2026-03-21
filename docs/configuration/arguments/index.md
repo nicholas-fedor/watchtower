@@ -444,6 +444,25 @@ Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
              Default: false
 ```
 
+### Use Docker Compose Depends-On
+
+Enables or disables processing of the Docker Compose `depends_on` configuration for determining container update order.
+When enabled (default), Watchtower automatically detects and respects Docker Compose service dependencies.
+When disabled, only the Watchtower `depends-on` label, Docker links, and network mode are used.
+
+```text
+            Argument: --use-compose-depends-on
+Environment Variable: WATCHTOWER_USE_COMPOSE_DEPENDS_ON
+                Type: Boolean
+             Default: true
+```
+
+!!! Note
+    Disabling this is useful when you want to prevent Watchtower from automatically using Docker Compose dependencies but still use explicit Watchtower labels or Docker links for ordering.
+
+!!! Warning
+    When used with `--rolling-restart`, the Docker Compose `depends_on` label is not considered even when enabled, as rolling restarts require explicit coordination across dependency chains.
+
 ## Registry & Authentication
 
 ### REPO_USER

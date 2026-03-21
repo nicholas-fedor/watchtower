@@ -56,6 +56,7 @@ type RunUpdatesWithNotificationsParams struct {
 	RunOnce                      bool              // Perform one-time update and exit
 	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	CurrentContainerID           types.ContainerID // ID of the current Watchtower container for self-update logic
+	UseComposeDependsOn          bool              // Enable Docker Compose depends_on label processing
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -80,22 +81,23 @@ func RunUpdatesWithNotifications(
 
 	// Configure update parameters based on provided flags
 	updateConfig := types.UpdateParams{
-		Filter:             params.Filter,             // Container filter determining which containers are targeted
-		Cleanup:            params.Cleanup,            // Remove old images after container updates
-		NoRestart:          params.NoRestart,          // Prevent containers from being restarted after updates
-		MonitorOnly:        params.MonitorOnly,        // Monitor containers without performing updates
-		LifecycleHooks:     params.LifecycleHooks,     // Enable pre- and post-update lifecycle hook commands
-		RollingRestart:     params.RollingRestart,     // Update containers sequentially rather than all at once
-		LabelPrecedence:    params.LabelPrecedence,    // Give container label settings priority over global flags
-		NoPull:             params.NoPull,             // Skip pulling new images from registry during updates
-		Timeout:            params.Timeout,            // Maximum duration for container stop operations
-		PullFailureDelay:   params.PullFailureDelay,   // Delay after failed Watchtower self-update pulls
-		LifecycleUID:       params.LifecycleUID,       // Default UID to run lifecycle hooks as
-		LifecycleGID:       params.LifecycleGID,       // Default GID to run lifecycle hooks as
-		CPUCopyMode:        params.CPUCopyMode,        // CPU settings handling when recreating containers
-		RunOnce:            params.RunOnce,            // Perform one-time update and exit
-		SkipSelfUpdate:     params.SkipSelfUpdate,     // Skip Watchtower self-update
-		CurrentContainerID: params.CurrentContainerID, // ID of the current Watchtower container for self-update logic
+		Filter:              params.Filter,              // Container filter determining which containers are targeted
+		Cleanup:             params.Cleanup,             // Remove old images after container updates
+		NoRestart:           params.NoRestart,           // Prevent containers from being restarted after updates
+		MonitorOnly:         params.MonitorOnly,         // Monitor containers without performing updates
+		LifecycleHooks:      params.LifecycleHooks,      // Enable pre- and post-update lifecycle hook commands
+		RollingRestart:      params.RollingRestart,      // Update containers sequentially rather than all at once
+		LabelPrecedence:     params.LabelPrecedence,     // Give container label settings priority over global flags
+		NoPull:              params.NoPull,              // Skip pulling new images from registry during updates
+		Timeout:             params.Timeout,             // Maximum duration for container stop operations
+		PullFailureDelay:    params.PullFailureDelay,    // Delay after failed Watchtower self-update pulls
+		LifecycleUID:        params.LifecycleUID,        // Default UID to run lifecycle hooks as
+		LifecycleGID:        params.LifecycleGID,        // Default GID to run lifecycle hooks as
+		CPUCopyMode:         params.CPUCopyMode,         // CPU settings handling when recreating containers
+		RunOnce:             params.RunOnce,             // Perform one-time update and exit
+		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
+		CurrentContainerID:  params.CurrentContainerID,  // ID of the current Watchtower container for self-update logic
+		UseComposeDependsOn: params.UseComposeDependsOn, // Enable Docker Compose depends_on label processing
 	}
 
 	// Execute the container update operation

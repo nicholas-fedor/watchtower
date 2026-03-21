@@ -528,9 +528,12 @@ func filterSelfReferences(links []string, containerName string) []string {
 // dependencies where a container would depend on itself. This ensures the
 // dependency resolution algorithm can process containers in a valid topological order.
 //
+// Parameters:
+//   - useComposeDependsOn: Whether to include Docker Compose depends_on label in dependency resolution.
+//
 // Returns:
 //   - []string: List of linked container names with self-references removed.
-func (c *Container) Links() []string {
+func (c *Container) Links(useComposeDependsOn bool) []string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Check Watchtower's depends-on label first.
@@ -538,9 +541,11 @@ func (c *Container) Links() []string {
 		return filterSelfReferences(links, c.Name())
 	}
 
-	// Check compose depends-on label.
-	if links := getLinksFromComposeLabel(c, clog); links != nil {
-		return filterSelfReferences(links, c.Name())
+	// Check compose depends-on label if enabled.
+	if useComposeDependsOn {
+		if links := getLinksFromComposeLabel(c, clog); links != nil {
+			return filterSelfReferences(links, c.Name())
+		}
 	}
 
 	// Fall back to HostConfig links and network mode.

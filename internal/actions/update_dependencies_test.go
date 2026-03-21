@@ -134,7 +134,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(provider.ToRestart()).To(gomega.BeTrue())
 			gomega.Expect(consumer.ToRestart()).To(gomega.BeFalse())
 
-			actions.UpdateImplicitRestart(containers, containers)
+			actions.UpdateImplicitRestart(containers, containers, true)
 
 			gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
 			gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // db
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // web
 
-				actions.UpdateImplicitRestart(containers, containers)
+				actions.UpdateImplicitRestart(containers, containers, true)
 
 				// web should be marked for restart because it depends on db
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
@@ -173,7 +173,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // db
 				gomega.Expect(containers[2].ToRestart()).To(gomega.BeFalse()) // app
 
-				actions.UpdateImplicitRestart(containers, containers)
+				actions.UpdateImplicitRestart(containers, containers, true)
 
 				// All should be marked for restart: cache -> db -> app
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
@@ -194,11 +194,113 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // db
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // web
 
-				actions.UpdateImplicitRestart(containers, containers)
+				actions.UpdateImplicitRestart(containers, containers, true)
 
 				// web should be marked for restart because it depends on db
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+			},
+		)
+
+		ginkgo.It(
+			"should NOT propagate restart via compose depends_on when UseComposeDependsOn is false",
+			func() {
+				// Create containers with compose depends_on label
+				dbContainer := mockActions.CreateMockContainerWithConfig(
+					"myproject_db_1",
+					"/myproject_db_1",
+					"postgres:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Image: "postgres:latest",
+						Labels: map[string]string{
+							"com.docker.compose.service": "db",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				webContainer := mockActions.CreateMockContainerWithConfig(
+					"myproject_web_1",
+					"/myproject_web_1",
+					"web:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Image: "web:latest",
+						Labels: map[string]string{
+							"com.docker.compose.service":    "web",
+							"com.docker.compose.depends_on": "db",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{dbContainer, webContainer}
+
+				// db container is stale
+				dbContainer.SetStale(true)
+
+				gomega.Expect(dbContainer.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(webContainer.ToRestart()).To(gomega.BeFalse())
+
+				// Call UpdateImplicitRestart with UseComposeDependsOn = false
+				actions.UpdateImplicitRestart(containers, containers, false)
+
+				// web should NOT be marked for restart because compose depends_on is disabled
+				gomega.Expect(dbContainer.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(webContainer.ToRestart()).To(gomega.BeFalse())
+			},
+		)
+
+		ginkgo.It(
+			"should still propagate restart via watchtower depends-on when UseComposeDependsOn is false",
+			func() {
+				// Create containers with watchtower depends-on label (should still work)
+				dbContainer := mockActions.CreateMockContainerWithConfig(
+					"myproject_db_1",
+					"/myproject_db_1",
+					"postgres:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Image:        "postgres:latest",
+						Labels:       map[string]string{},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				webContainer := mockActions.CreateMockContainerWithConfig(
+					"myproject_web_1",
+					"/myproject_web_1",
+					"web:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Image: "web:latest",
+						Labels: map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "myproject_db_1",
+						},
+						ExposedPorts: map[nat.Port]struct{}{},
+					})
+
+				containers := []types.Container{dbContainer, webContainer}
+
+				// db container is stale
+				dbContainer.SetStale(true)
+
+				gomega.Expect(dbContainer.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(webContainer.ToRestart()).To(gomega.BeFalse())
+
+				// Call UpdateImplicitRestart with UseComposeDependsOn = false
+				// But watchtower depends-on should still work
+				actions.UpdateImplicitRestart(containers, containers, false)
+
+				// web should be marked for restart because it depends on db via watchtower label
+				gomega.Expect(dbContainer.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(webContainer.ToRestart()).To(gomega.BeTrue())
 			},
 		)
 		ginkgo.It("should propagate restart through chained dependencies", func() {
@@ -256,7 +358,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
 			// Run UpdateImplicitRestart to propagate restart through the chain
-			actions.UpdateImplicitRestart(containers, containers)
+			actions.UpdateImplicitRestart(containers, containers, true)
 
 			// Verify that restart propagates: A and B should now be marked for restart
 			gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue()) // C
@@ -920,7 +1022,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(dependency.ToRestart()).To(gomega.BeTrue())
 					gomega.Expect(dependent.ToRestart()).To(gomega.BeFalse())
 
-					actions.UpdateImplicitRestart(containers, containers)
+					actions.UpdateImplicitRestart(containers, containers, true)
 
 					// Verify that restart propagates to dependent
 					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue()) // dependency
@@ -1361,7 +1463,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(dependency.ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(dependent.ToRestart()).To(gomega.BeFalse())
 
-				actions.UpdateImplicitRestart(containers, containers)
+				actions.UpdateImplicitRestart(containers, containers, true)
 
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue()) // dependency
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue()) // dependent
@@ -1375,7 +1477,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(dependency.ToRestart()).To(gomega.BeFalse())
 				gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
 
-				actions.UpdateImplicitRestart(containers, containers)
+				actions.UpdateImplicitRestart(containers, containers, true)
 
 				// With unidirectional logic, restart does NOT propagate from dependent to dependency
 				gomega.Expect(containers[0].ToRestart()).

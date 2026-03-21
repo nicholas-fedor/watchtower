@@ -248,7 +248,7 @@ func buildDependencyGraph(
 	for _, c := range containers {
 		normalizedIdentifier := normalizedMap[c]
 		// c.Links() already returns normalized container names
-		for _, normalizedLink := range c.Links() {
+		for _, normalizedLink := range c.Links(true) {
 			// Try exact match first
 			if _, exists := containerMap[normalizedLink]; exists {
 				if normalizedLink == normalizedIdentifier {
