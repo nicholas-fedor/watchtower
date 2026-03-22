@@ -23,6 +23,9 @@ on:
       - go.mod
       - go.sum
 
+permissions:
+  contents: read
+
 jobs:
   # Run Go tests and upload coverage
   test:
