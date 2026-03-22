@@ -34,11 +34,12 @@ type DependencySorter struct{}
 //
 // Parameters:
 //   - containers: Slice to sort in place. Modified directly.
+//   - useComposeDependsOn: Whether to include Docker Compose depends_on label in dependency resolution.
 //
 // Returns:
 //   - error: Non-nil if circular reference detected, nil on success.
 //     Error includes the container name and cycle path for debugging.
-func (ds DependencySorter) Sort(containers []types.Container) error {
+func (ds DependencySorter) Sort(containers []types.Container, useComposeDependsOn bool) error {
 	if containers == nil {
 		return nil
 	}
@@ -65,7 +66,7 @@ func (ds DependencySorter) Sort(containers []types.Container) error {
 	}).Debug("Separated containers by Watchtower status")
 
 	// Sort non-Watchtower containers by dependencies using internal sorter
-	sortedNonWatchtower, err := sortByDependencies(nonWatchtowerContainers)
+	sortedNonWatchtower, err := sortByDependencies(nonWatchtowerContainers, useComposeDependsOn)
 	if err != nil {
 		logrus.WithError(err).Debug("Dependency sort failed for non-Watchtower containers")
 
@@ -122,9 +123,9 @@ func (ds DependencySorter) Sort(containers []types.Container) error {
 //   - []types.Container: Sorted list in dependency order (dependencies first).
 //   - error: Non-nil if circular reference detected, nil on success.
 //     Error includes container name and cycle path for debugging.
-func sortByDependencies(containers []types.Container) ([]types.Container, error) {
+func sortByDependencies(containers []types.Container, useComposeDependsOn bool) ([]types.Container, error) {
 	// Phase 1: Build the dependency graph data structures
-	containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(containers)
+	containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(containers, useComposeDependsOn)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +209,7 @@ func sortByDependencies(containers []types.Container) ([]types.Container, error)
 //   - error: IdentifierCollisionError if duplicate identifiers detected, nil otherwise
 func buildDependencyGraph(
 	containers []types.Container,
+	useComposeDependsOn bool,
 ) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error) {
 	containerMap := make(map[string]types.Container)
 	indegree := make(map[string]int)
@@ -248,7 +250,7 @@ func buildDependencyGraph(
 	for _, c := range containers {
 		normalizedIdentifier := normalizedMap[c]
 		// c.Links() already returns normalized container names
-		for _, normalizedLink := range c.Links(true) {
+		for _, normalizedLink := range c.Links(useComposeDependsOn) {
 			// Try exact match first
 			if _, exists := containerMap[normalizedLink]; exists {
 				if normalizedLink == normalizedIdentifier {

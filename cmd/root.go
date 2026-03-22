@@ -579,7 +579,7 @@ func runMain(cfg types.RunConfig) int {
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
 	if rollingRestart {
-		err := actions.ValidateRollingRestartDependencies(ctx, client, cfg.Filter)
+		err := actions.ValidateRollingRestartDependencies(ctx, client, cfg.Filter, useComposeDependsOn)
 		if err != nil {
 			logNotify("Rolling restart compatibility validation failed", err)
 

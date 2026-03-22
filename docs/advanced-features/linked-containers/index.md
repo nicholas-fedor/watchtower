@@ -128,7 +128,7 @@ In most cases, no additional configuration is required. Watchtower automatically
 
 ### Disable Docker Compose Depends-On
 
-If you want to disable automatic dependency detection from the Docker Compose `depends_on` configuration while preserving other dependency sources, use the  :
+If you want to disable automatic dependency detection from the Docker Compose `depends_on` configuration while preserving other dependency sources, use the following configuration:
 
 === "Docker Compose"
 

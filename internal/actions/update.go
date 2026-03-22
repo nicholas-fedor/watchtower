@@ -118,7 +118,7 @@ func Update(
 	}
 
 	// Detect circular dependencies and mark affected containers as skipped.
-	cycles := container.DetectCycles(filteredContainers)
+	cycles := container.DetectCycles(filteredContainers, config.UseComposeDependsOn)
 	for _, c := range filteredContainers {
 		if cycles[container.ResolveContainerIdentifier(c)] {
 			progress.AddSkipped(c, errCircularDependency, config)
@@ -283,7 +283,7 @@ func Update(
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
-	err = sorter.SortByDependencies(filteredContainers)
+	err = sorter.SortByDependencies(filteredContainers, config.UseComposeDependsOn)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
 			var circularErr sorter.CircularReferenceError
@@ -332,7 +332,7 @@ func Update(
 	}
 
 	// Sort containers to restart by dependencies to ensure correct update and restart order.
-	err = sorter.SortByDependencies(allContainersToRestart)
+	err = sorter.SortByDependencies(allContainersToRestart, config.UseComposeDependsOn)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
 

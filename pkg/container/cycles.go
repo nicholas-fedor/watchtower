@@ -148,12 +148,13 @@ func (cd *cycleDetector) dfs(node string) {
 //
 // Parameters:
 //   - containers: List of containers to analyze for cycles. Should not be nil.
+//   - useComposeDependsOn: Whether to include Docker Compose depends_on label in dependency resolution.
 //
 // Returns:
 //   - map[string]bool: Map where keys are container names and values indicate cycle involvement.
 //     true = container is part of at least one cycle, false/absent = no cycles detected.
 //     Empty map returned if no cycles found.
-func DetectCycles(containers []types.Container) map[string]bool {
+func DetectCycles(containers []types.Container, useComposeDependsOn bool) map[string]bool {
 	// Initialize cycle detector with empty data structures
 	// All containers start as white (unvisited) and no cycles detected yet
 	cycleDetector := &cycleDetector{
@@ -181,7 +182,7 @@ func DetectCycles(containers []types.Container) map[string]bool {
 
 		// Get all dependencies (links) for this container
 		// c.Links() already returns normalized container names
-		links := c.Links(true)
+		links := c.Links(useComposeDependsOn)
 
 		// Translate each link target through the alias map to ensure canonical IDs
 		canonicalLinks := make([]string, 0, len(links))

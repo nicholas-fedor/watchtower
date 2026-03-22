@@ -39,6 +39,6 @@ func BenchmarkTimeSorterSort(b *testing.B) {
 	for b.Loop() {
 		temp := make([]types.Container, len(containers))
 		copy(temp, containers)
-		ts.Sort(temp)
+		ts.Sort(temp, false)
 	}
 }

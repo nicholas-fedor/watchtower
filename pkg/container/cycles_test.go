@@ -29,7 +29,7 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		})
 
 		containers := []types.Container{c1, c2}
-		cycles := DetectCycles(containers)
+		cycles := DetectCycles(containers, true)
 		gomega.Expect(cycles).To(gomega.BeEmpty())
 	})
 
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		})
 
 		containers := []types.Container{c1, c2}
-		cycles := DetectCycles(containers)
+		cycles := DetectCycles(containers, true)
 		gomega.Expect(cycles).To(gomega.HaveLen(2))
 		gomega.Expect(cycles).To(gomega.HaveKey("c1"))
 		gomega.Expect(cycles).To(gomega.HaveKey("c2"))
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		})
 
 		containers := []types.Container{c1, c2, c3}
-		cycles := DetectCycles(containers)
+		cycles := DetectCycles(containers, true)
 		gomega.Expect(cycles).To(gomega.HaveLen(3))
 		gomega.Expect(cycles).To(gomega.HaveKey("c1"))
 		gomega.Expect(cycles).To(gomega.HaveKey("c2"))
@@ -100,7 +100,7 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		})
 
 		containers := []types.Container{c1}
-		cycles := DetectCycles(containers)
+		cycles := DetectCycles(containers, true)
 		gomega.Expect(cycles).To(gomega.HaveLen(1))
 		gomega.Expect(cycles).To(gomega.HaveKey("c1"))
 	})
@@ -133,7 +133,7 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		})
 
 		containers := []types.Container{c1, c2, c3}
-		cycles := DetectCycles(containers)
+		cycles := DetectCycles(containers, true)
 		gomega.Expect(cycles).To(gomega.HaveLen(2))
 		gomega.Expect(cycles).To(gomega.HaveKey("c2"))
 		gomega.Expect(cycles).To(gomega.HaveKey("c3"))
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 
 	ginkgo.It("should handle empty container list", func() {
 		containers := []types.Container{}
-		cycles := DetectCycles(containers)
+		cycles := DetectCycles(containers, true)
 		gomega.Expect(cycles).To(gomega.BeEmpty())
 	})
 
@@ -170,7 +170,7 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 			c1,
 			c2,
 		} // Only c1 and c2 provided, "unknown" is not in the list
-		cycles := DetectCycles(containers)
+		cycles := DetectCycles(containers, true)
 		gomega.Expect(cycles).
 			To(gomega.HaveLen(2))
 			// Cycle should still be detected between c1 and c2

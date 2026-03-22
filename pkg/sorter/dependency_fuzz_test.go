@@ -47,7 +47,7 @@ func FuzzDependencySort(f *testing.F) {
 		copy(testContainers, containers)
 
 		// This should not panic
-		err := ds.Sort(testContainers)
+		err := ds.Sort(testContainers, true)
 		// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
 		if err != nil {
 			var (
@@ -100,7 +100,7 @@ func FuzzCycleDetection(f *testing.F) {
 		copy(testContainers, containers)
 
 		// This should not panic
-		err := ds.Sort(testContainers)
+		err := ds.Sort(testContainers, true)
 		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
 			var (
@@ -207,7 +207,7 @@ func FuzzSortByDependencies(f *testing.F) {
 		containers := generateBenchmarkContainers(int(count), float64(depFactor))
 
 		// This should not panic
-		sorted, err := sortByDependencies(containers)
+		sorted, err := sortByDependencies(containers, true)
 		// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
 		if err != nil {
 			var (
@@ -734,7 +734,7 @@ func FuzzIdentifierCollisions(f *testing.F) {
 		copy(testContainers, containers)
 
 		// This should not panic and should not detect false cycles
-		err := ds.Sort(testContainers)
+		err := ds.Sort(testContainers, true)
 		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
 			var (
@@ -781,7 +781,7 @@ func FuzzMalformedLabels(f *testing.F) {
 		copy(testContainers, containers)
 
 		// This should not panic
-		err := ds.Sort(testContainers)
+		err := ds.Sort(testContainers, true)
 		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
 			var (
@@ -821,7 +821,7 @@ func FuzzLinkNormalization(f *testing.F) {
 		copy(testContainers, containers)
 
 		// This should not panic
-		err := ds.Sort(testContainers)
+		err := ds.Sort(testContainers, true)
 		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
 			var (
@@ -860,7 +860,7 @@ func FuzzEmptyIdentifiers(f *testing.F) {
 		copy(testContainers, containers)
 
 		// This should not panic
-		err := ds.Sort(testContainers)
+		err := ds.Sort(testContainers, true)
 		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
 		if err != nil {
 			var (
