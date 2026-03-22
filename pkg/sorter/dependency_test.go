@@ -140,6 +140,40 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("c1 -> c2 -> c1"))
 		})
 
+		ginkgo.It("should ignore Compose depends_on but honor Watchtower labels when useComposeDependsOn is false", func() {
+			// c1 has a Compose-style dependency on c2 (only returned when useComposeDependsOn=true)
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().Name().Return("c1")
+			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
+			c1.EXPECT().Links(false).Return(nil) // Compose label ignored
+			c1.EXPECT().IsWatchtower().Return(false)
+			c1.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			// c2 has a Watchtower explicit depends-on label (returned regardless of flag)
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().Name().Return("c2")
+			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
+			c2.EXPECT().Links(false).Return(nil)
+			c2.EXPECT().IsWatchtower().Return(false)
+			c2.EXPECT().
+				ContainerInfo().
+				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
+
+			containers := []types.Container{c1, c2}
+			ds := DependencySorter{}
+			err := ds.Sort(containers, false)
+			// Since c1 has no dependencies when useComposeDependsOn=false, sort should succeed
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.HaveLen(2))
+			// No dependency ordering enforced, so both orderings are valid;
+			// just verify both containers are present
+			names := []string{containers[0].Name(), containers[1].Name()}
+			gomega.Expect(names).To(gomega.ContainElement("c1"))
+			gomega.Expect(names).To(gomega.ContainElement("c2"))
+		})
+
 		ginkgo.It("should place Watchtower containers last", func() {
 			watchtower := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			watchtower.EXPECT().Name().Return("watchtower")

@@ -59,6 +59,59 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 			gomega.Expect(containers[2].Name()).To(gomega.Equal("c3"))
 		})
 
+		ginkgo.It("should produce identical results regardless of useComposeDependsOn", func() {
+			now := time.Now()
+			ts := TimeSorter{}
+
+			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+					Created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano),
+				},
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{},
+				},
+			})
+			c1.EXPECT().Name().Return("c1").Times(2)
+
+			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+					Created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
+				},
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{},
+				},
+			})
+			c2.EXPECT().Name().Return("c2").Times(2)
+
+			c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+			c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+					Created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
+				},
+				Config: &dockerContainer.Config{
+					Labels: map[string]string{},
+				},
+			})
+			c3.EXPECT().Name().Return("c3").Times(2)
+
+			// Sort with useComposeDependsOn=false
+			containersFalse := []types.Container{c3, c1, c2}
+			err := ts.Sort(containersFalse, false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Sort with useComposeDependsOn=true
+			containersTrue := []types.Container{c3, c1, c2}
+			err = ts.Sort(containersTrue, true)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Both should produce identical ordering
+			gomega.Expect(containersTrue[0].Name()).To(gomega.Equal(containersFalse[0].Name()))
+			gomega.Expect(containersTrue[1].Name()).To(gomega.Equal(containersFalse[1].Name()))
+			gomega.Expect(containersTrue[2].Name()).To(gomega.Equal(containersFalse[2].Name()))
+		})
+
 		ginkgo.It(
 			"should handle invalid creation timestamps by using far future time as fallback",
 			func() {

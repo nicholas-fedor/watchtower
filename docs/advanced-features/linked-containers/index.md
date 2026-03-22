@@ -57,6 +57,7 @@ services:
 
 The `com.docker.compose.depends_on` label is automatically set by Docker Compose and parsed by Watchtower to extract service names and support implicitly restarting linked services.
 
+<!-- markdownlint-disable MD046 -->
 !!! Important "Docker Compose depends_on Restart Behavior"
     Docker Compose's [`depends_on`](https://docs.docker.com/reference/compose-file/services/#depends_on) has a `restart` attribute in the long-form syntax:
 
@@ -69,7 +70,8 @@ The `com.docker.compose.depends_on` label is automatically set by Docker Compose
             restart: true
     ```
 
-    Watchtower does not support using this to control implicit restarts, because the short-form syntax defaults to `restart: false`.
+    Watchtower does not support using this to control implicit restarts, because this is an explicit, opt-in feature that defaults to `false` when omitted, such as when using the short-form syntax.
+<!-- markdownlint-enable MD046 -->
 
 #### Docker Links and Network Mode
 
@@ -130,8 +132,8 @@ In most cases, no additional configuration is required. Watchtower automatically
 
 If you want to disable automatic dependency detection from the Docker Compose `depends_on` configuration while preserving other dependency sources, use the following configuration:
 
+<!-- markdownlint-disable MD046 -->
 === "Docker Compose"
-
     ```yaml
     services:
       watchtower:
@@ -139,9 +141,7 @@ If you want to disable automatic dependency detection from the Docker Compose `d
         environment:
           - WATCHTOWER_USE_COMPOSE_DEPENDS_ON=false
     ```
-
 === "Docker CLI"
-
     ```bash
     docker run -d \
         --name watchtower \
@@ -149,6 +149,7 @@ If you want to disable automatic dependency detection from the Docker Compose `d
         nickfedor/watchtower \
         --use-compose-depends-on=false
     ```
+<!-- markdownlint-enable MD046 -->
 
 This disables parsing of the `com.docker.compose.depends_on` label while still honoring:
 
@@ -160,17 +161,15 @@ This disables parsing of the `com.docker.compose.depends_on` label while still h
 
 For cases where automatic detection is insufficient, use the Watchtower depends-on label:
 
+<!-- markdownlint-disable MD046 -->
 === "Dockerfile"
-
     ```dockerfile
     FROM nginx:latest
 
     # Declare dependencies on database and cache services
     LABEL com.centurylinklabs.watchtower.depends-on="postgres,redis"
     ```
-
 === "Docker Compose"
-
     ```yaml
     services:
       web:
@@ -182,6 +181,7 @@ For cases where automatic detection is insufficient, use the Watchtower depends-
       redis:
         image: redis
     ```
+<!-- markdownlint-enable MD046 -->
 
 ### Advanced Scenarios
 
@@ -218,8 +218,8 @@ In this scenario, Watchtower will update containers in the order: `cache`, `data
 
 Consider a classic WordPress setup with MySQL database:
 
+<!-- markdownlint-disable MD046 -->
 === "Docker Compose"
-
     ```yaml
     services:
       wordpress:
@@ -233,9 +233,7 @@ Consider a classic WordPress setup with MySQL database:
         environment:
           MYSQL_ROOT_PASSWORD: example
     ```
-
 === "Update Process"
-
     When Watchtower detects a MySQL update:
 
     1. **Dependency Detection**: Identifies that `wordpress` depends on `mysql`
@@ -243,11 +241,13 @@ Consider a classic WordPress setup with MySQL database:
     3. **Update Order**: Updates and restarts `mysql` first, then `wordpress`
 
     This prevents WordPress from losing database connectivity during the update.
+<!-- markdownlint-enable MD046 -->
 
 ### Microservices Architecture
 
 For complex applications with multiple services:
 
+<!-- markdownlint-disable MD046 -->
 === "Docker Compose"
 
     ```yaml
@@ -281,11 +281,13 @@ For complex applications with multiple services:
     ```
 
     Update order: `postgres`, `redis`, `user-service`, `auth-service`, `api-gateway`
+<!-- markdownlint-enable MD046 -->
 
 ### Legacy Docker Links
 
 For applications using traditional Docker linking:
 
+<!-- markdownlint-disable MD046 -->
 === "Docker Run Commands"
 
     ```bash
@@ -318,6 +320,7 @@ Containers using `network_mode: service:container`:
 === "Watchtower Behavior"
 
     The `sidecar` container is treated as dependent on `main-app`, ensuring proper update sequencing.
+<!-- markdownlint-enable MD046 -->
 
 ## Troubleshooting
 
@@ -371,11 +374,3 @@ Check container labels:
 ```bash
 docker inspect container_name | jq '.[0].Config.Labels'
 ```
-
-### Best Practices
-
-- **Use Docker Compose** for complex applications - it provides clear dependency declarations
-- **Avoid circular dependencies** - they prevent successful updates
-- **Test update scenarios** in staging environments first
-- **Use explicit labels** when automatic detection doesn't work
-- **Monitor logs** during updates to verify correct ordering

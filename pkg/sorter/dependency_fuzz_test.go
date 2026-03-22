@@ -42,38 +42,41 @@ func FuzzDependencySort(f *testing.F) {
 
 		containers := generateBenchmarkContainers(int(count), float64(depFactor))
 
-		ds := DependencySorter{}
-		testContainers := make([]types.Container, len(containers))
-		copy(testContainers, containers)
+		// Test with both useComposeDependsOn values
+		for _, useComposeDependsOn := range []bool{true, false} {
+			ds := DependencySorter{}
+			testContainers := make([]types.Container, len(containers))
+			copy(testContainers, containers)
 
-		// This should not panic
-		err := ds.Sort(testContainers, true)
-		// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
-		if err != nil {
-			var (
-				circularErr  CircularReferenceError
-				collisionErr IdentifierCollisionError
-			)
+			// This should not panic
+			err := ds.Sort(testContainers, useComposeDependsOn)
+			// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
+			if err != nil {
+				var (
+					circularErr  CircularReferenceError
+					collisionErr IdentifierCollisionError
+				)
 
-			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
-				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
+					t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				}
 			}
-		}
 
-		// Verify all containers are still present
-		if len(testContainers) != len(containers) {
-			t.Fatalf("Container count changed: %d -> %d", len(containers), len(testContainers))
-		}
+			// Verify all containers are still present
+			if len(testContainers) != len(containers) {
+				t.Fatalf("Container count changed: %d -> %d", len(containers), len(testContainers))
+			}
 
-		// Verify all original containers are present in result
-		originalNames := make(map[string]bool)
-		for _, c := range containers {
-			originalNames[c.Name()] = true
-		}
+			// Verify all original containers are present in result
+			originalNames := make(map[string]bool)
+			for _, c := range containers {
+				originalNames[c.Name()] = true
+			}
 
-		for _, c := range testContainers {
-			if !originalNames[c.Name()] {
-				t.Fatalf("Unknown container in result: %s", c.Name())
+			for _, c := range testContainers {
+				if !originalNames[c.Name()] {
+					t.Fatalf("Unknown container in result: %s", c.Name())
+				}
 			}
 		}
 	})
@@ -95,21 +98,24 @@ func FuzzCycleDetection(f *testing.F) {
 			return // Skip empty inputs
 		}
 
-		ds := DependencySorter{}
-		testContainers := make([]types.Container, len(containers))
-		copy(testContainers, containers)
+		// Test with both useComposeDependsOn values
+		for _, useComposeDependsOn := range []bool{true, false} {
+			ds := DependencySorter{}
+			testContainers := make([]types.Container, len(containers))
+			copy(testContainers, containers)
 
-		// This should not panic
-		err := ds.Sort(testContainers, true)
-		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
-		if err != nil {
-			var (
-				circularErr  CircularReferenceError
-				collisionErr IdentifierCollisionError
-			)
+			// This should not panic
+			err := ds.Sort(testContainers, useComposeDependsOn)
+			// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
+			if err != nil {
+				var (
+					circularErr  CircularReferenceError
+					collisionErr IdentifierCollisionError
+				)
 
-			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
-				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
+					t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				}
 			}
 		}
 	})
@@ -729,28 +735,31 @@ func FuzzIdentifierCollisions(f *testing.F) {
 			return
 		}
 
-		ds := DependencySorter{}
-		testContainers := make([]types.Container, len(containers))
-		copy(testContainers, containers)
+		// Test with both useComposeDependsOn values
+		for _, useComposeDependsOn := range []bool{true, false} {
+			ds := DependencySorter{}
+			testContainers := make([]types.Container, len(containers))
+			copy(testContainers, containers)
 
-		// This should not panic and should not detect false cycles
-		err := ds.Sort(testContainers, true)
-		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
-		if err != nil {
-			var (
-				circularErr  CircularReferenceError
-				collisionErr IdentifierCollisionError
-			)
+			// This should not panic and should not detect false cycles
+			err := ds.Sort(testContainers, useComposeDependsOn)
+			// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
+			if err != nil {
+				var (
+					circularErr  CircularReferenceError
+					collisionErr IdentifierCollisionError
+				)
 
-			if errors.As(err, &circularErr) {
-				// Verify the cycle is real, not a false positive due to identifier collision
-				if !isRealCycle(containers, circularErr) {
-					t.Fatalf("False positive cycle detected: %v", circularErr)
+				if errors.As(err, &circularErr) {
+					// Verify the cycle is real, not a false positive due to identifier collision
+					if !isRealCycle(containers, circularErr) {
+						t.Fatalf("False positive cycle detected: %v", circularErr)
+					}
+				} else if !errors.As(err, &collisionErr) {
+					t.Fatalf("Unexpected error type: %T, error: %v", err, err)
 				}
-			} else if !errors.As(err, &collisionErr) {
-				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				// IdentifierCollisionError is expected and acceptable
 			}
-			// IdentifierCollisionError is expected and acceptable
 		}
 	})
 }
@@ -776,21 +785,24 @@ func FuzzMalformedLabels(f *testing.F) {
 			return
 		}
 
-		ds := DependencySorter{}
-		testContainers := make([]types.Container, len(containers))
-		copy(testContainers, containers)
+		// Test with both useComposeDependsOn values
+		for _, useComposeDependsOn := range []bool{true, false} {
+			ds := DependencySorter{}
+			testContainers := make([]types.Container, len(containers))
+			copy(testContainers, containers)
 
-		// This should not panic
-		err := ds.Sort(testContainers, true)
-		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
-		if err != nil {
-			var (
-				circularErr  CircularReferenceError
-				collisionErr IdentifierCollisionError
-			)
+			// This should not panic
+			err := ds.Sort(testContainers, useComposeDependsOn)
+			// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
+			if err != nil {
+				var (
+					circularErr  CircularReferenceError
+					collisionErr IdentifierCollisionError
+				)
 
-			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
-				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
+					t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				}
 			}
 		}
 	})
@@ -816,21 +828,24 @@ func FuzzLinkNormalization(f *testing.F) {
 			return
 		}
 
-		ds := DependencySorter{}
-		testContainers := make([]types.Container, len(containers))
-		copy(testContainers, containers)
+		// Test with both useComposeDependsOn values
+		for _, useComposeDependsOn := range []bool{true, false} {
+			ds := DependencySorter{}
+			testContainers := make([]types.Container, len(containers))
+			copy(testContainers, containers)
 
-		// This should not panic
-		err := ds.Sort(testContainers, true)
-		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
-		if err != nil {
-			var (
-				circularErr  CircularReferenceError
-				collisionErr IdentifierCollisionError
-			)
+			// This should not panic
+			err := ds.Sort(testContainers, useComposeDependsOn)
+			// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
+			if err != nil {
+				var (
+					circularErr  CircularReferenceError
+					collisionErr IdentifierCollisionError
+				)
 
-			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
-				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
+					t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				}
 			}
 		}
 	})
@@ -855,21 +870,24 @@ func FuzzEmptyIdentifiers(f *testing.F) {
 			return
 		}
 
-		ds := DependencySorter{}
-		testContainers := make([]types.Container, len(containers))
-		copy(testContainers, containers)
+		// Test with both useComposeDependsOn values
+		for _, useComposeDependsOn := range []bool{true, false} {
+			ds := DependencySorter{}
+			testContainers := make([]types.Container, len(containers))
+			copy(testContainers, containers)
 
-		// This should not panic
-		err := ds.Sort(testContainers, true)
-		// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
-		if err != nil {
-			var (
-				circularErr  CircularReferenceError
-				collisionErr IdentifierCollisionError
-			)
+			// This should not panic
+			err := ds.Sort(testContainers, useComposeDependsOn)
+			// Error should either be nil, CircularReferenceError, or IdentifierCollisionError
+			if err != nil {
+				var (
+					circularErr  CircularReferenceError
+					collisionErr IdentifierCollisionError
+				)
 
-			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
-				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
+					t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				}
 			}
 		}
 	})
