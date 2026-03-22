@@ -192,7 +192,7 @@ func BenchmarkDependencySorter(b *testing.B) {
 				testContainers := make([]types.Container, len(containers))
 				copy(testContainers, containers)
 
-				err := ds.Sort(testContainers)
+				err := ds.Sort(testContainers, true)
 				if err != nil {
 					b.Fatalf("Unexpected error in benchmark %s: %v", tc.name, err)
 				}
@@ -282,7 +282,7 @@ func BenchmarkCycleDetection(b *testing.B) {
 				testContainers := make([]types.Container, len(containers))
 				copy(testContainers, containers)
 
-				err := ds.Sort(testContainers)
+				err := ds.Sort(testContainers, true)
 				if tc.hasCycle && err == nil {
 					b.Fatalf("Expected cycle detection error in benchmark %s", tc.name)
 				}
@@ -309,7 +309,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 			testContainers := make([]types.Container, len(containers))
 			copy(testContainers, containers)
 
-			err := ds.Sort(testContainers)
+			err := ds.Sort(testContainers, true)
 			if err != nil {
 				b.Fatalf("Unexpected error: %v", err)
 			}
@@ -329,7 +329,7 @@ func BenchmarkSortStability(b *testing.B) {
 			testContainers := make([]types.Container, len(containers))
 			copy(testContainers, containers)
 
-			err := ds.Sort(testContainers)
+			err := ds.Sort(testContainers, true)
 			if err != nil {
 				b.Fatalf("Unexpected error: %v", err)
 			}

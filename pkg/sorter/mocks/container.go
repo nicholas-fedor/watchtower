@@ -27,7 +27,7 @@ func (c *SimpleContainer) ID() types.ContainerID {
 	return c.ContainerID
 }
 
-func (c *SimpleContainer) Links() []string {
+func (c *SimpleContainer) Links(useComposeDependsOn bool) []string {
 	return c.ContainerLinks
 }
 

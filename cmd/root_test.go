@@ -1177,7 +1177,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with the cancelable context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]types.Container{}, nil).Once()
 
-		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter, true)
 
 		require.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -1193,7 +1193,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with canceled context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.Canceled).Once()
 
-		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter, true)
 
 		// The function should return the error from ListContainers
 		require.Error(t, err)
@@ -1214,7 +1214,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with timed out context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
 
-		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter)
+		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter, true)
 
 		// The function should return the error from ListContainers
 		require.Error(t, err)

@@ -37,16 +37,16 @@ func (_m *MockSorter) EXPECT() *MockSorter_Expecter {
 }
 
 // Sort provides a mock function for the type MockSorter
-func (_mock *MockSorter) Sort(containers []types.Container) error {
-	ret := _mock.Called(containers)
+func (_mock *MockSorter) Sort(containers []types.Container, useComposeDependsOn bool) error {
+	ret := _mock.Called(containers, useComposeDependsOn)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Sort")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func([]types.Container) error); ok {
-		r0 = returnFunc(containers)
+	if returnFunc, ok := ret.Get(0).(func([]types.Container, bool) error); ok {
+		r0 = returnFunc(containers, useComposeDependsOn)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -60,18 +60,24 @@ type MockSorter_Sort_Call struct {
 
 // Sort is a helper method to define mock.On call
 //   - containers []types.Container
-func (_e *MockSorter_Expecter) Sort(containers interface{}) *MockSorter_Sort_Call {
-	return &MockSorter_Sort_Call{Call: _e.mock.On("Sort", containers)}
+//   - useComposeDependsOn bool
+func (_e *MockSorter_Expecter) Sort(containers interface{}, useComposeDependsOn interface{}) *MockSorter_Sort_Call {
+	return &MockSorter_Sort_Call{Call: _e.mock.On("Sort", containers, useComposeDependsOn)}
 }
 
-func (_c *MockSorter_Sort_Call) Run(run func(containers []types.Container)) *MockSorter_Sort_Call {
+func (_c *MockSorter_Sort_Call) Run(run func(containers []types.Container, useComposeDependsOn bool)) *MockSorter_Sort_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 []types.Container
 		if args[0] != nil {
 			arg0 = args[0].([]types.Container)
 		}
+		var arg1 bool
+		if args[1] != nil {
+			arg1 = args[1].(bool)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -82,7 +88,7 @@ func (_c *MockSorter_Sort_Call) Return(err error) *MockSorter_Sort_Call {
 	return _c
 }
 
-func (_c *MockSorter_Sort_Call) RunAndReturn(run func(containers []types.Container) error) *MockSorter_Sort_Call {
+func (_c *MockSorter_Sort_Call) RunAndReturn(run func(containers []types.Container, useComposeDependsOn bool) error) *MockSorter_Sort_Call {
 	_c.Call.Return(run)
 	return _c
 }

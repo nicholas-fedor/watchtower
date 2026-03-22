@@ -15,7 +15,8 @@
 //	if err != nil {
 //	    logrus.WithError(err).Error("Update failed")
 //	}
-//	err = actions.ValidateRollingRestartDependencies(client, filter)
+//	useComposeDependsOn := true
+//	err = actions.ValidateRollingRestartDependencies(ctx, client, filter, useComposeDependsOn)
 //	if err != nil {
 //	    logrus.WithError(err).Error("Sanity check failed")
 //	}

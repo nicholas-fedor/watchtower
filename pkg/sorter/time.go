@@ -16,10 +16,11 @@ type TimeSorter struct{}
 //
 // Parameters:
 //   - containers: Slice to sort in place.
+//   - useComposeDependsOn: Whether to include Docker Compose depends_on label (unused for time sorting).
 //
 // Returns:
 //   - error: Always nil (no errors possible).
-func (ts TimeSorter) Sort(containers []types.Container) error {
+func (ts TimeSorter) Sort(containers []types.Container, _ bool) error {
 	parsedTimes := make([]time.Time, len(containers))
 	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
