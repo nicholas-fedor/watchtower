@@ -11,6 +11,9 @@ on:
       - go.sum
       - main.go
 
+permissions:
+  contents: read
+
 jobs:
   Lint:
     uses: ./.github/workflows/lint.yaml

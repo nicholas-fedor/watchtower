@@ -19,6 +19,9 @@ on:
       DOCKERHUB_TOKEN:
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   # Build binaries, images, SBOMs, and attestations for production or development
   build:
@@ -29,6 +32,11 @@ jobs:
       attestations: write # For generating provenance and SBOMs
       id-token: write # For OIDC auth to Docker Hub and GHCR
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
       - name: Validate build-type input # Ensure build-type is 'prod' or 'dev'.
         run: |
           if [[ "${{ inputs.build-type }}" != "prod" && "${{ inputs.build-type }}" != "dev" ]]; then
