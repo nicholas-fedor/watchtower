@@ -212,49 +212,52 @@ func FuzzSortByDependencies(f *testing.F) {
 
 		containers := generateBenchmarkContainers(int(count), float64(depFactor))
 
-		// This should not panic
-		sorted, err := sortByDependencies(containers, true)
-		// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
-		if err != nil {
-			var (
-				circularErr  CircularReferenceError
-				collisionErr IdentifierCollisionError
-			)
+		// Test with both useComposeDependsOn values
+		for _, useComposeDependsOn := range []bool{true, false} {
+			// This should not panic
+			sorted, err := sortByDependencies(containers, useComposeDependsOn)
+			// If there's an error, it should be a CircularReferenceError or IdentifierCollisionError
+			if err != nil {
+				var (
+					circularErr  CircularReferenceError
+					collisionErr IdentifierCollisionError
+				)
 
-			if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
-				t.Fatalf("Unexpected error type: %T, error: %v", err, err)
-			}
-			// For cycles or collisions, sorted should be nil
-			return
-		}
-
-		// Verify all containers are present in result
-		if len(sorted) != len(containers) {
-			t.Fatalf("Sorted length mismatch: expected %d, got %d", len(containers), len(sorted))
-		}
-
-		// Verify all original containers are present in result
-		originalNames := make(map[string]bool)
-		for _, c := range containers {
-			originalNames[c.Name()] = true
-		}
-
-		for _, c := range sorted {
-			if !originalNames[c.Name()] {
-				t.Fatalf("Unknown container in result: %s", c.Name())
-			}
-		}
-
-		// Verify no duplicates in result
-		resultNames := make(map[string]bool)
-
-		for _, c := range sorted {
-			name := c.Name()
-			if resultNames[name] {
-				t.Fatalf("Duplicate container in result: %s", name)
+				if !errors.As(err, &circularErr) && !errors.As(err, &collisionErr) {
+					t.Fatalf("Unexpected error type: %T, error: %v", err, err)
+				}
+				// For cycles or collisions, sorted should be nil
+				continue
 			}
 
-			resultNames[name] = true
+			// Verify all containers are present in result
+			if len(sorted) != len(containers) {
+				t.Fatalf("Sorted length mismatch: expected %d, got %d", len(containers), len(sorted))
+			}
+
+			// Verify all original containers are present in result
+			originalNames := make(map[string]bool)
+			for _, c := range containers {
+				originalNames[c.Name()] = true
+			}
+
+			for _, c := range sorted {
+				if !originalNames[c.Name()] {
+					t.Fatalf("Unknown container in result: %s", c.Name())
+				}
+			}
+
+			// Verify no duplicates in result
+			resultNames := make(map[string]bool)
+
+			for _, c := range sorted {
+				name := c.Name()
+				if resultNames[name] {
+					t.Fatalf("Duplicate container in result: %s", name)
+				}
+
+				resultNames[name] = true
+			}
 		}
 	})
 }
@@ -362,7 +365,7 @@ func generateCollisionContainers(data []byte) []types.Container {
 }
 
 // isRealCycle verifies that a detected cycle is actually real and not a false positive.
-func isRealCycle(containers []types.Container, circularErr CircularReferenceError) bool {
+func isRealCycle(containers []types.Container, circularErr CircularReferenceError, useComposeDependsOn bool) bool {
 	cyclePath := circularErr.CyclePath
 
 	// Edge case: cycle path must have at least 3 elements for a valid cycle (A->B->A)
@@ -391,7 +394,7 @@ func isRealCycle(containers []types.Container, circularErr CircularReferenceErro
 			return false
 		}
 
-		links := fromContainer.Links(true)
+		links := fromContainer.Links(useComposeDependsOn)
 		found := slices.Contains(links, toName)
 
 		if !found {
@@ -752,7 +755,7 @@ func FuzzIdentifierCollisions(f *testing.F) {
 
 				if errors.As(err, &circularErr) {
 					// Verify the cycle is real, not a false positive due to identifier collision
-					if !isRealCycle(containers, circularErr) {
+					if !isRealCycle(containers, circularErr, useComposeDependsOn) {
 						t.Fatalf("False positive cycle detected: %v", circularErr)
 					}
 				} else if !errors.As(err, &collisionErr) {

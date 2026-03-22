@@ -141,17 +141,19 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 		})
 
 		ginkgo.It("should ignore Compose depends_on but honor Watchtower labels when useComposeDependsOn is false", func() {
-			// c1 has a Compose-style dependency on c2 (only returned when useComposeDependsOn=true)
+			// c1 has a Watchtower explicit depends-on label referencing c2.
+			// Links(false) still returns c2 because Watchtower labels are checked
+			// before the Compose depends_on label in the Links() method.
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
 			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(false).Return(nil) // Compose label ignored
+			c1.EXPECT().Links(false).Return([]string{"c2"}) // Watchtower label honored
 			c1.EXPECT().IsWatchtower().Return(false)
 			c1.EXPECT().
 				ContainerInfo().
 				Return(&dockerContainer.InspectResponse{ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"}, Config: &dockerContainer.Config{Labels: map[string]string{}}})
 
-			// c2 has a Watchtower explicit depends-on label (returned regardless of flag)
+			// c2 has no dependencies.
 			c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c2.EXPECT().Name().Return("c2")
 			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
@@ -164,14 +166,11 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			containers := []types.Container{c1, c2}
 			ds := DependencySorter{}
 			err := ds.Sort(containers, false)
-			// Since c1 has no dependencies when useComposeDependsOn=false, sort should succeed
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.HaveLen(2))
-			// No dependency ordering enforced, so both orderings are valid;
-			// just verify both containers are present
-			names := []string{containers[0].Name(), containers[1].Name()}
-			gomega.Expect(names).To(gomega.ContainElement("c1"))
-			gomega.Expect(names).To(gomega.ContainElement("c2"))
+			// c1 depends on c2, so c2 must come before c1
+			gomega.Expect(containers[0].Name()).To(gomega.Equal("c2"))
+			gomega.Expect(containers[1].Name()).To(gomega.Equal("c1"))
 		})
 
 		ginkgo.It("should place Watchtower containers last", func() {
