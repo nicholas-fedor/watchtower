@@ -84,7 +84,7 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog.Debug("Parsed Microsoft Teams webhook URL")
 
 	// Create Teams config from webhook.
-	config, err := teams.ConfigFromWebhookURL(*webhookURL)
+	config, err := teams.ConfigFromWebhookURL(webhookURL)
 	if err != nil {
 		clog.WithError(err).
 			Debug("Failed to create Microsoft Teams config from webhook URL")
