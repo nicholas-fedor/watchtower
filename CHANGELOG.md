@@ -8,6 +8,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add option to disable Docker Compose depends_on dependency detection by @nicholas-fedor in [#1457](https://github.com/nicholas-fedor/watchtower/pull/1457)
+- Add LJspice as a contributor for code by @allcontributors[bot] in [#1449](https://github.com/nicholas-fedor/watchtower/pull/1449)
+
+### Changed
+
+- Onboard StepSecurity by @stepsecurity-app[bot] in [#1456](https://github.com/nicholas-fedor/watchtower/pull/1456)
+- Enable updates for transitive go dependencies by @nicholas-fedor in [#1428](https://github.com/nicholas-fedor/watchtower/pull/1428)
+
+### Chores
+
+- Update module github.com/nicholas-fedor/shoutrrr to v0.14.1 by @renovate[bot] in [#1462](https://github.com/nicholas-fedor/watchtower/pull/1462)
+- Update module github.com/pelletier/go-toml/v2 to v2.3.0 by @renovate[bot] in [#1461](https://github.com/nicholas-fedor/watchtower/pull/1461)
+- Update docker/login-action digest to 292fe2d by @renovate[bot] in [#1460](https://github.com/nicholas-fedor/watchtower/pull/1460)
+- Update goreleaser/goreleaser-action digest to fdcf0b9 by @renovate[bot] in [#1459](https://github.com/nicholas-fedor/watchtower/pull/1459)
+- Update module go.yaml.in/yaml/v2 to v2.4.4 by @renovate[bot] in [#1440](https://github.com/nicholas-fedor/watchtower/pull/1440)
+- Update golangci/golangci-lint-action digest to e94e72c by @renovate[bot] in [#1458](https://github.com/nicholas-fedor/watchtower/pull/1458)
+- Update github/codeql-action digest to 3869755 by @renovate[bot] in [#1455](https://github.com/nicholas-fedor/watchtower/pull/1455)
+- Update docker/setup-qemu-action digest to 6632d37 by @renovate[bot] in [#1454](https://github.com/nicholas-fedor/watchtower/pull/1454)
+- Update docker/setup-buildx-action digest to d91f340 by @renovate[bot] in [#1453](https://github.com/nicholas-fedor/watchtower/pull/1453)
+- Update docker/login-action digest to da5b89b by @renovate[bot] in [#1452](https://github.com/nicholas-fedor/watchtower/pull/1452)
+- Update github/codeql-action digest to c6f9311 by @renovate[bot] in [#1450](https://github.com/nicholas-fedor/watchtower/pull/1450)
+- Update golangci/golangci-lint-action digest to b269f19 by @renovate[bot] in [#1448](https://github.com/nicholas-fedor/watchtower/pull/1448)
+- Update peter-evans/create-pull-request digest to b993918 by @renovate[bot] in [#1447](https://github.com/nicholas-fedor/watchtower/pull/1447)
+- Update google.golang.org/genproto/googleapis/rpc digest to d00831a by @renovate[bot] in [#1444](https://github.com/nicholas-fedor/watchtower/pull/1444)
+- Update golangci/golangci-lint-action digest to fa2a845 by @renovate[bot] in [#1446](https://github.com/nicholas-fedor/watchtower/pull/1446)
+- Update google.golang.org/genproto/googleapis/api digest to d00831a by @renovate[bot] in [#1445](https://github.com/nicholas-fedor/watchtower/pull/1445)
+- Update google.golang.org/genproto/googleapis/api digest to cd36c79 by @renovate[bot] in [#1443](https://github.com/nicholas-fedor/watchtower/pull/1443)
+- Update securego/gosec action to v2.25.0 by @renovate[bot] in [#1442](https://github.com/nicholas-fedor/watchtower/pull/1442)
+- Update module go.yaml.in/yaml/v2 to v3 by @renovate[bot] in [#1439](https://github.com/nicholas-fedor/watchtower/pull/1439)
+- Update codecov/codecov-action digest to 1af5884 by @renovate[bot] in [#1438](https://github.com/nicholas-fedor/watchtower/pull/1438)
+- Update module go.yaml.in/yaml/v2 to v2.4.4 by @renovate[bot] in [#1436](https://github.com/nicholas-fedor/watchtower/pull/1436)
+- Update golangci/golangci-lint-action digest to 2bcbc9e by @renovate[bot] in [#1435](https://github.com/nicholas-fedor/watchtower/pull/1435)
+- Update module go.yaml.in/yaml/v2 to v3 by @renovate[bot] in [#1434](https://github.com/nicholas-fedor/watchtower/pull/1434)
+- Update module golang.org/x/tools to v0.43.0 by @renovate[bot] in [#1433](https://github.com/nicholas-fedor/watchtower/pull/1433)
+- Update module golang.org/x/net to v0.52.0 by @renovate[bot] in [#1432](https://github.com/nicholas-fedor/watchtower/pull/1432)
+- Update actions/cache digest to 6682284 by @renovate[bot] in [#1431](https://github.com/nicholas-fedor/watchtower/pull/1431)
+- Update google.golang.org/genproto/googleapis/rpc digest to 0b37fe3 by @renovate[bot] in [#1430](https://github.com/nicholas-fedor/watchtower/pull/1430)
+- Update google.golang.org/genproto/googleapis/api digest to 0b37fe3 by @renovate[bot] in [#1429](https://github.com/nicholas-fedor/watchtower/pull/1429)
+- Update nicholas-fedor/govulncheck-action digest to b438bbb by @renovate[bot] in [#1425](https://github.com/nicholas-fedor/watchtower/pull/1425)
+
+### Fixed
+
+- Resolve type mismatch with shoutrrr API change by @nicholas-fedor in [#1463](https://github.com/nicholas-fedor/watchtower/pull/1463)
+- Prevent cleanup of images actively used by active containers by @LJspice in [#1427](https://github.com/nicholas-fedor/watchtower/pull/1427)
+
+### New Contributors
+
+- @stepsecurity-app[bot] made their first contribution in [#1456](https://github.com/nicholas-fedor/watchtower/pull/1456)
+- @LJspice made their first contribution in [#1427](https://github.com/nicholas-fedor/watchtower/pull/1427)
+
+## [1.14.4] - 2026-03-17
+
 ### Changed
 
 - Document regex pattern matching support by @nicholas-fedor in [#1404](https://github.com/nicholas-fedor/watchtower/pull/1404)
@@ -2774,7 +2828,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.3...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.4...HEAD)
+- [1.14.4](https://github.com/nicholas-fedor/watchtower/compare/v1.14.3...v1.14.4)
 - [1.14.3](https://github.com/nicholas-fedor/watchtower/compare/v1.14.2...v1.14.3)
 - [1.14.2](https://github.com/nicholas-fedor/watchtower/compare/v1.14.1...v1.14.2)
 - [1.14.1](https://github.com/nicholas-fedor/watchtower/compare/v1.14.0...v1.14.1)
