@@ -55,7 +55,7 @@ jobs:
           go-version-file: "go.mod"
 
       - name: Set up QEMU # Enable multi-platform emulation.
-        uses: docker/setup-qemu-action@6632d370eaa94c36e362c994b934b79877123e91
+        uses: docker/setup-qemu-action@6804d313191b81cfc5feb5065848250370954232
         with:
           platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
 
