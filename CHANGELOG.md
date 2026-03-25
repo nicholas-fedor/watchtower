@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update docker/setup-buildx-action digest to 172dff0 by @renovate[bot] in [#1467](https://github.com/nicholas-fedor/watchtower/pull/1467)
+- Update docker/login-action digest to a0d57b8 by @renovate[bot] in [#1466](https://github.com/nicholas-fedor/watchtower/pull/1466)
+
+## [1.15.0] - 2026-03-24
+
 ### Added
 
 - Add option to disable Docker Compose depends_on dependency detection by @nicholas-fedor in [#1457](https://github.com/nicholas-fedor/watchtower/pull/1457)
@@ -2828,7 +2835,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.14.4...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.15.0...HEAD)
+- [1.15.0](https://github.com/nicholas-fedor/watchtower/compare/v1.14.4...v1.15.0)
 - [1.14.4](https://github.com/nicholas-fedor/watchtower/compare/v1.14.3...v1.14.4)
 - [1.14.3](https://github.com/nicholas-fedor/watchtower/compare/v1.14.2...v1.14.3)
 - [1.14.2](https://github.com/nicholas-fedor/watchtower/compare/v1.14.1...v1.14.2)
