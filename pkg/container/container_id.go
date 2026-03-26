@@ -228,7 +228,18 @@ func ParseContainerIDFromCgroupString(cgroupString string) (types.ContainerID, e
 }
 
 // GetContainerIDFromHostname retrieves the container ID by matching the HOSTNAME env var.
-// Uses Docker API to list containers and find matching hostname.
+//
+// It uses the Docker API to list containers and find a matching hostname.
+// When multiple containers share the same hostname (e.g., in Docker Compose setups),
+// it prefers the container with the Watchtower label.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - client: Docker client interface for container operations.
+//
+// Returns:
+//   - types.ContainerID: The detected container ID if a match is found.
+//   - error: Non-nil if the HOSTNAME env var is missing or no matching container is found.
 func GetContainerIDFromHostname(ctx context.Context, client Client) (types.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
@@ -239,6 +250,12 @@ func GetContainerIDFromHostname(ctx context.Context, client Client) (types.Conta
 	if err != nil {
 		return "", fmt.Errorf("failed to list all containers: %w", err)
 	}
+
+	// Collect all containers matching the hostname.
+	var (
+		firstMatchID    types.ContainerID
+		watchtowerMatch types.ContainerID
+	)
 
 	for _, c := range containers {
 		containerInfo := c.ContainerInfo()
@@ -255,8 +272,33 @@ func GetContainerIDFromHostname(ctx context.Context, client Client) (types.Conta
 		}
 
 		if containerInfo.Config.Hostname == hostname {
-			return c.ID(), nil
+			// Record only the first match ID instead of accumulating full containers.
+			if firstMatchID == "" {
+				firstMatchID = c.ID()
+			}
+
+			// Track the Watchtower container separately to prefer it over non-Watchtower matches.
+			// Only capture the first Watchtower match to mirror firstMatchID's behavior.
+			if c.IsWatchtower() && watchtowerMatch == "" {
+				watchtowerMatch = c.ID()
+			}
 		}
+	}
+
+	// Return the Watchtower container if found among matches.
+	if watchtowerMatch != "" {
+		logrus.WithField("container_id", watchtowerMatch).
+			Debug("Found Watchtower container by hostname with Watchtower label")
+
+		return watchtowerMatch, nil
+	}
+
+	// Fall back to the first match if no Watchtower container was found.
+	if firstMatchID != "" {
+		logrus.WithField("container_id", firstMatchID).
+			Debug("Found container by hostname (first match, no Watchtower label)")
+
+		return firstMatchID, nil
 	}
 
 	return "", errNoContainerWithHostname
