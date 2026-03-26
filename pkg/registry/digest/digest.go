@@ -34,9 +34,10 @@ const ContentDigestHeader = "Docker-Content-Digest"
 // If not set during the build, it defaults to "Watchtower/unknown", providing a fallback identifier for registry requests.
 var UserAgent = "Watchtower/unknown"
 
-// inspectMutex synchronizes access to ImageInspector operations to ensure thread safety
-// during concurrent digest fetching operations.
-var inspectMutex sync.Mutex
+// imageInspectLocks provides per-image-name mutex synchronization for ImageInspectWithRaw operations.
+// This allows concurrent inspections of different images while serializing inspections of the
+// same image, preventing redundant concurrent requests to the Docker daemon for the same image.
+var imageInspectLocks sync.Map
 
 // Errors for digest retrieval operations.
 var (
@@ -52,6 +53,8 @@ var (
 	errFailedCreateRequest = errors.New("failed to create request")
 	// errFailedExecuteRequest indicates a failure to execute an HTTP request to the registry.
 	errFailedExecuteRequest = errors.New("failed to execute request")
+	// errUnexpectedLockType indicates the image inspect lock map stored an unexpected type.
+	errUnexpectedLockType = errors.New("unexpected type in image inspect lock map")
 )
 
 // NormalizeDigest standardizes a digest string for consistent comparison.
@@ -264,13 +267,30 @@ func fetchDigest(
 	}
 
 	// Inspect the image to check if it's locally built (no RepoDigests).
-	// Synchronize access to prevent race conditions in concurrent operations.
-	inspectMutex.Lock()
+	// Use a per-image-name mutex to serialize inspections of the same image
+	// while allowing concurrent inspections of different images. This prevents
+	// redundant concurrent requests to the Docker daemon for the same image
+	// without blocking unrelated image inspections.
+	imageName := container.ImageName()
 
-	inspect, _, err := inspector.ImageInspectWithRaw(ctx, container.ImageName())
+	// Atomically load an existing mutex for this image name, or store a new one
+	// if this is the first time the image is being inspected. LoadOrStore is
+	// safe for concurrent use and guarantees that all goroutines inspecting
+	// the same image name receive the same mutex instance.
+	mu, _ := imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
 
-	inspectMutex.Unlock()
+	// Type-assert the stored value to *sync.Mutex. This must succeed because
+	// LoadOrStore above guarantees the value is the *sync.Mutex we stored.
+	lock, ok := mu.(*sync.Mutex)
+	if !ok {
+		return "", fmt.Errorf("%w: %s", errUnexpectedLockType, imageName)
+	}
 
+	lock.Lock()
+
+	defer lock.Unlock()
+
+	inspect, _, err := inspector.ImageInspectWithRaw(ctx, imageName)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to inspect image")
 

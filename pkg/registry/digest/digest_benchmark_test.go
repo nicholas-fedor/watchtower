@@ -82,20 +82,39 @@ func BenchmarkNormalizeDigest(b *testing.B) {
 	}
 }
 
-// BenchmarkInspectMutexContention benchmarks the inspectMutex lock contention
-// when multiple goroutines attempt to acquire the lock simultaneously.
-// This measures the overhead of the global mutex in concurrent scenarios.
+// BenchmarkInspectMutexContention benchmarks the per-image inspect lock contention
+// when multiple goroutines attempt to acquire locks for the same image simultaneously.
+// This measures the overhead of the keyed mutex in concurrent scenarios.
 func BenchmarkInspectMutexContention(b *testing.B) {
-	// Simulate mutex lock/unlock with a no-op critical section
-	// This measures only the mutex contention overhead
+	// Simulate per-image lock/unlock with a no-op critical section
+	// This measures only the keyed mutex contention overhead
+	imageName := "nginx:latest"
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			inspectMutex.Lock()
+			// Use Load first to avoid allocating a new *sync.Mutex on every
+			// iteration; only call LoadOrStore when the key does not yet exist.
+			mu, ok := imageInspectLocks.Load(imageName)
+			if !ok {
+				mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
+			}
+
+			lock, ok := mu.(*sync.Mutex)
+			if !ok || lock == nil {
+				mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
+
+				lock, ok = mu.(*sync.Mutex)
+				if !ok || lock == nil {
+					continue
+				}
+			}
+
+			lock.Lock()
 			// Simulate minimal work inside the critical section
 			_ = dummyWork
 
-			inspectMutex.Unlock()
+			lock.Unlock()
 		}
 	})
 }
@@ -181,12 +200,29 @@ func BenchmarkConcurrentDigestChecks(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := range numGoroutines {
-				// Simulate the digest fetch pattern: lock, work, unlock
-				inspectMutex.Lock()
+				// Simulate the per-image digest fetch pattern: lock, work, unlock.
+				// Use Load first to avoid allocating a new *sync.Mutex on every iteration.
+				imageName := "image" + string(rune('0'+i))
+				mu, ok := imageInspectLocks.Load(imageName)
+				if !ok {
+					mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
+				}
+
+				lock, ok := mu.(*sync.Mutex)
+				if !ok || lock == nil {
+					mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
+
+					lock, ok = mu.(*sync.Mutex)
+					if !ok || lock == nil {
+						continue
+					}
+				}
+
+				lock.Lock()
 
 				_ = i // Simulate minimal work
 
-				inspectMutex.Unlock()
+				lock.Unlock()
 			}
 		}
 	})
