@@ -1841,6 +1841,28 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
 		})
 	})
+
+	ginkgo.When("stopping a container that was removed between check and stop", func() {
+		ginkgo.It("should return nil when Docker returns 404 NotFound", func() {
+			container := MockContainer(
+				WithContainerState(dockerContainer.State{Running: true}),
+			)
+			cid := container.ContainerInfo().ID
+
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"POST",
+						gomega.HaveSuffix(fmt.Sprintf("containers/%s/stop", cid)),
+					),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"No such container"}`),
+				),
+			)
+
+			err := StopSourceContainer(context.Background(), docker, container, 10*time.Second)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+	})
 })
 
 var _ = ginkgo.Describe("debugLogMacAddress", func() {

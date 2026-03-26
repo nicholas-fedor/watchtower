@@ -279,6 +279,15 @@ func StopSourceContainer(
 		Timeout: &timeoutSeconds,
 	})
 	if err != nil {
+		// Check if the container was already removed by another process before
+		// the stop call completed, treating it as already stopped.
+		if cerrdefs.IsNotFound(err) {
+			clog.WithField("elapsed", time.Since(startTime)).
+				Debug("Container not found during stop, treating as already stopped")
+
+			return nil
+		}
+
 		// Log the failure with elapsed time and error details for debugging.
 		clog.WithError(err).
 			WithField("elapsed", time.Since(startTime)).
