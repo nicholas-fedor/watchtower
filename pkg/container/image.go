@@ -385,9 +385,23 @@ func (c imageClient) performImagePull(
 	// Start the image pull.
 	response, err := c.api.ImagePull(ctx, imageName, opts)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to initiate image pull")
+		// Differentiate error types for appropriate logging and handling.
+		// Auth failures and missing images return distinct sentinel errors
+		// so callers can programmatically distinguish error categories.
+		switch {
+		case cerrdefs.IsUnauthorized(err):
+			clog.WithError(err).Warn("Image pull failed: authentication required")
 
-		return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
+			return fmt.Errorf("%w: %s: %w", errPullImageUnauthorized, imageName, err)
+		case cerrdefs.IsNotFound(err):
+			clog.WithError(err).Debug("Image pull failed: image not found in registry")
+
+			return fmt.Errorf("%w: %s: %w", errPullImageNotFound, imageName, err)
+		default:
+			clog.WithError(err).Debug("Failed to initiate image pull")
+
+			return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
+		}
 	}
 	defer response.Close()
 
