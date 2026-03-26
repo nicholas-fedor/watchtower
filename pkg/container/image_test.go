@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 	})
 	ginkgo.When("pulling an image that requires authentication", func() {
-		ginkgo.It("should log at Warn level and return errPullImageUnauthorized for auth failures", func() {
+		ginkgo.It("should log at Warn level and return ErrPullImageUnauthorized for auth failures", func() {
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
@@ -105,14 +105,14 @@ var _ = ginkgo.Describe("the client", func() {
 			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("authentication required"))
-			gomega.Expect(errors.Is(err, errPullImageUnauthorized)).To(gomega.BeTrue())
+			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeTrue())
 			gomega.Expect(errors.Is(err, errPullImageFailed)).To(gomega.BeFalse())
 			gomega.Eventually(logbuf).Should(gbytes.Say(`level=warning`))
 			gomega.Eventually(logbuf).Should(gbytes.Say(`Image pull failed: authentication required`))
 		})
 	})
 	ginkgo.When("pulling an image that does not exist in registry", func() {
-		ginkgo.It("should log at Debug level and return errPullImageNotFound for not found errors", func() {
+		ginkgo.It("should log at Debug level and return ErrPullImageNotFound for not found errors", func() {
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
@@ -133,7 +133,7 @@ var _ = ginkgo.Describe("the client", func() {
 			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("image not found"))
-			gomega.Expect(errors.Is(err, errPullImageNotFound)).To(gomega.BeTrue())
+			gomega.Expect(errors.Is(err, ErrPullImageNotFound)).To(gomega.BeTrue())
 			gomega.Expect(errors.Is(err, errPullImageFailed)).To(gomega.BeFalse())
 			gomega.Eventually(logbuf).Should(gbytes.Say(`Image pull failed: image not found in registry`))
 		})
@@ -161,8 +161,8 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to pull image"))
 			gomega.Expect(errors.Is(err, errPullImageFailed)).To(gomega.BeTrue())
-			gomega.Expect(errors.Is(err, errPullImageUnauthorized)).To(gomega.BeFalse())
-			gomega.Expect(errors.Is(err, errPullImageNotFound)).To(gomega.BeFalse())
+			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeFalse())
+			gomega.Expect(errors.Is(err, ErrPullImageNotFound)).To(gomega.BeFalse())
 			gomega.Eventually(logbuf).Should(gbytes.Say(`Failed to initiate image pull`))
 		})
 	})

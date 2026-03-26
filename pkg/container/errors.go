@@ -74,10 +74,10 @@ var (
 	errInspectImageFailed = errors.New("failed to inspect image")
 	// errPullImageFailed indicates a failure to pull an image from the registry.
 	errPullImageFailed = errors.New("failed to pull image")
-	// errPullImageUnauthorized indicates an authentication failure during image pull.
-	errPullImageUnauthorized = errors.New("failed to pull image: authentication required")
-	// errPullImageNotFound indicates the image was not found in the registry.
-	errPullImageNotFound = errors.New("failed to pull image: image not found")
+	// ErrPullImageUnauthorized indicates an authentication failure during image pull.
+	ErrPullImageUnauthorized = errors.New("failed to pull image: authentication required")
+	// ErrPullImageNotFound indicates the image was not found in the registry.
+	ErrPullImageNotFound = errors.New("failed to pull image: image not found")
 	// errReadPullResponseFailed indicates a failure to read the pull response stream.
 	errReadPullResponseFailed = errors.New("failed to read pull response")
 	// errRemoveImageFailed indicates a failure to remove an image from the Docker host.

@@ -392,11 +392,11 @@ func (c imageClient) performImagePull(
 		case cerrdefs.IsUnauthorized(err):
 			clog.WithError(err).Warn("Image pull failed: authentication required")
 
-			return fmt.Errorf("%w: %s: %w", errPullImageUnauthorized, imageName, err)
+			return fmt.Errorf("%w: %s: %w", ErrPullImageUnauthorized, imageName, err)
 		case cerrdefs.IsNotFound(err):
 			clog.WithError(err).Debug("Image pull failed: image not found in registry")
 
-			return fmt.Errorf("%w: %s: %w", errPullImageNotFound, imageName, err)
+			return fmt.Errorf("%w: %s: %w", ErrPullImageNotFound, imageName, err)
 		default:
 			clog.WithError(err).Debug("Failed to initiate image pull")
 
