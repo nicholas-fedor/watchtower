@@ -84,12 +84,20 @@ var _ = ginkgo.Describe("Container", func() {
 		ginkgo.It("removes port bindings with empty port string", func() {
 			c := MockContainer(WithPortBindings("80/tcp"))
 			c.containerInfo.HostConfig.PortBindings[""] = []dockerNat.PortBinding{}
+			c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{
+				"":       {},
+				"80/tcp": {},
+			}
 			err := c.VerifyConfiguration()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			_, exists := c.containerInfo.HostConfig.PortBindings[""]
 			gomega.Expect(exists).To(gomega.BeFalse())
 			_, exists = c.containerInfo.HostConfig.PortBindings["80/tcp"]
+			gomega.Expect(exists).To(gomega.BeTrue())
+			_, exists = c.containerInfo.Config.ExposedPorts[""]
+			gomega.Expect(exists).To(gomega.BeFalse())
+			_, exists = c.containerInfo.Config.ExposedPorts["80/tcp"]
 			gomega.Expect(exists).To(gomega.BeTrue())
 		})
 
