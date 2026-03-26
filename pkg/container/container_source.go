@@ -81,8 +81,8 @@ func ListSourceContainers(
 			"list_options": fmt.Sprintf("%+v", listOptions),
 		}).Debug("ContainerList API call failed")
 
-		// Handle 404 responses from Docker API
-		if strings.Contains(err.Error(), "page not found") {
+		// Check for 404 responses and return an empty container list instead of failing.
+		if cerrdefs.IsNotFound(err) {
 			clog.WithFields(logrus.Fields{
 				"error":       err,
 				"endpoint":    "/containers/json",

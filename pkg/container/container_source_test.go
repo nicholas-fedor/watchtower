@@ -181,6 +181,21 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			gomega.Expect(containers).To(gomega.HaveLen(1))
 		})
 	})
+
+	ginkgo.When("Docker API returns 404 NotFound for container list", func() {
+		ginkgo.It("should return empty container list without error", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/containers/json$")),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"page not found"}`),
+				),
+			)
+
+			containers, err := ListSourceContainers(context.Background(), docker, ClientOptions{}, nil)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.BeEmpty())
+		})
+	})
 })
 
 var _ = ginkgo.Describe("buildListFilterArgs", func() {
