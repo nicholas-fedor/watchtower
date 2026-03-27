@@ -1606,11 +1606,11 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				map[string]string{},
 			)
 
-			// Create a context with very short timeout
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
-			defer cancel()
+			// Create an already-expired context to ensure it is done
+			// before the retry loop's select statement runs.
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
 
-			// Wait for context to expire (ensuring it expires during retry delay)
 			// First call fails, triggering retry with expired context
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
