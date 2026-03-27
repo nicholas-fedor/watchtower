@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -36,6 +35,13 @@ var (
 	// the preRun phase with options derived from command-line flags and environment variables such as
 	// DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_API_VERSION.
 	client container.Client
+
+	// useComposeDependsOn is a flag that controls whether the Docker Compose depends_on label
+	// is processed for container dependency ordering.
+	//
+	// It is set in preRun via the --use-compose-depends-on flag or the WATCHTOWER_USE_COMPOSE_DEPENDS_ON environment variable,
+	// defaulting to true for backward compatibility.
+	useComposeDependsOn bool
 
 	// scheduleSpec holds the cron-formatted schedule string that dictates when periodic container updates occur.
 	//
@@ -281,6 +287,9 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Enable/disable operational precedence of labels.
 	labelPrecedence, _ = flagsSet.GetBool("label-take-precedence")
+
+	// Enable/disable Docker Compose depends_on label processing.
+	useComposeDependsOn, _ = flagsSet.GetBool("use-compose-depends-on")
 
 	// Retrieve lifecycle UID and GID flags.
 	lifecycleUID, _ = flagsSet.GetInt("lifecycle-uid")
@@ -551,6 +560,7 @@ func runMain(cfg types.RunConfig) int {
 			RunOnce:                      params.RunOnce,               // Perform one-time update and exit
 			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
 			CurrentContainerID:           currentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
+			UseComposeDependsOn:          params.UseComposeDependsOn,   // Enable Docker Compose depends_on label processing
 		}
 
 		metric := actions.RunUpdatesWithNotifications(ctx, actionParams)
@@ -568,7 +578,7 @@ func runMain(cfg types.RunConfig) int {
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
 	if rollingRestart {
-		err := actions.ValidateRollingRestartDependencies(ctx, client, cfg.Filter)
+		err := actions.ValidateRollingRestartDependencies(ctx, client, cfg.Filter, useComposeDependsOn)
 		if err != nil {
 			logNotify("Rolling restart compatibility validation failed", err)
 
@@ -593,10 +603,11 @@ func runMain(cfg types.RunConfig) int {
 			nil, // read from flags
 		)
 		params := types.UpdateParams{
-			Cleanup:        cleanup,
-			RunOnce:        cfg.RunOnce,
-			MonitorOnly:    monitorOnly,
-			SkipSelfUpdate: false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
+			Cleanup:             cleanup,
+			RunOnce:             cfg.RunOnce,
+			MonitorOnly:         monitorOnly,
+			SkipSelfUpdate:      false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
+			UseComposeDependsOn: useComposeDependsOn,
 		}
 		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
@@ -639,15 +650,11 @@ func runMain(cfg types.RunConfig) int {
 		currentWatchtowerContainer,
 	)
 	if err != nil {
-		if strings.Contains(err.Error(), "failed to list containers") {
-			logNotify("Failed to detect Watchtower instances", err)
-
-			return 1
-		}
-
-		logNotify("Multiple Watchtower instances detected", err)
-
-		return 1 // Log failure and exit.
+		// Cleanup failure is non-fatal — log a warning and continue.
+		// The old container may still be stopping; forcing exit would leave
+		// no Watchtower running. Continuing ensures the new instance operates
+		// even if the old container couldn't be fully cleaned up.
+		logrus.WithError(err).Warn("Failed to clean up excess Watchtower instances, continuing anyway")
 	}
 
 	// Track if cleanup occurred to prevent redundant updates after self-update
@@ -664,6 +671,12 @@ func runMain(cfg types.RunConfig) int {
 	}
 
 	// Configure and start the HTTP API, handling any startup errors.
+	//
+	// Determine if self-update should be skipped due to host-bound port conflicts.
+	// This flag is passed to the API so the warning is emitted near the HTTP server startup message.
+	skipSelfUpdate := currentWatchtowerContainer != nil &&
+		currentWatchtowerContainer.HasExposedPorts()
+
 	err = api.SetupAndStartAPI(
 		ctx,
 		cfg.APIHost,
@@ -687,6 +700,7 @@ func runMain(cfg types.RunConfig) int {
 		filters.FilterByImage,
 		metrics.Default,
 		logging.WriteStartupMessage,
+		skipSelfUpdate,
 	)
 	if err != nil {
 		logNotify("API setup failed", err)
@@ -695,6 +709,9 @@ func runMain(cfg types.RunConfig) int {
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
+	// The startup message is skipped here if it was already sent by the HTTP API in blocking mode.
+	startupMessageSent := cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI
+
 	err = scheduling.RunUpgradesOnSchedule(
 		ctx, cfg.Command,
 		cfg.Filter,
@@ -712,6 +729,7 @@ func runMain(cfg types.RunConfig) int {
 		cfg.UpdateOnStart,
 		cleanupOccurred,
 		currentWatchtowerContainer,
+		startupMessageSent,
 	)
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)

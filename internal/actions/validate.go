@@ -20,10 +20,11 @@ import (
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - filter: Container filter to select relevant containers.
+//   - useComposeDependsOn: Whether to include Docker Compose depends_on label in dependency resolution.
 //
 // Returns:
 //   - error: Non-nil if dependencies conflict with rolling restarts, nil otherwise.
-func ValidateRollingRestartDependencies(ctx context.Context, client container.Client, filter types.Filter) error {
+func ValidateRollingRestartDependencies(ctx context.Context, client container.Client, filter types.Filter, useComposeDependsOn bool) error {
 	logrus.Debug("Performing pre-update rolling restart dependency validation")
 
 	// Obtain the list of filtered containers.
@@ -45,7 +46,7 @@ func ValidateRollingRestartDependencies(ctx context.Context, client container.Cl
 	// Check each container for links.
 	for _, c := range containers {
 		// If a container has any links, then return an error.
-		if links := c.Links(); len(links) > 0 {
+		if links := c.Links(useComposeDependsOn); len(links) > 0 {
 			logrus.WithFields(logrus.Fields{
 				"container": c.Name(),
 				"links":     links,

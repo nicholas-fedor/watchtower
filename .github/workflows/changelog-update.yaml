@@ -8,6 +8,9 @@ on:
       - CHANGELOG.md
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   changelog:
     runs-on: ubuntu-latest
@@ -15,6 +18,11 @@ jobs:
       contents: write # For committing changelog
       pull-requests: write # For creating PR
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
@@ -22,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@5a30dd90ba97bcb89e03060b1d36736828e222e4
+        uses: crazy-max/ghaction-import-gpg@92a10f995fd20944e1cae9a2e86e62dafe4f6171
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -39,7 +47,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
 
       - name: Create Pull Request for Changelog
-        uses: peter-evans/create-pull-request@6699836a213cf8b28c4f0408a404a6ac79d4458a
+        uses: peter-evans/create-pull-request@00418193b417f888dbf1d993c5c0d31d27fdc7de
         with:
           token: ${{ secrets.CHANGELOG_PAT }}
           committer: Nick Fedor <nick@nickfedor.com>

@@ -19,7 +19,7 @@ type Container interface {
 	Enabled() (bool, bool)                            // Enabled status and presence.
 	IsMonitorOnly(params UpdateParams) bool           // Monitor-only check.
 	Scope() (string, bool)                            // Scope value and presence.
-	Links() []string                                  // Dependency links.
+	Links(useComposeDependsOn bool) []string          // Dependency links.
 	ToRestart() bool                                  // Needs restart check.
 	IsWatchtower() bool                               // Watchtower instance check.
 	StopSignal() string                               // Custom stop signal.
@@ -44,6 +44,7 @@ type Container interface {
 	GetCreateConfig() *dockerContainer.Config         // Creation config.
 	GetCreateHostConfig() *dockerContainer.HostConfig // Host creation config.
 	GetContainerChain() (string, bool)                // Container chain label value and presence.
+	HasExposedPorts() bool                            // Exposed ports presence check.
 }
 
 // ImageInspector defines the interface for inspecting Docker images.

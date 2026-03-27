@@ -564,6 +564,50 @@ func (_c *MockContainer_GetLifecycleUID_Call) RunAndReturn(run func() (int, bool
 	return _c
 }
 
+// HasExposedPorts provides a mock function for the type MockContainer
+func (_mock *MockContainer) HasExposedPorts() bool {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasExposedPorts")
+	}
+
+	var r0 bool
+	if returnFunc, ok := ret.Get(0).(func() bool); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	return r0
+}
+
+// MockContainer_HasExposedPorts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExposedPorts'
+type MockContainer_HasExposedPorts_Call struct {
+	*mock.Call
+}
+
+// HasExposedPorts is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) HasExposedPorts() *MockContainer_HasExposedPorts_Call {
+	return &MockContainer_HasExposedPorts_Call{Call: _e.mock.On("HasExposedPorts")}
+}
+
+func (_c *MockContainer_HasExposedPorts_Call) Run(run func()) *MockContainer_HasExposedPorts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_HasExposedPorts_Call) Return(b bool) *MockContainer_HasExposedPorts_Call {
+	_c.Call.Return(b)
+	return _c
+}
+
+func (_c *MockContainer_HasExposedPorts_Call) RunAndReturn(run func() bool) *MockContainer_HasExposedPorts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HasImageInfo provides a mock function for the type MockContainer
 func (_mock *MockContainer) HasImageInfo() bool {
 	ret := _mock.Called()
@@ -1109,16 +1153,16 @@ func (_c *MockContainer_IsWatchtower_Call) RunAndReturn(run func() bool) *MockCo
 }
 
 // Links provides a mock function for the type MockContainer
-func (_mock *MockContainer) Links() []string {
-	ret := _mock.Called()
+func (_mock *MockContainer) Links(useComposeDependsOn bool) []string {
+	ret := _mock.Called(useComposeDependsOn)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Links")
 	}
 
 	var r0 []string
-	if returnFunc, ok := ret.Get(0).(func() []string); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(bool) []string); ok {
+		r0 = returnFunc(useComposeDependsOn)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
@@ -1133,13 +1177,20 @@ type MockContainer_Links_Call struct {
 }
 
 // Links is a helper method to define mock.On call
-func (_e *MockContainer_Expecter) Links() *MockContainer_Links_Call {
-	return &MockContainer_Links_Call{Call: _e.mock.On("Links")}
+//   - useComposeDependsOn bool
+func (_e *MockContainer_Expecter) Links(useComposeDependsOn interface{}) *MockContainer_Links_Call {
+	return &MockContainer_Links_Call{Call: _e.mock.On("Links", useComposeDependsOn)}
 }
 
-func (_c *MockContainer_Links_Call) Run(run func()) *MockContainer_Links_Call {
+func (_c *MockContainer_Links_Call) Run(run func(useComposeDependsOn bool)) *MockContainer_Links_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 bool
+		if args[0] != nil {
+			arg0 = args[0].(bool)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1149,7 +1200,7 @@ func (_c *MockContainer_Links_Call) Return(strings []string) *MockContainer_Link
 	return _c
 }
 
-func (_c *MockContainer_Links_Call) RunAndReturn(run func() []string) *MockContainer_Links_Call {
+func (_c *MockContainer_Links_Call) RunAndReturn(run func(useComposeDependsOn bool) []string) *MockContainer_Links_Call {
 	_c.Call.Return(run)
 	return _c
 }

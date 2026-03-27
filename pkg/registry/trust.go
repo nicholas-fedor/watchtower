@@ -221,6 +221,7 @@ func EncodeCredentials(authConfig dockerConfig.AuthConfig) (string, error) {
 	}
 
 	// Marshal the auth config to JSON.
+	//nolint:gosec // G117: This is the expected standard Docker auth format
 	buf, err := json.Marshal(authConfig)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to marshal auth config to JSON")

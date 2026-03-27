@@ -341,7 +341,7 @@ func NewClient(opts ClientOptions) Client {
 		case err == nil:
 			// Ping succeeded: use the forced version client
 			cli = pingCli
-		case strings.Contains(err.Error(), "page not found"):
+		case cerrdefs.IsNotFound(err):
 			logrus.WithFields(logrus.Fields{
 				"version":  version,
 				"error":    err,

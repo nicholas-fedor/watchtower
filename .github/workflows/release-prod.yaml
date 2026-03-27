@@ -14,6 +14,9 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+" # Semantic version tags
 
+permissions:
+  contents: read
+
 jobs:
   # Run Go tests and upload coverage
   test:

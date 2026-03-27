@@ -277,6 +277,12 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Label applied to containers take precedence over arguments")
 
 	flags.BoolP(
+		"use-compose-depends-on",
+		"",
+		envBool("WATCHTOWER_USE_COMPOSE_DEPENDS_ON"),
+		"Include Docker Compose depends_on label when determining container update order")
+
+	flags.BoolP(
 		"disable-memory-swappiness",
 		"",
 		envBool("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS"),
@@ -706,6 +712,7 @@ func SetDefaults() {
 	viper.SetDefault("WATCHTOWER_LOG_FORMAT", "auto")
 	viper.SetDefault("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS", false)
 	viper.SetDefault("WATCHTOWER_CPU_COPY_MODE", "auto")
+	viper.SetDefault("WATCHTOWER_USE_COMPOSE_DEPENDS_ON", true)
 	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS1.2")
 }

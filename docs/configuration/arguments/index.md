@@ -26,6 +26,9 @@ docker run --rm \
 
 This command triggers an update attempt for "nginx" and "redis" containers, displays debug output, and removes the Watchtower container upon completion. Without arguments, Watchtower monitors all running containers.
 
+!!! Note
+    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching) for details.
+
 ## Secrets/Files
 
 Certain flags support referencing a file, using its contents as the value, to securely handle sensitive data like passwords or tokens, avoiding exposure in configuration files or command lines.
@@ -407,6 +410,9 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
              Default: None
 ```
 
+!!! Note
+    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex-pattern-matching) for details.
+
 ### Scope Filter
 
 Monitors containers with a `com.centurylinklabs.watchtower.scope` label matching the specified value, enabling multiple Watchtower instances.
@@ -437,6 +443,25 @@ Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
                 Type: Boolean
              Default: false
 ```
+
+### Use Docker Compose Depends-On
+
+Enables or disables processing of the Docker Compose `depends_on` configuration for determining container update order.
+When enabled (default), Watchtower automatically detects and respects Docker Compose service dependencies.
+When disabled, only the Watchtower `depends-on` label, Docker links, and network mode are used.
+
+```text
+            Argument: --use-compose-depends-on
+Environment Variable: WATCHTOWER_USE_COMPOSE_DEPENDS_ON
+                Type: Boolean
+             Default: true
+```
+
+!!! Note
+    Disabling this is useful when you want to prevent Watchtower from automatically using Docker Compose dependencies but still use explicit Watchtower labels or Docker links for ordering.
+
+!!! Warning
+    Rolling restarts are not supported when any container has linked dependencies (including Docker Compose `depends_on`, Watchtower `depends-on` labels, Docker links, or network mode dependencies). When `--rolling-restart` is enabled, `--use-compose-depends-on` controls whether Docker Compose `depends_on` labels are included in the dependency validation check.
 
 ## Registry & Authentication
 

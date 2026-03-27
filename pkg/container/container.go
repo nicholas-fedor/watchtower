@@ -486,9 +486,65 @@ func (c *Container) VerifyConfiguration() error {
 		clog.Debug("Initialized ExposedPorts due to PortBindings")
 	}
 
+	// Validate port bindings for empty or malformed port values.
+	// Docker rejects ports with empty port numbers (e.g., "/tcp") with
+	// "invalid port range: value is empty" during ContainerCreate.
+	for port := range c.containerInfo.HostConfig.PortBindings {
+		portStr := string(port)
+
+		// Skip and remove completely empty port entries.
+		if portStr == "" {
+			clog.Warn("Skipping empty port binding and exposed port")
+
+			delete(c.containerInfo.HostConfig.PortBindings, port)
+			delete(c.containerInfo.Config.ExposedPorts, port)
+
+			continue
+		}
+
+		// nat.Port format is "port/protocol"; validate the port part is non-empty.
+		portPart, _, _ := strings.Cut(portStr, "/")
+		if portPart == "" {
+			clog.WithField("port", portStr).
+				Warn("Skipping port binding with empty port number")
+
+			delete(c.containerInfo.HostConfig.PortBindings, port)
+			delete(c.containerInfo.Config.ExposedPorts, port)
+		}
+	}
+
 	clog.Debug("Verified container configuration")
 
 	return nil
+}
+
+// HasExposedPorts checks if the container has any host-bound port mappings.
+//
+// This is used to determine if a Watchtower container should skip self-updates,
+// as host-bound ports cause port conflicts during the self-update process where
+// the old container holds the port while the new container tries to bind it.
+//
+// Only actual host-to-container port bindings (HostConfig.PortBindings) are
+// considered, not merely declared exposed ports (Config.ExposedPorts), since
+// declared-but-unbound ports do not cause conflicts.
+//
+// Returns:
+//   - bool: True if the container has host-bound port mappings, false otherwise.
+func (c *Container) HasExposedPorts() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.containerInfo == nil {
+		return false
+	}
+
+	// Check if there are any port bindings (host-to-container port mappings).
+	// Guard against nil HostConfig before inspecting PortBindings.
+	if c.containerInfo.HostConfig != nil && len(c.containerInfo.HostConfig.PortBindings) > 0 {
+		return true
+	}
+
+	return false
 }
 
 // filterSelfReferences removes any links that reference the container itself.
@@ -528,9 +584,12 @@ func filterSelfReferences(links []string, containerName string) []string {
 // dependencies where a container would depend on itself. This ensures the
 // dependency resolution algorithm can process containers in a valid topological order.
 //
+// Parameters:
+//   - useComposeDependsOn: Whether to include Docker Compose depends_on label in dependency resolution.
+//
 // Returns:
 //   - []string: List of linked container names with self-references removed.
-func (c *Container) Links() []string {
+func (c *Container) Links(useComposeDependsOn bool) []string {
 	clog := logrus.WithField("container", c.Name())
 
 	// Check Watchtower's depends-on label first.
@@ -538,9 +597,11 @@ func (c *Container) Links() []string {
 		return filterSelfReferences(links, c.Name())
 	}
 
-	// Check compose depends-on label.
-	if links := getLinksFromComposeLabel(c, clog); links != nil {
-		return filterSelfReferences(links, c.Name())
+	// Check compose depends-on label if enabled.
+	if useComposeDependsOn {
+		if links := getLinksFromComposeLabel(c, clog); links != nil {
+			return filterSelfReferences(links, c.Name())
+		}
 	}
 
 	// Fall back to HostConfig links and network mode.

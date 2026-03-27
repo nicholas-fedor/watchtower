@@ -56,6 +56,7 @@ type RunUpdatesWithNotificationsParams struct {
 	RunOnce                      bool              // Perform one-time update and exit
 	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	CurrentContainerID           types.ContainerID // ID of the current Watchtower container for self-update logic
+	UseComposeDependsOn          bool              // Enable Docker Compose depends_on label processing
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -80,22 +81,23 @@ func RunUpdatesWithNotifications(
 
 	// Configure update parameters based on provided flags
 	updateConfig := types.UpdateParams{
-		Filter:             params.Filter,             // Container filter determining which containers are targeted
-		Cleanup:            params.Cleanup,            // Remove old images after container updates
-		NoRestart:          params.NoRestart,          // Prevent containers from being restarted after updates
-		MonitorOnly:        params.MonitorOnly,        // Monitor containers without performing updates
-		LifecycleHooks:     params.LifecycleHooks,     // Enable pre- and post-update lifecycle hook commands
-		RollingRestart:     params.RollingRestart,     // Update containers sequentially rather than all at once
-		LabelPrecedence:    params.LabelPrecedence,    // Give container label settings priority over global flags
-		NoPull:             params.NoPull,             // Skip pulling new images from registry during updates
-		Timeout:            params.Timeout,            // Maximum duration for container stop operations
-		PullFailureDelay:   params.PullFailureDelay,   // Delay after failed Watchtower self-update pulls
-		LifecycleUID:       params.LifecycleUID,       // Default UID to run lifecycle hooks as
-		LifecycleGID:       params.LifecycleGID,       // Default GID to run lifecycle hooks as
-		CPUCopyMode:        params.CPUCopyMode,        // CPU settings handling when recreating containers
-		RunOnce:            params.RunOnce,            // Perform one-time update and exit
-		SkipSelfUpdate:     params.SkipSelfUpdate,     // Skip Watchtower self-update
-		CurrentContainerID: params.CurrentContainerID, // ID of the current Watchtower container for self-update logic
+		Filter:              params.Filter,              // Container filter determining which containers are targeted
+		Cleanup:             params.Cleanup,             // Remove old images after container updates
+		NoRestart:           params.NoRestart,           // Prevent containers from being restarted after updates
+		MonitorOnly:         params.MonitorOnly,         // Monitor containers without performing updates
+		LifecycleHooks:      params.LifecycleHooks,      // Enable pre- and post-update lifecycle hook commands
+		RollingRestart:      params.RollingRestart,      // Update containers sequentially rather than all at once
+		LabelPrecedence:     params.LabelPrecedence,     // Give container label settings priority over global flags
+		NoPull:              params.NoPull,              // Skip pulling new images from registry during updates
+		Timeout:             params.Timeout,             // Maximum duration for container stop operations
+		PullFailureDelay:    params.PullFailureDelay,    // Delay after failed Watchtower self-update pulls
+		LifecycleUID:        params.LifecycleUID,        // Default UID to run lifecycle hooks as
+		LifecycleGID:        params.LifecycleGID,        // Default GID to run lifecycle hooks as
+		CPUCopyMode:         params.CPUCopyMode,         // CPU settings handling when recreating containers
+		RunOnce:             params.RunOnce,             // Perform one-time update and exit
+		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
+		CurrentContainerID:  params.CurrentContainerID,  // ID of the current Watchtower container for self-update logic
+		UseComposeDependsOn: params.UseComposeDependsOn, // Enable Docker Compose depends_on label processing
 	}
 
 	// Execute the container update operation
@@ -253,17 +255,18 @@ func buildSingleRestartedContainerReport(
 // using a standardized message "Removing image" with the image name and ID in the entry data.
 //
 // Parameters:
-//   - cleanedImages: Slice of CleanedImageInfo containing details of cleaned images.
+//   - cleanedImages: Slice of RemovedImageInfo containing details of cleaned images.
 //   - containerName: Name of the container to filter cleanup entries for.
+//   - now: Timestamp to use for all created log entries.
 //
 // Returns:
 //   - []*logrus.Entry: A slice of log entries for the cleaned images associated with the container.
 func buildCleanupEntriesForContainer(
 	cleanedImages []types.RemovedImageInfo,
 	containerName string,
+	now time.Time,
 ) []*logrus.Entry {
 	entries := make([]*logrus.Entry, 0)
-	now := time.Now()
 
 	for _, cleanedImage := range cleanedImages {
 		if cleanedImage.ContainerName == containerName {
@@ -417,6 +420,9 @@ func executeUpdate(
 // performImageCleanup executes image cleanup if enabled.
 //
 // It removes old images after updates if the cleanup flag is set.
+// When multiple containers share the same old image, the image is only removed once
+// (preventing duplicate "Removing image" log entries), but the returned slice includes
+// all container associations so that split-by-container notifications report correctly.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
@@ -425,27 +431,71 @@ func executeUpdate(
 //   - cleanupImageInfos: Slice of cleaned image info to be removed.
 //
 // Returns:
-//   - []types.CleanedImageInfo: Slice of successfully cleaned image info.
+//   - []types.RemovedImageInfo: Slice of successfully cleaned image info.
 func performImageCleanup(
 	ctx context.Context,
 	client container.Client,
 	cleanup bool,
 	cleanupImageInfos []types.RemovedImageInfo,
 ) []types.RemovedImageInfo {
-	if cleanup {
-		cleaned, err := RemoveImages(ctx, client, cleanupImageInfos)
-		if err != nil {
-			logrus.WithError(err).Warn("Failed to clean up some images after update")
-		}
-
-		if cleaned == nil {
-			cleaned = []types.RemovedImageInfo{}
-		}
-
-		return cleaned
+	if !cleanup || len(cleanupImageInfos) == 0 {
+		return []types.RemovedImageInfo{}
 	}
 
-	return []types.RemovedImageInfo{}
+	// Deduplicate by ImageID so each image is only removed once.
+	// This prevents duplicate "Removing image" log entries in non-split notifications
+	// when multiple containers share the same old image.
+	uniqueByImageID := deduplicateByImageID(cleanupImageInfos)
+
+	cleaned, err := RemoveImages(ctx, client, uniqueByImageID)
+	if err != nil {
+		logrus.WithError(err).Warn("Failed to clean up some images after update")
+	}
+
+	if len(cleaned) == 0 {
+		return []types.RemovedImageInfo{}
+	}
+
+	// Build a set of successfully removed image IDs.
+	removedIDs := make(map[types.ImageID]bool, len(cleaned))
+	for _, c := range cleaned {
+		removedIDs[c.ImageID] = true
+	}
+
+	// Expand to include all container associations for each removed image.
+	// This ensures split-by-container notifications report cleanup for every
+	// container that used the old image, not just the one that triggered removal.
+	result := make([]types.RemovedImageInfo, 0, len(cleanupImageInfos))
+	for _, info := range cleanupImageInfos {
+		if removedIDs[info.ImageID] {
+			result = append(result, info)
+		}
+	}
+
+	return result
+}
+
+// deduplicateByImageID returns a new slice containing only the first occurrence
+// of each ImageID. This is used to ensure each image is removed exactly once
+// even when multiple containers share the same old image.
+//
+// Parameters:
+//   - images: Slice of RemovedImageInfo that may contain duplicate ImageIDs.
+//
+// Returns:
+//   - []types.RemovedImageInfo: Slice with one entry per unique ImageID.
+func deduplicateByImageID(images []types.RemovedImageInfo) []types.RemovedImageInfo {
+	seen := make(map[types.ImageID]bool, len(images))
+	result := make([]types.RemovedImageInfo, 0, len(images))
+
+	for _, img := range images {
+		if !seen[img.ImageID] {
+			seen[img.ImageID] = true
+			result = append(result, img)
+		}
+	}
+
+	return result
 }
 
 // logUpdateReport logs the update report details for debugging purposes.
@@ -697,18 +747,21 @@ func sendSplitNotifications(
 
 			singleContainerReport := buildSingleContainerReport(report, result)
 
+			now := time.Now()
+
 			// Create log entries for container update events
 			entries := buildUpdateEntries(
 				report,
 				report.ID(),
 				report.NewContainerID(),
-				time.Now(),
+				now,
 			)
 
 			// Add cleanup entries for this container
 			containerCleanupEntries := buildCleanupEntriesForContainer(
 				cleanedImages,
 				report.Name(),
+				now,
 			)
 			entries = append(entries, containerCleanupEntries...)
 
@@ -760,6 +813,7 @@ func sendSplitNotifications(
 			containerCleanupEntries := buildCleanupEntriesForContainer(
 				cleanedImages,
 				report.Name(),
+				now,
 			)
 
 			// Create log entries for container restart events (similar to update but without "Found new image")
@@ -828,18 +882,21 @@ func sendSplitNotifications(
 
 				singleContainerReport := buildSingleContainerReport(report, result)
 
+				now := time.Now()
+
 				// Create log entries for container update events (monitor-only containers don't get updated, but we still send the same format)
 				entries := buildUpdateEntries(
 					report,
 					report.ID(),
 					report.NewContainerID(),
-					time.Now(),
+					now,
 				)
 
 				// Add cleanup entries for this container
 				containerCleanupEntries := buildCleanupEntriesForContainer(
 					cleanedImages,
 					report.Name(),
+					now,
 				)
 				entries = append(entries, containerCleanupEntries...)
 

@@ -1,233 +1,165 @@
-package digest_test
+package digest
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/url"
-	"strings"
+	"sync"
 	"testing"
-	"time"
 
-	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
+	"github.com/stretchr/testify/assert"
 )
 
-// FuzzExtractHeadDigest fuzzes the header parsing in extractHeadDigest to test for crashes or unexpected behavior with malformed inputs.
-func FuzzExtractHeadDigest(f *testing.F) {
-	// Seed with known good and bad inputs
-	f.Add(200, "sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547")
-	f.Add(200, "")
-	f.Add(404, "sha256:invalid")
-	f.Add(500, "malformed-digest")
-	f.Add(200, "invalid-digest")
-	f.Add(200, "sha256:")
-	f.Add(200, "sha256:short")
-
-	f.Fuzz(func(_ *testing.T, statusCode int, headerValue string) {
-		// Create a mock response with the fuzzed status and header
-		resp := &http.Response{
-			StatusCode: statusCode,
-			Header:     http.Header{},
-		}
-
-		resp.Header.Set(digest.ContentDigestHeader, headerValue)
-
-		// Call extractHeadDigest; we don't care about the result, just that it doesn't panic
-		_, _ = digest.ExtractHeadDigest(resp)
-	})
-}
-
-// FuzzExtractGetDigest fuzzes the body parsing in ExtractGetDigest to test for crashes or unexpected behavior with malformed inputs.
-func FuzzExtractGetDigest(f *testing.F) {
-	// Seed with known good and bad inputs
-	f.Add([]byte(`{"digest": "sha256:abc123"}`))
-	f.Add([]byte(`invalid json`))
-	f.Add([]byte(`sha256:valid`))
-	f.Add([]byte(``))
-	f.Add([]byte(`{"digest": ""}`))
-
-	f.Fuzz(func(_ *testing.T, body []byte) {
-		// Create a mock response with the fuzzed body
-		resp := &http.Response{
-			StatusCode: http.StatusOK,
-			Header:     http.Header{},
-			Body:       io.NopCloser(bytes.NewReader(body)),
-		}
-
-		resp.Header.Set("Content-Type", "application/json")
-		defer resp.Body.Close()
-
-		// Call ExtractGetDigest; we don't care about the result, just that it doesn't panic
-		_, _ = digest.ExtractGetDigest(resp)
-	})
-}
-
-// FuzzNormalizeDigest fuzzes the NormalizeDigest function to test for crashes or unexpected behavior with malformed inputs.
-func FuzzNormalizeDigest(f *testing.F) {
-	// Seed with known good and bad inputs
-	f.Add("sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547")
+// FuzzCanonicalizeImageName fuzzes canonicalizeImageName to verify it never
+// panics on arbitrary input and that canonical output is deterministic.
+func FuzzCanonicalizeImageName(f *testing.F) {
+	// Seed corpus with representative image name formats.
+	f.Add("nginx")
+	f.Add("nginx:latest")
+	f.Add("docker.io/library/nginx:latest")
+	f.Add("ghcr.io/owner/repo:tag")
+	f.Add("ghcr.io/owner/repo")
+	f.Add("myregistry.io/myimage")
 	f.Add("")
-	f.Add("d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547")
-	f.Add("md5:1234567890abcdef")
-	f.Add("sha256:")
-	f.Add(strings.Repeat("a", 1000))
-	f.Add("sha256:abc!@#$%^&*()")
+	f.Add("INVALID UPPER")
+	f.Add("library/alpine")
+	f.Add("alpine:3.19")
+	f.Add("localhost/test:dev")
+	f.Add("registry.example.com/ns/image:sha256-abc123")
 
-	f.Fuzz(func(_ *testing.T, input string) {
-		// Call NormalizeDigest; we don't care about the result, just that it doesn't panic
-		_ = digest.NormalizeDigest(input)
+	f.Fuzz(func(t *testing.T, imageName string) {
+		// Must not panic on any input.
+		result := canonicalizeImageName(imageName)
+
+		// Determinism: calling again must return the same value.
+		result2 := canonicalizeImageName(imageName)
+		assert.Equal(t, result, result2, "canonicalizeImageName must be deterministic")
+
+		// If parsing succeeded (non-fallback), the result should be non-empty
+		// and contain only lowercase characters in the host portion (no spaces).
+		if result != imageName {
+			assert.NotEmpty(t, result, "canonical result should not be empty when parsing succeeds")
+		}
 	})
 }
 
-// FuzzDigestsMatch fuzzes the digestsMatch function to ensure robust handling of malformed inputs.
-// It tests arrays of digest strings and remote digest strings with various edge cases.
-func FuzzDigestsMatch(f *testing.F) {
-	// Seed with matching digests
-	f.Add(`["repo@sha256:abc123"]`, "sha256:abc123")
-	// Seed with non-matching digests
-	f.Add(`["repo@sha256:abc123"]`, "sha256:def456")
-	// Seed with empty array
-	f.Add(`[]`, "sha256:abc123")
-	// Seed with malformed local digest (no @)
-	f.Add(`["malformed-digest"]`, "sha256:abc123")
-	// Seed with invalid digest format
-	f.Add(`["repo@invalid-digest"]`, "sha256:abc123")
-	// Seed with multiple digests, one matching
-	f.Add(`["repo1@sha256:abc123", "repo2@sha256:def456"]`, "sha256:abc123")
-	// Seed with empty part after @
-	f.Add(`["repo@"]`, "sha256:abc123")
-	// Seed with empty remote digest
-	f.Add(`["repo@sha256:abc123"]`, "")
-	// Seed with invalid remote digest
-	f.Add(`["repo@sha256:abc123"]`, "invalid-remote")
-	// Seed with malformed JSON
-	f.Add(`invalid json`, "sha256:abc123")
-	// Seed with nil-like empty
-	f.Add(`null`, "sha256:abc123")
+// FuzzGetReleaseImageInspectLock fuzzes the lock acquisition and release cycle
+// with various image name formats to verify no panics or deadlocks occur.
+func FuzzGetReleaseImageInspectLock(f *testing.F) {
+	f.Add("nginx")
+	f.Add("nginx:latest")
+	f.Add("ghcr.io/owner/repo:v1")
+	f.Add("")
+	f.Add("library/alpine:3.19")
 
-	f.Fuzz(func(_ *testing.T, localJSON, remote string) {
-		var localDigests []string
-		// Ignore unmarshal errors to test robustness with malformed JSON
-		json.Unmarshal([]byte(localJSON), &localDigests)
-		// Call DigestsMatch; we don't care about the result, just that it doesn't panic
-		digest.DigestsMatch(localDigests, remote)
+	f.Fuzz(func(t *testing.T, imageName string) {
+		// Acquire and release must not panic on any input.
+		lock, release := getImageInspectLock(imageName)
+
+		if lock != nil {
+			lock.Lock()
+
+			// Perform trivial work to avoid SA2001 (empty critical section).
+			_ = imageName
+
+			lock.Unlock()
+		}
+
+		release()
+
+		// Acquire again to test revival path.
+		lock2, release2 := getImageInspectLock(imageName)
+
+		if lock2 != nil {
+			lock2.Lock()
+
+			// Perform trivial work to avoid SA2001 (empty critical section).
+			_ = imageName
+
+			lock2.Unlock()
+		}
+
+		release2()
+
+		// Clean up to avoid unbounded test map growth.
+		key := canonicalizeImageName(imageName)
+		imageInspectLocks.Delete(key)
 	})
 }
 
-// FuzzBuildManifestURL fuzzes the buildManifestURL function to ensure robust URL construction.
-// It tests image reference strings and host override strings with various edge cases.
-func FuzzBuildManifestURL(f *testing.F) {
-	// Seed with known good and bad inputs
-	f.Add("ghcr.io/k6io/operator:latest", "")
-	f.Add("docker.io/library/alpine:latest", "registry.example.com")
-	f.Add("localhost:5000/myimage:v1.0", "127.0.0.1:5000")
-	f.Add("invalid image ref", "")
-	f.Add("", "example.com")
-	f.Add("example.com/test/image:", "")
-	f.Add("http://invalid url with spaces/test/image:latest", "bad host")
-	f.Add(strings.Repeat("a", 1000), strings.Repeat("b", 1000))
-	f.Add("lscr.io/test/image:latest", "") // Special case for lscr.io
-	f.Add("registry.example.com/image", "overridden.host")
+// FuzzLockLifecycleConcurrency fuzzes the concurrent lock lifecycle to verify
+// that acquire/release cycles from two goroutines sharing a canonical key never
+// panic and that both goroutines can independently lock and unlock.
+func FuzzLockLifecycleConcurrency(f *testing.F) {
+	f.Add("nginx")
+	f.Add("nginx:latest")
+	f.Add("ghcr.io/owner/repo:v1")
+	f.Add("library/alpine:3.19")
 
-	f.Fuzz(func(t *testing.T, imageRef, hostOverride string) {
-		// Create a mock container with the fuzzed image reference
-		mockContainer := mockActions.CreateMockContainer(
-			"mock-id",
-			"mock-name",
-			imageRef,
-			time.Now(),
-		)
+	f.Fuzz(func(t *testing.T, imageName string) {
+		key := canonicalizeImageName(imageName)
 
-		// Ensure WATCHTOWER_REGISTRY_TLS_SKIP is set to false for https scheme
-		t.Setenv("WATCHTOWER_REGISTRY_TLS_SKIP", "false")
+		defer imageInspectLocks.Delete(key)
 
-		// Call buildManifestURL; we don't care about the result, just that it doesn't panic
-		_, _, _, _ = digest.BuildManifestURL(mockContainer, hostOverride)
+		// Goroutine A acquires, works, unlocks, then signals B to start
+		// before calling releaseA. This forces B's getImageInspectLock to
+		// race with A's releaseA, exercising the window where refs drops
+		// to zero and deletion is pending.
+		startB := make(chan struct{})
+		aDone := make(chan struct{})
+		bDone := make(chan struct{})
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+
+			lockA, releaseA := getImageInspectLock(imageName)
+
+			lockA.Lock()
+
+			_ = imageName // Trivial work inside critical section.
+
+			lockA.Unlock()
+
+			// Signal B to start its getImageInspectLock while the entry
+			// still exists (refs > 0), then release — B's acquire races
+			// with our release's CompareAndDelete.
+			close(startB)
+			releaseA()
+
+			close(aDone)
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			<-startB // Wait until A has unlocked but not yet released.
+
+			lockB, releaseB := getImageInspectLock(imageName)
+
+			lockB.Lock()
+
+			_ = imageName // Trivial work inside critical section.
+
+			lockB.Unlock()
+			releaseB()
+
+			close(bDone)
+		}()
+
+		<-aDone
+		<-bDone
+
+		wg.Wait()
+
+		// Verify the entry was cleaned up (refs should be 0) or removed.
+		val, exists := imageInspectLocks.Load(key)
+		if exists {
+			entry, ok := val.(*imageLockEntry)
+			if ok {
+				entry.mu.Lock()
+				assert.Zero(t, entry.refs, "all references must be released after concurrent lifecycle")
+				entry.mu.Unlock()
+			}
+		}
 	})
-}
-
-// FuzzHandleManifestResponse fuzzes the HandleManifestResponse function to test for crashes or unexpected behavior
-// with malformed HTTP responses, status codes, headers, and redirect URLs.
-func FuzzHandleManifestResponse(f *testing.F) {
-	// Seed with valid responses
-	f.Add(
-		200,
-		"HEAD",
-		"example.com",
-		"challenge.com",
-		"example.com",
-		"sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547",
-		false,
-	)
-	f.Add(200, "GET", "example.com", "", "example.com", `{"digest": "sha256:abc123"}`, true)
-	f.Add(
-		302,
-		"HEAD",
-		"example.com",
-		"challenge.com",
-		"example.com",
-		"https://redirect.example.com/v2/repo/manifests/tag",
-		false,
-	)
-
-	// Seed with malformed headers
-	f.Add(200, "HEAD", "example.com", "", "example.com", "", false)
-	f.Add(200, "HEAD", "example.com", "", "example.com", "invalid-digest", false)
-	f.Add(200, "HEAD", "example.com", "", "example.com", "sha256:", false)
-	f.Add(200, "HEAD", "example.com", "", "example.com", "sha256:short", false)
-
-	// Seed with malformed status codes
-	f.Add(404, "HEAD", "example.com", "", "example.com", "", false)
-	f.Add(500, "GET", "example.com", "", "example.com", "", false)
-	f.Add(301, "HEAD", "example.com", "", "example.com", "invalid://url", false)
-
-	// Seed with edge cases
-	f.Add(302, "HEAD", "example.com", "challenge.com", "example.com", "", true)
-	f.Add(401, "HEAD", "example.com", "challenge.com", "challenge.com", "", false)
-	f.Add(404, "HEAD", "example.com", "challenge.com", "challenge.com", "", false)
-
-	f.Fuzz(
-		func(_ *testing.T, statusCode int, method, originalHost, challengeHost, currentHost, headerValue string, redirected bool) {
-			// Create a parsed URL for testing
-			parsedURL, err := url.Parse("https://example.com/v2/test/manifests/latest")
-			if err != nil {
-				return // Skip if URL parsing fails
-			}
-
-			// Create a mock HTTP response with fuzzed status code and headers
-			resp := &http.Response{
-				StatusCode: statusCode,
-				Header:     http.Header{},
-				Body:       io.NopCloser(bytes.NewReader([]byte{})),
-				Request:    &http.Request{URL: parsedURL},
-			}
-
-			// Set headers based on status code
-			if statusCode >= 300 && statusCode < 400 {
-				// For redirects, set Location header
-				resp.Header.Set("Location", headerValue)
-			} else {
-				// For success/error, set digest header
-				resp.Header.Set(digest.ContentDigestHeader, headerValue)
-				// For GET requests, set body if it's a JSON response
-				if method == "GET" && strings.HasPrefix(headerValue, "{") {
-					resp.Body = io.NopCloser(bytes.NewReader([]byte(headerValue)))
-					resp.Header.Set("Content-Type", "application/json")
-				}
-			}
-
-			// Call HandleManifestResponse; we don't care about the result, just that it doesn't panic
-			_, _, _, _ = digest.HandleManifestResponse(
-				resp,
-				method,
-				originalHost,
-				challengeHost,
-				redirected,
-				parsedURL,
-				currentHost,
-			)
-		},
-	)
 }

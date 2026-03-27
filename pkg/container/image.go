@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
+	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerImage "github.com/docker/docker/api/types/image"
 	dockerClient "github.com/docker/docker/client"
 
@@ -202,6 +203,22 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 		"image_id":   imageID.ShortID(),
 		"image_name": imageName,
 	})
+
+	containers, err := c.api.ContainerList(ctx, dockerContainer.ListOptions{All: true})
+	if err != nil {
+		clog.WithError(err).Warn("Failed to list containers for image usage check, skipping removal")
+
+		return fmt.Errorf("cannot verify image usage: %w", err)
+	}
+
+	for _, container := range containers {
+		state := container.State
+		if container.ImageID == string(imageID) &&
+			(state == dockerContainer.StateRunning || state == dockerContainer.StateRestarting || state == dockerContainer.StatePaused || state == dockerContainer.StateCreated) {
+			return ErrImageInUse
+		}
+	}
+
 	clog.WithField("notify", "yes").Info("Removing image")
 
 	// Perform image removal with force and pruning.
@@ -368,9 +385,23 @@ func (c imageClient) performImagePull(
 	// Start the image pull.
 	response, err := c.api.ImagePull(ctx, imageName, opts)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to initiate image pull")
+		// Differentiate error types for appropriate logging and handling.
+		// Auth failures and missing images return distinct sentinel errors
+		// so callers can programmatically distinguish error categories.
+		switch {
+		case cerrdefs.IsUnauthorized(err):
+			clog.WithError(err).Warn("Image pull failed: authentication required")
 
-		return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
+			return fmt.Errorf("%w: %s: %w", ErrPullImageUnauthorized, imageName, err)
+		case cerrdefs.IsNotFound(err):
+			clog.WithError(err).Debug("Image pull failed: image not found in registry")
+
+			return fmt.Errorf("%w: %s: %w", ErrPullImageNotFound, imageName, err)
+		default:
+			clog.WithError(err).Debug("Failed to initiate image pull")
+
+			return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
+		}
 	}
 	defer response.Close()
 

@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -18,11 +19,15 @@ import (
 // stopContainerTimeout sets the container stop timeout.
 const stopContainerTimeout = 10 * time.Minute
 
-// removalRetryDelay sets the delay before retrying removal operations.
-const removalRetryDelay = 500 * time.Millisecond
-
 // maxRemovalAttempts sets the maximum number of retries for container removal operations.
-const maxRemovalAttempts = 3
+// Docker's default stop timeout is 10 seconds, but our stopContainerTimeout overrides it
+// to 10 minutes. With 30 attempts and a 1s delay between retries, the total retry window
+// is approximately 30 seconds (30 × 1s), which covers the default Docker stop timeout
+// plus overhead for image removal delays.
+const maxRemovalAttempts = 30
+
+// RemovalRetryDelay sets the delay before retrying removal operations.
+var RemovalRetryDelay = 1 * time.Second
 
 // RemoveExcessWatchtowerInstances ensures a single Watchtower instance within the same scope.
 //
@@ -93,7 +98,7 @@ func RemoveExcessWatchtowerInstances(
 		removeImageInfos,
 	)
 	if err != nil {
-		return 0, err
+		return removed, err
 	}
 
 	return removed, nil
@@ -166,7 +171,7 @@ func getFilteredContainers(
 	switch {
 	case scope != "":
 		filter = filters.FilterByScope(scope, filters.WatchtowerContainersFilter)
-	case scope == "":
+	default:
 		filter = filters.UnscopedWatchtowerContainersFilter
 	}
 
@@ -242,11 +247,6 @@ func getChainedContainers(
 			c.ID() != currentContainer.ID() {
 			chainedContainers = append(chainedContainers, c)
 		}
-	}
-
-	// Return an empty slice if no chained containers are found
-	if len(chainedContainers) == 0 {
-		return []types.Container{}
 	}
 
 	return chainedContainers
@@ -369,10 +369,10 @@ func removeExcessContainers(
 
 			if attempt < maxRemovalAttempts-1 {
 				select {
-				case <-time.After(removalRetryDelay):
+				case <-time.After(RemovalRetryDelay):
 					// continue to next retry attempt
 				case <-ctx.Done():
-					return 0, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
+					return excessInstancesRemoved, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
 				}
 			}
 		}
@@ -419,7 +419,7 @@ func removeExcessContainers(
 	}
 
 	if excessInstancesRemoved < len(excessWatchtowerContainers) {
-		return 0, fmt.Errorf(
+		return excessInstancesRemoved, fmt.Errorf(
 			"%w: %d of %d instances failed to stop",
 			errStopWatchtowerFailed,
 			len(excessWatchtowerContainers)-excessInstancesRemoved,
@@ -484,11 +484,11 @@ func RemoveImages(
 					"image_id":   imageID,
 					"image_name": image.ImageName,
 				}).Debug("Image already removed")
-			case cerrdefs.IsConflict(err):
+			case cerrdefs.IsConflict(err) || errors.Is(err, container.ErrImageInUse):
 				logrus.WithFields(logrus.Fields{
 					"image_id":   imageID,
 					"image_name": image.ImageName,
-				}).Debug("Image is in use by running container, skipping removal")
+				}).Debug("Image is in use by active container, skipping removal")
 			default:
 				logrus.WithError(err).WithFields(logrus.Fields{
 					"image_id":   imageID,
