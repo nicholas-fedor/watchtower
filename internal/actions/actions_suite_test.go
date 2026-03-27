@@ -22,7 +22,10 @@ func TestActions(t *testing.T) {
 
 	// Override retry delay for tests to avoid 30s real-time waits
 	// (30 attempts × 1ms = 30ms instead of 30 attempts × 1s = 30s).
+	originalRetryDelay := actions.RemovalRetryDelay
 	actions.RemovalRetryDelay = 1 * time.Millisecond
+
+	t.Cleanup(func() { actions.RemovalRetryDelay = originalRetryDelay })
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	logrus.SetOutput(ginkgo.GinkgoWriter)

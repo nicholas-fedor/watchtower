@@ -423,8 +423,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			gomega.Expect(err).
 				To(gomega.HaveOccurred())
-				// Strict enforcement fails if any container fails
-			gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
+				// Partial success: one container was removed before failure
+			gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
 			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 		})
 
@@ -490,7 +490,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
-				gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
+				gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
 				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 			},
 		)
@@ -1045,8 +1045,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("1 of 2 instances failed to stop"))
 				gomega.Expect(cleanupOccurred).
-					To(gomega.Equal(0))
-					// No successful cleanups due to partial failure
+					To(gomega.Equal(1))
+					// Partial success: one container removed before failure
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.BeEmpty())
 				// Image info cleared on failure
@@ -1122,8 +1122,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("1 of 2 instances failed to stop"))
 				gomega.Expect(cleanupOccurred).
-					To(gomega.Equal(0))
-					// State consistency: no partial success reported
+					To(gomega.Equal(1))
+					// Partial success: one container removed before failure
 				gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 			},
 		)
@@ -1194,7 +1194,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
-				gomega.Expect(cleanupOccurred).To(gomega.Equal(0)) // All operations rolled back
+				gomega.Expect(cleanupOccurred).To(gomega.Equal(1)) // Partial success before failure
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.BeEmpty())
 				// Image info cleared on any failure

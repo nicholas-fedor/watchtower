@@ -98,7 +98,7 @@ func RemoveExcessWatchtowerInstances(
 		removeImageInfos,
 	)
 	if err != nil {
-		return 0, err
+		return removed, err
 	}
 
 	return removed, nil
@@ -377,7 +377,7 @@ func removeExcessContainers(
 				case <-time.After(RemovalRetryDelay):
 					// continue to next retry attempt
 				case <-ctx.Done():
-					return 0, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
+					return excessInstancesRemoved, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
 				}
 			}
 		}
@@ -424,7 +424,7 @@ func removeExcessContainers(
 	}
 
 	if excessInstancesRemoved < len(excessWatchtowerContainers) {
-		return 0, fmt.Errorf(
+		return excessInstancesRemoved, fmt.Errorf(
 			"%w: %d of %d instances failed to stop",
 			errStopWatchtowerFailed,
 			len(excessWatchtowerContainers)-excessInstancesRemoved,
