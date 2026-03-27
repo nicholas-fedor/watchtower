@@ -80,6 +80,55 @@ var _ = ginkgo.Describe("Container", func() {
 			err := c.VerifyConfiguration()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
+
+		ginkgo.It("removes port bindings with empty port string", func() {
+			c := MockContainer(WithPortBindings("80/tcp"))
+			c.containerInfo.HostConfig.PortBindings[""] = []dockerNat.PortBinding{}
+			c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{
+				"":       {},
+				"80/tcp": {},
+			}
+			err := c.VerifyConfiguration()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			_, exists := c.containerInfo.HostConfig.PortBindings[""]
+			gomega.Expect(exists).To(gomega.BeFalse())
+			_, exists = c.containerInfo.HostConfig.PortBindings["80/tcp"]
+			gomega.Expect(exists).To(gomega.BeTrue())
+			_, exists = c.containerInfo.Config.ExposedPorts[""]
+			gomega.Expect(exists).To(gomega.BeFalse())
+			_, exists = c.containerInfo.Config.ExposedPorts["80/tcp"]
+			gomega.Expect(exists).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("removes port bindings with empty port number", func() {
+			c := MockContainer(WithPortBindings("80/tcp"))
+			c.containerInfo.HostConfig.PortBindings["/tcp"] = []dockerNat.PortBinding{}
+			c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{
+				"/tcp": {},
+			}
+			err := c.VerifyConfiguration()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			_, exists := c.containerInfo.HostConfig.PortBindings["/tcp"]
+			gomega.Expect(exists).To(gomega.BeFalse())
+			_, exists = c.containerInfo.Config.ExposedPorts["/tcp"]
+			gomega.Expect(exists).To(gomega.BeFalse())
+			_, exists = c.containerInfo.HostConfig.PortBindings["80/tcp"]
+			gomega.Expect(exists).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("preserves valid port bindings unchanged", func() {
+			c := MockContainer(WithPortBindings("8080/tcp", "443/tcp"))
+			c.containerInfo.Config.ExposedPorts = map[dockerNat.Port]struct{}{
+				"8080/tcp": {},
+				"443/tcp":  {},
+			}
+			err := c.VerifyConfiguration()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(c.containerInfo.HostConfig.PortBindings).To(gomega.HaveLen(2))
+			gomega.Expect(c.containerInfo.Config.ExposedPorts).To(gomega.HaveLen(2))
+		})
 	})
 
 	ginkgo.Describe("Create Configuration", func() {
