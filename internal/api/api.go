@@ -102,7 +102,7 @@ func SetupAndStartAPI(
 				Cleanup:        cleanup,
 				RunOnce:        true,
 				MonitorOnly:    monitorOnly,
-				SkipSelfUpdate: false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
+				SkipSelfUpdate: skipSelfUpdate,
 			}
 			metric := runUpdatesWithNotifications(ctx, filterByImage(images, filter), params)
 			defaultMetrics().RegisterScan(metric)
