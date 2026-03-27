@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -34,9 +35,20 @@ const ContentDigestHeader = "Docker-Content-Digest"
 // If not set during the build, it defaults to "Watchtower/unknown", providing a fallback identifier for registry requests.
 var UserAgent = "Watchtower/unknown"
 
+// imageLockEntry holds a per-image mutex along with a reference count and dead flag.
+// When refs drops to zero, the entry is marked dead so new callers will revive it
+// rather than creating a duplicate. This keeps the map bounded in practice while
+// avoiding races between deletion and concurrent revival.
+type imageLockEntry struct {
+	mu      sync.Mutex
+	inspect sync.Mutex
+	refs    int
+	dead    bool
+}
+
 // imageInspectLocks provides per-image-name mutex synchronization for ImageInspectWithRaw operations.
-// This allows concurrent inspections of different images while serializing inspections of the
-// same image, preventing redundant concurrent requests to the Docker daemon for the same image.
+// Keys are canonicalized image references (e.g., "docker.io/library/nginx:latest") so that
+// different representations of the same image share a single lock. Values are *imageLockEntry.
 var imageInspectLocks sync.Map
 
 // Errors for digest retrieval operations.
@@ -53,9 +65,101 @@ var (
 	errFailedCreateRequest = errors.New("failed to create request")
 	// errFailedExecuteRequest indicates a failure to execute an HTTP request to the registry.
 	errFailedExecuteRequest = errors.New("failed to execute request")
-	// errUnexpectedLockType indicates the image inspect lock map stored an unexpected type.
-	errUnexpectedLockType = errors.New("unexpected type in image inspect lock map")
 )
+
+// canonicalizeImageName resolves an image name to its fully-qualified canonical form
+// using the distribution/reference library. This ensures that different representations
+// of the same image (e.g., "nginx:latest" vs "docker.io/library/nginx:latest") resolve
+// to the same lock key.
+//
+// Parameters:
+//   - imageName: Raw image name from container configuration.
+//
+// Returns:
+//   - string: Canonical image reference, or the original name if parsing fails.
+func canonicalizeImageName(imageName string) string {
+	ref, err := reference.ParseNormalizedNamed(imageName)
+	if err != nil {
+		return imageName
+	}
+
+	return ref.Name()
+}
+
+// getImageInspectLock retrieves or creates a reference-counted lock entry for the
+// given image name. The image name is canonicalized so that different representations
+// of the same image share a single mutex. The returned cleanup function must be called
+// after the caller is finished with the lock to decrement the reference count and
+// mark the entry for cleanup when no longer in use.
+//
+// Parameters:
+//   - imageName: Raw image name (may be short or fully-qualified).
+//
+// Returns:
+//   - *sync.Mutex: The per-image mutex for serializing inspections.
+//   - func(): Cleanup function that decrements the reference count.
+func getImageInspectLock(imageName string) (*sync.Mutex, func()) {
+	key := canonicalizeImageName(imageName)
+
+	// Create a candidate entry optimistically. If another goroutine wins the
+	// LoadOrStore race we discard this one and use theirs instead.
+	newEntry := &imageLockEntry{refs: 1}
+
+	val, loaded := imageInspectLocks.LoadOrStore(key, newEntry)
+	if loaded {
+		// Another goroutine already stored an entry; discard ours and
+		// revive or increment the existing one.
+		existing, isEntry := val.(*imageLockEntry)
+		if isEntry {
+			existing.mu.Lock()
+			existing.refs++
+			existing.dead = false
+			existing.mu.Unlock()
+
+			return &existing.inspect, func() { releaseImageInspectLock(key) }
+		}
+
+		// Unexpected type in map; overwrite with our entry.
+		imageInspectLocks.Store(key, newEntry)
+	}
+
+	return &newEntry.inspect, func() { releaseImageInspectLock(key) }
+}
+
+// releaseImageInspectLock decrements the reference count for the lock entry associated
+// with the given canonical image key. When the count reaches zero the entry is
+// conditionally removed from the map (only if it is still the same entry) to avoid
+// races with concurrent getImageInspectLock calls that may have revived it.
+//
+// Parameters:
+//   - key: Canonical image reference key.
+func releaseImageInspectLock(key string) {
+	val, loaded := imageInspectLocks.Load(key)
+	if !loaded {
+		return
+	}
+
+	entry, isEntry := val.(*imageLockEntry)
+	if !isEntry {
+		return
+	}
+
+	entry.mu.Lock()
+	entry.refs--
+
+	if entry.refs == 0 {
+		entry.dead = true
+		entry.mu.Unlock()
+
+		// Conditionally delete only if the map still points to this entry.
+		// A concurrent getImageInspectLock may have created a new entry.
+		imageInspectLocks.CompareAndDelete(key, entry)
+
+		return
+	}
+
+	entry.mu.Unlock()
+}
 
 // NormalizeDigest standardizes a digest string for consistent comparison.
 //
@@ -273,18 +377,11 @@ func fetchDigest(
 	// without blocking unrelated image inspections.
 	imageName := container.ImageName()
 
-	// Atomically load an existing mutex for this image name, or store a new one
-	// if this is the first time the image is being inspected. LoadOrStore is
-	// safe for concurrent use and guarantees that all goroutines inspecting
-	// the same image name receive the same mutex instance.
-	mu, _ := imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
+	// Acquire a reference-counted per-image lock that serializes inspections of the
+	// same canonical image while allowing concurrent inspections of different images.
+	lock, release := getImageInspectLock(imageName)
 
-	// Type-assert the stored value to *sync.Mutex. This must succeed because
-	// LoadOrStore above guarantees the value is the *sync.Mutex we stored.
-	lock, ok := mu.(*sync.Mutex)
-	if !ok {
-		return "", fmt.Errorf("%w: %s", errUnexpectedLockType, imageName)
-	}
+	defer release()
 
 	lock.Lock()
 

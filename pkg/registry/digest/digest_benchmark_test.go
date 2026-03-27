@@ -93,28 +93,14 @@ func BenchmarkInspectMutexContention(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			// Use Load first to avoid allocating a new *sync.Mutex on every
-			// iteration; only call LoadOrStore when the key does not yet exist.
-			mu, ok := imageInspectLocks.Load(imageName)
-			if !ok {
-				mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
-			}
-
-			lock, ok := mu.(*sync.Mutex)
-			if !ok || lock == nil {
-				mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
-
-				lock, ok = mu.(*sync.Mutex)
-				if !ok || lock == nil {
-					continue
-				}
-			}
+			lock, release := getImageInspectLock(imageName)
 
 			lock.Lock()
 			// Simulate minimal work inside the critical section
 			_ = dummyWork
 
 			lock.Unlock()
+			release()
 		}
 	})
 }
@@ -201,28 +187,16 @@ func BenchmarkConcurrentDigestChecks(b *testing.B) {
 		for pb.Next() {
 			for i := range numGoroutines {
 				// Simulate the per-image digest fetch pattern: lock, work, unlock.
-				// Use Load first to avoid allocating a new *sync.Mutex on every iteration.
 				imageName := "image" + string(rune('0'+i))
-				mu, ok := imageInspectLocks.Load(imageName)
-				if !ok {
-					mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
-				}
 
-				lock, ok := mu.(*sync.Mutex)
-				if !ok || lock == nil {
-					mu, _ = imageInspectLocks.LoadOrStore(imageName, &sync.Mutex{})
-
-					lock, ok = mu.(*sync.Mutex)
-					if !ok || lock == nil {
-						continue
-					}
-				}
+				lock, release := getImageInspectLock(imageName)
 
 				lock.Lock()
 
 				_ = i // Simulate minimal work
 
 				lock.Unlock()
+				release()
 			}
 		}
 	})
