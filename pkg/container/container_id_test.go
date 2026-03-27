@@ -454,6 +454,35 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 				ListContainers(context.Background()).
 				Return([]types.Container{mockContainer1, mockContainer2, mockContainerMatching, mockContainer3}, nil)
 		}, types.ContainerID("matching-container-id"), false, ""),
+		ginkgo.Entry("when multiple containers share hostname but only one is Watchtower", func() {
+			hostname := testHostname
+
+			// Set HOSTNAME environment variable
+			os.Setenv("HOSTNAME", hostname)
+
+			// Create a non-Watchtower container with matching hostname (first match)
+			nonWatchtowerContainer := MockContainer(
+				WithHostname(hostname),
+				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+					c.ID = "non-watchtower-id"
+				},
+			)
+
+			// Create a Watchtower container with matching hostname (second match)
+			watchtowerContainer := MockContainer(
+				WithHostname(hostname),
+				WithLabels(map[string]string{
+					"com.centurylinklabs.watchtower": "true",
+				}),
+				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+					c.ID = "watchtower-container-id"
+				},
+			)
+
+			mockClient.EXPECT().
+				ListContainers(context.Background()).
+				Return([]types.Container{nonWatchtowerContainer, watchtowerContainer}, nil)
+		}, types.ContainerID("watchtower-container-id"), false, ""),
 	)
 })
 
