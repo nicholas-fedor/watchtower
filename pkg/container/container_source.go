@@ -81,8 +81,8 @@ func ListSourceContainers(
 			"list_options": fmt.Sprintf("%+v", listOptions),
 		}).Debug("ContainerList API call failed")
 
-		// Handle 404 responses from Docker API
-		if strings.Contains(err.Error(), "page not found") {
+		// Check for 404 responses and return an empty container list instead of failing.
+		if cerrdefs.IsNotFound(err) {
 			clog.WithFields(logrus.Fields{
 				"error":       err,
 				"endpoint":    "/containers/json",
@@ -279,6 +279,15 @@ func StopSourceContainer(
 		Timeout: &timeoutSeconds,
 	})
 	if err != nil {
+		// Check if the container was already removed by another process before
+		// the stop call completed, treating it as already stopped.
+		if cerrdefs.IsNotFound(err) {
+			clog.WithField("elapsed", time.Since(startTime)).
+				Debug("Container not found during stop, treating as already stopped")
+
+			return nil
+		}
+
 		// Log the failure with elapsed time and error details for debugging.
 		clog.WithError(err).
 			WithField("elapsed", time.Since(startTime)).
