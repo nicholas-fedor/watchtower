@@ -518,14 +518,18 @@ func (c *Container) VerifyConfiguration() error {
 	return nil
 }
 
-// HasExposedPorts checks if the container has any exposed ports configured.
+// HasExposedPorts checks if the container has any host-bound port mappings.
 //
 // This is used to determine if a Watchtower container should skip self-updates,
-// as exposed ports cause port conflicts during the self-update process where
+// as host-bound ports cause port conflicts during the self-update process where
 // the old container holds the port while the new container tries to bind it.
 //
+// Only actual host-to-container port bindings (HostConfig.PortBindings) are
+// considered, not merely declared exposed ports (Config.ExposedPorts), since
+// declared-but-unbound ports do not cause conflicts.
+//
 // Returns:
-//   - bool: True if the container has exposed ports (via ExposedPorts or PortBindings), false otherwise.
+//   - bool: True if the container has host-bound port mappings, false otherwise.
 func (c *Container) HasExposedPorts() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -535,12 +539,8 @@ func (c *Container) HasExposedPorts() bool {
 	}
 
 	// Check if there are any port bindings (host-to-container port mappings).
+	// Guard against nil HostConfig before inspecting PortBindings.
 	if c.containerInfo.HostConfig != nil && len(c.containerInfo.HostConfig.PortBindings) > 0 {
-		return true
-	}
-
-	// Check if there are any exposed ports in the container config.
-	if c.containerInfo.Config != nil && len(c.containerInfo.Config.ExposedPorts) > 0 {
 		return true
 	}
 

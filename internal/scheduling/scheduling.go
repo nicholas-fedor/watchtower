@@ -75,6 +75,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 //   - updateOnStart: Boolean indicating whether to perform an update immediately on startup.
 //   - skipFirstRun: Boolean indicating whether to skip the first scheduled run.
 //   - currentWatchtowerContainer: The current Watchtower container for parent checking.
+//   - startupMessageSent: Whether the startup message was already sent (e.g., by the HTTP API in blocking mode).
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
@@ -96,6 +97,7 @@ func RunUpgradesOnSchedule(
 	updateOnStart bool,
 	skipFirstRun bool,
 	currentWatchtowerContainer types.Container,
+	startupMessageSent bool,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -133,7 +135,7 @@ func RunUpgradesOnSchedule(
 		if containerHasExposedPorts {
 			skipWatchtowerSelfUpdate = true
 
-			logrus.Warn("Skipping self-update to prevent port conflict")
+			logrus.Debug("Skipping self-update to prevent port conflict")
 		}
 
 		// Skip update if this is a Watchtower parent container (from self-update chain)
@@ -226,12 +228,15 @@ func RunUpgradesOnSchedule(
 	}
 
 	// Log startup message with the first scheduled run time.
+	// Skip if the startup message was already sent (e.g., by the HTTP API in blocking mode).
 	var nextRun time.Time
 	if len(scheduler.Entries()) > 0 {
 		nextRun = scheduler.Entries()[0].Schedule.Next(time.Now())
 	}
 
-	writeStartupMessage(c, nextRun, filtering, scope, client, notifier, metaVersion, &updateOnStart)
+	if !startupMessageSent {
+		writeStartupMessage(c, nextRun, filtering, scope, client, notifier, metaVersion, &updateOnStart)
+	}
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
 	if updateOnStart {

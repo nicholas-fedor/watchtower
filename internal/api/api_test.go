@@ -115,6 +115,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 					filterByImage,
 					defaultMetrics,
 					writeStartupMessage,
+					false, // skipSelfUpdate
 					mockServer,
 				)
 			}()
@@ -189,6 +190,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 					filterByImage,
 					defaultMetrics,
 					writeStartupMessage,
+					false, // skipSelfUpdate
 					mockServer,
 				)
 			}()
@@ -248,6 +250,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				filterByImage,
 				defaultMetrics,
 				writeStartupMessage,
+				false, // skipSelfUpdate
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
