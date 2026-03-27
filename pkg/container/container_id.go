@@ -239,7 +239,8 @@ func ParseContainerIDFromCgroupString(cgroupString string) (types.ContainerID, e
 //
 // Returns:
 //   - types.ContainerID: The detected container ID if a match is found.
-//   - error: Non-nil if the HOSTNAME env var is missing or no matching container is found.
+//   - error: Non-nil if the HOSTNAME env var is missing, the Docker client's
+//     ListContainers call fails (wrapped and propagated), or no matching container is found.
 func GetContainerIDFromHostname(ctx context.Context, client Client) (types.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
