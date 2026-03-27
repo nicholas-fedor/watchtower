@@ -41,7 +41,7 @@ jobs:
         with:
           args: "-no-fail -fmt sarif -out results.sarif ./..."
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@38697555549f1db7851b81482ff19f1fa5c4fedc # v4
+        uses: github/codeql-action/upload-sarif@b8bb9f28b8d3f992092362369c57161b755dea45 # v4
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: results.sarif
@@ -66,6 +66,6 @@ jobs:
           go-version-file: "go.mod"
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@38697555549f1db7851b81482ff19f1fa5c4fedc # v4
+        uses: github/codeql-action/upload-sarif@b8bb9f28b8d3f992092362369c57161b755dea45 # v4
         with:
           sarif_file: ${{ env.OUTPUT_FILE }}
