@@ -25,19 +25,19 @@ func TestCanonicalizeImageName(t *testing.T) {
 			expected: "docker.io/library/nginx",
 		},
 		{
-			name:     "bare name with tag stripped",
+			name:     "bare name with tag preserved",
 			input:    "nginx:latest",
-			expected: "docker.io/library/nginx",
+			expected: "docker.io/library/nginx:latest",
 		},
 		{
-			name:     "already canonical with tag stripped",
+			name:     "already canonical with tag preserved",
 			input:    "docker.io/library/nginx:latest",
-			expected: "docker.io/library/nginx",
+			expected: "docker.io/library/nginx:latest",
 		},
 		{
-			name:     "custom registry with tag stripped",
+			name:     "custom registry with tag preserved",
 			input:    "ghcr.io/owner/repo:tag",
-			expected: "ghcr.io/owner/repo",
+			expected: "ghcr.io/owner/repo:tag",
 		},
 		{
 			name:     "custom registry without tag",
@@ -48,6 +48,11 @@ func TestCanonicalizeImageName(t *testing.T) {
 			name:     "private registry without tag",
 			input:    "myregistry.io/myimage",
 			expected: "myregistry.io/myimage",
+		},
+		{
+			name:     "different tags resolve to different keys",
+			input:    "nginx:stable",
+			expected: "docker.io/library/nginx:stable",
 		},
 		{
 			name:     "empty string falls back to original",

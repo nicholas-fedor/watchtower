@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,5 +81,77 @@ func FuzzGetReleaseImageInspectLock(f *testing.F) {
 		// Clean up to avoid unbounded test map growth.
 		key := canonicalizeImageName(imageName)
 		imageInspectLocks.Delete(key)
+	})
+}
+
+// FuzzLockLifecycleConcurrency fuzzes the concurrent lock lifecycle to verify
+// that acquire/release cycles from two goroutines sharing a canonical key never
+// panic and that both goroutines can independently lock and unlock.
+func FuzzLockLifecycleConcurrency(f *testing.F) {
+	f.Add("nginx")
+	f.Add("nginx:latest")
+	f.Add("ghcr.io/owner/repo:v1")
+	f.Add("library/alpine:3.19")
+
+	f.Fuzz(func(t *testing.T, imageName string) {
+		key := canonicalizeImageName(imageName)
+
+		defer imageInspectLocks.Delete(key)
+
+		// Goroutine A acquires, works, releases, then signals.
+		// Goroutine B waits for A to finish, then acquires the same key.
+		// This exercises the cleanup-then-reacquire path without deadlock.
+		aDone := make(chan struct{})
+		bDone := make(chan struct{})
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+
+			lockA, releaseA := getImageInspectLock(imageName)
+
+			lockA.Lock()
+
+			_ = imageName // Trivial work inside critical section.
+
+			lockA.Unlock()
+			releaseA()
+
+			close(aDone)
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			<-aDone // Wait until A has fully released.
+
+			lockB, releaseB := getImageInspectLock(imageName)
+
+			lockB.Lock()
+
+			_ = imageName // Trivial work inside critical section.
+
+			lockB.Unlock()
+			releaseB()
+
+			close(bDone)
+		}()
+
+		<-bDone
+
+		wg.Wait()
+
+		// Verify the entry was cleaned up (refs should be 0).
+		val, exists := imageInspectLocks.Load(key)
+		if exists {
+			entry, ok := val.(*imageLockEntry)
+			if ok {
+				entry.mu.Lock()
+				assert.Zero(t, entry.refs, "all references must be released after concurrent lifecycle")
+				entry.mu.Unlock()
+			}
+		}
 	})
 }

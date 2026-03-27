@@ -70,27 +70,32 @@ var (
 // canonicalizeImageName resolves an image name to its fully-qualified canonical form
 // using the distribution/reference library. This ensures that different representations
 // of the same image (e.g., "nginx:latest" vs "docker.io/library/nginx:latest") resolve
-// to the same lock key.
+// to the same lock key. Tags and digests are preserved so that different references
+// to the same repository (e.g., repo:stable vs repo:canary) are serialized independently.
 //
 // Parameters:
 //   - imageName: Raw image name from container configuration.
 //
 // Returns:
-//   - string: Canonical image reference, or the original name if parsing fails.
+//   - string: Canonical image reference with tag/digest preserved, or the original name if parsing fails.
 func canonicalizeImageName(imageName string) string {
 	ref, err := reference.ParseNormalizedNamed(imageName)
 	if err != nil {
 		return imageName
 	}
 
-	return ref.Name()
+	return ref.String()
 }
 
 // getImageInspectLock retrieves or creates a reference-counted lock entry for the
 // given image name. The image name is canonicalized so that different representations
 // of the same image share a single mutex. The returned cleanup function must be called
 // after the caller is finished with the lock to decrement the reference count and
-// mark the entry for cleanup when no longer in use.
+// clean up the entry when no longer in use.
+//
+// The returned closure captures the exact *imageLockEntry pointer so that
+// releaseImageInspectLockEntry always decrements the correct entry even if a
+// concurrent caller has replaced the map entry in the interim.
 //
 // Parameters:
 //   - imageName: Raw image name (may be short or fully-qualified).
@@ -116,34 +121,30 @@ func getImageInspectLock(imageName string) (*sync.Mutex, func()) {
 			existing.dead = false
 			existing.mu.Unlock()
 
-			return &existing.inspect, func() { releaseImageInspectLock(key) }
+			return &existing.inspect, func() { releaseImageInspectLockEntry(key, existing) }
 		}
 
 		// Unexpected type in map; overwrite with our entry.
 		imageInspectLocks.Store(key, newEntry)
 	}
 
-	return &newEntry.inspect, func() { releaseImageInspectLock(key) }
+	return &newEntry.inspect, func() { releaseImageInspectLockEntry(key, newEntry) }
 }
 
-// releaseImageInspectLock decrements the reference count for the lock entry associated
-// with the given canonical image key. When the count reaches zero the entry is
-// conditionally removed from the map (only if it is still the same entry) to avoid
-// races with concurrent getImageInspectLock calls that may have revived it.
+// releaseImageInspectLockEntry decrements the reference count for the given lock
+// entry. When the count reaches zero the entry is conditionally removed from the
+// map (only if it is still the same entry) to avoid races with concurrent
+// getImageInspectLock calls that may have replaced it.
+//
+// Unlike releaseImageInspectLock (which loads the entry from the map by key),
+// this function operates on the exact pointer captured at acquisition time,
+// preventing the revive/delete race where a stale key-based lookup could
+// decrement the wrong entry's ref count.
 //
 // Parameters:
-//   - key: Canonical image reference key.
-func releaseImageInspectLock(key string) {
-	val, loaded := imageInspectLocks.Load(key)
-	if !loaded {
-		return
-	}
-
-	entry, isEntry := val.(*imageLockEntry)
-	if !isEntry {
-		return
-	}
-
+//   - key: Canonical image reference key used for conditional map deletion.
+//   - entry: The specific lock entry to release.
+func releaseImageInspectLockEntry(key string, entry *imageLockEntry) {
 	entry.mu.Lock()
 	entry.refs--
 
@@ -159,6 +160,26 @@ func releaseImageInspectLock(key string) {
 	}
 
 	entry.mu.Unlock()
+}
+
+// releaseImageInspectLock decrements the reference count for the lock entry
+// associated with the given canonical image key. This is the key-based variant;
+// prefer releaseImageInspectLockEntry when the exact entry pointer is available.
+//
+// Parameters:
+//   - key: Canonical image reference key.
+func releaseImageInspectLock(key string) {
+	val, loaded := imageInspectLocks.Load(key)
+	if !loaded {
+		return
+	}
+
+	entry, isEntry := val.(*imageLockEntry)
+	if !isEntry {
+		return
+	}
+
+	releaseImageInspectLockEntry(key, entry)
 }
 
 // NormalizeDigest standardizes a digest string for consistent comparison.
@@ -375,19 +396,20 @@ func fetchDigest(
 	// while allowing concurrent inspections of different images. This prevents
 	// redundant concurrent requests to the Docker daemon for the same image
 	// without blocking unrelated image inspections.
+	//
+	// The lock is scoped to only the daemon call; network I/O below runs
+	// concurrently for different images.
 	imageName := container.ImageName()
 
-	// Acquire a reference-counted per-image lock that serializes inspections of the
-	// same canonical image while allowing concurrent inspections of different images.
 	lock, release := getImageInspectLock(imageName)
-
-	defer release()
 
 	lock.Lock()
 
-	defer lock.Unlock()
-
 	inspect, _, err := inspector.ImageInspectWithRaw(ctx, imageName)
+
+	lock.Unlock()
+	release()
+
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to inspect image")
 
