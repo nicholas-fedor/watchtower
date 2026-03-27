@@ -1,6 +1,6 @@
 # Metrics
 
-!!! warning "Experimental feature"
+!!! Warning "Experimental feature"
     This feature was added in v1.0.4 and is still considered experimental. If you notice any strange behavior, please raise
     a ticket in the repository issues.
 
@@ -11,6 +11,9 @@ as well as creating a port mapping for your container for port `8080`.
 
 !!! Note
     You can enable both the metrics API and the update API simultaneously by using both `--http-api-metrics` and `--http-api-update` flags.
+
+!!! Warning
+    Enabling the metrics API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation. See [Updating Watchtower](../../getting-started/updating-watchtower/index.md#port-configuration-limitation) for more details.
 
 The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible metrics. This is separate from the [`/v1/update`](../http-api/index.md#http_api_update) endpoint which triggers updates and returns JSON results.
 
