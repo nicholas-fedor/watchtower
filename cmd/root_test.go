@@ -1053,12 +1053,12 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 		Config: &dockerContainer.Config{Hostname: hostname},
 	}).Once()
 
+	// Set up IsWatchtower expectation (called to check if container should be preferred)
+	mockContainer.EXPECT().IsWatchtower().Return(false).Once()
+
 	// Set up container mock to return the container ID
 	expectedID := types.ContainerID("test-container-id")
 	mockContainer.EXPECT().ID().Return(expectedID).Once()
-
-	// Set up container mock to indicate it is not a Watchtower container
-	mockContainer.EXPECT().IsWatchtower().Return(false).Once()
 
 	// Execute the function that calls ListContainers with context
 	resultID, err := container.GetContainerIDFromHostname(context.Background(), mockClient)

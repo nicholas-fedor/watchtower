@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -651,15 +650,11 @@ func runMain(cfg types.RunConfig) int {
 		currentWatchtowerContainer,
 	)
 	if err != nil {
-		if strings.Contains(err.Error(), "failed to list containers") {
-			logNotify("Failed to detect Watchtower instances", err)
-
-			return 1
-		}
-
-		logNotify("Multiple Watchtower instances detected", err)
-
-		return 1 // Log failure and exit.
+		// Cleanup failure is non-fatal — log a warning and continue.
+		// The old container may still be stopping; forcing exit would leave
+		// no Watchtower running. Continuing ensures the new instance operates
+		// even if the old container couldn't be fully cleaned up.
+		logrus.WithError(err).Warn("Failed to clean up excess Watchtower instances, continuing anyway")
 	}
 
 	// Track if cleanup occurred to prevent redundant updates after self-update
