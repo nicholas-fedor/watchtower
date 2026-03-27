@@ -671,6 +671,12 @@ func runMain(cfg types.RunConfig) int {
 	}
 
 	// Configure and start the HTTP API, handling any startup errors.
+	//
+	// Determine if self-update should be skipped due to host-bound port conflicts.
+	// This flag is passed to the API so the warning is emitted near the HTTP server startup message.
+	skipSelfUpdate := currentWatchtowerContainer != nil &&
+		currentWatchtowerContainer.HasExposedPorts()
+
 	err = api.SetupAndStartAPI(
 		ctx,
 		cfg.APIHost,
@@ -694,6 +700,7 @@ func runMain(cfg types.RunConfig) int {
 		filters.FilterByImage,
 		metrics.Default,
 		logging.WriteStartupMessage,
+		skipSelfUpdate,
 	)
 	if err != nil {
 		logNotify("API setup failed", err)
@@ -702,6 +709,9 @@ func runMain(cfg types.RunConfig) int {
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
+	// The startup message is skipped here if it was already sent by the HTTP API in blocking mode.
+	startupMessageSent := cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI
+
 	err = scheduling.RunUpgradesOnSchedule(
 		ctx, cfg.Command,
 		cfg.Filter,
@@ -719,6 +729,7 @@ func runMain(cfg types.RunConfig) int {
 		cfg.UpdateOnStart,
 		cleanupOccurred,
 		currentWatchtowerContainer,
+		startupMessageSent,
 	)
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)

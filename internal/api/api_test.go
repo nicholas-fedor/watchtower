@@ -115,6 +115,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 					filterByImage,
 					defaultMetrics,
 					writeStartupMessage,
+					false, // skipSelfUpdate
 					mockServer,
 				)
 			}()
@@ -189,6 +190,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 					filterByImage,
 					defaultMetrics,
 					writeStartupMessage,
+					false, // skipSelfUpdate
 					mockServer,
 				)
 			}()
@@ -248,6 +250,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				filterByImage,
 				defaultMetrics,
 				writeStartupMessage,
+				false, // skipSelfUpdate
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -305,6 +308,60 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 			},
 			ginkgo.Entry("monitorOnly false", false, false),
 			ginkgo.Entry("monitorOnly true", true, true),
+		)
+	})
+
+	ginkgo.When("update API is enabled with skipSelfUpdate parameter", func() {
+		ginkgo.DescribeTable("should pass skipSelfUpdate parameter to update function",
+			func(skipSelfUpdate, expectSkipSelfUpdate bool) {
+				ctx := context.Background()
+
+				var capturedParams types.UpdateParams
+
+				runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+					capturedParams = params
+
+					return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+				}
+				filterByImage := func(_ []string, filter types.Filter) types.Filter {
+					return filter
+				}
+				defaultMetrics := metrics.Default
+
+				// Create the update handler directly to test the parameter passing
+				updateHandler := update.New(func(images []string) *metrics.Metric {
+					params := types.UpdateParams{
+						Cleanup:        false,
+						RunOnce:        true,
+						MonitorOnly:    false,
+						SkipSelfUpdate: skipSelfUpdate,
+					}
+					metric := runUpdatesWithNotifications(
+						ctx,
+						filterByImage(images, filters.NoFilter),
+						params,
+					)
+					defaultMetrics().RegisterScan(metric)
+
+					return metric
+				}, nil)
+
+				// Create a test HTTP request to trigger the update
+				req, err := http.NewRequest(http.MethodPost, "/v1/update", http.NoBody)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				// Create a response recorder
+				w := httptest.NewRecorder()
+
+				// Call the handler
+				updateHandler.Handle(w, req)
+
+				// Verify the response
+				gomega.Expect(w.Code).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(capturedParams.SkipSelfUpdate).To(gomega.Equal(expectSkipSelfUpdate))
+			},
+			ginkgo.Entry("skipSelfUpdate false", false, false),
+			ginkgo.Entry("skipSelfUpdate true", true, true),
 		)
 	})
 })

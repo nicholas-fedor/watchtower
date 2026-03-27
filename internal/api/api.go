@@ -50,6 +50,7 @@ func GetAPIAddr(host, port string) string {
 //   - filterDesc: A human-readable description of the applied filter.
 //   - updateLock: A channel ensuring only one update runs at a time, shared with the scheduler.
 //   - cleanup: Boolean indicating whether to remove old images after updates.
+//   - monitorOnly: Boolean indicating whether to run in monitor-only mode.
 //   - client: Container client for Docker operations.
 //   - notifier: Notification system instance.
 //   - scope: Operational scope for Watchtower.
@@ -58,6 +59,7 @@ func GetAPIAddr(host, port string) string {
 //   - filterByImage: Function to filter by images.
 //   - defaultMetrics: Function to get default metrics.
 //   - writeStartupMessage: Function to write startup message.
+//   - skipSelfUpdate: Whether self-update will be skipped due to host-bound port conflicts.
 //
 // Returns:
 //   - error: An error if the API fails to start (excluding clean shutdown), nil otherwise.
@@ -79,6 +81,7 @@ func SetupAndStartAPI(
 	filterByImage func([]string, types.Filter) types.Filter,
 	defaultMetrics func() *metrics.Metrics,
 	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
+	skipSelfUpdate bool,
 	server ...api.HTTPServer,
 ) error {
 	// Get the formatted HTTP api address string.
@@ -99,7 +102,7 @@ func SetupAndStartAPI(
 				Cleanup:        cleanup,
 				RunOnce:        true,
 				MonitorOnly:    monitorOnly,
-				SkipSelfUpdate: false, // SkipWatchtowerSelfUpdate is not needed for API-triggered updates
+				SkipSelfUpdate: skipSelfUpdate,
 			}
 			metric := runUpdatesWithNotifications(ctx, filterByImage(images, filter), params)
 			defaultMetrics().RegisterScan(metric)
@@ -126,6 +129,11 @@ func SetupAndStartAPI(
 	if enableMetricsAPI {
 		metricsHandler := metricsAPI.New()
 		httpAPI.RegisterHandler(metricsHandler.Path, metricsHandler.Handle)
+	}
+
+	// Warn once at startup when self-update will be skipped due to host-bound port conflicts.
+	if skipSelfUpdate {
+		logrus.Warn("Skipping self-update to prevent port conflict: Watchtower container has host-bound ports")
 	}
 
 	// Start the API server, logging errors unless it's a clean shutdown.
