@@ -98,9 +98,11 @@ func FuzzLockLifecycleConcurrency(f *testing.F) {
 
 		defer imageInspectLocks.Delete(key)
 
-		// Goroutine A acquires, works, releases, then signals.
-		// Goroutine B waits for A to finish, then acquires the same key.
-		// This exercises the cleanup-then-reacquire path without deadlock.
+		// Goroutine A acquires, works, unlocks, then signals B to start
+		// before calling releaseA. This forces B's getImageInspectLock to
+		// race with A's releaseA, exercising the window where refs drops
+		// to zero and deletion is pending.
+		startB := make(chan struct{})
 		aDone := make(chan struct{})
 		bDone := make(chan struct{})
 
@@ -117,6 +119,11 @@ func FuzzLockLifecycleConcurrency(f *testing.F) {
 			_ = imageName // Trivial work inside critical section.
 
 			lockA.Unlock()
+
+			// Signal B to start its getImageInspectLock while the entry
+			// still exists (refs > 0), then release — B's acquire races
+			// with our release's CompareAndDelete.
+			close(startB)
 			releaseA()
 
 			close(aDone)
@@ -125,7 +132,7 @@ func FuzzLockLifecycleConcurrency(f *testing.F) {
 		go func() {
 			defer wg.Done()
 
-			<-aDone // Wait until A has fully released.
+			<-startB // Wait until A has unlocked but not yet released.
 
 			lockB, releaseB := getImageInspectLock(imageName)
 
@@ -139,11 +146,12 @@ func FuzzLockLifecycleConcurrency(f *testing.F) {
 			close(bDone)
 		}()
 
+		<-aDone
 		<-bDone
 
 		wg.Wait()
 
-		// Verify the entry was cleaned up (refs should be 0).
+		// Verify the entry was cleaned up (refs should be 0) or removed.
 		val, exists := imageInspectLocks.Load(key)
 		if exists {
 			entry, ok := val.(*imageLockEntry)

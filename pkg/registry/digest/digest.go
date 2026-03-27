@@ -117,8 +117,20 @@ func getImageInspectLock(imageName string) (*sync.Mutex, func()) {
 		existing, isEntry := val.(*imageLockEntry)
 		if isEntry {
 			existing.mu.Lock()
+
+			// Check dead before incrementing: if the entry was marked dead by a
+			// concurrent release that is about to remove it from the map, do not
+			// revive it — let it be deleted and create a fresh entry instead.
+			if existing.dead {
+				existing.mu.Unlock()
+
+				fresh := &imageLockEntry{refs: 1}
+				imageInspectLocks.Store(key, fresh)
+
+				return &fresh.inspect, func() { releaseImageInspectLockEntry(key, fresh) }
+			}
+
 			existing.refs++
-			existing.dead = false
 			existing.mu.Unlock()
 
 			return &existing.inspect, func() { releaseImageInspectLockEntry(key, existing) }
@@ -150,11 +162,12 @@ func releaseImageInspectLockEntry(key string, entry *imageLockEntry) {
 
 	if entry.refs == 0 {
 		entry.dead = true
-		entry.mu.Unlock()
 
-		// Conditionally delete only if the map still points to this entry.
-		// A concurrent getImageInspectLock may have created a new entry.
+		// Hold entry.mu while removing from the map so a concurrent
+		// getImageInspectLock cannot revive the entry between the dead
+		// flag being set and the map entry being deleted.
 		imageInspectLocks.CompareAndDelete(key, entry)
+		entry.mu.Unlock()
 
 		return
 	}
