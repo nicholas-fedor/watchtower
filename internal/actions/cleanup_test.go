@@ -343,7 +343,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
-				Return(errors.New("stop container failed"))
+				Return(errors.New("stop container failed")).
+				Times(maxRemovalAttempts)
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
@@ -405,7 +406,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				Return([]types.Container{old1Container, old2Container, newContainer}, nil)
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, old1Container, 10*time.Minute).
-				Return(errors.New("stop container failed"))
+				Return(errors.New("stop container failed")).
+				Times(maxRemovalAttempts)
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []types.RemovedImageInfo
@@ -471,7 +473,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, old1Container, 10*time.Minute).
 					Return(errors.New("removal of container watchtower-old1 is already in progress")).
-					Times(3)
+					Times(maxRemovalAttempts)
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).
 					Return(nil)
@@ -1741,11 +1743,11 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				map[string]string{},
 			)
 
-			// All three attempts fail
+			// All attempts fail
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
 				Return(errors.New("container stop failed")).
-				Times(3)
+				Times(maxRemovalAttempts)
 
 			removed, err := removeExcessContainers(
 				context.Background(),

@@ -20,10 +20,14 @@ import (
 const stopContainerTimeout = 10 * time.Minute
 
 // removalRetryDelay sets the delay before retrying removal operations.
-const removalRetryDelay = 500 * time.Millisecond
+const removalRetryDelay = 1 * time.Second
 
 // maxRemovalAttempts sets the maximum number of retries for container removal operations.
-const maxRemovalAttempts = 3
+// Docker's default stop timeout is 10 seconds, but our stopContainerTimeout overrides it
+// to 10 minutes. With 30 attempts and a 1s delay between retries, the total retry window
+// is approximately 30 seconds (30 × 1s), which covers the default Docker stop timeout
+// plus overhead for image removal delays.
+const maxRemovalAttempts = 30
 
 // RemoveExcessWatchtowerInstances ensures a single Watchtower instance within the same scope.
 //
