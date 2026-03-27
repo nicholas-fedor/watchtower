@@ -1192,8 +1192,9 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 			)
 		}()
 
-		// Wait a short time to allow the update to start and reach the delay
-		time.Sleep(10 * time.Millisecond)
+		// Let the goroutine reach its first blocking point (PullFailureDelay timer)
+		// before canceling the context.
+		synctest.Wait()
 		cancel()
 
 		// Wait for the update to complete

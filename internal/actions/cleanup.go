@@ -19,11 +19,15 @@ import (
 // stopContainerTimeout sets the container stop timeout.
 const stopContainerTimeout = 10 * time.Minute
 
-// removalRetryDelay sets the delay before retrying removal operations.
-const removalRetryDelay = 500 * time.Millisecond
-
 // maxRemovalAttempts sets the maximum number of retries for container removal operations.
-const maxRemovalAttempts = 3
+// Docker's default stop timeout is 10 seconds, but our stopContainerTimeout overrides it
+// to 10 minutes. With 30 attempts and a 1s delay between retries, the total retry window
+// is approximately 30 seconds (30 × 1s), which covers the default Docker stop timeout
+// plus overhead for image removal delays.
+const maxRemovalAttempts = 30
+
+// RemovalRetryDelay sets the delay before retrying removal operations.
+var RemovalRetryDelay = 1 * time.Second
 
 // RemoveExcessWatchtowerInstances ensures a single Watchtower instance within the same scope.
 //
@@ -94,7 +98,7 @@ func RemoveExcessWatchtowerInstances(
 		removeImageInfos,
 	)
 	if err != nil {
-		return 0, err
+		return removed, err
 	}
 
 	return removed, nil
@@ -365,10 +369,10 @@ func removeExcessContainers(
 
 			if attempt < maxRemovalAttempts-1 {
 				select {
-				case <-time.After(removalRetryDelay):
+				case <-time.After(RemovalRetryDelay):
 					// continue to next retry attempt
 				case <-ctx.Done():
-					return 0, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
+					return excessInstancesRemoved, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
 				}
 			}
 		}

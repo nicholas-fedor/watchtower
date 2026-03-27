@@ -557,6 +557,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		true,
 		false,
 		nil,
+		false, // startupMessageSent
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -645,6 +646,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			true,
 			false,
 			nil,
+			false, // startupMessageSent
 		)
 
 		// Should not return an error (context cancellation is expected)
@@ -737,6 +739,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 			false,
 			false,
 			nil,
+			false, // startupMessageSent
 		)
 
 		// Should not return an error
@@ -810,6 +813,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 			updateOnStart,
 			false,
 			nil,
+			false, // startupMessageSent
 		)
 
 		// Should not return an error
@@ -896,6 +900,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				updateOnStart1,
 				false,
 				nil,
+				false, // startupMessageSent
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -927,6 +932,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				updateOnStart2,
 				false,
 				nil,
+				false, // startupMessageSent
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -1047,12 +1053,12 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 		Config: &dockerContainer.Config{Hostname: hostname},
 	}).Once()
 
+	// Set up IsWatchtower expectation (called to check if container should be preferred)
+	mockContainer.EXPECT().IsWatchtower().Return(false).Once()
+
 	// Set up container mock to return the container ID
 	expectedID := types.ContainerID("test-container-id")
 	mockContainer.EXPECT().ID().Return(expectedID).Once()
-
-	// Set up container mock to indicate it is not a Watchtower container
-	mockContainer.EXPECT().IsWatchtower().Return(false).Once()
 
 	// Execute the function that calls ListContainers with context
 	resultID, err := container.GetContainerIDFromHostname(context.Background(), mockClient)
@@ -1125,6 +1131,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				false,
 				false,
 				nil,
+				false, // startupMessageSent
 			)
 			assert.NoError(t, err)
 
