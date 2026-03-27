@@ -171,7 +171,7 @@ func getFilteredContainers(
 	switch {
 	case scope != "":
 		filter = filters.FilterByScope(scope, filters.WatchtowerContainersFilter)
-	case scope == "":
+	default:
 		filter = filters.UnscopedWatchtowerContainersFilter
 	}
 
@@ -247,11 +247,6 @@ func getChainedContainers(
 			c.ID() != currentContainer.ID() {
 			chainedContainers = append(chainedContainers, c)
 		}
-	}
-
-	// Return an empty slice if no chained containers are found
-	if len(chainedContainers) == 0 {
-		return []types.Container{}
 	}
 
 	return chainedContainers

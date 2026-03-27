@@ -2547,3 +2547,230 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 		})
 	})
 })
+
+var _ = ginkgo.Describe("buildCleanupEntriesForContainer", func() {
+	ginkgo.It("should return empty entries when cleanedImages is empty", func() {
+		now := time.Now()
+
+		entries := buildCleanupEntriesForContainer(
+			[]types.RemovedImageInfo{},
+			"container-a",
+			now,
+		)
+
+		gomega.Expect(entries).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should return empty entries when no images match the container name", func() {
+		now := time.Now()
+
+		cleanedImages := []types.RemovedImageInfo{
+			{
+				ImageID:       types.ImageID("sha256:aaa"),
+				ImageName:     "nginx:old",
+				ContainerName: "container-b",
+			},
+		}
+
+		entries := buildCleanupEntriesForContainer(
+			cleanedImages,
+			"container-a",
+			now,
+		)
+
+		gomega.Expect(entries).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should return one entry for a single matching image", func() {
+		now := time.Now()
+
+		cleanedImages := []types.RemovedImageInfo{
+			{
+				ImageID:       types.ImageID("sha256:aaa"),
+				ImageName:     "nginx:old",
+				ContainerName: "container-a",
+			},
+		}
+
+		entries := buildCleanupEntriesForContainer(
+			cleanedImages,
+			"container-a",
+			now,
+		)
+
+		gomega.Expect(entries).To(gomega.HaveLen(1))
+		gomega.Expect(entries[0].Message).To(gomega.Equal("Removing image"))
+		gomega.Expect(entries[0].Data["image_name"]).To(gomega.Equal("nginx:old"))
+		gomega.Expect(entries[0].Data["container_name"]).To(gomega.Equal("container-a"))
+	})
+
+	ginkgo.It("should return entries for multiple different images matching the container", func() {
+		now := time.Now()
+
+		cleanedImages := []types.RemovedImageInfo{
+			{
+				ImageID:       types.ImageID("sha256:aaa"),
+				ImageName:     "nginx:old",
+				ContainerName: "container-a",
+			},
+			{
+				ImageID:       types.ImageID("sha256:bbb"),
+				ImageName:     "redis:old",
+				ContainerName: "container-a",
+			},
+		}
+
+		entries := buildCleanupEntriesForContainer(
+			cleanedImages,
+			"container-a",
+			now,
+		)
+
+		gomega.Expect(entries).To(gomega.HaveLen(2))
+	})
+
+	ginkgo.It("should return each entry per call without cross-call deduplication", func() {
+		now := time.Now()
+
+		cleanedImages := []types.RemovedImageInfo{
+			{
+				ImageID:       types.ImageID("sha256:aaa"),
+				ImageName:     "nginx:old",
+				ContainerName: "container-a",
+			},
+		}
+
+		// First call for container-a
+		entriesA := buildCleanupEntriesForContainer(
+			cleanedImages,
+			"container-a",
+			now,
+		)
+		gomega.Expect(entriesA).To(gomega.HaveLen(1))
+
+		// Second call for a different container that also lists the same image
+		// should still return the entry (no cross-container deduplication).
+		cleanedImagesForB := []types.RemovedImageInfo{
+			{
+				ImageID:       types.ImageID("sha256:aaa"),
+				ImageName:     "nginx:old",
+				ContainerName: "container-b",
+			},
+		}
+
+		entriesB := buildCleanupEntriesForContainer(
+			cleanedImagesForB,
+			"container-b",
+			now,
+		)
+		gomega.Expect(entriesB).To(gomega.HaveLen(1))
+	})
+
+	ginkgo.It("should handle mixed scenario filtering only matching container", func() {
+		now := time.Now()
+
+		cleanedImages := []types.RemovedImageInfo{
+			{
+				ImageID:       types.ImageID("sha256:aaa"),
+				ImageName:     "nginx:old",
+				ContainerName: "container-a",
+			},
+			{
+				ImageID:       types.ImageID("sha256:bbb"),
+				ImageName:     "redis:old",
+				ContainerName: "container-a",
+			},
+			{
+				ImageID:       types.ImageID("sha256:ccc"),
+				ImageName:     "postgres:old",
+				ContainerName: "container-b",
+			},
+		}
+
+		entries := buildCleanupEntriesForContainer(
+			cleanedImages,
+			"container-a",
+			now,
+		)
+
+		// Should get 2 entries: aaa and bbb (both belong to container-a).
+		// ccc is skipped because it belongs to container-b.
+		gomega.Expect(entries).To(gomega.HaveLen(2))
+	})
+
+	ginkgo.It("should use the provided timestamp for all entries", func() {
+		specificTime := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
+
+		cleanedImages := []types.RemovedImageInfo{
+			{
+				ImageID:       types.ImageID("sha256:aaa"),
+				ImageName:     "nginx:old",
+				ContainerName: "container-a",
+			},
+			{
+				ImageID:       types.ImageID("sha256:bbb"),
+				ImageName:     "redis:old",
+				ContainerName: "container-a",
+			},
+		}
+
+		entries := buildCleanupEntriesForContainer(
+			cleanedImages,
+			"container-a",
+			specificTime,
+		)
+
+		gomega.Expect(entries).To(gomega.HaveLen(2))
+
+		for _, entry := range entries {
+			gomega.Expect(entry.Time).To(gomega.Equal(specificTime))
+		}
+	})
+})
+
+var _ = ginkgo.Describe("deduplicateByImageID", func() {
+	ginkgo.It("should return empty slice for empty input", func() {
+		result := deduplicateByImageID([]types.RemovedImageInfo{})
+		gomega.Expect(result).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should return all entries when all ImageIDs are unique", func() {
+		images := []types.RemovedImageInfo{
+			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
+			{ImageID: types.ImageID("sha256:bbb"), ContainerName: "container-b"},
+		}
+
+		result := deduplicateByImageID(images)
+		gomega.Expect(result).To(gomega.HaveLen(2))
+		gomega.Expect(result[0].ImageID).To(gomega.Equal(types.ImageID("sha256:aaa")))
+		gomega.Expect(result[1].ImageID).To(gomega.Equal(types.ImageID("sha256:bbb")))
+	})
+
+	ginkgo.It("should keep only first occurrence when ImageIDs are duplicated", func() {
+		images := []types.RemovedImageInfo{
+			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
+			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-b"},
+		}
+
+		result := deduplicateByImageID(images)
+		gomega.Expect(result).To(gomega.HaveLen(1))
+		// Should keep the first occurrence with container-a
+		gomega.Expect(result[0].ContainerName).To(gomega.Equal("container-a"))
+	})
+
+	ginkgo.It("should handle mixed unique and duplicate ImageIDs", func() {
+		images := []types.RemovedImageInfo{
+			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
+			{ImageID: types.ImageID("sha256:bbb"), ContainerName: "container-b"},
+			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-c"},
+			{ImageID: types.ImageID("sha256:ccc"), ContainerName: "container-d"},
+		}
+
+		result := deduplicateByImageID(images)
+		gomega.Expect(result).To(gomega.HaveLen(3))
+		gomega.Expect(result[0].ImageID).To(gomega.Equal(types.ImageID("sha256:aaa")))
+		gomega.Expect(result[0].ContainerName).To(gomega.Equal("container-a"))
+		gomega.Expect(result[1].ImageID).To(gomega.Equal(types.ImageID("sha256:bbb")))
+		gomega.Expect(result[2].ImageID).To(gomega.Equal(types.ImageID("sha256:ccc")))
+	})
+})

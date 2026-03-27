@@ -82,9 +82,9 @@ var _ = ginkgo.Describe("the update action", func() {
 					// Update completes despite some failures
 				gomega.Expect(report).NotTo(gomega.BeNil())
 				gomega.Expect(report.Failed()).To(gomega.HaveLen(1)) // One container failed to stop
-				// Cleanup should still be attempted for successful operations
-				// Since all containers use the same image, only one cleanup entry is created
-				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1)) // Deduplicated by image ID
+				// Cleanup should still be attempted for successful operations.
+				// 2 of 3 containers succeeded; each gets its own entry for split notifications.
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(2))
 			},
 		)
 	})

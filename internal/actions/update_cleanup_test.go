@@ -15,7 +15,7 @@ import (
 var _ = ginkgo.Describe("the update action", func() {
 	ginkgo.When("watchtower has been instructed to clean up", func() {
 		ginkgo.When("there are multiple containers using the same image", func() {
-			ginkgo.It("should collect the image ID once for deferred cleanup", func() {
+			ginkgo.It("should collect one entry per container for deferred cleanup", func() {
 				client := mockActions.CreateMockClient(getCommonTestData(), false, false)
 				client.TestData.Staleness = map[string]bool{
 					"test-container-01": true,
@@ -29,9 +29,16 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
-				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				// Each container using the same image gets its own entry so that
+				// split-by-container notifications report correctly. Image-level
+				// deduplication happens later in performImageCleanup.
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(3))
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ContainerName", "test-container-01")))
+				gomega.Expect(cleanupImageInfos).
+					To(gomega.ContainElement(gomega.HaveField("ContainerName", "test-container-02")))
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ContainerName", "test-container-03")))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
@@ -40,7 +47,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.When("there are multiple containers using different images", func() {
-			ginkgo.It("should collect each image ID for deferred cleanup", func() {
+			ginkgo.It("should collect one entry per container for each image", func() {
 				testData := getCommonTestData()
 				testData.Containers = append(
 					testData.Containers,
@@ -69,7 +76,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("unique-fake-image:latest"))))
-				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(2))
+				// 3 containers for fake-image:latest + 1 container for unique-fake-image:latest
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(4))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
 					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
 			})
@@ -95,7 +103,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.When("performing a rolling restart update", func() {
-			ginkgo.It("should collect the image ID for deferred cleanup", func() {
+			ginkgo.It("should collect one entry per container for deferred cleanup", func() {
 				client := mockActions.CreateMockClient(getCommonTestData(), false, false)
 				client.TestData.Staleness = map[string]bool{
 					"test-container-01": true,
@@ -111,7 +119,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(3))
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("fake-image:latest"))))
-				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				// Each container using the same image gets its own entry for split notifications.
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(3))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
 					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
 				gomega.Expect(client.TestData.WaitForContainerHealthyCount.Load()).
