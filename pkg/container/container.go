@@ -486,6 +486,33 @@ func (c *Container) VerifyConfiguration() error {
 		clog.Debug("Initialized ExposedPorts due to PortBindings")
 	}
 
+	// Validate port bindings for empty or malformed port values.
+	// Docker rejects ports with empty port numbers (e.g., "/tcp") with
+	// "invalid port range: value is empty" during ContainerCreate.
+	for port := range c.containerInfo.HostConfig.PortBindings {
+		portStr := string(port)
+
+		// Skip and remove completely empty port entries.
+		if portStr == "" {
+			clog.Warn("Skipping empty port binding and exposed port")
+
+			delete(c.containerInfo.HostConfig.PortBindings, port)
+			delete(c.containerInfo.Config.ExposedPorts, port)
+
+			continue
+		}
+
+		// nat.Port format is "port/protocol"; validate the port part is non-empty.
+		portPart, _, _ := strings.Cut(portStr, "/")
+		if portPart == "" {
+			clog.WithField("port", portStr).
+				Warn("Skipping port binding with empty port number")
+
+			delete(c.containerInfo.HostConfig.PortBindings, port)
+			delete(c.containerInfo.Config.ExposedPorts, port)
+		}
+	}
+
 	clog.Debug("Verified container configuration")
 
 	return nil

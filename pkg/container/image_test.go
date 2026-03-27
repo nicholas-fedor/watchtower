@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/onsi/ginkgo/v2"
@@ -80,6 +81,89 @@ var _ = ginkgo.Describe("the client", func() {
 				gomega.Expect(err).
 					To(gomega.MatchError(`image is pinned with sha256, skipping pull`))
 			})
+		})
+	})
+	ginkgo.When("pulling an image that requires authentication", func() {
+		ginkgo.It("should log at Warn level and return ErrPullImageUnauthorized for auth failures", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
+					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:abc","RepoDigests":["private-registry.io/app@sha256:abc"]}`),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
+					ghttp.RespondWith(http.StatusUnauthorized, `{"message":"unauthorized: authentication required"}`),
+				),
+			)
+
+			i := newImageClient(docker)
+			pullContainer := MockContainer(WithImageName("private-registry.io/app:latest"))
+
+			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+			defer resetLogrus()
+
+			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("authentication required"))
+			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeTrue())
+			gomega.Expect(errors.Is(err, errPullImageFailed)).To(gomega.BeFalse())
+			gomega.Eventually(logbuf).Should(gbytes.Say(`level=warning`))
+			gomega.Eventually(logbuf).Should(gbytes.Say(`Image pull failed: authentication required`))
+		})
+	})
+	ginkgo.When("pulling an image that does not exist in registry", func() {
+		ginkgo.It("should log at Debug level and return ErrPullImageNotFound for not found errors", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
+					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:def","RepoDigests":["nonexistent@sha256:def"]}`),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"manifest for nonexistent:latest not found"}`),
+				),
+			)
+
+			i := newImageClient(docker)
+			pullContainer := MockContainer(WithImageName("nonexistent:latest"))
+
+			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+			defer resetLogrus()
+
+			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("image not found"))
+			gomega.Expect(errors.Is(err, ErrPullImageNotFound)).To(gomega.BeTrue())
+			gomega.Expect(errors.Is(err, errPullImageFailed)).To(gomega.BeFalse())
+			gomega.Eventually(logbuf).Should(gbytes.Say(`Image pull failed: image not found in registry`))
+		})
+	})
+	ginkgo.When("pulling an image with a server error", func() {
+		ginkgo.It("should log at Debug level and return errPullImageFailed for other errors", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
+					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:ghi","RepoDigests":["app@sha256:ghi"]}`),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
+					ghttp.RespondWith(http.StatusInternalServerError, `{"message":"internal server error"}`),
+				),
+			)
+
+			i := newImageClient(docker)
+			pullContainer := MockContainer(WithImageName("app:latest"))
+
+			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+			defer resetLogrus()
+
+			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to pull image"))
+			gomega.Expect(errors.Is(err, errPullImageFailed)).To(gomega.BeTrue())
+			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeFalse())
+			gomega.Expect(errors.Is(err, ErrPullImageNotFound)).To(gomega.BeFalse())
+			gomega.Eventually(logbuf).Should(gbytes.Say(`Failed to initiate image pull`))
 		})
 	})
 	ginkgo.When("removing a image", func() {

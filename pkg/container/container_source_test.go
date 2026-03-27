@@ -181,6 +181,21 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			gomega.Expect(containers).To(gomega.HaveLen(1))
 		})
 	})
+
+	ginkgo.When("Docker API returns 404 NotFound for container list", func() {
+		ginkgo.It("should return empty container list without error", func() {
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp("^/v[0-9.]+/containers/json$")),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"page not found"}`),
+				),
+			)
+
+			containers, err := ListSourceContainers(context.Background(), docker, ClientOptions{}, nil)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.BeEmpty())
+		})
+	})
 })
 
 var _ = ginkgo.Describe("buildListFilterArgs", func() {
@@ -1839,6 +1854,28 @@ var _ = ginkgo.Describe("StopSourceContainer", func() {
 			err := StopSourceContainer(context.Background(), docker, container, 10*time.Second)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.BeEmpty())
+		})
+	})
+
+	ginkgo.When("stopping a container that was removed between check and stop", func() {
+		ginkgo.It("should return nil when Docker returns 404 NotFound", func() {
+			container := MockContainer(
+				WithContainerState(dockerContainer.State{Running: true}),
+			)
+			cid := container.ContainerInfo().ID
+
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"POST",
+						gomega.HaveSuffix(fmt.Sprintf("containers/%s/stop", cid)),
+					),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"No such container"}`),
+				),
+			)
+
+			err := StopSourceContainer(context.Background(), docker, container, 10*time.Second)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 	})
 })
