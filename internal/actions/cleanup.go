@@ -167,7 +167,7 @@ func getFilteredContainers(
 	switch {
 	case scope != "":
 		filter = filters.FilterByScope(scope, filters.WatchtowerContainersFilter)
-	case scope == "":
+	default:
 		filter = filters.UnscopedWatchtowerContainersFilter
 	}
 
@@ -243,11 +243,6 @@ func getChainedContainers(
 			c.ID() != currentContainer.ID() {
 			chainedContainers = append(chainedContainers, c)
 		}
-	}
-
-	// Return an empty slice if no chained containers are found
-	if len(chainedContainers) == 0 {
-		return []types.Container{}
 	}
 
 	return chainedContainers
@@ -420,7 +415,7 @@ func removeExcessContainers(
 	}
 
 	if excessInstancesRemoved < len(excessWatchtowerContainers) {
-		return 0, fmt.Errorf(
+		return excessInstancesRemoved, fmt.Errorf(
 			"%w: %d of %d instances failed to stop",
 			errStopWatchtowerFailed,
 			len(excessWatchtowerContainers)-excessInstancesRemoved,

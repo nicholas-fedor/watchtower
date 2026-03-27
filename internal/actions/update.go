@@ -1303,6 +1303,10 @@ func restartContainersInSortedOrder(
 
 // addCleanupImageInfo adds cleanup info if not already present.
 //
+// Deduplication is based on the (ImageID, ContainerName) pair so that when
+// notifications are split by container, each container that used the old image
+// receives its own "Removing image" entry.
+//
 // Parameters:
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info.
 //   - imageID: ID of the image to clean up.
@@ -1316,7 +1320,7 @@ func addCleanupImageInfo(
 	containerID types.ContainerID,
 ) {
 	for _, existing := range *cleanupImageInfos {
-		if existing.ImageID == imageID {
+		if existing.ImageID == imageID && existing.ContainerName == containerName {
 			return
 		}
 	}
