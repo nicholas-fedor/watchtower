@@ -343,7 +343,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
-				Return(errors.New("stop container failed"))
+				Return(errors.New("stop container failed")).
+				Times(maxRemovalAttempts)
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
@@ -405,7 +406,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				Return([]types.Container{old1Container, old2Container, newContainer}, nil)
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, old1Container, 10*time.Minute).
-				Return(errors.New("stop container failed"))
+				Return(errors.New("stop container failed")).
+				Times(maxRemovalAttempts)
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []types.RemovedImageInfo
@@ -421,8 +423,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			gomega.Expect(err).
 				To(gomega.HaveOccurred())
-				// Strict enforcement fails if any container fails
-			gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
+				// Partial success: one container was removed before failure
+			gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
 			gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 		})
 
@@ -471,7 +473,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, old1Container, 10*time.Minute).
 					Return(errors.New("removal of container watchtower-old1 is already in progress")).
-					Times(3)
+					Times(maxRemovalAttempts)
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).
 					Return(nil)
@@ -488,7 +490,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
-				gomega.Expect(cleanupOccurred).To(gomega.Equal(0))
+				gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
 				gomega.Expect(cleanupImageIDs).To(gomega.BeEmpty())
 			},
 		)
@@ -1043,8 +1045,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("1 of 2 instances failed to stop"))
 				gomega.Expect(cleanupOccurred).
-					To(gomega.Equal(0))
-					// No successful cleanups due to partial failure
+					To(gomega.Equal(1))
+					// Partial success: one container removed before failure
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.BeEmpty())
 				// Image info cleared on failure
@@ -1120,8 +1122,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				gomega.Expect(err.Error()).
 					To(gomega.ContainSubstring("1 of 2 instances failed to stop"))
 				gomega.Expect(cleanupOccurred).
-					To(gomega.Equal(0))
-					// State consistency: no partial success reported
+					To(gomega.Equal(1))
+					// Partial success: one container removed before failure
 				gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 			},
 		)
@@ -1192,7 +1194,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				)
 
 				gomega.Expect(err).To(gomega.HaveOccurred())
-				gomega.Expect(cleanupOccurred).To(gomega.Equal(0)) // All operations rolled back
+				gomega.Expect(cleanupOccurred).To(gomega.Equal(1)) // Partial success before failure
 				gomega.Expect(cleanupImageInfos).
 					To(gomega.BeEmpty())
 				// Image info cleared on any failure
@@ -1604,11 +1606,11 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				map[string]string{},
 			)
 
-			// Create a context with very short timeout
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
-			defer cancel()
+			// Create an already-expired context to ensure it is done
+			// before the retry loop's select statement runs.
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
 
-			// Wait for context to expire (ensuring it expires during retry delay)
 			// First call fails, triggering retry with expired context
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
@@ -1741,11 +1743,11 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				map[string]string{},
 			)
 
-			// All three attempts fail
+			// All attempts fail
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).
 				Return(errors.New("container stop failed")).
-				Times(3)
+				Times(maxRemovalAttempts)
 
 			removed, err := removeExcessContainers(
 				context.Background(),

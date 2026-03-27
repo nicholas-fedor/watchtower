@@ -806,6 +806,85 @@ Turns out everything is on fire
 			})
 		})
 	})
+
+	ginkgo.When("deduplicating entries for grouped notifications", func() {
+		ginkgo.It("should return empty slice for empty input", func() {
+			result := deduplicateEntries([]*logrus.Entry{})
+			gomega.Expect(result).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should return single entry unchanged", func() {
+			entries := []*logrus.Entry{
+				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
+			}
+			result := deduplicateEntries(entries)
+			gomega.Expect(result).To(gomega.HaveLen(1))
+		})
+
+		ginkgo.It("should deduplicate 'Found new image' entries with same image and new ID", func() {
+			entries := []*logrus.Entry{
+				{Message: "Found new image", Data: logrus.Fields{"container": "app-a", "image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Found new image", Data: logrus.Fields{"container": "app-b", "image": "nginx:latest", "new_id": "abc123"}},
+			}
+			result := deduplicateEntries(entries)
+			gomega.Expect(result).To(gomega.HaveLen(1))
+			gomega.Expect(result[0].Data["container"]).To(gomega.Equal("app-a"))
+		})
+
+		ginkgo.It("should keep 'Found new image' entries with different images", func() {
+			entries := []*logrus.Entry{
+				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Found new image", Data: logrus.Fields{"image": "redis:latest", "new_id": "def456"}},
+			}
+			result := deduplicateEntries(entries)
+			gomega.Expect(result).To(gomega.HaveLen(2))
+		})
+
+		ginkgo.It("should keep 'Found new image' entries with same image but different new IDs", func() {
+			entries := []*logrus.Entry{
+				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "def456"}},
+			}
+			result := deduplicateEntries(entries)
+			gomega.Expect(result).To(gomega.HaveLen(2))
+		})
+
+		ginkgo.It("should deduplicate 'Removing image' entries with same image ID", func() {
+			entries := []*logrus.Entry{
+				{Message: "Removing image", Data: logrus.Fields{"container_name": "app-a", "image_id": "sha256:abc"}},
+				{Message: "Removing image", Data: logrus.Fields{"container_name": "app-b", "image_id": "sha256:abc"}},
+			}
+			result := deduplicateEntries(entries)
+			gomega.Expect(result).To(gomega.HaveLen(1))
+			gomega.Expect(result[0].Data["container_name"]).To(gomega.Equal("app-a"))
+		})
+
+		ginkgo.It("should not deduplicate other message types", func() {
+			entries := []*logrus.Entry{
+				{Message: "Stopping container", Data: logrus.Fields{"container": "app-a"}},
+				{Message: "Stopping container", Data: logrus.Fields{"container": "app-b"}},
+			}
+			result := deduplicateEntries(entries)
+			gomega.Expect(result).To(gomega.HaveLen(2))
+		})
+
+		ginkgo.It("should handle mixed entry types correctly", func() {
+			entries := []*logrus.Entry{
+				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Stopping container", Data: logrus.Fields{"container": "app-a"}},
+				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Removing image", Data: logrus.Fields{"image_id": "sha256:old"}},
+				{Message: "Started new container", Data: logrus.Fields{"container": "app-a"}},
+				{Message: "Removing image", Data: logrus.Fields{"image_id": "sha256:old"}},
+			}
+			result := deduplicateEntries(entries)
+			gomega.Expect(result).To(gomega.HaveLen(4))
+			gomega.Expect(result[0].Message).To(gomega.Equal("Found new image"))
+			gomega.Expect(result[1].Message).To(gomega.Equal("Stopping container"))
+			gomega.Expect(result[2].Message).To(gomega.Equal("Removing image"))
+			gomega.Expect(result[3].Message).To(gomega.Equal("Started new container"))
+		})
+	})
 })
 
 func TestSlowNotificationNotSent(t *testing.T) {

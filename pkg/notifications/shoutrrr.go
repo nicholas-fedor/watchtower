@@ -466,6 +466,11 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 		"report_available": report != nil,
 	}).Debug("SendNotification called - sending queued entries and report")
 
+	// Deduplicate entries to prevent repeated messages when multiple containers
+	// share the same image (e.g., two containers using nginx:latest will both
+	// log "Found new image" but only one notification should be sent).
+	entries = deduplicateEntries(entries)
+
 	n.sendEntries(entries, report)
 }
 
@@ -527,6 +532,61 @@ func (n *shoutrrrTypeNotifier) GetEntries() []*logrus.Entry {
 //   - report: Optional scan report.
 func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, report types.Report) {
 	n.sendEntries(entries, report)
+}
+
+// deduplicateEntries removes duplicate log entries that occur when multiple containers
+// share the same image. This applies to grouped (non-split) notifications only.
+//
+// For "Found new image" entries, deduplication is based on (message, image name, new image ID).
+// For "Removing image" entries, deduplication is based on (message, image ID).
+// All other entries are kept as-is.
+//
+// Parameters:
+//   - entries: Log entries that may contain duplicates.
+//
+// Returns:
+//   - []*logrus.Entry: Deduplicated entries preserving original order.
+func deduplicateEntries(entries []*logrus.Entry) []*logrus.Entry {
+	if len(entries) <= 1 {
+		return entries
+	}
+
+	type dedupKey struct {
+		message string
+		data    string
+	}
+
+	seen := make(map[dedupKey]bool)
+	result := make([]*logrus.Entry, 0, len(entries))
+
+	for _, entry := range entries {
+		var key dedupKey
+
+		switch entry.Message {
+		case "Found new image":
+			// Deduplicate by image name and new image ID.
+			image, _ := entry.Data["image"].(string)
+			newID, _ := entry.Data["new_id"].(string)
+			key = dedupKey{message: entry.Message, data: image + "\x00" + newID}
+		case "Removing image":
+			// Deduplicate by image ID.
+			imageID, _ := entry.Data["image_id"].(string)
+			key = dedupKey{message: entry.Message, data: imageID}
+		default:
+			// Non-deduplicatable entries are always kept.
+			result = append(result, entry)
+
+			continue
+		}
+
+		if !seen[key] {
+			seen[key] = true
+
+			result = append(result, entry)
+		}
+	}
+
+	return result
 }
 
 // ShouldSendNotification checks if a notification should be sent for the given report based on the notifier's log level.

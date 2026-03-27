@@ -44,6 +44,7 @@ type Container interface {
 	GetCreateConfig() *dockerContainer.Config         // Creation config.
 	GetCreateHostConfig() *dockerContainer.HostConfig // Host creation config.
 	GetContainerChain() (string, bool)                // Container chain label value and presence.
+	HasExposedPorts() bool                            // Exposed ports presence check.
 }
 
 // ImageInspector defines the interface for inspecting Docker images.

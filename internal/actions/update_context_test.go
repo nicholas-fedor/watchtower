@@ -82,9 +82,9 @@ var _ = ginkgo.Describe("the update action", func() {
 					// Update completes despite some failures
 				gomega.Expect(report).NotTo(gomega.BeNil())
 				gomega.Expect(report.Failed()).To(gomega.HaveLen(1)) // One container failed to stop
-				// Cleanup should still be attempted for successful operations
-				// Since all containers use the same image, only one cleanup entry is created
-				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1)) // Deduplicated by image ID
+				// Cleanup should still be attempted for successful operations.
+				// 2 of 3 containers succeeded; each gets its own entry for split notifications.
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(2))
 			},
 		)
 	})
@@ -182,8 +182,9 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 			)
 		}()
 
-		// Wait a bit to allow operations to start, then cancel
-		time.Sleep(5 * time.Millisecond)
+		// Let the goroutine reach its first blocking point (SimulatedLatency timer
+		// in mock's checkContextCancellation) before canceling.
+		synctest.Wait()
 		cancel()
 
 		// Wait for the update to complete
@@ -574,9 +575,10 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 			)
 		}()
 
-		// Wait for operations to start and enter the stop phase, then cancel
-		// This should interrupt stopContainersInReversedOrder while it's iterating
-		time.Sleep(3 * time.Millisecond)
+		// Let the goroutine reach its first blocking point (SimulatedLatency timer
+		// in mock's checkContextCancellation) before canceling.
+		// This should interrupt stopContainersInReversedOrder while it's iterating.
+		synctest.Wait()
 		cancel()
 
 		// Wait for the update to complete
@@ -638,10 +640,10 @@ func TestEarlyCancellationRestartContainers(t *testing.T) {
 			)
 		}()
 
-		// Wait longer to allow stop phase to complete, then cancel during restart phase
-		// With 3 containers and 3ms latency per stop, stop takes ~9ms, so we wait ~12ms
-		// to ensure stop is done and we're in the restart phase
-		time.Sleep(12 * time.Millisecond)
+		// Let the goroutine reach its first blocking point (SimulatedLatency timer
+		// in mock's checkContextCancellation) before canceling.
+		// This allows some operations to start before cancellation takes effect.
+		synctest.Wait()
 		cancel()
 
 		// Wait for the update to complete
