@@ -198,6 +198,13 @@ func (m mockContainer) IsWatchtower() bool {
 	return false // Minimal stub, not used in these tests
 }
 
+// HasExposedPorts indicates whether the container has exposed ports configured.
+// This method satisfies the types.Container interface, returning false as a minimal stub
+// since the auth package does not use this data in these authentication-focused tests.
+func (m mockContainer) HasExposedPorts() bool {
+	return false // Minimal stub, not used in these tests
+}
+
 // StopSignal returns the signal used to stop the container. This method satisfies
 // the types.Container interface, returning an empty string as a minimal stub since
 // the auth package does not use this data in these authentication-focused tests.
