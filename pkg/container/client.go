@@ -463,7 +463,7 @@ func (c *client) ListContainers(ctx context.Context, filter ...types.Filter) ([]
 
 	// Attempt to list source containers with retry for transient Docker connection failures.
 	// The Docker daemon may become temporarily unreachable (e.g., during host maintenance),
-	// so retrying with exponential backoff (5s, 10s, 20s) improves resilience.
+	// so retrying with exponential backoff (5s then 10s between attempts) improves resilience.
 	var (
 		containers []types.Container
 		err        error

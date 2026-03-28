@@ -136,7 +136,8 @@ func (client MockClient) ListContainers(ctx context.Context, filter ...types.Fil
 	}
 
 	if client.TestData.ListContainersError != nil &&
-		int(client.TestData.ListContainersCount.Load()) <= client.TestData.ListContainersFailCount {
+		(client.TestData.ListContainersFailCount == 0 ||
+			int(client.TestData.ListContainersCount.Load()) <= client.TestData.ListContainersFailCount) {
 		return nil, client.TestData.ListContainersError
 	}
 
