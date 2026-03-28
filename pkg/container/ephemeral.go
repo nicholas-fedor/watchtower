@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +31,65 @@ const (
 	// orchestratorCleanupTimeout is the timeout for cleanup operations on failed orchestrator creation.
 	orchestratorCleanupTimeout = 5 * time.Second
 )
+
+// Docker connection environment variable keys.
+const (
+	// dockerHostEnv is the environment variable key for the Docker daemon host.
+	dockerHostEnv = "DOCKER_HOST"
+	// dockerTLSEnv is the environment variable key for TLS verification.
+	dockerTLSEnv = "DOCKER_TLS_VERIFY"
+	// dockerCertPathEnv is the environment variable key for TLS certificate path.
+	dockerCertPathEnv = "DOCKER_CERT_PATH"
+	// dockerAPIVersionEnv is the environment variable key for the Docker API version.
+	dockerAPIVersionEnv = "DOCKER_API_VERSION"
+)
+
+// Default Docker socket paths for different platforms and runtimes.
+const (
+	// defaultUnixSocketPath is the standard Docker socket path on Unix systems.
+	defaultUnixSocketPath = "/var/run/docker.sock"
+	// defaultWindowsPipePath is the standard Docker named pipe path on Windows.
+	defaultWindowsPipePath = "//./pipe/docker_engine"
+)
+
+// envPartsCount is the expected number of parts when splitting "KEY=VALUE" strings.
+const envPartsCount = 2
+
+// bindPartsMinCount is the minimum number of parts for a valid bind mount string.
+const bindPartsMinCount = 2
+
+// Remote Docker connection schemes that do not use a local socket.
+// These require environment variable passthrough rather than socket mounting.
+var remoteDockerSchemes = []string{
+	"tcp://",
+	"http://",
+	"https://",
+	"ssh://",
+}
+
+// DockerConnectionConfig holds the Docker connection configuration extracted from
+// a source container's environment variables and bind mounts. This enables the
+// ephemeral orchestrator to maintain the same Docker connection as the source
+// container, supporting local sockets, Windows named pipes, remote TCP/TLS hosts,
+// and socket proxies.
+type DockerConnectionConfig struct {
+	// Host is the DOCKER_HOST value (e.g., "unix:///var/run/docker.sock", "tcp://host:2375").
+	Host string
+	// TLSVerify indicates whether TLS verification is enabled ("1" or empty).
+	TLSVerify string
+	// CertPath is the path to TLS certificates for remote connections.
+	CertPath string
+	// APIVersion is the pinned Docker API version (empty for autonegotiation).
+	APIVersion string
+	// IsLocal indicates whether the connection is to a local socket or named pipe.
+	IsLocal bool
+	// SocketBind is the socket bind mount string for local connections (e.g., "/var/run/docker.sock:/var/run/docker.sock").
+	// Empty for remote connections.
+	SocketBind string
+	// CertBinds are additional bind mounts for TLS certificate directories.
+	// Only populated for remote TLS connections where certificates need to be mounted.
+	CertBinds []string
+}
 
 // CreateEphemeralOrchestrator creates a short-lived container that orchestrates
 // the Watchtower self-update transition.
@@ -65,18 +125,23 @@ func (c *client) CreateEphemeralOrchestrator(
 
 	clog.Debug("Creating ephemeral orchestrator for self-update")
 
-	// Build the orchestrator container configuration.
-	config := buildOrchestratorConfig(sourceContainer, newImage, containerChain)
+	// Extract the Docker connection configuration from the source container.
+	// This ensures the orchestrator uses the same connection method as the source,
+	// supporting local sockets, named pipes, remote TCP/TLS, and socket proxies.
+	connConfig := extractDockerConnectionConfig(sourceContainer)
 
-	// Extract the source container's host config to derive the Docker socket bind mount.
-	// This ensures the orchestrator uses the same socket path as the source container,
-	// supporting non-standard socket setups and Windows named pipes.
-	var sourceHostConfig *dockerContainer.HostConfig
-	if containerInfo := sourceContainer.ContainerInfo(); containerInfo != nil {
-		sourceHostConfig = containerInfo.HostConfig
-	}
+	clog.WithFields(logrus.Fields{
+		"docker_host": connConfig.Host,
+		"is_local":    connConfig.IsLocal,
+		"tls_verify":  connConfig.TLSVerify != "",
+		"api_version": connConfig.APIVersion,
+	}).Debug("Extracted Docker connection configuration")
 
-	hostConfig := buildOrchestratorHostConfig(sourceHostConfig)
+	// Build the orchestrator container configuration with Docker env vars.
+	config := buildOrchestratorConfig(sourceContainer, newImage, containerChain, connConfig)
+
+	// Build the host configuration with appropriate socket/TLS mounts.
+	hostConfig := buildOrchestratorHostConfig(connConfig)
 
 	// Generate a deterministic container name based on the full source container ID.
 	// Using the full ID instead of ShortID() guarantees uniqueness and avoids
@@ -150,6 +215,8 @@ func (c *client) CreateEphemeralOrchestrator(
 //   - Uses the same Watchtower image (no separate image pull needed)
 //   - Runs with --self-update-orchestrator flag
 //   - Passes old container ID, new image, original name, and container chain via environment
+//   - Forwards Docker connection environment variables (DOCKER_HOST, DOCKER_TLS_VERIFY,
+//     DOCKER_CERT_PATH, DOCKER_API_VERSION) to maintain connection parity with the source
 //   - Sets the orchestrator label for identification
 //   - Omits the watchtower label and scope label to avoid excess instance detection
 //
@@ -157,6 +224,7 @@ func (c *client) CreateEphemeralOrchestrator(
 //   - sourceContainer: Current Watchtower container.
 //   - newImage: Image reference for the new container.
 //   - containerChain: Container chain label for lineage tracking.
+//   - connConfig: Docker connection configuration extracted from the source container.
 //
 // Returns:
 //   - *dockerContainer.Config: The container configuration.
@@ -164,16 +232,27 @@ func buildOrchestratorConfig(
 	sourceContainer types.Container,
 	newImage string,
 	containerChain string,
+	connConfig *DockerConnectionConfig,
 ) *dockerContainer.Config {
+	// Build the environment variables with orchestrator-specific values.
+	env := []string{
+		fmt.Sprintf("%s=%s", orchestratorOldIDEnv, sourceContainer.ID()),
+		fmt.Sprintf("%s=%s", orchestratorNewImageEnv, newImage),
+		fmt.Sprintf("%s=%s", orchestratorOriginalNameEnv, sourceContainer.Name()),
+		fmt.Sprintf("%s=%s", orchestratorContainerChainEnv, containerChain),
+	}
+
+	// Forward Docker connection environment variables to maintain parity with the source.
+	// This ensures the ephemeral orchestrator can connect to the same Docker daemon,
+	// whether via local socket, remote TCP/TLS, or socket proxy.
+	if connConfig != nil {
+		env = appendDockerEnvVars(env, connConfig)
+	}
+
 	return &dockerContainer.Config{
 		Image: newImage,
 		Cmd:   []string{"--self-update-orchestrator"},
-		Env: []string{
-			fmt.Sprintf("%s=%s", orchestratorOldIDEnv, sourceContainer.ID()),
-			fmt.Sprintf("%s=%s", orchestratorNewImageEnv, newImage),
-			fmt.Sprintf("%s=%s", orchestratorOriginalNameEnv, sourceContainer.Name()),
-			fmt.Sprintf("%s=%s", orchestratorContainerChainEnv, containerChain),
-		},
+		Env:   env,
 		Labels: map[string]string{
 			// Orchestrator label only — watchtower label omitted to avoid excess instance detection.
 			OrchestratorLabel: "true",
@@ -186,23 +265,36 @@ func buildOrchestratorConfig(
 //
 // The configuration ensures:
 //   - AutoRemove for automatic cleanup on exit
-//   - Docker socket mount for container management (derived from source container or fallback)
+//   - For local connections: Docker socket mount for container management
+//   - For remote connections: No socket mount; relies on environment variables
+//   - For TLS connections: Certificate directory mounts when certificates are on the host
 //   - No port bindings to avoid conflicts
 //   - No restart policy (one-shot container)
 //
 // Parameters:
-//   - sourceHostConfig: The source container's host configuration, used to derive
-//     the Docker socket bind mount. If nil or contains no socket bind, falls back
-//     to the platform-appropriate default socket path.
+//   - connConfig: Docker connection configuration indicating connection type and mounts.
 //
 // Returns:
 //   - *dockerContainer.HostConfig: The host configuration.
-func buildOrchestratorHostConfig(sourceHostConfig *dockerContainer.HostConfig) *dockerContainer.HostConfig {
-	socketBind := resolveDockerSocketBind(sourceHostConfig)
+func buildOrchestratorHostConfig(connConfig *DockerConnectionConfig) *dockerContainer.HostConfig {
+	var binds []string
+
+	if connConfig != nil && connConfig.IsLocal {
+		// Local connection: mount the Docker socket or named pipe.
+		// This is the most common case for standard Docker installations.
+		binds = append(binds, connConfig.SocketBind)
+	}
+
+	// Add TLS certificate bind mounts if present.
+	// These are needed when the source container has TLS certificates
+	// that must be accessible to the ephemeral orchestrator.
+	if connConfig != nil && len(connConfig.CertBinds) > 0 {
+		binds = append(binds, connConfig.CertBinds...)
+	}
 
 	return &dockerContainer.HostConfig{
 		AutoRemove: true,
-		Binds:      []string{socketBind},
+		Binds:      binds,
 		// No port bindings — avoids conflicts with the new Watchtower container
 		// No restart policy — one-shot container that exits after orchestration
 	}
@@ -215,7 +307,7 @@ func buildOrchestratorHostConfig(sourceHostConfig *dockerContainer.HostConfig) *
 // If no socket bind is found in the source config, it returns the platform-appropriate
 // default socket path:
 //   - Unix: "/var/run/docker.sock:/var/run/docker.sock"
-//   - Windows: "//var/run/docker.sock:/var/run/docker.sock" (via named pipe)
+//   - Windows: "//./pipe/docker_engine://./pipe/docker_engine" (named pipe)
 //
 // Parameters:
 //   - sourceHostConfig: The source container's host configuration containing bind mounts.
@@ -223,13 +315,7 @@ func buildOrchestratorHostConfig(sourceHostConfig *dockerContainer.HostConfig) *
 // Returns:
 //   - string: The Docker socket bind mount string.
 func resolveDockerSocketBind(sourceHostConfig *dockerContainer.HostConfig) string {
-	const (
-		defaultUnixSocketBind    = "/var/run/docker.sock:/var/run/docker.sock"
-		defaultWindowsSocketBind = "//var/run/docker.sock:/var/run/docker.sock"
-	)
-
 	// Try to extract the socket bind from the source container's binds.
-
 	if sourceHostConfig != nil {
 		for _, bind := range sourceHostConfig.Binds {
 			// Check if this bind mount references the Docker socket.
@@ -242,27 +328,47 @@ func resolveDockerSocketBind(sourceHostConfig *dockerContainer.HostConfig) strin
 
 	// Fall back to platform-appropriate default.
 	if isWindows() {
-		return defaultWindowsSocketBind
+		return defaultWindowsPipePath + ":" + defaultWindowsPipePath
 	}
 
-	return defaultUnixSocketBind
+	return defaultUnixSocketPath + ":" + defaultUnixSocketPath
 }
 
 // isDockerSocketBind checks if a bind mount string references the Docker socket.
 // It matches common patterns for both Unix sockets and Windows named pipes.
 //
+// This supports:
+//   - Standard Unix socket: /var/run/docker.sock
+//   - Alternative Unix socket: /run/docker.sock
+//   - Rootless Docker: /run/user/<UID>/docker.sock
+//   - Docker Desktop macOS: $HOME/.docker/run/docker.sock
+//   - Windows named pipe: //./pipe/docker_engine
+//   - Podman socket: /var/run/podman/podman.sock
+//   - balenaOS socket: /var/run/balena-engine.sock
+//
 // Parameters:
 //   - bind: The bind mount string to check (e.g., "/var/run/docker.sock:/var/run/docker.sock").
 //
 // Returns:
-//   - bool: True if the bind mount references the Docker socket.
+//   - bool: True if the bind mount references a Docker-compatible socket.
 func isDockerSocketBind(bind string) bool {
-	// Common Docker socket paths:
-	// - /var/run/docker.sock (standard Unix)
-	// - /run/docker.sock (alternative Unix location)
-	// - //var/run/docker.sock (Windows named pipe)
-	return strings.Contains(bind, "docker.sock") ||
-		strings.Contains(bind, "docker_engine")
+	// Check for known Docker socket patterns.
+	// The bind string format is "host_path:container_path[:options]".
+	// We check the entire string to catch both host and container paths.
+	socketPatterns := []string{
+		"docker.sock",
+		"docker_engine",
+		"podman.sock",
+		"balena-engine.sock",
+	}
+
+	for _, pattern := range socketPatterns {
+		if strings.Contains(bind, pattern) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isWindows returns true if the current platform is Windows.
@@ -271,6 +377,318 @@ func isDockerSocketBind(bind string) bool {
 //   - bool: True on Windows platforms.
 func isWindows() bool {
 	return runtime.GOOS == "windows"
+}
+
+// extractDockerConnectionConfig extracts the Docker connection configuration from
+// a source container's environment variables and bind mounts.
+//
+// This function:
+//   - Parses DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH, and DOCKER_API_VERSION
+//     from the source container's environment
+//   - Detects whether the connection is local (socket/pipe) or remote (TCP/TLS/SSH)
+//   - For local connections: derives the socket bind mount from the source container's
+//     host config or falls back to the platform-appropriate default
+//   - For remote connections: prepares environment variables for passthrough
+//   - For TLS connections: prepares certificate directory bind mounts if needed
+//
+// Parameters:
+//   - sourceContainer: The source Watchtower container to extract configuration from.
+//
+// Returns:
+//   - *DockerConnectionConfig: The extracted connection configuration.
+func extractDockerConnectionConfig(sourceContainer types.Container) *DockerConnectionConfig {
+	config := &DockerConnectionConfig{
+		// Default to local connection with platform-appropriate socket.
+		IsLocal:    true,
+		SocketBind: defaultSocketBind(),
+	}
+
+	// Extract environment variables from the source container.
+	var containerEnv []string
+	if containerInfo := sourceContainer.ContainerInfo(); containerInfo != nil && containerInfo.Config != nil {
+		containerEnv = containerInfo.Config.Env
+	}
+
+	// Parse Docker connection environment variables.
+	for _, envVar := range containerEnv {
+		key, value, found := parseEnvVar(envVar)
+		if !found {
+			continue
+		}
+
+		switch key {
+		case dockerHostEnv:
+			config.Host = value
+		case dockerTLSEnv:
+			config.TLSVerify = value
+		case dockerCertPathEnv:
+			config.CertPath = value
+		case dockerAPIVersionEnv:
+			config.APIVersion = value
+		}
+	}
+
+	// Determine connection type based on DOCKER_HOST.
+	if config.Host != "" {
+		config.IsLocal = isLocalDockerHost(config.Host)
+
+		if config.IsLocal {
+			// Local connection: extract socket path from DOCKER_HOST.
+			socketPath := extractSocketPath(config.Host)
+			if socketPath != "" {
+				config.SocketBind = socketPath + ":" + socketPath
+			}
+		}
+	}
+
+	// For local connections, try to find the socket bind in the source container's mounts.
+	// This handles cases where the socket is mounted at a different path inside the container.
+	if config.IsLocal {
+		var sourceHostConfig *dockerContainer.HostConfig
+		if containerInfo := sourceContainer.ContainerInfo(); containerInfo != nil {
+			sourceHostConfig = containerInfo.HostConfig
+		}
+
+		socketBind := resolveDockerSocketBind(sourceHostConfig)
+		if socketBind != "" {
+			config.SocketBind = socketBind
+		}
+	}
+
+	// Prepare TLS certificate bind mounts for remote TLS connections.
+	if !config.IsLocal && config.CertPath != "" {
+		config.CertBinds = prepareTLSCertBinds(config.CertPath, sourceContainer)
+	}
+
+	return config
+}
+
+// appendDockerEnvVars appends Docker connection environment variables to the
+// environment slice for the ephemeral orchestrator container.
+//
+// This ensures the orchestrator can connect to the same Docker daemon as the
+// source container, regardless of connection type (local socket, remote TCP/TLS,
+// or socket proxy).
+//
+// Parameters:
+//   - env: The environment variable slice to append to.
+//   - connConfig: The Docker connection configuration.
+//
+// Returns:
+//   - []string: The updated environment variable slice.
+func appendDockerEnvVars(env []string, connConfig *DockerConnectionConfig) []string {
+	// Always forward DOCKER_HOST if set, as it determines the connection endpoint.
+	if connConfig.Host != "" {
+		env = append(env, fmt.Sprintf("%s=%s", dockerHostEnv, connConfig.Host))
+	}
+
+	// Forward TLS verification setting for remote connections.
+	if connConfig.TLSVerify != "" {
+		env = append(env, fmt.Sprintf("%s=%s", dockerTLSEnv, connConfig.TLSVerify))
+	}
+
+	// Forward TLS certificate path for remote TLS connections.
+	if connConfig.CertPath != "" {
+		env = append(env, fmt.Sprintf("%s=%s", dockerCertPathEnv, connConfig.CertPath))
+	}
+
+	// Forward API version if pinned.
+	if connConfig.APIVersion != "" {
+		env = append(env, fmt.Sprintf("%s=%s", dockerAPIVersionEnv, connConfig.APIVersion))
+	}
+
+	return env
+}
+
+// defaultSocketBind returns the platform-appropriate default Docker socket bind mount.
+//
+// Returns:
+//   - string: The default socket bind mount string.
+func defaultSocketBind() string {
+	if isWindows() {
+		return defaultWindowsPipePath + ":" + defaultWindowsPipePath
+	}
+
+	return defaultUnixSocketPath + ":" + defaultUnixSocketPath
+}
+
+// isLocalDockerHost determines whether a DOCKER_HOST value refers to a local
+// connection (Unix socket or Windows named pipe) or a remote connection (TCP/TLS/SSH).
+//
+// Local connections include:
+//   - unix:///path/to/socket (Unix domain socket)
+//   - npipe:////./pipe/docker_engine (Windows named pipe)
+//
+// Remote connections include:
+//   - tcp://host:port (TCP, possibly with TLS)
+//   - http://host:port (HTTP)
+//   - https://host:port (HTTPS with TLS)
+//   - ssh://user@host (SSH tunnel)
+//
+// Parameters:
+//   - host: The DOCKER_HOST value to check.
+//
+// Returns:
+//   - bool: True if the connection is local, false if remote.
+func isLocalDockerHost(host string) bool {
+	// Check for remote connection schemes.
+	for _, scheme := range remoteDockerSchemes {
+		if strings.HasPrefix(host, scheme) {
+			return false
+		}
+	}
+
+	// Unix sockets and Windows named pipes are local.
+	// Also handle scheme-less paths that start with / (Unix) or // (Windows pipe).
+	if strings.HasPrefix(host, "unix://") ||
+		strings.HasPrefix(host, "npipe://") ||
+		strings.HasPrefix(host, "/") ||
+		strings.HasPrefix(host, "//") {
+		return true
+	}
+
+	// Default to local for unrecognized schemes (conservative approach).
+	return true
+}
+
+// extractSocketPath extracts the socket file path from a DOCKER_HOST value.
+//
+// For Unix sockets, it strips the "unix://" prefix.
+// For Windows named pipes, it strips the "npipe://" prefix.
+//
+// Parameters:
+//   - host: The DOCKER_HOST value.
+//
+// Returns:
+//   - string: The socket file path, or empty string if extraction fails.
+func extractSocketPath(host string) string {
+	// Handle unix:// scheme.
+	if after, ok := strings.CutPrefix(host, "unix://"); ok {
+		return after
+	}
+
+	// Handle npipe:// scheme (Windows named pipes).
+	if after, ok := strings.CutPrefix(host, "npipe://"); ok {
+		return after
+	}
+
+	// Handle scheme-less paths.
+	if strings.HasPrefix(host, "/") || strings.HasPrefix(host, "//") {
+		return host
+	}
+
+	return ""
+}
+
+// parseEnvVar parses an environment variable string in "KEY=VALUE" format.
+//
+// Parameters:
+//   - envVar: The environment variable string to parse.
+//
+// Returns:
+//   - string: The environment variable key.
+//   - string: The environment variable value.
+//   - bool: True if the string was successfully parsed.
+func parseEnvVar(envVar string) (string, string, bool) {
+	parts := strings.SplitN(envVar, "=", envPartsCount)
+	if len(parts) != envPartsCount {
+		return "", "", false
+	}
+
+	return parts[0], parts[1], true
+}
+
+// prepareTLSCertBinds prepares bind mounts for TLS certificate directories.
+//
+// When using a remote Docker host with TLS, the ephemeral orchestrator needs
+// access to the TLS certificates (ca.pem, cert.pem, key.pem). This function
+// examines the source container's bind mounts to find certificate-related mounts
+// and prepares corresponding bind strings for the orchestrator.
+//
+// Parameters:
+//   - certPath: The DOCKER_CERT_PATH value from the source container.
+//   - sourceContainer: The source container to extract bind mounts from.
+//
+// Returns:
+//   - []string: List of bind mount strings for TLS certificates.
+func prepareTLSCertBinds(
+	certPath string,
+	sourceContainer types.Container,
+) []string {
+	var certBinds []string
+
+	// Get the source container's host config for bind mounts.
+	var sourceHostConfig *dockerContainer.HostConfig
+	if containerInfo := sourceContainer.ContainerInfo(); containerInfo != nil {
+		sourceHostConfig = containerInfo.HostConfig
+	}
+
+	if sourceHostConfig == nil {
+		return certBinds
+	}
+
+	// Look for bind mounts that contain TLS certificate files.
+	tlsFiles := []string{"ca.pem", "cert.pem", "key.pem"}
+
+	for _, bind := range sourceHostConfig.Binds {
+		// Parse the bind mount string.
+		hostPath, containerPath, ok := parseBindMount(bind)
+		if !ok {
+			continue
+		}
+
+		// Check if this bind mount is for TLS certificates.
+		// We check if the container path matches or is a parent of the cert path.
+		for _, tlsFile := range tlsFiles {
+			if strings.Contains(containerPath, tlsFile) ||
+				strings.Contains(hostPath, tlsFile) {
+				certBinds = append(certBinds, bind)
+
+				break
+			}
+		}
+
+		// Also check if the entire cert directory is mounted.
+		if certPath != "" && (containerPath == certPath ||
+			strings.HasPrefix(containerPath, certPath+"/")) {
+			// Avoid duplicates.
+			if !containsBind(certBinds, bind) {
+				certBinds = append(certBinds, bind)
+			}
+		}
+	}
+
+	return certBinds
+}
+
+// parseBindMount parses a bind mount string in "host_path:container_path[:options]" format.
+//
+// Parameters:
+//   - bind: The bind mount string to parse.
+//
+// Returns:
+//   - string: The host-side path.
+//   - string: The container-side path.
+//   - bool: True if parsing succeeded.
+func parseBindMount(bind string) (string, string, bool) {
+	parts := strings.Split(bind, ":")
+	if len(parts) < bindPartsMinCount {
+		return "", "", false
+	}
+
+	return parts[0], parts[1], true
+}
+
+// containsBind checks if a bind mount string is already present in the slice.
+//
+// Parameters:
+//   - binds: The slice of bind mount strings.
+//   - bind: The bind mount string to check.
+//
+// Returns:
+//   - bool: True if the bind mount is already in the slice.
+func containsBind(binds []string, bind string) bool {
+	return slices.Contains(binds, bind)
 }
 
 // RemoveOrphanedOrchestrators removes any ephemeral orchestrator containers

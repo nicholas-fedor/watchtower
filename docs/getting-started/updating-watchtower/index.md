@@ -17,7 +17,7 @@ To use the [HTTP API](../../advanced-features/http-api/index.md) or [Metrics API
 - **Disable HTTP API**: Use only scheduled updates without the HTTP API if self-updates are required.
 - **Ephemeral Self-Updates**: Enable Watchtower to use a separate, short-lived container to orchestrate the self-update process.
 
-## Ephemeral Self-Update
+## Ephemeral Self-Updates
 
 !!! Warning "This is an experimental feature"
 
@@ -48,12 +48,12 @@ docker run -d \
 
 ### Differences from Default Self-Update
 
-| Aspect                | Default (Rename)                   | Ephemeral                                  |
-|-----------------------|------------------------------------|--------------------------------------------|
-| Mechanism             | Renames old container, creates new | Orchestrator handles stop/create/start     |
-| Port conflicts        | Skipped automatically              | No port mappings required for orchestrator |
-| Old container cleanup | Deferred to next startup           | Immediate removal by orchestrator          |
-| Failure recovery      | Old container persists (renamed)   | Old container preserved if new one fails   |
+| Aspect                | Default (Rename)                   | Ephemeral                                         |
+|-----------------------|------------------------------------|---------------------------------------------------|
+| Mechanism             | Renames old container, creates new | Orchestrator handles stop/create/start            |
+| Port conflicts        | Skipped automatically              | Self-update not skipped when ports are configured |
+| Old container cleanup | Deferred to next startup           | Immediate removal by orchestrator                 |
+| Failure recovery      | Old container persists (renamed)   | Old container preserved if new one fails          |
 
 ### Limitations
 

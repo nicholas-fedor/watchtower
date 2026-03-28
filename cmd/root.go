@@ -350,8 +350,11 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 		actions.RunOrchestrator(context.Background(), client)
 
-		// RunOrchestrator calls os.Exit, so this is unreachable.
-		return
+		// Defensive: RunOrchestrator should always call os.Exit, but if it ever
+		// returns unexpectedly, ensure the process terminates to prevent the
+		// preRun flow from continuing into the main Watchtower loop.
+		logrus.WithField("flag", "self-update-orchestrator").
+			Fatal("RunOrchestrator returned unexpectedly; exiting to prevent unintended execution")
 	}
 
 	// Warn about potential redundancy in flag combinations that could result in no action.

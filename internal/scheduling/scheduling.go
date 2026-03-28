@@ -121,13 +121,12 @@ func RunUpgradesOnSchedule(
 		),
 	)
 
-	// Determine if the Watchtower container has exposed ports, which would cause
-	// port conflicts during rename-based self-update. When a port is configured
-	// (e.g., HTTP API), the old container holds the port while the new container
-	// tries to bind it, resulting in both containers being stopped.
+	// Determine if self-update should be skipped due to exposed port conflicts.
+	// When a port is configured (e.g., HTTP API), the old container holds the port
+	// while the new container tries to bind it, resulting in both containers being stopped.
 	// Ephemeral self-updates are exempt from this restriction because they remove
 	// the old container before creating the new one, avoiding port conflicts.
-	containerHasExposedPorts := currentWatchtowerContainer != nil &&
+	skipSelfUpdateForPorts := currentWatchtowerContainer != nil &&
 		currentWatchtowerContainer.HasExposedPorts() &&
 		!ephemeralSelfUpdate
 
@@ -137,7 +136,7 @@ func RunUpgradesOnSchedule(
 	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool) {
 		// Skip self-update if the container has exposed ports to prevent port conflicts.
 		// This takes precedence over the skipWatchtowerSelfUpdate parameter.
-		if containerHasExposedPorts {
+		if skipSelfUpdateForPorts {
 			skipWatchtowerSelfUpdate = true
 
 			logrus.Debug("Skipping self-update to prevent port conflict")

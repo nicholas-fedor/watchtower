@@ -40,6 +40,8 @@ var (
 	errOrchestratorRemoveFailed = errors.New("failed to remove old container")
 	// errOrchestratorCreateFailed indicates a failure to create the new container.
 	errOrchestratorCreateFailed = errors.New("failed to create new container")
+	// errOrchestratorStartFailed indicates a failure to start the new container.
+	errOrchestratorStartFailed = errors.New("failed to start new container")
 	// errOrchestratorInspectFailed indicates a failure to inspect a container during orchestration.
 	errOrchestratorInspectFailed = errors.New("failed to inspect container during orchestration")
 	// errNewContainerNotRunning indicates the new container is not running after start.
@@ -86,7 +88,10 @@ func EphemeralSelfUpdate(
 
 	// Create a detached context for the orchestrator creation to survive parent cancellation.
 	// Uses a 60-second timeout to prevent indefinite hangs during orchestrator creation.
-	detachedCtx, cancelDetached := context.WithTimeout(context.Background(), orchestratorCreateTimeout)
+	detachedCtx, cancelDetached := context.WithTimeout(
+		context.Background(),
+		orchestratorCreateTimeout,
+	)
 	defer cancelDetached()
 
 	// The image name from the source container reflects the latest pulled image.
@@ -138,13 +143,14 @@ func EphemeralSelfUpdate(
 	clog.WithField("orchestrator_id", orchestratorID.ShortID()).
 		Debug("Ephemeral orchestrator started; Watchtower will be replaced")
 
-	// Log "Started new container" for notification template compatibility.
-	// The orchestrator ID is used here as a proxy for the new container,
-	// since the actual new container's ID is determined by the orchestrator.
+	// Log that the orchestrator has been started. The orchestrator ID identifies
+	// the ephemeral container that will perform the replacement; the actual new
+	// container's ID is determined by the orchestrator and emitted in its own
+	// "Started new container" log entry.
 	logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"new_id":    orchestratorID.ShortID(),
-	}).Info("Started new container")
+		"container":       sourceContainer.Name(),
+		"orchestrator_id": orchestratorID.ShortID(),
+	}).Info("Started self-update orchestrator")
 
 	// Return the orchestrator ID. The orchestrator will handle:
 	// - Stopping the old container
@@ -185,9 +191,9 @@ func EphemeralSelfUpdate(
 func RunOrchestrator(ctx context.Context, client container.Client) {
 	clog := logrus.WithField("mode", "orchestrator")
 
-	clog.Info("Starting Watchtower self-update orchestrator")
+	clog.Debug("Starting Watchtower self-update orchestrator")
 
-	// Step 1: VALIDATE - Read environment variables.
+	// Read environment variables.
 	oldID, newImage, originalName, containerChain, err := readOrchestratorEnv()
 	if err != nil {
 		clog.WithError(err).Fatal("Failed to read orchestrator environment variables")
@@ -201,18 +207,30 @@ func RunOrchestrator(ctx context.Context, client container.Client) {
 	}).Debug("Read orchestrator environment variables")
 
 	// Create a timeout context for the entire orchestration.
-	orchCtx, orchCancel := context.WithTimeout(ctx, orchestratorTimeout)
+	orchCtx, orchCancel := context.WithTimeout(
+		ctx,
+		orchestratorTimeout,
+	)
 
 	// Execute the orchestration sequence.
-	err = orchestrateSelfUpdate(orchCtx, client, oldID, newImage, originalName, containerChain)
+	err = orchestrateSelfUpdate(
+		orchCtx,
+		client,
+		oldID,
+		newImage,
+		originalName,
+		containerChain,
+	)
 	if err != nil {
+		// Explicitly cancel before exit since deferred calls do not run on os.Exit.
 		orchCancel()
 		clog.WithError(err).Error("Orchestration failed")
 		os.Exit(1)
 	}
 
+	// Explicitly cancel before exit since deferred calls do not run on os.Exit.
 	orchCancel()
-	clog.Info("Self-update orchestration completed successfully")
+	clog.Debug("Self-update orchestration completed successfully")
 	os.Exit(0)
 }
 
@@ -255,21 +273,28 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 	return oldID, newImage, originalName, containerChain, nil
 }
 
-// orchestrateSelfUpdate performs the container replacement sequence.
+// orchestrateSelfUpdate performs the container replacement sequence for a
+// Watchtower self-update.
 //
-// It follows a deterministic state machine. If the new container fails to start
-// or is not running, the old container is preserved for manual recovery.
+// It follows a deterministic state machine that inspects the old container,
+// stops and removes it, creates and starts a new container from the updated
+// image, and verifies the new container is running before returning.
+//
+// If the new container fails to start or is not running after the update,
+// manual recovery is required because the old container has already been
+// removed. Automatic rollback is not supported since the new container
+// replaces the old one rather than renaming it.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
-//   - oldID: ID of the old Watchtower container.
+//   - oldID: ID of the old Watchtower container to replace.
 //   - newImage: Image reference for the new container.
-//   - originalName: Original container name to preserve.
+//   - originalName: Original container name to preserve on the new container.
 //   - containerChain: Container chain label for lineage tracking.
 //
 // Returns:
-//   - error: Non-nil if orchestration fails.
+//   - error: Non-nil if any step in the orchestration fails.
 func orchestrateSelfUpdate(
 	ctx context.Context,
 	client container.Client,
@@ -284,20 +309,94 @@ func orchestrateSelfUpdate(
 		"original_name": originalName,
 	})
 
-	// Step 2: INSPECT - Get the old container's full configuration.
+	// Inspect the old container and propagate the chain label.
+	oldContainer, err := inspectOldContainer(
+		ctx,
+		client,
+		clog,
+		oldID,
+		containerChain,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Stop and remove the old container to free its name.
+	skipRemoval, err := stopAndRemoveOldContainer(
+		ctx,
+		client,
+		clog,
+		oldContainer,
+	)
+	if err != nil {
+		return err
+	}
+
+	_ = skipRemoval // Removal is skipped only when StopContainer returns NotFound.
+
+	// Create and start the new container.
+	newContainerID, err := createAndStartNewContainer(
+		ctx,
+		client,
+		clog,
+		oldContainer,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Verify the new container is running, starting it explicitly if needed.
+	err = ensureContainerRunning(ctx, client, clog, newContainerID)
+	if err != nil {
+		return err
+	}
+
+	// Emit the actual new container ID at Info level so notification templates
+	// can consume the correct "new_id" field. The orchestrator container runs
+	// after the source Watchtower process is stopped by the orchestrator.
+	clog.WithField("new_id", newContainerID.ShortID()).
+		Info("Started new container")
+
+	return nil
+}
+
+// inspectOldContainer retrieves the old container's configuration and propagates
+// the container chain label to it. The chain label is set on the old container's
+// config so that StartContainer's GetCreateConfig() includes it on the new container.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - clog: Logger with container context fields.
+//   - oldID: ID of the old Watchtower container to inspect.
+//   - containerChain: Container chain label for lineage tracking.
+//
+// Returns:
+//   - types.Container: The inspected old container.
+//   - error: Non-nil if inspection fails.
+func inspectOldContainer(
+	ctx context.Context,
+	client container.Client,
+	clog *logrus.Entry,
+	oldID string,
+	containerChain string,
+) (types.Container, error) {
 	clog.Debug("Inspecting old container")
 
-	oldContainer, err := client.GetContainer(ctx, types.ContainerID(oldID))
+	oldContainer, err := client.GetContainer(
+		ctx,
+		types.ContainerID(oldID),
+	)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
 			clog.Error("Old container not found")
 
-			return fmt.Errorf("%w: %s", errOrchestratorOldContainerNotFound, oldID)
+			return nil, fmt.Errorf("%w: %s", errOrchestratorOldContainerNotFound, oldID)
 		}
 
 		clog.WithError(err).Error("Failed to inspect old container")
 
-		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
+		return nil, fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
 
 	if !oldContainer.IsRunning() {
@@ -307,8 +406,13 @@ func orchestrateSelfUpdate(
 	clog.WithField("old_name", oldContainer.Name()).
 		Debug("Inspected old container successfully")
 
-	// Set the container chain label on the old container's config so that
-	// StartContainer's GetCreateConfig() includes it on the new container.
+	// Propagate the container chain label to the old container's config.
+	// This intentionally mutates the cached container config in-place so that
+	// StartContainer's GetCreateConfig() will include the label on the new container.
+	//
+	// Note: This mutates the container object retrieved from GetContainer, which
+	// could affect other code paths holding a reference to the same object. This
+	// is safe here because the old container is about to be stopped and removed.
 	if containerChain != "" {
 		if c, ok := oldContainer.(*container.Container); ok {
 			containerInfo := c.ContainerInfo()
@@ -317,6 +421,9 @@ func orchestrateSelfUpdate(
 					containerInfo.Config.Labels = make(map[string]string)
 				}
 
+				// In-place mutation required: StartContainer reads labels from this
+				// config to build the new container. Any other references to this
+				// container object will also see this label after this assignment.
 				containerInfo.Config.Labels[container.ContainerChainLabel] = containerChain
 				clog.WithField("container_chain", containerChain).
 					Debug("Set container chain label on source container config")
@@ -324,46 +431,81 @@ func orchestrateSelfUpdate(
 		}
 	}
 
-	// Step 3: STOP OLD - Stop the old Watchtower container.
+	return oldContainer, nil
+}
+
+// stopAndRemoveOldContainer stops the old container and removes it to free its
+// name for the new one. If StopContainer returns NotFound, removal is skipped
+// because the Docker daemon already removed the container.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - clog: Logger with container context fields.
+//   - oldContainer: The old Watchtower container to stop and remove.
+//
+// Returns:
+//   - skipRemoval: True if removal was skipped (container already gone).
+//   - error: Non-nil if stopping or removing fails fatally.
+func stopAndRemoveOldContainer(
+	ctx context.Context,
+	client container.Client,
+	clog *logrus.Entry,
+	oldContainer types.Container,
+) (bool, error) {
 	clog.Debug("Stopping old Watchtower container")
 
 	skipRemoval := false
 
-	err = client.StopContainer(ctx, oldContainer, orchestratorStopTimeout)
+	err := client.StopContainer(
+		ctx,
+		oldContainer,
+		orchestratorStopTimeout,
+	)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
 			clog.Debug("Old container already removed")
 
-			// Container is gone, skip removal and proceed to creating the new one.
+			// Container was already removed during the stop attempt;
+			// skip removal and proceed to creating the new one.
 			skipRemoval = true
 		} else {
 			// StopContainer failed for a reason other than NotFound.
-			// Re-inspect the container to get its current state as the old container
-			// object may be stale after the failed stop attempt.
-			freshContainer, inspectErr := client.GetContainer(ctx, oldContainer.ID())
+			// Re-inspect the container to get its current state, since the
+			// old container object may be stale after the failed stop attempt.
+			freshContainer, inspectErr := client.GetContainer(
+				ctx,
+				oldContainer.ID(),
+			)
 			if inspectErr != nil {
 				clog.WithError(inspectErr).Error("Failed to re-inspect old container after stop failure")
 				clog.WithError(err).Error("Failed to stop old container")
 
-				return fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+				return false, fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
 			}
 
 			if !freshContainer.IsRunning() {
+				// Container stopped despite the error; proceed with removal.
 				clog.Debug("Old container is not running after stop attempt, proceeding with removal")
 			} else {
 				// Container is still running and StopContainer failed — this is fatal.
 				clog.WithError(err).Error("Failed to stop old container")
 
-				return fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+				return false, fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
 			}
 		}
 	} else {
+		// StopContainer succeeded.
 		clog.Debug("Old container stopped")
 	}
 
-	// Step 3a: REMOVE OLD - Remove the old container to free its name for the new one.
-	// StartTargetContainer renames the new container to the source container's name,
-	// which fails if a stopped container with the same name still exists.
+	// Remove the old container to free its name for the new one.
+	// StartTargetContainer renames the new container to the source
+	// container's name, which fails if a stopped container with the same
+	// name still exists.
+	//
+	// This step is skipped if skipRemoval is true, which occurs when
+	// StopContainer returns NotFound (container already removed).
 	if !skipRemoval {
 		clog.Debug("Removing old Watchtower container to free the name for the new container")
 
@@ -374,35 +516,77 @@ func orchestrateSelfUpdate(
 			} else {
 				clog.WithError(err).Error("Failed to remove old container")
 
-				return fmt.Errorf("%w: %w", errOrchestratorRemoveFailed, err)
+				return false, fmt.Errorf("%w: %w", errOrchestratorRemoveFailed, err)
 			}
 		} else {
 			clog.Debug("Old container removed")
 		}
 	}
 
-	// Step 4+5: CREATE AND START NEW - Use the existing StartContainer which handles
-	// config extraction, container creation, renaming, network attachment, and starting.
-	// StartContainer resolves the image from the source container's config (GetCreateConfig().Image),
-	// not from the WT_ORCHESTRATOR_NEW_IMAGE env var. The env var is retained for debugging.
+	return skipRemoval, nil
+}
+
+// createAndStartNewContainer creates and starts a new container using the old
+// container's configuration. StartContainer handles config extraction, container
+// creation, renaming, network attachment, and starting.
+//
+// StartContainer resolves the image from the source container's config
+// (GetCreateConfig().Image), not from the WT_ORCHESTRATOR_NEW_IMAGE env var.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - clog: Logger with container context fields.
+//   - oldContainer: The old container whose config is used for the new one.
+//
+// Returns:
+//   - types.ContainerID: ID of the newly created container.
+//   - error: Non-nil if creation or starting fails.
+func createAndStartNewContainer(
+	ctx context.Context,
+	client container.Client,
+	clog *logrus.Entry,
+	oldContainer types.Container,
+) (types.ContainerID, error) {
 	clog.Debug("Creating and starting new Watchtower container")
 
-	newContainerID, err := client.StartContainer(ctx, oldContainer)
+	newContainerID, err := client.StartContainer(
+		ctx,
+		oldContainer,
+	)
 	if err != nil {
 		clog.WithError(err).Error("Failed to create and start new container")
 		clog.Warn("Rollback unavailable: the old container has been removed. Manual intervention required.")
 
-		return fmt.Errorf("%w: %w", errOrchestratorCreateFailed, err)
+		return "", fmt.Errorf("%w: %w", errOrchestratorCreateFailed, err)
 	}
 
-	// Step 5a: VERIFY - Confirm the new container is running before removing the old one.
-	// StartContainer may create the container without starting it if the source container
-	// is stopped and the reviveStopped option is not enabled. Since we just stopped the
-	// old container, this is the common case. Start the container explicitly if needed.
-	clog.WithField("new_id", newContainerID.ShortID()).
+	return newContainerID, nil
+}
+
+// ensureContainerRunning verifies the container is running and starts it
+// explicitly if needed. StartContainer may create the container without
+// starting it if the source container was stopped and the reviveStopped
+// option is not enabled.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - clog: Logger with container context fields.
+//   - containerID: ID of the container to verify and start.
+//
+// Returns:
+//   - error: Non-nil if the container cannot be verified or started.
+func ensureContainerRunning(
+	ctx context.Context,
+	client container.Client,
+	clog *logrus.Entry,
+	containerID types.ContainerID,
+) error {
+	clog.WithField("new_id", containerID.ShortID()).
 		Debug("Verifying new container is running")
 
-	newContainer, err := client.GetContainer(ctx, newContainerID)
+	ctr, err := client.GetContainer(ctx, containerID)
 	if err != nil {
 		clog.WithError(err).Error("Failed to inspect new container")
 		clog.Warn("Cannot verify new container is running. Old container was removed; manual recovery requires recreating the container.")
@@ -410,42 +594,39 @@ func orchestrateSelfUpdate(
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
 
-	if !newContainer.IsRunning() {
-		clog.Debug("New container was created but not started, starting it now")
+	if ctr.IsRunning() {
+		clog.Debug("New container verified as running")
 
-		err = client.StartContainerByID(ctx, newContainerID)
-		if err != nil {
-			clog.WithError(err).Error("Failed to start new container")
-			clog.Warn("Rollback unavailable: the old container has been removed. Manual intervention required.")
+		return nil
+	}
 
-			return fmt.Errorf("%w: %w", errOrchestratorCreateFailed, err)
-		}
+	// Container was created but not started; start it explicitly.
+	clog.Debug("New container was created but not started, starting it now")
 
-		// Re-verify the container is running after explicit start.
-		newContainer, err = client.GetContainer(ctx, newContainerID)
-		if err != nil {
-			clog.WithError(err).Error("Failed to inspect new container after start")
-			clog.Warn("Cannot verify new container is running. Old container was removed; manual recovery requires recreating the container.")
+	err = client.StartContainerByID(ctx, containerID)
+	if err != nil {
+		clog.WithError(err).Error("Failed to start new container")
+		clog.Warn("Rollback unavailable: the old container has been removed. Manual intervention required.")
 
-			return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
-		}
+		return fmt.Errorf("%w: %w", errOrchestratorStartFailed, err)
+	}
 
-		if !newContainer.IsRunning() {
-			clog.Error("New container is not running after explicit start. Old container was removed; manual recovery requires recreating the container.")
+	// Re-verify the container is running after the explicit start call.
+	ctr, err = client.GetContainer(ctx, containerID)
+	if err != nil {
+		clog.WithError(err).Error("Failed to inspect new container after start")
+		clog.Warn("Cannot verify new container is running. Old container was removed; manual recovery requires recreating the container.")
 
-			return fmt.Errorf("%w: %s", errNewContainerNotRunning, newContainerID.ShortID())
-		}
+		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
+	}
+
+	if !ctr.IsRunning() {
+		clog.Error("New container is not running after explicit start. Old container was removed; manual recovery requires recreating the container.")
+
+		return fmt.Errorf("%w: %s", errNewContainerNotRunning, containerID.ShortID())
 	}
 
 	clog.Debug("New container verified as running")
-
-	// Step 6: CLEANUP OLD - The old container was already removed in step 3a.
-	// This step is retained for safety in case removal was deferred.
-	clog.Debug("Old container cleanup verified")
-
-	// Step 7: COMPLETE - Log successful orchestration.
-	clog.WithField("new_id", newContainerID.ShortID()).
-		Debug("Self-update orchestration completed")
 
 	return nil
 }
