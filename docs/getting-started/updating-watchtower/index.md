@@ -33,7 +33,7 @@ The ephemeral self-update mechanism is an alternative to the default rename-base
     - Starts the new Watchtower container.
     - Verifies the new container is running.
     - Removes the old container.
-4. The orchestrator exits and is automatically removed (via Docker's `AutoRemove`).
+4. The orchestrator exits and is automatically removed.
 
 ### Enabling Ephemeral Self-Updates
 
@@ -48,12 +48,12 @@ docker run -d \
 
 ### Differences from Default Self-Update
 
-| Aspect                | Default (Rename)                   | Ephemeral                                |
-|-----------------------|------------------------------------|------------------------------------------|
-| Mechanism             | Renames old container, creates new | Orchestrator handles stop/create/start   |
-| Port conflicts        | Skipped automatically              | Orchestrator has no ports                |
-| Old container cleanup | Deferred to next startup           | Immediate removal by orchestrator        |
-| Failure recovery      | Old container persists (renamed)   | Old container preserved if new one fails |
+| Aspect                | Default (Rename)                   | Ephemeral                                  |
+|-----------------------|------------------------------------|--------------------------------------------|
+| Mechanism             | Renames old container, creates new | Orchestrator handles stop/create/start     |
+| Port conflicts        | Skipped automatically              | No port mappings required for orchestrator |
+| Old container cleanup | Deferred to next startup           | Immediate removal by orchestrator          |
+| Failure recovery      | Old container persists (renamed)   | Old container preserved if new one fails   |
 
 ### Limitations
 

@@ -36,6 +36,8 @@ var (
 	errOrchestratorOldContainerNotFound = errors.New("old container not found")
 	// errOrchestratorStopFailed indicates a failure to stop the old container.
 	errOrchestratorStopFailed = errors.New("failed to stop old container")
+	// errOrchestratorRemoveFailed indicates a failure to remove the old container.
+	errOrchestratorRemoveFailed = errors.New("failed to remove old container")
 	// errOrchestratorCreateFailed indicates a failure to create the new container.
 	errOrchestratorCreateFailed = errors.New("failed to create new container")
 	// errOrchestratorInspectFailed indicates a failure to inspect a container during orchestration.
@@ -114,9 +116,9 @@ func EphemeralSelfUpdate(
 	// The orchestrator will handle the actual stop/start/remove operations,
 	// but we emit these Info entries so notifications match the normal update flow.
 	logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"id":        sourceContainer.ID().ShortID(),
-		"old_id":    sourceContainer.ImageID().ShortID(),
+		"container":    sourceContainer.Name(),
+		"id":           sourceContainer.ID().ShortID(),
+		"old_image_id": sourceContainer.ImageID().ShortID(),
 	}).Info("Stopping container")
 
 	// Create the ephemeral orchestrator container.
@@ -325,24 +327,35 @@ func orchestrateSelfUpdate(
 	// Step 3: STOP OLD - Stop the old Watchtower container.
 	clog.Debug("Stopping old Watchtower container")
 
+	skipRemoval := false
+
 	err = client.StopContainer(ctx, oldContainer, orchestratorStopTimeout)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
 			clog.Debug("Old container already removed")
 
-			// Container is gone, proceed directly to creating the new one.
-			goto createNew
-		}
-
-		// StopContainer failed for a reason other than NotFound.
-		// Check if the container is already stopped — if so, proceed to removal.
-		if !oldContainer.IsRunning() {
-			clog.Debug("Old container is not running, proceeding with removal")
+			// Container is gone, skip removal and proceed to creating the new one.
+			skipRemoval = true
 		} else {
-			// Container is still running and StopContainer failed — this is fatal.
-			clog.WithError(err).Error("Failed to stop old container")
+			// StopContainer failed for a reason other than NotFound.
+			// Re-inspect the container to get its current state as the old container
+			// object may be stale after the failed stop attempt.
+			freshContainer, inspectErr := client.GetContainer(ctx, oldContainer.ID())
+			if inspectErr != nil {
+				clog.WithError(inspectErr).Error("Failed to re-inspect old container after stop failure")
+				clog.WithError(err).Error("Failed to stop old container")
 
-			return fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+				return fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+			}
+
+			if !freshContainer.IsRunning() {
+				clog.Debug("Old container is not running after stop attempt, proceeding with removal")
+			} else {
+				// Container is still running and StopContainer failed — this is fatal.
+				clog.WithError(err).Error("Failed to stop old container")
+
+				return fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+			}
 		}
 	} else {
 		clog.Debug("Old container stopped")
@@ -351,22 +364,22 @@ func orchestrateSelfUpdate(
 	// Step 3a: REMOVE OLD - Remove the old container to free its name for the new one.
 	// StartTargetContainer renames the new container to the source container's name,
 	// which fails if a stopped container with the same name still exists.
-	clog.Debug("Removing old Watchtower container to free the name for the new container")
+	if !skipRemoval {
+		clog.Debug("Removing old Watchtower container to free the name for the new container")
 
-	err = client.RemoveContainer(ctx, oldContainer)
-	if err != nil {
-		if cerrdefs.IsNotFound(err) {
-			clog.Debug("Old container already removed")
+		err = client.RemoveContainer(ctx, oldContainer)
+		if err != nil {
+			if cerrdefs.IsNotFound(err) {
+				clog.Debug("Old container already removed")
+			} else {
+				clog.WithError(err).Error("Failed to remove old container")
+
+				return fmt.Errorf("%w: %w", errOrchestratorRemoveFailed, err)
+			}
 		} else {
-			clog.WithError(err).Error("Failed to remove old container")
-
-			return fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+			clog.Debug("Old container removed")
 		}
-	} else {
-		clog.Debug("Old container removed")
 	}
-
-createNew:
 
 	// Step 4+5: CREATE AND START NEW - Use the existing StartContainer which handles
 	// config extraction, container creation, renaming, network attachment, and starting.
@@ -392,7 +405,7 @@ createNew:
 	newContainer, err := client.GetContainer(ctx, newContainerID)
 	if err != nil {
 		clog.WithError(err).Error("Failed to inspect new container")
-		clog.Warn("Cannot verify new container is running. Old container preserved for manual recovery.")
+		clog.Warn("Cannot verify new container is running. Old container was removed; manual recovery requires recreating the container.")
 
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
@@ -412,13 +425,13 @@ createNew:
 		newContainer, err = client.GetContainer(ctx, newContainerID)
 		if err != nil {
 			clog.WithError(err).Error("Failed to inspect new container after start")
-			clog.Warn("Cannot verify new container is running. Old container preserved for manual recovery.")
+			clog.Warn("Cannot verify new container is running. Old container was removed; manual recovery requires recreating the container.")
 
 			return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 		}
 
 		if !newContainer.IsRunning() {
-			clog.Error("New container is not running after explicit start. Old container preserved for manual recovery.")
+			clog.Error("New container is not running after explicit start. Old container was removed; manual recovery requires recreating the container.")
 
 			return fmt.Errorf("%w: %s", errNewContainerNotRunning, newContainerID.ShortID())
 		}

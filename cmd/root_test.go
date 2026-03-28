@@ -558,7 +558,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		false,
 		nil,
 		false, // startupMessageSent
-		false,
+		false, // ephemeralSelfUpdate
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -648,7 +648,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			false,
 			nil,
 			false, // startupMessageSent
-			false,
+			false, // ephemeralSelfUpdate
 		)
 
 		// Should not return an error (context cancellation is expected)
@@ -742,7 +742,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 			false,
 			nil,
 			false, // startupMessageSent
-			false,
+			false, // ephemeralSelfUpdate
 		)
 
 		// Should not return an error
@@ -817,7 +817,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 			false,
 			nil,
 			false, // startupMessageSent
-			false,
+			false, // ephemeralSelfUpdate
 		)
 
 		// Should not return an error
@@ -905,7 +905,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false,
 				nil,
 				false, // startupMessageSent
-				false,
+				false, // ephemeralSelfUpdate
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -938,7 +938,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false,
 				nil,
 				false, // startupMessageSent
-				false,
+				false, // ephemeralSelfUpdate
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -1138,7 +1138,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				false,
 				nil,
 				false, // startupMessageSent
-				false,
+				false, // ephemeralSelfUpdate
 			)
 			assert.NoError(t, err)
 
@@ -1237,6 +1237,83 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		require.Error(t, err)
 		mockClient.AssertExpectations(t)
 	})
+}
+
+// TestEphemeralSelfUpdateExercisesTruePath verifies that RunUpgradesOnSchedule
+// correctly handles ephemeralSelfUpdate=true, which bypasses the exposed-ports
+// self-update restriction by removing the old container before creating a new one.
+func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
+	// Create a command with update-on-start flag enabled
+	cmd := &cobra.Command{}
+	flags.RegisterSystemFlags(cmd)
+	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
+	require.NoError(t, err)
+
+	// Track update calls
+	updateCallCount := int32(0)
+	updateCalled := make(chan struct{}, 1)
+
+	// Mock the update function
+	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		atomic.AddInt32(&updateCallCount, 1)
+
+		select {
+		case updateCalled <- struct{}{}:
+		default:
+		}
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
+
+	// Create update lock
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	// Create a context that shuts down quickly
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
+	filterDesc := testFilterDesc
+
+	// Call RunUpgradesOnSchedule with ephemeralSelfUpdate=true
+	err = scheduling.RunUpgradesOnSchedule(
+		ctx,
+		cmd,
+		filter,
+		filterDesc,
+		updateLock,
+		false,
+		"",
+		logging.WriteStartupMessage,
+		runUpdatesWithNotifications,
+		nil,
+		"",
+		nil,
+		"",
+		false,
+		true,
+		false,
+		nil,
+		false, // startupMessageSent
+		true,  // ephemeralSelfUpdate
+	)
+
+	require.NoError(t, err)
+
+	// Verify that update was called immediately
+	select {
+	case <-updateCalled:
+		// Expected: update was called
+	default:
+		t.Error("Update function was not called immediately with ephemeralSelfUpdate=true")
+	}
+
+	// Verify at least one update call occurred
+	assert.GreaterOrEqual(t, atomic.LoadInt32(&updateCallCount), int32(1))
 }
 
 // TestCreateSignalContext verifies that the signal-aware context is properly created

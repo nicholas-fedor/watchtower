@@ -579,9 +579,9 @@ func runMain(cfg types.RunConfig) int {
 			CPUCopyMode:                  cpuCopyMode,                  // CPU settings handling when recreating containers
 			PullFailureDelay:             params.PullFailureDelay,      // Delay after failed Watchtower self-update pulls
 			RunOnce:                      params.RunOnce,               // Perform one-time update and exit
-			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
 			CurrentContainerID:           currentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
 			UseComposeDependsOn:          params.UseComposeDependsOn,   // Enable Docker Compose depends_on label processing
+			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
 			EphemeralSelfUpdate:          ephemeralSelfUpdate,          // Use ephemeral container for self-update
 		}
 
@@ -628,8 +628,8 @@ func runMain(cfg types.RunConfig) int {
 			Cleanup:             cleanup,
 			RunOnce:             cfg.RunOnce,
 			MonitorOnly:         monitorOnly,
-			SkipSelfUpdate:      false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
 			UseComposeDependsOn: useComposeDependsOn,
+			SkipSelfUpdate:      false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
 		}
 		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
@@ -682,10 +682,14 @@ func runMain(cfg types.RunConfig) int {
 	// Check for and cleanup orphaned ephemeral orchestrator containers.
 	// These may persist if the orchestrator crashed or was killed unexpectedly.
 	// With AutoRemove: true, this is a safety net for edge cases.
-	_, orchestratorErr := container.RemoveOrphanedOrchestrators(ctx, client)
+	removedOrchestratorCount, orchestratorErr := container.RemoveOrphanedOrchestrators(ctx, client)
 	if orchestratorErr != nil {
 		logrus.WithError(orchestratorErr).
+			WithField("removed_orchestrators", removedOrchestratorCount).
 			Warn("Failed to clean up orphaned orchestrator containers, continuing anyway")
+	} else if removedOrchestratorCount > 0 {
+		logrus.WithField("removed_orchestrators", removedOrchestratorCount).
+			Debug("Cleaned up orphaned orchestrator containers")
 	}
 
 	// Track if cleanup occurred to prevent redundant updates after self-update

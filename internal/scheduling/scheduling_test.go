@@ -855,59 +855,77 @@ func TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate(t *testing.T) {
 // the Watchtower container has no exposed ports, the port-conflict guard does
 // not interfere regardless of the ephemeralSelfUpdate setting.
 func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
-	cmd := &cobra.Command{}
-	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-
-	ctx := t.Context()
-
-	var capturedParams types.UpdateParams
-
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
-		capturedParams = params
-
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	tests := []struct {
+		name                string
+		ephemeralSelfUpdate bool
+	}{
+		{
+			name:                "ephemeralSelfUpdate=true",
+			ephemeralSelfUpdate: true,
+		},
+		{
+			name:                "ephemeralSelfUpdate=false",
+			ephemeralSelfUpdate: false,
+		},
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
-	cmd.PersistentFlags().Bool("update-on-start", true, "")
+			ctx := t.Context()
 
-	// Create a Watchtower container WITHOUT exposed ports.
-	containerNoPorts := createTestContainer("")
+			var capturedParams types.UpdateParams
 
-	require.False(t, containerNoPorts.HasExposedPorts(),
-		"test container should not have exposed ports",
-	)
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+				capturedParams = params
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
-	defer timeoutCancel()
+				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+			}
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // lock (auto-created)
-		false, // cleanup
-		"",    // empty schedule
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false,            // monitorOnly
-		true,             // updateOnStart - triggers immediate update
-		false,            // skipFirstRun
-		containerNoPorts, // currentWatchtowerContainer without exposed ports
-		false,            // startupMessageSent
-		false,            // ephemeralSelfUpdate
-	)
-	require.NoError(t, err)
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
 
-	// Without exposed ports, the port-conflict guard should not trigger,
-	// so SkipSelfUpdate should remain false.
-	assert.False(t, capturedParams.SkipSelfUpdate,
-		"self-update should NOT be skipped when container has no exposed ports",
-	)
+			cmd.PersistentFlags().Bool("update-on-start", true, "")
+
+			// Create a Watchtower container WITHOUT exposed ports.
+			containerNoPorts := createTestContainer("")
+
+			require.False(t, containerNoPorts.HasExposedPorts(),
+				"test container should not have exposed ports",
+			)
+
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
+			defer timeoutCancel()
+
+			err := scheduling.RunUpgradesOnSchedule(
+				timeoutCtx,
+				cmd,
+				filters.NoFilter,
+				"test filter",
+				nil,   // lock (auto-created)
+				false, // cleanup
+				"",    // empty schedule
+				writeStartupMessage,
+				runUpdatesWithNotifications,
+				client,
+				"",  // scope
+				nil, // no notifier
+				"v1.0.0",
+				false,            // monitorOnly
+				true,             // updateOnStart - triggers immediate update
+				false,            // skipFirstRun
+				containerNoPorts, // currentWatchtowerContainer without exposed ports
+				false,            // startupMessageSent
+				tt.ephemeralSelfUpdate,
+			)
+			require.NoError(t, err)
+
+			// Without exposed ports, the port-conflict guard should not trigger,
+			// so SkipSelfUpdate should remain false regardless of ephemeralSelfUpdate.
+			assert.False(t, capturedParams.SkipSelfUpdate,
+				"self-update should NOT be skipped when container has no exposed ports",
+			)
+		})
+	}
 }

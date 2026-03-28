@@ -76,6 +76,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 //   - skipFirstRun: Boolean indicating whether to skip the first scheduled run.
 //   - currentWatchtowerContainer: The current Watchtower container for parent checking.
 //   - startupMessageSent: Whether the startup message was already sent (e.g., by the HTTP API in blocking mode).
+//   - ephemeralSelfUpdate: Whether the self-update uses ephemeral mode (removes old container before creating new one).
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.

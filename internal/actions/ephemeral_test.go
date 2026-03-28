@@ -89,6 +89,12 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(orchID).NotTo(gomega.BeEmpty())
 			gomega.Expect(renamed).To(gomega.BeFalse())
+
+			// Verify the orchestrator's chain was set to the source container ID.
+			gomega.Expect(client.TestData.LastContainerChain).To(
+				gomega.Equal("source-456"),
+				"orchestrator chain should be the source container ID when no existing chain is present",
+			)
 		})
 	})
 
@@ -114,12 +120,10 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 				},
 			)
 
-			// Verify the container is a *container.Container so chain extraction works.
-			_, ok := sourceContainer.(*container.Container)
+			// Verify the mock container has the expected chain label.
+			c, ok := sourceContainer.(*container.Container)
 			gomega.Expect(ok).To(gomega.BeTrue(), "sourceContainer should be *container.Container")
 
-			// Verify the chain label is readable.
-			c := sourceContainer.(*container.Container)
 			chain, present := c.GetContainerChain()
 			gomega.Expect(present).To(gomega.BeTrue())
 			gomega.Expect(chain).To(gomega.Equal(existingChain))
@@ -140,6 +144,12 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(orchID).NotTo(gomega.BeEmpty())
 			gomega.Expect(renamed).To(gomega.BeFalse())
+
+			// Verify the orchestrator's chain has the source ID appended to the existing chain.
+			gomega.Expect(client.TestData.LastContainerChain).To(
+				gomega.Equal("old-id-1,old-id-2,source-789"),
+				"orchestrator chain should have source container ID appended to existing chain",
+			)
 		})
 	})
 

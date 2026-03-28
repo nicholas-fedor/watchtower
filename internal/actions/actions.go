@@ -54,9 +54,9 @@ type RunUpdatesWithNotificationsParams struct {
 	CPUCopyMode                  string            // CPU settings handling when recreating containers
 	PullFailureDelay             time.Duration     // Delay after failed Watchtower self-update pulls
 	RunOnce                      bool              // Perform one-time update and exit
-	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	CurrentContainerID           types.ContainerID // ID of the current Watchtower container for self-update logic
 	UseComposeDependsOn          bool              // Enable Docker Compose depends_on label processing
+	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	EphemeralSelfUpdate          bool              // Use ephemeral container for self-update if true
 }
 
@@ -96,9 +96,9 @@ func RunUpdatesWithNotifications(
 		LifecycleGID:        params.LifecycleGID,        // Default GID to run lifecycle hooks as
 		CPUCopyMode:         params.CPUCopyMode,         // CPU settings handling when recreating containers
 		RunOnce:             params.RunOnce,             // Perform one-time update and exit
-		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
 		CurrentContainerID:  params.CurrentContainerID,  // ID of the current Watchtower container for self-update logic
 		UseComposeDependsOn: params.UseComposeDependsOn, // Enable Docker Compose depends_on label processing
+		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
 		EphemeralSelfUpdate: params.EphemeralSelfUpdate, // Use ephemeral container for self-update if true
 	}
 

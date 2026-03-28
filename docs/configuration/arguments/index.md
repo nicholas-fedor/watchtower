@@ -470,8 +470,8 @@ Uses a short-lived orchestrator container to perform Watchtower self-updates ins
 ```text
             Argument: --ephemeral-self-update
 Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
-                 Type: Boolean
-              Default: false
+                Type: Boolean
+             Default: false
 ```
 
 !!! Warning "This is an experimental feature."

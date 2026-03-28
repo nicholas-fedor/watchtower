@@ -3,6 +3,9 @@ package container
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -24,6 +27,8 @@ const (
 	orchestratorOriginalNameEnv = "WT_ORCHESTRATOR_ORIGINAL_NAME"
 	// orchestratorContainerChainEnv is the environment variable key for the container chain label.
 	orchestratorContainerChainEnv = "WT_ORCHESTRATOR_CONTAINER_CHAIN"
+	// orchestratorCleanupTimeout is the timeout for cleanup operations on failed orchestrator creation.
+	orchestratorCleanupTimeout = 5 * time.Second
 )
 
 // CreateEphemeralOrchestrator creates a short-lived container that orchestrates
@@ -62,10 +67,21 @@ func (c *client) CreateEphemeralOrchestrator(
 
 	// Build the orchestrator container configuration.
 	config := buildOrchestratorConfig(sourceContainer, newImage, containerChain)
-	hostConfig := buildOrchestratorHostConfig()
 
-	// Generate a deterministic container name based on the source container ID.
-	orchestratorName := "watchtower-orchestrator-" + sourceContainer.ID().ShortID()
+	// Extract the source container's host config to derive the Docker socket bind mount.
+	// This ensures the orchestrator uses the same socket path as the source container,
+	// supporting non-standard socket setups and Windows named pipes.
+	var sourceHostConfig *dockerContainer.HostConfig
+	if containerInfo := sourceContainer.ContainerInfo(); containerInfo != nil {
+		sourceHostConfig = containerInfo.HostConfig
+	}
+
+	hostConfig := buildOrchestratorHostConfig(sourceHostConfig)
+
+	// Generate a deterministic container name based on the full source container ID.
+	// Using the full ID instead of ShortID() guarantees uniqueness and avoids
+	// potential collisions from the 12-character truncation.
+	orchestratorName := "watchtower-orchestrator-" + string(sourceContainer.ID())
 
 	clog.WithField("orchestrator_name", orchestratorName).
 		Debug("Creating ephemeral orchestrator container")
@@ -100,8 +116,16 @@ func (c *client) CreateEphemeralOrchestrator(
 		clog.WithError(err).Error("Failed to start ephemeral orchestrator container")
 
 		// Attempt cleanup of the created but not-started container.
+		// Use a fresh context so cleanup can proceed even if the original ctx is cancelled.
+		ctxCleanup, cancelCleanup := context.WithTimeout(
+			context.Background(),
+			orchestratorCleanupTimeout,
+		)
+		defer cancelCleanup()
+
+		//nolint:contextcheck // Fresh context intentional for cleanup to survive parent cancellation.
 		cleanupErr := c.api.ContainerRemove(
-			ctx,
+			ctxCleanup,
 			resp.ID,
 			dockerContainer.RemoveOptions{Force: true},
 		)
@@ -151,7 +175,7 @@ func buildOrchestratorConfig(
 			fmt.Sprintf("%s=%s", orchestratorContainerChainEnv, containerChain),
 		},
 		Labels: map[string]string{
-			// Orchator label only — watchtower label omitted to avoid excess instance detection.
+			// Orchestrator label only — watchtower label omitted to avoid excess instance detection.
 			OrchestratorLabel: "true",
 		},
 	}
@@ -162,19 +186,91 @@ func buildOrchestratorConfig(
 //
 // The configuration ensures:
 //   - AutoRemove for automatic cleanup on exit
-//   - Docker socket mount for container management
+//   - Docker socket mount for container management (derived from source container or fallback)
 //   - No port bindings to avoid conflicts
 //   - No restart policy (one-shot container)
 //
+// Parameters:
+//   - sourceHostConfig: The source container's host configuration, used to derive
+//     the Docker socket bind mount. If nil or contains no socket bind, falls back
+//     to the platform-appropriate default socket path.
+//
 // Returns:
 //   - *dockerContainer.HostConfig: The host configuration.
-func buildOrchestratorHostConfig() *dockerContainer.HostConfig {
+func buildOrchestratorHostConfig(sourceHostConfig *dockerContainer.HostConfig) *dockerContainer.HostConfig {
+	socketBind := resolveDockerSocketBind(sourceHostConfig)
+
 	return &dockerContainer.HostConfig{
 		AutoRemove: true,
-		Binds:      []string{"/var/run/docker.sock:/var/run/docker.sock"},
+		Binds:      []string{socketBind},
 		// No port bindings — avoids conflicts with the new Watchtower container
 		// No restart policy — one-shot container that exits after orchestration
 	}
+}
+
+// resolveDockerSocketBind derives the Docker socket bind mount from the source
+// container's host configuration. It searches for a bind mount that references
+// the Docker socket and returns the bind string.
+//
+// If no socket bind is found in the source config, it returns the platform-appropriate
+// default socket path:
+//   - Unix: "/var/run/docker.sock:/var/run/docker.sock"
+//   - Windows: "//var/run/docker.sock:/var/run/docker.sock" (via named pipe)
+//
+// Parameters:
+//   - sourceHostConfig: The source container's host configuration containing bind mounts.
+//
+// Returns:
+//   - string: The Docker socket bind mount string.
+func resolveDockerSocketBind(sourceHostConfig *dockerContainer.HostConfig) string {
+	const (
+		defaultUnixSocketBind    = "/var/run/docker.sock:/var/run/docker.sock"
+		defaultWindowsSocketBind = "//var/run/docker.sock:/var/run/docker.sock"
+	)
+
+	// Try to extract the socket bind from the source container's binds.
+
+	if sourceHostConfig != nil {
+		for _, bind := range sourceHostConfig.Binds {
+			// Check if this bind mount references the Docker socket.
+			// Supports both Unix socket paths and Windows named pipes.
+			if isDockerSocketBind(bind) {
+				return bind
+			}
+		}
+	}
+
+	// Fall back to platform-appropriate default.
+	if isWindows() {
+		return defaultWindowsSocketBind
+	}
+
+	return defaultUnixSocketBind
+}
+
+// isDockerSocketBind checks if a bind mount string references the Docker socket.
+// It matches common patterns for both Unix sockets and Windows named pipes.
+//
+// Parameters:
+//   - bind: The bind mount string to check (e.g., "/var/run/docker.sock:/var/run/docker.sock").
+//
+// Returns:
+//   - bool: True if the bind mount references the Docker socket.
+func isDockerSocketBind(bind string) bool {
+	// Common Docker socket paths:
+	// - /var/run/docker.sock (standard Unix)
+	// - /run/docker.sock (alternative Unix location)
+	// - //var/run/docker.sock (Windows named pipe)
+	return strings.Contains(bind, "docker.sock") ||
+		strings.Contains(bind, "docker_engine")
+}
+
+// isWindows returns true if the current platform is Windows.
+//
+// Returns:
+//   - bool: True on Windows platforms.
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }
 
 // RemoveOrphanedOrchestrators removes any ephemeral orchestrator containers

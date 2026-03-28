@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 
 	ginkgo.Describe("buildOrchestratorHostConfig", func() {
 		ginkgo.It("should return a host config with AutoRemove and Docker socket mount", func() {
-			hostConfig := buildOrchestratorHostConfig()
+			hostConfig := buildOrchestratorHostConfig(nil)
 
 			gomega.Expect(hostConfig).NotTo(gomega.BeNil())
 			gomega.Expect(hostConfig.AutoRemove).To(gomega.BeTrue())
@@ -84,15 +84,40 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 		})
 
 		ginkgo.It("should not set port bindings", func() {
-			hostConfig := buildOrchestratorHostConfig()
+			hostConfig := buildOrchestratorHostConfig(nil)
 
 			gomega.Expect(hostConfig.PortBindings).To(gomega.BeNil())
 		})
 
 		ginkgo.It("should not set a restart policy", func() {
-			hostConfig := buildOrchestratorHostConfig()
+			hostConfig := buildOrchestratorHostConfig(nil)
 
 			gomega.Expect(hostConfig.RestartPolicy.Name).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should use socket bind from source host config when available", func() {
+			sourceHost := &dockerContainer.HostConfig{
+				Binds: []string{
+					"/custom/docker.sock:/var/run/docker.sock",
+					"/data:/data",
+				},
+			}
+			hostConfig := buildOrchestratorHostConfig(sourceHost)
+
+			gomega.Expect(hostConfig.Binds).To(gomega.Equal(
+				[]string{"/custom/docker.sock:/var/run/docker.sock"},
+			))
+		})
+
+		ginkgo.It("should fall back to default when source host config has no socket bind", func() {
+			sourceHost := &dockerContainer.HostConfig{
+				Binds: []string{"/data:/data"},
+			}
+			hostConfig := buildOrchestratorHostConfig(sourceHost)
+
+			gomega.Expect(hostConfig.Binds).To(gomega.Equal(
+				[]string{"/var/run/docker.sock:/var/run/docker.sock"},
+			))
 		})
 	})
 
@@ -133,12 +158,16 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					// ContainerCreate handler.
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/containers/create")),
-						func(w http.ResponseWriter, r *http.Request) {
+						func(w http.ResponseWriter, _ *http.Request) {
 							w.Header().Set("Content-Type", "application/json")
 							w.WriteHeader(http.StatusCreated)
-							json.NewEncoder(w).Encode(dockerContainer.CreateResponse{
+
+							err := json.NewEncoder(w).Encode(dockerContainer.CreateResponse{
 								ID: "orchestrator-id-123",
 							})
+							if err != nil {
+								gomega.Expect(err).NotTo(gomega.HaveOccurred(), "encode response")
+							}
 						},
 					),
 					// ContainerStart handler.
@@ -191,12 +220,16 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					// ContainerCreate succeeds.
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/containers/create")),
-						func(w http.ResponseWriter, r *http.Request) {
+						func(w http.ResponseWriter, _ *http.Request) {
 							w.Header().Set("Content-Type", "application/json")
 							w.WriteHeader(http.StatusCreated)
-							json.NewEncoder(w).Encode(dockerContainer.CreateResponse{
+
+							err := json.NewEncoder(w).Encode(dockerContainer.CreateResponse{
 								ID: "orchestrator-fail-start",
 							})
+							if err != nil {
+								gomega.Expect(err).NotTo(gomega.HaveOccurred(), "encode response")
+							}
 						},
 					),
 					// ContainerStart fails.
