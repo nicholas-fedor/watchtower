@@ -151,6 +151,13 @@ var (
 	// controlling CPU limit copying behavior for compatibility with different container runtimes like Podman.
 	cpuCopyMode string
 
+	// ephemeralSelfUpdate is a boolean flag enabling the ephemeral container-based self-update mechanism.
+	//
+	// When true, Watchtower uses a short-lived orchestrator container to perform the self-update
+	// transition atomically. When false (default), the existing rename-based approach is used.
+	// It is set in preRun via the --ephemeral-self-update flag or WATCHTOWER_EPHEMERAL_SELF_UPDATE env var.
+	ephemeralSelfUpdate bool
+
 	// currentWatchtowerContainerID stores the current Watchtower container ID.
 	//
 	// It is initialized once in preRun after the client is set up, and used throughout the application
@@ -321,16 +328,10 @@ func preRun(cmd *cobra.Command, _ []string) {
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
 	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
 	cpuCopyMode, _ = flagsSet.GetString("cpu-copy-mode")
+	ephemeralSelfUpdate, _ = flagsSet.GetBool("ephemeral-self-update")
 
-	// Warn about potential redundancy in flag combinations that could result in no action.
-	if monitorOnly && noPull {
-		logrus.WithFields(logrus.Fields{
-			"monitor_only": monitorOnly,
-			"no_pull":      noPull,
-		}).Warn("Combining monitor-only and no-pull might result in no updates")
-	}
-
-	// Initialize the Docker client with options reflecting the desired container handling behavior.
+	// Initialize the Docker client before the orchestrator check.
+	// The orchestrator needs a valid client to perform container operations.
 	client = container.NewClient(container.ClientOptions{
 		IncludeStopped:          includeStopped,
 		ReviveStopped:           reviveStopped,
@@ -340,6 +341,26 @@ func preRun(cmd *cobra.Command, _ []string) {
 		CPUCopyMode:             cpuCopyMode,
 		WarnOnHeadFailed:        container.WarningStrategy(warnOnHeadPullFailed),
 	})
+
+	// Check for orchestrator mode early — this is an internal mode where Watchtower
+	// runs as a one-shot orchestrator for self-update. It reads environment variables
+	// to determine the old container ID, new image, and original container name.
+	if isOrchestrator, _ := flagsSet.GetBool("self-update-orchestrator"); isOrchestrator {
+		logrus.Info("Running in ephemeral self-update orchestrator mode")
+
+		actions.RunOrchestrator(context.Background(), client)
+
+		// RunOrchestrator calls os.Exit, so this is unreachable.
+		return
+	}
+
+	// Warn about potential redundancy in flag combinations that could result in no action.
+	if monitorOnly && noPull {
+		logrus.WithFields(logrus.Fields{
+			"monitor_only": monitorOnly,
+			"no_pull":      noPull,
+		}).Warn("Combining monitor-only and no-pull might result in no updates")
+	}
 
 	// Create a timeout-bound context for Docker API lookups to prevent hanging indefinitely.
 	// This ensures the container ID lookup fails fast if the Docker API is unresponsive.
@@ -561,6 +582,7 @@ func runMain(cfg types.RunConfig) int {
 			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
 			CurrentContainerID:           currentWatchtowerContainerID, // ID of the current Watchtower container for self-update logic
 			UseComposeDependsOn:          params.UseComposeDependsOn,   // Enable Docker Compose depends_on label processing
+			EphemeralSelfUpdate:          ephemeralSelfUpdate,          // Use ephemeral container for self-update
 		}
 
 		metric := actions.RunUpdatesWithNotifications(ctx, actionParams)
@@ -657,6 +679,15 @@ func runMain(cfg types.RunConfig) int {
 		logrus.WithError(err).Warn("Failed to clean up excess Watchtower instances, continuing anyway")
 	}
 
+	// Check for and cleanup orphaned ephemeral orchestrator containers.
+	// These may persist if the orchestrator crashed or was killed unexpectedly.
+	// With AutoRemove: true, this is a safety net for edge cases.
+	_, orchestratorErr := container.RemoveOrphanedOrchestrators(ctx, client)
+	if orchestratorErr != nil {
+		logrus.WithError(orchestratorErr).
+			Warn("Failed to clean up orphaned orchestrator containers, continuing anyway")
+	}
+
 	// Track if cleanup occurred to prevent redundant updates after self-update
 	var cleanupOccurred bool
 	if totalRemovedInstances > 0 {
@@ -673,9 +704,12 @@ func runMain(cfg types.RunConfig) int {
 	// Configure and start the HTTP API, handling any startup errors.
 	//
 	// Determine if self-update should be skipped due to host-bound port conflicts.
+	// Ephemeral self-updates are exempt because they remove the old container before
+	// creating the new one, avoiding port conflicts.
 	// This flag is passed to the API so the warning is emitted near the HTTP server startup message.
 	skipSelfUpdate := currentWatchtowerContainer != nil &&
-		currentWatchtowerContainer.HasExposedPorts()
+		currentWatchtowerContainer.HasExposedPorts() &&
+		!ephemeralSelfUpdate
 
 	err = api.SetupAndStartAPI(
 		ctx,
@@ -730,6 +764,7 @@ func runMain(cfg types.RunConfig) int {
 		cleanupOccurred,
 		currentWatchtowerContainer,
 		startupMessageSent,
+		ephemeralSelfUpdate,
 	)
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)

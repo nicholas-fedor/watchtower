@@ -57,6 +57,7 @@ type RunUpdatesWithNotificationsParams struct {
 	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	CurrentContainerID           types.ContainerID // ID of the current Watchtower container for self-update logic
 	UseComposeDependsOn          bool              // Enable Docker Compose depends_on label processing
+	EphemeralSelfUpdate          bool              // Use ephemeral container for self-update if true
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -98,6 +99,7 @@ func RunUpdatesWithNotifications(
 		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
 		CurrentContainerID:  params.CurrentContainerID,  // ID of the current Watchtower container for self-update logic
 		UseComposeDependsOn: params.UseComposeDependsOn, // Enable Docker Compose depends_on label processing
+		EphemeralSelfUpdate: params.EphemeralSelfUpdate, // Use ephemeral container for self-update if true
 	}
 
 	// Execute the container update operation

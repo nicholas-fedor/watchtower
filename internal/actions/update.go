@@ -1383,6 +1383,15 @@ func restartStaleContainer(
 	// but skip in run-once mode as there's no need to avoid conflicts
 	// with a continuously running instance.
 	if sourceContainer.IsWatchtower() && !config.RunOnce {
+		// Opt-in ephemeral self-update: use a short-lived orchestrator container
+		// to perform the transition atomically. The orchestrator handles stopping
+		// the old container, creating and starting the new one, and cleanup.
+		if config.EphemeralSelfUpdate {
+			logrus.WithFields(fields).Debug("Using ephemeral self-update")
+
+			return EphemeralSelfUpdate(ctx, client, sourceContainer, config)
+		}
+
 		newName := "watchtower-old-" + sourceContainer.ID().ShortID()
 
 		err := client.RenameContainer(ctx, sourceContainer, newName)

@@ -98,6 +98,7 @@ func RunUpgradesOnSchedule(
 	skipFirstRun bool,
 	currentWatchtowerContainer types.Container,
 	startupMessageSent bool,
+	ephemeralSelfUpdate bool,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -120,11 +121,14 @@ func RunUpgradesOnSchedule(
 	)
 
 	// Determine if the Watchtower container has exposed ports, which would cause
-	// port conflicts during self-update. When a port is configured (e.g., HTTP API),
-	// the old container holds the port while the new container tries to bind it,
-	// resulting in both containers being stopped.
+	// port conflicts during rename-based self-update. When a port is configured
+	// (e.g., HTTP API), the old container holds the port while the new container
+	// tries to bind it, resulting in both containers being stopped.
+	// Ephemeral self-updates are exempt from this restriction because they remove
+	// the old container before creating the new one, avoiding port conflicts.
 	containerHasExposedPorts := currentWatchtowerContainer != nil &&
-		currentWatchtowerContainer.HasExposedPorts()
+		currentWatchtowerContainer.HasExposedPorts() &&
+		!ephemeralSelfUpdate
 
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself

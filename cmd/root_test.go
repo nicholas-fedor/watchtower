@@ -558,6 +558,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		false,
 		nil,
 		false, // startupMessageSent
+		false,
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -647,6 +648,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			false,
 			nil,
 			false, // startupMessageSent
+			false,
 		)
 
 		// Should not return an error (context cancellation is expected)
@@ -740,6 +742,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 			false,
 			nil,
 			false, // startupMessageSent
+			false,
 		)
 
 		// Should not return an error
@@ -814,6 +817,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 			false,
 			nil,
 			false, // startupMessageSent
+			false,
 		)
 
 		// Should not return an error
@@ -901,6 +905,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false,
 				nil,
 				false, // startupMessageSent
+				false,
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -933,6 +938,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false,
 				nil,
 				false, // startupMessageSent
+				false,
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -1132,6 +1138,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				false,
 				nil,
 				false, // startupMessageSent
+				false,
 			)
 			assert.NoError(t, err)
 

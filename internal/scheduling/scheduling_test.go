@@ -111,6 +111,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 		false, // skipFirstRun
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -159,6 +160,7 @@ func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
 		false, // skipFirstRun
 		nil,   // currentWatchtowerContainer
 		true,  // startupMessageSent - suppress the startup message
+		false, // ephemeralSelfUpdate
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -211,6 +213,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 		false, // skipFirstRun
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -269,6 +272,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		false, // skipFirstRun
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
 	)
 	if err == nil {
 		t.Error("expected error")
@@ -314,6 +318,7 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		false, // skipFirstRun
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -378,6 +383,7 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 				false,          // skipFirstRun
 				nil,            // currentWatchtowerContainer
 				false,          // startupMessageSent
+				false,          // ephemeralSelfUpdate
 			)
 			if err != nil {
 				t.Errorf("expected no error, got %v", err)
@@ -487,6 +493,7 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 		false, // skipFirstRun
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -541,6 +548,7 @@ func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 		true,  // skipFirstRun - should skip Watchtower self-update on first run
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -607,6 +615,7 @@ func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
 		false,           // skipFirstRun
 		parentContainer, // currentWatchtowerContainer - should skip updates
 		false,           // startupMessageSent
+		false,           // ephemeralSelfUpdate
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -666,6 +675,7 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 		false, // skipFirstRun
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {

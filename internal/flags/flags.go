@@ -296,6 +296,24 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"CPU copy mode for container recreation, used for compatibility with Podman. Options: auto, full, none",
 	)
 
+	flags.BoolP(
+		"ephemeral-self-update",
+		"",
+		envBool("WATCHTOWER_EPHEMERAL_SELF_UPDATE"),
+		"Use an ephemeral container to orchestrate Watchtower self-updates (experimental)",
+	)
+
+	flags.Bool(
+		"self-update-orchestrator",
+		false,
+		"Internal: Run as ephemeral orchestrator for self-update (not for direct use)",
+	)
+	// Hide the orchestrator flag from help output since it's internal.
+	err := flags.MarkHidden("self-update-orchestrator")
+	if err != nil {
+		logrus.WithError(err).Debug("Failed to hide self-update-orchestrator flag")
+	}
+
 	flags.IntP(
 		"lifecycle-uid",
 		"",
@@ -1144,6 +1162,14 @@ func SetupLogging(flags *pflag.FlagSet) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
+	// Default to "auto" when neither the flag nor WATCHTOWER_LOG_FORMAT is set.
+	// This prevents configureLogFormat from returning errInvalidLogFormat on empty strings,
+	// which is the case when running the ephemeral orchestrator container without
+	// WATCHTOWER_LOG_FORMAT in its environment.
+	if logFormat == "" {
+		logFormat = "auto"
+	}
+
 	noColor, err := flags.GetBool("no-color")
 	if err != nil {
 		logrus.WithField("flag", "no-color").WithError(err).Debug("Failed to get no-color flag")
@@ -1156,7 +1182,7 @@ func SetupLogging(flags *pflag.FlagSet) error {
 		return err
 	}
 
-	// Set log level.
+	// Set log level only when explicitly specified.
 	rawLogLevel, err := flags.GetString("log-level")
 	if err != nil {
 		logrus.WithField("flag", "log-level").WithError(err).Debug("Failed to get log-level flag")
@@ -1164,17 +1190,26 @@ func SetupLogging(flags *pflag.FlagSet) error {
 		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
 	}
 
-	logLevel, err := logrus.ParseLevel(rawLogLevel)
-	if err != nil {
-		logrus.WithError(err).WithField("level", rawLogLevel).Debug("Invalid log level specified")
+	// Only parse and override the log level when a value was explicitly set.
+	// When rawLogLevel is empty (neither --log-level nor WATCHTOWER_LOG_LEVEL is set),
+	// preserve the level configured earlier (e.g., InfoLevel from main.go init).
+	// This prevents logrus.ParseLevel("") from returning an error, which would
+	// cause SetupLogging to fail and preRun to call logrus.Fatal before the
+	// orchestrator mode check — silently killing the ephemeral orchestrator container.
+	if rawLogLevel != "" {
+		logLevel, err := logrus.ParseLevel(rawLogLevel)
+		if err != nil {
+			logrus.WithError(err).WithField("level", rawLogLevel).Debug("Invalid log level specified")
 
-		return fmt.Errorf("%w: %w", errInvalidLogLevel, err)
+			return fmt.Errorf("%w: %w", errInvalidLogLevel, err)
+		}
+
+		logrus.SetLevel(logLevel)
 	}
 
-	logrus.SetLevel(logLevel)
 	logrus.WithFields(logrus.Fields{
 		"format":   logFormat,
-		"level":    logLevel,
+		"level":    logrus.GetLevel(),
 		"no_color": noColor,
 	}).Debug("Configured logging settings")
 

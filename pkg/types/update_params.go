@@ -23,4 +23,5 @@ type UpdateParams struct {
 	SkipSelfUpdate      bool          // Skip Watchtower self-update if true.
 	CurrentContainerID  ContainerID   // ID of the current container being updated.
 	UseComposeDependsOn bool          // Enable Docker Compose depends_on label processing.
+	EphemeralSelfUpdate bool          // Use ephemeral container for self-update if true.
 }

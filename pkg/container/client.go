@@ -265,6 +265,40 @@ type Client interface {
 	// Returns:
 	//   - error: Non-nil if removal fails, nil on success.
 	RemoveContainer(ctx context.Context, container types.Container) error
+
+	// CreateEphemeralOrchestrator creates a short-lived container that orchestrates
+	// the Watchtower self-update transition.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - sourceContainer: The current Watchtower container being replaced.
+	//   - newImage: The image reference for the new Watchtower container.
+	//   - containerChain: The container chain label for lineage tracking.
+	//
+	// Returns:
+	//   - types.ContainerID: ID of the ephemeral orchestrator container.
+	//   - error: Non-nil if creation or start fails, nil on success.
+	CreateEphemeralOrchestrator(
+		ctx context.Context,
+		sourceContainer types.Container,
+		newImage string,
+		containerChain string,
+	) (types.ContainerID, error)
+
+	// StartContainerByID starts a container by its ID directly.
+	//
+	// Unlike StartContainer, this does not check the reviveStopped option or
+	// create a new container from a source configuration. It directly starts
+	// an existing, already-created container. This is used by the ephemeral
+	// orchestrator to start the new container after the old one has been stopped.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - containerID: ID of the container to start.
+	//
+	// Returns:
+	//   - error: Non-nil if starting fails, nil on success.
+	StartContainerByID(ctx context.Context, containerID types.ContainerID) error
 }
 
 // client is the concrete implementation of the Client interface.
@@ -612,6 +646,47 @@ func (c *client) StartContainer(ctx context.Context, container types.Container) 
 		Debug("Started new container")
 
 	return newID, nil
+}
+
+// StartContainerByID starts a container by its ID directly.
+//
+// Unlike StartContainer, this does not create a new container from a source
+// configuration. It directly starts an existing, already-created container
+// using the Docker API's ContainerStart method. This bypasses the reviveStopped
+// check that prevents StartContainer from starting new containers when the
+// source container is stopped.
+//
+// This method is used by the ephemeral orchestrator to start the new container
+// after the old one has been stopped during the self-update sequence.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - containerID: ID of the container to start.
+//
+// Returns:
+//   - error: Non-nil if starting fails, nil on success.
+func (c *client) StartContainerByID(
+	ctx context.Context,
+	containerID types.ContainerID,
+) error {
+	clog := logrus.WithField("container_id", containerID.ShortID())
+
+	clog.Debug("Starting container by ID")
+
+	err := c.api.ContainerStart(
+		ctx,
+		string(containerID),
+		dockerContainer.StartOptions{},
+	)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to start container by ID")
+
+		return fmt.Errorf("failed to start container %s: %w", containerID.ShortID(), err)
+	}
+
+	clog.Debug("Container started successfully")
+
+	return nil
 }
 
 // UpdateContainer updates the configuration of an existing container.
