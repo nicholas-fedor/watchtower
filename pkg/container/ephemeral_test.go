@@ -175,7 +175,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 				gomega.Expect(config.IsLocal).To(gomega.BeTrue())
 				gomega.Expect(config.Host).To(gomega.BeEmpty())
 				gomega.Expect(config.SocketBind).To(gomega.Equal(
-					"/var/run/docker.sock:/var/run/docker.sock",
+					defaultSocketBind(),
 				))
 			})
 		})
