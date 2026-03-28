@@ -138,7 +138,9 @@ func (c *client) CreateEphemeralOrchestrator(
 	config := buildOrchestratorConfig(sourceContainer, newImage, containerChain, connConfig)
 
 	// Build the host configuration with appropriate socket/TLS mounts.
-	hostConfig := buildOrchestratorHostConfig(connConfig)
+	// The orchestrator inherits the source container's NetworkMode to ensure
+	// network connectivity parity (e.g., host network for local Docker access).
+	hostConfig := buildOrchestratorHostConfig(connConfig, sourceContainer)
 
 	// Generate a deterministic container name based on the full source container ID.
 	// Using the full ID instead of ShortID() guarantees uniqueness and avoids
@@ -262,6 +264,7 @@ func buildOrchestratorConfig(
 //
 // The configuration ensures:
 //   - AutoRemove for automatic cleanup on exit
+//   - NetworkMode inherited from the source container for network parity
 //   - For local connections: Docker socket mount for container management
 //   - For remote connections: No socket mount; relies on environment variables
 //   - For TLS connections: Certificate directory mounts when certificates are on the host
@@ -270,10 +273,14 @@ func buildOrchestratorConfig(
 //
 // Parameters:
 //   - connConfig: Docker connection configuration indicating connection type and mounts.
+//   - sourceContainer: Source container whose NetworkMode is inherited.
 //
 // Returns:
 //   - *dockerContainer.HostConfig: The host configuration.
-func buildOrchestratorHostConfig(connConfig *DockerConnectionConfig) *dockerContainer.HostConfig {
+func buildOrchestratorHostConfig(
+	connConfig *DockerConnectionConfig,
+	sourceContainer types.Container,
+) *dockerContainer.HostConfig {
 	var binds []string
 
 	if connConfig != nil && connConfig.IsLocal {
@@ -289,9 +296,19 @@ func buildOrchestratorHostConfig(connConfig *DockerConnectionConfig) *dockerCont
 		binds = append(binds, connConfig.CertBinds...)
 	}
 
+	// Inherit the source container's NetworkMode to ensure the orchestrator
+	// has the same network access as the source (e.g., host network for
+	// local Docker daemon communication, custom networks for proxy access).
+	var networkMode dockerContainer.NetworkMode
+	if containerInfo := sourceContainer.ContainerInfo(); containerInfo != nil &&
+		containerInfo.HostConfig != nil {
+		networkMode = containerInfo.HostConfig.NetworkMode
+	}
+
 	return &dockerContainer.HostConfig{
-		AutoRemove: true,
-		Binds:      binds,
+		AutoRemove:  true,
+		Binds:       binds,
+		NetworkMode: networkMode,
 		// No port bindings — avoids conflicts with the new Watchtower container
 		// No restart policy — one-shot container that exits after orchestration
 	}
@@ -633,8 +650,9 @@ func prepareTLSCertBinds(
 	tlsFiles := []string{"ca.pem", "cert.pem", "key.pem"}
 
 	for _, bind := range sourceHostConfig.Binds {
-		// Parse the bind mount string.
-		hostPath, containerPath, ok := parseBindMount(bind)
+		// Parse the bind mount string, stripping mount options (e.g., :ro, :rw)
+		// from the container path to ensure correct path comparisons.
+		hostPath, containerPath, _, ok := parseBindMount(bind)
 		if !ok {
 			continue
 		}
@@ -670,9 +688,10 @@ func prepareTLSCertBinds(
 //
 // Returns:
 //   - string: The host-side path.
-//   - string: The container-side path.
+//   - string: The container-side path (without mount options).
+//   - string: Mount options (e.g., "ro", "rw"), empty if none.
 //   - bool: True if parsing succeeded.
-func parseBindMount(bind string) (string, string, bool) {
+func parseBindMount(bind string) (string, string, string, bool) {
 	// Detect Windows drive-letter pattern (e.g., "C:" where len >= 2 and second rune is ':').
 	// In that case, locate the separator colon after the drive-letter (index > 1).
 	// Otherwise, use the first ':' as the separator.
@@ -689,18 +708,34 @@ func parseBindMount(bind string) (string, string, bool) {
 	}
 
 	if sepIdx == -1 {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	hostPath := bind[:sepIdx]
-	containerPath := bind[sepIdx+1:]
+	containerAndOpts := bind[sepIdx+1:]
 
 	// Both parts must be non-empty.
-	if hostPath == "" || containerPath == "" {
-		return "", "", false
+	if hostPath == "" || containerAndOpts == "" {
+		return "", "", "", false
 	}
 
-	return hostPath, containerPath, true
+	// Strip mount options (e.g., :ro, :rw) from the container path.
+	// Format is "host:container[:options]" where options come after a third colon.
+	containerPath := containerAndOpts
+	options := ""
+
+	before, after, ok := strings.Cut(containerAndOpts, ":")
+	if ok {
+		containerPath = before
+		options = after
+	}
+
+	// Container path must be non-empty after stripping options.
+	if containerPath == "" {
+		return "", "", "", false
+	}
+
+	return hostPath, containerPath, options, true
 }
 
 // containsBind checks if a bind mount string is already present in the slice.

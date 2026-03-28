@@ -466,27 +466,31 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 
 	ginkgo.Describe("buildOrchestratorHostConfig", func() {
 		ginkgo.It("should return a host config with AutoRemove", func() {
-			hostConfig := buildOrchestratorHostConfig(nil)
+			source := MockContainer()
+			hostConfig := buildOrchestratorHostConfig(nil, source)
 
 			gomega.Expect(hostConfig).NotTo(gomega.BeNil())
 			gomega.Expect(hostConfig.AutoRemove).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should not set port bindings", func() {
-			hostConfig := buildOrchestratorHostConfig(nil)
+			source := MockContainer()
+			hostConfig := buildOrchestratorHostConfig(nil, source)
 
 			gomega.Expect(hostConfig.PortBindings).To(gomega.BeNil())
 		})
 
 		ginkgo.It("should not set a restart policy", func() {
-			hostConfig := buildOrchestratorHostConfig(nil)
+			source := MockContainer()
+			hostConfig := buildOrchestratorHostConfig(nil, source)
 
 			gomega.Expect(hostConfig.RestartPolicy.Name).To(gomega.BeEmpty())
 		})
 
 		ginkgo.When("connConfig is nil", func() {
 			ginkgo.It("should return empty binds", func() {
-				hostConfig := buildOrchestratorHostConfig(nil)
+				source := MockContainer()
+				hostConfig := buildOrchestratorHostConfig(nil, source)
 
 				gomega.Expect(hostConfig.Binds).To(gomega.BeEmpty())
 			})
@@ -498,7 +502,8 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					Host:    "tcp://remote:2375",
 					IsLocal: false,
 				}
-				hostConfig := buildOrchestratorHostConfig(connConfig)
+				source := MockContainer()
+				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				gomega.Expect(hostConfig.Binds).To(gomega.BeEmpty())
 				gomega.Expect(hostConfig.AutoRemove).To(gomega.BeTrue())
@@ -512,7 +517,8 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					IsLocal:    true,
 					SocketBind: "/custom/docker.sock:/var/run/docker.sock",
 				}
-				hostConfig := buildOrchestratorHostConfig(connConfig)
+				source := MockContainer()
+				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				gomega.Expect(hostConfig.Binds).To(gomega.Equal(
 					[]string{"/custom/docker.sock:/var/run/docker.sock"},
@@ -531,7 +537,8 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 						"/host/certs:/certs/cert.pem",
 					},
 				}
-				hostConfig := buildOrchestratorHostConfig(connConfig)
+				source := MockContainer()
+				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				gomega.Expect(hostConfig.Binds).To(gomega.HaveLen(3))
 				gomega.Expect(hostConfig.Binds).To(gomega.ContainElement(
@@ -557,12 +564,24 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 						"/host/certs:/certs",
 					},
 				}
-				hostConfig := buildOrchestratorHostConfig(connConfig)
+				source := MockContainer()
+				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				gomega.Expect(hostConfig.Binds).To(gomega.Equal(
 					[]string{"/host/certs:/certs"},
 				))
 				gomega.Expect(hostConfig.AutoRemove).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("source container has a network mode", func() {
+			ginkgo.It("should inherit the source NetworkMode", func() {
+				source := MockContainer(WithNetworkMode("host"))
+				hostConfig := buildOrchestratorHostConfig(nil, source)
+
+				gomega.Expect(hostConfig.NetworkMode).To(
+					gomega.Equal(dockerContainer.NetworkMode("host")),
+				)
 			})
 		})
 	})

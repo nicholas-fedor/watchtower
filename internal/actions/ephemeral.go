@@ -58,6 +58,10 @@ var (
 //  5. Removes the old container
 //  6. Exits (AutoRemove cleans up the orchestrator)
 //
+// This function blocks until the orchestrator completes and the new container
+// is running, then returns the new container's ID for health checks and
+// post-update lifecycle hooks.
+//
 // The ephemeral container uses the same Watchtower image (already pulled) and
 // mounts the Docker socket for container management.
 //
@@ -68,8 +72,8 @@ var (
 //   - config: Update parameters.
 //
 // Returns:
-//   - types.ContainerID: ID of the ephemeral orchestrator container.
-//   - bool: True if orchestration was initiated.
+//   - types.ContainerID: ID of the new Watchtower container.
+//   - bool: False (old container is removed, not renamed).
 //   - error: Non-nil if orchestration fails.
 func EphemeralSelfUpdate(
 	ctx context.Context,
@@ -101,10 +105,7 @@ func EphemeralSelfUpdate(
 	// Compute the container chain for lineage tracking. The orchestrator will
 	// set this on the new container's labels via the WT_ORCHESTRATOR_CONTAINER_CHAIN
 	// environment variable. This preserves the cleanup behavior used in the rename path.
-	existingChain := ""
-	if c, ok := sourceContainer.(*container.Container); ok {
-		existingChain, _ = c.GetContainerChain()
-	}
+	existingChain, _ := sourceContainer.GetContainerChain()
 
 	var newChain string
 	if existingChain != "" {
@@ -152,18 +153,123 @@ func EphemeralSelfUpdate(
 		"orchestrator_id": orchestratorID.ShortID(),
 	}).Debug("Started self-update orchestrator")
 
-	// Return the orchestrator ID. The orchestrator will handle:
-	// - Stopping the old container
-	// - Creating and starting the new container
-	// - Removing the old container
-	// - Self-cleaning (AutoRemove: true)
+	// Wait for the orchestrator to complete and the new container to appear.
+	// The orchestrator will:
+	// - Stop the old container
+	// - Create and start the new container
+	// - Remove the old container
+	// - Rename the new container to the source's original name
+	// - Self-clean (AutoRemove: true)
 	//
-	// The current Watchtower process will be stopped by the orchestrator.
-	//
+	// After the old container is removed and the new one is renamed,
+	// the new container will be discoverable by the original name.
+	newContainerID, err := waitForNewContainer(
+		ctx,
+		client,
+		sourceContainer,
+	)
+	if err != nil {
+		clog.WithError(err).Error("Failed to discover new container after ephemeral self-update")
+
+		return "", false, fmt.Errorf("%w: %w", errEphemeralOrchestratorFailed, err)
+	}
+
+	clog.WithField("new_id", newContainerID.ShortID()).
+		Info("Ephemeral self-update completed; new container is running")
+
 	// Return false for "renamed" because in the ephemeral flow the old container
 	// IS removed (not renamed). This allows cleanup image info to be collected
 	// for the old image, unlike the rename path where the old container persists.
-	return orchestratorID, false, nil
+	return newContainerID, false, nil
+}
+
+// newContainerPollInterval defines how often to poll for the new container.
+const newContainerPollInterval = 2 * time.Second
+
+// newContainerTimeout defines the maximum time to wait for the new container.
+const newContainerTimeout = 5 * time.Minute
+
+// waitForNewContainer polls Docker until the new Watchtower container appears.
+//
+// After the ephemeral orchestrator starts, it:
+//  1. Stops and removes the old container
+//  2. Creates and starts a new container from the updated image
+//  3. Renames the new container to the original name
+//
+// During this process, the old container's name is freed when it is removed,
+// and the new container eventually takes the original name. This function
+// polls ListContainers to detect when the new container is running with
+// the source container's original name and a different ID.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - sourceContainer: The original Watchtower container being replaced.
+//
+// Returns:
+//   - types.ContainerID: ID of the newly created container.
+//   - error: Non-nil if the new container is not found within the timeout.
+func waitForNewContainer(
+	ctx context.Context,
+	client container.Client,
+	sourceContainer types.Container,
+) (types.ContainerID, error) {
+	// Create a dedicated context with a generous timeout for orchestrator completion.
+	// The orchestrator has a 5-minute timeout; we match it here.
+	waitCtx, waitCancel := context.WithTimeout(ctx, newContainerTimeout)
+	defer waitCancel()
+
+	clog := logrus.WithField("source_name", sourceContainer.Name())
+	clog.Debug("Waiting for ephemeral orchestrator to complete and new container to appear")
+
+	for {
+		select {
+		case <-waitCtx.Done():
+			return "", fmt.Errorf(
+				"timed out waiting for new container after ephemeral self-update: %w",
+				waitCtx.Err(),
+			)
+		default:
+		}
+
+		containers, err := client.ListContainers(waitCtx, nil)
+		if err != nil {
+			clog.WithError(err).Debug("Failed to list containers while waiting for new container")
+
+			select {
+			case <-waitCtx.Done():
+				return "", fmt.Errorf(
+					"timed out waiting for new container: %w",
+					waitCtx.Err(),
+				)
+			case <-time.After(newContainerPollInterval):
+				continue
+			}
+		}
+
+		for _, c := range containers {
+			// Look for a container with the source's original name but a different ID.
+			// This indicates the new container has been renamed to the original name.
+			if c.Name() == sourceContainer.Name() && c.ID() != sourceContainer.ID() {
+				if c.IsRunning() {
+					clog.WithField("new_id", c.ID().ShortID()).
+						Debug("Found new container with source name")
+
+					return c.ID(), nil
+				}
+			}
+		}
+
+		select {
+		case <-waitCtx.Done():
+			return "", fmt.Errorf(
+				"timed out waiting for new container after ephemeral self-update: %w",
+				waitCtx.Err(),
+			)
+		case <-time.After(newContainerPollInterval):
+			// Continue polling
+		}
+	}
 }
 
 // RunOrchestrator executes the orchestrator mode for self-update.
@@ -416,20 +522,18 @@ func inspectOldContainer(
 	// could affect other code paths holding a reference to the same object. This
 	// is safe here because the old container is about to be stopped and removed.
 	if containerChain != "" {
-		if c, ok := oldContainer.(*container.Container); ok {
-			containerInfo := c.ContainerInfo()
-			if containerInfo != nil && containerInfo.Config != nil {
-				if containerInfo.Config.Labels == nil {
-					containerInfo.Config.Labels = make(map[string]string)
-				}
-
-				// In-place mutation required: StartContainer reads labels from this
-				// config to build the new container. Any other references to this
-				// container object will also see this label after this assignment.
-				containerInfo.Config.Labels[container.ContainerChainLabel] = containerChain
-				clog.WithField("container_chain", containerChain).
-					Debug("Set container chain label on source container config")
+		containerInfo := oldContainer.ContainerInfo()
+		if containerInfo != nil && containerInfo.Config != nil {
+			if containerInfo.Config.Labels == nil {
+				containerInfo.Config.Labels = make(map[string]string)
 			}
+
+			// In-place mutation required: StartContainer reads labels from this
+			// config to build the new container. Any other references to this
+			// container object will also see this label after this assignment.
+			containerInfo.Config.Labels[container.ContainerChainLabel] = containerChain
+			clog.WithField("container_chain", containerChain).
+				Debug("Set container chain label on source container config")
 		}
 	}
 

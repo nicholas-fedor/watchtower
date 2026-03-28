@@ -1386,10 +1386,37 @@ func restartStaleContainer(
 		// Opt-in ephemeral self-update: use a short-lived orchestrator container
 		// to perform the transition atomically. The orchestrator handles stopping
 		// the old container, creating and starting the new one, and cleanup.
+		// EphemeralSelfUpdate blocks until the new container is running and
+		// returns its ID so callers can run health checks and lifecycle hooks.
 		if config.EphemeralSelfUpdate {
 			logrus.WithFields(fields).Debug("Using ephemeral self-update")
 
-			return EphemeralSelfUpdate(ctx, client, sourceContainer, config)
+			newContainerID, renamed, err := EphemeralSelfUpdate(
+				ctx,
+				client,
+				sourceContainer,
+				config,
+			)
+			if err != nil {
+				return "", false, err
+			}
+
+			// Execute post-update lifecycle hooks for the new container if enabled.
+			// In the rename path this is handled later in the function, but the
+			// ephemeral path returns early so we must run hooks here.
+			if sourceContainer.ToRestart() && config.LifecycleHooks {
+				logrus.WithFields(fields).Debug("Executing post-update command for ephemeral update")
+				//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+				lifecycle.ExecutePostUpdateCommand(
+					detachedCtx,
+					client,
+					newContainerID,
+					config.LifecycleUID,
+					config.LifecycleGID,
+				)
+			}
+
+			return newContainerID, renamed, nil
 		}
 
 		newName := "watchtower-old-" + sourceContainer.ID().ShortID()

@@ -476,7 +476,8 @@ Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
 
 !!! Warning "This is an experimental feature."
 
-See [Updating Watchtower](../../getting-started/updating-watchtower/index.md#ephemeral-self-update) for details on how this mechanism works.
+!!! Note
+    The ephemeral self-update mechanism is only active when Watchtower is running in normal daemon mode. When Watchtower is started with `--run-once` (one-shot execution), this flag is ignored because the process exits immediately after the initial update pass and there is no continuously running instance to replace. See [Updating Watchtower](../../getting-started/updating-watchtower/index.md#ephemeral-self-update) for details on how this mechanism works.
 
 ## Registry & Authentication
 
