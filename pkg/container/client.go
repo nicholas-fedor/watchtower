@@ -44,7 +44,7 @@ const (
 )
 
 // baseListRetryDelay is the base delay for exponential backoff between retries.
-// Actual delays are baseDelay * 2^attempt (5s, 10s, 20s).
+// Actual delays are baseDelay * 2^attempt (5s, 10s).
 var baseListRetryDelay = 5 * time.Second
 
 // Errors for container health operations.
