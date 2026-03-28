@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -2193,7 +2194,7 @@ var _ = ginkgo.Describe("isDaemonConnectionError", func() {
 			errors.New("dial unix /var/run/docker.sock: connect: connection refused"),
 			true),
 		ginkgo.Entry("EOF error returns true",
-			errors.New("failed to execute request: EOF"),
+			fmt.Errorf("failed to execute request: %w", io.EOF),
 			true),
 		ginkgo.Entry("permission denied error returns false",
 			errors.New("permission denied"),

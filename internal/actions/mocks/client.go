@@ -129,11 +129,11 @@ func (client MockClient) checkContextCancellation(ctx context.Context) error {
 
 // ListContainers returns containers from TestData, optionally filtered.
 func (client MockClient) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
+	client.TestData.ListContainersCount.Add(1)
+
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return nil, err
 	}
-
-	client.TestData.ListContainersCount.Add(1)
 
 	if client.TestData.ListContainersError != nil &&
 		int(client.TestData.ListContainersCount.Load()) <= client.TestData.ListContainersFailCount {

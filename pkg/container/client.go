@@ -1578,5 +1578,6 @@ func isDaemonConnectionError(err error) bool {
 
 	return strings.Contains(errMsg, "Cannot connect to the Docker daemon") ||
 		strings.Contains(errMsg, "connection refused") ||
-		strings.Contains(errMsg, "EOF")
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
 }
