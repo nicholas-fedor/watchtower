@@ -686,6 +686,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#ephemeral_self-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ephemeral Self-Updates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ephemeral Self-Updates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how_it_works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling_ephemeral_self-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Ephemeral Self-Updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#differences_from_default_self-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differences from Default Self-Update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1314,6 +1375,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#ephemeral_self-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ephemeral Self-Updates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ephemeral Self-Updates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how_it_works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabling_ephemeral_self-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Ephemeral Self-Updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#differences_from_default_self-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differences from Default Self-Update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1345,6 +1467,71 @@
 <li><strong>Remove port mappings</strong>: Avoid publishing ports to the host and access the API through the Docker network instead.</li>
 <li><strong>Use <code>--run-once</code></strong>: Run Watchtower once without scheduling, then restart manually when needed.</li>
 <li><strong>Disable HTTP API</strong>: Use only scheduled updates without the HTTP API if self-updates are required.</li>
+<li><strong>Ephemeral Self-Updates</strong>: Enable Watchtower to use a separate, short-lived container to orchestrate the self-update process.</li>
+</ul>
+<h2 id="ephemeral_self-updates">Ephemeral Self-Updates<a class="headerlink" href="#ephemeral_self-updates" title="Permanent link">&para;</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">This is an experimental feature</p>
+</div>
+<p>The ephemeral self-update mechanism is an alternative to the default rename-based approach. It uses a short-lived orchestrator container to perform the container replacement, providing a more atomic handoff between old and new Watchtower instances.</p>
+<h3 id="how_it_works">How It Works<a class="headerlink" href="#how_it_works" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Watchtower detects a new version of its own image is available and pulls it.</li>
+<li>A short-lived orchestrator container is created from the new Watchtower image with the <code>--self-update-orchestrator</code> internal flag.</li>
+<li>The orchestrator mounts the Docker socket and performs the following sequence:<ul>
+<li>Stops the old Watchtower container.</li>
+<li>Creates a new container from the new image with the same configuration.</li>
+<li>Starts the new Watchtower container.</li>
+<li>Verifies the new container is running.</li>
+<li>Removes the old container.</li>
+</ul>
+</li>
+<li>The orchestrator exits and is automatically removed.</li>
+</ol>
+<h3 id="enabling_ephemeral_self-updates">Enabling Ephemeral Self-Updates<a class="headerlink" href="#enabling_ephemeral_self-updates" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_EPHEMERAL_SELF_UPDATE</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span>nickfedor/watchtower
+</code></pre></div>
+<h3 id="differences_from_default_self-update">Differences from Default Self-Update<a class="headerlink" href="#differences_from_default_self-update" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Default (Rename)</th>
+<th>Ephemeral</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mechanism</td>
+<td>Renames old container, creates new</td>
+<td>Orchestrator handles stop/create/start</td>
+</tr>
+<tr>
+<td>Port conflicts</td>
+<td>Skipped automatically</td>
+<td>Self-update not skipped when ports are configured</td>
+</tr>
+<tr>
+<td>Old container cleanup</td>
+<td>Deferred to next startup</td>
+<td>Immediate removal by orchestrator</td>
+</tr>
+<tr>
+<td>Failure recovery</td>
+<td>Old container persists (renamed)</td>
+<td>Old container preserved if new one fails</td>
+</tr>
+</tbody>
+</table>
+<h3 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The Docker socket must be mounted in the Watchtower container (required for both mechanisms).</li>
+<li>The orchestrator container is identified by the <code>com.centurylinklabs.watchtower.ephemeral-orchestrator</code> label. Orphaned orchestrators from crashes are cleaned up on Watchtower startup.</li>
 </ul>
 
 
@@ -1368,7 +1555,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 27, 2026 05:17:13 UTC"><span class="timeago" datetime="2026-03-27T05:17:13+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 27, 2026 05:17:13 UTC">2026-03-27</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 28, 2026 19:27:06 UTC"><span class="timeago" datetime="2026-03-28T19:27:06+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 28, 2026 19:27:06 UTC">2026-03-28</span>
   </span>
 
     
