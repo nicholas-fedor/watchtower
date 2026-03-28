@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -2178,3 +2179,33 @@ func withEnvVars(vars map[string]string) func() {
 		}
 	}
 }
+
+var _ = ginkgo.Describe("isDaemonConnectionError", func() {
+	ginkgo.DescribeTable("error detection",
+		func(err error, expected bool) {
+			gomega.Expect(isDaemonConnectionError(err)).To(gomega.Equal(expected))
+		},
+		ginkgo.Entry("nil error returns false", nil, false),
+		ginkgo.Entry("Docker daemon connection error returns true",
+			errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"),
+			true),
+		ginkgo.Entry("connection refused error returns true",
+			errors.New("dial unix /var/run/docker.sock: connect: connection refused"),
+			true),
+		ginkgo.Entry("EOF error returns true",
+			errors.New("failed to execute request: EOF"),
+			true),
+		ginkgo.Entry("permission denied error returns false",
+			errors.New("permission denied"),
+			false),
+		ginkgo.Entry("container not found error returns false",
+			errors.New("Error: No such container: abc123"),
+			false),
+		ginkgo.Entry("generic error returns false",
+			errors.New("some random error"),
+			false),
+		ginkgo.Entry("wrapped Docker daemon error returns true",
+			fmt.Errorf("failed to list containers: %w", errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock")),
+			true),
+	)
+})

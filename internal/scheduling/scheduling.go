@@ -190,7 +190,7 @@ func RunUpgradesOnSchedule(
 			metrics.Default().RegisterScan(metric)
 		}
 
-		logrus.Debug("Update operation completed successfully")
+		logrus.Debug("Update operation completed")
 
 		nextRuns := scheduler.Entries()
 		if len(nextRuns) > 0 {

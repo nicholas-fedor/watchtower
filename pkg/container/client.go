@@ -37,7 +37,15 @@ const (
 	// The value is 30 seconds, which should be sufficient for most Docker daemon
 	// initialization scenarios while preventing indefinite hangs.
 	DaemonInitTimeout = 30 * time.Second
+
+	// maxListRetries is the maximum number of retry attempts for transient Docker
+	// connection failures when listing containers.
+	maxListRetries = 3
 )
+
+// baseListRetryDelay is the base delay for exponential backoff between retries.
+// Actual delays are baseDelay * 2^attempt (5s, 10s, 20s).
+var baseListRetryDelay = 5 * time.Second
 
 // Errors for container health operations.
 var (
@@ -453,14 +461,51 @@ func (c *client) ListContainers(ctx context.Context, filter ...types.Filter) ([]
 		}
 	}
 
-	// Attempt to list source containers and handle errors by logging and returning them.
-	containers, err := ListSourceContainers(
-		ctx,
-		c.api,
-		c.ClientOptions,
-		containerFilter,
-		isPodman,
+	// Attempt to list source containers with retry for transient Docker connection failures.
+	// The Docker daemon may become temporarily unreachable (e.g., during host maintenance),
+	// so retrying with exponential backoff (5s, 10s, 20s) improves resilience.
+	var (
+		containers []types.Container
+		err        error
 	)
+
+	for attempt := range maxListRetries {
+		containers, err = ListSourceContainers(
+			ctx,
+			c.api,
+			c.ClientOptions,
+			containerFilter,
+			isPodman,
+		)
+		if err == nil {
+			break
+		}
+
+		// Only retry for transient connection errors; fail immediately for others.
+		if !isDaemonConnectionError(err) {
+			break
+		}
+
+		// Don't sleep after the last attempt.
+		if attempt == maxListRetries-1 {
+			break
+		}
+
+		delay := baseListRetryDelay * time.Duration(1<<attempt)
+
+		logrus.WithFields(logrus.Fields{
+			"attempt": attempt + 1,
+			"max":     maxListRetries,
+			"delay":   delay,
+		}).Warn("Docker daemon unavailable, retrying container list...")
+
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context canceled during container list retry: %w", ctx.Err())
+		}
+	}
+
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to list containers")
 
@@ -1513,4 +1558,25 @@ func (c *client) waitForExecOrTimeout(
 	}
 
 	return false, nil
+}
+
+// isDaemonConnectionError checks if an error is a transient Docker daemon connection error.
+// These errors indicate the Docker daemon is temporarily unreachable and may self-heal,
+// making them suitable for retry logic.
+//
+// Parameters:
+//   - err: The error to check.
+//
+// Returns:
+//   - bool: True if the error is a Docker daemon connection error, false otherwise.
+func isDaemonConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errMsg := err.Error()
+
+	return strings.Contains(errMsg, "Cannot connect to the Docker daemon") ||
+		strings.Contains(errMsg, "connection refused") ||
+		strings.Contains(errMsg, "EOF")
 }
