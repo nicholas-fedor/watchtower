@@ -51,7 +51,7 @@ func createDefaultMockClient(td *mockActions.TestData) mockActions.MockClient {
 
 var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 	ginkgo.When("the orchestrator is created successfully", func() {
-		ginkgo.It("should return the new container ID and false (not renamed)", func() {
+		ginkgo.It("should return empty container ID and false (not renamed)", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
@@ -59,15 +59,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 				"com.centurylinklabs.watchtower": "true",
 			})
 
-			// Mock the new container that the orchestrator creates.
-			// It has the source's name ("watchtower") but a different ID.
-			newContainer := createDefaultMockContainer("new-container-123", map[string]string{
-				"com.centurylinklabs.watchtower": "true",
-			})
-
-			client := createDefaultMockClient(&mockActions.TestData{
-				Containers: []types.Container{newContainer},
-			})
+			client := createDefaultMockClient(&mockActions.TestData{})
 
 			newID, renamed, err := actions.EphemeralSelfUpdate(
 				ctx,
@@ -77,7 +69,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new-container-123")))
+			gomega.Expect(newID).To(gomega.BeEmpty())
 			gomega.Expect(renamed).To(gomega.BeFalse())
 		})
 	})
@@ -91,14 +83,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 				"com.centurylinklabs.watchtower": "true",
 			})
 
-			// Mock the new container that the orchestrator creates.
-			newContainer := createDefaultMockContainer("new-container-456", map[string]string{
-				"com.centurylinklabs.watchtower": "true",
-			})
-
-			client := createDefaultMockClient(&mockActions.TestData{
-				Containers: []types.Container{newContainer},
-			})
+			client := createDefaultMockClient(&mockActions.TestData{})
 
 			newID, renamed, err := actions.EphemeralSelfUpdate(
 				ctx,
@@ -108,7 +93,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new-container-456")))
+			gomega.Expect(newID).To(gomega.BeEmpty())
 			gomega.Expect(renamed).To(gomega.BeFalse())
 
 			// Verify the orchestrator's chain was set to the source container ID.
@@ -136,14 +121,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 			gomega.Expect(present).To(gomega.BeTrue())
 			gomega.Expect(chain).To(gomega.Equal(existingChain))
 
-			// Mock the new container that the orchestrator creates.
-			newContainer := createDefaultMockContainer("new-container-789", map[string]string{
-				"com.centurylinklabs.watchtower": "true",
-			})
-
-			client := createDefaultMockClient(&mockActions.TestData{
-				Containers: []types.Container{newContainer},
-			})
+			client := createDefaultMockClient(&mockActions.TestData{})
 
 			newID, renamed, err := actions.EphemeralSelfUpdate(
 				ctx,
@@ -153,7 +131,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new-container-789")))
+			gomega.Expect(newID).To(gomega.BeEmpty())
 			gomega.Expect(renamed).To(gomega.BeFalse())
 
 			// Verify the orchestrator's chain has the source ID appended to the existing chain.
