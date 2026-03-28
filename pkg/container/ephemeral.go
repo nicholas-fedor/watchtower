@@ -55,9 +55,6 @@ const (
 // envPartsCount is the expected number of parts when splitting "KEY=VALUE" strings.
 const envPartsCount = 2
 
-// bindPartsMinCount is the minimum number of parts for a valid bind mount string.
-const bindPartsMinCount = 2
-
 // Remote Docker connection schemes that do not use a local socket.
 // These require environment variable passthrough rather than socket mounting.
 var remoteDockerSchemes = []string{
@@ -438,6 +435,9 @@ func extractDockerConnectionConfig(sourceContainer types.Container) *DockerConne
 			if socketPath != "" {
 				config.SocketBind = socketPath + ":" + socketPath
 			}
+		} else {
+			// Remote connection: clear socket bind as no local mount is needed.
+			config.SocketBind = ""
 		}
 	}
 
@@ -548,6 +548,8 @@ func isLocalDockerHost(host string) bool {
 	}
 
 	// Default to local for unrecognized schemes (conservative approach).
+	logrus.Warnf("unrecognized host scheme for %q, treating as local", host)
+
 	return true
 }
 
@@ -671,12 +673,34 @@ func prepareTLSCertBinds(
 //   - string: The container-side path.
 //   - bool: True if parsing succeeded.
 func parseBindMount(bind string) (string, string, bool) {
-	parts := strings.Split(bind, ":")
-	if len(parts) < bindPartsMinCount {
+	// Detect Windows drive-letter pattern (e.g., "C:" where len >= 2 and second rune is ':').
+	// In that case, locate the separator colon after the drive-letter (index > 1).
+	// Otherwise, use the first ':' as the separator.
+	var sepIdx int
+
+	if len(bind) >= 2 && bind[1] == ':' {
+		// Windows drive-letter detected; find separator after drive letter.
+		sepIdx = strings.Index(bind[2:], ":")
+		if sepIdx != -1 {
+			sepIdx += 2 // adjust for offset into bind[2:]
+		}
+	} else {
+		sepIdx = strings.Index(bind, ":")
+	}
+
+	if sepIdx == -1 {
 		return "", "", false
 	}
 
-	return parts[0], parts[1], true
+	hostPath := bind[:sepIdx]
+	containerPath := bind[sepIdx+1:]
+
+	// Both parts must be non-empty.
+	if hostPath == "" || containerPath == "" {
+		return "", "", false
+	}
+
+	return hostPath, containerPath, true
 }
 
 // containsBind checks if a bind mount string is already present in the slice.

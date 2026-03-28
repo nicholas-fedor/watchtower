@@ -1,6 +1,7 @@
 package container
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -240,7 +241,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 				gomega.Expect(config.IsLocal).To(gomega.BeFalse())
 				gomega.Expect(config.Host).To(gomega.Equal("tcp://remote-host:2375"))
 				// Remote connections do not use socket bind.
-				gomega.Expect(config.IsLocal).To(gomega.BeFalse())
+				gomega.Expect(config.SocketBind).To(gomega.BeEmpty())
 			})
 		})
 
@@ -605,17 +606,23 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/containers/create")),
 						func(w http.ResponseWriter, _ *http.Request) {
 							w.Header().Set("Content-Type", "application/json")
-							w.WriteHeader(http.StatusCreated)
 
-							err := json.NewEncoder(w).Encode(dockerContainer.CreateResponse{
+							var buf bytes.Buffer
+
+							err := json.NewEncoder(&buf).Encode(dockerContainer.CreateResponse{
 								ID: "orchestrator-id-123",
 							})
 							if err != nil {
 								ginkgo.GinkgoWriter.Printf(
 									"failed to encode CreateResponse: %v\n", err,
 								)
-								w.WriteHeader(http.StatusInternalServerError)
+								gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+								return
 							}
+
+							w.WriteHeader(http.StatusCreated)
+							_, _ = w.Write(buf.Bytes())
 						},
 					),
 					// ContainerStart handler.
@@ -670,17 +677,23 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 						ghttp.VerifyRequest("POST", gomega.HaveSuffix("/containers/create")),
 						func(w http.ResponseWriter, _ *http.Request) {
 							w.Header().Set("Content-Type", "application/json")
-							w.WriteHeader(http.StatusCreated)
 
-							err := json.NewEncoder(w).Encode(dockerContainer.CreateResponse{
+							var buf bytes.Buffer
+
+							err := json.NewEncoder(&buf).Encode(dockerContainer.CreateResponse{
 								ID: "orchestrator-fail-start",
 							})
 							if err != nil {
 								ginkgo.GinkgoWriter.Printf(
 									"failed to encode CreateResponse: %v\n", err,
 								)
-								w.WriteHeader(http.StatusInternalServerError)
+								gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+								return
 							}
+
+							w.WriteHeader(http.StatusCreated)
+							_, _ = w.Write(buf.Bytes())
 						},
 					),
 					// ContainerStart fails.

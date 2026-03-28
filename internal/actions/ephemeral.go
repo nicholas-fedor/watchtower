@@ -221,17 +221,19 @@ func RunOrchestrator(ctx context.Context, client container.Client) {
 		originalName,
 		containerChain,
 	)
+	// Determine exit code and log result.
+	exitCode := 0
 	if err != nil {
-		// Explicitly cancel before exit since deferred calls do not run on os.Exit.
-		orchCancel()
+		exitCode = 1
+
 		clog.WithError(err).Error("Orchestration failed")
-		os.Exit(1)
+	} else {
+		clog.Debug("Self-update orchestration completed successfully")
 	}
 
 	// Explicitly cancel before exit since deferred calls do not run on os.Exit.
 	orchCancel()
-	clog.Debug("Self-update orchestration completed successfully")
-	os.Exit(0)
+	os.Exit(exitCode)
 }
 
 // readOrchestratorEnv reads and validates the environment variables required
