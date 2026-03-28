@@ -50,6 +50,7 @@ type TestData struct {
 	StopOrder                    []string                              // Order in which containers were stopped.
 	StartOrder                   []string                              // Order in which containers were started.
 	SimulatedLatency             time.Duration                         // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
+	LastContainerChain           string                                // Last container chain passed to CreateEphemeralOrchestrator.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -208,6 +209,26 @@ func (client MockClient) StartContainer(ctx context.Context, c types.Container) 
 	return c.ID(), nil
 }
 
+// StartContainerByID simulates starting a container by its ID directly.
+// It provides a minimal implementation for testing purposes.
+// Returns the configured StartContainerError if set.
+func (client MockClient) StartContainerByID(ctx context.Context, containerID types.ContainerID) error {
+	client.TestData.StartContainerCount.Add(1)
+
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return err
+	}
+
+	if client.TestData.StartContainerError != nil {
+		return client.TestData.StartContainerError
+	}
+
+	client.TestData.StartOrder = append(client.TestData.StartOrder, string(containerID))
+	client.Stopped[string(containerID)] = false
+
+	return nil
+}
+
 // RenameContainer simulates renaming a container, incrementing the RenameContainerCount.
 // It returns nil to indicate success without modifying any state.
 func (client MockClient) RenameContainer(ctx context.Context, _ types.Container, _ string) error {
@@ -362,6 +383,24 @@ func (client MockClient) RemoveContainer(ctx context.Context, _ types.Container)
 	}
 
 	return nil
+}
+
+// CreateEphemeralOrchestrator simulates creating an ephemeral orchestrator container.
+// It records the container chain parameter for test verification and returns a mock
+// container ID for the orchestrator and nil error to indicate success.
+func (client MockClient) CreateEphemeralOrchestrator(
+	ctx context.Context,
+	_ types.Container,
+	_ string,
+	containerChain string,
+) (types.ContainerID, error) {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return "", err
+	}
+
+	client.TestData.LastContainerChain = containerChain
+
+	return types.ContainerID("mock-ephemeral-orchestrator"), nil
 }
 
 // GetInfo returns mock system information for testing.

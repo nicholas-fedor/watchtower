@@ -20,7 +20,8 @@ type UpdateParams struct {
 	LifecycleGID        int           // Default GID for lifecycle hooks.
 	CPUCopyMode         string        // CPU copy mode for container recreation.
 	RunOnce             bool          // Run once mode if true.
-	SkipSelfUpdate      bool          // Skip Watchtower self-update if true.
 	CurrentContainerID  ContainerID   // ID of the current container being updated.
 	UseComposeDependsOn bool          // Enable Docker Compose depends_on label processing.
+	SkipSelfUpdate      bool          // Skip Watchtower self-update if true.
+	EphemeralSelfUpdate bool          // Use ephemeral container for self-update if true.
 }

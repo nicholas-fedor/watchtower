@@ -463,6 +463,22 @@ Environment Variable: WATCHTOWER_USE_COMPOSE_DEPENDS_ON
 !!! Warning
     Rolling restarts are not supported when any container has linked dependencies (including Docker Compose `depends_on`, Watchtower `depends-on` labels, Docker links, or network mode dependencies). When `--rolling-restart` is enabled, `--use-compose-depends-on` controls whether Docker Compose `depends_on` labels are included in the dependency validation check.
 
+### Ephemeral Self-Update
+
+Uses a short-lived orchestrator container to perform Watchtower self-updates instead of the default rename-based approach.
+
+```text
+            Argument: --ephemeral-self-update
+Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
+                Type: Boolean
+             Default: false
+```
+
+!!! Warning "This is an experimental feature."
+
+!!! Note
+    The ephemeral self-update mechanism is only active when Watchtower is running in normal daemon mode. When Watchtower is started with `--run-once` (one-shot execution), this flag is ignored because the process exits immediately after the initial update pass and there is no continuously running instance to replace. See [Updating Watchtower](../../getting-started/updating-watchtower/index.md#ephemeral-self-update) for details on how this mechanism works.
+
 ## Registry & Authentication
 
 ### REPO_USER

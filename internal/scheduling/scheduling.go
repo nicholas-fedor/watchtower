@@ -76,6 +76,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 //   - skipFirstRun: Boolean indicating whether to skip the first scheduled run.
 //   - currentWatchtowerContainer: The current Watchtower container for parent checking.
 //   - startupMessageSent: Whether the startup message was already sent (e.g., by the HTTP API in blocking mode).
+//   - ephemeralSelfUpdate: Whether the self-update uses ephemeral mode (removes old container before creating new one).
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
@@ -98,6 +99,7 @@ func RunUpgradesOnSchedule(
 	skipFirstRun bool,
 	currentWatchtowerContainer types.Container,
 	startupMessageSent bool,
+	ephemeralSelfUpdate bool,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -119,12 +121,14 @@ func RunUpgradesOnSchedule(
 		),
 	)
 
-	// Determine if the Watchtower container has exposed ports, which would cause
-	// port conflicts during self-update. When a port is configured (e.g., HTTP API),
-	// the old container holds the port while the new container tries to bind it,
-	// resulting in both containers being stopped.
-	containerHasExposedPorts := currentWatchtowerContainer != nil &&
-		currentWatchtowerContainer.HasExposedPorts()
+	// Determine if self-update should be skipped due to exposed port conflicts.
+	// When a port is configured (e.g., HTTP API), the old container holds the port
+	// while the new container tries to bind it, resulting in both containers being stopped.
+	// Ephemeral self-updates are exempt from this restriction because they remove
+	// the old container before creating the new one, avoiding port conflicts.
+	skipSelfUpdateForPorts := currentWatchtowerContainer != nil &&
+		currentWatchtowerContainer.HasExposedPorts() &&
+		!ephemeralSelfUpdate
 
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
@@ -132,7 +136,7 @@ func RunUpgradesOnSchedule(
 	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool) {
 		// Skip self-update if the container has exposed ports to prevent port conflicts.
 		// This takes precedence over the skipWatchtowerSelfUpdate parameter.
-		if containerHasExposedPorts {
+		if skipSelfUpdateForPorts {
 			skipWatchtowerSelfUpdate = true
 
 			logrus.Debug("Skipping self-update to prevent port conflict")

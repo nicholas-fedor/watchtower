@@ -30,6 +30,8 @@ const (
 	zodiacLabel = "com.centurylinklabs.zodiac.original-image"
 	// scope defines a unique monitoring scope for this Watchtower instance.
 	scope = "com.centurylinklabs.watchtower.scope"
+	// OrchestratorLabel identifies ephemeral orchestrator containers used during self-update.
+	OrchestratorLabel = "com.centurylinklabs.watchtower.ephemeral-orchestrator"
 )
 
 // Lifecycle hook labels configure commands executed during container update phases.

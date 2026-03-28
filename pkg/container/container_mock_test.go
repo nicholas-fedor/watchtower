@@ -323,6 +323,40 @@ func WithID(id string) MockContainerUpdate {
 	}
 }
 
+// WithEnv sets environment variables on the mock container's Config.
+//
+// Parameters:
+//   - env: Environment variables in "KEY=VALUE" format.
+//
+// Returns:
+//   - MockContainerUpdate: Function to set environment variables in container Config.
+func WithEnv(env []string) MockContainerUpdate {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if c.Config == nil {
+			c.Config = &dockerContainer.Config{}
+		}
+
+		c.Config.Env = env
+	}
+}
+
+// WithBinds sets bind mounts on the mock container's HostConfig.
+//
+// Parameters:
+//   - binds: Bind mount strings in "host_path:container_path" format.
+//
+// Returns:
+//   - MockContainerUpdate: Function to set bind mounts in container HostConfig.
+func WithBinds(binds []string) MockContainerUpdate {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainer.HostConfig{}
+		}
+
+		c.HostConfig.Binds = binds
+	}
+}
+
 // MockClient is a mock implementation of the Operations interface for testing container operations.
 type MockClient struct {
 	createFunc        func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerContainer.CreateResponse, error)

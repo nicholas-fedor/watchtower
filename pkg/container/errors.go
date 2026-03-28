@@ -107,3 +107,11 @@ var (
 	// errNoContainerWithHostname indicates no container was found with the matching hostname.
 	errNoContainerWithHostname = errors.New("no container found with matching hostname")
 )
+
+// Errors for ephemeral orchestrator operations in ephemeral.go.
+var (
+	// ErrEphemeralCreateFailed indicates a failure to create the ephemeral orchestrator container.
+	ErrEphemeralCreateFailed = errors.New("failed to create ephemeral orchestrator container")
+	// ErrEphemeralStartFailed indicates a failure to start the ephemeral orchestrator container.
+	ErrEphemeralStartFailed = errors.New("failed to start ephemeral orchestrator container")
+)

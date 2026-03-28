@@ -660,6 +660,7 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 		"notification-slack-icon-url":   "legacy",
 		"cert-path":                     "new feature",
 		"notification-template-file":    "new feature",
+		"self-update-orchestrator":      "internal",
 	}
 
 	cmd := new(cobra.Command)
