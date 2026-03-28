@@ -150,7 +150,7 @@ func EphemeralSelfUpdate(
 	logrus.WithFields(logrus.Fields{
 		"container":       sourceContainer.Name(),
 		"orchestrator_id": orchestratorID.ShortID(),
-	}).Info("Started self-update orchestrator")
+	}).Debug("Started self-update orchestrator")
 
 	// Return the orchestrator ID. The orchestrator will handle:
 	// - Stopping the old container
