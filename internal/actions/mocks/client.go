@@ -35,12 +35,14 @@ type TestData struct {
 	UpdateContainerCount         atomic.Int32                          // Number of times UpdateContainer was called.
 	IsContainerStaleCount        atomic.Int32                          // Number of times IsContainerStale was called.
 	WaitForContainerHealthyCount atomic.Int32                          // Number of times WaitForContainerHealthy was called.
+	ListContainersCount          atomic.Int32                          // Number of times ListContainers was called.
 	NameOfContainerToKeep        string                                // Name of the container to avoid stopping.
 	Containers                   []types.Container                     // List of mock containers.
 	ContainersByID               map[types.ContainerID]types.Container // Map of containers by ID.
 	Staleness                    map[string]bool                       // Map of container names to staleness status.
 	IsContainerStaleError        error                                 // Error to return from IsContainerStale (for testing).
 	ListContainersError          error                                 // Error to return from ListContainers (for testing).
+	ListContainersFailCount      int                                   // Number of times ListContainers should fail before succeeding.
 	StopContainerError           error                                 // Error to return from StopContainer (for testing).
 	StartContainerError          error                                 // Error to return from StartContainer (for testing).
 	UpdateContainerError         error                                 // Error to return from UpdateContainer (for testing).
@@ -127,11 +129,15 @@ func (client MockClient) checkContextCancellation(ctx context.Context) error {
 
 // ListContainers returns containers from TestData, optionally filtered.
 func (client MockClient) ListContainers(ctx context.Context, filter ...types.Filter) ([]types.Container, error) {
+	client.TestData.ListContainersCount.Add(1)
+
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return nil, err
 	}
 
-	if client.TestData.ListContainersError != nil {
+	if client.TestData.ListContainersError != nil &&
+		(client.TestData.ListContainersFailCount == 0 ||
+			int(client.TestData.ListContainersCount.Load()) <= client.TestData.ListContainersFailCount) {
 		return nil, client.TestData.ListContainersError
 	}
 
