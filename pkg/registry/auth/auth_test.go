@@ -26,6 +26,7 @@ import (
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerImage "github.com/docker/docker/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -259,6 +260,13 @@ func (m mockContainer) IsStale() bool {
 // since the auth package does not use this logic in these authentication-focused tests.
 func (m mockContainer) IsNoPull(_ types.UpdateParams) bool {
 	return false // Minimal stub, not used in these tests
+}
+
+// CooldownDelay returns the cooldown delay duration for the container. This method
+// satisfies the types.Container interface, returning 0 as a minimal stub since the
+// auth package does not use this value in these authentication-focused tests.
+func (m mockContainer) CooldownDelay(_ types.UpdateParams) time.Duration {
+	return 0 // Minimal stub, not used in these tests
 }
 
 // SetLinkedToRestarting sets the container's linked-to-restarting status. This method
@@ -1152,7 +1160,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(req.Method).To(gomega.Equal(http.MethodGet))
 			gomega.Expect(req.URL.String()).To(gomega.Equal("https://example.com/v2/"))
 			gomega.Expect(req.Header.Get("Accept")).To(gomega.Equal("*/*"))
-			gomega.Expect(req.Header.Get("User-Agent")).To(gomega.Equal("Watchtower (Docker)"))
+			gomega.Expect(req.Header.Get("User-Agent")).To(gomega.Equal(meta.UserAgent))
 			gomega.Expect(req.Context()).To(gomega.Equal(context.Background()))
 		})
 

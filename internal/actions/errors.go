@@ -40,6 +40,14 @@ var (
 	errSelfDependency = errors.New("container has self-dependency")
 )
 
+// Errors for image cooldown operations.
+var (
+	// errImageCooldown indicates the image is within the cooldown period and the update is deferred.
+	errImageCooldown = errors.New("deferred")
+	// errFetchImageAgeFailed indicates the image creation time could not be determined from the registry.
+	errFetchImageAgeFailed = errors.New("image creation time unavailable")
+)
+
 // Errors for Watchtower self-update operations.
 var (
 	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.

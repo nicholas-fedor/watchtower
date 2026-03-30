@@ -27,6 +27,7 @@ import (
 	dockerImage "github.com/docker/docker/api/types/image"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
@@ -223,7 +224,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -296,7 +297,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -450,7 +451,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			_, err = client.Do(req)
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -513,7 +514,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -587,7 +588,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -883,10 +884,10 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			origUserAgent := digest.UserAgent
-			digest.UserAgent = "Watchtower/v0.0.0-unknown"
+			origUserAgent := meta.UserAgent
+			meta.UserAgent = "Watchtower/v0.0.0-unknown"
 
-			defer func() { digest.UserAgent = origUserAgent }()
+			defer func() { meta.UserAgent = origUserAgent }()
 
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -932,7 +933,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1004,7 +1005,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1074,7 +1075,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1143,7 +1144,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1625,7 +1626,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1695,7 +1696,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1762,7 +1763,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1829,7 +1830,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1897,7 +1898,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2026,7 +2027,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2095,7 +2096,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2165,7 +2166,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2233,7 +2234,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2301,7 +2302,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", digest.UserAgent)
+			req.Header.Set("User-Agent", meta.UserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2751,7 +2752,7 @@ var _ = ginkgo.Describe("Digests", func() {
 					"Accept",
 					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 				)
-				req.Header.Set("User-Agent", digest.UserAgent)
+				req.Header.Set("User-Agent", meta.UserAgent)
 
 				resp, err := client.Do(req)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2830,7 +2831,7 @@ var _ = ginkgo.Describe("Digests", func() {
 					"Accept",
 					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 				)
-				req.Header.Set("User-Agent", digest.UserAgent)
+				req.Header.Set("User-Agent", meta.UserAgent)
 
 				resp, err := client.Do(req)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -2906,7 +2907,7 @@ var _ = ginkgo.Describe("Digests", func() {
 					"Accept",
 					"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 				)
-				req.Header.Set("User-Agent", digest.UserAgent)
+				req.Header.Set("User-Agent", meta.UserAgent)
 
 				resp, err := client.Do(req)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -3085,7 +3086,7 @@ func TestDigestClient_GetManifest_SlowResponse(t *testing.T) {
 			"Accept",
 			"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 		)
-		req.Header.Set("User-Agent", digest.UserAgent)
+		req.Header.Set("User-Agent", meta.UserAgent)
 
 		resp, err := client.Do(req)
 		if err == nil {

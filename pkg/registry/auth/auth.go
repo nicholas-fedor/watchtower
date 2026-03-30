@@ -21,6 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -538,7 +539,7 @@ func GetChallengeRequest(ctx context.Context, url url.URL) (*http.Request, error
 
 	// Set headers for compatibility and identification.
 	req.Header.Set("Accept", "*/*")
-	req.Header.Set("User-Agent", "Watchtower (Docker)")
+	req.Header.Set("User-Agent", meta.UserAgent)
 
 	logrus.WithFields(logrus.Fields{
 		"url": url.String(),

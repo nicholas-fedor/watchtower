@@ -572,6 +572,12 @@ func deduplicateEntries(entries []*logrus.Entry) []*logrus.Entry {
 			// Deduplicate by image ID.
 			imageID, _ := entry.Data["image_id"].(string)
 			key = dedupKey{message: entry.Message, data: imageID}
+		case "Image is within cooldown period - deferring update",
+			"Image age exceeds cooldown - proceeding with update",
+			"Image creation time unavailable - deferring update":
+			// Deduplicate by image name — multiple containers may share the same image.
+			image, _ := entry.Data["image"].(string)
+			key = dedupKey{message: entry.Message, data: image}
 		default:
 			// Non-deduplicatable entries are always kept.
 			result = append(result, entry)

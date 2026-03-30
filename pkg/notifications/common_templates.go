@@ -10,6 +10,8 @@ var commonTemplates = map[string]string{
 	// Handles messages: "Found new image" (new image available), "Stopping container" (stopping old container),
 	// "Started new container" (new container started), "Stopping linked container" (stopping linked container),
 	// "Started linked container" (linked container started), "Removing image" (image cleanup completed), "Container updated" (update completed),
+	// "Image is within cooldown period - deferring update" (image too new for update), "Image age exceeds cooldown - proceeding with update" (image old enough),
+	// "Image creation time unavailable - deferring update" (image age could not be determined from registry),
 	// "Detected multiple Watchtower instances - initiating cleanup" (multiple instances detected).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
@@ -41,6 +43,12 @@ var commonTemplates = map[string]string{
     Detected {{index $e.Data "count"}} Watchtower instances - initiating cleanup
 {{- else if eq $msg "Successfully removed all excess Watchtower instances" -}}
     Successfully removed {{index $e.Data "removed_instances"}} excess Watchtower{{if eq (index $e.Data "removed_instances") 1}} instance{{else}} instances{{end}}
+{{- else if eq $msg "Image is within cooldown period - deferring update" -}}
+    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created less than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - eligible in {{with (index $e.Data "eligible_in")}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Image age exceeds cooldown - proceeding with update" -}}
+    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created more than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - proceeding with update
+{{- else if eq $msg "Image creation time unavailable - deferring update" -}}
+    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} creation time unavailable (cooldown: {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}}) - deferring update for safety
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}
@@ -64,7 +72,7 @@ var commonTemplates = map[string]string{
 {{- if .Report -}}
   {{- /* Use report summary data */ -}}
   {{- with .Report -}}
-    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed, {{len .Fresh}} Fresh, {{len .Skipped}} Skipped
       {{- /* List successfully updated containers */ -}}
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}

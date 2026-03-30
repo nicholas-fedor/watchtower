@@ -349,7 +349,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(true, container, params)
+		result := shouldUpdateContainer(container, true, params)
 		gomega.Expect(result).To(gomega.BeTrue())
 	})
 
@@ -372,7 +372,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(true, container, params)
+		result := shouldUpdateContainer(container, true, params)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
 
@@ -392,7 +392,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(true, container, params)
+		result := shouldUpdateContainer(container, true, params)
 		gomega.Expect(result).To(gomega.BeTrue())
 	})
 
@@ -415,7 +415,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(true, container, params)
+		result := shouldUpdateContainer(container, true, params)
 		gomega.Expect(result).To(gomega.BeTrue())
 	})
 
@@ -441,7 +441,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 			params := types.UpdateParams{
 				CurrentContainerID: types.ContainerID(currentID),
 			}
-			result := shouldUpdateContainer(true, container, params)
+			result := shouldUpdateContainer(container, true, params)
 			gomega.Expect(result).To(gomega.BeFalse())
 		},
 	)
@@ -468,7 +468,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 			params := types.UpdateParams{
 				CurrentContainerID: types.ContainerID(currentID),
 			}
-			result := shouldUpdateContainer(true, container, params)
+			result := shouldUpdateContainer(container, true, params)
 			gomega.Expect(result).To(gomega.BeFalse())
 		},
 	)
@@ -492,7 +492,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(true, container, params)
+		result := shouldUpdateContainer(container, true, params)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
 
@@ -516,7 +516,7 @@ var _ = ginkgo.Describe("shouldUpdateContainer", func() {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(true, container, params)
+		result := shouldUpdateContainer(container, true, params)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
 })

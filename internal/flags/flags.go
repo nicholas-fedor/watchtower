@@ -91,6 +91,12 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		envDuration("WATCHTOWER_TIMEOUT"),
 		"Timeout before a container is forcefully stopped")
 
+	flags.StringP(
+		"cooldown-delay",
+		"",
+		envString("WATCHTOWER_COOLDOWN_DELAY"),
+		"Minimum time since image creation before allowing updates. Supports h, m, s, d (days), w (weeks), M (months) (e.g., 24h, 3d, 1w, 1M)")
+
 	flags.BoolP(
 		"no-pull",
 		"",
@@ -719,6 +725,7 @@ func SetDefaults() {
 	viper.SetDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
 	viper.SetDefault("WATCHTOWER_POLL_INTERVAL", defaultPollIntervalSeconds)
 	viper.SetDefault("WATCHTOWER_TIMEOUT", time.Second*defaultStopTimeoutSeconds)
+	viper.SetDefault("WATCHTOWER_COOLDOWN_DELAY", "")
 	viper.SetDefault("WATCHTOWER_HTTP_API_HOST", "")
 	viper.SetDefault("WATCHTOWER_HTTP_API_PORT", "8080")
 	viper.SetDefault("WATCHTOWER_NOTIFICATIONS", []string{})

@@ -156,6 +156,34 @@ func (m Progress) MarkRestarted(containerID types.ContainerID) {
 	}).Debug("Marked container as restarted")
 }
 
+// SetCooldownInfo sets cooldown metadata on a container's status.
+//
+// Parameters:
+//   - containerID: Container ID.
+//   - age: Human-readable image age.
+//   - delay: Human-readable cooldown duration.
+//   - remaining: Human-readable remaining time (empty if passed).
+//   - passed: True if the image passed the cooldown check.
+func (m Progress) SetCooldownInfo(containerID types.ContainerID, age, delay, remaining string, passed bool) {
+	update, exists := m[containerID]
+	if !exists {
+		logrus.WithField("container_id", containerID.ShortID()).
+			Debug("Attempted to set cooldown info on non-existent container")
+
+		return
+	}
+
+	update.SetCooldownInfo(age, delay, remaining, passed)
+	logrus.WithFields(logrus.Fields{
+		"container_id": containerID.ShortID(),
+		"name":         update.Name(),
+		"passed":       passed,
+		"image_age":    age,
+		"cooldown":     delay,
+		"remaining":    remaining,
+	}).Debug("Set cooldown info on container")
+}
+
 // Restarted returns all containers marked as restarted.
 //
 // Returns:

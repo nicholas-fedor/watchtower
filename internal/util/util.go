@@ -1,11 +1,25 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
+)
+
+// Errors for duration parsing.
+var (
+	// errNegativeDuration indicates a negative duration value was provided.
+	errNegativeDuration = errors.New("negative values are not supported")
+
+	// errInvalidChar indicates an invalid character in a duration string.
+	errInvalidChar = errors.New("invalid character in duration string")
+
+	// errInvalidUnit indicates an invalid unit suffix in a duration string.
+	errInvalidUnit = errors.New("invalid unit in duration string")
 )
 
 // timeUnit represents a single unit of time (hours, minutes, or seconds) with its value and labels.
@@ -121,9 +135,9 @@ func StructMapSubtract(map1, map2 map[string]struct{}) map[string]struct{} {
 
 // FormatDuration converts a time.Duration into a human-readable string representation.
 //
-// It breaks down the duration into hours, minutes, and seconds, formatting each unit with appropriate
-// grammar (singular or plural) and returning a string like "1 hour, 2 minutes, 3 seconds" or "0 seconds"
-// if the duration is zero, ensuring a user-friendly output for logs and notifications.
+// It breaks down the duration into months, weeks, days, hours, minutes, and seconds, formatting each unit
+// with appropriate grammar (singular or plural) and returning a string like
+// "1 week, 2 days, 3 hours" or "0 seconds" if the duration is zero.
 //
 // Parameters:
 //   - duration: The time.Duration to convert into a readable string.
@@ -132,14 +146,35 @@ func StructMapSubtract(map1, map2 map[string]struct{}) map[string]struct{} {
 //   - string: A formatted string representing the duration, always including at least "0 seconds".
 func FormatDuration(duration time.Duration) string {
 	const (
-		minutesPerHour   = 60 // Number of minutes in an hour for duration breakdown
-		secondsPerMinute = 60 // Number of seconds in a minute for duration breakdown
-		timeUnitCount    = 3  // Number of time units (hours, minutes, seconds) for pre-allocation
+		hoursPerDay      = 24
+		daysPerMonth     = 30
+		daysPerWeek      = 7
+		minutesPerHour   = 60
+		secondsPerMinute = 60
+		timeUnitCount    = 6
 	)
 
-	// Define units with calculated values from the duration, preserving order for display.
+	// Handle negative durations by recording the sign and working with absolute value.
+	negative := duration < 0
+	if negative {
+		duration = duration.Abs()
+	}
+
+	totalHours := duration.Hours()
+	totalDays := int64(totalHours) / hoursPerDay
+
+	months := totalDays / daysPerMonth
+	remainingAfterMonths := totalDays % daysPerMonth
+	weeks := remainingAfterMonths / daysPerWeek
+	remainingAfterWeeks := remainingAfterMonths % daysPerWeek
+	hours := int64(totalHours) % hoursPerDay
+
+	// Define units with calculated values, preserving order for display.
 	units := []timeUnit{
-		{int64(duration.Hours()), "hour", "hours"},
+		{months, "month", "months"},
+		{weeks, "week", "weeks"},
+		{remainingAfterWeeks, "day", "days"},
+		{hours, "hour", "hours"},
 		{int64(math.Mod(duration.Minutes(), minutesPerHour)), "minute", "minutes"},
 		{int64(math.Mod(duration.Seconds(), secondsPerMinute)), "second", "seconds"},
 	}
@@ -158,10 +193,15 @@ func FormatDuration(duration time.Duration) string {
 		)
 	}
 
-	// Join non-empty parts, ensuring a readable output with proper separators.
-	joined := strings.Join(FilterEmpty(parts), ", ")
+	// Join non-empty parts with spaces for compact output.
+	joined := strings.Join(FilterEmpty(parts), " ")
 	if joined == "" {
 		return "0 seconds" // Default output when duration is zero or all units are skipped.
+	}
+
+	// Prepend negative sign if the original duration was negative.
+	if negative {
+		return "-" + joined
 	}
 
 	return joined
@@ -222,4 +262,196 @@ func FilterEmpty(parts []string) []string {
 //   - string: Normalized name without leading "/".
 func NormalizeContainerName(name string) string {
 	return strings.TrimPrefix(name, "/")
+}
+
+// ParseDuration parses a duration string with extended unit support.
+//
+// It supports all standard Go duration units (h, m, s, ms, us, ns) plus:
+//   - d: days (24 hours)
+//   - w: weeks (7 days)
+//   - M: months (30 days)
+//
+// Units can be combined (e.g., "1w2d", "2M3w", "1M15d12h").
+// An empty string or "0" returns a zero duration without error.
+//
+// Parameters:
+//   - s: The duration string to parse.
+//
+// Returns:
+//   - time.Duration: The parsed duration.
+//   - error: Non-nil if the string cannot be parsed.
+func ParseDuration(duration string) (time.Duration, error) {
+	if duration == "" || duration == "0" {
+		return 0, nil
+	}
+
+	// Reject negative values — all durations in Watchtower are non-negative.
+	if duration[0] == '-' {
+		return 0, fmt.Errorf("invalid duration %q: %w", duration, errNegativeDuration)
+	}
+
+	expanded, err := expandDurationUnits(duration)
+	if err != nil {
+		return 0, fmt.Errorf("invalid duration %q: %w", duration, err)
+	}
+
+	d, err := time.ParseDuration(expanded)
+	if err != nil {
+		return 0, fmt.Errorf("invalid duration %q: %w", duration, err)
+	}
+
+	return d, nil
+}
+
+// isValidDurationChar reports whether ch is a valid duration unit character
+// that may appear without a preceding numeric value during parsing.
+//
+// Parameters:
+//   - ch: The byte to validate.
+//
+// Returns:
+//   - bool: True if ch is a recognized duration unit (h, m, s, d, w, M, n, u).
+func isValidDurationChar(ch byte) bool {
+	switch ch {
+	case 'h', 'm', 's', 'd', 'w', 'M', 'n', 'u':
+		return true
+	default:
+		return false
+	}
+}
+
+// expandDurationUnits converts extended unit suffixes (d, w, M) into their
+// hour equivalents so that time.ParseDuration can handle them.
+//
+// For example:
+//   - "1d" → "24h"
+//   - "1w" → "168h"
+//   - "1M" → "720h"
+//   - "1M2w3d12h" → "720h336h72h12h"
+//
+// Standard units (h, m, s, ms, us, ns) are passed through unchanged.
+//
+// Parameters:
+//   - s: Duration string potentially containing d, w, or M units.
+//
+// Returns:
+//   - string: Duration string with only standard Go units.
+//   - error: Non-nil if the string is malformed.
+func expandDurationUnits(durationStr string) (string, error) {
+	const (
+		hoursPerDay    = 24
+		daysPerWeek    = 7
+		daysPerMonth   = 30
+		growMultiplier = 4 // Pre-allocate space for expanded output.
+	)
+
+	var result strings.Builder
+
+	result.Grow(len(durationStr) * growMultiplier)
+
+	i := 0
+
+	for i < len(durationStr) {
+		// Find the numeric part (digits and optional decimal point).
+		numStart := i
+
+		for i < len(durationStr) && (durationStr[i] >= '0' && durationStr[i] <= '9' || durationStr[i] == '.') {
+			i++
+		}
+
+		if i == numStart {
+			// No number found — validate that the character is a known
+			// duration unit or separator; reject anything else.
+			char := durationStr[i]
+			if !isValidDurationChar(char) {
+				return "", fmt.Errorf(
+					"%w: %q in %q at position %d",
+					errInvalidChar, char, durationStr, i,
+				)
+			}
+
+			result.WriteByte(char)
+
+			i++
+
+			continue
+		}
+
+		numStr := durationStr[numStart:i]
+
+		if i >= len(durationStr) {
+			// Trailing number with no unit — pass through.
+			result.WriteString(numStr)
+
+			break
+		}
+
+		// Read the unit character.
+		unit := durationStr[i]
+		i++
+
+		switch unit {
+		case 'd':
+			hours, err := multiplyUnit(numStr, hoursPerDay)
+			if err != nil {
+				return "", err
+			}
+
+			result.WriteString(hours)
+		case 'w':
+			hours, err := multiplyUnit(numStr, hoursPerDay*daysPerWeek)
+			if err != nil {
+				return "", err
+			}
+
+			result.WriteString(hours)
+		case 'M':
+			hours, err := multiplyUnit(numStr, hoursPerDay*daysPerMonth)
+			if err != nil {
+				return "", err
+			}
+
+			result.WriteString(hours)
+		default:
+			// Standard Go unit — validate and pass through unchanged.
+			if !isValidDurationChar(unit) {
+				return "", fmt.Errorf(
+					"%w: %q in %q",
+					errInvalidUnit, unit, durationStr,
+				)
+			}
+
+			result.WriteString(numStr)
+			result.WriteByte(unit)
+		}
+	}
+
+	return result.String(), nil
+}
+
+// multiplyUnit multiplies a numeric string by a factor and returns the result
+// as a duration string in hours (e.g., "1" * 24 → "24h").
+//
+// Parameters:
+//   - numStr: Numeric string (integer or decimal).
+//   - factor: Multiplier (e.g., 24 for days-to-hours).
+//
+// Returns:
+//   - string: Resulting duration string (e.g., "24h").
+//   - error: Non-nil if numStr cannot be parsed as a float.
+func multiplyUnit(numStr string, factor float64) (string, error) {
+	num, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return "", fmt.Errorf("invalid number %q: %w", numStr, err)
+	}
+
+	result := num * factor
+
+	// Use 'f' format to avoid scientific notation, then trim trailing zeros.
+	formatted := fmt.Sprintf("%.10f", result)
+	// Remove trailing zeros after decimal point.
+	formatted = strings.TrimRight(formatted, "0")
+	formatted = strings.TrimRight(formatted, ".")
+
+	return formatted + "h", nil
 }

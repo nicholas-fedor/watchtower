@@ -921,6 +921,28 @@ Environment Variable: WATCHTOWER_TIMEOUT
               Default: 30s
 ```
 
+### Cooldown Delay
+
+Sets the minimum time since an image was created before Watchtower will perform the update. Image age is determined from the image creation timestamp in the registry config blob. This can reduce risk from newly pushed images but is not a comprehensive security control.
+
+```text
+            Argument: --cooldown-delay
+Environment Variable: WATCHTOWER_COOLDOWN_DELAY
+                Type: String
+             Default: (empty / disabled)
+```
+
+Accepted units: `h` (hours), `m` (minutes), `s` (seconds), `d` (days), `w` (weeks), `M` (months, i.e. 30 days).
+These can be combined (e.g., `24h`, `3d`, `1w`, `1M`, `1w12h`).
+Leaving the setting empty disables cooldown.
+
+!!! Warning
+    This setting delays *all* updates, including critical security patches.
+    Operators should weigh the trade-off between update immediacy and exposure to unverified images.
+
+!!! Note
+    See [Image Cooldown](../../advanced-features/image-cooldown/index.md) for detailed information on how cooldown works, boundary behavior, per-container labels, limitations, and interaction with other features like `--no-pull`.
+
 ### Lifecycle UID
 
 Sets the default user ID to run lifecycle hooks as when no container-specific UID is specified.

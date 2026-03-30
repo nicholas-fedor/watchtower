@@ -2,6 +2,7 @@ package container
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1512,6 +1513,171 @@ func TestGetEffectiveScope_NilContainer(t *testing.T) {
 	_, err := GetEffectiveScope(nil, "")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errCurrentContainerNotCached)
+}
+
+func TestContainer_CooldownDelay(t *testing.T) {
+	type args struct {
+		params types.UpdateParams
+	}
+
+	tests := []struct {
+		name string
+		c    *Container
+		args args
+		want time.Duration
+	}{
+		{
+			name: "NoLabelUsesGlobal",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			args: args{
+				params: types.UpdateParams{
+					CooldownDelay: 10 * time.Minute,
+				},
+			},
+			want: 10 * time.Minute,
+		},
+		{
+			name: "LabelOverridesGlobal",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							cooldownDelayLabel: "24h",
+						},
+					},
+				},
+			},
+			args: args{
+				params: types.UpdateParams{
+					CooldownDelay: 10 * time.Minute,
+				},
+			},
+			want: 24 * time.Hour,
+		},
+		{
+			name: "LabelZeroDisables",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							cooldownDelayLabel: "0",
+						},
+					},
+				},
+			},
+			args: args{
+				params: types.UpdateParams{
+					CooldownDelay: 10 * time.Minute,
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "ExtendedUnitsDays",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							cooldownDelayLabel: "3d",
+						},
+					},
+				},
+			},
+			args: args{
+				params: types.UpdateParams{
+					CooldownDelay: 10 * time.Minute,
+				},
+			},
+			want: 72 * time.Hour,
+		},
+		{
+			name: "InvalidLabelFallsBackToGlobal",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							cooldownDelayLabel: "invalid",
+						},
+					},
+				},
+			},
+			args: args{
+				params: types.UpdateParams{
+					CooldownDelay: 10 * time.Minute,
+				},
+			},
+			want: 10 * time.Minute,
+		},
+		{
+			name: "EmptyLabelFallsBackToGlobal",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							cooldownDelayLabel: "",
+						},
+					},
+				},
+			},
+			args: args{
+				params: types.UpdateParams{
+					CooldownDelay: 10 * time.Minute,
+				},
+			},
+			want: 10 * time.Minute,
+		},
+		{
+			name: "NegativeLabelFallsBackToGlobal",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+						Name: "/test-container",
+					},
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							cooldownDelayLabel: "-1h",
+						},
+					},
+				},
+			},
+			args: args{
+				params: types.UpdateParams{
+					CooldownDelay: 10 * time.Minute,
+				},
+			},
+			want: 10 * time.Minute,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.c.CooldownDelay(tt.args.params)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {

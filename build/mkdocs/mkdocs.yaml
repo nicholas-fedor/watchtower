@@ -184,6 +184,7 @@ nav:
       - Template Preview: notifications/template-preview/index.md
   - Advanced Features:
       - HTTP API: advanced-features/http-api/index.md
+      - Image Cooldown: advanced-features/image-cooldown/index.md
       - Lifecycle Hooks: advanced-features/lifecycle-hooks/index.md
       - Linked Containers: advanced-features/linked-containers/index.md
       - Metrics: advanced-features/metrics/index.md
