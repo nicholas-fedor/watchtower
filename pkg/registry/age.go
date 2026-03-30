@@ -129,8 +129,8 @@ func FetchImageCreationTime(
 	// Use the cached HTTP client for registry requests.
 	client := auth.NewAuthClient()
 
-	// Obtain an authentication token for the registry.
-	token, _, redirected, redirectHost, err := auth.GetToken(
+	// Obtain an authentication token and challenge host for the registry.
+	token, challengeHost, redirected, redirectHost, err := auth.GetToken(
 		ctx,
 		container,
 		registryAuth,
@@ -145,7 +145,7 @@ func FetchImageCreationTime(
 			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
-	// Build the manifest URL.
+	// Build the initial manifest URL to get the original host.
 	manifestURL, originalHost, parsedURL, err := buildManifestURLForAge(
 		container,
 		"",
@@ -158,6 +158,7 @@ func FetchImageCreationTime(
 		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
+	// Determine the primary manifest host based on auth redirect.
 	// If redirected during auth, use the redirect host for manifest requests.
 	if redirectHost != "" && redirectHost != originalHost && redirected {
 		manifestURL, _, parsedURL, err = buildManifestURLForAge(
@@ -167,14 +168,16 @@ func FetchImageCreationTime(
 		if err != nil {
 			logrus.WithError(err).
 				WithFields(fields).
-				Debug("Failed to build manifest URL with challenge host")
+				Debug("Failed to build manifest URL with redirect host")
 
 			return time.Time{},
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 		}
 	}
 
-	// Fetch the manifest.
+	// Try manifest fetch with host fallback: primary (redirect/original),
+	// then challenge host, then original host.
+	// This mirrors the retry logic in digest.go's HandleManifestResponse.
 	configDigest, err := fetchManifestForAge(
 		ctx,
 		client,
@@ -183,6 +186,7 @@ func FetchImageCreationTime(
 		parsedURL,
 		targetOS,
 		targetArch,
+		challengeHost,
 		fields,
 	)
 	if err != nil {
@@ -298,6 +302,9 @@ func buildManifestURLForAge(
 // fetchManifestForAge fetches the image manifest and extracts the config digest.
 // It handles multi-platform indexes by selecting the platform-specific manifest.
 //
+// On 401/404 responses, it retries across alternate hosts (challenge host, original host)
+// mirroring the retry logic in digest.go's HandleManifestResponse.
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - client: HTTP client for registry requests.
@@ -306,6 +313,8 @@ func buildManifestURLForAge(
 //   - parsedURL: Parsed manifest URL.
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
+//   - challengeHost: Challenge host from auth (empty if not applicable).
+//   - redirected: Whether auth was redirected.
 //   - fields: Logging fields.
 //
 // Returns:
@@ -316,131 +325,207 @@ func fetchManifestForAge(
 	client auth.Client,
 	manifestURL, token string,
 	parsedURL *url.URL,
-	targetOS, targetArch string,
+	targetOS, targetArch, challengeHost string,
 	fields logrus.Fields,
 ) (string, error) {
-	// Create the manifest request with broad Accept headers.
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		manifestURL,
-		nil,
-	)
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to create manifest request")
+	// Determine the original host for fallback.
+	originalHost := parsedURL.Host
 
-		return "",
-			fmt.Errorf(
-				"%w: %w",
-				errFetchManifestFailed,
-				err,
-			)
+	// If the current URL host differs from original (e.g., redirect), original is still the base.
+	if fields["original_host"] == nil {
+		fields["original_host"] = originalHost
 	}
 
-	if token != "" {
-		req.Header.Set("Authorization", token)
+	// Build list of hosts to try: primary (current), then challenge, then original.
+	// This mirrors the retry chain in digest.go's HandleManifestResponse.
+	type hostCandidate struct {
+		host string
+		name string
 	}
 
-	// Accept all supported manifest types.
-	req.Header.Set("Accept", strings.Join([]string{
-		"application/vnd.oci.image.index.v1+json",
-		"application/vnd.docker.distribution.manifest.list.v2+json",
-		"application/vnd.oci.image.manifest.v1+json",
-		"application/vnd.docker.distribution.manifest.v2+json",
-	}, ", "))
-	req.Header.Set("User-Agent", meta.UserAgent)
+	currentHost := parsedURL.Host
 
-	resp, err := client.Do(req)
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to execute manifest request")
+	hosts := []hostCandidate{{host: currentHost, name: "primary"}}
 
-		return "",
-			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
-	}
-	defer resp.Body.Close()
-
-	// Handle non-success responses.
-	if resp.StatusCode != http.StatusOK {
-		logrus.WithFields(fields).
-			WithField("status", resp.StatusCode).
-			Debug("Manifest request returned non-OK status")
-
-		return "",
-			fmt.Errorf(
-				"%w: status %d",
-				errFetchManifestFailed,
-				resp.StatusCode,
-			)
+	// Add challenge host if different from current and available.
+	if challengeHost != "" && challengeHost != currentHost {
+		hosts = append(hosts, hostCandidate{host: challengeHost, name: "challenge"})
 	}
 
-	// Read the manifest body with a size limit to prevent unbounded memory allocation.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize+1))
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to read manifest response")
-
-		return "",
-			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	// Add original host if different from current and challenge.
+	if originalHost != currentHost && originalHost != challengeHost {
+		hosts = append(hosts, hostCandidate{host: originalHost, name: "original"})
 	}
 
-	if len(body) > maxManifestSize {
-		logrus.WithFields(fields).
-			WithField("size", len(body)).
-			WithField("limit", maxManifestSize).
-			Debug("Manifest response exceeds size limit")
+	var lastErr error
 
-		return "",
-			fmt.Errorf(
-				"%w: %d bytes exceeds limit of %d bytes",
-				errManifestTooLarge,
-				len(body),
-				maxManifestSize,
-			)
-	}
+	for i, candidate := range hosts {
+		// Build URL for this host attempt.
+		attemptURL := *parsedURL
+		attemptURL.Host = candidate.host
+		attemptManifestURL := attemptURL.String()
 
-	// Try to parse as image index (multi-platform).
-	var index imageIndex
+		// Skip re-fetching if this is the same URL as the initial manifestURL.
+		if i > 0 || attemptManifestURL != manifestURL {
+			logrus.WithFields(fields).
+				WithField("attempt_host", candidate.host).
+				WithField("attempt_name", candidate.name).
+				Debug("Retrying manifest fetch on alternate host")
+		}
 
-	idxErr := json.Unmarshal(body, &index)
-	if idxErr == nil && isIndexMediaType(index.MediaType) {
-		return selectPlatformManifest(
+		// Create the manifest request with broad Accept headers.
+		req, err := http.NewRequestWithContext(
 			ctx,
-			client,
-			index,
-			parsedURL,
-			token,
-			targetOS,
-			targetArch,
-			fields,
+			http.MethodGet,
+			attemptManifestURL,
+			nil,
 		)
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to create manifest request")
+
+			return "",
+				fmt.Errorf(
+					"%w: %w",
+					errFetchManifestFailed,
+					err,
+				)
+		}
+
+		if token != "" {
+			req.Header.Set("Authorization", token)
+		}
+
+		// Accept all supported manifest types.
+		req.Header.Set("Accept", strings.Join([]string{
+			"application/vnd.oci.image.index.v1+json",
+			"application/vnd.docker.distribution.manifest.list.v2+json",
+			"application/vnd.oci.image.manifest.v1+json",
+			"application/vnd.docker.distribution.manifest.v2+json",
+		}, ", "))
+		req.Header.Set("User-Agent", meta.UserAgent)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to execute manifest request")
+
+			return "",
+				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+		}
+
+		// Handle non-success responses with retry logic.
+		if resp.StatusCode != http.StatusOK {
+			status := resp.StatusCode
+			resp.Body.Close()
+
+			// Retry on 401/404 if there are more hosts to try.
+			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
+				i < len(hosts)-1 {
+				logrus.WithFields(fields).
+					WithField("status", status).
+					WithField("host", candidate.host).
+					Debug("Manifest request failed, trying next host")
+
+				lastErr = fmt.Errorf(
+					"%w: status %d on %s",
+					errFetchManifestFailed,
+					status,
+					candidate.host,
+				)
+
+				continue
+			}
+
+			logrus.WithFields(fields).
+				WithField("status", status).
+				Debug("Manifest request returned non-OK status")
+
+			return "",
+				fmt.Errorf(
+					"%w: status %d",
+					errFetchManifestFailed,
+					status,
+				)
+		}
+
+		// Read the manifest body with a size limit to prevent unbounded memory allocation.
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize+1))
+		resp.Body.Close()
+
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to read manifest response")
+
+			return "",
+				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+		}
+
+		if len(body) > maxManifestSize {
+			logrus.WithFields(fields).
+				WithField("size", len(body)).
+				WithField("limit", maxManifestSize).
+				Debug("Manifest response exceeds size limit")
+
+			return "",
+				fmt.Errorf(
+					"%w: %d bytes exceeds limit of %d bytes",
+					errManifestTooLarge,
+					len(body),
+					maxManifestSize,
+				)
+		}
+
+		// Try to parse as image index (multi-platform).
+		var index imageIndex
+
+		idxErr := json.Unmarshal(body, &index)
+		if idxErr == nil && isIndexMediaType(index.MediaType) {
+			return selectPlatformManifest(
+				ctx,
+				client,
+				index,
+				parsedURL,
+				token,
+				targetOS,
+				targetArch,
+				challengeHost,
+				fields,
+			)
+		}
+
+		// Parse as single-platform manifest.
+		var manifest imageManifest
+
+		err = json.Unmarshal(body, &manifest)
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to parse manifest JSON")
+
+			return "",
+				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+		}
+
+		if manifest.Config.Digest == "" {
+			logrus.WithFields(fields).
+				Debug("Manifest does not contain config digest")
+
+			return "", errNoConfigDigest
+		}
+
+		return manifest.Config.Digest, nil
 	}
 
-	// Parse as single-platform manifest.
-	var manifest imageManifest
-
-	err = json.Unmarshal(body, &manifest)
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to parse manifest JSON")
-
-		return "",
-			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	// All hosts exhausted.
+	if lastErr != nil {
+		return "", lastErr
 	}
 
-	if manifest.Config.Digest == "" {
-		logrus.WithFields(fields).
-			Debug("Manifest does not contain config digest")
-
-		return "", errNoConfigDigest
-	}
-
-	return manifest.Config.Digest, nil
+	return "", fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
 }
 
 // selectPlatformManifest selects the platform-specific manifest from an image index
@@ -448,6 +533,9 @@ func fetchManifestForAge(
 //
 // If targetOS or targetArch are empty, runtime.GOOS and runtime.GOARCH are used as defaults,
 // allowing cross-platform monitoring via environment variables or configuration overrides.
+//
+// On 401/404 responses, it retries on the challenge host mirroring the retry logic
+// in digest.go's HandleManifestResponse.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -457,6 +545,7 @@ func fetchManifestForAge(
 //   - token: Authentication token.
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
+//   - challengeHost: Challenge host from auth (empty if not applicable).
 //   - fields: Logging fields.
 //
 // Returns:
@@ -468,7 +557,7 @@ func selectPlatformManifest(
 	index imageIndex,
 	parsedURL *url.URL,
 	token string,
-	targetOS, targetArch string,
+	targetOS, targetArch, challengeHost string,
 	fields logrus.Fields,
 ) (string, error) {
 	// Use runtime defaults if no override is specified.
@@ -542,114 +631,254 @@ func selectPlatformManifest(
 		WithField("digest", selectedDigest).
 		Debug("Selected platform manifest from index")
 
-	// Build URL for platform-specific manifest.
-	platformURL := *parsedURL
-	idx := strings.LastIndex(platformURL.Path, "/manifests/")
+	// Build URL path for platform-specific manifest.
+	idx := strings.LastIndex(parsedURL.Path, "/manifests/")
 
 	if idx == -1 {
 		logrus.WithFields(fields).
-			WithField("path", platformURL.Path).
+			WithField("path", parsedURL.Path).
 			Debug("Could not find /manifests/ in URL path")
 
 		return "",
 			fmt.Errorf(
 				"%w: malformed manifest URL path %q",
 				errFetchManifestFailed,
-				platformURL.Path,
+				parsedURL.Path,
 			)
 	}
 
-	platformURL.Path = platformURL.Path[:idx+len("/manifests/")] + selectedDigest
+	platformPathPrefix := parsedURL.Path[:idx+len("/manifests/")]
 
-	// Fetch the platform-specific manifest.
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		platformURL.String(),
-		nil,
-	)
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to create platform manifest request")
-
-		return "",
-			fmt.Errorf(
-				"%w: %w",
-				errFetchManifestFailed,
-				err,
-			)
+	// Build list of hosts to try: primary (current), then challenge, then original.
+	// This mirrors the retry chain in digest.go's HandleManifestResponse.
+	type hostCandidate struct {
+		host string
+		name string
 	}
 
-	if token != "" {
-		req.Header.Set("Authorization", token)
+	originalHost := parsedURL.Host
+
+	hosts := []hostCandidate{{host: parsedURL.Host, name: "primary"}}
+
+	if challengeHost != "" && challengeHost != parsedURL.Host {
+		hosts = append(hosts, hostCandidate{host: challengeHost, name: "challenge"})
 	}
 
-	req.Header.Set(
-		"Accept",
-		strings.Join(
-			[]string{
-				"application/vnd.oci.image.manifest.v1+json",
-				"application/vnd.docker.distribution.manifest.v2+json",
-			},
-			", "),
-	)
-	req.Header.Set("User-Agent", meta.UserAgent)
+	var lastErr error
 
-	resp, err := client.Do(req)
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to execute platform manifest request")
+	for i, candidate := range hosts {
+		// Build platform URL for this host attempt.
+		attemptURL := *parsedURL
+		attemptURL.Host = candidate.host
+		attemptURL.Path = platformPathPrefix + selectedDigest
 
-		return "",
-			fmt.Errorf(
-				"%w: %w",
-				errFetchManifestFailed,
-				err,
-			)
+		if i > 0 {
+			logrus.WithFields(fields).
+				WithField("attempt_host", candidate.host).
+				WithField("attempt_name", candidate.name).
+				Debug("Retrying platform manifest fetch on alternate host")
+		}
+
+		// Fetch the platform-specific manifest.
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodGet,
+			attemptURL.String(),
+			nil,
+		)
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to create platform manifest request")
+
+			return "",
+				fmt.Errorf(
+					"%w: %w",
+					errFetchManifestFailed,
+					err,
+				)
+		}
+
+		if token != "" {
+			req.Header.Set("Authorization", token)
+		}
+
+		req.Header.Set(
+			"Accept",
+			strings.Join(
+				[]string{
+					"application/vnd.oci.image.manifest.v1+json",
+					"application/vnd.docker.distribution.manifest.v2+json",
+				},
+				", "),
+		)
+		req.Header.Set("User-Agent", meta.UserAgent)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to execute platform manifest request")
+
+			return "",
+				fmt.Errorf(
+					"%w: %w",
+					errFetchManifestFailed,
+					err,
+				)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			status := resp.StatusCode
+			resp.Body.Close()
+
+			// Retry on 401/404 if there are more hosts to try.
+			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
+				i < len(hosts)-1 {
+				logrus.WithFields(fields).
+					WithField("status", status).
+					WithField("host", candidate.host).
+					Debug("Platform manifest request failed, trying next host")
+
+				lastErr = fmt.Errorf(
+					"%w: status %d on %s",
+					errFetchManifestFailed,
+					status,
+					candidate.host,
+				)
+
+				continue
+			}
+
+			// On non-redirected registries, try challenge host for 401/404 on original.
+			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
+				challengeHost != "" && candidate.host == originalHost {
+				logrus.WithFields(fields).
+					WithField("status", status).
+					Debug("Platform manifest failed on original host, trying challenge host")
+
+				retryURL := *parsedURL
+				retryURL.Host = challengeHost
+				retryURL.Path = platformPathPrefix + selectedDigest
+
+				retryReq, retryErr := http.NewRequestWithContext(
+					ctx,
+					http.MethodGet,
+					retryURL.String(),
+					nil,
+				)
+				if retryErr != nil {
+					return "",
+						fmt.Errorf("%w: %w", errFetchManifestFailed, retryErr)
+				}
+
+				if token != "" {
+					retryReq.Header.Set("Authorization", token)
+				}
+
+				retryReq.Header.Set(
+					"Accept",
+					strings.Join(
+						[]string{
+							"application/vnd.oci.image.manifest.v1+json",
+							"application/vnd.docker.distribution.manifest.v2+json",
+						},
+						", "),
+				)
+				retryReq.Header.Set("User-Agent", meta.UserAgent)
+
+				retryResp, retryErr := client.Do(retryReq)
+				if retryErr != nil {
+					return "",
+						fmt.Errorf("%w: %w", errFetchManifestFailed, retryErr)
+				}
+
+				if retryResp.StatusCode != http.StatusOK {
+					retryStatus := retryResp.StatusCode
+					retryResp.Body.Close()
+
+					logrus.WithFields(fields).
+						WithField("status", retryStatus).
+						Debug("Platform manifest retry also failed")
+
+					return "",
+						fmt.Errorf(
+							"%w: status %d",
+							errFetchManifestFailed,
+							retryStatus,
+						)
+				}
+
+				var retryManifest imageManifest
+
+				err = json.NewDecoder(retryResp.Body).Decode(&retryManifest)
+				retryResp.Body.Close()
+
+				if err != nil {
+					logrus.WithError(err).
+						WithFields(fields).
+						Debug("Failed to parse platform manifest JSON")
+
+					return "",
+						fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+				}
+
+				if retryManifest.Config.Digest == "" {
+					logrus.WithFields(fields).
+						Debug("Platform manifest does not contain config digest")
+
+					return "", errNoConfigDigest
+				}
+
+				return retryManifest.Config.Digest, nil
+			}
+
+			logrus.WithFields(fields).
+				WithField("status", status).
+				Debug("Platform manifest request returned non-OK status")
+
+			return "",
+				fmt.Errorf(
+					"%w: status %d",
+					errFetchManifestFailed,
+					status,
+				)
+		}
+
+		var manifest imageManifest
+
+		err = json.NewDecoder(resp.Body).Decode(&manifest)
+		resp.Body.Close()
+
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to parse platform manifest JSON")
+
+			return "",
+				fmt.Errorf(
+					"%w: %w",
+					errFetchManifestFailed,
+					err,
+				)
+		}
+
+		if manifest.Config.Digest == "" {
+			logrus.WithFields(fields).
+				Debug("Platform manifest does not contain config digest")
+
+			return "", errNoConfigDigest
+		}
+
+		return manifest.Config.Digest, nil
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		logrus.WithFields(fields).
-			WithField(
-				"status",
-				resp.StatusCode,
-			).Debug("Platform manifest request returned non-OK status")
-
-		return "",
-			fmt.Errorf(
-				"%w: status %d",
-				errFetchManifestFailed,
-				resp.StatusCode,
-			)
+	// All hosts exhausted.
+	if lastErr != nil {
+		return "", lastErr
 	}
 
-	var manifest imageManifest
-
-	err = json.NewDecoder(resp.Body).Decode(&manifest)
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to parse platform manifest JSON")
-
-		return "",
-			fmt.Errorf(
-				"%w: %w",
-				errFetchManifestFailed,
-				err,
-			)
-	}
-
-	if manifest.Config.Digest == "" {
-		logrus.WithFields(fields).
-			Debug("Platform manifest does not contain config digest")
-
-		return "", errNoConfigDigest
-	}
-
-	return manifest.Config.Digest, nil
+	return "", fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
 }
 
 // fetchConfigBlob fetches the image config blob from the registry.

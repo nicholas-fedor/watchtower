@@ -138,6 +138,7 @@ func TestFetchManifestForAge_SinglePlatform(t *testing.T) {
 		"Bearer test-token",
 		parsedURL,
 		"", "",
+		"",
 		logrus.Fields{"test": "single_platform"},
 	)
 	require.NoError(t, err)
@@ -178,6 +179,7 @@ func TestFetchManifestForAge_MultiPlatformIndex(t *testing.T) {
 		"Bearer test-token",
 		parsedURL,
 		"", "",
+		"",
 		logrus.Fields{"test": "multi_platform"},
 	)
 	require.NoError(t, err)
@@ -207,6 +209,7 @@ func TestFetchManifestForAge_AuthFailure(t *testing.T) {
 		"Bearer test-token",
 		parsedURL,
 		"", "",
+		"",
 		logrus.Fields{"test": "auth_failure"},
 	)
 	require.Error(t, err)
@@ -236,6 +239,7 @@ func TestFetchManifestForAge_NotFound(t *testing.T) {
 		"Bearer test-token",
 		parsedURL,
 		"", "",
+		"",
 		logrus.Fields{"test": "not_found"},
 	)
 	require.Error(t, err)
@@ -269,6 +273,7 @@ func TestFetchManifestForAge_MissingConfigDigest(t *testing.T) {
 		"Bearer test-token",
 		parsedURL,
 		"", "",
+		"",
 		logrus.Fields{"test": "missing_digest"},
 	)
 	require.Error(t, err)
@@ -612,6 +617,7 @@ func TestSelectPlatformManifest_PlatformMatch(t *testing.T) {
 		parsedURL,
 		"Bearer test-token",
 		"", "",
+		"",
 		logrus.Fields{"test": "platform_match"},
 	)
 	require.NoError(t, err)
@@ -647,6 +653,7 @@ func TestSelectPlatformManifest_NoMatch(t *testing.T) {
 		parsedURL,
 		"",
 		"", "",
+		"",
 		logrus.Fields{"test": "no_match"},
 	)
 	require.Error(t, err)
@@ -709,6 +716,7 @@ func TestSelectPlatformManifest_SkipsAttestationManifests(t *testing.T) {
 		parsedURL,
 		"Bearer test-token",
 		"", "",
+		"",
 		logrus.Fields{"test": "skips_attestation"},
 	)
 	require.NoError(t, err)
@@ -760,6 +768,7 @@ func TestSelectPlatformManifest_MissingConfigDigest(t *testing.T) {
 		parsedURL,
 		"Bearer test-token",
 		"", "",
+		"",
 		logrus.Fields{"test": "missing_digest"},
 	)
 	require.Error(t, err)
@@ -796,7 +805,7 @@ func TestPipeline_SinglePlatformManifest_ReturnsCreationTime(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_single"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", fields)
+	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 	assert.Equal(t, configDigest, digest)
 
@@ -850,7 +859,7 @@ func TestPipeline_MultiPlatformIndex_ReturnsCreationTime(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_multi"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", fields)
+	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 	assert.Equal(t, configDigest, digest)
 
@@ -896,7 +905,7 @@ func TestPipeline_MissingCreationTimestamp(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_missing_created"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", fields)
+	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -940,7 +949,7 @@ func TestPipeline_ConfigBlobNotFound(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_config_fail"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", fields)
+	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	_, err = fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -976,7 +985,7 @@ func TestPipeline_InvalidConfigJSON(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_invalid_json"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", fields)
+	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -1025,7 +1034,7 @@ func TestPipeline_RedirectOnBlob(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_redirect"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", fields)
+	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -1067,6 +1076,7 @@ func TestPipeline_ManifestNotFound(t *testing.T) {
 		"",
 		parsedURL,
 		"", "",
+		"",
 		logrus.Fields{"test": "pipeline_not_found"},
 	)
 	require.Error(t, err)
@@ -1098,6 +1108,7 @@ func TestPipeline_AuthFailure(t *testing.T) {
 		"Bearer invalid",
 		parsedURL,
 		"", "",
+		"",
 		logrus.Fields{"test": "pipeline_auth_fail"},
 	)
 	require.Error(t, err)
