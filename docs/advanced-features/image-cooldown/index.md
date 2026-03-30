@@ -227,6 +227,74 @@ The cooldown feature relies on the `created` field from the image config blob. S
 - **Clock skew**: If the Watchtower host and the registry have significantly different system clocks, age calculations may be inaccurate. NTP synchronization on all involved hosts is recommended to minimize this risk. When the image creation time is in the future (negative age), Watchtower logs a warning and proceeds with the update to avoid indefinite deferral.
 - **Missing `created` field**: Some registries or image build tools may not populate the `created` field. When the field is absent, Watchtower cannot determine the image age and defers the update as a safety measure (see the warning above).
 
+### Registry Usage Impact
+
+The cooldown check issues `GET` requests to the registry for the image manifest and config blob.
+These requests may count against container registry pull rate limits, which is most relevant for Docker Hub users.
+
+!!! Note "The cooldown check runs only when a newer image is detected (i.e., the container is stale). It does not run on every Watchtower cycle."
+
+#### Docker Hub
+
+Official Documentation: <https://docs.docker.com/docker-hub/usage/pulls/>
+
+Docker Hub enforces pull rate limits per six-hour window:
+
+| Account Type                   | Pull Limit                                   |
+|--------------------------------|----------------------------------------------|
+| Unauthenticated                | 100 pulls per IP (IPv4) or /64 subnet (IPv6) |
+| Personal (free, authenticated) | 200 pulls                                    |
+| Pro / Team / Business          | Unlimited                                    |
+
+Not all registry requests count as pulls.
+Verified behavior (tested against `nickfedor/watchtower` on Docker Hub):
+
+| Request Type                       | Counts as Pull? |
+|------------------------------------|-----------------|
+| `HEAD` manifest                    | No              |
+| `GET` manifest                     | Yes             |
+| `GET` config blob (307 → CDN)      | No              |
+| Auth token request                 | No              |
+
+The existing digest comparison uses a `HEAD` request, which does not consume a pull.
+The cooldown age check uses `GET` requests for manifests, which do consume pulls, but the config blob fetch is served via a CDN redirect (`307`) and does **not** count against the limit.
+
+##### Multi-Platform Images
+
+The cooldown check consumes **two pulls** per stale container:
+
+- One `GET` for the image index manifest
+- One `GET` for the platform-specific manifest
+
+The subsequent config blob fetch does not count.
+
+##### Single-Platform Images
+
+The cooldown check consumes **one pull** per stale container:
+
+- One `GET` for the image manifest
+
+The subsequent config blob fetch does not count.
+
+##### Practical Impact
+
+Users running Watchtower against Docker Hub with many monitored containers or short polling intervals should be aware that each stale image detected during a cooldown window consumes one or two pulls.
+Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls, and paid tiers have unlimited pulls.
+
+#### GitHub Container Registry (ghcr.io)
+
+GHCR.io does not publish explicit pull rate limits and currently provides free storage and bandwidth for container images.
+Observed limits are in the range of tens of thousands of requests per minute, which is well beyond what Watchtower's cooldown feature would generate under any realistic deployment.
+
+#### Summary
+
+| Registry                        | Pull Limit                  | Cooldown Impact                                                     |
+|---------------------------------|-----------------------------|---------------------------------------------------------------------|
+| Docker Hub (unauthenticated)    | 100 / 6 hours               | Moderate — may exceed limit with many containers on short intervals |
+| Docker Hub (authenticated free) | 200 / 6 hours               | Low — sufficient for most deployments                               |
+| Docker Hub (paid)               | Unlimited                   | None                                                                |
+| GHCR.io                         | ~44,000 / minute (observed) | None                                                                |
+
 ### Monitor-Only Containers
 
 Cooldown is not evaluated for containers running in monitor-only mode (`--monitor-only` or the `com.centurylinklabs.watchtower.monitor-only` label).
