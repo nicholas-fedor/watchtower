@@ -275,10 +275,24 @@ func Update(
 			// Skip cooldown check for no-pull and monitor-only containers since they won't be updated.
 			cooldownDelay := sourceContainer.CooldownDelay(config)
 
-			if shouldUpdate && cooldownDelay > 0 && !sourceContainer.IsNoPull(config) && !sourceContainer.IsMonitorOnly(config) {
+			if shouldUpdate &&
+				cooldownDelay > 0 &&
+				!sourceContainer.IsNoPull(config) &&
+				!sourceContainer.IsMonitorOnly(config) {
+				pullOpts, pullErr := registry.GetPullOptions(
+					sourceContainer.ImageName(),
+				)
+				if pullErr != nil {
+					clog.WithError(pullErr).
+						Debug("Failed to get pull options for cooldown check")
+
+					continue
+				}
+
 				imageAge, ageErr := fetchImageAge(
 					ctx,
 					sourceContainer,
+					pullOpts.RegistryAuth,
 				)
 				if ageErr != nil {
 					// Conservative posture: if we can't determine the age, defer the update.
@@ -1817,28 +1831,28 @@ func restartStaleContainer(
 }
 
 // fetchImageAge retrieves the age of the newest image from the registry by fetching
-// the image's creation time from the config blob and calculating the elapsed duration.
+// its creation timestamp and calculating the elapsed time since then.
+//
+// It uses the provided registryAuth credentials to fetch the image creation time
+// from the registry and returns the duration since creation.
 //
 // Parameters:
-//   - ctx: Context for cancellation and timeout control.
+//   - ctx: Context for cancellation and timeouts.
 //   - container: Container whose image age to fetch.
+//   - registryAuth: Base64-encoded registry credentials for authentication.
 //
 // Returns:
-//   - time.Duration: The age of the image (time since creation).
-//   - error: Non-nil if fetching fails.
+//   - time.Duration: Elapsed time since the image was created.
+//   - error: Non-nil if image creation time retrieval fails.
 func fetchImageAge(
 	ctx context.Context,
 	container types.Container,
+	registryAuth string,
 ) (time.Duration, error) {
-	opts, err := registry.GetPullOptions(container.ImageName())
-	if err != nil {
-		return 0, fmt.Errorf("failed to get pull options: %w", err)
-	}
-
 	creationTime, err := registry.FetchImageCreationTime(
 		ctx,
 		container,
-		opts.RegistryAuth,
+		registryAuth,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch image creation time: %w", err)
