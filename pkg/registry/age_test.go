@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -1113,4 +1114,97 @@ func TestPipeline_AuthFailure(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errFetchManifestFailed)
+}
+
+func TestFetchManifestForAge_OversizedManifest(t *testing.T) {
+	t.Parallel()
+
+	server := ghttp.NewServer()
+	t.Cleanup(server.Close)
+
+	// Build a JSON manifest larger than maxManifestSize (1 MiB) by padding the digest field.
+	oversizedDigest := "sha256:" + strings.Repeat("a", maxManifestSize+1024)
+	oversizedManifest := fmt.Sprintf(`{
+		"schemaVersion": 2,
+		"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+		"config": {
+			"mediaType": "application/vnd.docker.container.image.v1+json",
+			"digest": "%s",
+			"size": %d
+		}
+	}`, oversizedDigest, len(oversizedDigest))
+
+	server.AppendHandlers(
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest("GET", "/v2/test/manifests/latest"),
+			ghttp.RespondWith(http.StatusOK, oversizedManifest,
+				http.Header{"Content-Type": {"application/vnd.docker.distribution.manifest.v2+json"}},
+			),
+		),
+	)
+
+	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
+	require.NoError(t, err)
+
+	_, err = fetchManifestForAge(
+		context.Background(),
+		server.HTTPTestServer.Client(),
+		parsedURL.String(),
+		"Bearer test-token",
+		parsedURL,
+		"", "",
+		"",
+		logrus.Fields{"test": "oversized_manifest"},
+	)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errManifestTooLarge)
+}
+
+func TestSelectPlatformManifest_AmbiguousPlatformMatch(t *testing.T) {
+	t.Parallel()
+
+	parsedURL, err := url.Parse("https://registry.example.com/v2/repo/manifests/latest")
+	require.NoError(t, err)
+
+	// Two entries matching runtime.GOOS/runtime.GOARCH with different variants
+	// forces selectPlatformCandidate to return errAmbiguousPlatformMatch.
+	idx := imageIndex{
+		MediaType:     "application/vnd.oci.image.index.v1+json",
+		SchemaVersion: 2,
+		Manifests: []indexEntry{
+			{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    "sha256:digest1variantv7",
+				Size:      500,
+				Platform: platform{
+					Architecture: runtime.GOARCH,
+					OS:           runtime.GOOS,
+					Variant:      "v7",
+				},
+			},
+			{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    "sha256:digest2variantv8",
+				Size:      500,
+				Platform: platform{
+					Architecture: runtime.GOARCH,
+					OS:           runtime.GOOS,
+					Variant:      "v8",
+				},
+			},
+		},
+	}
+
+	_, err = selectPlatformManifest(
+		context.Background(),
+		nil,
+		idx,
+		parsedURL,
+		"",
+		"", "",
+		"",
+		logrus.Fields{"test": "ambiguous_platform_match"},
+	)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errAmbiguousPlatformMatch)
 }

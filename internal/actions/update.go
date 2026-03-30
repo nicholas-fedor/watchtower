@@ -283,8 +283,33 @@ func Update(
 					sourceContainer.ImageName(),
 				)
 				if pullErr != nil {
+					// Conservative posture: if pull options are unavailable, defer the update
+					// and record the container as skipped so it appears in notifications/reports.
+					cooldownStr := util.FormatDuration(cooldownDelay)
+
 					clog.WithError(pullErr).
-						Debug("Failed to get pull options for cooldown check")
+						Info("Failed to get pull options for cooldown check - deferring update")
+
+					filteredContainers[i].SetStale(false)
+					progress.AddSkipped(
+						sourceContainer,
+						fmt.Errorf(
+							"%w: could not get pull options for %s (cooldown: %s) - deferring update: %w",
+							errGetPullOptionsFailed,
+							sourceContainer.ImageName(),
+							cooldownStr,
+							pullErr,
+						),
+						config,
+					)
+					// Set cooldown info so split notifications can show the deferral reason.
+					progress.SetCooldownInfo(
+						sourceContainer.ID(),
+						"",
+						cooldownStr,
+						"",
+						false,
+					)
 
 					continue
 				}
@@ -327,11 +352,17 @@ func Update(
 				// and the registry (image creation time is in the future). Log a warning
 				// and proceed with the update to avoid indefinite deferral.
 				if imageAge < 0 {
+					ageStr := util.FormatDuration(imageAge)
+					cooldownStr := util.FormatDuration(cooldownDelay)
+
 					clog.WithFields(
 						logrus.Fields{
-							"image_age": imageAge,
-							"cooldown":  util.FormatDuration(cooldownDelay),
+							"image_age": ageStr,
+							"cooldown":  cooldownStr,
 						}).Warn("Image creation time is in the future (possible clock skew) - proceeding with update")
+
+					// Fall through to the proceeding block below, which will
+					// set cooldownAge / cooldownDelayStr and log the update.
 				} else if imageAge <= cooldownDelay {
 					// Defer when image age is less than or equal to cooldown.
 					// Updates only proceed when imageAge > cooldownDelay.

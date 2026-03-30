@@ -859,7 +859,7 @@ func fetchPlatformManifestWithRetry(
 
 				var retryManifest imageManifest
 
-				err = json.NewDecoder(retryResp.Body).Decode(&retryManifest)
+				err = json.NewDecoder(io.LimitReader(retryResp.Body, maxManifestSize)).Decode(&retryManifest)
 				retryResp.Body.Close()
 
 				if err != nil {
@@ -895,7 +895,7 @@ func fetchPlatformManifestWithRetry(
 
 		var manifest imageManifest
 
-		err = json.NewDecoder(resp.Body).Decode(&manifest)
+		err = json.NewDecoder(io.LimitReader(resp.Body, maxManifestSize)).Decode(&manifest)
 		resp.Body.Close()
 
 		if err != nil {

@@ -46,6 +46,8 @@ var (
 	errImageCooldown = errors.New("deferred")
 	// errFetchImageAgeFailed indicates the image creation time could not be determined from the registry.
 	errFetchImageAgeFailed = errors.New("image creation time unavailable")
+	// errGetPullOptionsFailed indicates pull options (e.g., registry auth) could not be retrieved for cooldown check.
+	errGetPullOptionsFailed = errors.New("failed to get pull options")
 )
 
 // Errors for Watchtower self-update operations.
