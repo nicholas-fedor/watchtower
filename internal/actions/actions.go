@@ -1022,7 +1022,7 @@ func sendSplitNotifications(
 			if containerStatus.CooldownAge() != "" {
 				entry = &logrus.Entry{
 					Level:   logrus.InfoLevel,
-					Message: "Image is within cooldown period, deferring update",
+					Message: "Image is within cooldown period - deferring update",
 					Data: logrus.Fields{
 						"image":       report.ImageName(),
 						"image_age":   containerStatus.CooldownAge(),
@@ -1034,7 +1034,7 @@ func sendSplitNotifications(
 			} else {
 				entry = &logrus.Entry{
 					Level:   logrus.InfoLevel,
-					Message: "Image creation time unavailable, deferring update",
+					Message: "Image creation time unavailable - deferring update",
 					Data: logrus.Fields{
 						"image":    report.ImageName(),
 						"cooldown": containerStatus.CooldownDelay(),

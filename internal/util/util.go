@@ -345,6 +345,30 @@ func expandDurationUnits(durationStr string) (string, error) {
 		growMultiplier = 4 // Pre-allocate space for expanded output.
 	)
 
+	// processUnit handles the unit character for a parsed numeric string.
+	// For extended units (d, w, M) it converts to hours via multiplyUnit;
+	// for standard Go units it validates and passes through unchanged.
+	processUnit := func(numStr string, unit byte) (string, error) {
+		switch unit {
+		case 'd':
+			return multiplyUnit(numStr, hoursPerDay)
+		case 'w':
+			return multiplyUnit(numStr, hoursPerDay*daysPerWeek)
+		case 'M':
+			return multiplyUnit(numStr, hoursPerDay*daysPerMonth)
+		default:
+			// Standard Go unit — validate and pass through unchanged.
+			if !isValidDurationChar(unit) {
+				return "", fmt.Errorf(
+					"%w: %q in %q",
+					errInvalidUnit, unit, durationStr,
+				)
+			}
+
+			return numStr + string(unit), nil
+		}
+	}
+
 	var result strings.Builder
 
 	result.Grow(len(durationStr) * growMultiplier)
@@ -390,40 +414,12 @@ func expandDurationUnits(durationStr string) (string, error) {
 		unit := durationStr[i]
 		i++
 
-		switch unit {
-		case 'd':
-			hours, err := multiplyUnit(numStr, hoursPerDay)
-			if err != nil {
-				return "", err
-			}
-
-			result.WriteString(hours)
-		case 'w':
-			hours, err := multiplyUnit(numStr, hoursPerDay*daysPerWeek)
-			if err != nil {
-				return "", err
-			}
-
-			result.WriteString(hours)
-		case 'M':
-			hours, err := multiplyUnit(numStr, hoursPerDay*daysPerMonth)
-			if err != nil {
-				return "", err
-			}
-
-			result.WriteString(hours)
-		default:
-			// Standard Go unit — validate and pass through unchanged.
-			if !isValidDurationChar(unit) {
-				return "", fmt.Errorf(
-					"%w: %q in %q",
-					errInvalidUnit, unit, durationStr,
-				)
-			}
-
-			result.WriteString(numStr)
-			result.WriteByte(unit)
+		expanded, err := processUnit(numStr, unit)
+		if err != nil {
+			return "", err
 		}
+
+		result.WriteString(expanded)
 	}
 
 	return result.String(), nil

@@ -1515,10 +1515,40 @@ func TestGetEffectiveScope_NilContainer(t *testing.T) {
 	assert.ErrorIs(t, err, errCurrentContainerNotCached)
 }
 
+// cooldownTestContainer creates a test Container with the given cooldown delay label value.
+// Pass labelValue as nil to create a container with no cooldown delay label (empty labels map).
+// Pass a pointer to a string to set the cooldown delay label to that value.
+//
+// Parameters:
+//   - labelValue: Optional label value; nil omits the label entirely.
+//
+// Returns:
+//   - *Container: A test container with the specified cooldown label configuration.
+func cooldownTestContainer(labelValue *string) *Container {
+	labels := map[string]string{}
+
+	if labelValue != nil {
+		labels[cooldownDelayLabel] = *labelValue
+	}
+
+	return &Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
+				Name: "/test-container",
+			},
+			Config: &dockerContainer.Config{
+				Labels: labels,
+			},
+		},
+	}
+}
+
 func TestContainer_CooldownDelay(t *testing.T) {
 	type args struct {
 		params types.UpdateParams
 	}
+
+	strPtr := func(s string) *string { return &s }
 
 	tests := []struct {
 		name string
@@ -1528,16 +1558,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 	}{
 		{
 			name: "NoLabelUsesGlobal",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				},
-			},
+			c:    cooldownTestContainer(nil),
 			args: args{
 				params: types.UpdateParams{
 					CooldownDelay: 10 * time.Minute,
@@ -1547,18 +1568,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 		},
 		{
 			name: "LabelOverridesGlobal",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							cooldownDelayLabel: "24h",
-						},
-					},
-				},
-			},
+			c:    cooldownTestContainer(strPtr("24h")),
 			args: args{
 				params: types.UpdateParams{
 					CooldownDelay: 10 * time.Minute,
@@ -1568,18 +1578,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 		},
 		{
 			name: "LabelZeroDisables",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							cooldownDelayLabel: "0",
-						},
-					},
-				},
-			},
+			c:    cooldownTestContainer(strPtr("0")),
 			args: args{
 				params: types.UpdateParams{
 					CooldownDelay: 10 * time.Minute,
@@ -1589,18 +1588,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 		},
 		{
 			name: "ExtendedUnitsDays",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							cooldownDelayLabel: "3d",
-						},
-					},
-				},
-			},
+			c:    cooldownTestContainer(strPtr("3d")),
 			args: args{
 				params: types.UpdateParams{
 					CooldownDelay: 10 * time.Minute,
@@ -1610,18 +1598,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 		},
 		{
 			name: "InvalidLabelFallsBackToGlobal",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							cooldownDelayLabel: "invalid",
-						},
-					},
-				},
-			},
+			c:    cooldownTestContainer(strPtr("invalid")),
 			args: args{
 				params: types.UpdateParams{
 					CooldownDelay: 10 * time.Minute,
@@ -1631,18 +1608,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 		},
 		{
 			name: "EmptyLabelFallsBackToGlobal",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							cooldownDelayLabel: "",
-						},
-					},
-				},
-			},
+			c:    cooldownTestContainer(strPtr("")),
 			args: args{
 				params: types.UpdateParams{
 					CooldownDelay: 10 * time.Minute,
@@ -1652,18 +1618,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 		},
 		{
 			name: "NegativeLabelFallsBackToGlobal",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							cooldownDelayLabel: "-1h",
-						},
-					},
-				},
-			},
+			c:    cooldownTestContainer(strPtr("-1h")),
 			args: args{
 				params: types.UpdateParams{
 					CooldownDelay: 10 * time.Minute,

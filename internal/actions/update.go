@@ -270,12 +270,12 @@ func Update(
 			// Track cooldown info for setting on the progress entry after AddScanned.
 			var cooldownAge, cooldownDelayStr string
 
-			// Cooldown check: if stale and cooldown is configured, verify the image age.
+			// Cooldown check: if the container should be updated and cooldown is configured, verify the image age.
 			// Uses per-container label if set, otherwise falls back to global setting.
-			// Skip cooldown check for monitor-only containers since they won't be updated.
+			// Skip cooldown check for no-pull and monitor-only containers since they won't be updated.
 			cooldownDelay := sourceContainer.CooldownDelay(config)
 
-			if stale && cooldownDelay > 0 && !sourceContainer.IsNoPull(config) && !sourceContainer.IsMonitorOnly(config) {
+			if shouldUpdate && cooldownDelay > 0 && !sourceContainer.IsNoPull(config) && !sourceContainer.IsMonitorOnly(config) {
 				imageAge, ageErr := fetchImageAge(
 					ctx,
 					sourceContainer,

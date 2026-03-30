@@ -37,6 +37,16 @@ var (
 	errNoPlatformMatch = errors.New("no matching platform found in image index")
 	// errMissingTag indicates the image reference does not contain a tag.
 	errMissingTag = errors.New("missing tag in image reference")
+	// errManifestTooLarge indicates the manifest response exceeded the size limit.
+	errManifestTooLarge = errors.New("manifest response exceeds size limit")
+)
+
+// Size limits for registry responses to prevent unbounded memory allocation.
+const (
+	// maxManifestSize is the maximum allowed size for a manifest response body (1 MiB).
+	maxManifestSize = 1 << 20
+	// maxConfigSize is the maximum allowed size for a config blob response body (4 MiB).
+	maxConfigSize = 1 << 22
 )
 
 // imageIndex represents a multi-platform image index (OCI or Docker manifest list).
@@ -195,10 +205,10 @@ func FetchImageCreationTime(
 	}
 	defer configBody.Close()
 
-	// Parse the config JSON.
+	// Parse the config JSON with a size limit to prevent unbounded memory allocation.
 	var config imageConfig
 
-	err = json.NewDecoder(configBody).Decode(&config)
+	err = json.NewDecoder(io.LimitReader(configBody, maxConfigSize+1)).Decode(&config)
 	if err != nil {
 		logrus.WithError(err).
 			WithFields(fields).
@@ -365,8 +375,8 @@ func fetchManifestForAge(
 			)
 	}
 
-	// Read the manifest body.
-	body, err := io.ReadAll(resp.Body)
+	// Read the manifest body with a size limit to prevent unbounded memory allocation.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize+1))
 	if err != nil {
 		logrus.WithError(err).
 			WithFields(fields).
@@ -374,6 +384,21 @@ func fetchManifestForAge(
 
 		return "",
 			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	}
+
+	if len(body) > maxManifestSize {
+		logrus.WithFields(fields).
+			WithField("size", len(body)).
+			WithField("limit", maxManifestSize).
+			Debug("Manifest response exceeds size limit")
+
+		return "",
+			fmt.Errorf(
+				"%w: %d bytes exceeds limit of %d bytes",
+				errManifestTooLarge,
+				len(body),
+				maxManifestSize,
+			)
 	}
 
 	// Try to parse as image index (multi-platform).

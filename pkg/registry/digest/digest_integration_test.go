@@ -884,10 +884,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				mockDigest,
 			)
 
-			origUserAgent := meta.UserAgent
-			meta.UserAgent = "Watchtower/v0.0.0-unknown"
-
-			defer func() { meta.UserAgent = origUserAgent }()
+			customUserAgent := "Watchtower/v0.0.0-unknown"
 
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -933,7 +930,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				"Accept",
 				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
 			)
-			req.Header.Set("User-Agent", meta.UserAgent)
+			req.Header.Set("User-Agent", customUserAgent)
 
 			resp, err := client.Do(req)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

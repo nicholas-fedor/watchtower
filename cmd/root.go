@@ -310,6 +310,9 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Retrieve cooldown delay for minimum image age before updating.
 	// Supports extended units: d (days), w (weeks), M (months).
+	// Reset to zero to avoid persisting values from a previous preRun invocation.
+	cooldownDelay = time.Duration(0)
+
 	cooldownDelayStr, _ := flagsSet.GetString("cooldown-delay")
 
 	if cooldownDelayStr != "" {
