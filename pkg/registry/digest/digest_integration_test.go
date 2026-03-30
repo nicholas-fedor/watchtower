@@ -904,7 +904,7 @@ var _ = ginkgo.Describe("Digests", func() {
 				),
 				ghttp.CombineHandlers(
 					ghttp.VerifyHeader(http.Header{
-						"User-Agent": []string{"Watchtower/v0.0.0-unknown"},
+						"User-Agent": []string{customUserAgent},
 					}),
 					ghttp.VerifyRequest("HEAD", "/v2/test/image/manifests/latest"),
 					ghttp.RespondWith(http.StatusOK, nil, http.Header{

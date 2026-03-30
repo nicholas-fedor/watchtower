@@ -35,6 +35,8 @@ var (
 	errImageCreationTimeMissing = errors.New("image config does not contain creation timestamp")
 	// errNoPlatformMatch indicates no matching platform was found in the image index.
 	errNoPlatformMatch = errors.New("no matching platform found in image index")
+	// errAmbiguousPlatformMatch indicates multiple platform entries matched OS/Architecture with differing Variants.
+	errAmbiguousPlatformMatch = errors.New("ambiguous platform match: multiple entries with differing variants")
 	// errMissingTag indicates the image reference does not contain a tag.
 	errMissingTag = errors.New("missing tag in image reference")
 	// errManifestTooLarge indicates the manifest response exceeded the size limit.
@@ -478,8 +480,13 @@ func selectPlatformManifest(
 		targetArch = runtime.GOARCH
 	}
 
-	// Select the matching platform entry.
-	var selectedDigest string
+	// Collect all matching non-attestation platform entries.
+	type candidate struct {
+		digest  string
+		variant string
+	}
+
+	var candidates []candidate
 
 	for _, entry := range index.Manifests {
 		// Skip attestation manifests.
@@ -490,13 +497,14 @@ func selectPlatformManifest(
 		}
 
 		if entry.Platform.OS == targetOS && entry.Platform.Architecture == targetArch {
-			selectedDigest = entry.Digest
-
-			break
+			candidates = append(candidates, candidate{
+				digest:  entry.Digest,
+				variant: entry.Platform.Variant,
+			})
 		}
 	}
 
-	if selectedDigest == "" {
+	if len(candidates) == 0 {
 		logrus.WithFields(fields).
 			WithField("os", targetOS).
 			WithField("arch", targetArch).
@@ -505,13 +513,38 @@ func selectPlatformManifest(
 		return "", errNoPlatformMatch
 	}
 
+	// If multiple candidates exist, check that all variant values are identical.
+	if len(candidates) > 1 {
+		firstVariant := candidates[0].variant
+
+		for _, c := range candidates[1:] {
+			if c.variant != firstVariant {
+				variants := make([]string, 0, len(candidates))
+
+				for _, c := range candidates {
+					variants = append(variants, c.variant)
+				}
+
+				logrus.WithFields(fields).
+					WithField("os", targetOS).
+					WithField("arch", targetArch).
+					WithField("variants", variants).
+					Debug("Ambiguous platform match: multiple entries with differing variants")
+
+				return "", errAmbiguousPlatformMatch
+			}
+		}
+	}
+
+	selectedDigest := candidates[0].digest
+
 	logrus.WithFields(fields).
 		WithField("digest", selectedDigest).
 		Debug("Selected platform manifest from index")
 
 	// Build URL for platform-specific manifest.
 	platformURL := *parsedURL
-	idx := strings.Index(platformURL.Path, "/manifests/")
+	idx := strings.LastIndex(platformURL.Path, "/manifests/")
 
 	if idx == -1 {
 		logrus.WithFields(fields).
@@ -644,16 +677,17 @@ func fetchConfigBlob(
 	// Manifest URL path is: /v2/{image_path}/manifests/{tag}
 	// Blob URL path should be: /v2/{image_path}/blobs/{digest}
 	path := parsedURL.Path
-	// Find /manifests/ and replace with /blobs/
-	before, _, ok := strings.Cut(path, "/manifests/")
-	if !ok {
+	// Find the last /manifests/ and replace with /blobs/ to correctly handle
+	// image paths that contain "/manifests/" as a component.
+	idx := strings.LastIndex(path, "/manifests/")
+	if idx == -1 {
 		logrus.WithFields(fields).
 			Debug("Could not parse image path from manifest URL")
 
 		return nil, errFetchConfigFailed
 	}
 
-	imagePath := before
+	imagePath := path[:idx]
 	blobPath := imagePath + "/blobs/" + configDigest
 
 	blobURL := *parsedURL
