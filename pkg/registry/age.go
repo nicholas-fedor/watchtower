@@ -299,35 +299,31 @@ func buildManifestURLForAge(
 	return manifestURLStr, originalHost, parsedURL, nil
 }
 
-// fetchManifestForAge fetches the image manifest and extracts the config digest.
-// It handles multi-platform indexes by selecting the platform-specific manifest.
+// retryManifestRequest fetches manifest bytes from the registry with host-based retry.
 //
-// On 401/404 responses, it retries across alternate hosts (challenge host, original host)
-// mirroring the retry logic in digest.go's HandleManifestResponse.
+// It iterates through candidate hosts (primary, challenge, original) and returns the
+// raw response body on the first successful HTTP 200. On 401/404, it advances to the
+// next host. The response body is size-limited to maxManifestSize.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - client: HTTP client for registry requests.
-//   - manifestURL: URL of the manifest to fetch.
-//   - token: Authentication token.
-//   - parsedURL: Parsed manifest URL.
-//   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
-//   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
-//   - challengeHost: Challenge host from auth (empty if not applicable).
-//   - redirected: Whether auth was redirected.
-//   - fields: Logging fields.
+//   - parsedURL: Parsed manifest URL used as the base for host substitution.
+//   - manifestURL: Original manifest URL string (to avoid redundant re-fetch).
+//   - token: Authentication token for the Authorization header.
+//   - challengeHost: Registry challenge host for fallback.
+//   - fields: Logging fields for context.
 //
 // Returns:
-//   - string: The config digest.
-//   - error: Non-nil if fetching fails.
-func fetchManifestForAge(
+//   - []byte: Raw manifest response body bytes.
+//   - error: Non-nil if all hosts fail or body exceeds size limit.
+func retryManifestRequest(
 	ctx context.Context,
 	client auth.Client,
-	manifestURL, token string,
 	parsedURL *url.URL,
-	targetOS, targetArch, challengeHost string,
+	manifestURL, token, challengeHost string,
 	fields logrus.Fields,
-) (string, error) {
+) ([]byte, error) {
 	// Determine the original host for fallback.
 	originalHost := parsedURL.Host
 
@@ -385,7 +381,7 @@ func fetchManifestForAge(
 				WithFields(fields).
 				Debug("Failed to create manifest request")
 
-			return "",
+			return nil,
 				fmt.Errorf(
 					"%w: %w",
 					errFetchManifestFailed,
@@ -412,16 +408,14 @@ func fetchManifestForAge(
 				WithFields(fields).
 				Debug("Failed to execute manifest request")
 
-			return "",
+			return nil,
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 		}
 
-		// Handle non-success responses with retry logic.
 		if resp.StatusCode != http.StatusOK {
 			status := resp.StatusCode
 			resp.Body.Close()
 
-			// Retry on 401/404 if there are more hosts to try.
 			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
 				i < len(hosts)-1 {
 				logrus.WithFields(fields).
@@ -443,7 +437,7 @@ func fetchManifestForAge(
 				WithField("status", status).
 				Debug("Manifest request returned non-OK status")
 
-			return "",
+			return nil,
 				fmt.Errorf(
 					"%w: status %d",
 					errFetchManifestFailed,
@@ -460,7 +454,7 @@ func fetchManifestForAge(
 				WithFields(fields).
 				Debug("Failed to read manifest response")
 
-			return "",
+			return nil,
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 		}
 
@@ -470,7 +464,7 @@ func fetchManifestForAge(
 				WithField("limit", maxManifestSize).
 				Debug("Manifest response exceeds size limit")
 
-			return "",
+			return nil,
 				fmt.Errorf(
 					"%w: %d bytes exceeds limit of %d bytes",
 					errManifestTooLarge,
@@ -479,102 +473,126 @@ func fetchManifestForAge(
 				)
 		}
 
-		// Try to parse as image index (multi-platform).
-		var index imageIndex
-
-		idxErr := json.Unmarshal(body, &index)
-		if idxErr == nil && isIndexMediaType(index.MediaType) {
-			return selectPlatformManifest(
-				ctx,
-				client,
-				index,
-				parsedURL,
-				token,
-				targetOS,
-				targetArch,
-				challengeHost,
-				fields,
-			)
-		}
-
-		// Parse as single-platform manifest.
-		var manifest imageManifest
-
-		err = json.Unmarshal(body, &manifest)
-		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to parse manifest JSON")
-
-			return "",
-				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
-		}
-
-		if manifest.Config.Digest == "" {
-			logrus.WithFields(fields).
-				Debug("Manifest does not contain config digest")
-
-			return "", errNoConfigDigest
-		}
-
-		return manifest.Config.Digest, nil
+		return body, nil
 	}
 
 	// All hosts exhausted.
 	if lastErr != nil {
-		return "", lastErr
+		return nil, lastErr
 	}
 
-	return "", fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
+	return nil, fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
 }
 
-// selectPlatformManifest selects the platform-specific manifest from an image index
-// and fetches it to extract the config digest.
+// fetchManifestForAge fetches the image manifest and extracts the config digest.
+// It handles multi-platform indexes by selecting the platform-specific manifest.
 //
-// If targetOS or targetArch are empty, runtime.GOOS and runtime.GOARCH are used as defaults,
-// allowing cross-platform monitoring via environment variables or configuration overrides.
-//
-// On 401/404 responses, it retries on the challenge host mirroring the retry logic
-// in digest.go's HandleManifestResponse.
+// On 401/404 responses, it retries across alternate hosts (challenge host, original host)
+// mirroring the retry logic in digest.go's HandleManifestResponse.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - client: HTTP client for registry requests.
-//   - index: The parsed image index.
-//   - parsedURL: Parsed URL for constructing platform manifest URLs.
+//   - manifestURL: URL of the manifest to fetch.
 //   - token: Authentication token.
+//   - parsedURL: Parsed manifest URL.
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
-//   - challengeHost: Challenge host from auth (empty if not applicable).
-//   - fields: Logging fields.
+//   - challengeHost: Registry challenge host for fallback.
+//   - fields: Logging fields for context.
 //
 // Returns:
-//   - string: The config digest from the platform-specific manifest.
-//   - error: Non-nil if selection or fetching fails.
-func selectPlatformManifest(
+//   - string: Config digest (e.g., "sha256:abc...").
+//   - error: Non-nil if fetch, parse, or platform selection fails.
+func fetchManifestForAge(
 	ctx context.Context,
 	client auth.Client,
-	index imageIndex,
+	manifestURL, token string,
 	parsedURL *url.URL,
-	token string,
 	targetOS, targetArch, challengeHost string,
 	fields logrus.Fields,
 ) (string, error) {
-	// Use runtime defaults if no override is specified.
-	if targetOS == "" {
-		targetOS = runtime.GOOS
+	body, err := retryManifestRequest(
+		ctx,
+		client,
+		parsedURL,
+		manifestURL,
+		token,
+		challengeHost,
+		fields,
+	)
+	if err != nil {
+		return "", err
 	}
 
-	if targetArch == "" {
-		targetArch = runtime.GOARCH
+	// Try to parse as image index (multi-platform).
+	var index imageIndex
+
+	idxErr := json.Unmarshal(body, &index)
+	if idxErr == nil && isIndexMediaType(index.MediaType) {
+		return selectPlatformManifest(
+			ctx,
+			client,
+			index,
+			parsedURL,
+			token,
+			targetOS,
+			targetArch,
+			challengeHost,
+			fields,
+		)
 	}
 
-	// Collect all matching non-attestation platform entries.
+	// Parse as single-platform manifest.
+	var manifest imageManifest
+
+	err = json.Unmarshal(body, &manifest)
+	if err != nil {
+		logrus.WithError(err).
+			WithFields(fields).
+			Debug("Failed to parse manifest JSON")
+
+		return "",
+			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	}
+
+	if manifest.Config.Digest == "" {
+		logrus.WithFields(fields).
+			Debug("Manifest does not contain config digest")
+
+		return "", errNoConfigDigest
+	}
+
+	return manifest.Config.Digest, nil
+}
+
+// selectPlatformCandidate filters the image index for matching platform entries
+// and disambiguates variant conflicts.
+//
+// It skips attestation manifests, collects entries matching the target OS and
+// architecture, and returns the digest of the selected candidate. If multiple
+// candidates exist with differing variants, it returns errAmbiguousPlatformMatch.
+//
+// Parameters:
+//   - index: The parsed image index.
+//   - targetOS: Target OS for matching.
+//   - targetArch: Target architecture for matching.
+//   - fields: Logging fields for context.
+//
+// Returns:
+//   - string: The selected platform manifest digest.
+//   - error: errNoPlatformMatch if no candidates, errAmbiguousPlatformMatch if ambiguous.
+func selectPlatformCandidate(
+	index imageIndex,
+	targetOS, targetArch string,
+	fields logrus.Fields,
+) (string, error) {
 	type candidate struct {
 		digest  string
 		variant string
 	}
 
+	// Collect all matching non-attestation platform entries.
 	var candidates []candidate
 
 	for _, entry := range index.Manifests {
@@ -631,6 +649,35 @@ func selectPlatformManifest(
 		WithField("digest", selectedDigest).
 		Debug("Selected platform manifest from index")
 
+	return selectedDigest, nil
+}
+
+// fetchPlatformManifestWithRetry fetches the platform-specific manifest by digest
+// with host-based retry on 401/404 responses.
+//
+// It constructs the platform manifest URL from the parsed base URL and selected digest,
+// then iterates through candidate hosts. On non-redirected registries, a special
+// challenge-host retry is attempted when the original host fails.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - client: HTTP client for registry requests.
+//   - parsedURL: Parsed base manifest URL for path construction.
+//   - token: Authentication token.
+//   - selectedDigest: Platform manifest digest to fetch.
+//   - challengeHost: Challenge host for fallback.
+//   - fields: Logging fields for context.
+//
+// Returns:
+//   - string: The config digest from the platform-specific manifest.
+//   - error: Non-nil if all hosts fail.
+func fetchPlatformManifestWithRetry(
+	ctx context.Context,
+	client auth.Client,
+	parsedURL *url.URL,
+	token, selectedDigest, challengeHost string,
+	fields logrus.Fields,
+) (string, error) {
 	// Build URL path for platform-specific manifest.
 	idx := strings.LastIndex(parsedURL.Path, "/manifests/")
 
@@ -728,6 +775,7 @@ func selectPlatformManifest(
 				)
 		}
 
+		// Handle non-success responses with retry logic.
 		if resp.StatusCode != http.StatusOK {
 			status := resp.StatusCode
 			resp.Body.Close()
@@ -879,6 +927,68 @@ func selectPlatformManifest(
 	}
 
 	return "", fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
+}
+
+// selectPlatformManifest selects the platform-specific manifest from an image index
+// and fetches it to extract the config digest.
+//
+// If targetOS or targetArch are empty, runtime.GOOS and runtime.GOARCH are used as defaults,
+// allowing cross-platform monitoring via environment variables or configuration overrides.
+//
+// On 401/404 responses, it retries on the challenge host mirroring the retry logic
+// in digest.go's HandleManifestResponse.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - client: HTTP client for registry requests.
+//   - index: The parsed image index.
+//   - parsedURL: Parsed URL for constructing platform manifest URLs.
+//   - token: Authentication token.
+//   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
+//   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
+//   - challengeHost: Challenge host from auth (empty if not applicable).
+//   - fields: Logging fields.
+//
+// Returns:
+//   - string: The config digest from the platform-specific manifest.
+//   - error: Non-nil if selection or fetching fails.
+func selectPlatformManifest(
+	ctx context.Context,
+	client auth.Client,
+	index imageIndex,
+	parsedURL *url.URL,
+	token string,
+	targetOS, targetArch, challengeHost string,
+	fields logrus.Fields,
+) (string, error) {
+	// Use runtime defaults if no override is specified.
+	if targetOS == "" {
+		targetOS = runtime.GOOS
+	}
+
+	if targetArch == "" {
+		targetArch = runtime.GOARCH
+	}
+
+	selectedDigest, err := selectPlatformCandidate(
+		index,
+		targetOS,
+		targetArch,
+		fields,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return fetchPlatformManifestWithRetry(
+		ctx,
+		client,
+		parsedURL,
+		token,
+		selectedDigest,
+		challengeHost,
+		fields,
+	)
 }
 
 // fetchConfigBlob fetches the image config blob from the registry.
