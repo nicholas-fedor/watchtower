@@ -1151,6 +1151,239 @@ func TestProgress_MarkRestarted_Concurrent(t *testing.T) {
 	}
 }
 
+func TestProgress_SetCooldownInfo(t *testing.T) {
+	type args struct {
+		containerID types.ContainerID
+		age         string
+		delay       string
+		remaining   string
+		passed      bool
+	}
+
+	tests := []struct {
+		name string
+		m    Progress
+		args args
+		want Progress
+	}{
+		{
+			name: "set cooldown info on existing container - passed",
+			m: Progress{
+				"cont1": &ContainerStatus{containerID: "cont1", state: ScannedState},
+			},
+			args: args{
+				containerID: "cont1",
+				age:         "47 days, 11 hours",
+				delay:       "24 hours",
+				remaining:   "",
+				passed:      true,
+			},
+			want: Progress{
+				"cont1": &ContainerStatus{
+					containerID:       "cont1",
+					state:             ScannedState,
+					cooldownPassed:    true,
+					cooldownAge:       "47 days, 11 hours",
+					cooldownDelay:     "24 hours",
+					cooldownRemaining: "",
+				},
+			},
+		},
+		{
+			name: "set cooldown info on existing container - not passed",
+			m: Progress{
+				"cont1": &ContainerStatus{containerID: "cont1", state: SkippedState},
+			},
+			args: args{
+				containerID: "cont1",
+				age:         "2 hours",
+				delay:       "24 hours",
+				remaining:   "22 hours",
+				passed:      false,
+			},
+			want: Progress{
+				"cont1": &ContainerStatus{
+					containerID:       "cont1",
+					state:             SkippedState,
+					cooldownPassed:    false,
+					cooldownAge:       "2 hours",
+					cooldownDelay:     "24 hours",
+					cooldownRemaining: "22 hours",
+				},
+			},
+		},
+		{
+			name: "set cooldown info on non-existent container - no panic",
+			m:    Progress{},
+			args: args{
+				containerID: "cont1",
+				age:         "1 day",
+				delay:       "24 hours",
+				remaining:   "",
+				passed:      true,
+			},
+			want: Progress{},
+		},
+		{
+			name: "overwrite existing cooldown info",
+			m: Progress{
+				"cont1": &ContainerStatus{
+					containerID:       "cont1",
+					state:             ScannedState,
+					cooldownPassed:    false,
+					cooldownAge:       "old age",
+					cooldownDelay:     "old delay",
+					cooldownRemaining: "old remaining",
+				},
+			},
+			args: args{
+				containerID: "cont1",
+				age:         "new age",
+				delay:       "new delay",
+				remaining:   "new remaining",
+				passed:      true,
+			},
+			want: Progress{
+				"cont1": &ContainerStatus{
+					containerID:       "cont1",
+					state:             ScannedState,
+					cooldownPassed:    true,
+					cooldownAge:       "new age",
+					cooldownDelay:     "new delay",
+					cooldownRemaining: "new remaining",
+				},
+			},
+		},
+		{
+			name: "set cooldown with empty values",
+			m: Progress{
+				"cont1": &ContainerStatus{containerID: "cont1", state: ScannedState},
+			},
+			args: args{
+				containerID: "cont1",
+				age:         "",
+				delay:       "",
+				remaining:   "",
+				passed:      false,
+			},
+			want: Progress{
+				"cont1": &ContainerStatus{
+					containerID:       "cont1",
+					state:             ScannedState,
+					cooldownPassed:    false,
+					cooldownAge:       "",
+					cooldownDelay:     "",
+					cooldownRemaining: "",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.m.SetCooldownInfo(tt.args.containerID, tt.args.age, tt.args.delay, tt.args.remaining, tt.args.passed)
+
+			if len(tt.m) != len(tt.want) {
+				t.Errorf(
+					"Progress.SetCooldownInfo() map length = %d, want %d",
+					len(tt.m),
+					len(tt.want),
+				)
+
+				return
+			}
+
+			for id, gotStatus := range tt.m {
+				wantStatus := tt.want[id]
+				if gotStatus.containerID != wantStatus.containerID ||
+					gotStatus.state != wantStatus.state {
+					t.Errorf(
+						"Progress.SetCooldownInfo() status for %v = %+v, want %+v",
+						id,
+						gotStatus,
+						wantStatus,
+					)
+				}
+
+				if gotStatus.CooldownPassed() != wantStatus.cooldownPassed {
+					t.Errorf(
+						"Progress.SetCooldownInfo() CooldownPassed for %v = %v, want %v",
+						id,
+						gotStatus.CooldownPassed(),
+						wantStatus.cooldownPassed,
+					)
+				}
+
+				if gotStatus.CooldownAge() != wantStatus.cooldownAge {
+					t.Errorf(
+						"Progress.SetCooldownInfo() CooldownAge for %v = %v, want %v",
+						id,
+						gotStatus.CooldownAge(),
+						wantStatus.cooldownAge,
+					)
+				}
+
+				if gotStatus.CooldownDelay() != wantStatus.cooldownDelay {
+					t.Errorf(
+						"Progress.SetCooldownInfo() CooldownDelay for %v = %v, want %v",
+						id,
+						gotStatus.CooldownDelay(),
+						wantStatus.cooldownDelay,
+					)
+				}
+
+				if gotStatus.CooldownRemaining() != wantStatus.cooldownRemaining {
+					t.Errorf(
+						"Progress.SetCooldownInfo() CooldownRemaining for %v = %v, want %v",
+						id,
+						gotStatus.CooldownRemaining(),
+						wantStatus.cooldownRemaining,
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestProgress_SetCooldownInfo_Concurrent(t *testing.T) {
+	m := Progress{
+		"cont1": &ContainerStatus{containerID: "cont1", state: ScannedState},
+		"cont2": &ContainerStatus{containerID: "cont2", state: ScannedState},
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+
+		m.SetCooldownInfo("cont1", "1 day", "24 hours", "", true)
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		m.SetCooldownInfo("cont2", "2 hours", "24 hours", "22 hours", false)
+	}()
+
+	wg.Wait()
+
+	if m["cont1"].CooldownPassed() != true {
+		t.Errorf("cont1 CooldownPassed = %v, want true", m["cont1"].CooldownPassed())
+	}
+
+	if m["cont1"].CooldownAge() != "1 day" {
+		t.Errorf("cont1 CooldownAge = %v, want '1 day'", m["cont1"].CooldownAge())
+	}
+
+	if m["cont2"].CooldownPassed() != false {
+		t.Errorf("cont2 CooldownPassed = %v, want false", m["cont2"].CooldownPassed())
+	}
+
+	if m["cont2"].CooldownRemaining() != "22 hours" {
+		t.Errorf("cont2 CooldownRemaining = %v, want '22 hours'", m["cont2"].CooldownRemaining())
+	}
+}
+
 func TestProgress_Restarted(t *testing.T) {
 	tests := []struct {
 		name string

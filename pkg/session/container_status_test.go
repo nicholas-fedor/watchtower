@@ -387,6 +387,117 @@ func TestContainerStatus_RestartedStateWithMissingData(t *testing.T) {
 	}
 }
 
+func TestContainerStatus_SetCooldownInfo(t *testing.T) {
+	tests := []struct {
+		name      string
+		u         *ContainerStatus
+		age       string
+		delay     string
+		remaining string
+		passed    bool
+	}{
+		{
+			name:      "cooldown passed with age",
+			u:         &ContainerStatus{containerID: "cont1"},
+			age:       "47 days, 11 hours",
+			delay:     "24 hours",
+			remaining: "",
+			passed:    true,
+		},
+		{
+			name:      "cooldown not passed with remaining",
+			u:         &ContainerStatus{containerID: "cont2"},
+			age:       "2 hours",
+			delay:     "24 hours",
+			remaining: "22 hours",
+			passed:    false,
+		},
+		{
+			name:      "empty values",
+			u:         &ContainerStatus{containerID: "cont3"},
+			age:       "",
+			delay:     "",
+			remaining: "",
+			passed:    false,
+		},
+		{
+			name:      "overwrites previous values",
+			u:         &ContainerStatus{containerID: "cont4", cooldownAge: "old age", cooldownDelay: "old delay", cooldownRemaining: "old remaining", cooldownPassed: true},
+			age:       "new age",
+			delay:     "new delay",
+			remaining: "new remaining",
+			passed:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.u.SetCooldownInfo(tt.age, tt.delay, tt.remaining, tt.passed)
+
+			if got := tt.u.CooldownAge(); got != tt.age {
+				t.Errorf("CooldownAge() = %v, want %v", got, tt.age)
+			}
+
+			if got := tt.u.CooldownDelay(); got != tt.delay {
+				t.Errorf("CooldownDelay() = %v, want %v", got, tt.delay)
+			}
+
+			if got := tt.u.CooldownRemaining(); got != tt.remaining {
+				t.Errorf("CooldownRemaining() = %v, want %v", got, tt.remaining)
+			}
+
+			if got := tt.u.CooldownPassed(); got != tt.passed {
+				t.Errorf("CooldownPassed() = %v, want %v", got, tt.passed)
+			}
+		})
+	}
+}
+
+func TestContainerStatus_CooldownDefaults(t *testing.T) {
+	u := &ContainerStatus{containerID: "cont1"}
+
+	if got := u.CooldownPassed(); got {
+		t.Errorf("CooldownPassed() default = %v, want false", got)
+	}
+
+	if got := u.CooldownAge(); got != "" {
+		t.Errorf("CooldownAge() default = %v, want empty", got)
+	}
+
+	if got := u.CooldownDelay(); got != "" {
+		t.Errorf("CooldownDelay() default = %v, want empty", got)
+	}
+
+	if got := u.CooldownRemaining(); got != "" {
+		t.Errorf("CooldownRemaining() default = %v, want empty", got)
+	}
+}
+
+func TestContainerStatus_CooldownGettersReturnDirectValues(t *testing.T) {
+	u := &ContainerStatus{
+		containerID:       "cont1",
+		cooldownPassed:    true,
+		cooldownAge:       "3 days",
+		cooldownDelay:     "48 hours",
+		cooldownRemaining: "12 hours",
+	}
+
+	if got := u.CooldownPassed(); got != true {
+		t.Errorf("CooldownPassed() = %v, want true", got)
+	}
+
+	if got := u.CooldownAge(); got != "3 days" {
+		t.Errorf("CooldownAge() = %v, want '3 days'", got)
+	}
+
+	if got := u.CooldownDelay(); got != "48 hours" {
+		t.Errorf("CooldownDelay() = %v, want '48 hours'", got)
+	}
+
+	if got := u.CooldownRemaining(); got != "12 hours" {
+		t.Errorf("CooldownRemaining() = %v, want '12 hours'", got)
+	}
+}
+
 func TestContainerStatus_RestartedStateIntegration(t *testing.T) {
 	tests := []struct {
 		name string
