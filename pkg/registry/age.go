@@ -130,7 +130,7 @@ func FetchImageCreationTime(
 	client := auth.NewAuthClient()
 
 	// Obtain an authentication token for the registry.
-	token, challengeHost, redirected, err := auth.GetToken(
+	token, _, redirected, redirectHost, err := auth.GetToken(
 		ctx,
 		container,
 		registryAuth,
@@ -158,11 +158,11 @@ func FetchImageCreationTime(
 		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
-	// If redirected during auth, use the challenge host for manifest requests.
-	if challengeHost != "" && challengeHost != originalHost && redirected {
+	// If redirected during auth, use the redirect host for manifest requests.
+	if redirectHost != "" && redirectHost != originalHost && redirected {
 		manifestURL, _, parsedURL, err = buildManifestURLForAge(
 			container,
-			challengeHost,
+			redirectHost,
 		)
 		if err != nil {
 			logrus.WithError(err).
@@ -744,10 +744,22 @@ func fetchConfigBlob(
 			return nil, errFetchConfigFailed
 		}
 
+		// Resolve relative Location against the current request URL.
+		locationURL, err := url.Parse(location)
+		if err != nil {
+			logrus.WithError(err).
+				WithFields(fields).
+				Debug("Failed to parse redirect Location header")
+
+			return nil, fmt.Errorf("%w: %w", errFetchConfigFailed, err)
+		}
+
+		resolvedURL := resp.Request.URL.ResolveReference(locationURL)
+
 		redirectReq, err := http.NewRequestWithContext(
 			ctx,
 			http.MethodGet,
-			location,
+			resolvedURL.String(),
 			nil,
 		)
 		if err != nil {
@@ -760,6 +772,14 @@ func fetchConfigBlob(
 		}
 
 		redirectReq.Header.Set("User-Agent", meta.UserAgent)
+
+		// Copy Authorization header for same-origin redirects.
+		if resolvedURL.Scheme == resp.Request.URL.Scheme &&
+			resolvedURL.Host == resp.Request.URL.Host {
+			if auth := resp.Request.Header.Get("Authorization"); auth != "" {
+				redirectReq.Header.Set("Authorization", auth)
+			}
+		}
 
 		resp, err = client.Do(redirectReq)
 		if err != nil {

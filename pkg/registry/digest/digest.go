@@ -451,7 +451,12 @@ func fetchDigest(
 		Debug("Extracted original host from manifest URL")
 
 	// Obtain an authentication token and challenge host for the registry.
-	token, challengeHost, redirected, err := auth.GetToken(ctx, container, registryAuth, client)
+	token, challengeHost, redirected, redirectHost, err := auth.GetToken(
+		ctx,
+		container,
+		registryAuth,
+		client,
+	)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
 
@@ -460,28 +465,38 @@ func fetchDigest(
 
 	// If no token is returned, authentication is not required.
 	if token == "" {
-		logrus.WithFields(fields).Debug("No authentication required, proceeding with request")
+		logrus.WithFields(fields).
+			Debug("No authentication required, proceeding with request")
 	} else {
 		logrus.WithFields(fields).
 			WithField("challenge_host", challengeHost).
 			WithField("redirected", redirected).
+			WithField("redirect_host", redirectHost).
 			Debug("Received challenge host and redirect flag from GetToken")
 	}
 
-	// Build the manifest URL, using challenge host when redirected
+	// Build the manifest URL, using redirect host when redirected
 	var (
 		manifestURL string
 		parsedURL   *url.URL
 	)
 
-	if challengeHost != "" && challengeHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = BuildManifestURL(container, challengeHost)
+	if redirectHost != "" && redirectHost != originalHost && redirected {
+		manifestURL, _, parsedURL, err = BuildManifestURL(
+			container,
+			redirectHost,
+		)
 	} else {
-		manifestURL, _, parsedURL, err = BuildManifestURL(container, "")
+		manifestURL, _, parsedURL, err = BuildManifestURL(
+			container,
+			"",
+		)
 	}
 
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+		logrus.WithError(err).
+			WithFields(fields).
+			Debug("Failed to build manifest URL")
 
 		return "", err
 	}

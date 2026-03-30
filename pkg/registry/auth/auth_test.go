@@ -428,7 +428,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", originalTLSSkip)
 
 		// Execute GetToken and verify the result.
-		token, _, _, err := auth.GetToken(
+		token, _, _, _, err := auth.GetToken(
 			context.Background(),
 			containerInstance,
 			creds,
@@ -509,7 +509,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
 				creds := fmt.Sprintf("%s:%s", GHCRCredentials.Username, GHCRCredentials.Password)
 				client := auth.NewAuthClient()
-				token, _, _, err := auth.GetToken(
+				token, _, _, _, err := auth.GetToken(
 					context.Background(),
 					mockContainerInstance,
 					creds,
@@ -564,7 +564,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 
 			client := auth.NewAuthClient()
-			token, _, _, err := auth.GetToken(
+			token, _, _, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"user:pass",
@@ -613,7 +613,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				}
 
 				// Execute GetToken and verify the result.
-				token, _, _, err := auth.GetToken(
+				token, _, _, _, err := auth.GetToken(
 					context.Background(),
 					containerInstance,
 					"",
@@ -656,7 +656,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			client := auth.NewAuthClient()
 
 			// Execute GetToken and verify the expected failure.
-			token, _, _, err := auth.GetToken(
+			token, _, _, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -708,7 +708,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify the result.
-			token, _, _, err := auth.GetToken(
+			token, _, _, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -755,7 +755,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify the result.
-			token, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
+			token, _, _, _, err := auth.GetToken(context.Background(), containerInstance, "", client)
 
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -801,7 +801,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			}
 
 			// Execute GetToken and verify the result.
-			token, _, _, err := auth.GetToken(
+			token, _, _, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -843,7 +843,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			client := auth.NewAuthClient()
 
 			// Execute GetToken and verify the expected failure.
-			token, _, _, err := auth.GetToken(
+			token, _, _, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -908,7 +908,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
-			token, challengeHost, redirected, err := auth.GetToken(
+			token, challengeHost, redirected, redirectHost, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -917,7 +917,8 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
 			gomega.Expect(challengeHost).To(gomega.Equal(redirectAddr))
-			gomega.Expect(redirected).To(gomega.BeFalse()) // No HTTP redirect occurred
+			gomega.Expect(redirected).To(gomega.BeFalse())   // No HTTP redirect occurred
+			gomega.Expect(redirectHost).To(gomega.Equal("")) // No redirect, so redirectHost is empty
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			gomega.Expect(redirectServer.ReceivedRequests()).To(gomega.HaveLen(1))
 		})
@@ -966,7 +967,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
-			token, challengeHost, redirected, err := auth.GetToken(
+			token, challengeHost, redirected, redirectHost, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -976,6 +977,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
 			gomega.Expect(challengeHost).To(gomega.Equal(serverAddr))
 			gomega.Expect(redirected).To(gomega.BeFalse())
+			gomega.Expect(redirectHost).To(gomega.Equal("")) // No redirect, so redirectHost is empty
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(2))
 		})
 
@@ -1043,7 +1045,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
-			token, challengeHost, redirected, err := auth.GetToken(
+			token, challengeHost, redirected, redirectHost, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
@@ -1052,7 +1054,8 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
 			gomega.Expect(challengeHost).To(gomega.Equal(redirectAddr))
-			gomega.Expect(redirected).To(gomega.BeTrue()) // HTTP redirect occurred
+			gomega.Expect(redirected).To(gomega.BeTrue())              // HTTP redirect occurred
+			gomega.Expect(redirectHost).To(gomega.Equal(redirectAddr)) // Redirect host matches the final destination
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 			gomega.Expect(redirectServer.ReceivedRequests()).To(gomega.HaveLen(2))
 		})
@@ -1127,7 +1130,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Execute GetToken and verify failure due to too many redirects
-			token, _, _, err := auth.GetToken(
+			token, _, _, _, err := auth.GetToken(
 				context.Background(),
 				containerInstance,
 				"",
