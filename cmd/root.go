@@ -97,6 +97,12 @@ var (
 	// WATCHTOWER_TIMEOUT environment variable, ensuring containers are stopped gracefully within a specified time limit.
 	timeout time.Duration
 
+	// cooldownDelay specifies the minimum age a new image must have before Watchtower will update a container.
+	//
+	// It is set in preRun via the --cooldown-delay flag or the WATCHTOWER_COOLDOWN_DELAY environment variable,
+	// providing a safeguard against supply chain attacks by deferring updates to newly pushed images.
+	cooldownDelay time.Duration
+
 	// lifecycleHooks is a boolean flag enabling the execution of pre- and post-update lifecycle hook commands.
 	//
 	// It is set in preRun via the --enable-lifecycle-hooks flag or the WATCHTOWER_LIFECYCLE_HOOKS environment variable,
@@ -301,6 +307,27 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Retrieve lifecycle UID and GID flags.
 	lifecycleUID, _ = flagsSet.GetInt("lifecycle-uid")
 	lifecycleGID, _ = flagsSet.GetInt("lifecycle-gid")
+
+	// Retrieve cooldown delay for minimum image age before updating.
+	// Supports extended units: d (days), w (weeks), M (months).
+	// Reset to zero to avoid persisting values from a previous preRun invocation.
+	cooldownDelay = time.Duration(0)
+
+	cooldownDelayStr, _ := flagsSet.GetString("cooldown-delay")
+
+	if cooldownDelayStr != "" {
+		parsed, err := util.ParseDuration(cooldownDelayStr)
+		if err != nil {
+			logrus.WithError(err).Fatal("Please specify a valid cooldown delay value (e.g., 24h, 3d, 1w, 1M).")
+		}
+
+		cooldownDelay = parsed
+	}
+
+	// Validate the cooldown delay value to ensure it's non-negative.
+	if cooldownDelay < 0 {
+		logrus.Fatal("Please specify a positive value for cooldown delay value.")
+	}
 
 	// Retrieve notification split flag.
 	notificationSplitByContainer, _ = flagsSet.GetBool("notification-split-by-container")
@@ -586,6 +613,7 @@ func runMain(cfg types.RunConfig) int {
 			UseComposeDependsOn:          params.UseComposeDependsOn,   // Enable Docker Compose depends_on label processing
 			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
 			EphemeralSelfUpdate:          ephemeralSelfUpdate,          // Use ephemeral container for self-update
+			CooldownDelay:                cooldownDelay,                // Minimum time since image creation before allowing updates
 		}
 
 		metric := actions.RunUpdatesWithNotifications(ctx, actionParams)
@@ -633,6 +661,7 @@ func runMain(cfg types.RunConfig) int {
 			MonitorOnly:         monitorOnly,
 			UseComposeDependsOn: useComposeDependsOn,
 			SkipSelfUpdate:      false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
+			CooldownDelay:       cooldownDelay,
 		}
 		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)

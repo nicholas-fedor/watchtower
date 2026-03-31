@@ -58,6 +58,7 @@ type RunUpdatesWithNotificationsParams struct {
 	UseComposeDependsOn          bool              // Enable Docker Compose depends_on label processing
 	SkipSelfUpdate               bool              // Skip Watchtower self-update
 	EphemeralSelfUpdate          bool              // Use ephemeral container for self-update if true
+	CooldownDelay                time.Duration     // Minimum time since image creation before allowing updates.
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -100,6 +101,7 @@ func RunUpdatesWithNotifications(
 		UseComposeDependsOn: params.UseComposeDependsOn, // Enable Docker Compose depends_on label processing
 		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
 		EphemeralSelfUpdate: params.EphemeralSelfUpdate, // Use ephemeral container for self-update if true
+		CooldownDelay:       params.CooldownDelay,       // Minimum time since image creation before allowing updates
 	}
 
 	// Execute the container update operation
@@ -291,35 +293,44 @@ func buildCleanupEntriesForContainer(
 
 // buildUpdateEntries constructs log entries for container update events.
 //
-// It creates three logrus.Entry structs representing the key stages of a container update:
-// finding a new image, stopping the container, and starting the new container.
-// For monitor-only containers, it reports detection without action.
+// It creates logrus.Entry structs representing the key stages of a container update:
+// finding a new image, an optional cooldown result, stopping the container, and starting
+// the new container. For monitor-only containers, it reports detection without action.
 //
 // Parameters:
 //   - containerReport: The container report containing update details.
 //   - oldContainerID: The original container ID before update.
 //   - newContainerID: The new container ID after update.
 //   - now: The current timestamp to use for all entries.
+//   - cooldownAge: Human-readable image age (empty if no cooldown check).
+//   - cooldownDelay: Human-readable cooldown duration.
+//   - cooldownPassed: Whether the image passed the cooldown check.
 //
 // Returns:
-//   - []*logrus.Entry: A slice of three log entries for the update events.
+//   - []*logrus.Entry: A slice of log entries for the update events.
 func buildUpdateEntries(
 	containerReport types.ContainerReport,
 	oldContainerID, newContainerID types.ContainerID,
 	now time.Time,
+	cooldownAge string,
+	cooldownDelay string,
+	cooldownPassed bool,
 ) []*logrus.Entry {
+	// Build the "Found new image" entry.
+	foundEntry := &logrus.Entry{
+		Level:   logrus.InfoLevel,
+		Message: FoundNewImageMessage,
+		Data: logrus.Fields{
+			"container": containerReport.Name(),
+			"image":     containerReport.ImageName(),
+			"new_id":    containerReport.LatestImageID().ShortID(),
+		},
+		Time: now,
+	}
+
 	if containerReport.IsMonitorOnly() {
 		return []*logrus.Entry{
-			{
-				Level:   logrus.InfoLevel,
-				Message: FoundNewImageMessage,
-				Data: logrus.Fields{
-					"container": containerReport.Name(),
-					"image":     containerReport.ImageName(),
-					"new_id":    containerReport.LatestImageID().ShortID(),
-				},
-				Time: now,
-			},
+			foundEntry,
 			{
 				Level:   logrus.DebugLevel,
 				Message: UpdateSkippedMessage,
@@ -339,18 +350,24 @@ func buildUpdateEntries(
 		}
 	}
 
-	return []*logrus.Entry{
-		{
+	entries := []*logrus.Entry{foundEntry}
+
+	// Insert cooldown "proceeding" entry after "Found new image" when available.
+	if cooldownPassed && cooldownAge != "" {
+		entries = append(entries, &logrus.Entry{
 			Level:   logrus.InfoLevel,
-			Message: FoundNewImageMessage,
+			Message: "Image age exceeds cooldown - proceeding with update",
 			Data: logrus.Fields{
-				"container": containerReport.Name(),
 				"image":     containerReport.ImageName(),
-				"new_id":    containerReport.LatestImageID().ShortID(),
+				"image_age": cooldownAge,
+				"cooldown":  cooldownDelay,
 			},
 			Time: now,
-		},
-		{
+		})
+	}
+
+	entries = append(entries,
+		&logrus.Entry{
 			Level:   logrus.InfoLevel,
 			Message: StoppingContainerMessage,
 			Data: logrus.Fields{
@@ -360,7 +377,7 @@ func buildUpdateEntries(
 			},
 			Time: now,
 		},
-		{
+		&logrus.Entry{
 			Level:   logrus.InfoLevel,
 			Message: StartedNewContainerMessage,
 			Data: logrus.Fields{
@@ -369,7 +386,9 @@ func buildUpdateEntries(
 			},
 			Time: now,
 		},
-	}
+	)
+
+	return entries
 }
 
 // startNotifications initiates notification batching if a notifier is provided.
@@ -709,6 +728,42 @@ func sendSplitNotifications(
 				notified[containerID] = true
 			}
 		}
+
+		// Send notifications for cooldown-skipped containers (report mode).
+		for _, report := range result.Skipped() {
+			if report == nil {
+				continue
+			}
+
+			containerStatus, ok := report.(*session.ContainerStatus)
+			if !ok || containerStatus.CooldownDelay() == "" {
+				continue
+			}
+
+			if containerStatus.CooldownPassed() {
+				continue
+			}
+
+			containerID := string(report.ID())
+			if notified[containerID] {
+				continue
+			}
+
+			singleSkippedReport := &session.SingleContainerReport{
+				SkippedReports:   []types.ContainerReport{report},
+				ScannedReports:   result.Scanned(),
+				UpdatedReports:   result.Updated(),
+				RestartedReports: result.Restarted(),
+				FailedReports:    result.Failed(),
+				StaleReports:     result.Stale(),
+				FreshReports:     result.Fresh(),
+			}
+			if notifier.ShouldSendNotification(singleSkippedReport) {
+				notifier.SendNotification(singleSkippedReport)
+			}
+
+			notified[containerID] = true
+		}
 	} else {
 		// Log updated containers for debugging
 		updatedNames := make([]string, 0, len(result.Updated()))
@@ -751,12 +806,26 @@ func sendSplitNotifications(
 
 			now := time.Now()
 
+			// Extract cooldown info from the container status if available.
+			var cdAge, cdDelay string
+
+			var cdPassed bool
+
+			if cs, ok := report.(*session.ContainerStatus); ok {
+				cdAge = cs.CooldownAge()
+				cdDelay = cs.CooldownDelay()
+				cdPassed = cs.CooldownPassed()
+			}
+
 			// Create log entries for container update events
 			entries := buildUpdateEntries(
 				report,
 				report.ID(),
 				report.NewContainerID(),
 				now,
+				cdAge,
+				cdDelay,
+				cdPassed,
 			)
 
 			// Add cleanup entries for this container
@@ -892,6 +961,9 @@ func sendSplitNotifications(
 					report.ID(),
 					report.NewContainerID(),
 					now,
+					"",
+					"",
+					false,
 				)
 
 				// Add cleanup entries for this container
@@ -908,6 +980,76 @@ func sendSplitNotifications(
 
 				notified[containerID] = true
 			}
+		}
+
+		// Send notifications for cooldown-skipped containers.
+		// These are skipped containers whose skip reason is related to cooldown.
+		for _, report := range result.Skipped() {
+			if report == nil {
+				continue
+			}
+
+			containerStatus, ok := report.(*session.ContainerStatus)
+			if !ok || containerStatus.CooldownDelay() == "" {
+				// Skip non-cooldown skipped containers.
+				continue
+			}
+
+			if containerStatus.CooldownPassed() {
+				continue // Already handled in the updated container loop above.
+			}
+
+			containerID := string(report.ID())
+			if notified[containerID] {
+				continue
+			}
+
+			now := time.Now()
+
+			singleSkippedReport := &session.SingleContainerReport{
+				SkippedReports:   []types.ContainerReport{report},
+				ScannedReports:   result.Scanned(),
+				UpdatedReports:   result.Updated(),
+				RestartedReports: result.Restarted(),
+				FailedReports:    result.Failed(),
+				StaleReports:     result.Stale(),
+				FreshReports:     result.Fresh(),
+			}
+
+			// Build the appropriate message based on whether image age was available.
+			var entry *logrus.Entry
+
+			if containerStatus.CooldownAge() != "" {
+				entry = &logrus.Entry{
+					Level:   logrus.InfoLevel,
+					Message: "Image is within cooldown period - deferring update",
+					Data: logrus.Fields{
+						"image":       report.ImageName(),
+						"image_age":   containerStatus.CooldownAge(),
+						"cooldown":    containerStatus.CooldownDelay(),
+						"eligible_in": containerStatus.CooldownRemaining(),
+					},
+					Time: now,
+				}
+			} else {
+				entry = &logrus.Entry{
+					Level:   logrus.InfoLevel,
+					Message: "Image creation time unavailable - deferring update",
+					Data: logrus.Fields{
+						"image":    report.ImageName(),
+						"cooldown": containerStatus.CooldownDelay(),
+					},
+					Time: now,
+				}
+			}
+
+			entries := []*logrus.Entry{entry}
+
+			if notifier.ShouldSendNotification(singleSkippedReport) {
+				notifier.SendFilteredEntries(entries, singleSkippedReport)
+			}
+
+			notified[containerID] = true
 		}
 	}
 

@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -32,6 +34,9 @@ const (
 	scope = "com.centurylinklabs.watchtower.scope"
 	// OrchestratorLabel identifies ephemeral orchestrator containers used during self-update.
 	OrchestratorLabel = "com.centurylinklabs.watchtower.ephemeral-orchestrator"
+	// cooldownDelayLabel sets the minimum image age before updating this container.
+	// Accepts duration strings (e.g., "24h", "3d", "1w", "0" to disable).
+	cooldownDelayLabel = "com.centurylinklabs.watchtower.cooldown-delay"
 )
 
 // Lifecycle hook labels configure commands executed during container update phases.
@@ -299,6 +304,49 @@ func (c *Container) IsMonitorOnly(params types.UpdateParams) bool {
 //   - bool: True if no-pull, false otherwise.
 func (c *Container) IsNoPull(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
+}
+
+// CooldownDelay returns the effective cooldown delay for this container.
+//
+// If the container has the cooldown-delay label set, its value is used (parsed
+// as a duration string). Otherwise, the global CooldownDelay from UpdateParams
+// is used. Setting the label to "0" disables cooldown for this container.
+//
+// Parameters:
+//   - params: Update parameters from types.UpdateParams.
+//
+// Returns:
+//   - time.Duration: Effective cooldown delay for this container.
+func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
+	labelVal, ok := c.getLabelValue(cooldownDelayLabel)
+	if !ok {
+		// No label set — use global value.
+		return params.CooldownDelay
+	}
+
+	if labelVal == "" {
+		// Label present but empty — use global value.
+		return params.CooldownDelay
+	}
+
+	parsed, err := util.ParseDuration(labelVal)
+	if err != nil {
+		logrus.WithError(err).
+			WithField("container", c.Name()).
+			WithField("label", cooldownDelayLabel).
+			WithField("value", labelVal).
+			Warn("Failed to parse cooldown-delay label, using global value")
+
+		return params.CooldownDelay
+	}
+
+	logrus.WithField("container", c.Name()).
+		WithField("label", cooldownDelayLabel).
+		WithField("value", labelVal).
+		WithField("duration", parsed).
+		Debug("Parsed cooldown-delay label")
+
+	return parsed
 }
 
 // Scope retrieves the monitoring scope from labels.

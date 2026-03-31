@@ -59,12 +59,12 @@ func TestFormatDuration(t *testing.T) {
 		{
 			name:     "minutes and seconds",
 			duration: 2*time.Minute + 30*time.Second,
-			expected: "2 minutes, 30 seconds",
+			expected: "2 minutes 30 seconds",
 		},
 		{
 			name:     "hours, minutes, seconds",
 			duration: 1*time.Hour + 30*time.Minute + 45*time.Second,
-			expected: "1 hour, 30 minutes, 45 seconds",
+			expected: "1 hour 30 minutes 45 seconds",
 		},
 		{
 			name:     "single hour",

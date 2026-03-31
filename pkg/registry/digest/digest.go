@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -29,11 +30,6 @@ import (
 // This header, typically "Docker-Content-Digest", contains the digest value (e.g., "sha256:abc...") for an image manifest,
 // allowing Watchtower to compare or fetch it without downloading the full manifest body.
 const ContentDigestHeader = "Docker-Content-Digest"
-
-// UserAgent is the User-Agent header value used in HTTP requests to identify Watchtower as the client.
-// It can be customized at build time using linker flags (e.g., -ldflags "-X ...UserAgent=Watchtower/v1.0").
-// If not set during the build, it defaults to "Watchtower/unknown", providing a fallback identifier for registry requests.
-var UserAgent = "Watchtower/unknown"
 
 // imageLockEntry holds a per-image mutex along with a reference count and dead flag.
 // When refs drops to zero, the entry is marked dead so new callers will revive it
@@ -455,7 +451,12 @@ func fetchDigest(
 		Debug("Extracted original host from manifest URL")
 
 	// Obtain an authentication token and challenge host for the registry.
-	token, challengeHost, redirected, err := auth.GetToken(ctx, container, registryAuth, client)
+	token, challengeHost, redirected, redirectHost, err := auth.GetToken(
+		ctx,
+		container,
+		registryAuth,
+		client,
+	)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
 
@@ -464,28 +465,38 @@ func fetchDigest(
 
 	// If no token is returned, authentication is not required.
 	if token == "" {
-		logrus.WithFields(fields).Debug("No authentication required, proceeding with request")
+		logrus.WithFields(fields).
+			Debug("No authentication required, proceeding with request")
 	} else {
 		logrus.WithFields(fields).
 			WithField("challenge_host", challengeHost).
 			WithField("redirected", redirected).
+			WithField("redirect_host", redirectHost).
 			Debug("Received challenge host and redirect flag from GetToken")
 	}
 
-	// Build the manifest URL, using challenge host when redirected
+	// Build the manifest URL, using redirect host when redirected
 	var (
 		manifestURL string
 		parsedURL   *url.URL
 	)
 
-	if challengeHost != "" && challengeHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = BuildManifestURL(container, challengeHost)
+	if redirectHost != "" && redirectHost != originalHost && redirected {
+		manifestURL, _, parsedURL, err = BuildManifestURL(
+			container,
+			redirectHost,
+		)
 	} else {
-		manifestURL, _, parsedURL, err = BuildManifestURL(container, "")
+		manifestURL, _, parsedURL, err = BuildManifestURL(
+			container,
+			"",
+		)
 	}
 
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+		logrus.WithError(err).
+			WithFields(fields).
+			Debug("Failed to build manifest URL")
 
 		return "", err
 	}
@@ -1011,7 +1022,7 @@ func makeManifestRequest(
 		"Accept",
 		"application/vnd.docker.distribution.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json",
 	)
-	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("User-Agent", meta.UserAgent)
 
 	return req, nil
 }

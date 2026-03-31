@@ -242,7 +242,7 @@ updt1 (mock/updt1:latest): Updated
 	ginkgo.When("using report templates", func() {
 		ginkgo.When("no custom template is provided", func() {
 			ginkgo.It("should format the messages using the default template", func() {
-				expected := `4 Scanned, 2 Updated, 0 Restarted, 1 Failed
+				expected := `4 Scanned, 2 Updated, 0 Restarted, 1 Failed, 1 Fresh, 1 Skipped
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000
 - updt2 (mock/updt2:latest): 01d120000000 updated to d0a120000000
 - frsh1 (mock/frsh1:latest): Fresh
@@ -291,7 +291,7 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.Describe("the default template", func() {
 			ginkgo.When("all containers are fresh", func() {
 				ginkgo.It("should return the summary", func() {
-					expected := `1 Scanned, 0 Updated, 0 Restarted, 0 Failed
+					expected := `1 Scanned, 0 Updated, 0 Restarted, 0 Failed, 1 Fresh, 0 Skipped
 - frsh1 (mock/frsh1:latest): Fresh`
 					gomega.Expect(getTemplatedResult(``, false, mockDataAllFresh)).
 						To(gomega.Equal(expected))
@@ -299,7 +299,7 @@ updt1 (mock/updt1:latest): Updated
 			})
 			ginkgo.When("at least one container was updated", func() {
 				ginkgo.It("should send a report", func() {
-					expected := `1 Scanned, 1 Updated, 0 Restarted, 0 Failed
+					expected := `1 Scanned, 1 Updated, 0 Restarted, 0 Failed, 0 Fresh, 0 Skipped
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000`
 					data := mockDataFromStates(session.UpdatedState)
 					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
@@ -307,7 +307,7 @@ updt1 (mock/updt1:latest): Updated
 			})
 			ginkgo.When("at least one container failed to update", func() {
 				ginkgo.It("should send a report", func() {
-					expected := `1 Scanned, 0 Updated, 0 Restarted, 1 Failed
+					expected := `1 Scanned, 0 Updated, 0 Restarted, 1 Failed, 0 Fresh, 0 Skipped
 - fail1 (mock/fail1:latest): Failed: accidentally the whole container`
 					data := mockDataFromStates(session.FailedState)
 					gomega.Expect(getTemplatedResult(``, false, data)).To(gomega.Equal(expected))
@@ -315,7 +315,7 @@ updt1 (mock/updt1:latest): Updated
 			})
 			ginkgo.When("containers are restarted due to dependencies", func() {
 				ginkgo.It("should send a report with restarted containers", func() {
-					expected := `2 Scanned, 1 Updated, 1 Restarted, 0 Failed
+					expected := `2 Scanned, 1 Updated, 1 Restarted, 0 Failed, 0 Fresh, 0 Skipped
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000
 - rstr1 (mock/rstr1:latest): Restarted`
 					data := mockDataFromStates(session.UpdatedState, session.RestartedState)
@@ -324,7 +324,7 @@ updt1 (mock/updt1:latest): Updated
 			})
 			ginkgo.When("mixing updated and restarted containers", func() {
 				ginkgo.It("should show different states for updated vs restarted", func() {
-					expected := `3 Scanned, 2 Updated, 1 Restarted, 0 Failed
+					expected := `3 Scanned, 2 Updated, 1 Restarted, 0 Failed, 0 Fresh, 0 Skipped
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000
 - updt2 (mock/updt2:latest): 01d120000000 updated to d0a120000000
 - rstr1 (mock/rstr1:latest): Restarted`

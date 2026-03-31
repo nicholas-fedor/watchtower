@@ -14,10 +14,12 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/docker/docker/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
+	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -34,9 +36,11 @@ const projectServiceParts = 2
 
 // Update scans and updates containers based on parameters.
 //
-// It checks container staleness, sorts by dependencies, and updates or restarts containers as needed,
-// collecting cleaned image info for cleanup. Non-stale linked containers are restarted but not marked as updated.
-// Containers with pinned images (referenced by digest) are skipped to preserve immutability.
+// It checks container staleness, sorts by dependencies, and updates or restarts
+// containers as needed, collecting cleaned image info for cleanup.
+// Non-stale linked containers are restarted but not marked as updated.
+// Containers with pinned images (referenced by digest) are skipped to
+// preserve immutability.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
@@ -63,7 +67,10 @@ func Update(
 	logrus.Debug("Starting container update check")
 
 	// Fetch all containers for monitoring
-	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
+	allContainers, err := client.ListContainers(
+		ctx,
+		filters.NoFilter,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -95,20 +102,29 @@ func Update(
 	// Prepare a list of container names and images for detailed debugging output.
 	filteredContainerNames := make([]string, len(filteredContainers))
 	for i, c := range filteredContainers {
-		filteredContainerNames[i] = fmt.Sprintf("%s (%s)", c.Name(), c.ImageName())
+		filteredContainerNames[i] = fmt.Sprintf(
+			"%s (%s)",
+			c.Name(),
+			c.ImageName(),
+		)
 	}
 	// Log the retrieved containers and filter details.
-	logrus.WithFields(logrus.Fields{
-		"count":      len(filteredContainers),
-		"containers": filteredContainerNames,
-		"filter":     fmt.Sprintf("%T", config.Filter),
-	}).Debug("Retrieved containers for update check")
+	logrus.WithFields(
+		logrus.Fields{
+			"count":      len(filteredContainers),
+			"containers": filteredContainerNames,
+			"filter":     fmt.Sprintf("%T", config.Filter),
+		}).Debug("Retrieved containers for update check")
 
 	// Skip monitored containers that reference themselves as dependencies
 	// via the Watchtower depends-on label.
 	for _, monitoredContainer := range filteredContainers {
 		if hasSelfDependency(monitoredContainer) {
-			progress.AddSkipped(monitoredContainer, errSelfDependency, config)
+			progress.AddSkipped(
+				monitoredContainer,
+				errSelfDependency,
+				config,
+			)
 			logrus.Warnf(
 				"Skipping container update (self-dependency): %s (%s)",
 				monitoredContainer.Name(),
@@ -118,7 +134,10 @@ func Update(
 	}
 
 	// Detect circular dependencies and mark affected containers as skipped.
-	cycles := container.DetectCycles(filteredContainers, config.UseComposeDependsOn)
+	cycles := container.DetectCycles(
+		filteredContainers,
+		config.UseComposeDependsOn,
+	)
 	for _, c := range filteredContainers {
 		if cycles[container.ResolveContainerIdentifier(c)] {
 			progress.AddSkipped(c, errCircularDependency, config)
@@ -158,7 +177,7 @@ func Update(
 		isPinned, err := isPinned(sourceContainer, progress, config)
 		if err != nil {
 			// Log and skip containers with unparsable image references, marking as skipped.
-			clog.WithError(err).Debug("Failed to check pinned image, skipping container")
+			clog.WithError(err).Debug("Failed to check pinned image - skipping container")
 			progress.AddSkipped(
 				sourceContainer,
 				fmt.Errorf("%w: %w", errParseImageReference, err),
@@ -189,11 +208,19 @@ func Update(
 			stale = false
 			newestImage = sourceContainer.ImageID()
 		} else {
-			stale, newestImage, err = client.IsContainerStale(ctx, sourceContainer, config)
+			stale, newestImage, err = client.IsContainerStale(
+				ctx,
+				sourceContainer,
+				config,
+			)
 		}
 
 		// Determine if the container should be updated based on staleness and config.
-		shouldUpdate := shouldUpdateContainer(stale, sourceContainer, config)
+		shouldUpdate := shouldUpdateContainer(
+			sourceContainer,
+			stale,
+			config,
+		)
 
 		// Log when skipping Watchtower self-update in run-once mode
 		if stale && sourceContainer.IsWatchtower() && config.RunOnce {
@@ -207,24 +234,26 @@ func Update(
 			}
 		}
 
-		// Verify the container’s configuration if it’s slated for update to ensure recreation is possible.
+		// Verify the container’s configuration if it’s slated for update to
+		// ensure recreation is possible.
 		if err == nil && shouldUpdate {
 			err = sourceContainer.VerifyConfiguration()
 			if err != nil {
 				// Log configuration verification failure with detailed context.
-				logrus.WithError(err).WithFields(logrus.Fields{
-					"container_name": sourceContainer.Name(),
-					"container_id":   sourceContainer.ID().ShortID(),
-					"image_name":     sourceContainer.ImageName(),
-					"image_id":       sourceContainer.ImageID().ShortID(),
-				}).Debug("Failed to verify container configuration")
+				logrus.WithError(err).WithFields(
+					logrus.Fields{
+						"container_name": sourceContainer.Name(),
+						"container_id":   sourceContainer.ID().ShortID(),
+						"image_name":     sourceContainer.ImageName(),
+						"image_id":       sourceContainer.ImageID().ShortID(),
+					}).Debug("Failed to verify container configuration")
 			}
 		}
 
 		// Handle staleness check results, logging skips or adding to the progress report.
 		if err != nil {
 			// Skip containers with staleness check errors, marking them as skipped.
-			clog.WithError(err).Debug("Cannot update container, skipping")
+			clog.WithError(err).Debug("Cannot update container - skipping")
 
 			stale = false
 			staleCheckFailed++
@@ -232,22 +261,195 @@ func Update(
 			progress.AddSkipped(sourceContainer, err, config)
 
 			// Track if Watchtower self-update pull failed for safeguard.
-			// Only set to true if we actually attempted a self-update (i.e., SkipSelfUpdate is false)
+			// Only set to true if we actually attempted a self-update
+			// (i.e., SkipSelfUpdate is false)
 			if sourceContainer.IsWatchtower() && !config.SkipSelfUpdate {
 				watchtowerPullFailed = true
 			}
 		} else {
+			// Track cooldown info for setting on the progress entry after AddScanned.
+			var cooldownAge, cooldownDelayStr string
+
+			// Cooldown check: if the container should be updated and cooldown is configured, verify the image age.
+			// Uses per-container label if set, otherwise falls back to global setting.
+			// Skip cooldown check for no-pull and monitor-only containers since they won't be updated.
+			cooldownDelay := sourceContainer.CooldownDelay(config)
+
+			if shouldUpdate &&
+				cooldownDelay > 0 &&
+				!sourceContainer.IsNoPull(config) &&
+				!sourceContainer.IsMonitorOnly(config) {
+				pullOpts, pullErr := registry.GetPullOptions(
+					sourceContainer.ImageName(),
+				)
+				if pullErr != nil {
+					// Conservative posture: if pull options are unavailable, defer the update
+					// and record the container as skipped so it appears in notifications/reports.
+					cooldownStr := util.FormatDuration(cooldownDelay)
+
+					clog.WithError(pullErr).
+						Info("Failed to get pull options for cooldown check - deferring update")
+
+					filteredContainers[i].SetStale(false)
+					progress.AddSkipped(
+						sourceContainer,
+						fmt.Errorf(
+							"%w: could not get pull options for %s (cooldown: %s) - deferring update: %w",
+							errGetPullOptionsFailed,
+							sourceContainer.ImageName(),
+							cooldownStr,
+							pullErr,
+						),
+						config,
+					)
+					// Set cooldown info so split notifications can show the deferral reason.
+					progress.SetCooldownInfo(
+						sourceContainer.ID(),
+						"",
+						cooldownStr,
+						"",
+						false,
+					)
+
+					continue
+				}
+
+				imageAge, ageErr := fetchImageAge(
+					ctx,
+					sourceContainer,
+					pullOpts.RegistryAuth,
+				)
+				if ageErr != nil {
+					// Conservative posture: if we can't determine the age, defer the update.
+					cooldownStr := util.FormatDuration(cooldownDelay)
+
+					clog.WithError(ageErr).
+						Info("Image creation time unavailable - deferring update")
+
+					filteredContainers[i].SetStale(false)
+					progress.AddSkipped(
+						sourceContainer,
+						fmt.Errorf(
+							"%w: could not determine image age (cooldown: %s) - deferring update for safety",
+							errFetchImageAgeFailed,
+							cooldownStr,
+						),
+						config,
+					)
+					// Set cooldown info so split notifications can show the deferral reason.
+					progress.SetCooldownInfo(
+						sourceContainer.ID(),
+						"",
+						cooldownStr,
+						"",
+						false,
+					)
+
+					continue
+				}
+
+				// Negative image age indicates clock skew between the Watchtower host
+				// and the registry (image creation time is in the future). Log a warning
+				// and proceed with the update to avoid indefinite deferral.
+				//
+				// futureTimestamp tracks whether we detected clock skew so that the
+				// "Image age exceeds cooldown" block below is skipped — that block
+				// records cooldown metadata that would be misleading for a negative age.
+				futureTimestamp := false
+
+				if imageAge < 0 {
+					futureTimestamp = true
+					ageStr := util.FormatDuration(imageAge)
+					cooldownStr := util.FormatDuration(cooldownDelay)
+
+					clog.WithFields(
+						logrus.Fields{
+							"image_age": ageStr,
+							"cooldown":  cooldownStr,
+						}).Warn("Image creation time is in the future (possible clock skew) - proceeding with update")
+				} else if imageAge <= cooldownDelay {
+					// Defer when image age is less than or equal to cooldown.
+					// Updates only proceed when imageAge > cooldownDelay.
+					remaining := cooldownDelay - imageAge
+					ageStr := util.FormatDuration(imageAge)
+					cooldownStr := util.FormatDuration(cooldownDelay)
+					remainingStr := util.FormatDuration(remaining)
+
+					clog.WithFields(
+						logrus.Fields{
+							"image_age":   ageStr,
+							"cooldown":    cooldownStr,
+							"eligible_in": remainingStr,
+						}).Info("Image is within cooldown period - deferring update")
+
+					filteredContainers[i].SetStale(false)
+					progress.AddSkipped(
+						sourceContainer,
+						fmt.Errorf(
+							"%w: image age %s is within %s cooldown - eligible in %s",
+							errImageCooldown,
+							ageStr,
+							cooldownStr,
+							remainingStr,
+						),
+						config,
+					)
+					// Set cooldown info AFTER AddSkipped (which creates a new ContainerStatus).
+					progress.SetCooldownInfo(
+						sourceContainer.ID(),
+						ageStr,
+						cooldownStr,
+						remainingStr,
+						false)
+
+					continue
+				}
+
+				// Only record cooldown metadata when the image age is a real
+				// (non-negative) value that exceeds the cooldown window.
+				if !futureTimestamp {
+					ageStr := util.FormatDuration(imageAge)
+					cooldownStr := util.FormatDuration(cooldownDelay)
+
+					clog.WithFields(
+						logrus.Fields{
+							"image_age": ageStr,
+							"cooldown":  cooldownStr,
+						}).Info("Image age exceeds cooldown - proceeding with update")
+
+					// Store for setting after AddScanned.
+					cooldownAge = ageStr
+					cooldownDelayStr = cooldownStr
+				}
+			}
+
 			// For fresh containers, set newestImage to current image ID for proper categorization
 			if !stale {
 				newestImage = sourceContainer.ImageID()
 			}
 
 			// Log successful staleness check and add to scanned containers.
-			clog.WithFields(logrus.Fields{
-				"stale":        stale,
-				"newest_image": newestImage,
-			}).Debug("Checked container staleness")
-			progress.AddScanned(sourceContainer, newestImage, config)
+			clog.WithFields(
+				logrus.Fields{
+					"stale":        stale,
+					"newest_image": newestImage,
+				}).Debug("Checked container staleness")
+			progress.AddScanned(
+				sourceContainer,
+				newestImage,
+				config,
+			)
+
+			// Set cooldown info AFTER AddScanned, which creates a new ContainerStatus.
+			if cooldownAge != "" {
+				progress.SetCooldownInfo(
+					sourceContainer.ID(),
+					cooldownAge,
+					cooldownDelayStr,
+					"",
+					true,
+				)
+			}
 		}
 
 		// Update the container’s stale status for dependency sorting.
@@ -261,11 +463,12 @@ func Update(
 	}
 
 	// Log the summary of staleness checks, including total, stale, and failed counts.
-	logrus.WithFields(logrus.Fields{
-		"total":  len(filteredContainers),
-		"stale":  staleCount,
-		"failed": staleCheckFailed,
-	}).Debug("Completed container staleness check")
+	logrus.WithFields(
+		logrus.Fields{
+			"total":  len(filteredContainers),
+			"stale":  staleCount,
+			"failed": staleCheckFailed,
+		}).Debug("Completed container staleness check")
 
 	// Build a map for a lookup of containers by ID.
 	containerByID := make(map[types.ContainerID]types.Container, len(allContainers))
@@ -283,18 +486,24 @@ func Update(
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
-	err = sorter.SortByDependencies(filteredContainers, config.UseComposeDependsOn)
+	err = sorter.SortByDependencies(
+		filteredContainers,
+		config.UseComposeDependsOn,
+	)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
-			var circularErr sorter.CircularReferenceError
-			if errors.As(err, &circularErr) {
+			if circularErr, ok := errors.AsType[sorter.CircularReferenceError](err); ok {
 				circularName := circularErr.ContainerName
 				// Find the container and mark as skipped.
 				for _, c := range filteredContainers {
 					if c.Name() == circularName {
 						// Only add if not already skipped (e.g., from initial cycle detection)
 						if _, exists := (*progress)[c.ID()]; !exists {
-							progress.AddSkipped(c, errCircularDependency, config)
+							progress.AddSkipped(
+								c,
+								errCircularDependency,
+								config,
+							)
 							logrus.Warnf(
 								"Skipping container update (circular dependency): %s (%s)",
 								c.Name(),
@@ -309,7 +518,8 @@ func Update(
 			// Skip UpdateImplicitRestart to avoid potential issues with circular dependencies.
 		} else {
 			// Log and return an error if dependency sorting fails for other reasons.
-			logrus.WithError(err).Debug("Failed to sort containers by dependencies")
+			logrus.WithError(err).
+				Debug("Failed to sort containers by dependencies")
 
 			return nil, []types.RemovedImageInfo{}, fmt.Errorf(
 				"%w: %w",
@@ -319,7 +529,11 @@ func Update(
 		}
 	} else {
 		// Mark containers linked to restarting ones for restart without updating.
-		UpdateImplicitRestart(allContainers, filteredContainers, config.UseComposeDependsOn)
+		UpdateImplicitRestart(
+			allContainers,
+			filteredContainers,
+			config.UseComposeDependsOn,
+		)
 	}
 
 	// Collect all containers to restart (updates and implicit restarts)
@@ -332,9 +546,13 @@ func Update(
 	}
 
 	// Sort containers to restart by dependencies to ensure correct update and restart order.
-	err = sorter.SortByDependencies(allContainersToRestart, config.UseComposeDependsOn)
+	err = sorter.SortByDependencies(
+		allContainersToRestart,
+		config.UseComposeDependsOn,
+	)
 	if err != nil {
-		logrus.WithError(err).Debug("Failed to sort all containers to restart by dependencies")
+		logrus.WithError(err).
+			Debug("Failed to sort all containers to restart by dependencies")
 
 		return nil, []types.RemovedImageInfo{}, fmt.Errorf(
 			"%w: %w",
@@ -404,21 +622,24 @@ func Update(
 		lifecycle.ExecutePostChecks(ctx, client, config)
 	}
 
-	// Add safeguard delay if Watchtower self-update pull failed to prevent rapid restarts.
+	// Add safeguard delay if Watchtower self-update pull failed
+	// to prevent rapid restarts.
 	if watchtowerPullFailed {
 		delay := config.PullFailureDelay
 		if delay == 0 {
 			delay = defaultPullFailureDelay // Default delay
 		}
 
-		logrus.WithField("delay", delay).
-			Info("Watchtower self-update pull failed, sleeping to prevent rapid restarts")
+		logrus.WithField(
+			"delay",
+			delay).
+			Info("Watchtower self-update pull failed - sleeping to prevent rapid restarts")
 
 		select {
 		case <-time.After(delay):
 		case <-ctx.Done():
 			logrus.WithError(ctx.Err()).
-				Debug("Context canceled during pull-failure delay; skipping remaining delay")
+				Debug("Context canceled during pull-failure delay - skipping remaining delay")
 		}
 	}
 
@@ -434,7 +655,10 @@ func hasSelfDependency(c types.Container) bool {
 		return false
 	}
 
-	clog := logrus.WithField("container", c.Name())
+	clog := logrus.WithField(
+		"container",
+		c.Name(),
+	)
 
 	links := container.GetLinksFromWatchtowerLabel(sourceContainer, clog)
 
@@ -449,7 +673,12 @@ func hasSelfDependency(c types.Container) bool {
 // Parameters:
 //   - allContainers: List of all containers.
 //   - containers: List of containers to update.
-func UpdateImplicitRestart(allContainers, containers []types.Container, useComposeDependsOn bool) {
+//   - useComposeDependsOn: Boolean value of use-compose-depends-on configuration
+func UpdateImplicitRestart(
+	allContainers,
+	containers []types.Container,
+	useComposeDependsOn bool,
+) {
 	logrus.Debug("Starting UpdateImplicitRestart")
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
@@ -474,12 +703,13 @@ func UpdateImplicitRestart(allContainers, containers []types.Container, useCompo
 			links := c.Links(useComposeDependsOn)
 
 			containerIdentifier := container.ResolveContainerIdentifier(c)
-			logrus.WithFields(logrus.Fields{
-				"container":            c.Name(),
-				"container_identifier": containerIdentifier,
-				"links":                links,
-				"to_restart":           c.ToRestart(),
-			}).Debug("Checking links for container")
+			logrus.WithFields(
+				logrus.Fields{
+					"container":            c.Name(),
+					"container_identifier": containerIdentifier,
+					"links":                links,
+					"to_restart":           c.ToRestart(),
+				}).Debug("Checking links for container")
 
 			if link := linkedIdentifierMarkedForRestart(
 				links,
@@ -487,10 +717,11 @@ func UpdateImplicitRestart(allContainers, containers []types.Container, useCompo
 				c,
 				allContainers,
 			); link != "" {
-				logrus.WithFields(logrus.Fields{
-					"container":  c.Name(),
-					"restarting": link,
-				}).Debug("Marked container as linked to restarting")
+				logrus.WithFields(
+					logrus.Fields{
+						"container":  c.Name(),
+						"restarting": link,
+					}).Debug("Marked container as linked to restarting")
 				containers[i].SetLinkedToRestarting(true)
 
 				if ac, ok := byID[c.ID()]; ok {
@@ -504,10 +735,14 @@ func UpdateImplicitRestart(allContainers, containers []types.Container, useCompo
 		}
 	}
 
-	logrus.WithField("marked_containers", markedContainers).Debug("Completed UpdateImplicitRestart")
+	logrus.WithField(
+		"marked_containers",
+		markedContainers,
+	).Debug("Completed UpdateImplicitRestart")
 }
 
-// shouldUpdateContainer determines if a container should be updated based on its staleness and update parameters.
+// shouldUpdateContainer determines if a container should be updated
+// based on its staleness and update parameters.
 //
 // It checks multiple conditions:
 // - The container must be stale (outdated image)
@@ -517,13 +752,17 @@ func UpdateImplicitRestart(allContainers, containers []types.Container, useCompo
 // - Watchtower self-updates are skipped if SkipSelfUpdate is true
 //
 // Parameters:
-//   - stale: Whether the container's image is outdated.
 //   - container: The container to check.
+//   - stale: Whether the container's image is outdated.
 //   - config: Update parameters controlling update behavior.
 //
 // Returns:
 //   - bool: True if the container should be updated, false otherwise.
-func shouldUpdateContainer(stale bool, container types.Container, config types.UpdateParams) bool {
+func shouldUpdateContainer(
+	container types.Container,
+	stale bool,
+	config types.UpdateParams,
+) bool {
 	// Must be stale to update
 	if !stale {
 		return false
@@ -534,7 +773,8 @@ func shouldUpdateContainer(stale bool, container types.Container, config types.U
 		return false
 	}
 
-	// Allow update if NoRestart is false, or if it's a Watchtower container (which can update even with NoRestart)
+	// Allow update if NoRestart is false, or if it's a Watchtower container
+	// (which can update even with NoRestart)
 	if config.NoRestart && !container.IsWatchtower() {
 		return false
 	}
@@ -594,19 +834,25 @@ func linkedIdentifierMarkedForRestart(
 
 	dependentProject := getProject(dependentContainer)
 
-	logrus.WithFields(logrus.Fields{
-		"links":               links,
-		"restartByIdentifier": restartByIdentifier,
-		"dependentProject":    dependentProject,
-	}).Debug("Searching for restarting linked container")
+	logrus.WithFields(
+		logrus.Fields{
+			"links":               links,
+			"restartByIdentifier": restartByIdentifier,
+			"dependentProject":    dependentProject,
+		}).Debug("Searching for restarting linked container")
 
 	for _, link := range links {
-		logrus.WithField("checking_link", link).Debug("Checking link for restarting match")
+		logrus.WithField(
+			"checking_link",
+			link,
+		).Debug("Checking link for restarting match")
 
 		// Exact match
 		if restartByIdentifier[link] {
-			logrus.WithField("found_restarting_identifier", link).
-				Debug("Found restarting linked container via exact match")
+			logrus.WithField(
+				"found_restarting_identifier",
+				link,
+			).Debug("Found restarting linked container via exact match")
 
 			return link
 		}
@@ -621,31 +867,34 @@ func linkedIdentifierMarkedForRestart(
 			linkProject := parts[0]
 			serviceName := parts[1]
 
-			logrus.WithFields(logrus.Fields{
-				"link":        link,
-				"linkProject": linkProject,
-				"serviceName": serviceName,
-			}).Debug("Checking project-service match")
+			logrus.WithFields(
+				logrus.Fields{
+					"link":        link,
+					"linkProject": linkProject,
+					"serviceName": serviceName,
+				}).Debug("Checking project-service match")
 
 			for identifier, restarting := range restartByIdentifier {
 				if restarting && getProject(nameToContainer[identifier]) == linkProject &&
 					strings.Contains(identifier, serviceName) {
-					logrus.WithFields(logrus.Fields{
-						"link":    link,
-						"matched": identifier,
-						"project": linkProject,
-						"service": serviceName,
-					}).Debug("Found restarting linked container via project-service match")
+					logrus.WithFields(
+						logrus.Fields{
+							"link":    link,
+							"matched": identifier,
+							"project": linkProject,
+							"service": serviceName,
+						}).Debug("Found restarting linked container via project-service match")
 
 					return identifier
 				}
 			}
 		} else {
 			// service name only, prioritize same project first, then cross-project dependencies
-			logrus.WithFields(logrus.Fields{
-				"link":             link,
-				"dependentProject": dependentProject,
-			}).Debug("Checking service-only match")
+			logrus.WithFields(
+				logrus.Fields{
+					"link":             link,
+					"dependentProject": dependentProject,
+				}).Debug("Checking service-only match")
 
 			// crossProjectMatch stores the first cross-project match found, used as fallback
 			// when no same-project match exists.
@@ -682,11 +931,12 @@ func linkedIdentifierMarkedForRestart(
 					matchProject := getProject(nameToContainer[identifier])
 					// Priority 1: Same-project match - return immediately
 					if matchProject == dependentProject {
-						logrus.WithFields(logrus.Fields{
-							"link":    link,
-							"matched": identifier,
-							"project": matchProject,
-						}).Debug("Found restarting linked container via same-project service match")
+						logrus.WithFields(
+							logrus.Fields{
+								"link":    link,
+								"matched": identifier,
+								"project": matchProject,
+							}).Debug("Found restarting linked container via same-project service match")
 
 						return identifier
 					}
@@ -704,11 +954,12 @@ func linkedIdentifierMarkedForRestart(
 			// If no same-project match was found, return cross-project match as fallback.
 			// See note above about non-deterministic selection when multiple matches exist.
 			if crossProjectMatch != "" {
-				logrus.WithFields(logrus.Fields{
-					"link":    link,
-					"matched": crossProjectMatch,
-					"project": getProject(nameToContainer[crossProjectMatch]),
-				}).Debug("Found restarting linked container via cross-project service match")
+				logrus.WithFields(
+					logrus.Fields{
+						"link":    link,
+						"matched": crossProjectMatch,
+						"project": getProject(nameToContainer[crossProjectMatch]),
+					}).Debug("Found restarting linked container via cross-project service match")
 
 				return crossProjectMatch
 			}
@@ -746,10 +997,11 @@ func parseReference(
 	container types.Container,
 ) (reference.Reference, error) {
 	// Set up logging with container and image details.
-	clog := logrus.WithFields(logrus.Fields{
-		"container": container.Name(),
-		"image":     imageName,
-	})
+	clog := logrus.WithFields(
+		logrus.Fields{
+			"container": container.Name(),
+			"image":     imageName,
+		})
 
 	// Parse the image reference using the Docker reference library.
 	normalizedRef, err := reference.ParseDockerRef(imageName)
@@ -758,16 +1010,22 @@ func parseReference(
 			WithField("image_name", imageName).
 			Debug("Failed to parse image reference")
 
-		return nil, fmt.Errorf("failed to parse image reference %s: %w", imageName, err)
+		return nil,
+			fmt.Errorf(
+				"failed to parse image reference %s: %w",
+				imageName,
+				err,
+			)
 	}
 
 	// Log successful parsing with reference type and context.
-	clog.WithFields(logrus.Fields{
-		"image_name":     imageName,
-		"config_image":   configImage,
-		"fallback_image": fallbackImage,
-		"ref_type":       fmt.Sprintf("%T", normalizedRef),
-	}).Debug("Parsed image reference")
+	clog.WithFields(
+		logrus.Fields{
+			"image_name":     imageName,
+			"config_image":   configImage,
+			"fallback_image": fallbackImage,
+			"ref_type":       fmt.Sprintf("%T", normalizedRef),
+		}).Debug("Parsed image reference")
 
 	return normalizedRef, nil
 }
@@ -794,10 +1052,11 @@ func isPinned(
 	config types.UpdateParams,
 ) (bool, error) {
 	// Set up logging with container and image details for debugging.
-	clog := logrus.WithFields(logrus.Fields{
-		"container": container.Name(),
-		"image":     container.ImageName(),
-	})
+	clog := logrus.WithFields(
+		logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		})
 
 	// Get initial image name and configuration.
 	imageName := container.ImageName()
@@ -806,14 +1065,23 @@ func isPinned(
 
 	// Check if ImageName is invalid and fall back to Config.Image or a derived name.
 	if isInvalidImageName(imageName) {
-		clog.WithField("invalid_image", imageName).Debug("Invalid ImageName detected")
+		clog.WithField(
+			"invalid_image",
+			imageName,
+		).Debug("Invalid ImageName detected")
 
 		if configImage != "" && !isInvalidImageName(configImage) {
 			imageName = configImage
-			clog.WithField("config_image", configImage).Debug("Using Config.Image as fallback")
+			clog.WithField(
+				"config_image",
+				configImage,
+			).Debug("Using Config.Image as fallback")
 		} else {
 			imageName = fallbackImage
-			clog.WithField("fallback_image", fallbackImage).Debug("Using derived fallback image")
+			clog.WithField(
+				"fallback_image",
+				fallbackImage,
+			).Debug("Using derived fallback image")
 		}
 	}
 
@@ -823,12 +1091,22 @@ func isPinned(
 	}
 
 	// Parse the selected image name to check for a digest-based reference.
-	normalizedRef, err := parseReference(imageName, configImage, fallbackImage, container)
+	normalizedRef, err := parseReference(
+		imageName,
+		configImage,
+		fallbackImage,
+		container,
+	)
 	if err != nil && imageName != fallbackImage {
 		// Retry parsing with the fallback image if the initial attempt failed.
 		clog.Debug("Retrying with fallback image")
 
-		normalizedRef, err = parseReference(fallbackImage, configImage, fallbackImage, container)
+		normalizedRef, err = parseReference(
+			fallbackImage,
+			configImage,
+			fallbackImage,
+			container,
+		)
 	}
 
 	if err != nil {
@@ -839,8 +1117,15 @@ func isPinned(
 	_, isDigested := normalizedRef.(reference.Digested)
 	if isDigested {
 		// Mark the container as scanned to skip updates for pinned images.
-		clog.WithField("is_digested", isDigested).Debug("Pinned image detected, marking as scanned")
-		progress.AddScanned(container, container.ImageID(), config)
+		clog.WithField(
+			"is_digested",
+			isDigested,
+		).Debug("Pinned image detected, marking as scanned")
+		progress.AddScanned(
+			container,
+			container.ImageID(),
+			config,
+		)
 	}
 
 	return isDigested, nil
@@ -891,7 +1176,10 @@ func performRollingRestart(
 		containerNames[i] = c.Name()
 	}
 
-	logrus.WithField("processing_order", containerNames).Debug("Starting performRollingRestart")
+	logrus.WithField(
+		"processing_order",
+		containerNames,
+	).Debug("Starting performRollingRestart")
 
 	// Process containers in forward order to respect dependency chains.
 	for i := range containers {
@@ -900,21 +1188,23 @@ func performRollingRestart(
 		case <-ctx.Done():
 			// Handle the current container that was not processed due to cancellation.
 			c := containers[i]
-			logrus.WithFields(logrus.Fields{
-				"container":    c.Name(),
-				"image":        c.ImageName(),
-				"container_id": c.ID().ShortID(),
-			}).Info("Skipped container restart due to context cancellation")
+			logrus.WithFields(
+				logrus.Fields{
+					"container":    c.Name(),
+					"image":        c.ImageName(),
+					"container_id": c.ID().ShortID(),
+				}).Info("Skipped container restart due to context cancellation")
 			failed[c.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
 
 			// Handle remaining containers that were not processed due to cancellation.
 			for j := i + 1; j < len(containers); j++ {
 				skipped := containers[j]
-				logrus.WithFields(logrus.Fields{
-					"container":    skipped.Name(),
-					"image":        skipped.ImageName(),
-					"container_id": skipped.ID().ShortID(),
-				}).Info("Skipped container restart due to context cancellation")
+				logrus.WithFields(
+					logrus.Fields{
+						"container":    skipped.Name(),
+						"image":        skipped.ImageName(),
+						"container_id": skipped.ID().ShortID(),
+					}).Info("Skipped container restart due to context cancellation")
 				failed[skipped.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
 			}
 
@@ -932,7 +1222,8 @@ func performRollingRestart(
 			"image":     c.ImageName(),
 		}
 
-		logrus.WithFields(fields).Debug("Processing container for rolling restart")
+		logrus.WithFields(fields).
+			Debug("Processing container for rolling restart")
 
 		// Mark for update if stale
 		if c.IsStale() && progress != nil {
@@ -1030,21 +1321,23 @@ func stopContainersInReversedOrder(
 		// First, log and track the current container, then iterate remaining containers.
 		if ctx.Err() != nil {
 			// Handle the current container that was not processed due to cancellation.
-			logrus.WithFields(logrus.Fields{
-				"container":    c.Name(),
-				"image":        c.ImageName(),
-				"container_id": c.ID().ShortID(),
-			}).Info("Skipped container stop due to context cancellation")
+			logrus.WithFields(
+				logrus.Fields{
+					"container":    c.Name(),
+					"image":        c.ImageName(),
+					"container_id": c.ID().ShortID(),
+				}).Info("Skipped container stop due to context cancellation")
 			failed[c.ID()] = fmt.Errorf("stop skipped: %w", ctx.Err())
 
 			// Handle remaining containers that were not processed due to cancellation.
 			for j := i - 1; j >= 0; j-- {
 				skipped := containers[j]
-				logrus.WithFields(logrus.Fields{
-					"container":    skipped.Name(),
-					"image":        skipped.ImageName(),
-					"container_id": skipped.ID().ShortID(),
-				}).Info("Skipped container stop due to context cancellation")
+				logrus.WithFields(
+					logrus.Fields{
+						"container":    skipped.Name(),
+						"image":        skipped.ImageName(),
+						"container_id": skipped.ID().ShortID(),
+					}).Info("Skipped container stop due to context cancellation")
 				failed[skipped.ID()] = fmt.Errorf("stop skipped: %w", ctx.Err())
 			}
 
@@ -1070,7 +1363,8 @@ func stopContainersInReversedOrder(
 				},
 			)
 
-			logrus.WithFields(fields).Debug("Stopped container")
+			logrus.WithFields(fields).
+				Debug("Stopped container")
 		}
 	}
 
@@ -1113,7 +1407,8 @@ func stopStaleContainer(
 		return nil
 	}
 
-	logrus.WithFields(fields).Debug("Stopping container for restart")
+	logrus.WithFields(fields).
+		Debug("Stopping container for restart")
 
 	// Verify configuration for linked containers to ensure restart compatibility.
 	if container.IsLinkedToRestarting() {
@@ -1137,20 +1432,27 @@ func stopStaleContainer(
 			config.LifecycleGID,
 		)
 		if err != nil {
-			logrus.WithFields(fields).WithError(err).Debug("Pre-update command execution failed")
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Pre-update command execution failed")
 
 			return fmt.Errorf("%w: %w", errPreUpdateFailed, err)
 		}
 
 		if skipUpdate {
-			logrus.WithFields(fields).Debug("Skipping container due to pre-update exit code 75")
+			logrus.WithFields(fields).
+				Debug("Skipping container due to pre-update exit code 75")
 
 			return errSkipUpdate
 		}
 	}
 
 	// Stop the container with the configured timeout.
-	err := client.StopAndRemoveContainer(ctx, container, config.Timeout)
+	err := client.StopAndRemoveContainer(
+		ctx,
+		container,
+		config.Timeout,
+	)
 	if err != nil {
 		// Check if the container is already gone (e.g., "No such container" error).
 		// Treat this as non-fatal, similar to RemoveExcessWatchtowerInstances.
@@ -1162,7 +1464,9 @@ func stopStaleContainer(
 			return nil
 		}
 
-		logrus.WithFields(fields).WithError(err).Error("Failed to stop container")
+		logrus.WithFields(fields).
+			WithError(err).
+			Error("Failed to stop container")
 
 		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
 	}
@@ -1208,21 +1512,23 @@ func restartContainersInSortedOrder(
 		// First, log and track the current container, then iterate remaining containers.
 		if ctx.Err() != nil {
 			// Handle the current container that was not processed due to cancellation.
-			logrus.WithFields(logrus.Fields{
-				"container":    c.Name(),
-				"image":        c.ImageName(),
-				"container_id": c.ID().ShortID(),
-			}).Info("Skipped container restart due to context cancellation")
+			logrus.WithFields(
+				logrus.Fields{
+					"container":    c.Name(),
+					"image":        c.ImageName(),
+					"container_id": c.ID().ShortID(),
+				}).Info("Skipped container restart due to context cancellation")
 			failed[c.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
 
 			// Handle remaining containers that were not processed due to cancellation.
 			for j := i + 1; j < len(containers); j++ {
 				skipped := containers[j]
-				logrus.WithFields(logrus.Fields{
-					"container":    skipped.Name(),
-					"image":        skipped.ImageName(),
-					"container_id": skipped.ID().ShortID(),
-				}).Info("Skipped container restart due to context cancellation")
+				logrus.WithFields(
+					logrus.Fields{
+						"container":    skipped.Name(),
+						"image":        skipped.ImageName(),
+						"container_id": skipped.ID().ShortID(),
+					}).Info("Skipped container restart due to context cancellation")
 				failed[skipped.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
 			}
 
@@ -1278,13 +1584,15 @@ func restartContainersInSortedOrder(
 					}
 				}
 
-				logrus.WithFields(fields).Debug("Restarted container")
+				logrus.WithFields(fields).
+					Debug("Restarted container")
 
 				if renamed {
 					renamedContainers[c.ID()] = true
 				}
-				// Only collect cleaned image info for stale containers that were not renamed, as renamed
-				// containers (Watchtower self-updates) are cleaned up by CheckForMultipleWatchtowerInstances
+				// Only collect cleaned image info for stale containers that were
+				// not renamed, as renamed containers (Watchtower self-updates)
+				// are cleaned up by CheckForMultipleWatchtowerInstances
 				// in the new container.
 				if c.IsStale() && !renamedContainers[c.ID()] {
 					addCleanupImageInfo(
@@ -1364,9 +1672,14 @@ func restartStaleContainer(
 	)
 
 	if config.Timeout <= 0 {
-		detachedCtx, cancelDetached = context.WithCancel(context.Background())
+		detachedCtx, cancelDetached = context.WithCancel(
+			context.Background(),
+		)
 	} else {
-		detachedCtx, cancelDetached = context.WithTimeout(context.Background(), config.Timeout)
+		detachedCtx, cancelDetached = context.WithTimeout(
+			context.Background(),
+			config.Timeout,
+		)
 	}
 
 	defer cancelDetached()
@@ -1390,7 +1703,8 @@ func restartStaleContainer(
 		// the orchestrator completes the replacement asynchronously. The current
 		// Watchtower process will be stopped by the orchestrator shortly after.
 		if config.EphemeralSelfUpdate {
-			logrus.WithFields(fields).Debug("Using ephemeral self-update")
+			logrus.WithFields(fields).
+				Debug("Using ephemeral self-update")
 
 			_, renamed, err := EphemeralSelfUpdate(
 				ctx,
@@ -1410,19 +1724,34 @@ func restartStaleContainer(
 
 		newName := "watchtower-old-" + sourceContainer.ID().ShortID()
 
-		err := client.RenameContainer(ctx, sourceContainer, newName)
+		err := client.RenameContainer(
+			ctx,
+			sourceContainer,
+			newName,
+		)
 		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"container": sourceContainer.Name(),
-				"new_name":  newName,
-			}).Debug("Failed to rename Watchtower container")
+			logrus.WithError(err).
+				WithFields(
+					logrus.Fields{
+						"container": sourceContainer.Name(),
+						"new_name":  newName,
+					}).
+				Debug("Failed to rename Watchtower container")
 
-			return "", false, fmt.Errorf("%w: %w", errRenameWatchtowerFailed, err)
+			return "",
+				false,
+				fmt.Errorf(
+					"%w: %w",
+					errRenameWatchtowerFailed,
+					err,
+				)
 		}
 
 		logrus.WithFields(fields).
-			WithField("new_name", newName).
-			Debug("Renamed Watchtower container")
+			WithField(
+				"new_name",
+				newName,
+			).Debug("Renamed Watchtower container")
 
 		renamed = true
 	}
@@ -1456,22 +1785,30 @@ func restartStaleContainer(
 	// Start the new container unless restarts are disabled.
 	// Watchtower containers are always started.
 	if !config.NoRestart || sourceContainer.IsWatchtower() {
-		logrus.WithFields(fields).Debug("Starting container with updated configuration")
+		logrus.WithFields(fields).
+			Debug("Starting container with updated configuration")
 
 		var err error
 
 		// Start the new container.
 		newContainerID, err = client.StartContainer(ctx, sourceContainer)
 		if err != nil {
-			logrus.WithFields(fields).WithError(err).Debug("Failed to start container")
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Failed to start container")
 
 			// If there's an error and the container is an old Watchtower container,
 			// then stop and remove it.
 			if renamed && sourceContainer.IsWatchtower() {
-				logrus.WithFields(fields).Debug("Cleaning up failed Watchtower container")
+				logrus.WithFields(fields).
+					Debug("Cleaning up failed Watchtower container")
 
 				//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-				cleanupErr := client.StopAndRemoveContainer(detachedCtx, sourceContainer, config.Timeout)
+				cleanupErr := client.StopAndRemoveContainer(
+					detachedCtx,
+					sourceContainer,
+					config.Timeout,
+				)
 				if cleanupErr != nil {
 					logrus.WithError(cleanupErr).
 						WithFields(fields).
@@ -1479,12 +1816,19 @@ func restartStaleContainer(
 				}
 			}
 
-			return "", renamed, fmt.Errorf("%w: %w", errStartContainerFailed, err)
+			return "",
+				renamed,
+				fmt.Errorf(
+					"%w: %w",
+					errStartContainerFailed,
+					err,
+				)
 		}
 
 		// Run post-update lifecycle hooks for restarting containers if enabled.
 		if sourceContainer.ToRestart() && config.LifecycleHooks {
-			logrus.WithFields(fields).Debug("Executing post-update command")
+			logrus.WithFields(fields).
+				Debug("Executing post-update command")
 			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
 			lifecycle.ExecutePostUpdateCommand(
 				detachedCtx,
@@ -1510,7 +1854,11 @@ func restartStaleContainer(
 		// Update the renamed Watchtower container's restart policy.
 		//
 		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-		err := client.UpdateContainer(detachedCtx, sourceContainer, updateConfig)
+		err := client.UpdateContainer(
+			detachedCtx,
+			sourceContainer,
+			updateConfig,
+		)
 		if err != nil {
 			logrus.WithError(err).
 				WithFields(fields).
@@ -1519,4 +1867,35 @@ func restartStaleContainer(
 	}
 
 	return newContainerID, renamed, nil
+}
+
+// fetchImageAge retrieves the age of the newest image from the registry by fetching
+// its creation timestamp and calculating the elapsed time since then.
+//
+// It uses the provided registryAuth credentials to fetch the image creation time
+// from the registry and returns the duration since creation.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - container: Container whose image age to fetch.
+//   - registryAuth: Base64-encoded registry credentials for authentication.
+//
+// Returns:
+//   - time.Duration: Elapsed time since the image was created.
+//   - error: Non-nil if image creation time retrieval fails.
+func fetchImageAge(
+	ctx context.Context,
+	container types.Container,
+	registryAuth string,
+) (time.Duration, error) {
+	creationTime, err := registry.FetchImageCreationTime(
+		ctx,
+		container,
+		registryAuth,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch image creation time: %w", err)
+	}
+
+	return time.Since(creationTime), nil
 }

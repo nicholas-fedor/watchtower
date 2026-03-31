@@ -35,15 +35,19 @@ const (
 //
 //nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
-	containerID    types.ContainerID // Container ID.
-	oldImage       types.ImageID     // Original image ID.
-	newImage       types.ImageID     // Latest image ID.
-	containerName  string            // Container name.
-	imageName      string            // Image name with tag.
-	containerError error             // Error encountered, if any.
-	state          State             // Current state.
-	monitorOnly    bool              // Monitor-only flag.
-	newContainerID types.ContainerID // New container ID after update.
+	containerID       types.ContainerID // Container ID.
+	oldImage          types.ImageID     // Original image ID.
+	newImage          types.ImageID     // Latest image ID.
+	containerName     string            // Container name.
+	imageName         string            // Image name with tag.
+	containerError    error             // Error encountered, if any.
+	state             State             // Current state.
+	monitorOnly       bool              // Monitor-only flag.
+	newContainerID    types.ContainerID // New container ID after update.
+	cooldownPassed    bool              // True if image passed cooldown check.
+	cooldownAge       string            // Human-readable image age (e.g., "47 days, 11 hours").
+	cooldownDelay     string            // Human-readable cooldown duration (e.g., "24 hours").
+	cooldownRemaining string            // Human-readable remaining time (empty if passed).
 }
 
 // ID returns the container ID.
@@ -147,4 +151,38 @@ func (u *ContainerStatus) NewContainerID() types.ContainerID {
 //   - newID: The new container ID.
 func (u *ContainerStatus) SetNewContainerID(newID types.ContainerID) {
 	u.newContainerID = newID
+}
+
+// SetCooldownInfo sets cooldown metadata for this container.
+//
+// Parameters:
+//   - age: Human-readable image age (e.g., "47 days, 11 hours").
+//   - delay: Human-readable cooldown duration (e.g., "24 hours").
+//   - remaining: Human-readable remaining time (empty if passed).
+//   - passed: True if the image passed the cooldown check.
+func (u *ContainerStatus) SetCooldownInfo(age, delay, remaining string, passed bool) {
+	u.cooldownPassed = passed
+	u.cooldownAge = age
+	u.cooldownDelay = delay
+	u.cooldownRemaining = remaining
+}
+
+// CooldownPassed returns whether the image passed the cooldown check.
+func (u *ContainerStatus) CooldownPassed() bool {
+	return u.cooldownPassed
+}
+
+// CooldownAge returns the human-readable image age.
+func (u *ContainerStatus) CooldownAge() string {
+	return u.cooldownAge
+}
+
+// CooldownDelay returns the human-readable cooldown duration.
+func (u *ContainerStatus) CooldownDelay() string {
+	return u.cooldownDelay
+}
+
+// CooldownRemaining returns the human-readable remaining cooldown time.
+func (u *ContainerStatus) CooldownRemaining() string {
+	return u.cooldownRemaining
 }

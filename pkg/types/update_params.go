@@ -24,4 +24,5 @@ type UpdateParams struct {
 	UseComposeDependsOn bool          // Enable Docker Compose depends_on label processing.
 	SkipSelfUpdate      bool          // Skip Watchtower self-update if true.
 	EphemeralSelfUpdate bool          // Use ephemeral container for self-update if true.
+	CooldownDelay       time.Duration // Minimum time since image creation before allowing updates.
 }

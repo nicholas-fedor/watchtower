@@ -405,7 +405,7 @@ func inspectOldContainer(
 	}
 
 	if !oldContainer.IsRunning() {
-		clog.Warn("Old container is not running, proceeding with creation only")
+		clog.Warn("Old container is not running - proceeding with creation only")
 	}
 
 	clog.WithField("old_name", oldContainer.Name()).
@@ -489,7 +489,7 @@ func stopAndRemoveOldContainer(
 
 			if !freshContainer.IsRunning() {
 				// Container stopped despite the error; proceed with removal.
-				clog.Debug("Old container is not running after stop attempt, proceeding with removal")
+				clog.Debug("Old container is not running after stop attempt - proceeding with removal")
 			} else {
 				// Container is still running and StopContainer failed — this is fatal.
 				clog.WithError(err).Error("Failed to stop old container")

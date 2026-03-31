@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"strings"
+	"time"
 
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerImage "github.com/docker/docker/api/types/image"
@@ -36,6 +37,7 @@ type Container interface {
 	SetStale(status bool)                             // Set stale status.
 	IsStale() bool                                    // Stale status check.
 	IsNoPull(params UpdateParams) bool                // No-pull check.
+	CooldownDelay(params UpdateParams) time.Duration  // Effective cooldown delay.
 	SetLinkedToRestarting(status bool)                // Set linked-to-restarting status.
 	IsLinkedToRestarting() bool                       // Linked-to-restarting check.
 	PreUpdateTimeout() int                            // Pre-update timeout.
