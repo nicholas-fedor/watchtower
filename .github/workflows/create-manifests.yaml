@@ -36,13 +36,13 @@ jobs:
           fetch-depth: 0
 
       - name: Login to Docker Hub
-        uses: docker/login-action@5c42dd293b89d96bae168b5b3694e4e72a5b1117
+        uses: docker/login-action@bb9683dca29f758cbd6ee832740e9f2dbeb21a3e
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
-        uses: docker/login-action@5c42dd293b89d96bae168b5b3694e4e72a5b1117
+        uses: docker/login-action@bb9683dca29f758cbd6ee832740e9f2dbeb21a3e
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
