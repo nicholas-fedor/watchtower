@@ -177,7 +177,6 @@ func FetchImageCreationTime(
 
 	// Try manifest fetch with host fallback: primary (redirect/original),
 	// then challenge host, then original host.
-	// This mirrors the retry logic in digest.go's HandleManifestResponse.
 	configDigest, winningHost, err := fetchManifestForAge(
 		ctx,
 		client,
@@ -187,6 +186,7 @@ func FetchImageCreationTime(
 		targetOS,
 		targetArch,
 		challengeHost,
+		originalHost,
 		fields,
 	)
 	if err != nil {
@@ -316,6 +316,7 @@ func buildManifestURLForAge(
 //   - manifestURL: Original manifest URL string (to avoid redundant re-fetch).
 //   - token: Authentication token for the Authorization header.
 //   - challengeHost: Registry challenge host for fallback.
+//   - originalHost: The true original registry host before any redirects.
 //   - fields: Logging fields for context.
 //
 // Returns:
@@ -325,13 +326,14 @@ func retryManifestRequest(
 	ctx context.Context,
 	client auth.Client,
 	parsedURL *url.URL,
-	manifestURL, token, challengeHost string,
+	manifestURL, token, challengeHost, originalHost string,
 	fields logrus.Fields,
 ) ([]byte, string, error) {
-	// Determine the original host for fallback.
-	originalHost := parsedURL.Host
+	// Use the provided originalHost for fallback; if empty, derive from parsedURL.
+	if originalHost == "" {
+		originalHost = parsedURL.Host
+	}
 
-	// If the current URL host differs from original (e.g., redirect), original is still the base.
 	if fields["original_host"] == nil {
 		fields["original_host"] = originalHost
 	}
@@ -510,6 +512,7 @@ func retryManifestRequest(
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
 //   - challengeHost: Registry challenge host for fallback.
+//   - originalHost: The true original registry host before any redirects.
 //   - fields: Logging fields for context.
 //
 // Returns:
@@ -520,7 +523,7 @@ func fetchManifestForAge(
 	client auth.Client,
 	manifestURL, token string,
 	parsedURL *url.URL,
-	targetOS, targetArch, challengeHost string,
+	targetOS, targetArch, challengeHost, originalHost string,
 	fields logrus.Fields,
 ) (string, string, error) {
 	body, winningHost, err := retryManifestRequest(
@@ -530,6 +533,7 @@ func fetchManifestForAge(
 		manifestURL,
 		token,
 		challengeHost,
+		originalHost,
 		fields,
 	)
 	if err != nil {
