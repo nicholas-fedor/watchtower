@@ -997,99 +997,110 @@ func TestMetrics_RestartedWithPartialFailures(t *testing.T) {
 func TestMetrics_HandleUpdate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		tests := []struct {
-			name string
-			m    *Metrics
+			name          string
+			metric        *Metric // nil for the "skipped scan" path
+			expectGauge   float64
+			expectCounter float64
 		}{
 			{
-				name: "handle valid metric",
-				m: func() *Metrics {
-					reg := prometheus.NewRegistry()
-					ctx, cancel := context.WithCancel(context.Background())
-
-					return &Metrics{
-						channel: make(chan *Metric, 1),
-						stopCh:  make(chan struct{}),
-						ctx:     ctx,
-						cancel:  cancel,
-						scanned: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_scanned"}),
-						updated: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_updated"}),
-						failed: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_failed"}),
-						restarted: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_restarted"}),
-						skipped: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_skipped"}),
-						restartedTotal: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_restarted_total"}),
-						total: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_total"}),
-						skippedScans: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_skipped_scans"}),
-					}
-				}(),
+				name:          "handle valid metric",
+				metric:        &Metric{Scanned: 3, Updated: 2, Failed: 1, Restarted: 1, Skipped: 1},
+				expectGauge:   1, // Skipped gauge set from metric
+				expectCounter: 0, // skippedScans not incremented for valid metrics
 			},
 			{
-				name: "handle nil metric (skipped)",
-				m: func() *Metrics {
-					reg := prometheus.NewRegistry()
-					ctx, cancel := context.WithCancel(context.Background())
-
-					return &Metrics{
-						channel: make(chan *Metric, 1),
-						stopCh:  make(chan struct{}),
-						ctx:     ctx,
-						cancel:  cancel,
-						scanned: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_scanned_skip"}),
-						updated: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_updated_skip"}),
-						failed: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_failed_skip"}),
-						restarted: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_restarted_skip"}),
-						skipped: promauto.With(reg).
-							NewGauge(prometheus.GaugeOpts{Name: "test_skipped_skip"}),
-						restartedTotal: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_restarted_total_skip"}),
-						total: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_total_skip"}),
-						skippedScans: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_skipped_scans_skip"}),
-					}
-				}(),
+				name:          "handle nil metric (skipped scan)",
+				metric:        nil,
+				expectGauge:   0, // Skipped gauge reset to 0
+				expectCounter: 1, // skippedScans incremented for skipped scans
 			},
 		}
 
 		for _, tt := range tests {
-			// Run HandleUpdate and deterministically wait for completion
+			reg := prometheus.NewRegistry()
+			ctx, cancel := context.WithCancel(context.Background())
+
+			m := &Metrics{
+				channel: make(chan *Metric, 1),
+				stopCh:  make(chan struct{}),
+				ctx:     ctx,
+				cancel:  cancel,
+				scanned: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_scanned"}),
+				updated: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_updated"}),
+				failed: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_failed"}),
+				restarted: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_restarted"}),
+				skipped: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_skipped"}),
+				restartedTotal: promauto.With(reg).
+					NewCounter(prometheus.CounterOpts{Name: "test_restarted_total"}),
+				total: promauto.With(reg).
+					NewCounter(prometheus.CounterOpts{Name: "test_total"}),
+				skippedScans: promauto.With(reg).
+					NewCounter(prometheus.CounterOpts{Name: "test_skipped_scans"}),
+			}
+
+			// Start HandleUpdate in a goroutine
 			done := make(chan struct{})
 
 			go func() {
-				tt.m.HandleUpdate()
+				m.HandleUpdate()
 				close(done)
 			}()
 
 			// Send metric to channel
-			if tt.name == "handle valid metric" {
-				tt.m.channel <- &Metric{Scanned: 3, Updated: 2, Failed: 1, Restarted: 1, Skipped: 1}
-			} else {
-				tt.m.channel <- nil
-			}
+			m.channel <- tt.metric
 
-			// Close stopCh to signal shutdown
-			close(tt.m.stopCh)
+			synctest.Wait() // Allow metric to be processed
 
-			// Wait for completion
+			// Close stopCh and wait for HandleUpdate to exit
+			close(m.stopCh)
 			synctest.Wait()
 
-			// Check if done is closed
 			select {
 			case <-done:
 				// processed to completion
 			default:
 				t.Fatal("HandleUpdate timed out")
+			}
+
+			// Verify skipped gauge and skippedScans counter values from the registry
+			metricFamilies, err := reg.Gather()
+			if err != nil {
+				t.Fatalf("Failed to gather metrics: %v", err)
+			}
+
+			foundSkippedGauge := false
+			foundSkippedScans := false
+
+			for _, mf := range metricFamilies {
+				switch mf.GetName() {
+				case "test_skipped":
+					foundSkippedGauge = true
+
+					val := mf.GetMetric()[0].GetGauge().GetValue()
+					if val != tt.expectGauge {
+						t.Errorf("%s: skipped gauge = %v, want %v", tt.name, val, tt.expectGauge)
+					}
+				case "test_skipped_scans":
+					foundSkippedScans = true
+
+					val := mf.GetMetric()[0].GetCounter().GetValue()
+					if val != tt.expectCounter {
+						t.Errorf("%s: skippedScans counter = %v, want %v", tt.name, val, tt.expectCounter)
+					}
+				}
+			}
+
+			if !foundSkippedGauge {
+				t.Errorf("%s: skipped gauge metric not found in registry", tt.name)
+			}
+
+			if !foundSkippedScans {
+				t.Errorf("%s: skippedScans counter metric not found in registry", tt.name)
 			}
 		}
 	})

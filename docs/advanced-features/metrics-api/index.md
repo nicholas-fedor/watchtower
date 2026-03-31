@@ -26,7 +26,7 @@ The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible met
 | `watchtower_containers_restarted_total` | Counter | Number of containers restarted due to linked dependencies since watchtower started |
 | `watchtower_containers_skipped`         | Gauge   | Number of containers skipped during the last scan                                  |
 | `watchtower_scans_total`                | Counter | Number of scans since watchtower started                                           |
-| `watchtower_scans_skipped`              | Counter | Number of skipped scans since watchtower started                                   |
+| `watchtower_scans_skipped_total`        | Counter | Number of skipped scans since watchtower started                                   |
 
 ## Example Prometheus `scrape_config`
 

@@ -245,6 +245,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 				// Verify the response
 				gomega.Expect(w.Code).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(capturedParams.RunOnce).To(gomega.BeFalse())
 				gomega.Expect(capturedParams.MonitorOnly).To(gomega.Equal(expectMonitorOnly))
 			},
 			ginkgo.Entry("monitorOnly false", false, false),
@@ -299,6 +300,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 				// Verify the response
 				gomega.Expect(w.Code).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(capturedParams.RunOnce).To(gomega.BeFalse())
 				gomega.Expect(capturedParams.SkipSelfUpdate).To(gomega.Equal(expectSkipSelfUpdate))
 			},
 			ginkgo.Entry("skipSelfUpdate false", false, false),
