@@ -1535,6 +1535,50 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#cooldown_delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Delay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cooldown_platform_os" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Platform OS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cooldown_platform_architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Platform Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cooldown_platform_variant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Platform Variant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#lifecycle_uid" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1914,6 +1958,34 @@
     
   
     HTTP API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced-features/image-cooldown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image Cooldown
   
 
     
@@ -2899,6 +2971,50 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#cooldown_delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Delay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cooldown_platform_os" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Platform OS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cooldown_platform_architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Platform Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cooldown_platform_variant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooldown Platform Variant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#lifecycle_uid" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3698,12 +3814,72 @@ Can reference a file for security.</p>
 <a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a>                Type: Duration
 <a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a>              Default: 30s
 </code></pre></div>
+<h3 id="cooldown_delay">Cooldown Delay<a class="headerlink" href="#cooldown_delay" title="Permanent link">&para;</a></h3>
+<p>Sets the minimum time since an image was created before Watchtower will perform the update. Image age is determined from the image creation timestamp in the registry config blob. This can reduce risk from newly pushed images but is not a comprehensive security control.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>            Argument: --cooldown-delay
+<a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>Environment Variable: WATCHTOWER_COOLDOWN_DELAY
+<a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>                Type: String
+<a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a>             Default: (empty / disabled)
+</code></pre></div>
+<p>Accepted units: <code>h</code> (hours), <code>m</code> (minutes), <code>s</code> (seconds), <code>d</code> (days), <code>w</code> (weeks), <code>M</code> (months, i.e. 30 days).
+These can be combined (e.g., <code>24h</code>, <code>3d</code>, <code>1w</code>, <code>1M</code>, <code>1w12h</code>).
+Leaving the setting empty disables cooldown.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This setting delays <em>all</em> updates, including critical security patches.
+Operators should weigh the trade-off between update immediacy and exposure to unverified images.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a href="../../advanced-features/image-cooldown/">Image Cooldown</a> for detailed information on how cooldown works, boundary behavior, per-container labels, limitations, and interaction with other features like <code>--no-pull</code>.</p>
+</div>
+<h3 id="cooldown_platform_os">Cooldown Platform OS<a class="headerlink" href="#cooldown_platform_os" title="Permanent link">&para;</a></h3>
+<p>Overrides the OS used for platform selection when fetching image manifests during cooldown checks.
+By default, Watchtower uses the runtime OS (e.g., <code>linux</code>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>            Argument: None
+<a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>Environment Variable: WATCHTOWER_COOLDOWN_PLATFORM_OS
+<a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a>                Type: String
+<a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a>             Default: runtime.GOOS
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Useful for cross-platform monitoring (e.g., monitoring Linux containers from a macOS or Windows host).
+Only affects the cooldown image age check; does not impact Docker's local platform detection.</p>
+<p>See <a href="../../advanced-features/image-cooldown/">Image Cooldown</a> for details on how platform selection works with multi-platform images.</p>
+</div>
+<h3 id="cooldown_platform_architecture">Cooldown Platform Architecture<a class="headerlink" href="#cooldown_platform_architecture" title="Permanent link">&para;</a></h3>
+<p>Overrides the architecture used for platform selection when fetching image manifests during cooldown checks.
+By default, Watchtower uses the runtime architecture (e.g., <code>amd64</code>, <code>arm64</code>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>            Argument: None
+<a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>Environment Variable: WATCHTOWER_COOLDOWN_PLATFORM_ARCH
+<a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a>                Type: String
+<a id="__codelineno-63-4" name="__codelineno-63-4" href="#__codelineno-63-4"></a>             Default: runtime.GOARCH
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Useful for cross-platform monitoring (e.g., monitoring <code>arm64</code> containers from an <code>amd64</code> host).
+Only affects the cooldown image age check; does not impact Docker's local platform detection.</p>
+<p>See <a href="../../advanced-features/image-cooldown/">Image Cooldown</a> for details on how platform selection works with multi-platform images.</p>
+</div>
+<h3 id="cooldown_platform_variant">Cooldown Platform Variant<a class="headerlink" href="#cooldown_platform_variant" title="Permanent link">&para;</a></h3>
+<p>Specifies the platform variant for platform selection when fetching image manifests during cooldown checks. This disambiguates when multiple image index entries share the same OS and architecture but differ by variant (e.g., ARM <code>v7</code> vs <code>v8</code>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>            Argument: None
+<a id="__codelineno-64-2" name="__codelineno-64-2" href="#__codelineno-64-2"></a>Environment Variable: WATCHTOWER_COOLDOWN_PLATFORM_VARIANT
+<a id="__codelineno-64-3" name="__codelineno-64-3" href="#__codelineno-64-3"></a>                Type: String
+<a id="__codelineno-64-4" name="__codelineno-64-4" href="#__codelineno-64-4"></a>             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Required only for ARM images with multiple variants (e.g., <code>v7</code>, <code>v8</code>).
+When not specified and multiple variants exist, Watchtower returns an ambiguous platform match error.</p>
+<p>See <a href="../../advanced-features/image-cooldown/">Image Cooldown</a> for details on how platform selection works with multi-platform images.</p>
+</div>
 <h3 id="lifecycle_uid">Lifecycle UID<a class="headerlink" href="#lifecycle_uid" title="Permanent link">&para;</a></h3>
 <p>Sets the default user ID to run lifecycle hooks as when no container-specific UID is specified.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>            Argument: --lifecycle-uid
-<a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_UID
-<a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>                Type: Integer
-<a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a>              Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>            Argument: --lifecycle-uid
+<a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_UID
+<a id="__codelineno-65-3" name="__codelineno-65-3" href="#__codelineno-65-3"></a>                Type: Integer
+<a id="__codelineno-65-4" name="__codelineno-65-4" href="#__codelineno-65-4"></a>              Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3712,10 +3888,10 @@ Can reference a file for security.</p>
 </div>
 <h3 id="lifecycle_gid">Lifecycle GID<a class="headerlink" href="#lifecycle_gid" title="Permanent link">&para;</a></h3>
 <p>Sets the default group ID to run lifecycle hooks as when no container-specific GID is specified.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>            Argument: --lifecycle-gid
-<a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_GID
-<a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a>                Type: Integer
-<a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a>              Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>            Argument: --lifecycle-gid
+<a id="__codelineno-66-2" name="__codelineno-66-2" href="#__codelineno-66-2"></a>Environment Variable: WATCHTOWER_LIFECYCLE_GID
+<a id="__codelineno-66-3" name="__codelineno-66-3" href="#__codelineno-66-3"></a>                Type: Integer
+<a id="__codelineno-66-4" name="__codelineno-66-4" href="#__codelineno-66-4"></a>              Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3724,10 +3900,10 @@ Can reference a file for security.</p>
 </div>
 <h3 id="health_check">Health Check<a class="headerlink" href="#health_check" title="Permanent link">&para;</a></h3>
 <p>Returns a success exit code for Docker <code>HEALTHCHECK</code>, verifying another process is running in the container.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>            Argument: --health-check
-<a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>Environment Variable: None
-<a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a>                Type: N/A
-<a id="__codelineno-63-4" name="__codelineno-63-4" href="#__codelineno-63-4"></a>             Default: N/A
+<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>            Argument: --health-check
+<a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a>Environment Variable: None
+<a id="__codelineno-67-3" name="__codelineno-67-3" href="#__codelineno-67-3"></a>                Type: N/A
+<a id="__codelineno-67-4" name="__codelineno-67-4" href="#__codelineno-67-4"></a>             Default: N/A
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3737,18 +3913,18 @@ Do not use on the main command line.</p>
 <h2 id="output_compatibility">Output &amp; Compatibility<a class="headerlink" href="#output_compatibility" title="Permanent link">&para;</a></h2>
 <h3 id="programmatic_output_porcelain">Programmatic Output (Porcelain)<a class="headerlink" href="#programmatic_output_porcelain" title="Permanent link">&para;</a></h3>
 <p>Outputs session results in a machine-readable format (version specified by <code>VERSION</code>).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>            Argument: --porcelain, -P
-<a id="__codelineno-64-2" name="__codelineno-64-2" href="#__codelineno-64-2"></a>Environment Variable: WATCHTOWER_PORCELAIN
-<a id="__codelineno-64-3" name="__codelineno-64-3" href="#__codelineno-64-3"></a>     Possible Values: v1
-<a id="__codelineno-64-4" name="__codelineno-64-4" href="#__codelineno-64-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>            Argument: --porcelain, -P
+<a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a>Environment Variable: WATCHTOWER_PORCELAIN
+<a id="__codelineno-68-3" name="__codelineno-68-3" href="#__codelineno-68-3"></a>     Possible Values: v1
+<a id="__codelineno-68-4" name="__codelineno-68-4" href="#__codelineno-68-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Equivalent to:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>--notification-url logger://
-<a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a>--notification-log-stdout
-<a id="__codelineno-65-3" name="__codelineno-65-3" href="#__codelineno-65-3"></a>--notification-report
-<a id="__codelineno-65-4" name="__codelineno-65-4" href="#__codelineno-65-4"></a>--notification-template porcelain.VERSION.summary-no-log
+<div class="highlight"><pre><span></span><code><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>--notification-url logger://
+<a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a>--notification-log-stdout
+<a id="__codelineno-69-3" name="__codelineno-69-3" href="#__codelineno-69-3"></a>--notification-report
+<a id="__codelineno-69-4" name="__codelineno-69-4" href="#__codelineno-69-4"></a>--notification-template porcelain.VERSION.summary-no-log
 </code></pre></div></p>
 </div>
 
@@ -3773,7 +3949,7 @@ Do not use on the main command line.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 28, 2026 19:27:06 UTC"><span class="timeago" datetime="2026-03-28T19:27:06+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 28, 2026 19:27:06 UTC">2026-03-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 31, 2026 05:14:11 UTC"><span class="timeago" datetime="2026-03-31T05:14:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 31, 2026 05:14:11 UTC">2026-03-31</span>
   </span>
 
     
