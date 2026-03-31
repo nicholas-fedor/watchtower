@@ -1081,12 +1081,28 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 				case "test_skipped":
 					foundSkippedGauge = true
 
+					if len(mf.GetMetric()) == 0 {
+						t.Fatalf("%s: no samples in %s metric family", tt.name, mf.GetName())
+					}
+
+					if mf.GetMetric()[0].GetGauge() == nil {
+						t.Fatalf("%s: %s metric is not a gauge", tt.name, mf.GetName())
+					}
+
 					val := mf.GetMetric()[0].GetGauge().GetValue()
 					if val != tt.expectGauge {
 						t.Errorf("%s: skipped gauge = %v, want %v", tt.name, val, tt.expectGauge)
 					}
 				case "test_skipped_scans":
 					foundSkippedScans = true
+
+					if len(mf.GetMetric()) == 0 {
+						t.Fatalf("%s: no samples in %s metric family", tt.name, mf.GetName())
+					}
+
+					if mf.GetMetric()[0].GetCounter() == nil {
+						t.Fatalf("%s: %s metric is not a counter", tt.name, mf.GetName())
+					}
 
 					val := mf.GetMetric()[0].GetCounter().GetValue()
 					if val != tt.expectCounter {
