@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				updateHandler := update.New(func(images []string) *metrics.Metric {
 					params := types.UpdateParams{
 						Cleanup:        false, // cleanup
-						RunOnce:        true,
+						RunOnce:        false,
 						MonitorOnly:    monitorOnly,
 						SkipSelfUpdate: false,
 					}
@@ -245,6 +245,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 				// Verify the response
 				gomega.Expect(w.Code).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(capturedParams.RunOnce).To(gomega.BeFalse())
 				gomega.Expect(capturedParams.MonitorOnly).To(gomega.Equal(expectMonitorOnly))
 			},
 			ginkgo.Entry("monitorOnly false", false, false),
@@ -273,7 +274,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				updateHandler := update.New(func(images []string) *metrics.Metric {
 					params := types.UpdateParams{
 						Cleanup:        false,
-						RunOnce:        true,
+						RunOnce:        false,
 						MonitorOnly:    false,
 						SkipSelfUpdate: skipSelfUpdate,
 					}
@@ -299,6 +300,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 
 				// Verify the response
 				gomega.Expect(w.Code).To(gomega.Equal(http.StatusOK))
+				gomega.Expect(capturedParams.RunOnce).To(gomega.BeFalse())
 				gomega.Expect(capturedParams.SkipSelfUpdate).To(gomega.Equal(expectSkipSelfUpdate))
 			},
 			ginkgo.Entry("skipSelfUpdate false", false, false),

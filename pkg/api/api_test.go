@@ -349,69 +349,47 @@ func TestAPI_StartServerSynchronously(t *testing.T) {
 }
 
 func TestAPI_StartServerAsynchronously(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		logBuffer := &threadSafeBuffer{buf: &bytes.Buffer{}, mu: sync.Mutex{}}
-		logrus.SetOutput(logBuffer)
-		logrus.SetLevel(logrus.DebugLevel)
+	logBuffer := &threadSafeBuffer{buf: &bytes.Buffer{}, mu: sync.Mutex{}}
+	logrus.SetOutput(logBuffer)
+	logrus.SetLevel(logrus.DebugLevel)
 
-		defer func() {
-			logrus.SetOutput(os.Stderr)
-			logrus.SetLevel(logrus.InfoLevel)
-		}()
+	defer func() {
+		logrus.SetOutput(os.Stderr)
+		logrus.SetLevel(logrus.InfoLevel)
+	}()
 
-		listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer listener.Close()
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
 
-		tcpAddr, ok := listener.Addr().(*net.TCPAddr)
-		if !ok {
-			t.Fatal("expected TCP address")
-		}
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatal("expected TCP address")
+	}
 
-		port := tcpAddr.Port
+	port := tcpAddr.Port
 
-		listener.Close()
+	listener.Close()
 
-		apiInstance := api.New(testToken, ":8080", testRateLimit)
-		apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
-		apiInstance.RegisterFunc("/test-async", http.HandlerFunc(testHandler))
+	apiInstance := api.New(testToken, ":8080", testRateLimit)
+	apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
+	apiInstance.RegisterFunc("/test-async", http.HandlerFunc(testHandler))
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		err = apiInstance.Start(ctx, false, false)
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
+	err = apiInstance.Start(ctx, false, false)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
-		// Wait for server to be ready
-		serverReady := false
+	// Wait for server to be ready
+	serverReady := false
 
-		maxAttempts := 50
-		for i := 0; i < maxAttempts && !serverReady; i++ {
-			req, _ := http.NewRequestWithContext(
-				ctx,
-				http.MethodGet,
-				fmt.Sprintf("http://127.0.0.1:%d/test-async", port),
-				nil,
-			)
-			req.Header.Set("Authorization", "Bearer "+testToken)
-
-			resp, reqErr := http.DefaultClient.Do(req)
-			if reqErr == nil {
-				resp.Body.Close()
-
-				serverReady = true
-			}
-		}
-
-		if !serverReady {
-			t.Fatal("server did not start within expected time")
-		}
-
-		// Make the request
+	maxAttempts := 50
+	for i := 0; i < maxAttempts && !serverReady; i++ {
 		req, _ := http.NewRequestWithContext(
 			ctx,
 			http.MethodGet,
@@ -420,46 +398,53 @@ func TestAPI_StartServerAsynchronously(t *testing.T) {
 		)
 		req.Header.Set("Authorization", "Bearer "+testToken)
 
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
+		resp, reqErr := http.DefaultClient.Do(req)
+		if reqErr == nil {
+			resp.Body.Close()
 
-		body, _ := io.ReadAll(resp.Body)
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+			serverReady = true
 		}
 
-		if string(body) != testResponse {
-			t.Fatalf("expected 'Hello!', got %s", string(body))
-		}
+		time.Sleep(50 * time.Millisecond)
+	}
 
-		// Wait for server to stop after cancellation
-		done := make(chan struct{})
+	if !serverReady {
+		t.Fatal("server did not start within expected time")
+	}
 
-		go func() {
-			defer close(done)
+	// Make the request
+	req, _ := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		fmt.Sprintf("http://127.0.0.1:%d/test-async", port),
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer "+testToken)
 
-			<-ctx.Done()
-		}()
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
 
-		cancel()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
 
-		synctest.Wait()
+	if string(body) != testResponse {
+		t.Fatalf("expected 'Hello!', got %s", string(body))
+	}
 
-		// Wait for the done channel
-		select {
-		case <-done:
-			// Server stopped
-		default:
-			t.Fatal("server did not stop as expected")
-		}
+	// Cancel context and wait for server to shut down
+	cancel()
 
-		if strings.Contains(logBuffer.String(), "HTTP server failed") {
-			t.Error("unexpected error log")
-		}
-	})
+	// Give the server time to shut down gracefully
+	time.Sleep(200 * time.Millisecond)
+
+	if strings.Contains(logBuffer.String(), "HTTP server failed") {
+		t.Error("unexpected error log")
+	}
 }
 
 func TestAPI_StartServerAsyncLogErrorOnFailure(t *testing.T) {

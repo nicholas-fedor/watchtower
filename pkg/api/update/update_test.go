@@ -115,6 +115,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(0)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(0)))
 
 				// Check timing section
 				timing := response["timing"].(map[string]any)
@@ -170,6 +171,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(1)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(0)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(0)))
 
 				// Check timing section
 				timing := response["timing"].(map[string]any)
@@ -243,7 +245,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 		)
 
 		ginkgo.It(
-			"should correctly report state transitions with restarted containers in API response",
+			"should correctly report state transitions with restarted and skipped containers in API response",
 			func() {
 				called := false
 				mockUpdateFn = func(images []string) *metrics.Metric {
@@ -251,8 +253,8 @@ var _ = ginkgo.Describe("Update Handler", func() {
 
 					gomega.Expect(images).To(gomega.BeNil())
 
-					// Simulate state transition: containers scanned, some updated, some restarted
-					return &metrics.Metric{Scanned: 5, Updated: 1, Failed: 0, Restarted: 2}
+					// Simulate state transition: containers scanned, some updated, some restarted, some skipped
+					return &metrics.Metric{Scanned: 5, Updated: 1, Failed: 0, Restarted: 2, Skipped: 3}
 				}
 				handler = update.New(mockUpdateFn, nil)
 
@@ -277,6 +279,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(1)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(2)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(3)))
 
 				gomega.Expect(called).To(gomega.BeTrue())
 
@@ -288,10 +291,10 @@ var _ = ginkgo.Describe("Update Handler", func() {
 		)
 
 		ginkgo.It(
-			"should maintain priority ordering in API response summary with restarted containers",
+			"should maintain priority ordering in API response summary with restarted and skipped containers",
 			func() {
 				mockUpdateFn = func(_ []string) *metrics.Metric {
-					return &metrics.Metric{Scanned: 20, Updated: 5, Failed: 2, Restarted: 8}
+					return &metrics.Metric{Scanned: 20, Updated: 5, Failed: 2, Restarted: 8, Skipped: 4}
 				}
 				handler = update.New(mockUpdateFn, nil)
 
@@ -316,12 +319,14 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary).To(gomega.HaveKey("updated"))
 				gomega.Expect(summary).To(gomega.HaveKey("failed"))
 				gomega.Expect(summary).To(gomega.HaveKey("restarted"))
+				gomega.Expect(summary).To(gomega.HaveKey("skipped"))
 
 				// Verify values are correct
 				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(20)))
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(5)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(2)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(8)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(4)))
 
 				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 				req := server.ReceivedRequests()[0]

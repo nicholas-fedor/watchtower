@@ -20,6 +20,7 @@ type Metric struct {
 	Updated   int // Number of containers updated (excludes stale).
 	Failed    int // Number of containers failed.
 	Restarted int // Number of containers restarted due to linked dependencies.
+	Skipped   int // Number of containers skipped during the scan.
 }
 
 // Metrics handles processing and exposing scan metrics.
@@ -29,9 +30,10 @@ type Metrics struct {
 	updated        prometheus.Gauge   // Gauge for updated containers.
 	failed         prometheus.Gauge   // Gauge for failed containers.
 	restarted      prometheus.Gauge   // Gauge for restarted containers.
+	skipped        prometheus.Gauge   // Gauge for skipped containers.
 	restartedTotal prometheus.Counter // Counter for total restarted containers.
 	total          prometheus.Counter // Counter for total scans.
-	skipped        prometheus.Counter // Counter for skipped scans.
+	skippedScans   prometheus.Counter // Counter for skipped scans.
 	dropped        prometheus.Counter // Counter for dropped metrics.
 	stopCh         chan struct{}      // Channel for shutdown signaling.
 	shutdownOnce   sync.Once          // Ensures shutdown is called only once.
@@ -73,6 +75,10 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 			Name: "watchtower_containers_restarted",
 			Help: "Number of containers restarted due to linked dependencies during the last scan",
 		}),
+		skipped: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_containers_skipped",
+			Help: "Number of containers skipped during the last scan",
+		}),
 		restartedTotal: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "watchtower_containers_restarted_total",
 			Help: "Total number of containers restarted due to linked dependencies",
@@ -81,7 +87,7 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 			Name: "watchtower_scans_total",
 			Help: "Number of scans since the watchtower started",
 		}),
-		skipped: prometheus.NewCounter(prometheus.CounterOpts{
+		skippedScans: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "watchtower_scans_skipped_total",
 			Help: "Number of skipped scans since watchtower started",
 		}),
@@ -102,9 +108,10 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		metrics.updated,
 		metrics.failed,
 		metrics.restarted,
+		metrics.skipped,
 		metrics.restartedTotal,
 		metrics.total,
-		metrics.skipped,
+		metrics.skippedScans,
 		metrics.dropped,
 	}
 	for _, m := range metricsList {
@@ -142,6 +149,7 @@ func NewMetric(report types.Report) *Metric {
 		Updated:   len(report.Updated()), // Only count actually updated containers.
 		Failed:    len(report.Failed()),
 		Restarted: len(report.Restarted()),
+		Skipped:   len(report.Skipped()),
 	}
 }
 
@@ -218,11 +226,12 @@ func (m *Metrics) HandleUpdate() {
 			if change == nil {
 				// Update was skipped and rescheduled
 				m.total.Inc()
-				m.skipped.Inc()
+				m.skippedScans.Inc()
 				m.scanned.Set(0)
 				m.updated.Set(0)
 				m.failed.Set(0)
 				m.restarted.Set(0)
+				m.skipped.Set(0)
 
 				continue
 			}
@@ -232,6 +241,7 @@ func (m *Metrics) HandleUpdate() {
 			m.updated.Set(float64(change.Updated))
 			m.failed.Set(float64(change.Failed))
 			m.restarted.Set(float64(change.Restarted))
+			m.skipped.Set(float64(change.Skipped))
 			m.restartedTotal.Add(float64(change.Restarted))
 		case <-m.stopCh:
 			return
