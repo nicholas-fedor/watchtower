@@ -11,7 +11,7 @@
       
       
       
-        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/advanced-features/metrics/">
+        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/advanced-features/metrics-api/">
       
       
         <link rel="prev" href="../linked-containers/">
@@ -28,7 +28,7 @@
     
     
       
-        <title>Metrics - Watchtower</title>
+        <title>Metrics API - Watchtower</title>
       
     
     
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#metrics" class="md-skip">
+        <a href="#metrics_api" class="md-skip">
           Skip to content
         </a>
       
@@ -138,7 +138,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Metrics
+              Metrics API
             
           </span>
         </div>
@@ -1151,7 +1151,7 @@
   <span class="md-ellipsis">
     
   
-    Metrics
+    Metrics API
   
 
     
@@ -1169,7 +1169,7 @@
   <span class="md-ellipsis">
     
   
-    Metrics
+    Metrics API
   
 
     
@@ -1406,12 +1406,7 @@
   
 
 
-<h1 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h1>
-<div class="admonition warning">
-<p class="admonition-title">Experimental feature</p>
-<p>This feature was added in v1.0.4 and is still considered experimental. If you notice any strange behavior, please raise
-a ticket in the repository issues.</p>
-</div>
+<h1 id="metrics_api">Metrics API<a class="headerlink" href="#metrics_api" title="Permanent link">&para;</a></h1>
 <p>Metrics can be used to track how Watchtower behaves over time.</p>
 <p>To use this feature, you have to set an <a href="../../configuration/arguments/#http_api_token">API token</a> and <a href="../../configuration/arguments/#http_api_metrics">enable the metrics API</a>,
 as well as creating a port mapping for your container for port <code>8080</code>.</p>
@@ -1424,6 +1419,10 @@ as well as creating a port mapping for your container for port <code>8080</code>
 <p>Enabling the metrics API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation. See <a href="../../getting-started/updating-watchtower/#port-configuration-limitation">Updating Watchtower</a> for more details.</p>
 </div>
 <p>The metrics API endpoint is <code>/v1/metrics</code> and provides Prometheus-compatible metrics. This is separate from the <a href="../http-api/#http_api_update"><code>/v1/update</code></a> endpoint which triggers updates and returns JSON results.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code>/v1/metrics</code> endpoint only accepts <code>GET</code> requests. Requests with other HTTP methods will receive a <code>405 Method Not Allowed</code> response.</p>
+</div>
 <h2 id="available_metrics">Available Metrics<a class="headerlink" href="#available_metrics" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1437,12 +1436,12 @@ as well as creating a port mapping for your container for port <code>8080</code>
 <tr>
 <td><code>watchtower_containers_scanned</code></td>
 <td>Gauge</td>
-<td>Number of containers scanned for changes by watchtower during the last scan</td>
+<td>Number of containers scanned for changes during the last scan</td>
 </tr>
 <tr>
 <td><code>watchtower_containers_updated</code></td>
 <td>Gauge</td>
-<td>Number of containers updated by watchtower during the last scan</td>
+<td>Number of containers updated during the last scan</td>
 </tr>
 <tr>
 <td><code>watchtower_containers_failed</code></td>
@@ -1452,12 +1451,12 @@ as well as creating a port mapping for your container for port <code>8080</code>
 <tr>
 <td><code>watchtower_containers_restarted_total</code></td>
 <td>Counter</td>
-<td>Total number of containers restarted due to linked dependencies</td>
+<td>Number of containers restarted due to linked dependencies since watchtower started</td>
 </tr>
 <tr>
 <td><code>watchtower_scans_total</code></td>
 <td>Counter</td>
-<td>Number of scans since the watchtower started</td>
+<td>Number of scans since watchtower started</td>
 </tr>
 <tr>
 <td><code>watchtower_scans_skipped</code></td>
@@ -1469,7 +1468,7 @@ as well as creating a port mapping for your container for port <code>8080</code>
 <h2 id="example_prometheus_scrape_config">Example Prometheus <code>scrape_config</code><a class="headerlink" href="#example_prometheus_scrape_config" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">scrape_configs</span><span class="p">:</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">watchtower</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">metrics_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/v1/metrics</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">bearer_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">demotoken</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
