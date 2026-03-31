@@ -21,6 +21,15 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+var (
+	// errMissingRunUpdatesWithNotifications indicates RunUpdatesWithNotifications was not provided.
+	errMissingRunUpdatesWithNotifications = errors.New("RunUpdatesWithNotifications must be provided when EnableUpdateAPI is set")
+	// errMissingFilterByImage indicates FilterByImage was not provided.
+	errMissingFilterByImage = errors.New("FilterByImage must be provided when EnableUpdateAPI is set")
+	// errMissingDefaultMetrics indicates DefaultMetrics was not provided.
+	errMissingDefaultMetrics = errors.New("DefaultMetrics must be provided when EnableUpdateAPI is set")
+)
+
 // Options holds all configuration for SetupAndStartAPI, replacing the previous
 // long parameter list with a single structured argument.
 type Options struct {
@@ -112,6 +121,19 @@ func SetupAndStartAPI(
 
 	// Register the update API endpoint if enabled, linking it to the update handler.
 	if opts.EnableUpdateAPI {
+		// Validate that required injected functions are non-nil before use.
+		if opts.RunUpdatesWithNotifications == nil {
+			return errMissingRunUpdatesWithNotifications
+		}
+
+		if opts.FilterByImage == nil {
+			return errMissingFilterByImage
+		}
+
+		if opts.DefaultMetrics == nil {
+			return errMissingDefaultMetrics
+		}
+
 		updateHandler := update.New(func(images []string) *metrics.Metric {
 			params := types.UpdateParams{
 				Cleanup:        opts.Cleanup,

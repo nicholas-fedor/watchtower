@@ -433,7 +433,7 @@ The template preview is integrated into `docs/notifications/template-preview/ind
 #### Workflow Process
 
 1. **Checkout**: Full repository with history for versioning
-2. **Go Setup**: Installs Go 1.25.x for WASM compilation
+2. **Go Setup**: Installs Go 1.26.x for WASM compilation
 3. **Template Preview Build**: Executes `scripts/build-tplprev.sh`
 4. **Python Setup**: Configures Python with pip caching
 5. **MkDocs Installation**: Installs dependencies from `docs-requirements.txt`

@@ -147,9 +147,15 @@ func (api *API) RequireToken(handleFunc http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Extract and hash the provided token for constant-time comparison.
-		// Strip the "Bearer " prefix to extract the raw token before hashing.
+		// Parse the Authorization header in an RFC-compliant, case-insensitive manner.
 		auth := strings.TrimSpace(r.Header.Get("Authorization"))
-		rawToken := strings.TrimPrefix(auth, "Bearer ")
+		fields := strings.Fields(auth)
+
+		var rawToken string
+		if len(fields) >= 2 && strings.EqualFold(fields[0], "Bearer") {
+			rawToken = fields[1]
+		}
+
 		providedHash := sha256.Sum256([]byte(rawToken))
 
 		// Use constant-time comparison with data-independent timing to prevent

@@ -51,7 +51,7 @@ func getWithToken(baseURL string) (map[string]string, error) {
 			continue
 		}
 
-		parts := strings.Split(line, " ")
+		parts := strings.Fields(line)
 		if len(parts) < 2 {
 			continue
 		}

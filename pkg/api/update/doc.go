@@ -6,7 +6,7 @@
 //   - New: Creates a handler with an update function and optional lock channel.
 //
 // Security features:
-//   - Request body size limiting: Caps request bodies at 1 MB to prevent resource exhaustion.
+//   - Request body size limiting: Caps request bodies at 1 MiB to prevent resource exhaustion.
 //
 // Usage example:
 //

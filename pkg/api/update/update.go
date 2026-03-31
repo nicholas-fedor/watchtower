@@ -3,6 +3,7 @@ package update
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -85,6 +86,12 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	_, err := io.Copy(io.Discard, r.Body)
 	if err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+
+			return
+		}
+
 		logrus.WithError(err).Debug("Failed to read request body")
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 

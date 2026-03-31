@@ -110,7 +110,7 @@ This behavior ensures that full updates (which may be resource-intensive) are no
 The following example shows what happens when a full update is requested while another update is already running:
 
 ```bash
-curl -i -H "Authorization: Bearer mytoken" localhost:8080/v1/update
+curl -i -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update
 ```
 
 Response:
