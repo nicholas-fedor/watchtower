@@ -863,6 +863,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer3})
 			mockReport.EXPECT().Failed().Return([]types.ContainerReport{mockContainer4})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 
 			metric := generateAndLogMetric(mockReport)
 
@@ -880,6 +881,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 
 			metric := generateAndLogMetric(mockReport)
 

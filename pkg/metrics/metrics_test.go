@@ -35,6 +35,7 @@ func TestNewMetric(t *testing.T) {
 					mock.EXPECT().Updated().Return([]types.ContainerReport{})
 					mock.EXPECT().Failed().Return([]types.ContainerReport{})
 					mock.EXPECT().Restarted().Return([]types.ContainerReport{})
+					mock.EXPECT().Skipped().Return([]types.ContainerReport{})
 
 					return mock
 				}(),
@@ -44,6 +45,7 @@ func TestNewMetric(t *testing.T) {
 				Updated:   0,
 				Failed:    0,
 				Restarted: 0,
+				Skipped:   0,
 			},
 		},
 		{
@@ -55,6 +57,7 @@ func TestNewMetric(t *testing.T) {
 					mock.EXPECT().Updated().Return(make([]types.ContainerReport, 1))
 					mock.EXPECT().Failed().Return(make([]types.ContainerReport, 1))
 					mock.EXPECT().Restarted().Return(make([]types.ContainerReport, 2))
+					mock.EXPECT().Skipped().Return(make([]types.ContainerReport, 1))
 
 					return mock
 				}(),
@@ -64,6 +67,7 @@ func TestNewMetric(t *testing.T) {
 				Updated:   1, // Only count actually updated containers
 				Failed:    1,
 				Restarted: 2,
+				Skipped:   1,
 			},
 		},
 		{
@@ -75,6 +79,7 @@ func TestNewMetric(t *testing.T) {
 					mock.EXPECT().Updated().Return([]types.ContainerReport{})
 					mock.EXPECT().Failed().Return([]types.ContainerReport{})
 					mock.EXPECT().Restarted().Return(make([]types.ContainerReport, 5))
+					mock.EXPECT().Skipped().Return([]types.ContainerReport{})
 
 					return mock
 				}(),
@@ -84,6 +89,7 @@ func TestNewMetric(t *testing.T) {
 				Updated:   0,
 				Failed:    0,
 				Restarted: 5,
+				Skipped:   0,
 			},
 		},
 		{
@@ -95,6 +101,7 @@ func TestNewMetric(t *testing.T) {
 					mock.EXPECT().Updated().Return(make([]types.ContainerReport, 3))
 					mock.EXPECT().Failed().Return(make([]types.ContainerReport, 2))
 					mock.EXPECT().Restarted().Return(make([]types.ContainerReport, 4))
+					mock.EXPECT().Skipped().Return(make([]types.ContainerReport, 2))
 
 					return mock
 				}(),
@@ -104,6 +111,7 @@ func TestNewMetric(t *testing.T) {
 				Updated:   3,
 				Failed:    2,
 				Restarted: 4,
+				Skipped:   2,
 			},
 		},
 	}
@@ -139,6 +147,7 @@ func TestNewMetric_ErrorHandling(t *testing.T) {
 				mock.EXPECT().Updated().Return(nil)
 				mock.EXPECT().Failed().Return(nil)
 				mock.EXPECT().Restarted().Return(nil)
+				mock.EXPECT().Skipped().Return(nil)
 
 				return mock
 			}(),
@@ -147,6 +156,7 @@ func TestNewMetric_ErrorHandling(t *testing.T) {
 				Updated:   0,
 				Failed:    0,
 				Restarted: 0,
+				Skipped:   0,
 			},
 			shouldPanic: false,
 		},
@@ -493,12 +503,16 @@ func TestDefault(t *testing.T) {
 				t.Errorf("Default().restarted is nil")
 			}
 
+			if got.skipped == nil {
+				t.Errorf("Default().skipped is nil")
+			}
+
 			if got.total == nil {
 				t.Errorf("Default().total is nil")
 			}
 
-			if got.skipped == nil {
-				t.Errorf("Default().skipped is nil")
+			if got.skippedScans == nil {
+				t.Errorf("Default().skippedScans is nil")
 			}
 
 			if got.dropped == nil {
@@ -667,8 +681,8 @@ func TestNewWithRegistry(t *testing.T) {
 				t.Errorf("NewWithRegistry().total is nil")
 			}
 
-			if got.skipped == nil {
-				t.Errorf("NewWithRegistry().skipped is nil")
+			if got.skippedScans == nil {
+				t.Errorf("NewWithRegistry().skippedScans is nil")
 			}
 
 			// Gather metrics from the registry and verify registration
@@ -677,8 +691,8 @@ func TestNewWithRegistry(t *testing.T) {
 				t.Fatalf("Failed to gather metrics: %v", err)
 			}
 
-			if len(metricFamilies) != 8 {
-				t.Errorf("Expected 8 metric families registered, got %d", len(metricFamilies))
+			if len(metricFamilies) != 9 {
+				t.Errorf("Expected 9 metric families registered, got %d", len(metricFamilies))
 			}
 
 			expectedNames := map[string]bool{
@@ -686,6 +700,7 @@ func TestNewWithRegistry(t *testing.T) {
 				"watchtower_containers_updated":         true,
 				"watchtower_containers_failed":          true,
 				"watchtower_containers_restarted":       true,
+				"watchtower_containers_skipped":         true,
 				"watchtower_containers_restarted_total": true,
 				"watchtower_scans_total":                true,
 				"watchtower_scans_skipped_total":        true,
@@ -1004,12 +1019,14 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 							NewGauge(prometheus.GaugeOpts{Name: "test_failed"}),
 						restarted: promauto.With(reg).
 							NewGauge(prometheus.GaugeOpts{Name: "test_restarted"}),
+						skipped: promauto.With(reg).
+							NewGauge(prometheus.GaugeOpts{Name: "test_skipped"}),
 						restartedTotal: promauto.With(reg).
 							NewCounter(prometheus.CounterOpts{Name: "test_restarted_total"}),
 						total: promauto.With(reg).
 							NewCounter(prometheus.CounterOpts{Name: "test_total"}),
-						skipped: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_skipped"}),
+						skippedScans: promauto.With(reg).
+							NewCounter(prometheus.CounterOpts{Name: "test_skipped_scans"}),
 					}
 				}(),
 			},
@@ -1032,12 +1049,14 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 							NewGauge(prometheus.GaugeOpts{Name: "test_failed_skip"}),
 						restarted: promauto.With(reg).
 							NewGauge(prometheus.GaugeOpts{Name: "test_restarted_skip"}),
+						skipped: promauto.With(reg).
+							NewGauge(prometheus.GaugeOpts{Name: "test_skipped_skip"}),
 						restartedTotal: promauto.With(reg).
 							NewCounter(prometheus.CounterOpts{Name: "test_restarted_total_skip"}),
 						total: promauto.With(reg).
 							NewCounter(prometheus.CounterOpts{Name: "test_total_skip"}),
-						skipped: promauto.With(reg).
-							NewCounter(prometheus.CounterOpts{Name: "test_skipped_skip"}),
+						skippedScans: promauto.With(reg).
+							NewCounter(prometheus.CounterOpts{Name: "test_skipped_scans_skip"}),
 					}
 				}(),
 			},
@@ -1054,7 +1073,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 
 			// Send metric to channel
 			if tt.name == "handle valid metric" {
-				tt.m.channel <- &Metric{Scanned: 3, Updated: 2, Failed: 1, Restarted: 1}
+				tt.m.channel <- &Metric{Scanned: 3, Updated: 2, Failed: 1, Restarted: 1, Skipped: 1}
 			} else {
 				tt.m.channel <- nil
 			}
@@ -1133,12 +1152,14 @@ func TestMetrics_HandleUpdate_ContextCancellation(t *testing.T) {
 					NewGauge(prometheus.GaugeOpts{Name: "test_failed_ctx"}),
 				restarted: promauto.With(reg).
 					NewGauge(prometheus.GaugeOpts{Name: "test_restarted_ctx"}),
+				skipped: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_skipped_ctx"}),
 				restartedTotal: promauto.With(reg).
 					NewCounter(prometheus.CounterOpts{Name: "test_restarted_total_ctx"}),
 				total: promauto.With(reg).
 					NewCounter(prometheus.CounterOpts{Name: "test_total_ctx"}),
-				skipped: promauto.With(reg).
-					NewCounter(prometheus.CounterOpts{Name: "test_skipped_ctx"}),
+				skippedScans: promauto.With(reg).
+					NewCounter(prometheus.CounterOpts{Name: "test_skipped_scans_ctx"}),
 				dropped: promauto.With(reg).
 					NewCounter(prometheus.CounterOpts{Name: "test_dropped_ctx"}),
 			}

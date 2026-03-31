@@ -196,6 +196,7 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			"updated":   metric.Updated,
 			"failed":    metric.Failed,
 			"restarted": metric.Restarted,
+			"skipped":   metric.Skipped,
 		},
 		"timing": map[string]any{
 			"duration_ms": duration.Milliseconds(),

@@ -115,6 +115,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(0)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(0)))
 
 				// Check timing section
 				timing := response["timing"].(map[string]any)
@@ -170,6 +171,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(1)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(0)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(0)))
 
 				// Check timing section
 				timing := response["timing"].(map[string]any)
@@ -277,6 +279,7 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(1)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(0)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(2)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(0)))
 
 				gomega.Expect(called).To(gomega.BeTrue())
 
@@ -316,12 +319,14 @@ var _ = ginkgo.Describe("Update Handler", func() {
 				gomega.Expect(summary).To(gomega.HaveKey("updated"))
 				gomega.Expect(summary).To(gomega.HaveKey("failed"))
 				gomega.Expect(summary).To(gomega.HaveKey("restarted"))
+				gomega.Expect(summary).To(gomega.HaveKey("skipped"))
 
 				// Verify values are correct
 				gomega.Expect(summary["scanned"]).To(gomega.Equal(float64(20)))
 				gomega.Expect(summary["updated"]).To(gomega.Equal(float64(5)))
 				gomega.Expect(summary["failed"]).To(gomega.Equal(float64(2)))
 				gomega.Expect(summary["restarted"]).To(gomega.Equal(float64(8)))
+				gomega.Expect(summary["skipped"]).To(gomega.Equal(float64(0)))
 
 				gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
 				req := server.ReceivedRequests()[0]

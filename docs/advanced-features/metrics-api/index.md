@@ -18,14 +18,15 @@ The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible met
 
 ## Available Metrics
 
-| Name                                    | Type    | Description                                                               |
-|-----------------------------------------|---------|---------------------------------------------------------------------------|
-| `watchtower_containers_scanned`         | Gauge   | Number of containers scanned for changes during the last scan            |
-| `watchtower_containers_updated`         | Gauge   | Number of containers updated during the last scan                        |
-| `watchtower_containers_failed`          | Gauge   | Number of containers where update failed during the last scan            |
+| Name                                    | Type    | Description                                                                        |
+|-----------------------------------------|---------|------------------------------------------------------------------------------------|
+| `watchtower_containers_scanned`         | Gauge   | Number of containers scanned for changes during the last scan                      |
+| `watchtower_containers_updated`         | Gauge   | Number of containers updated during the last scan                                  |
+| `watchtower_containers_failed`          | Gauge   | Number of containers where update failed during the last scan                      |
 | `watchtower_containers_restarted_total` | Counter | Number of containers restarted due to linked dependencies since watchtower started |
-| `watchtower_scans_total`                | Counter | Number of scans since watchtower started                                 |
-| `watchtower_scans_skipped`              | Counter | Number of skipped scans since watchtower started                         |
+| `watchtower_containers_skipped`         | Gauge   | Number of containers skipped during the last scan                                  |
+| `watchtower_scans_total`                | Counter | Number of scans since watchtower started                                           |
+| `watchtower_scans_skipped`              | Counter | Number of skipped scans since watchtower started                                   |
 
 ## Example Prometheus `scrape_config`
 

@@ -32,7 +32,8 @@ The `/v1/update` endpoint returns a JSON response containing the results of the 
     "scanned": 8,
     "updated": 0,
     "failed": 0,
-    "restarted": 0
+    "restarted": 0,
+    "skipped": 2
   },
   "timing": {
     "duration_ms": 1250,
@@ -49,6 +50,7 @@ The `/v1/update` endpoint returns a JSON response containing the results of the 
 - `updated`: Number of containers that were successfully updated
 - `failed`: Number of containers where the update failed
 - `restarted`: Number of containers that were restarted due to linked dependencies
+- `skipped`: Number of containers that were skipped during the update
 
 ##### Timing Section
 
