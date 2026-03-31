@@ -187,7 +187,7 @@ nav:
       - Image Cooldown: advanced-features/image-cooldown/index.md
       - Lifecycle Hooks: advanced-features/lifecycle-hooks/index.md
       - Linked Containers: advanced-features/linked-containers/index.md
-      - Metrics: advanced-features/metrics/index.md
+      - Metrics API: advanced-features/metrics-api/index.md
       - Remote Hosts: advanced-features/remote-hosts/index.md
       - Running Multiple Instances: advanced-features/running-multiple-instances/index.md
       - Stop Signals: advanced-features/stop-signals/index.md

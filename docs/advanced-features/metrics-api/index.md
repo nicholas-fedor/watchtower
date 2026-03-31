@@ -1,8 +1,4 @@
-# Metrics
-
-!!! Warning "Experimental feature"
-    This feature was added in v1.0.4 and is still considered experimental. If you notice any strange behavior, please raise
-    a ticket in the repository issues.
+# Metrics API
 
 Metrics can be used to track how Watchtower behaves over time.
 
@@ -17,23 +13,26 @@ as well as creating a port mapping for your container for port `8080`.
 
 The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible metrics. This is separate from the [`/v1/update`](../http-api/index.md#http_api_update) endpoint which triggers updates and returns JSON results.
 
+!!! Note
+    The `/v1/metrics` endpoint only accepts `GET` requests. Requests with other HTTP methods will receive a `405 Method Not Allowed` response.
+
 ## Available Metrics
 
-| Name                                    | Type    | Description                                                                 |
-|-----------------------------------------|---------|-----------------------------------------------------------------------------|
-| `watchtower_containers_scanned`         | Gauge   | Number of containers scanned for changes by watchtower during the last scan |
-| `watchtower_containers_updated`         | Gauge   | Number of containers updated by watchtower during the last scan             |
-| `watchtower_containers_failed`          | Gauge   | Number of containers where update failed during the last scan               |
-| `watchtower_containers_restarted_total` | Counter | Total number of containers restarted due to linked dependencies             |
-| `watchtower_scans_total`                | Counter | Number of scans since the watchtower started                                |
-| `watchtower_scans_skipped`              | Counter | Number of skipped scans since watchtower started                            |
+| Name                                    | Type    | Description                                                               |
+|-----------------------------------------|---------|---------------------------------------------------------------------------|
+| `watchtower_containers_scanned`         | Gauge   | Number of containers scanned for changes during the last scan            |
+| `watchtower_containers_updated`         | Gauge   | Number of containers updated during the last scan                        |
+| `watchtower_containers_failed`          | Gauge   | Number of containers where update failed during the last scan            |
+| `watchtower_containers_restarted_total` | Counter | Number of containers restarted due to linked dependencies since watchtower started |
+| `watchtower_scans_total`                | Counter | Number of scans since watchtower started                                 |
+| `watchtower_scans_skipped`              | Counter | Number of skipped scans since watchtower started                         |
 
 ## Example Prometheus `scrape_config`
 
 ```yaml
 scrape_configs:
   - job_name: watchtower
-    scrape_interval: 5s
+    scrape_interval: 15s
     metrics_path: /v1/metrics
     bearer_token: demotoken
     static_configs:

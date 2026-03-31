@@ -16,12 +16,12 @@ Lifecycle hooks enable containers to perform custom actions such as:
 
 Watchtower supports four distinct lifecycle hook types that execute at different stages of the update process:
 
-| Hook Type       | Description                                 | Execution Timing                                |
-|-----------------|---------------------------------------------|-------------------------------------------------|
-| **Pre-check**   | Executed for each filtered container before the update cycle begins | Per container, before scanning containers |
-| **Pre-update**  | Executed before stopping the old container  | Per container, immediately before stopping      |
-| **Post-update** | Executed after starting the new container   | Per container, immediately after starting       |
-| **Post-check**  | Executed for each filtered container after the update cycle completes | Per container, after all updates          |
+| Hook Type       | Description                                                           | Execution Timing                           |
+|-----------------|-----------------------------------------------------------------------|--------------------------------------------|
+| **Pre-check**   | Executed for each filtered container before the update cycle begins   | Per container, before scanning containers  |
+| **Pre-update**  | Executed before stopping the old container                            | Per container, immediately before stopping |
+| **Post-update** | Executed after starting the new container                             | Per container, immediately after starting  |
+| **Post-check**  | Executed for each filtered container after the update cycle completes | Per container, after all updates           |
 
 ## Configuration
 

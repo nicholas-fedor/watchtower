@@ -514,6 +514,16 @@ func run(command *cobra.Command, args []string) {
 		apiPort = "8080" // Default port if unset.
 	}
 
+	// Get the HTTP API rate limit, defaulting to 60 requests per minute.
+	apiRateLimit, err := flagsSet.GetInt("http-api-rate-limit")
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to get http-api-rate-limit flag")
+	}
+
+	if apiRateLimit <= 0 {
+		apiRateLimit = 60 // Default rate limit if invalid.
+	}
+
 	// Handle health check mode as an early exit, preventing updates or API setup.
 	if healthCheck {
 		if os.Getpid() == 1 {
@@ -541,6 +551,7 @@ func run(command *cobra.Command, args []string) {
 		APIToken:         apiToken,
 		APIHost:          apiHost,
 		APIPort:          apiPort,
+		APIRateLimit:     apiRateLimit,
 	}
 
 	// Execute core logic and exit with the returned status code (0 for success, 1 for failure).
@@ -749,28 +760,31 @@ func runMain(cfg types.RunConfig) int {
 
 	err = api.SetupAndStartAPI(
 		ctx,
-		cfg.APIHost,
-		cfg.APIPort,
-		cfg.APIToken,
-		cfg.EnableUpdateAPI,
-		cfg.EnableMetricsAPI,
-		cfg.UnblockHTTPAPI,
-		cfg.NoStartupMessage,
-		cfg.Filter,
-		cfg.Command,
-		cfg.FilterDesc,
-		updateLock,
-		cleanup,
-		monitorOnly,
-		client,
-		notifier,
-		scope,
-		meta.Version,
-		runUpdatesWithNotifications,
-		filters.FilterByImage,
-		metrics.Default,
-		logging.WriteStartupMessage,
-		skipSelfUpdate,
+		api.Options{
+			Host:                        cfg.APIHost,
+			Port:                        cfg.APIPort,
+			Token:                       cfg.APIToken,
+			RateLimit:                   cfg.APIRateLimit,
+			EnableUpdateAPI:             cfg.EnableUpdateAPI,
+			EnableMetricsAPI:            cfg.EnableMetricsAPI,
+			UnblockHTTPAPI:              cfg.UnblockHTTPAPI,
+			NoStartupMessage:            cfg.NoStartupMessage,
+			Filter:                      cfg.Filter,
+			Command:                     cfg.Command,
+			FilterDesc:                  cfg.FilterDesc,
+			UpdateLock:                  updateLock,
+			Cleanup:                     cleanup,
+			MonitorOnly:                 monitorOnly,
+			SkipSelfUpdate:              skipSelfUpdate,
+			Client:                      client,
+			Notifier:                    notifier,
+			Scope:                       scope,
+			Version:                     meta.Version,
+			RunUpdatesWithNotifications: runUpdatesWithNotifications,
+			FilterByImage:               filters.FilterByImage,
+			DefaultMetrics:              metrics.Default,
+			WriteStartupMessage:         logging.WriteStartupMessage,
+		},
 	)
 	if err != nil {
 		logNotify("API setup failed", err)

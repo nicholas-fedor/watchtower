@@ -10,7 +10,7 @@ If a self-update is attempted when a port is mapped to a Watchtower container, t
 
 When Watchtower has a port configured (e.g., via `--http-api-port` or Docker port mappings), self-updates are automatically skipped to prevent port conflicts.
 
-To use the [HTTP API](../../advanced-features/http-api/index.md) or [Metrics API](../../advanced-features/metrics/index.md) with self-updates, consider one of the following approaches:
+To use the [HTTP API](../../advanced-features/http-api/index.md) or [Metrics API](../../advanced-features/metrics-api/index.md) with self-updates, consider one of the following approaches:
 
 - **Remove port mappings**: Avoid publishing ports to the host and access the API through the Docker network instead.
 - **Use `--run-once`**: Run Watchtower once without scheduling, then restart manually when needed.

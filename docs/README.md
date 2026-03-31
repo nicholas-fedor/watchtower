@@ -433,7 +433,7 @@ The template preview is integrated into `docs/notifications/template-preview/ind
 #### Workflow Process
 
 1. **Checkout**: Full repository with history for versioning
-2. **Go Setup**: Installs Go 1.25.x for WASM compilation
+2. **Go Setup**: Installs Go 1.26.x for WASM compilation
 3. **Template Preview Build**: Executes `scripts/build-tplprev.sh`
 4. **Python Setup**: Configures Python with pip caching
 5. **MkDocs Installation**: Installs dependencies from `docs-requirements.txt`
@@ -463,7 +463,7 @@ The template preview is integrated into `docs/notifications/template-preview/ind
 ### Prerequisites
 
 - Python 3.x with pip
-- Go 1.25.x or later
+- Go 1.26.x or later
 - Git with full repository history
 
 ### Local Development
@@ -529,7 +529,7 @@ The documentation is automatically deployed via GitHub Actions. Manual deploymen
 
 #### Common Issues
 
-- **WASM Build Failures**: Ensure Go version matches CI (1.25.x)
+- **WASM Build Failures**: Ensure Go version matches CI (1.26.x)
 - **Missing Dependencies**: Clear pip cache and reinstall
 - **Version Conflicts**: Check Mike version aliases with `mike list`
 

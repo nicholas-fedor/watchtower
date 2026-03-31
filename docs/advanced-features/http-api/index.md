@@ -9,10 +9,14 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 ## Endpoints
 
-|            **Name**            | **Endpoint**  |          **Parameters**           |                           **Description**                            |
-|:------------------------------:|:-------------:|:---------------------------------:|:--------------------------------------------------------------------:|
-|   [Update](#http_api_update)   | `/v1/update`  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation |
-| [Metrics](../metrics/index.md) | `/v1/metrics` |                                   |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
+|              **Name**              | **Method** | **Endpoint**  |          **Parameters**           |                           **Description**                            |
+|:----------------------------------:|:----------:|:-------------:|:---------------------------------:|:--------------------------------------------------------------------:|
+|     [Update](#http_api_update)     |   `POST`   | `/v1/update`  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation |
+| [Metrics](../metrics-api/index.md) |   `GET`    | `/v1/metrics` |                                   |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
+
+!!! Note
+    Endpoints enforce HTTP method restrictions using method-based routing.
+    Requests with unsupported methods will receive a `405 Method Not Allowed` response.
 
 ### HTTP API Update
 
@@ -39,21 +43,19 @@ The `/v1/update` endpoint returns a JSON response containing the results of the 
 }
 ```
 
-**Summary Section:**
+##### Summary Section
 
 - `scanned`: Number of containers that were scanned for updates
 - `updated`: Number of containers that were successfully updated
 - `failed`: Number of containers where the update failed
 - `restarted`: Number of containers that were restarted due to linked dependencies
 
-Restarted containers represent containers that were restarted because they have dependencies on other containers that were updated. This is part of Watchtower's linked container functionality, which ensures that dependent services are restarted when their linked containers are updated to maintain consistency.
-
-**Timing Section:**
+##### Timing Section
 
 - `duration_ms`: Execution time in milliseconds
 - `duration`: Human-readable execution time
 
-**Metadata:**
+##### Metadata
 
 - `timestamp`: UTC timestamp when the response was generated (RFC3339 format)
 - `api_version`: API version identifier
@@ -62,11 +64,12 @@ Restarted containers represent containers that were restarted because they have 
 
 The `/v1/update` endpoint returns the following HTTP status codes:
 
-| Status Code | Description                                               |
-|:-----------:|:----------------------------------------------------------|
-|     200     | Update completed successfully                             |
-|     429     | Another update is already in progress (full updates only) |
-|     500     | Internal server error during request processing           |
+| Status Code | Description                                                                               |
+|:-----------:|:------------------------------------------------------------------------------------------|
+|     200     | Update completed successfully                                                             |
+|     401     | Invalid or missing authentication token                                                   |
+|     429     | Another update is already in progress (full updates only) or the request was rate limited |
+|     500     | Internal server error during request processing                                           |
 
 #### Error Response Format
 
@@ -79,8 +82,6 @@ When an error occurs, the API returns a JSON response with the following structu
   "timestamp": "2025-01-20T11:30:45Z"
 }
 ```
-
-**Error Response Fields:**
 
 - `error`: A human-readable error message describing what went wrong
 - `api_version`: API version identifier
@@ -104,12 +105,12 @@ The `/v1/update` endpoint handles concurrent requests differently based on wheth
 
 This behavior ensures that full updates (which may be resource-intensive) are not queued up, while targeted updates (which are typically faster) can wait for their turn.
 
-#### Example 429 Response
+##### Example 429 Response
 
 The following example shows what happens when a full update is requested while another update is already running:
 
 ```bash
-curl -i -H "Authorization: Bearer mytoken" localhost:8080/v1/update
+curl -i -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update
 ```
 
 Response:
@@ -128,26 +129,59 @@ Retry-After: 30
 
 The client should wait at least 30 seconds (as indicated by the `Retry-After` header) before attempting another request.
 
-#### Requirements
+#### Security
 
 ##### Authentication
 
 Watchtower uses token-based, header authentication for the HTTP API.
 
-This should be set using the [HTTP API Token](../../configuration/arguments/index.md#http_api_token) configuration option.
+- This should be set using the [HTTP API Token](../../configuration/arguments/index.md#http_api_token) configuration option.
+- All HTTP API endpoints (`/v1/update` and `/v1/metrics`) require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
+- Invalid token attempts for any endpoint requiring auth (`/v1/update` and `/v1/metrics`) are logged with the token length (not the token value)
 
-All requests to the `/v1/update` endpoint will require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
+##### Rate Limiting
 
-##### Address and Port Configuration
+Watchtower enforces two independent mechanisms that can each return HTTP 429 (Too Many Requests):
+
+**Per-IP request-rate limiting** (applies globally to all HTTP API endpoints):
+
+- Every incoming request to any HTTP API endpoint (`/v1/update`, `/v1/metrics`, etc.) is checked against a per-IP rate limiter **before** authentication is evaluated.
+- Default limit: 60 requests per minute with a burst capacity of 10 requests.
+- Configurable via [`--http-api-rate-limit`](../../configuration/arguments/index.md#http_api_rate_limit) flag or `WATCHTOWER_HTTP_API_RATE_LIMIT` environment variable.
+- Rate-limited requests receive HTTP 429 with no body.
+- Rate limit state is tracked per client IP address.
+
+**Concurrency-based update limiting** (applies only to `/v1/update`):
+
+- The `/v1/update` handler uses an internal lock to ensure only one update runs at a time.
+- If a full update (no `image` query parameter) is requested while another update is already in progress, the handler immediately returns HTTP 429 with a JSON error body and a `Retry-After: 30` header.
+- Targeted updates (with `image` query parameter) block until the lock is available rather than returning 429.
+
+**Precedence:** Per-IP rate limiting is evaluated first. If a request passes the rate limit, it proceeds to the endpoint handler where concurrency limiting may apply for `/v1/update`.
+
+##### Request Body Protection
+
+- Request bodies are capped at 1 MiB to prevent resource exhaustion from large uploads
+- Requests exceeding this limit will be rejected with HTTP 413 (Payload Too Large)
+
+#### Address and Port Configuration
 
 Watchtower defaults to listening on all interfaces on port 8080.
+
+##### HTTP API Host
+
+Use the [HTTP API Host](../../configuration/arguments/index.md#http_api_host) configuration option to bind to a specific host interface.
+
+- This must be a valid IP address (IPv4 or IPv6).
+- If not specified, Watchtower listens on all interfaces on the port specified by `--http-api-port`.
+
+##### HTTP API Port
+
 The port can be changed using the [HTTP API Port](../../configuration/arguments/index.md#http_api_port) configuration option.
-To bind to a specific host, use the [HTTP API Host](../../configuration/arguments/index.md#http_api_host) configuration option.
-The host must be a valid IP address (IPv4 or IPv6).
 
-Alternatively, if Watchtower is being run via a Docker container, then the `host:container` port mapping can be updated accordingly (e.g. `8080:8080` -> `9000:8080`).
+If Watchtower is being run via a Docker container, then the `host:container` port mapping can be updated accordingly (e.g. `8080:8080` -> `9000:8080`).
 
-###### Examples
+##### Examples
 
 - Listen on all interfaces on port 8080 (default):
 
@@ -176,7 +210,7 @@ Watchtower supports using the `image` URL query parameter to filter updates for 
 The following `curl` command would trigger an update of all container images monitored by Watchtower:
 
 ```bash
-curl -H "Authorization: Bearer mytoken" localhost:8080/v1/update
+curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update
 ```
 
 ##### Image Filtering with Tags
@@ -186,7 +220,7 @@ You can specify image tags to target containers running a specific version (e.g.
 For example, to update only containers using `foo/bar:1.0` and `foo/baz:latest`:
 
 ```bash
-curl -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar:1.0,foo/baz:latest
+curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar:1.0,foo/baz:latest
 ```
 
 ##### Image Filtering without Tags
@@ -196,15 +230,16 @@ If no tag is provided, Watchtower matches containers regardless of their tag.
 The following `curl` command would trigger an update for the images `foo/bar` and `foo/baz`:
 
 ```bash
-curl -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar,foo/baz
+curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar,foo/baz
 ```
 
-#### Scheduled Updates
+#### Using the HTTP API and Periodic Updates
 
-By default, enabling this mode prevents periodic polls (i.e. [scheduled](../../configuration/arguments/index.md#schedule) or [interval](../../configuration/arguments/index.md#poll_interval) polling).
-Use the [HTTP API Periodic Polls](../../configuration/arguments/index.md#http_api_periodic_polls) configuration option to allow both API-triggered and scheduled updates.
+By default, enabling the HTTP API prevents periodic updates (i.e. [scheduled](../../configuration/arguments/index.md#schedule) or [interval](../../configuration/arguments/index.md#poll_interval) polling).
 
-#### Example
+Use the [HTTP API Periodic Polls](../../configuration/arguments/index.md#http_api_periodic_polls) configuration option to enable periodic updates while using the HTTP API.
+
+##### Example
 
 ```yaml title="Example Docker Compose Configuration"
 services:
