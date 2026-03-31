@@ -137,7 +137,7 @@ func SetupAndStartAPI(
 		updateHandler := update.New(func(images []string) *metrics.Metric {
 			params := types.UpdateParams{
 				Cleanup:        opts.Cleanup,
-				RunOnce:        true,
+				RunOnce:        false,
 				MonitorOnly:    opts.MonitorOnly,
 				SkipSelfUpdate: opts.SkipSelfUpdate,
 			}

@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				updateHandler := update.New(func(images []string) *metrics.Metric {
 					params := types.UpdateParams{
 						Cleanup:        false, // cleanup
-						RunOnce:        true,
+						RunOnce:        false,
 						MonitorOnly:    monitorOnly,
 						SkipSelfUpdate: false,
 					}
@@ -273,7 +273,7 @@ var _ = ginkgo.Describe("SetupAndStartAPI", func() {
 				updateHandler := update.New(func(images []string) *metrics.Metric {
 					params := types.UpdateParams{
 						Cleanup:        false,
-						RunOnce:        true,
+						RunOnce:        false,
 						MonitorOnly:    false,
 						SkipSelfUpdate: skipSelfUpdate,
 					}
