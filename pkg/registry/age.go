@@ -178,7 +178,7 @@ func FetchImageCreationTime(
 	// Try manifest fetch with host fallback: primary (redirect/original),
 	// then challenge host, then original host.
 	// This mirrors the retry logic in digest.go's HandleManifestResponse.
-	configDigest, err := fetchManifestForAge(
+	configDigest, winningHost, err := fetchManifestForAge(
 		ctx,
 		client,
 		manifestURL,
@@ -197,11 +197,15 @@ func FetchImageCreationTime(
 		WithField("config_digest", configDigest).
 		Debug("Extracted config digest from manifest")
 
+	// Use the host that successfully served the manifest for the blob fetch.
+	blobURL := *parsedURL
+	blobURL.Host = winningHost
+
 	// Fetch the config blob.
 	configBody, err := fetchConfigBlob(
 		ctx,
 		client,
-		parsedURL,
+		&blobURL,
 		configDigest,
 		token,
 		fields,
@@ -323,7 +327,7 @@ func retryManifestRequest(
 	parsedURL *url.URL,
 	manifestURL, token, challengeHost string,
 	fields logrus.Fields,
-) ([]byte, error) {
+) ([]byte, string, error) {
 	// Determine the original host for fallback.
 	originalHost := parsedURL.Host
 
@@ -382,6 +386,7 @@ func retryManifestRequest(
 				Debug("Failed to create manifest request")
 
 			return nil,
+				"",
 				fmt.Errorf(
 					"%w: %w",
 					errFetchManifestFailed,
@@ -409,6 +414,7 @@ func retryManifestRequest(
 				Debug("Failed to execute manifest request")
 
 			return nil,
+				"",
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 		}
 
@@ -438,6 +444,7 @@ func retryManifestRequest(
 				Debug("Manifest request returned non-OK status")
 
 			return nil,
+				"",
 				fmt.Errorf(
 					"%w: status %d",
 					errFetchManifestFailed,
@@ -455,6 +462,7 @@ func retryManifestRequest(
 				Debug("Failed to read manifest response")
 
 			return nil,
+				"",
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 		}
 
@@ -465,6 +473,7 @@ func retryManifestRequest(
 				Debug("Manifest response exceeds size limit")
 
 			return nil,
+				"",
 				fmt.Errorf(
 					"%w: %d bytes exceeds limit of %d bytes",
 					errManifestTooLarge,
@@ -473,15 +482,17 @@ func retryManifestRequest(
 				)
 		}
 
-		return body, nil
+		return body, candidate.host, nil
 	}
 
 	// All hosts exhausted.
 	if lastErr != nil {
-		return nil, lastErr
+		return nil, "", lastErr
 	}
 
-	return nil, fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
+	return nil,
+		"",
+		fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
 }
 
 // fetchManifestForAge fetches the image manifest and extracts the config digest.
@@ -511,8 +522,8 @@ func fetchManifestForAge(
 	parsedURL *url.URL,
 	targetOS, targetArch, challengeHost string,
 	fields logrus.Fields,
-) (string, error) {
-	body, err := retryManifestRequest(
+) (string, string, error) {
+	body, winningHost, err := retryManifestRequest(
 		ctx,
 		client,
 		parsedURL,
@@ -522,7 +533,7 @@ func fetchManifestForAge(
 		fields,
 	)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// Try to parse as image index (multi-platform).
@@ -530,11 +541,17 @@ func fetchManifestForAge(
 
 	idxErr := json.Unmarshal(body, &index)
 	if idxErr == nil && isIndexMediaType(index.MediaType) {
+		// For multi-platform images, selectPlatformManifest performs its own
+		// host fallback internally. Build a parsedURL with the winning host so
+		// the platform-specific fetch starts from the correct origin.
+		effectiveURL := *parsedURL
+		effectiveURL.Host = winningHost
+
 		return selectPlatformManifest(
 			ctx,
 			client,
 			index,
-			parsedURL,
+			&effectiveURL,
 			token,
 			targetOS,
 			targetArch,
@@ -553,6 +570,7 @@ func fetchManifestForAge(
 			Debug("Failed to parse manifest JSON")
 
 		return "",
+			"",
 			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
@@ -560,10 +578,10 @@ func fetchManifestForAge(
 		logrus.WithFields(fields).
 			Debug("Manifest does not contain config digest")
 
-		return "", errNoConfigDigest
+		return "", "", errNoConfigDigest
 	}
 
-	return manifest.Config.Digest, nil
+	return manifest.Config.Digest, winningHost, nil
 }
 
 // selectPlatformCandidate filters the image index for matching platform entries
@@ -670,6 +688,7 @@ func selectPlatformCandidate(
 //
 // Returns:
 //   - string: The config digest from the platform-specific manifest.
+//   - string: The host that successfully served the manifest.
 //   - error: Non-nil if all hosts fail.
 func fetchPlatformManifestWithRetry(
 	ctx context.Context,
@@ -677,7 +696,7 @@ func fetchPlatformManifestWithRetry(
 	parsedURL *url.URL,
 	token, selectedDigest, challengeHost string,
 	fields logrus.Fields,
-) (string, error) {
+) (string, string, error) {
 	// Build URL path for platform-specific manifest.
 	idx := strings.LastIndex(parsedURL.Path, "/manifests/")
 
@@ -687,6 +706,7 @@ func fetchPlatformManifestWithRetry(
 			Debug("Could not find /manifests/ in URL path")
 
 		return "",
+			"",
 			fmt.Errorf(
 				"%w: malformed manifest URL path %q",
 				errFetchManifestFailed,
@@ -739,6 +759,7 @@ func fetchPlatformManifestWithRetry(
 				Debug("Failed to create platform manifest request")
 
 			return "",
+				"",
 				fmt.Errorf(
 					"%w: %w",
 					errFetchManifestFailed,
@@ -768,6 +789,7 @@ func fetchPlatformManifestWithRetry(
 				Debug("Failed to execute platform manifest request")
 
 			return "",
+				"",
 				fmt.Errorf(
 					"%w: %w",
 					errFetchManifestFailed,
@@ -817,6 +839,7 @@ func fetchPlatformManifestWithRetry(
 				)
 				if retryErr != nil {
 					return "",
+						"",
 						fmt.Errorf("%w: %w", errFetchManifestFailed, retryErr)
 				}
 
@@ -838,6 +861,7 @@ func fetchPlatformManifestWithRetry(
 				retryResp, retryErr := client.Do(retryReq)
 				if retryErr != nil {
 					return "",
+						"",
 						fmt.Errorf("%w: %w", errFetchManifestFailed, retryErr)
 				}
 
@@ -850,6 +874,7 @@ func fetchPlatformManifestWithRetry(
 						Debug("Platform manifest retry also failed")
 
 					return "",
+						"",
 						fmt.Errorf(
 							"%w: status %d",
 							errFetchManifestFailed,
@@ -868,6 +893,7 @@ func fetchPlatformManifestWithRetry(
 						Debug("Failed to parse platform manifest JSON")
 
 					return "",
+						"",
 						fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 				}
 
@@ -875,10 +901,10 @@ func fetchPlatformManifestWithRetry(
 					logrus.WithFields(fields).
 						Debug("Platform manifest does not contain config digest")
 
-					return "", errNoConfigDigest
+					return "", "", errNoConfigDigest
 				}
 
-				return retryManifest.Config.Digest, nil
+				return retryManifest.Config.Digest, challengeHost, nil
 			}
 
 			logrus.WithFields(fields).
@@ -886,6 +912,7 @@ func fetchPlatformManifestWithRetry(
 				Debug("Platform manifest request returned non-OK status")
 
 			return "",
+				"",
 				fmt.Errorf(
 					"%w: status %d",
 					errFetchManifestFailed,
@@ -904,6 +931,7 @@ func fetchPlatformManifestWithRetry(
 				Debug("Failed to parse platform manifest JSON")
 
 			return "",
+				"",
 				fmt.Errorf(
 					"%w: %w",
 					errFetchManifestFailed,
@@ -915,18 +943,20 @@ func fetchPlatformManifestWithRetry(
 			logrus.WithFields(fields).
 				Debug("Platform manifest does not contain config digest")
 
-			return "", errNoConfigDigest
+			return "", "", errNoConfigDigest
 		}
 
-		return manifest.Config.Digest, nil
+		return manifest.Config.Digest, candidate.host, nil
 	}
 
 	// All hosts exhausted.
 	if lastErr != nil {
-		return "", lastErr
+		return "", "", lastErr
 	}
 
-	return "", fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
+	return "",
+		"",
+		fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
 }
 
 // selectPlatformManifest selects the platform-specific manifest from an image index
@@ -951,6 +981,7 @@ func fetchPlatformManifestWithRetry(
 //
 // Returns:
 //   - string: The config digest from the platform-specific manifest.
+//   - string: The host that successfully served the manifest.
 //   - error: Non-nil if selection or fetching fails.
 func selectPlatformManifest(
 	ctx context.Context,
@@ -960,7 +991,7 @@ func selectPlatformManifest(
 	token string,
 	targetOS, targetArch, challengeHost string,
 	fields logrus.Fields,
-) (string, error) {
+) (string, string, error) {
 	// Use runtime defaults if no override is specified.
 	if targetOS == "" {
 		targetOS = runtime.GOOS
@@ -977,7 +1008,7 @@ func selectPlatformManifest(
 		fields,
 	)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	return fetchPlatformManifestWithRetry(

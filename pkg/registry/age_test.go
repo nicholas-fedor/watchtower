@@ -132,7 +132,7 @@ func TestFetchManifestForAge_SinglePlatform(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
 	require.NoError(t, err)
 
-	got, err := fetchManifestForAge(
+	got, _, err := fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -173,7 +173,7 @@ func TestFetchManifestForAge_MultiPlatformIndex(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
 	require.NoError(t, err)
 
-	got, err := fetchManifestForAge(
+	got, _, err := fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -203,7 +203,7 @@ func TestFetchManifestForAge_AuthFailure(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
 	require.NoError(t, err)
 
-	_, err = fetchManifestForAge(
+	_, _, err = fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -233,7 +233,7 @@ func TestFetchManifestForAge_NotFound(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
 	require.NoError(t, err)
 
-	_, err = fetchManifestForAge(
+	_, _, err = fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -267,7 +267,7 @@ func TestFetchManifestForAge_MissingConfigDigest(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
 	require.NoError(t, err)
 
-	_, err = fetchManifestForAge(
+	_, _, err = fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -611,7 +611,7 @@ func TestSelectPlatformManifest_PlatformMatch(t *testing.T) {
 		},
 	}
 
-	got, err := selectPlatformManifest(
+	got, _, err := selectPlatformManifest(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		idx,
@@ -647,7 +647,7 @@ func TestSelectPlatformManifest_NoMatch(t *testing.T) {
 		},
 	}
 
-	_, err = selectPlatformManifest(
+	_, _, err = selectPlatformManifest(
 		context.Background(),
 		nil,
 		idx,
@@ -710,7 +710,7 @@ func TestSelectPlatformManifest_SkipsAttestationManifests(t *testing.T) {
 		},
 	}
 
-	got, err := selectPlatformManifest(
+	got, _, err := selectPlatformManifest(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		idx,
@@ -762,7 +762,7 @@ func TestSelectPlatformManifest_MissingConfigDigest(t *testing.T) {
 		},
 	}
 
-	_, err = selectPlatformManifest(
+	_, _, err = selectPlatformManifest(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		idx,
@@ -806,7 +806,7 @@ func TestPipeline_SinglePlatformManifest_ReturnsCreationTime(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_single"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 	assert.Equal(t, configDigest, digest)
 
@@ -860,7 +860,7 @@ func TestPipeline_MultiPlatformIndex_ReturnsCreationTime(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_multi"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 	assert.Equal(t, configDigest, digest)
 
@@ -906,7 +906,7 @@ func TestPipeline_MissingCreationTimestamp(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_missing_created"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -950,7 +950,7 @@ func TestPipeline_ConfigBlobNotFound(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_config_fail"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	_, err = fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -986,7 +986,7 @@ func TestPipeline_InvalidConfigJSON(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_invalid_json"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -1035,7 +1035,7 @@ func TestPipeline_RedirectOnBlob(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_redirect"}
 
-	digest, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -1070,7 +1070,7 @@ func TestPipeline_ManifestNotFound(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/library/alpine/manifests/3.19")
 	require.NoError(t, err)
 
-	_, err = fetchManifestForAge(
+	_, _, err = fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -1102,7 +1102,7 @@ func TestPipeline_AuthFailure(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/library/alpine/manifests/3.19")
 	require.NoError(t, err)
 
-	_, err = fetchManifestForAge(
+	_, _, err = fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -1146,7 +1146,7 @@ func TestFetchManifestForAge_OversizedManifest(t *testing.T) {
 	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
 	require.NoError(t, err)
 
-	_, err = fetchManifestForAge(
+	_, _, err = fetchManifestForAge(
 		context.Background(),
 		server.HTTPTestServer.Client(),
 		parsedURL.String(),
@@ -1195,7 +1195,7 @@ func TestSelectPlatformManifest_AmbiguousPlatformMatch(t *testing.T) {
 		},
 	}
 
-	_, err = selectPlatformManifest(
+	_, _, err = selectPlatformManifest(
 		context.Background(),
 		nil,
 		idx,

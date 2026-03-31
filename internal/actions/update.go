@@ -351,7 +351,14 @@ func Update(
 				// Negative image age indicates clock skew between the Watchtower host
 				// and the registry (image creation time is in the future). Log a warning
 				// and proceed with the update to avoid indefinite deferral.
+				//
+				// futureTimestamp tracks whether we detected clock skew so that the
+				// "Image age exceeds cooldown" block below is skipped — that block
+				// records cooldown metadata that would be misleading for a negative age.
+				futureTimestamp := false
+
 				if imageAge < 0 {
+					futureTimestamp = true
 					ageStr := util.FormatDuration(imageAge)
 					cooldownStr := util.FormatDuration(cooldownDelay)
 
@@ -360,9 +367,6 @@ func Update(
 							"image_age": ageStr,
 							"cooldown":  cooldownStr,
 						}).Warn("Image creation time is in the future (possible clock skew) - proceeding with update")
-
-					// Fall through to the proceeding block below, which will
-					// set cooldownAge / cooldownDelayStr and log the update.
 				} else if imageAge <= cooldownDelay {
 					// Defer when image age is less than or equal to cooldown.
 					// Updates only proceed when imageAge > cooldownDelay.
@@ -401,18 +405,22 @@ func Update(
 					continue
 				}
 
-				ageStr := util.FormatDuration(imageAge)
-				cooldownStr := util.FormatDuration(cooldownDelay)
+				// Only record cooldown metadata when the image age is a real
+				// (non-negative) value that exceeds the cooldown window.
+				if !futureTimestamp {
+					ageStr := util.FormatDuration(imageAge)
+					cooldownStr := util.FormatDuration(cooldownDelay)
 
-				clog.WithFields(
-					logrus.Fields{
-						"image_age": ageStr,
-						"cooldown":  cooldownStr,
-					}).Info("Image age exceeds cooldown - proceeding with update")
+					clog.WithFields(
+						logrus.Fields{
+							"image_age": ageStr,
+							"cooldown":  cooldownStr,
+						}).Info("Image age exceeds cooldown - proceeding with update")
 
-				// Store for setting after AddScanned.
-				cooldownAge = ageStr
-				cooldownDelayStr = cooldownStr
+					// Store for setting after AddScanned.
+					cooldownAge = ageStr
+					cooldownDelayStr = cooldownStr
+				}
 			}
 
 			// For fresh containers, set newestImage to current image ID for proper categorization
