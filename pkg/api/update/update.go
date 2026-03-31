@@ -16,6 +16,10 @@ import (
 // retryAfterSeconds is the value for the Retry-After header in 429 responses.
 const retryAfterSeconds = "30"
 
+// maxRequestBodySize defines the maximum request body size (1 MiB) to prevent
+// resource exhaustion from large uploads.
+const maxRequestBodySize = 1 << 20
+
 // Handler triggers container update scans via HTTP.
 //
 // It holds the update function, endpoint path, and concurrency lock for the /v1/update endpoint.
@@ -76,6 +80,9 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	}).Info("Received HTTP API update request")
 
 	// Discard request body to prevent I/O blocking in tests and CI environments.
+	// Limit body size to prevent resource exhaustion from large uploads.
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+
 	_, err := io.Copy(io.Discard, r.Body)
 	if err != nil {
 		logrus.WithError(err).Debug("Failed to read request body")

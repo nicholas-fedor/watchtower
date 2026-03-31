@@ -735,8 +735,7 @@ Environment Variable: WATCHTOWER_HTTP_API_UPDATE
              Default: false
 ```
 
-!!! Note
-    See [HTTP API Mode](../../advanced-features/http-api/index.md) for details.
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md) for details"
 
 ### HTTP API Token
 
@@ -761,12 +760,11 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
              Default: false
 ```
 
-!!! Note
-    See [Metrics](../../advanced-features/metrics/index.md) for details.
+!!! Note "See the [Metrics API documentation](../../advanced-features/metrics-api/index.md) for details"
 
 ### HTTP API Host
 
-Sets the host to bind the HTTP API to.
+Sets the host interface for binding the HTTP API.
 
 ```text
             Argument: --http-api-host
@@ -775,11 +773,7 @@ Environment Variable: WATCHTOWER_HTTP_API_HOST
              Default: empty (binds to all interfaces)
 ```
 
-!!! Note
-     If not specified, Watchtower listens on all interfaces on the port specified by `--http-api-port`.
-     Use this option to bind to a specific host, such as `127.0.0.1` for localhost only.
-     The host must be a valid IP address (IPv4 or IPv6).
-     The port is set separately with `--http-api-port`.
+!!! Note "See the [HTTP API Host documentation](../../advanced-features/http-api/index.md#http_api_host) for details"
 
 ### HTTP API Port
 
@@ -791,6 +785,26 @@ Environment Variable: WATCHTOWER_HTTP_API_PORT
                 Type: String
              Default: 8080
 ```
+
+!!! Note "See the [HTTP API Port documentation](../../advanced-features/http-api/index.md#http_api_port) for details"
+
+### HTTP API Rate Limit
+
+Sets the maximum number of API requests allowed per minute per IP address for the HTTP API.
+This helps protect against brute-force attacks while allowing normal API usage.
+
+```text
+            Argument: --http-api-rate-limit
+Environment Variable: WATCHTOWER_HTTP_API_RATE_LIMIT
+                Type: Integer
+             Default: 60
+```
+
+!!! Note
+    Rate limiting is enforced per client IP address and applies to all HTTP API endpoints
+    (`/v1/update` and `/v1/metrics`). When the limit is exceeded, the client receives
+    HTTP 429 (Too Many Requests). The burst capacity is fixed at 10 requests to allow short
+    bursts of legitimate activity (e.g., concurrent dashboard updates).
 
 ## Notifications
 
@@ -923,7 +937,10 @@ Environment Variable: WATCHTOWER_TIMEOUT
 
 ### Cooldown Delay
 
-Sets the minimum time since an image was created before Watchtower will perform the update. Image age is determined from the image creation timestamp in the registry config blob. This can reduce risk from newly pushed images but is not a comprehensive security control.
+Sets a global minimum image age before Watchtower will perform the update.
+
+Image age is determined from the image creation timestamp in the registry config blob.
+This helps to establish a time buffer against newly pushed images; however, is not a comprehensive security control.
 
 ```text
             Argument: --cooldown-delay
@@ -932,9 +949,9 @@ Environment Variable: WATCHTOWER_COOLDOWN_DELAY
              Default: (empty / disabled)
 ```
 
-Accepted units: `h` (hours), `m` (minutes), `s` (seconds), `d` (days), `w` (weeks), `M` (months, i.e. 30 days).
-These can be combined (e.g., `24h`, `3d`, `1w`, `1M`, `1w12h`).
-Leaving the setting empty disables cooldown.
+- Accepted units: `h` (hours), `m` (minutes), `s` (seconds), `d` (days), `w` (weeks), `M` (months, i.e. 30 days).
+- These can be combined (e.g., `24h`, `3d`, `1w`, `1M`, `1w12h`).
+- Leaving the setting empty disables cooldown.
 
 !!! Warning
     This setting delays *all* updates, including critical security patches.

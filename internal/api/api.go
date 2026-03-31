@@ -21,6 +21,57 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Options holds all configuration for SetupAndStartAPI, replacing the previous
+// long parameter list with a single structured argument.
+type Options struct {
+	// Host to bind the HTTP API to.
+	Host string
+	// Port for the HTTP API server.
+	Port string
+	// Token for HTTP API authentication.
+	Token string
+	// RateLimit is the maximum authentication requests per minute per IP address.
+	RateLimit int
+	// EnableUpdateAPI enables the HTTP update API endpoint.
+	EnableUpdateAPI bool
+	// EnableMetricsAPI enables the HTTP metrics API endpoint.
+	EnableMetricsAPI bool
+	// UnblockHTTPAPI allows periodic polling alongside the HTTP API.
+	UnblockHTTPAPI bool
+	// NoStartupMessage suppresses startup messages if true.
+	NoStartupMessage bool
+	// Filter determines which containers are targeted for updates.
+	Filter types.Filter
+	// Command is the cobra.Command instance representing the executed command.
+	Command *cobra.Command
+	// FilterDesc is a human-readable description of the applied filter.
+	FilterDesc string
+	// UpdateLock is a channel ensuring only one update runs at a time, shared with the scheduler.
+	UpdateLock chan bool
+	// Cleanup indicates whether to remove old images after updates.
+	Cleanup bool
+	// MonitorOnly indicates whether to run in monitor-only mode.
+	MonitorOnly bool
+	// SkipSelfUpdate indicates self-update will be skipped due to host-bound port conflicts.
+	SkipSelfUpdate bool
+	// Client is the container client for Docker operations.
+	Client container.Client
+	// Notifier is the notification system instance.
+	Notifier types.Notifier
+	// Scope is the operational scope for Watchtower.
+	Scope string
+	// Version string.
+	Version string
+	// RunUpdatesWithNotifications runs updates with notifications.
+	RunUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric
+	// FilterByImage filters by images.
+	FilterByImage func([]string, types.Filter) types.Filter
+	// DefaultMetrics returns the default metrics instance.
+	DefaultMetrics func() *metrics.Metrics
+	// WriteStartupMessage writes the startup message.
+	WriteStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
+}
+
 // GetAPIAddr formats the API address string based on host and port.
 func GetAPIAddr(host, port string) string {
 	address := host + ":" + port
@@ -38,109 +89,75 @@ func GetAPIAddr(host, port string) string {
 //
 // Parameters:
 //   - ctx: The context controlling the API's lifecycle, enabling graceful shutdown on cancellation.
-//   - apiHost: The host to bind the HTTP API to.
-//   - apiPort: The port for the HTTP API server.
-//   - apiToken: The authentication token for HTTP API access.
-//   - enableUpdateAPI: Enables the HTTP update API endpoint.
-//   - enableMetricsAPI: Enables the HTTP metrics API endpoint.
-//   - unblockHTTPAPI: Allows periodic polling alongside the HTTP API.
-//   - noStartupMessage: Suppresses startup messages if true.
-//   - filter: The types.Filter determining which containers are targeted for updates.
-//   - command: The cobra.Command instance representing the executed command.
-//   - filterDesc: A human-readable description of the applied filter.
-//   - updateLock: A channel ensuring only one update runs at a time, shared with the scheduler.
-//   - cleanup: Boolean indicating whether to remove old images after updates.
-//   - monitorOnly: Boolean indicating whether to run in monitor-only mode.
-//   - client: Container client for Docker operations.
-//   - notifier: Notification system instance.
-//   - scope: Operational scope for Watchtower.
-//   - version: Version string.
-//   - runUpdatesWithNotifications: Function to run updates with notifications.
-//   - filterByImage: Function to filter by images.
-//   - defaultMetrics: Function to get default metrics.
-//   - writeStartupMessage: Function to write startup message.
-//   - skipSelfUpdate: Whether self-update will be skipped due to host-bound port conflicts.
+//   - opts: The Options struct containing all API configuration.
+//   - server: Optional HTTPServer implementation for testing; if not provided, a real http.Server is used.
 //
 // Returns:
 //   - error: An error if the API fails to start (excluding clean shutdown), nil otherwise.
 func SetupAndStartAPI(
 	ctx context.Context,
-	apiHost, apiPort, apiToken string,
-	enableUpdateAPI, enableMetricsAPI, unblockHTTPAPI, noStartupMessage bool,
-	filter types.Filter,
-	command *cobra.Command,
-	filterDesc string,
-	updateLock chan bool,
-	cleanup bool,
-	monitorOnly bool,
-	client container.Client,
-	notifier types.Notifier,
-	scope string,
-	version string,
-	runUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric,
-	filterByImage func([]string, types.Filter) types.Filter,
-	defaultMetrics func() *metrics.Metrics,
-	writeStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool),
-	skipSelfUpdate bool,
+	opts Options,
 	server ...api.HTTPServer,
 ) error {
 	// Get the formatted HTTP api address string.
-	address := GetAPIAddr(apiHost, apiPort)
+	address := GetAPIAddr(opts.Host, opts.Port)
 
 	// Initialize the HTTP API with the configured authentication token and address.
 	var httpAPI *api.API
 	if len(server) > 0 {
-		httpAPI = api.New(apiToken, address, server[0])
+		httpAPI = api.New(opts.Token, address, opts.RateLimit, server[0])
 	} else {
-		httpAPI = api.New(apiToken, address)
+		httpAPI = api.New(opts.Token, address, opts.RateLimit)
 	}
 
 	// Register the update API endpoint if enabled, linking it to the update handler.
-	if enableUpdateAPI {
+	if opts.EnableUpdateAPI {
 		updateHandler := update.New(func(images []string) *metrics.Metric {
 			params := types.UpdateParams{
-				Cleanup:        cleanup,
+				Cleanup:        opts.Cleanup,
 				RunOnce:        true,
-				MonitorOnly:    monitorOnly,
-				SkipSelfUpdate: skipSelfUpdate,
+				MonitorOnly:    opts.MonitorOnly,
+				SkipSelfUpdate: opts.SkipSelfUpdate,
 			}
-			metric := runUpdatesWithNotifications(ctx, filterByImage(images, filter), params)
-			defaultMetrics().RegisterScan(metric)
+			metric := opts.RunUpdatesWithNotifications(ctx, opts.FilterByImage(images, opts.Filter), params)
+			opts.DefaultMetrics().RegisterScan(metric)
 
 			return metric
-		}, updateLock)
-		httpAPI.RegisterFunc(updateHandler.Path, updateHandler.Handle)
+		}, opts.UpdateLock)
+		// Use Go 1.22+ method-based routing to restrict to POST only.
+		httpAPI.RegisterFunc("POST "+updateHandler.Path, updateHandler.Handle)
 
-		if !unblockHTTPAPI {
-			writeStartupMessage(
-				command,
+		if !opts.UnblockHTTPAPI {
+			opts.WriteStartupMessage(
+				opts.Command,
 				time.Time{},
-				filterDesc,
-				scope,
-				client,
-				notifier,
-				version,
+				opts.FilterDesc,
+				opts.Scope,
+				opts.Client,
+				opts.Notifier,
+				opts.Version,
 				nil, // read from flags
 			)
 		}
 	}
 
 	// Register the metrics API endpoint if enabled, providing access to update metrics.
-	if enableMetricsAPI {
+	if opts.EnableMetricsAPI {
 		metricsHandler := metricsAPI.New()
-		httpAPI.RegisterHandler(metricsHandler.Path, metricsHandler.Handle)
+		// Use Go 1.22+ method-based routing to restrict to GET only.
+		httpAPI.RegisterHandler("GET "+metricsHandler.Path, metricsHandler.Handle)
 	}
 
 	// Warn once at startup when self-update will be skipped due to host-bound port conflicts.
-	if skipSelfUpdate {
+	if opts.SkipSelfUpdate {
 		logrus.Warn("Skipping self-update to prevent port conflict: Watchtower container has host-bound ports")
 	}
 
 	// Start the API server, logging errors unless it's a clean shutdown.
 	err := httpAPI.Start(
 		ctx,
-		enableUpdateAPI && !unblockHTTPAPI,
-		noStartupMessage,
+		opts.EnableUpdateAPI && !opts.UnblockHTTPAPI,
+		opts.NoStartupMessage,
 	)
 	if err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {

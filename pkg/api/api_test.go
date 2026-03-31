@@ -28,6 +28,9 @@ import (
 // testToken is a constant token used for testing authentication.
 const testToken = "123123123"
 
+// testRateLimit is the default rate limit (requests per minute) used for testing.
+const testRateLimit = 60
+
 // testResponse is a constant response used for testing.
 const testResponse = "Hello!"
 
@@ -58,7 +61,7 @@ func TestAPI_ServerShutdown(t *testing.T) {
 
 		listener.Close()
 
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 		apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 		apiInstance.RegisterFunc("/test-shutdown", http.HandlerFunc(testHandler))
 
@@ -99,7 +102,7 @@ func TestAPI_ServerStartError(t *testing.T) {
 
 		port := tcpAddr.Port
 
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 		apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 		apiInstance.RegisterFunc("/test-error", http.HandlerFunc(testHandler))
 
@@ -121,7 +124,7 @@ func TestAPI_ServerStartError(t *testing.T) {
 // TestAPI_ServerShutdownTimeout tests that the server returns an error on shutdown failure.
 func TestAPI_ServerShutdownTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 		apiInstance.Addr = "127.0.0.1:0"
 		apiInstance.RegisterFunc("/test-shutdown-fail", http.HandlerFunc(testHandler))
 
@@ -163,7 +166,7 @@ func TestAPI_ServerShutdownTimeout(t *testing.T) {
 // TestAPI_ServerStartTimeout tests that the server starts and serves requests correctly.
 func TestAPI_ServerStartTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 
 		testMux := http.NewServeMux()
 		testMux.Handle("/test-handler", apiInstance.RequireToken(http.HandlerFunc(testHandler)))
@@ -232,7 +235,7 @@ func TestAPI_SkipStartWhenNoHandlers(t *testing.T) {
 			logrus.SetLevel(logrus.InfoLevel)
 		}()
 
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 
 		err := apiInstance.Start(context.Background(), true, false)
 		if err != nil {
@@ -266,7 +269,7 @@ func TestAPI_StartServerSynchronously(t *testing.T) {
 
 		listener.Close()
 
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 		apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 		apiInstance.RegisterFunc("/test-sync", http.HandlerFunc(testHandler))
 
@@ -371,7 +374,7 @@ func TestAPI_StartServerAsynchronously(t *testing.T) {
 
 		listener.Close()
 
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 		apiInstance.Addr = fmt.Sprintf("127.0.0.1:%d", port)
 		apiInstance.RegisterFunc("/test-async", http.HandlerFunc(testHandler))
 
@@ -470,7 +473,7 @@ func TestAPI_StartServerAsyncLogErrorOnFailure(t *testing.T) {
 			logrus.SetLevel(logrus.InfoLevel)
 		}()
 
-		apiInstance := api.New(testToken, ":8080")
+		apiInstance := api.New(testToken, ":8080", testRateLimit)
 		apiInstance.Addr = "127.0.0.1:invalid"
 		apiInstance.RegisterFunc("/test-fail", http.HandlerFunc(testHandler))
 
@@ -509,7 +512,7 @@ var _ = ginkgo.Describe("API", func() {
 		)
 
 		ginkgo.BeforeEach(func() {
-			apiInstance = api.New(testToken, ":8080")
+			apiInstance = api.New(testToken, ":8080", testRateLimit)
 			server = ghttp.NewServer()
 			server.RouteToHandler("GET", "/hello", apiInstance.RequireToken(testHandler))
 		})
@@ -577,7 +580,7 @@ var _ = ginkgo.Describe("API", func() {
 		})
 
 		ginkgo.It("should fail with a fatal log when token is empty", func() {
-			emptyTokenAPI := api.New("", ":8080")
+			emptyTokenAPI := api.New("", ":8080", testRateLimit)
 			emptyTokenAPI.RegisterFunc("/test", http.HandlerFunc(testHandler))
 
 			var logOutput string

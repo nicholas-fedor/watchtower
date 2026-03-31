@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	token = "123123123"
+	token       = "123123123"
+	rateLimit60 = 60 // Maximum authentication requests per minute per IP address.
 )
 
 func TestMetrics(t *testing.T) {
@@ -51,6 +52,10 @@ func getWithToken(baseURL string) (map[string]string, error) {
 		}
 
 		parts := strings.Split(line, " ")
+		if len(parts) < 2 {
+			continue
+		}
+
 		metricMap[parts[0]] = parts[1]
 	}
 
@@ -66,7 +71,7 @@ var _ = ginkgo.Describe("the metrics API", func() {
 	)
 
 	ginkgo.BeforeEach(func() {
-		httpAPI = api.New(token, ":8080")
+		httpAPI = api.New(token, ":8080", rateLimit60)
 		m = metricsAPI.New()
 		handleReq = httpAPI.RequireToken(m.Handle)
 		server = ghttp.NewServer()
