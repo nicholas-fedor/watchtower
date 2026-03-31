@@ -138,7 +138,7 @@ func TestFetchManifestForAge_SinglePlatform(t *testing.T) {
 		parsedURL.String(),
 		"Bearer test-token",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "single_platform"},
@@ -180,7 +180,7 @@ func TestFetchManifestForAge_MultiPlatformIndex(t *testing.T) {
 		parsedURL.String(),
 		"Bearer test-token",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "multi_platform"},
@@ -211,7 +211,7 @@ func TestFetchManifestForAge_AuthFailure(t *testing.T) {
 		parsedURL.String(),
 		"Bearer test-token",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "auth_failure"},
@@ -242,7 +242,7 @@ func TestFetchManifestForAge_NotFound(t *testing.T) {
 		parsedURL.String(),
 		"Bearer test-token",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "not_found"},
@@ -277,7 +277,7 @@ func TestFetchManifestForAge_MissingConfigDigest(t *testing.T) {
 		parsedURL.String(),
 		"Bearer test-token",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "missing_digest"},
@@ -622,7 +622,7 @@ func TestSelectPlatformManifest_PlatformMatch(t *testing.T) {
 		idx,
 		parsedURL,
 		"Bearer test-token",
-		"", "",
+		"", "", "",
 		"",
 		logrus.Fields{"test": "platform_match"},
 	)
@@ -658,7 +658,7 @@ func TestSelectPlatformManifest_NoMatch(t *testing.T) {
 		idx,
 		parsedURL,
 		"",
-		"", "",
+		"", "", "",
 		"",
 		logrus.Fields{"test": "no_match"},
 	)
@@ -721,7 +721,7 @@ func TestSelectPlatformManifest_SkipsAttestationManifests(t *testing.T) {
 		idx,
 		parsedURL,
 		"Bearer test-token",
-		"", "",
+		"", "", "",
 		"",
 		logrus.Fields{"test": "skips_attestation"},
 	)
@@ -773,7 +773,7 @@ func TestSelectPlatformManifest_MissingConfigDigest(t *testing.T) {
 		idx,
 		parsedURL,
 		"Bearer test-token",
-		"", "",
+		"", "", "",
 		"",
 		logrus.Fields{"test": "missing_digest"},
 	)
@@ -811,7 +811,7 @@ func TestPipeline_SinglePlatformManifest_ReturnsCreationTime(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_single"}
 
-	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", parsedURL.Host, fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", "", parsedURL.Host, fields)
 	require.NoError(t, err)
 	assert.Equal(t, configDigest, digest)
 
@@ -865,7 +865,7 @@ func TestPipeline_MultiPlatformIndex_ReturnsCreationTime(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_multi"}
 
-	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", parsedURL.Host, fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", "", parsedURL.Host, fields)
 	require.NoError(t, err)
 	assert.Equal(t, configDigest, digest)
 
@@ -911,7 +911,7 @@ func TestPipeline_MissingCreationTimestamp(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_missing_created"}
 
-	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", parsedURL.Host, fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", "", parsedURL.Host, fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -955,7 +955,7 @@ func TestPipeline_ConfigBlobNotFound(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_config_fail"}
 
-	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", parsedURL.Host, fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", "", parsedURL.Host, fields)
 	require.NoError(t, err)
 
 	_, err = fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -991,7 +991,7 @@ func TestPipeline_InvalidConfigJSON(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_invalid_json"}
 
-	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", parsedURL.Host, fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", "", parsedURL.Host, fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -1040,7 +1040,7 @@ func TestPipeline_RedirectOnBlob(t *testing.T) {
 	ctx := context.Background()
 	fields := logrus.Fields{"test": "pipeline_redirect"}
 
-	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", parsedURL.Host, fields)
+	digest, _, err := fetchManifestForAge(ctx, client, parsedURL.String(), "", parsedURL, "", "", "", "", parsedURL.Host, fields)
 	require.NoError(t, err)
 
 	body, err := fetchConfigBlob(ctx, client, parsedURL, digest, "", fields)
@@ -1081,7 +1081,7 @@ func TestPipeline_ManifestNotFound(t *testing.T) {
 		parsedURL.String(),
 		"",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "pipeline_not_found"},
@@ -1114,7 +1114,7 @@ func TestPipeline_AuthFailure(t *testing.T) {
 		parsedURL.String(),
 		"Bearer invalid",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "pipeline_auth_fail"},
@@ -1159,7 +1159,7 @@ func TestFetchManifestForAge_OversizedManifest(t *testing.T) {
 		parsedURL.String(),
 		"Bearer test-token",
 		parsedURL,
-		"", "",
+		"", "", "",
 		"",
 		parsedURL.Host,
 		logrus.Fields{"test": "oversized_manifest"},
@@ -1209,10 +1209,222 @@ func TestSelectPlatformManifest_AmbiguousPlatformMatch(t *testing.T) {
 		idx,
 		parsedURL,
 		"",
-		"", "",
+		"", "", "",
 		"",
 		logrus.Fields{"test": "ambiguous_platform_match"},
 	)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errAmbiguousPlatformMatch)
+}
+
+func TestSelectPlatformManifest_VariantSelection(t *testing.T) {
+	t.Parallel()
+
+	server := ghttp.NewServer()
+	t.Cleanup(server.Close)
+
+	configDigest := "sha256:cfgvariantsel01abcdef1234567890abcdef1234567890abcdef1234567890abc"
+	platformDigestV8 := "sha256:pltv8variant01abcdef1234567890abcdef1234567890abcdef123456789012"
+
+	server.AppendHandlers(
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest("GET", gomega.MatchRegexp(`/v2/repo/manifests/sha256:pltv8.*`)),
+			ghttp.RespondWith(http.StatusOK, platformManifestJSON(configDigest),
+				http.Header{"Content-Type": {"application/vnd.oci.image.manifest.v1+json"}},
+			),
+		),
+	)
+
+	parsedURL, err := url.Parse(server.URL() + "/v2/repo/manifests/latest")
+	require.NoError(t, err)
+
+	// Two entries matching runtime.GOOS/runtime.GOARCH with different variants.
+	// Specifying "v8" should select the v8 variant instead of errAmbiguousPlatformMatch.
+	idx := imageIndex{
+		MediaType:     "application/vnd.oci.image.index.v1+json",
+		SchemaVersion: 2,
+		Manifests: []indexEntry{
+			{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    "sha256:digest1variantv7",
+				Size:      500,
+				Platform: platform{
+					Architecture: runtime.GOARCH,
+					OS:           runtime.GOOS,
+					Variant:      "v7",
+				},
+			},
+			{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    platformDigestV8,
+				Size:      500,
+				Platform: platform{
+					Architecture: runtime.GOARCH,
+					OS:           runtime.GOOS,
+					Variant:      "v8",
+				},
+			},
+		},
+	}
+
+	got, _, err := selectPlatformManifest(
+		context.Background(),
+		server.HTTPTestServer.Client(),
+		idx,
+		parsedURL,
+		"Bearer test-token",
+		runtime.GOOS,
+		runtime.GOARCH,
+		"v8", // Specify target variant
+		"",
+		logrus.Fields{"test": "variant_selection"},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, configDigest, got)
+}
+
+func TestSelectPlatformCandidate_VariantFiltering(t *testing.T) {
+	t.Parallel()
+
+	// Two entries matching runtime.GOOS/runtime.GOARCH with different variants.
+	idx := imageIndex{
+		MediaType:     "application/vnd.oci.image.index.v1+json",
+		SchemaVersion: 2,
+		Manifests: []indexEntry{
+			{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    "sha256:digestv7variant001",
+				Size:      500,
+				Platform: platform{
+					Architecture: runtime.GOARCH,
+					OS:           runtime.GOOS,
+					Variant:      "v7",
+				},
+			},
+			{
+				MediaType: "application/vnd.oci.image.manifest.v1+json",
+				Digest:    "sha256:digestv8variant002",
+				Size:      500,
+				Platform: platform{
+					Architecture: runtime.GOARCH,
+					OS:           runtime.GOOS,
+					Variant:      "v8",
+				},
+			},
+		},
+	}
+
+	t.Run("selects matching variant", func(t *testing.T) {
+		t.Parallel()
+
+		digest, err := selectPlatformCandidate(
+			idx,
+			runtime.GOOS,
+			runtime.GOARCH,
+			"v8",
+			logrus.Fields{"test": "variant_filter_v8"},
+		)
+		require.NoError(t, err)
+		assert.Equal(t, "sha256:digestv8variant002", digest)
+	})
+
+	t.Run("no matching variant falls back to ambiguity error", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := selectPlatformCandidate(
+			idx,
+			runtime.GOOS,
+			runtime.GOARCH,
+			"v9", // No v9 variant exists
+			logrus.Fields{"test": "variant_filter_no_match"},
+		)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, errAmbiguousPlatformMatch)
+	})
+
+	t.Run("empty variant returns ambiguity error for multiple variants", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := selectPlatformCandidate(
+			idx,
+			runtime.GOOS,
+			runtime.GOARCH,
+			"", // No variant specified
+			logrus.Fields{"test": "variant_filter_empty"},
+		)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, errAmbiguousPlatformMatch)
+	})
+}
+
+// indexJSONWithoutMediaType returns an image index JSON without the top-level mediaType field.
+// This simulates registries (e.g., Amazon ECR) that omit mediaType from the JSON body
+// but set the Content-Type header correctly.
+func indexJSONWithoutMediaType(digestCurrentPlatform, digestOther string) string {
+	return fmt.Sprintf(`{
+		"schemaVersion": 2,
+		"manifests": [
+			{
+				"mediaType": "application/vnd.oci.image.manifest.v1+json",
+				"digest": "%s",
+				"size": 500,
+				"platform": {
+					"architecture": "%s",
+					"os": "%s"
+				}
+			},
+			{
+				"mediaType": "application/vnd.oci.image.manifest.v1+json",
+				"digest": "%s",
+				"size": 500,
+				"platform": {
+					"architecture": "arm64",
+					"os": "linux"
+				}
+			}
+		]
+	}`, digestCurrentPlatform, runtime.GOARCH, runtime.GOOS, digestOther)
+}
+
+func TestFetchManifestForAge_IndexWithoutMediaType_ContentTypeFallback(t *testing.T) {
+	t.Parallel()
+
+	server := ghttp.NewServer()
+	t.Cleanup(server.Close)
+
+	configDigest := "sha256:cfgnometype01abcdef1234567890abcdef1234567890abcdef1234567890abcde"
+	platformDigest := fmt.Sprintf("sha256:pltnometype%s%s01abcdef1234567890abcdef1234567890abcdef", runtime.GOOS, runtime.GOARCH)
+
+	// First response: index JSON WITHOUT top-level mediaType, but Content-Type header indicates an index.
+	server.AppendHandlers(
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest("GET", "/v2/test/manifests/latest"),
+			ghttp.RespondWith(http.StatusOK, indexJSONWithoutMediaType(platformDigest, "sha256:arm64digest"),
+				http.Header{"Content-Type": {"application/vnd.oci.image.index.v1+json"}},
+			),
+		),
+		ghttp.CombineHandlers(
+			ghttp.VerifyRequest("GET", gomega.MatchRegexp(`/v2/test/manifests/sha256:pltnometype.*`)),
+			ghttp.RespondWith(http.StatusOK, platformManifestJSON(configDigest),
+				http.Header{"Content-Type": {"application/vnd.oci.image.manifest.v1+json"}},
+			),
+		),
+	)
+
+	parsedURL, err := url.Parse(server.URL() + "/v2/test/manifests/latest")
+	require.NoError(t, err)
+
+	got, _, err := fetchManifestForAge(
+		context.Background(),
+		server.HTTPTestServer.Client(),
+		parsedURL.String(),
+		"Bearer test-token",
+		parsedURL,
+		"", "", "",
+		"",
+		parsedURL.Host,
+		logrus.Fields{"test": "index_no_mediatype"},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, configDigest, got)
 }

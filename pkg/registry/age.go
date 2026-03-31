@@ -95,8 +95,10 @@ type imageConfig struct {
 // It handles multi-platform images by selecting the correct platform manifest
 // and follows redirects for blob requests.
 //
-// For cross-platform monitoring, set WATCHTOWER_REGISTRY_PLATFORM_OS and
-// WATCHTOWER_REGISTRY_PLATFORM_ARCH to override the runtime defaults.
+// For cross-platform monitoring, set WATCHTOWER_COOLDOWN_PLATFORM_OS and
+// WATCHTOWER_COOLDOWN_PLATFORM_ARCH to override the runtime defaults.
+// Set WATCHTOWER_COOLDOWN_PLATFORM_VARIANT to specify a platform variant
+// (e.g., "v7", "v8") for ARM images with multiple variants.
 //
 // This function does NOT download the image layers — only the manifest and config
 // blob (typically <15KB total) are fetched.
@@ -120,8 +122,9 @@ func FetchImageCreationTime(
 	}
 
 	// Determine target platform (supports cross-platform monitoring overrides).
-	targetOS := viper.GetString("WATCHTOWER_REGISTRY_PLATFORM_OS")
-	targetArch := viper.GetString("WATCHTOWER_REGISTRY_PLATFORM_ARCH")
+	targetOS := viper.GetString("WATCHTOWER_COOLDOWN_PLATFORM_OS")
+	targetArch := viper.GetString("WATCHTOWER_COOLDOWN_PLATFORM_ARCH")
+	targetVariant := viper.GetString("WATCHTOWER_COOLDOWN_PLATFORM_VARIANT")
 
 	// Transform auth credentials into usable format.
 	registryAuth = auth.TransformAuth(registryAuth)
@@ -185,6 +188,7 @@ func FetchImageCreationTime(
 		parsedURL,
 		targetOS,
 		targetArch,
+		targetVariant,
 		challengeHost,
 		originalHost,
 		fields,
@@ -321,6 +325,8 @@ func buildManifestURLForAge(
 //
 // Returns:
 //   - []byte: Raw manifest response body bytes.
+//   - string: The winning host that served the manifest.
+//   - string: The HTTP Content-Type header value from the response.
 //   - error: Non-nil if all hosts fail or body exceeds size limit.
 func retryManifestRequest(
 	ctx context.Context,
@@ -328,7 +334,7 @@ func retryManifestRequest(
 	parsedURL *url.URL,
 	manifestURL, token, challengeHost, originalHost string,
 	fields logrus.Fields,
-) ([]byte, string, error) {
+) ([]byte, string, string, error) {
 	// Use the provided originalHost for fallback; if empty, derive from parsedURL.
 	if originalHost == "" {
 		originalHost = parsedURL.Host
@@ -389,6 +395,7 @@ func retryManifestRequest(
 
 			return nil,
 				"",
+				"",
 				fmt.Errorf(
 					"%w: %w",
 					errFetchManifestFailed,
@@ -416,6 +423,7 @@ func retryManifestRequest(
 				Debug("Failed to execute manifest request")
 
 			return nil,
+				"",
 				"",
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 		}
@@ -447,12 +455,16 @@ func retryManifestRequest(
 
 			return nil,
 				"",
+				"",
 				fmt.Errorf(
 					"%w: status %d",
 					errFetchManifestFailed,
 					status,
 				)
 		}
+
+		// Capture Content-Type header for media type fallback detection.
+		contentType := resp.Header.Get("Content-Type")
 
 		// Read the manifest body with a size limit to prevent unbounded memory allocation.
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize+1))
@@ -465,6 +477,7 @@ func retryManifestRequest(
 
 			return nil,
 				"",
+				"",
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 		}
 
@@ -476,6 +489,7 @@ func retryManifestRequest(
 
 			return nil,
 				"",
+				"",
 				fmt.Errorf(
 					"%w: %d bytes exceeds limit of %d bytes",
 					errManifestTooLarge,
@@ -484,15 +498,16 @@ func retryManifestRequest(
 				)
 		}
 
-		return body, candidate.host, nil
+		return body, candidate.host, contentType, nil
 	}
 
 	// All hosts exhausted.
 	if lastErr != nil {
-		return nil, "", lastErr
+		return nil, "", "", lastErr
 	}
 
 	return nil,
+		"",
 		"",
 		fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
 }
@@ -511,6 +526,7 @@ func retryManifestRequest(
 //   - parsedURL: Parsed manifest URL.
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
+//   - targetVariant: Target variant for platform selection (empty for any variant).
 //   - challengeHost: Registry challenge host for fallback.
 //   - originalHost: The true original registry host before any redirects.
 //   - fields: Logging fields for context.
@@ -523,10 +539,10 @@ func fetchManifestForAge(
 	client auth.Client,
 	manifestURL, token string,
 	parsedURL *url.URL,
-	targetOS, targetArch, challengeHost, originalHost string,
+	targetOS, targetArch, targetVariant, challengeHost, originalHost string,
 	fields logrus.Fields,
 ) (string, string, error) {
-	body, winningHost, err := retryManifestRequest(
+	body, winningHost, contentType, err := retryManifestRequest(
 		ctx,
 		client,
 		parsedURL,
@@ -544,7 +560,20 @@ func fetchManifestForAge(
 	var index imageIndex
 
 	idxErr := json.Unmarshal(body, &index)
-	if idxErr == nil && isIndexMediaType(index.MediaType) {
+	// Use mediaType from JSON body if present, otherwise fall back to HTTP Content-Type header.
+	// Some registries (e.g., Amazon ECR) omit mediaType from the JSON body but set the
+	// Content-Type header correctly.
+	effectiveMediaType := index.MediaType
+	if effectiveMediaType == "" {
+		// Extract the media type from Content-Type, ignoring parameters like charset.
+		if idx := strings.Index(contentType, ";"); idx != -1 {
+			contentType = strings.TrimSpace(contentType[:idx])
+		}
+
+		effectiveMediaType = contentType
+	}
+
+	if idxErr == nil && isIndexMediaType(effectiveMediaType) {
 		// For multi-platform images, selectPlatformManifest performs its own
 		// host fallback internally. Build a parsedURL with the winning host so
 		// the platform-specific fetch starts from the correct origin.
@@ -559,6 +588,7 @@ func fetchManifestForAge(
 			token,
 			targetOS,
 			targetArch,
+			targetVariant,
 			challengeHost,
 			fields,
 		)
@@ -592,13 +622,16 @@ func fetchManifestForAge(
 // and disambiguates variant conflicts.
 //
 // It skips attestation manifests, collects entries matching the target OS and
-// architecture, and returns the digest of the selected candidate. If multiple
-// candidates exist with differing variants, it returns errAmbiguousPlatformMatch.
+// architecture, and returns the digest of the selected candidate. If a targetVariant
+// is specified, it filters to only candidates matching that variant. If multiple
+// candidates exist with differing variants and no targetVariant is specified,
+// it returns errAmbiguousPlatformMatch.
 //
 // Parameters:
 //   - index: The parsed image index.
 //   - targetOS: Target OS for matching.
 //   - targetArch: Target architecture for matching.
+//   - targetVariant: Target variant for matching (empty for any variant).
 //   - fields: Logging fields for context.
 //
 // Returns:
@@ -606,7 +639,7 @@ func fetchManifestForAge(
 //   - error: errNoPlatformMatch if no candidates, errAmbiguousPlatformMatch if ambiguous.
 func selectPlatformCandidate(
 	index imageIndex,
-	targetOS, targetArch string,
+	targetOS, targetArch, targetVariant string,
 	fields logrus.Fields,
 ) (string, error) {
 	type candidate struct {
@@ -640,6 +673,47 @@ func selectPlatformCandidate(
 			Debug("No matching platform found in image index")
 
 		return "", errNoPlatformMatch
+	}
+
+	// If a target variant is specified, filter candidates to only those matching.
+	if targetVariant != "" {
+		var variantCandidates []candidate
+
+		for _, c := range candidates {
+			if c.variant == targetVariant {
+				variantCandidates = append(variantCandidates, c)
+			}
+		}
+
+		if len(variantCandidates) == 1 {
+			selectedDigest := variantCandidates[0].digest
+
+			logrus.WithFields(fields).
+				WithField("digest", selectedDigest).
+				WithField("variant", targetVariant).
+				Debug("Selected platform manifest by variant from index")
+
+			return selectedDigest, nil
+		}
+
+		if len(variantCandidates) == 0 {
+			// No candidates match the requested variant; fall through to ambiguity check.
+			logrus.WithFields(fields).
+				WithField("target_variant", targetVariant).
+				Debug("No platform entries match requested variant, checking ambiguity")
+		}
+
+		if len(variantCandidates) > 1 {
+			// Multiple entries with the same variant - return the first one.
+			selectedDigest := variantCandidates[0].digest
+
+			logrus.WithFields(fields).
+				WithField("digest", selectedDigest).
+				WithField("variant", targetVariant).
+				Debug("Selected first matching variant platform manifest from index")
+
+			return selectedDigest, nil
+		}
 	}
 
 	// If multiple candidates exist, check that all variant values are identical.
@@ -968,6 +1042,8 @@ func fetchPlatformManifestWithRetry(
 //
 // If targetOS or targetArch are empty, runtime.GOOS and runtime.GOARCH are used as defaults,
 // allowing cross-platform monitoring via environment variables or configuration overrides.
+// If targetVariant is specified, it will be used to disambiguate when multiple entries
+// match the same OS/architecture with different variants.
 //
 // On 401/404 responses, it retries on the challenge host mirroring the retry logic
 // in digest.go's HandleManifestResponse.
@@ -980,6 +1056,7 @@ func fetchPlatformManifestWithRetry(
 //   - token: Authentication token.
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
+//   - targetVariant: Target variant for platform selection (empty for any variant).
 //   - challengeHost: Challenge host from auth (empty if not applicable).
 //   - fields: Logging fields.
 //
@@ -993,7 +1070,7 @@ func selectPlatformManifest(
 	index imageIndex,
 	parsedURL *url.URL,
 	token string,
-	targetOS, targetArch, challengeHost string,
+	targetOS, targetArch, targetVariant, challengeHost string,
 	fields logrus.Fields,
 ) (string, string, error) {
 	// Use runtime defaults if no override is specified.
@@ -1009,6 +1086,7 @@ func selectPlatformManifest(
 		index,
 		targetOS,
 		targetArch,
+		targetVariant,
 		fields,
 	)
 	if err != nil {
