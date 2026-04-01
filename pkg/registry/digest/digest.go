@@ -266,7 +266,7 @@ func CompareDigest(
 	// 3. This avoids an extra Docker daemon call
 	if len(container.ImageInfo().RepoDigests) == 0 {
 		logrus.WithFields(fields).
-			Debug("Local image detected (empty RepoDigests) - skipping digest comparison")
+			Debug("Image with no registry reference detected (empty RepoDigests) - skipping digest comparison")
 
 		return true, nil
 	}
