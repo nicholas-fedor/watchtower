@@ -97,7 +97,10 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			i := newImageClient(docker)
-			pullContainer := MockContainer(WithImageName("private-registry.io/app:latest"))
+			pullContainer := MockContainer(
+				WithImageName("private-registry.io/app:latest"),
+				WithRepoDigests([]string{"private-registry.io/app@sha256:abc"}),
+			)
 
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 			defer resetLogrus()
@@ -125,7 +128,10 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			i := newImageClient(docker)
-			pullContainer := MockContainer(WithImageName("nonexistent:latest"))
+			pullContainer := MockContainer(
+				WithImageName("nonexistent:latest"),
+				WithRepoDigests([]string{"nonexistent@sha256:def"}),
+			)
 
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 			defer resetLogrus()
@@ -152,7 +158,10 @@ var _ = ginkgo.Describe("the client", func() {
 			)
 
 			i := newImageClient(docker)
-			pullContainer := MockContainer(WithImageName("app:latest"))
+			pullContainer := MockContainer(
+				WithImageName("app:latest"),
+				WithRepoDigests([]string{"app@sha256:ghi"}),
+			)
 
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 			defer resetLogrus()

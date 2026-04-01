@@ -151,6 +151,72 @@ var _ = ginkgo.Describe("Digests", func() {
 		return digest.NormalizeDigest(digestHeader), nil
 	}
 
+	// setupRemoteDigestTestServer appends standard registry auth handlers to an existing
+	// TLS test server and performs a HEAD request to fetch a remote digest.
+	// The container parameter must have an image ref that includes the server address
+	// (e.g., serverAddr + "/test/image:latest").
+	// It returns the extracted remote digest.
+	setupRemoteDigestTestServer := func(
+		server *ghttp.Server,
+		container types.Container,
+		remoteDigestHash string,
+	) string {
+		serverAddr := server.Addr()
+
+		server.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v2/"),
+				ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
+					"WWW-Authenticate": []string{
+						fmt.Sprintf(
+							`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
+							serverAddr,
+						),
+					},
+				}),
+			),
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/token"),
+				ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
+			),
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("HEAD", "/v2/test/image/manifests/latest"),
+				ghttp.RespondWith(http.StatusOK, nil, http.Header{
+					digest.ContentDigestHeader: []string{remoteDigestHash},
+				}),
+			),
+		)
+
+		client := newTestAuthClient()
+		ctx := context.Background()
+		registryAuth := auth.TransformAuth("token")
+		token, _, _, _, err := auth.GetToken(ctx, container, registryAuth, client)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		url, err := manifest.BuildManifestURL(container, getScheme())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set(
+			"Accept",
+			"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+		)
+		req.Header.Set("User-Agent", meta.UserAgent)
+
+		resp, err := client.Do(req)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		defer resp.Body.Close()
+
+		remoteDigest, err := extractHeadDigest(resp)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		return remoteDigest
+	}
+
 	ginkgo.When("a digest comparison is done", func() {
 		ginkgo.It("should return true if digests match",
 			SkipIfCredentialsEmpty(GHCRCredentials, func() {
@@ -169,7 +235,38 @@ var _ = ginkgo.Describe("Digests", func() {
 			}),
 		)
 
-		ginkgo.It("should return false if RepoDigests is empty", func() {
+		ginkgo.It("should skip digest fetch and return true for local images (empty RepoDigests)", func() {
+			// Verify that CompareDigest detects local images by empty RepoDigests
+			// and returns true without making any HTTP requests or inspector calls.
+			mockContainerLocal := mockActions.CreateMockContainerWithImageInfoP(
+				mockID,
+				mockName,
+				"local/test/image:latest",
+				mockCreated,
+				&dockerImage.InspectResponse{RepoDigests: []string{}},
+			)
+
+			// Create a mock inspector with no expectations set.
+			// If ImageInspectWithRaw is called, testify will panic due to
+			// "no return value specified", which should not happen for local images.
+			inspector := &mockTypes.MockImageInspector{}
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				inspector,
+				mockContainerLocal,
+				"",
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			// Local images should return true (treated as up-to-date) to avoid
+			// unnecessary registry requests.
+			gomega.Expect(matches).To(gomega.BeTrue())
+			// Verify that ImageInspectWithRaw was never called.
+			inspector.AssertNotCalled(ginkgo.GinkgoT(), "ImageInspectWithRaw")
+		})
+
+		ginkgo.It("should return false when DigestsMatch is called with empty local digests", func() {
+			// Verify that DigestsMatch returns false when comparing empty local digests
+			// against a remote digest (manual comparison scenario).
 			server := ghttp.NewTLSServer()
 			defer server.Close()
 
@@ -183,56 +280,11 @@ var _ = ginkgo.Describe("Digests", func() {
 				&dockerImage.InspectResponse{RepoDigests: []string{}},
 			)
 
-			server.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/v2/"),
-					ghttp.RespondWith(http.StatusUnauthorized, nil, http.Header{
-						"WWW-Authenticate": []string{
-							fmt.Sprintf(
-								`Bearer realm="https://%s/token",service="test-service",scope="repository:test/image:pull"`,
-								serverAddr,
-							),
-						},
-					}),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", "/token"),
-					ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("HEAD", "/v2/test/image/manifests/latest"),
-					ghttp.RespondWith(http.StatusOK, nil, http.Header{
-						digest.ContentDigestHeader: []string{mockDigestHash},
-					}),
-				),
+			remoteDigest := setupRemoteDigestTestServer(
+				server,
+				mockContainerEmptyDigests,
+				mockDigestHash,
 			)
-
-			client := newTestAuthClient()
-			ctx := context.Background()
-			registryAuth := auth.TransformAuth("token")
-			token, _, _, _, err := auth.GetToken(ctx, mockContainerEmptyDigests, registryAuth, client)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			url, err := manifest.BuildManifestURL(mockContainerEmptyDigests, getScheme())
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set(
-				"Accept",
-				"application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
-			)
-			req.Header.Set("User-Agent", meta.UserAgent)
-
-			resp, err := client.Do(req)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			defer resp.Body.Close()
-
-			remoteDigest, err := extractHeadDigest(resp)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			matches := digest.DigestsMatch(
 				mockContainerEmptyDigests.ImageInfo().RepoDigests,
