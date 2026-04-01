@@ -222,6 +222,11 @@ func NormalizeDigest(digest string) string {
 
 // CompareDigest checks whether a container's current image digest matches the latest from its registry.
 //
+// It first inspects the image to check if it's locally built (empty RepoDigests).
+// For local images, digest comparison against a remote registry is not possible,
+// so it returns true to indicate the image should not be updated. This avoids
+// unnecessary HTTP requests and confusing error messages for locally built images.
+//
 // Parameters:
 //   - ctx: Context for request lifecycle control.
 //   - inspector: Image inspector for checking if image is locally built.
@@ -249,25 +254,60 @@ func CompareDigest(
 		return false, errMissingImageInfo
 	}
 
+	// Check if the container's image has no RepoDigests, which indicates a locally
+	// built image that has never been pushed or pulled. For such images, there is
+	// no remote digest to compare against, so we treat them as up-to-date to avoid
+	// unnecessary registry requests and confusing error messages.
+	//
+	// We check container.ImageInfo().RepoDigests rather than inspecting via the
+	// Docker daemon because:
+	// 1. The container was already populated with image info during initialization
+	// 2. For locally built images, RepoDigests is always empty
+	// 3. This avoids an extra Docker daemon call
+	if len(container.ImageInfo().RepoDigests) == 0 {
+		logrus.WithFields(fields).
+			Debug("Local image detected (empty RepoDigests) - skipping digest comparison")
+
+		return true, nil
+	}
+
 	// Fetch the latest digest from the registry using a HEAD request for efficiency.
-	remoteDigest, err := fetchDigest(ctx, inspector, container, registryAuth, http.MethodHead)
+	remoteDigest, err := fetchDigest(
+		ctx,
+		inspector,
+		container,
+		registryAuth,
+		http.MethodHead,
+	)
 	if err != nil {
 		return false, err
 	}
 
-	// If HEAD request returned empty digest (due to 404), fall back to GET request.
+	// If HEAD request returned empty digest (due to missing Docker-Content-Digest header),
+	// fall back to GET request.
 	if remoteDigest == "" {
-		logrus.WithFields(fields).Debug("HEAD request returned empty digest, falling back to GET")
+		logrus.WithFields(fields).
+			Debug("HEAD request returned empty digest - falling back to GET")
 
-		remoteDigest, err = FetchDigest(ctx, inspector, container, registryAuth)
+		remoteDigest, err = FetchDigest(
+			ctx,
+			inspector,
+			container,
+			registryAuth,
+		)
 		if err != nil {
 			return false, err
 		}
 	}
 
 	// Compare the fetched remote digest with the container's local digests.
-	matches := DigestsMatch(container.ImageInfo().RepoDigests, remoteDigest)
-	logrus.WithFields(fields).WithField("matches", matches).Debug("Completed digest comparison")
+	matches := DigestsMatch(
+		container.ImageInfo().RepoDigests,
+		remoteDigest,
+	)
+	logrus.WithFields(fields).
+		WithField("matches", matches).
+		Debug("Completed digest comparison")
 
 	return matches, nil
 }

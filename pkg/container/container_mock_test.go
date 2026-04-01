@@ -98,6 +98,19 @@ func WithImageName(name string) MockContainerUpdate {
 	}
 }
 
+// WithRepoDigests sets the RepoDigests for the mock image.
+//
+// Parameters:
+//   - digests: List of repo digests (e.g., ["repo@sha256:abc"]).
+//
+// Returns:
+//   - MockContainerUpdate: Function to set RepoDigests on image metadata.
+func WithRepoDigests(digests []string) MockContainerUpdate {
+	return func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
+		i.RepoDigests = digests
+	}
+}
+
 // WithLinks sets dependency links for the mock container.
 //
 // Parameters:

@@ -169,7 +169,33 @@ var _ = ginkgo.Describe("Digests", func() {
 			}),
 		)
 
-		ginkgo.It("should return false if RepoDigests is empty", func() {
+		ginkgo.It("should skip digest fetch and return true for local images (empty RepoDigests)", func() {
+			// Verify that CompareDigest detects local images by empty RepoDigests
+			// and returns true without making any HTTP requests.
+			mockContainerLocal := mockActions.CreateMockContainerWithImageInfoP(
+				mockID,
+				mockName,
+				"local/test/image:latest",
+				mockCreated,
+				&dockerImage.InspectResponse{RepoDigests: []string{}},
+			)
+
+			inspector := newMockImageInspector([]string{}) // Empty RepoDigests for local image
+			matches, err := digest.CompareDigest(
+				context.Background(),
+				inspector,
+				mockContainerLocal,
+				"",
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			// Local images should return true (treated as up-to-date) to avoid
+			// unnecessary registry requests.
+			gomega.Expect(matches).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should return false when DigestsMatch is called with empty local digests", func() {
+			// Verify that DigestsMatch returns false when comparing empty local digests
+			// against a remote digest (manual comparison scenario).
 			server := ghttp.NewTLSServer()
 			defer server.Close()
 
