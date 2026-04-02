@@ -77,14 +77,14 @@ jobs:
 
       - name: Login to Docker Hub # Authenticate to Docker Hub
         if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@bb555fc48dca4deb5f227b07c7304c673b5708f0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR # Authenticate to GHCR
         if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@bb555fc48dca4deb5f227b07c7304c673b5708f0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
