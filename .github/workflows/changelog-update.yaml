@@ -47,7 +47,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
 
       - name: Create Pull Request for Changelog
-        uses: peter-evans/create-pull-request@8170bccad11c0df62542c04dcaefe36d342dfd39
+        uses: peter-evans/create-pull-request@d32e88dac789dcc7906e7d26f69f24116fa9c97d
         with:
           token: ${{ secrets.CHANGELOG_PAT }}
           committer: Nick Fedor <nick@nickfedor.com>
