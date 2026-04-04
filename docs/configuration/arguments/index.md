@@ -459,6 +459,7 @@ Environment Variable: WATCHTOWER_USE_COMPOSE_DEPENDS_ON
 
 !!! Note
     Disabling this is useful when you want to prevent Watchtower from automatically using Docker Compose dependencies but still use explicit Watchtower labels or Docker links for ordering.
+    For more information on Watchtower's handling of linked containers, please reference the [Linked Containers documentation](../../advanced-features/linked-containers/index.md).
 
 !!! Warning
     Rolling restarts are not supported when any container has linked dependencies (including Docker Compose `depends_on`, Watchtower `depends-on` labels, Docker links, or network mode dependencies). When `--rolling-restart` is enabled, `--use-compose-depends-on` controls whether Docker Compose `depends_on` labels are included in the dependency validation check.
