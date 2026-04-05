@@ -1316,6 +1316,117 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(token).
 				To(gomega.Equal("Bearer mock-token"), "Expected token to be 'Bearer mock-token'")
 		})
+
+		ginkgo.It("should fail on non-OK HTTP status with plain text body", func() {
+			server := ghttp.NewTLSServer()
+
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/"),
+					func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusUnauthorized)
+						w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+						fmt.Fprint(w, "Unauthorized")
+					},
+				),
+			)
+			defer server.Close()
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			challenge := fmt.Sprintf(
+				`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`,
+				server.URL(),
+			)
+			ref, _ := reference.ParseNormalizedNamed("test/image")
+
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
+
+			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("401"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("Unauthorized"))
+			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		ginkgo.It("should fail on non-OK HTTP status with JSON error body", func() {
+			server := ghttp.NewTLSServer()
+
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/"),
+					func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusForbidden)
+						w.Header().Set("Content-Type", "application/json")
+						fmt.Fprint(w, `{"errors":[{"code":"DENIED","message":"access denied"}]}`)
+					},
+				),
+			)
+			defer server.Close()
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			challenge := fmt.Sprintf(
+				`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`,
+				server.URL(),
+			)
+			ref, _ := reference.ParseNormalizedNamed("test/image")
+
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
+
+			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("403"))
+			gomega.Expect(token).To(gomega.Equal(""))
+		})
+
+		ginkgo.It("should handle empty token in successful response", func() {
+			server := ghttp.NewTLSServer()
+
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/"),
+					ghttp.RespondWith(
+						http.StatusOK,
+						`{"token": ""}`,
+						http.Header{"Content-Type": []string{"application/json"}},
+					),
+				),
+			)
+			defer server.Close()
+
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			challenge := fmt.Sprintf(
+				`bearer realm="%s",service="test-service",scope="repository:test/image:pull"`,
+				server.URL(),
+			)
+			ref, _ := reference.ParseNormalizedNamed("test/image")
+
+			token, err := auth.GetBearerHeader(context.Background(), challenge, ref, "", client)
+
+			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(1))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal("Bearer "))
+		})
 	})
 
 	ginkgo.Describe("GetAuthURL", func() {

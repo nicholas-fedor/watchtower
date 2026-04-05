@@ -60,8 +60,10 @@ func EncodedAuth(imageName string) (string, error) {
 		credentials, err = EncodedConfigCredentials(imageName)
 	}
 
-	if err == nil {
+	if err == nil && credentials != "" {
 		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials")
+	} else if err == nil {
+		logrus.WithFields(fields).Debug("No authentication credentials found for image")
 	}
 
 	return credentials, err

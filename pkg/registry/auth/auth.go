@@ -68,6 +68,8 @@ var (
 	errFailedCreateBearerRequest = errors.New("failed to create bearer token request")
 	// errFailedExecuteBearerRequest indicates a failure to send or receive a response for the bearer token request.
 	errFailedExecuteBearerRequest = errors.New("failed to execute bearer token request")
+	// errFailedGetBearerToken indicates the token endpoint returned a non-OK HTTP status.
+	errFailedGetBearerToken = errors.New("failed to get bearer token")
 	// errFailedUnmarshalBearerResponse indicates a failure to parse the bearer token response JSON.
 	errFailedUnmarshalBearerResponse = errors.New("failed to unmarshal bearer token response")
 	// errFailedParseImageName indicates a failure to parse the container image name into a normalized reference.
@@ -632,6 +634,25 @@ func GetBearerHeader(
 	}
 
 	defer authResponse.Body.Close()
+
+	// Check HTTP status before attempting to parse the response body.
+	if authResponse.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(authResponse.Body)
+		responseBody := strings.TrimSpace(string(body))
+
+		logrus.WithFields(logrus.Fields{
+			"image":    imageRef.Name(),
+			"status":   authResponse.StatusCode,
+			"response": responseBody,
+		}).Debug("Bearer token request returned non-OK status")
+
+		return "", fmt.Errorf(
+			"%w: %d %s",
+			errFailedGetBearerToken,
+			authResponse.StatusCode,
+			responseBody,
+		)
+	}
 
 	// Read and parse the response body into a token structure.
 	body, _ := io.ReadAll(authResponse.Body)
