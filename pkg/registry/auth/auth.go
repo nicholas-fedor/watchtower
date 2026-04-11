@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
+	"github.com/nicholas-fedor/watchtower/internal/urlutil"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -849,14 +850,18 @@ func GetChallengeURL(imageRef reference.Named) url.URL {
 // either its canonical registry or an explicit registry endpoint override.
 func GetChallengeURLWithRegistryEndpoint(imageRef reference.Named, registryEndpoint string) url.URL {
 	if registryEndpoint != "" {
-		if endpointURL, ok := buildRegistryEndpointURL(registryEndpoint, "/v2/"); ok {
+		if endpointURL, err := urlutil.BuildRegistryEndpointURL(
+			registryEndpoint,
+			"/v2/",
+			getRegistryScheme(),
+		); err == nil {
 			logrus.WithFields(logrus.Fields{
 				"image":             imageRef.Name(),
 				"registry_endpoint": registryEndpoint,
 				"url":               endpointURL.String(),
 			}).Debug("Generated challenge URL from registry endpoint override")
 
-			return endpointURL
+			return *endpointURL
 		}
 
 		logrus.WithFields(logrus.Fields{
@@ -895,49 +900,10 @@ func GetChallengeURLWithRegistryEndpoint(imageRef reference.Named, registryEndpo
 	return URL
 }
 
-func buildRegistryEndpointURL(registryEndpoint, resourcePath string) (url.URL, bool) {
-	scheme := "https"
+func getRegistryScheme() string {
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
-		scheme = "http"
+		return "http"
 	}
 
-	endpointURL, err := url.Parse(registryEndpoint)
-	if err != nil {
-		return url.URL{}, false
-	}
-
-	if endpointURL.Scheme == "" && endpointURL.Host == "" && endpointURL.Path != "" {
-		endpointURL, err = url.Parse(scheme + "://" + registryEndpoint)
-		if err != nil {
-			return url.URL{}, false
-		}
-	}
-
-	if endpointURL.Scheme == "" {
-		endpointURL.Scheme = scheme
-	}
-
-	if endpointURL.Host == "" {
-		return url.URL{}, false
-	}
-
-	endpointURL.Path = joinURLPath(endpointURL.Path, resourcePath)
-	endpointURL.RawPath = ""
-	endpointURL.RawQuery = ""
-	endpointURL.Fragment = ""
-
-	return *endpointURL, true
-}
-
-func joinURLPath(basePath, resourcePath string) string {
-	switch {
-	case basePath == "":
-		return resourcePath
-	case strings.HasSuffix(basePath, "/") && strings.HasPrefix(resourcePath, "/"):
-		return basePath + strings.TrimPrefix(resourcePath, "/")
-	case !strings.HasSuffix(basePath, "/") && !strings.HasPrefix(resourcePath, "/"):
-		return basePath + "/" + resourcePath
-	default:
-		return basePath + resourcePath
-	}
+	return "https"
 }

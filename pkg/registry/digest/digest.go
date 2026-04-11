@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
+	"github.com/nicholas-fedor/watchtower/internal/urlutil"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -395,7 +396,7 @@ func BuildManifestURLWithRegistryEndpoint(
 	originalHost := parsedURL.Host
 
 	if registryEndpoint != "" {
-		endpointURL, err := buildRegistryEndpointURL(registryEndpoint, parsedURL.Path)
+		endpointURL, err := urlutil.BuildRegistryEndpointURL(registryEndpoint, parsedURL.Path, scheme)
 		if err != nil {
 			return "", "", nil, fmt.Errorf(
 				"%w: invalid registry endpoint %q: %w",
@@ -736,53 +737,6 @@ func getRegistryEndpoints(
 	}
 
 	return append(endpoints, "")
-}
-
-func buildRegistryEndpointURL(registryEndpoint, resourcePath string) (*url.URL, error) {
-	scheme := "https"
-	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
-		scheme = "http"
-	}
-
-	endpointURL, err := url.Parse(registryEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	if endpointURL.Scheme == "" && endpointURL.Host == "" && endpointURL.Path != "" {
-		endpointURL, err = url.Parse(scheme + "://" + registryEndpoint)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if endpointURL.Scheme == "" {
-		endpointURL.Scheme = scheme
-	}
-
-	if endpointURL.Host == "" {
-		return nil, fmt.Errorf("missing host")
-	}
-
-	endpointURL.Path = joinURLPath(endpointURL.Path, resourcePath)
-	endpointURL.RawPath = ""
-	endpointURL.RawQuery = ""
-	endpointURL.Fragment = ""
-
-	return endpointURL, nil
-}
-
-func joinURLPath(basePath, resourcePath string) string {
-	switch {
-	case basePath == "":
-		return resourcePath
-	case strings.HasSuffix(basePath, "/") && strings.HasPrefix(resourcePath, "/"):
-		return basePath + strings.TrimPrefix(resourcePath, "/")
-	case !strings.HasSuffix(basePath, "/") && !strings.HasPrefix(resourcePath, "/"):
-		return basePath + "/" + resourcePath
-	default:
-		return basePath + resourcePath
-	}
 }
 
 // HandleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
