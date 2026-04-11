@@ -1,12 +1,36 @@
 package digest
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 
+	dockerImage "github.com/docker/docker/api/types/image"
+	dockerRegistry "github.com/docker/docker/api/types/registry"
+	dockerSystem "github.com/docker/docker/api/types/system"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type mockImageInspectorWithInfo struct {
+	repoDigests []string
+	info        dockerSystem.Info
+}
+
+func (m *mockImageInspectorWithInfo) ImageInspectWithRaw(
+	_ context.Context,
+	_ string,
+) (dockerImage.InspectResponse, []byte, error) {
+	return dockerImage.InspectResponse{RepoDigests: m.repoDigests}, nil, nil
+}
+
+func (m *mockImageInspectorWithInfo) Info(_ context.Context) (dockerSystem.Info, error) {
+	return m.info, nil
+}
 
 // TestCanonicalizeImageName validates the canonicalizeImageName function using
 // table-driven tests covering bare names, tagged images, fully-qualified
@@ -346,4 +370,45 @@ func TestImageInspectLock_DifferentImagesConcurrent(t *testing.T) {
 
 	close(proceedA)
 	close(proceedB)
+}
+
+func TestCompareDigest_PrefersDaemonRegistryMirrorsForDockerHub(t *testing.T) {
+	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+	defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+	const digestHeader = "sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodHead && r.URL.Path == "/v2/library/watchtower-mirror-regression/manifests/latest":
+			w.Header().Set(ContentDigestHeader, digestHeader)
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	container := mockTypes.NewMockContainer(t)
+	container.EXPECT().Name().Return("mirror-container")
+	container.EXPECT().ImageName().Return("watchtower-mirror-regression:latest")
+	container.EXPECT().HasImageInfo().Return(true)
+	container.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{
+		RepoDigests: []string{"docker.io/library/watchtower-mirror-regression@" + digestHeader},
+	})
+
+	inspector := &mockImageInspectorWithInfo{
+		repoDigests: []string{"docker.io/library/watchtower-mirror-regression@" + digestHeader},
+		info: dockerSystem.Info{
+			RegistryConfig: &dockerRegistry.ServiceConfig{
+				Mirrors: []string{server.URL},
+			},
+		},
+	}
+
+	matches, err := CompareDigest(context.Background(), inspector, container, "")
+	require.NoError(t, err)
+	assert.True(t, matches)
 }

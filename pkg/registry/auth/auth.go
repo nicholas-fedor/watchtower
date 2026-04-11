@@ -350,8 +350,21 @@ func GetToken(
 	registryAuth string,
 	client Client,
 ) (string, string, bool, string, error) {
+	return GetTokenWithRegistryEndpoint(ctx, container, registryAuth, client, "")
+}
+
+// GetTokenWithRegistryEndpoint fetches a token using either the image's canonical
+// registry or an explicit registry endpoint override such as a Docker mirror.
+func GetTokenWithRegistryEndpoint(
+	ctx context.Context,
+	container types.Container,
+	registryAuth string,
+	client Client,
+	registryEndpoint string,
+) (string, string, bool, string, error) {
 	fields := logrus.Fields{
-		"image": container.ImageName(),
+		"image":             container.ImageName(),
+		"registry_endpoint": registryEndpoint,
 	}
 
 	// Parse image name into a normalized reference.
@@ -363,7 +376,7 @@ func GetToken(
 	}
 
 	// Generate the challenge URL.
-	challengeURL := GetChallengeURL(normalizedRef)
+	challengeURL := GetChallengeURLWithRegistryEndpoint(normalizedRef, registryEndpoint)
 	logrus.WithFields(fields).
 		WithField("url", challengeURL.String()).
 		Debug("Constructed challenge URL")
@@ -829,6 +842,29 @@ func TransformAuth(registryAuth string) string {
 // Returns:
 //   - url.URL: Generated challenge URL.
 func GetChallengeURL(imageRef reference.Named) url.URL {
+	return GetChallengeURLWithRegistryEndpoint(imageRef, "")
+}
+
+// GetChallengeURLWithRegistryEndpoint generates a challenge URL for an image using
+// either its canonical registry or an explicit registry endpoint override.
+func GetChallengeURLWithRegistryEndpoint(imageRef reference.Named, registryEndpoint string) url.URL {
+	if registryEndpoint != "" {
+		if endpointURL, ok := buildRegistryEndpointURL(registryEndpoint, "/v2/"); ok {
+			logrus.WithFields(logrus.Fields{
+				"image":             imageRef.Name(),
+				"registry_endpoint": registryEndpoint,
+				"url":               endpointURL.String(),
+			}).Debug("Generated challenge URL from registry endpoint override")
+
+			return endpointURL
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"image":             imageRef.Name(),
+			"registry_endpoint": registryEndpoint,
+		}).Warn("Invalid registry endpoint override, falling back to canonical registry")
+	}
+
 	// Extract registry host from the image reference.
 	host, _ := GetRegistryAddress(imageRef.Name())
 
@@ -857,4 +893,51 @@ func GetChallengeURL(imageRef reference.Named) url.URL {
 	}).Debug("Generated challenge URL")
 
 	return URL
+}
+
+func buildRegistryEndpointURL(registryEndpoint, resourcePath string) (url.URL, bool) {
+	scheme := "https"
+	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		scheme = "http"
+	}
+
+	endpointURL, err := url.Parse(registryEndpoint)
+	if err != nil {
+		return url.URL{}, false
+	}
+
+	if endpointURL.Scheme == "" && endpointURL.Host == "" && endpointURL.Path != "" {
+		endpointURL, err = url.Parse(scheme + "://" + registryEndpoint)
+		if err != nil {
+			return url.URL{}, false
+		}
+	}
+
+	if endpointURL.Scheme == "" {
+		endpointURL.Scheme = scheme
+	}
+
+	if endpointURL.Host == "" {
+		return url.URL{}, false
+	}
+
+	endpointURL.Path = joinURLPath(endpointURL.Path, resourcePath)
+	endpointURL.RawPath = ""
+	endpointURL.RawQuery = ""
+	endpointURL.Fragment = ""
+
+	return *endpointURL, true
+}
+
+func joinURLPath(basePath, resourcePath string) string {
+	switch {
+	case basePath == "":
+		return resourcePath
+	case strings.HasSuffix(basePath, "/") && strings.HasPrefix(resourcePath, "/"):
+		return basePath + strings.TrimPrefix(resourcePath, "/")
+	case !strings.HasSuffix(basePath, "/") && !strings.HasPrefix(resourcePath, "/"):
+		return basePath + "/" + resourcePath
+	default:
+		return basePath + resourcePath
+	}
 }

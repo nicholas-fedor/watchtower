@@ -118,6 +118,10 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.It("should log at Debug level and return ErrPullImageNotFound for not found errors", func() {
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`/info$`)),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{}),
+				),
+				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
 					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:def","RepoDigests":["nonexistent@sha256:def"]}`),
 				),
@@ -147,6 +151,10 @@ var _ = ginkgo.Describe("the client", func() {
 	ginkgo.When("pulling an image with a server error", func() {
 		ginkgo.It("should log at Debug level and return errPullImageFailed for other errors", func() {
 			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`/info$`)),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{}),
+				),
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
 					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:ghi","RepoDigests":["app@sha256:ghi"]}`),
