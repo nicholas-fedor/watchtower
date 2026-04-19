@@ -70,6 +70,7 @@ jobs:
           driver: docker-container
           platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
           use: true
+          driver-opts: network=host
 
       - name: Install Syft for SBOM generation # Install Syft for GoReleaser SBOM generation
         if: ${{ inputs.build-type == 'prod' }}
