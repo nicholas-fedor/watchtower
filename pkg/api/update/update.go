@@ -32,6 +32,10 @@ type Handler struct {
 
 // New creates a new Handler instance.
 //
+// This factory function initializes a Handler with the provided update function and an optional
+// lock channel. If no lock channel is provided, a new buffered channel (capacity 1) is created
+// and seeded with a token to represent an initially-unlocked state.
+//
 // Parameters:
 //   - updateFn: Function to execute container updates, accepting a list of image names and returning metrics.
 //   - updateLock: Optional lock channel for synchronizing updates; if nil, a new channel is created.
@@ -40,12 +44,10 @@ type Handler struct {
 //   - *Handler: Initialized handler with the specified update function and path.
 func New(updateFn func(images []string) *metrics.Metric, updateLock chan bool) *Handler {
 	var hLock chan bool
-	// Use provided lock or create a new one with capacity 1 for single-update serialization.
 	if updateLock != nil {
 		hLock = updateLock
 
-		logrus.WithField("source", "provided").
-			Debug("Initialized update lock from provided channel")
+		logrus.WithField("source", "provided").Debug("Initialized update lock from provided channel")
 	} else {
 		hLock = make(chan bool, 1)
 		hLock <- true
@@ -62,29 +64,54 @@ func New(updateFn func(images []string) *metrics.Metric, updateLock chan bool) *
 
 // Handle processes HTTP update requests, triggering container updates with lock synchronization.
 //
-// For HEAD requests, it triggers the update asynchronously and returns immediately with HTTP 202 Accepted,
-// allowing clients to fire-and-forget updates without waiting for completion.
-//
-// For targeted updates (with image query parameters), the handler blocks until the lock is available,
-// ensuring the specific images are updated even if another update is in progress.
-//
-// For full updates (no image query parameters), the handler returns HTTP 429 (Too Many Requests) immediately
-// if another update is already running, since queuing a redundant full scan provides no benefit.
-//
-// On success (POST), it returns HTTP 200 (OK) with JSON results including summary metrics, timing, and metadata.
-// Errors during request processing (e.g., reading the body) return HTTP 500 (Internal Server Error).
+// For HEAD requests, it triggers the update asynchronously and returns immediately with HTTP 202 Accepted.
+// For targeted updates (with image query parameters), the handler blocks until the lock is available.
+// For full updates (no image query parameters), the handler returns HTTP 429 if another update is running.
+// On success (POST), it returns HTTP 200 with JSON results including summary metrics, timing, and metadata.
 //
 // Parameters:
 //   - w: HTTP response writer for sending status codes and responses.
 //   - r: HTTP request containing optional "image" query parameters for targeted updates.
-func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	logrus.WithFields(logrus.Fields{
 		"method": r.Method,
 		"path":   r.URL.Path,
 	}).Info("Received HTTP API update request")
 
-	// Discard request body to prevent I/O blocking in tests and CI environments.
-	// Limit body size to prevent resource exhaustion from large uploads.
+	if !h.readRequestBody(w, r) {
+		return
+	}
+
+	images := h.extractImages(r)
+
+	lockToken, acquired, requestErr := h.acquireLock(w, r, images)
+	if requestErr {
+		return
+	}
+
+	if !acquired {
+		return // 429 response already sent
+	}
+
+	if r.Method == http.MethodHead {
+		h.handleHead(w, images, lockToken)
+
+		return
+	}
+
+	h.handlePost(w, images, lockToken)
+}
+
+// readRequestBody discards the request body up to the maximum allowed size.
+// On error, it logs and sends an appropriate HTTP error response.
+//
+// Parameters:
+//   - w: HTTP response writer (used to send error responses).
+//   - r: HTTP request containing the body to be discarded.
+//
+// Returns:
+//   - bool: true if the body was read successfully, false otherwise.
+func (h *Handler) readRequestBody(w http.ResponseWriter, r *http.Request) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 
 	_, err := io.Copy(io.Discard, r.Body)
@@ -92,16 +119,28 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
 
-			return
+			return false
 		}
 
 		logrus.WithError(err).Debug("Failed to read request body")
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 
-		return
+		return false
 	}
 
-	// Extract images from query parameters.
+	return true
+}
+
+// extractImages parses the "image" query parameters into a slice of image strings.
+// It supports comma-separated values within a single query parameter and multiple
+// "image" parameters, combining all values into a single slice.
+//
+// Parameters:
+//   - r: HTTP request containing optional "image" query parameters.
+//
+// Returns:
+//   - []string: Slice of image names to update; may be empty if no images specified.
+func (h *Handler) extractImages(r *http.Request) []string {
 	var images []string
 
 	imageQueries, found := r.URL.Query()["image"]
@@ -115,111 +154,166 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		logrus.Debug("No image query parameters provided")
 	}
 
-	// Acquire lock with different strategies based on update type.
+	return images
+}
+
+// acquireLock attempts to acquire the update lock.
+//
+// For targeted updates (len(images) > 0), it blocks until the lock is available or the request is cancelled.
+// For full updates, it attempts a non-blocking acquire and returns false with a 429 response if the lock is held.
+//
+// Parameters:
+//   - w: HTTP response writer (used to send 429 error if lock unavailable for full update).
+//   - r: HTTP request (used to check context cancellation for targeted updates).
+//   - images: Slice of image names; determines targeted vs full update strategy.
+//
+// Returns:
+//   - lockToken (bool): The lock token to be returned to the channel when releasing.
+//   - acquired (bool): true if the lock was acquired, false otherwise.
+//   - requestErr (bool): true if an error response was already sent (cancellation), false otherwise.
+func (h *Handler) acquireLock(w http.ResponseWriter, r *http.Request, images []string) (bool, bool, bool) {
 	logrus.Debug("Handler: trying to acquire lock")
 
-	var lockToken bool
-
 	if len(images) > 0 {
-		// Targeted update: block until the lock is available to ensure specific images are updated.
 		select {
-		case token := <-handle.lock:
-			lockToken = token
-
+		case token := <-h.lock:
 			logrus.Debug("Handler: acquired lock for targeted update")
+
+			return token, true, false
 		case <-r.Context().Done():
 			logrus.Debug("Handler: request cancelled while waiting for lock")
 			http.Error(w, "request cancelled", http.StatusServiceUnavailable)
 
-			return
-		}
-	} else {
-		// Full update: try to acquire lock without blocking.
-		select {
-		case token := <-handle.lock:
-			lockToken = token
-
-			logrus.Debug("Handler: acquired lock for full update")
-		default:
-			logrus.Debug("Skipped update, another update already in progress")
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Retry-After", retryAfterSeconds)
-			w.WriteHeader(http.StatusTooManyRequests)
-
-			errResponse := map[string]any{
-				"error":       "another update is already running",
-				"api_version": "v1",
-				"timestamp":   time.Now().UTC().Format(time.RFC3339),
-			}
-
-			var buf bytes.Buffer
-
-			encErr := json.NewEncoder(&buf).Encode(errResponse)
-			if encErr != nil {
-				logrus.WithError(encErr).Error("Failed to encode 429 response")
-
-				return
-			}
-
-			_, writeErr := w.Write(buf.Bytes())
-			if writeErr != nil {
-				logrus.WithError(writeErr).Error("Failed to write 429 response")
-			}
-
-			return
+			return false, false, true
 		}
 	}
 
-	// Handle HEAD request: spawn async update and return immediately.
-	if r.Method == http.MethodHead {
-		logrus.Info("Handling HEAD request - spawning async update")
+	select {
+	case token := <-h.lock:
+		logrus.Debug("Handler: acquired lock for full update")
 
-		go func() {
-			// Ensure lock is released and recover from panics.
-			defer func() {
-				if rec := recover(); rec != nil {
-					logrus.WithField("panic", rec).Error("Update goroutine panicked")
-				}
+		return token, true, false
+	default:
+		logrus.Debug("Skipped update, another update already in progress")
+		h.send429Response(w)
 
-				logrus.Debug("Handler (HEAD): releasing lock")
+		return false, false, false
+	}
+}
 
-				handle.lock <- lockToken
-			}()
+// send429Response writes a JSON error response indicating an update is already running.
+// It sets the Retry-After header to suggest when the client may retry.
+//
+// Parameters:
+//   - w: HTTP response writer to send the error payload.
+func (h *Handler) send429Response(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", retryAfterSeconds)
+	w.WriteHeader(http.StatusTooManyRequests)
 
-			logrus.Debug("Handler (HEAD): executing update function")
+	errResponse := map[string]any{
+		"error":       "another update is already running",
+		"api_version": "v1",
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+	}
 
-			startTime := time.Now()
+	var buf bytes.Buffer
 
-			handle.fn(images)
-
-			duration := time.Since(startTime)
-			logrus.WithField("duration", duration).Debug("Handler (HEAD): update function completed")
-		}()
-
-		// Set response headers for HEAD.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted) // 202
+	err := json.NewEncoder(&buf).Encode(errResponse)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to encode 429 response")
 
 		return
 	}
 
-	// POST: synchronous execution.
-	defer func() {
-		logrus.Debug("Handler: releasing lock")
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		logrus.WithError(err).Error("Failed to write 429 response")
+	}
+}
 
-		handle.lock <- lockToken
+// handleHead processes a HEAD request by spawning an asynchronous update and returning 202 Accepted.
+// The update runs in a separate goroutine, allowing the client to fire-and-forget.
+//
+// Parameters:
+//   - w: HTTP response writer to send the 202 Accepted response.
+//   - images: Slice of image names to update (passed to the async update function).
+//   - lockToken: The lock token to be released by the async goroutine upon completion.
+func (h *Handler) handleHead(w http.ResponseWriter, images []string, lockToken bool) {
+	logrus.Info("Handling HEAD request - spawning async update")
+
+	go func() {
+		h.executeUpdateAsync(images, lockToken)
 	}()
 
-	// Execute update and get results
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// handlePost processes a POST request synchronously, returning the update results as JSON.
+// It defers lock release until the update completes and response is written.
+//
+// Parameters:
+//   - w: HTTP response writer to send the 200 OK response with JSON body.
+//   - images: Slice of image names to update.
+//   - lockToken: The lock token to be released via defer upon function return.
+func (h *Handler) handlePost(w http.ResponseWriter, images []string, lockToken bool) {
+	defer h.releaseLock(lockToken)
+
+	metric, duration := h.executeUpdate(images)
+	h.writeSuccessResponse(w, metric, duration)
+}
+
+// executeUpdateAsync runs the update function in a goroutine, ensuring the lock is released when done.
+// It recovers from panics to avoid crashing the process and logs the completion duration.
+//
+// Parameters:
+//   - images: Slice of image names to update.
+//   - lockToken: The lock token to release when the update finishes (or panics).
+func (h *Handler) executeUpdateAsync(images []string, lockToken bool) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logrus.WithField("panic", rec).Error("Update goroutine panicked")
+		}
+
+		h.releaseLock(lockToken)
+	}()
+
+	startTime := time.Now()
+
+	h.fn(images)
+
+	duration := time.Since(startTime)
+	logrus.WithField("duration", duration).Debug("Handler (HEAD): update function completed")
+}
+
+// executeUpdate runs the update function and returns the metric along with duration.
+//
+// Parameters:
+//   - images: Slice of image names to update.
+//
+// Returns:
+//   - *metrics.Metric: The update metrics returned by the update function.
+//   - time.Duration: The elapsed time taken to execute the update.
+func (h *Handler) executeUpdate(images []string) (*metrics.Metric, time.Duration) {
 	logrus.Debug("Handler: executing update function")
 
 	startTime := time.Now()
-	metric := handle.fn(images)
+	metric := h.fn(images)
 	duration := time.Since(startTime)
 
 	logrus.Debug("Handler: update function completed")
 
-	// Return enhanced JSON response with detailed update results
+	return metric, duration
+}
+
+// writeSuccessResponse encodes the metric into JSON and writes a 200 OK response.
+//
+// Parameters:
+//   - w: HTTP response writer to send the success payload.
+//   - metric: The update metrics to encode into the response body.
+//   - duration: The elapsed time of the update operation, included in the response timing.
+func (h *Handler) writeSuccessResponse(w http.ResponseWriter, metric *metrics.Metric, duration time.Duration) {
 	response := map[string]any{
 		"summary": map[string]any{
 			"scanned":   metric.Scanned,
@@ -238,7 +332,7 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	var buf bytes.Buffer
 
-	err = json.NewEncoder(&buf).Encode(response)
+	err := json.NewEncoder(&buf).Encode(response)
 	if err != nil {
 		logrus.WithError(err).Error("Failed to encode JSON response")
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -253,4 +347,14 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.WithError(err).Error("Failed to write response")
 	}
+}
+
+// releaseLock returns the lock token to the channel, allowing another update to proceed.
+//
+// Parameters:
+//   - token: The lock token (bool) to send back to the lock channel.
+func (h *Handler) releaseLock(token bool) {
+	logrus.Debug("Handler: releasing lock")
+
+	h.lock <- token
 }

@@ -838,9 +838,9 @@ func TestHeadFullUpdateReturns202WhenLockAcquired(t *testing.T) {
 // returns 429 Too Many Requests when the lock is already held.
 func TestHeadFullUpdateReturns429WhenLocked(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-        customLock := make(chan bool, 1) // lock held (empty)
+		customLock := make(chan bool, 1) // lock held (empty)
 
-        handler := update.New(func(_ []string) *metrics.Metric {
+		handler := update.New(func(_ []string) *metrics.Metric {
 			t.Error("update function should not be called when lock is unavailable")
 
 			return &metrics.Metric{}
@@ -887,9 +887,9 @@ func TestHeadFullUpdateReturns429WhenLocked(t *testing.T) {
 // blocks until the lock becomes available, then returns 202 and triggers the update.
 func TestHeadTargetedUpdateBlocksWhenLocked(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-        customLock := make(chan bool, 1) // lock held (empty)
+		customLock := make(chan bool, 1) // lock held (empty)
 
-        var called atomic.Int32
+		var called atomic.Int32
 
 		handler := update.New(func(images []string) *metrics.Metric {
 			called.Add(1)
@@ -981,4 +981,162 @@ func (f *faultyResponseWriter) WriteHeader(statusCode int) {
 		f.ResponseWriter.WriteHeader(statusCode)
 	}
 	// Ignore subsequent calls to WriteHeader after writing has started
+}
+
+// TestReadRequestBodyRejectsOversizedBody verifies that requests exceeding the
+// maximum body size (1 MiB) receive a 413 Payload Too Large response.
+func TestReadRequestBodyRejectsOversizedBody(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		largeBody := bytes.Repeat([]byte("x"), (1<<20)+1)
+		mockUpdateFn := func(_ []string) *metrics.Metric {
+			t.Error("update function should not be called when body too large")
+
+			return &metrics.Metric{}
+		}
+		handler := update.New(mockUpdateFn, nil)
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", bytes.NewReader(largeBody))
+		handler.Handle(rec, req)
+
+		if rec.Code != http.StatusRequestEntityTooLarge {
+			t.Errorf("expected status %d, got %d", http.StatusRequestEntityTooLarge, rec.Code)
+		}
+
+		synctest.Wait()
+	})
+}
+
+// TestAcquireLockCancelsForTargetedUpdate verifies that a targeted update request
+// returns 503 Service Unavailable if the request context is cancelled while waiting.
+func TestAcquireLockCancelsForTargetedUpdate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		customLock := make(chan bool, 1) // lock held (empty)
+
+		var called atomic.Int32
+
+		handler := update.New(func(_ []string) *metrics.Metric {
+			called.Add(1)
+
+			return &metrics.Metric{}
+		}, customLock)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/v1/update?image=test:latest", nil)
+		handler.Handle(rec, req)
+
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Errorf("expected status %d, got %d", http.StatusServiceUnavailable, rec.Code)
+		}
+
+		if called.Load() != 0 {
+			t.Errorf("update function should not be called after cancellation")
+		}
+
+		synctest.Wait()
+	})
+}
+
+// TestExecuteUpdateAsyncRecoversFromPanic verifies that if the update function panics,
+// the async goroutine recovers and still releases the lock.
+func TestExecuteUpdateAsyncRecoversFromPanic(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var panicked atomic.Int32
+
+		customLock := make(chan bool, 1)
+		customLock <- true
+
+		handler := update.New(func(images []string) *metrics.Metric {
+			panicked.Add(1)
+			panic("simulated panic")
+		}, customLock)
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodHead, "/v1/update", nil)
+		handler.Handle(rec, req)
+
+		if rec.Code != http.StatusAccepted {
+			t.Errorf("expected status %d, got %d", http.StatusAccepted, rec.Code)
+		}
+
+		synctest.Wait()
+
+		if panicked.Load() != 1 {
+			t.Error("update function should have panicked")
+		}
+		// Verify lock was released.
+		select {
+		case <-customLock:
+		default:
+			t.Error("lock was not released after panic")
+		}
+	})
+}
+
+// TestSend429ResponseHandlesWriteError verifies that 429 response write errors
+// are logged without panicking.
+func TestSend429ResponseHandlesWriteError(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mockUpdateFn := func(_ []string) *metrics.Metric { return &metrics.Metric{} }
+		customLock := make(chan bool, 1) // locked
+		handler := update.New(mockUpdateFn, customLock)
+		faulty := &faultyResponseWriter{ResponseWriter: httptest.NewRecorder()}
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", nil)
+		handler.Handle(faulty, req)
+
+		if faulty.lastStatusCode != http.StatusTooManyRequests {
+			t.Errorf("expected status %d, got %d", http.StatusTooManyRequests, faulty.lastStatusCode)
+		}
+	})
+}
+
+// TestWriteSuccessResponseHandlesWriteError verifies that 200 response write errors
+// are logged without panicking.
+func TestWriteSuccessResponseHandlesWriteError(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mockUpdateFn := func(_ []string) *metrics.Metric {
+			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+		}
+
+		customLock := make(chan bool, 1)
+		customLock <- true
+
+		handler := update.New(mockUpdateFn, customLock)
+		faulty := &faultyResponseWriter{ResponseWriter: httptest.NewRecorder()}
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", nil)
+		handler.Handle(faulty, req)
+
+		if faulty.lastStatusCode != http.StatusOK {
+			t.Errorf("expected status %d, got %d", http.StatusOK, faulty.lastStatusCode)
+		}
+	})
+}
+
+// TestHandleReturnsEarlyWhenRequestBodyInvalid verifies that Handle returns early
+// when the request body is unreadable, without calling the update function.
+func TestHandleReturnsEarlyWhenRequestBodyInvalid(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var called atomic.Int32
+
+		mockUpdateFn := func(_ []string) *metrics.Metric {
+			called.Add(1)
+
+			return &metrics.Metric{}
+		}
+		handler := update.New(mockUpdateFn, nil)
+		faultyReader := &faultyReadCloser{err: errors.New("read error")}
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", faultyReader)
+		handler.Handle(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("expected status %d, got %d", http.StatusInternalServerError, rec.Code)
+		}
+
+		if called.Load() != 0 {
+			t.Error("update function should not be called when body read fails")
+		}
+
+		synctest.Wait()
+	})
 }
