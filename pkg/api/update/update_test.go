@@ -796,6 +796,148 @@ func TestConcurrentRequests(t *testing.T) {
 	})
 }
 
+// TestHeadFullUpdateReturns202WhenLockAcquired verifies that a HEAD request for a full update
+// returns 202 Accepted with an empty body and triggers the update asynchronously.
+func TestHeadFullUpdateReturns202WhenLockAcquired(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var called atomic.Int32
+
+		mockUpdateFn := func(images []string) *metrics.Metric {
+			called.Add(1)
+
+			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
+		}
+		handler := update.New(mockUpdateFn, nil)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodHead,
+			"/v1/update",
+			nil,
+		)
+		handler.Handle(rec, req)
+
+		if rec.Code != http.StatusAccepted {
+			t.Errorf("expected status %d, got %d", http.StatusAccepted, rec.Code)
+		}
+
+		if rec.Body.Len() != 0 {
+			t.Errorf("expected empty body, got %q", rec.Body.String())
+		}
+
+		synctest.Wait()
+
+		if called.Load() != 1 {
+			t.Errorf("expected update function to be called once, got %d", called.Load())
+		}
+	})
+}
+
+// TestHeadFullUpdateReturns429WhenLocked verifies that a HEAD request for a full update
+// returns 429 Too Many Requests when the lock is already held.
+func TestHeadFullUpdateReturns429WhenLocked(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+        customLock := make(chan bool, 1) // lock held (empty)
+
+        handler := update.New(func(_ []string) *metrics.Metric {
+			t.Error("update function should not be called when lock is unavailable")
+
+			return &metrics.Metric{}
+		}, customLock)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodHead,
+			"/v1/update",
+			nil,
+		)
+		handler.Handle(rec, req)
+
+		if rec.Code != http.StatusTooManyRequests {
+			t.Errorf("expected status %d, got %d", http.StatusTooManyRequests, rec.Code)
+		}
+
+		if rec.Header().Get("Content-Type") != "application/json" {
+			t.Errorf("expected Content-Type application/json, got %s", rec.Header().Get("Content-Type"))
+		}
+
+		if rec.Header().Get("Retry-After") != "30" {
+			t.Errorf("expected Retry-After 30, got %s", rec.Header().Get("Retry-After"))
+		}
+
+		var response map[string]any
+
+		err := json.Unmarshal(rec.Body.Bytes(), &response)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		errMsg, ok := response["error"].(string)
+		if !ok || errMsg != "another update is already running" {
+			t.Errorf("unexpected error message: %v", response["error"])
+		}
+
+		synctest.Wait()
+	})
+}
+
+// TestHeadTargetedUpdateBlocksWhenLocked verifies that a HEAD request for a targeted update
+// blocks until the lock becomes available, then returns 202 and triggers the update.
+func TestHeadTargetedUpdateBlocksWhenLocked(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+        customLock := make(chan bool, 1) // lock held (empty)
+
+        var called atomic.Int32
+
+		handler := update.New(func(images []string) *metrics.Metric {
+			called.Add(1)
+
+			if len(images) != 1 || images[0] != "myimage:latest" {
+				t.Errorf("unexpected images: %v", images)
+			}
+
+			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+		}, customLock)
+
+		done := make(chan int, 1)
+
+		go func() {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequestWithContext(
+				context.Background(),
+				http.MethodHead,
+				"/v1/update?image=myimage:latest",
+				nil,
+			)
+			handler.Handle(rec, req)
+
+			done <- rec.Code
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
+		if called.Load() != 0 {
+			t.Error("update function should not be called while lock is held")
+		}
+
+		// Release the lock
+		customLock <- true
+
+		synctest.Wait()
+
+		code := <-done
+		if code != http.StatusAccepted {
+			t.Errorf("expected status %d for HEAD targeted update, got %d", http.StatusAccepted, code)
+		}
+
+		if called.Load() != 1 {
+			t.Errorf("expected 1 call, got %d", called.Load())
+		}
+	})
+}
+
 // faultyReadCloser simulates a body reader that fails.
 type faultyReadCloser struct {
 	err error

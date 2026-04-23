@@ -62,13 +62,16 @@ func New(updateFn func(images []string) *metrics.Metric, updateLock chan bool) *
 
 // Handle processes HTTP update requests, triggering container updates with lock synchronization.
 //
+// For HEAD requests, it triggers the update asynchronously and returns immediately with HTTP 202 Accepted,
+// allowing clients to fire-and-forget updates without waiting for completion.
+//
 // For targeted updates (with image query parameters), the handler blocks until the lock is available,
 // ensuring the specific images are updated even if another update is in progress.
 //
 // For full updates (no image query parameters), the handler returns HTTP 429 (Too Many Requests) immediately
 // if another update is already running, since queuing a redundant full scan provides no benefit.
 //
-// On success, it returns HTTP 200 (OK) with JSON results including summary metrics, timing, and metadata.
+// On success (POST), it returns HTTP 200 (OK) with JSON results including summary metrics, timing, and metadata.
 // Errors during request processing (e.g., reading the body) return HTTP 500 (Internal Server Error).
 //
 // Parameters:
@@ -115,41 +118,30 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	// Acquire lock with different strategies based on update type.
 	logrus.Debug("Handler: trying to acquire lock")
 
+	var lockToken bool
+
 	if len(images) > 0 {
 		// Targeted update: block until the lock is available to ensure specific images are updated.
-		// Use select with request context to avoid goroutine leaks if the client disconnects.
 		select {
-		case chanValue := <-handle.lock:
+		case token := <-handle.lock:
+			lockToken = token
+
 			logrus.Debug("Handler: acquired lock for targeted update")
-
-			defer func() {
-				logrus.Debug("Handler: releasing lock")
-
-				handle.lock <- chanValue
-			}()
 		case <-r.Context().Done():
 			logrus.Debug("Handler: request cancelled while waiting for lock")
 			http.Error(w, "request cancelled", http.StatusServiceUnavailable)
 
 			return
 		}
-
-		logrus.WithField("images", images).Info("Executing targeted update")
 	} else {
 		// Full update: try to acquire lock without blocking.
-		// If another update is already running, a redundant full scan is unnecessary.
 		select {
-		case chanValue := <-handle.lock:
+		case token := <-handle.lock:
+			lockToken = token
+
 			logrus.Debug("Handler: acquired lock for full update")
-
-			defer func() {
-				logrus.Debug("Handler: releasing lock")
-
-				handle.lock <- chanValue
-			}()
 		default:
 			logrus.Debug("Skipped update, another update already in progress")
-
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", retryAfterSeconds)
 			w.WriteHeader(http.StatusTooManyRequests)
@@ -176,9 +168,47 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 			return
 		}
-
-		logrus.Info("Executing full update")
 	}
+
+	// Handle HEAD request: spawn async update and return immediately.
+	if r.Method == http.MethodHead {
+		logrus.Info("Handling HEAD request - spawning async update")
+
+		go func() {
+			// Ensure lock is released and recover from panics.
+			defer func() {
+				if rec := recover(); rec != nil {
+					logrus.WithField("panic", rec).Error("Update goroutine panicked")
+				}
+
+				logrus.Debug("Handler (HEAD): releasing lock")
+
+				handle.lock <- lockToken
+			}()
+
+			logrus.Debug("Handler (HEAD): executing update function")
+
+			startTime := time.Now()
+
+			handle.fn(images)
+
+			duration := time.Since(startTime)
+			logrus.WithField("duration", duration).Debug("Handler (HEAD): update function completed")
+		}()
+
+		// Set response headers for HEAD.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted) // 202
+
+		return
+	}
+
+	// POST: synchronous execution.
+	defer func() {
+		logrus.Debug("Handler: releasing lock")
+
+		handle.lock <- lockToken
+	}()
 
 	// Execute update and get results
 	logrus.Debug("Handler: executing update function")
@@ -216,7 +246,6 @@ func (handle *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set content type to JSON and write response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
