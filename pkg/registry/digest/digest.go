@@ -17,10 +17,12 @@ import (
 	"sync"
 
 	"github.com/distribution/reference"
+	dockerSystem "github.com/docker/docker/api/types/system"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
+	"github.com/nicholas-fedor/watchtower/internal/urlutil"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -46,6 +48,10 @@ type imageLockEntry struct {
 // Keys are canonicalized image references (e.g., "docker.io/library/nginx:latest") so that
 // different representations of the same image share a single lock. Values are *imageLockEntry.
 var imageInspectLocks sync.Map
+
+type registryInfoProvider interface {
+	Info(ctx context.Context) (dockerSystem.Info, error)
+}
 
 // Errors for digest retrieval operations.
 var (
@@ -354,6 +360,17 @@ func BuildManifestURL(
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
+	return BuildManifestURLWithRegistryEndpoint(container, hostOverride, "")
+}
+
+// BuildManifestURLWithRegistryEndpoint constructs a manifest URL using either the
+// image's canonical registry or an explicit registry endpoint override such as a
+// Docker registry mirror.
+func BuildManifestURLWithRegistryEndpoint(
+	container types.Container,
+	hostOverride string,
+	registryEndpoint string,
+) (string, string, *url.URL, error) {
 	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
 	scheme := "https"
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
@@ -377,6 +394,22 @@ func BuildManifestURL(
 	}
 
 	originalHost := parsedURL.Host
+
+	if registryEndpoint != "" {
+		endpointURL, err := urlutil.BuildRegistryEndpointURL(registryEndpoint, parsedURL.Path, scheme)
+		if err != nil {
+			return "", "", nil, fmt.Errorf(
+				"%w: invalid registry endpoint %q: %w",
+				errFailedBuildManifestURL,
+				registryEndpoint,
+				err,
+			)
+		}
+
+		originalHost = endpointURL.Host
+		parsedURL = endpointURL
+		manifestURL = parsedURL.String()
+	}
 
 	// Special handling for lscr.io registry redirects:
 	// lscr.io (LinuxServer.io) images are hosted on GitHub Container Registry (ghcr.io)
@@ -435,9 +468,46 @@ func fetchDigest(
 	registryAuth string,
 	method string,
 ) (string, error) {
+	endpoints := getRegistryEndpoints(ctx, inspector, container)
+	var lastErr error
+
+	for _, endpoint := range endpoints {
+		digest, err := fetchDigestFromRegistryEndpoint(
+			ctx,
+			inspector,
+			container,
+			registryAuth,
+			method,
+			endpoint,
+		)
+		if err == nil {
+			return digest, nil
+		}
+
+		lastErr = err
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container":         container.Name(),
+			"image":             container.ImageName(),
+			"method":            method,
+			"registry_endpoint": endpoint,
+		}).Debug("Digest fetch failed for registry endpoint")
+	}
+
+	return "", lastErr
+}
+
+func fetchDigestFromRegistryEndpoint(
+	ctx context.Context,
+	inspector types.ImageInspector,
+	container types.Container,
+	registryAuth string,
+	method string,
+	registryEndpoint string,
+) (string, error) {
 	fields := logrus.Fields{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container":         container.Name(),
+		"image":             container.ImageName(),
+		"registry_endpoint": registryEndpoint,
 	}
 
 	// Inspect the image to check if it's locally built (no RepoDigests).
@@ -479,7 +549,7 @@ func fetchDigest(
 	client := auth.NewAuthClient()
 
 	// Build initial manifest URL to get original host
-	_, originalHost, _, err := BuildManifestURL(container, "")
+	_, originalHost, _, err := BuildManifestURLWithRegistryEndpoint(container, "", registryEndpoint)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
 
@@ -491,11 +561,12 @@ func fetchDigest(
 		Debug("Extracted original host from manifest URL")
 
 	// Obtain an authentication token and challenge host for the registry.
-	token, challengeHost, redirected, redirectHost, err := auth.GetToken(
+	token, challengeHost, redirected, redirectHost, err := auth.GetTokenWithRegistryEndpoint(
 		ctx,
 		container,
 		registryAuth,
 		client,
+		registryEndpoint,
 	)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
@@ -522,14 +593,16 @@ func fetchDigest(
 	)
 
 	if redirectHost != "" && redirectHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = BuildManifestURL(
+		manifestURL, _, parsedURL, err = BuildManifestURLWithRegistryEndpoint(
 			container,
 			redirectHost,
+			registryEndpoint,
 		)
 	} else {
-		manifestURL, _, parsedURL, err = BuildManifestURL(
+		manifestURL, _, parsedURL, err = BuildManifestURLWithRegistryEndpoint(
 			container,
 			"",
+			registryEndpoint,
 		)
 	}
 
@@ -615,6 +688,55 @@ func fetchDigest(
 		Debug("Fetched remote digest")
 
 	return digest, nil
+}
+
+func getRegistryEndpoints(
+	ctx context.Context,
+	inspector types.ImageInspector,
+	container types.Container,
+) []string {
+	registryHost, err := auth.GetRegistryAddress(container.ImageName())
+	if err != nil || registryHost != auth.DockerRegistryHost {
+		return []string{""}
+	}
+
+	infoProvider, ok := inspector.(registryInfoProvider)
+	if !ok {
+		return []string{""}
+	}
+
+	info, err := infoProvider.Info(ctx)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		}).Debug("Failed to read registry mirrors from daemon info")
+
+		return []string{""}
+	}
+
+	if info.RegistryConfig == nil || len(info.RegistryConfig.Mirrors) == 0 {
+		return []string{""}
+	}
+
+	seen := map[string]struct{}{}
+	endpoints := make([]string, 0, len(info.RegistryConfig.Mirrors)+1)
+
+	for _, mirror := range info.RegistryConfig.Mirrors {
+		mirror = strings.TrimSpace(mirror)
+		if mirror == "" {
+			continue
+		}
+
+		if _, exists := seen[mirror]; exists {
+			continue
+		}
+
+		seen[mirror] = struct{}{}
+		endpoints = append(endpoints, mirror)
+	}
+
+	return append(endpoints, "")
 }
 
 // HandleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
