@@ -25,6 +25,7 @@ jobs:
     name: Check for Code Changes
     runs-on: ubuntu-latest
     permissions:
+      contents: read # For code checkout
       actions: read # For querying previous workflow runs via API
     outputs:
       has-changes: ${{ steps.check.outputs.has-changes }}
