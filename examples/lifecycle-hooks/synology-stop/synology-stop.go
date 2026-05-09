@@ -354,7 +354,13 @@ func stopContainer(
 	// Headers required by DSM API [DSM API Guide §2.3]
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	req.Header.Set("X-Syno-Token", synoToken) // CSRF protection [DSM API Guide §3.2]
-	req.AddCookie(&http.Cookie{Name: "id", Value: sid})
+	req.AddCookie(&http.Cookie{
+		Name:     "id",
+		Value:    sid,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
 
 	resp, err := client.Do(req)
 	// Network or timeout error
@@ -399,7 +405,13 @@ func logout(client *http.Client, config *Config, sid string) error {
 		return fmt.Errorf("failed to create logout request: %w", err)
 	}
 
-	req.AddCookie(&http.Cookie{Name: "id", Value: sid})
+	req.AddCookie(&http.Cookie{
+		Name:     "id",
+		Value:    sid,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -424,7 +436,13 @@ func doHTTPRequest(
 
 	// Attach session cookie if provided
 	if sid != "" {
-		req.AddCookie(&http.Cookie{Name: "id", Value: sid})
+		req.AddCookie(&http.Cookie{
+			Name:     "id",
+			Value:    sid,
+			Secure:   true,
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+		})
 	}
 	// Attach CSRF token if provided
 	if synoToken != "" {

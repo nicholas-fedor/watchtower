@@ -1,17 +1,18 @@
-name: Publish Docs
+---
+name: Publish Documentation
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - docs/**
+      - build/mkdocs/**
   release:
     types: [published]
 
 permissions:
-  contents: write
-  actions: read
+  contents: read # Set default read-only permissions
 
 jobs:
   build-docs:
@@ -23,22 +24,27 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout
-        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+      - name: Checkout Repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version-file: "go.mod"
+          cache: false
+          go-version-file: go.mod
 
-      - name: Set executable permissions for script
+      - name: Make Script Executable
         run: chmod +x ./scripts/build-tplprev.sh
 
       - name: Build tplprev
@@ -47,18 +53,18 @@ jobs:
           go clean -cache  # Clear build cache
           ./scripts/build-tplprev.sh
 
-      - name: Setup python
-        uses: actions/setup-python@28f2168f4d98ee0445e3c6321f6e6616c83dd5ec
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: 3.x
+          python-version: "3.14.4"
           cache: "pip"
-          cache-dependency-path: build/mkdocs/docs-requirements.txt
+          cache-dependency-path: |
+            build/mkdocs/docs-requirements.txt
 
-      - run: echo "cache_id=$(date --utc '+%V')" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      - name: Setup Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          key: mkdocs-material-${{ env.cache_id }}
+          key: mkdocs-material-${{ hashFiles('build/mkdocs/docs-requirements.txt') }}
           path: .cache
           restore-keys: |
             mkdocs-material-
@@ -69,25 +75,29 @@ jobs:
 
       - name: Determine Mike Version and Aliases
         id: mike
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "version=${TAG_NAME}" >> "$GITHUB_OUTPUT"
             echo "aliases=latest" >> "$GITHUB_OUTPUT"
           else
             echo "version=dev" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and Deploy
+        env:
+          ALIASES: ${{ steps.mike.outputs.aliases }}
+          VERSION: ${{ steps.mike.outputs.version }}
         run: |
-          if [ -n "${{ steps.mike.outputs.aliases }}" ]; then
-            mike delete latest --push || true
+          if [ -n "${ALIASES}" ]; then
             mike deploy \
               --config-file build/mkdocs/mkdocs.yaml \
               --push \
-              --update-aliases "${{ steps.mike.outputs.version }}" "${{ steps.mike.outputs.aliases }}"
+              --update-aliases "${VERSION}" "${ALIASES}"
           else
             mike deploy \
               --config-file build/mkdocs/mkdocs.yaml \
               --push \
-              "${{ steps.mike.outputs.version }}"
+              "${VERSION}"
           fi

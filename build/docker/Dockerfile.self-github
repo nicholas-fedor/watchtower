@@ -1,39 +1,44 @@
-#
-# Builder
-#
+ARG BASE_IMAGE=golang:alpine@sha256:91eda9776261207ea25fd06b5b7fed8d397dd2c0a283e77f2ab6e91bfa71079d
 
-FROM golang:alpine@sha256:91eda9776261207ea25fd06b5b7fed8d397dd2c0a283e77f2ab6e91bfa71079d AS builder
+# Builder Stage
+FROM ${BASE_IMAGE} AS builder
 
-# use version (for example "v0.3.3") or "main"
+RUN apk add --no-cache ca-certificates tzdata git alpine-sdk
+
+WORKDIR /watchtower
+
 ARG WATCHTOWER_VERSION=main
-
-RUN apk add --no-cache \
-  alpine-sdk \
-  ca-certificates \
-  git \
-  tzdata
-
-RUN git clone --branch "${WATCHTOWER_VERSION}" https://github.com/nicholas-fedor/watchtower.git
-
-RUN \
-  cd watchtower && \
-  \
-  CGO_ENABLED=0 GOOS=linux go build -a -ldflags "-extldflags '-static' -X github.com/nicholas-fedor/watchtower/internal/meta.Version=$(git describe --tags)" . && \
-  go test ./... -v
+RUN git clone --branch "${WATCHTOWER_VERSION}" https://github.com/nicholas-fedor/watchtower.git .
 
 
-#
-# watchtower
-#
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -a \
+    -ldflags "\
+    -s -w \
+    -X github.com/nicholas-fedor/watchtower/internal/meta.Version=$(git describe --tags --always) \
+    " \
+    -o ./bin/watchtower \
+    .
 
+# Final Build
 FROM scratch
 
-LABEL "com.centurylinklabs.watchtower"="true"
+LABEL \
+    "com.centurylinklabs.watchtower"="true" \
+    "org.opencontainers.image.url"="https://watchtower.nickfedor.com" \
+    "org.opencontainers.image.documentation"="https://watchtower.nickfedor.com" \
+    "org.opencontainers.image.source"="https://github.com/nicholas-fedor/watchtower" \
+    "org.opencontainers.image.licenses"="Apache-2.0" \
+    "org.opencontainers.image.title"="Watchtower" \
+    "org.opencontainers.image.description"="Automate Docker container updates."
 
-# copy files from other container
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
-COPY --from=builder /go/watchtower/watchtower /watchtower
+
+COPY --chmod=0755 --from=builder /watchtower/bin/watchtower /watchtower
+
+EXPOSE 8080
 
 HEALTHCHECK CMD [ "/watchtower", "--health-check"]
 

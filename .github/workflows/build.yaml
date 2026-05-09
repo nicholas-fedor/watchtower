@@ -1,14 +1,18 @@
+---
 name: Build Release
 
 on:
-  # Called by other workflows with inputs for build type and dry-run mode
   workflow_call:
     inputs:
-      build-type:
-        description: "Type of build (prod or dev)"
+      ENVIRONMENT:
+        description: "GitHub environment for secrets access"
         required: true
         type: string
-      dry-run:
+      BUILD_TYPE:
+        description: "Type of release build (stable or nightly)"
+        required: true
+        type: string
+      DRY_RUN:
         description: "Run in test mode without publishing artifacts"
         required: false
         default: false
@@ -20,100 +24,112 @@ on:
         required: true
 
 permissions:
-  contents: read
+  contents: read # Declare default permissions as read only.
 
 jobs:
-  # Build binaries, images, SBOMs, and attestations for production or development
   build:
+    name: Build
     runs-on: ubuntu-latest
+    environment: ${{ inputs.ENVIRONMENT }}
+    env:
+      DOCKER_CLI_EXPERIMENTAL: "enabled"
+      CGO_ENABLED: 0
+      TAG: ${{ github.ref_name }}
     permissions:
       contents: write # For code checkout and publishing releases
       packages: write # For pushing images to registries
       attestations: write # For generating provenance and SBOMs
       id-token: write # For OIDC auth to Docker Hub and GHCR
+
     steps:
-      - name: Harden the runner (Audit all outbound calls)
+      - name: Harden the Runner (Step Security)
         uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
         with:
           egress-policy: audit
 
-      - name: Validate build-type input # Ensure build-type is 'prod' or 'dev'.
+      - name: Validate BUILD_TYPE input
+        env:
+          BUILD_TYPE: ${{ inputs.BUILD_TYPE }}
         run: |
-          if [[ "${{ inputs.build-type }}" != "prod" && "${{ inputs.build-type }}" != "dev" ]]; then
-            echo "Error: build-type must be 'prod' or 'dev', got '${{ inputs.build-type }}'"
+          if [[ "${BUILD_TYPE}" != "stable" && "${BUILD_TYPE}" != "nightly" ]]; then
+            echo "Error: BUILD_TYPE must be 'stable' or 'nightly', got '${BUILD_TYPE}'"
             exit 1
           fi
 
-      - name: Checkout code
-        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+      - name: Checkout Repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 0 # Full history for GoReleaser versioning.
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version-file: "go.mod"
+          cache: false # Disable to prevent cache poisoning
+          go-version-file: go.mod
 
-      - name: Set up QEMU # Enable multi-platform emulation.
-        uses: docker/setup-qemu-action@f4e8deed0c3c26542279f4042c0e1d059cbf012d
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        with:
+          image: tonistiigi/binfmt@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3 # latest
+          platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
           platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
 
-      - name: Enable containerd snapshotter # Enable containerd for multi-platform builds
-        run: |
-          sudo bash -c 'echo "{\"features\": {\"containerd-snapshotter\": true}}" > /etc/docker/daemon.json'
-          sudo systemctl restart docker
+      - name: Install Syft for SBOM generation
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        if: ${{ inputs.BUILD_TYPE == 'stable' }}
 
-      - name: Set up Docker Buildx # Configure multi-platform builds.
-        uses: docker/setup-buildx-action@21162887f0d6e25b4e8eafb0cf44cf9bf7f6acd3
-        with:
-          driver: docker-container
-          platforms: linux/amd64,linux/386,linux/arm/v6,linux/arm64/v8,linux/riscv64
-          use: true
-          driver-opts: network=host
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - name: Install Syft for SBOM generation # Install Syft for GoReleaser SBOM generation
-        if: ${{ inputs.build-type == 'prod' }}
-        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-
-      - name: Login to Docker Hub # Authenticate to Docker Hub
-        if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@ba754150c9dbbaa912ae0ac3cfba43f84195cef2
+      - name: Login to Docker Hub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        if: ${{ !inputs.DRY_RUN }}
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Login to GHCR # Authenticate to GHCR
-        if: ${{ !inputs.dry-run }}
-        uses: docker/login-action@ba754150c9dbbaa912ae0ac3cfba43f84195cef2
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        if: ${{ !inputs.DRY_RUN }}
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ github.token }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@01cbe076be10ba0af7b0b9319ac490a93d3d2fcd
+        uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7.2.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.DRY_RUN }}
         with:
           distribution: goreleaser
           version: "~> v2"
-          # prod (full release), dev (snapshot), skip publish in dry-run
-          # https://goreleaser.com/cmd/goreleaser_release/
-          # Execute GoReleaser release process
-          # Use prod.yml or dev.yml based on build-type
-          # Generate snapshot versions for dev builds
-          # Remove dist directory before building
-          # Skip publishing during dry-run
-          args: release --config build/goreleaser/${{ inputs.build-type }}.yml ${{ inputs.build-type == 'dev' && '--snapshot' || '' }} --clean ${{ inputs.dry-run && '--skip=publish' || '' }}
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          DRY_RUN: ${{ inputs.dry-run }}
+          args: >-
+            release
+            --config build/goreleaser/${{ inputs.BUILD_TYPE }}.yaml
+            ${{ inputs.BUILD_TYPE == 'nightly' && '--skip=validate,archive' || '' }}
+            --clean
+            ${{ inputs.DRY_RUN && '--skip=publish' || '' }}
 
-      - name: Generate artifact attestation # Generate attestations for prod builds.
-        if: ${{ !inputs.dry-run && inputs.build-type == 'prod' }}
-        uses: actions/attest-build-provenance@10334b5f1e684784025c3fc0a277c88c19089275
+      - name: Upload Binary SBOMs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !inputs.DRY_RUN && inputs.BUILD_TYPE == 'stable' }}
+        with:
+          name: ${{ inputs.BUILD_TYPE }}-binary-sboms
+          path: dist/*.sbom
+          if-no-files-found: ignore
+
+      - name: Generate Artifact Attestation
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        if: ${{ !inputs.DRY_RUN && inputs.BUILD_TYPE == 'stable' }}
         with:
           subject-checksums: ./dist/checksums.txt
 
-      - name: Clean up dist directory # Remove dist directory to avoid leftover artifacts.
+      - name: Cleanup dist Directory
         if: always()
         run: rm -rf dist
