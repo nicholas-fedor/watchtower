@@ -203,11 +203,16 @@ func loadConfig() (*Config, error) {
 	}
 
 	parsedURL, err := url.Parse(config.SynoURL)
-	if err != nil || parsedURL.Scheme == "" {
+	if err != nil {
 		return nil, ErrInvalidSynoURL
 	}
 
-	config.IsHTTPS = parsedURL.Scheme == "https"
+	scheme := strings.ToLower(parsedURL.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return nil, ErrInvalidSynoURL
+	}
+
+	config.IsHTTPS = scheme == "https"
 
 	config.SynoUser = os.Getenv("SYNO_USER")
 	// Required for login – abort if missing (common error 101 [DSM API Guide §2.4 p8])
