@@ -140,7 +140,6 @@ linters:
     - funcorder # Checks the order of functions, methods, and constructors.
     - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid.
     - gochecksumtype # Run exhaustiveness checks on Go "sum types".
-    - goconst # Finds repeated strings that could be replaced by a constant.
     - godoclint # Checks Golang's documentation practice (godoc).
     - godox # Detects usage of FIXME, TODO and other keywords inside comments.
     - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
@@ -187,6 +186,7 @@ linters:
     - gochecknoglobals # Check that no global variables exist.
     - gochecknoinits # Checks that no init functions are present in Go code.
     - gocognit # Computes and checks the cognitive complexity of functions.
+    - goconst # Finds repeated strings that could be replaced by a constant.
     - gocyclo # Computes and checks the cyclomatic complexity of functions. [fast]
     - gomodguard # Allow and blocklist linter for direct Go module dependencies. This is different from depguard where there are different block types for example version constraints and module recommendations.
     - interfacebloat # A linter that checks the number of methods inside an interface. [fast]

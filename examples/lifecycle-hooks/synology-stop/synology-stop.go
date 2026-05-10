@@ -105,6 +105,9 @@ var (
 	// ErrMissingSIDOrSynoToken is returned when the login JSON response is malformed
 	// or the server did not return expected fields (should never happen on a healthy DSM).
 	ErrMissingSIDOrSynoToken = errors.New("failed to extract SID or SynoToken from response")
+
+	// ErrInvalidSynoURL is returned when SYNO_URL cannot be parsed or is missing a scheme.
+	ErrInvalidSynoURL = errors.New("SYNO_URL must be a valid URL with scheme (http or https)")
 )
 
 // Config holds all runtime configuration loaded from environment variables.
@@ -114,6 +117,7 @@ type Config struct {
 	SynoPass        string        // DSM password (required) [SYNO_PASS]
 	ClientTimeout   time.Duration // HTTP client timeout [CLIENT_TIMEOUT]
 	ClientSSLVerify bool          // TLS cert verification [CLIENT_SSL_VERIFY]
+	IsHTTPS         bool          // true when SynoURL scheme is "https"
 }
 
 type WTContainer struct {
@@ -198,6 +202,18 @@ func loadConfig() (*Config, error) {
 		return nil, ErrNoSynoURL
 	}
 
+	parsedURL, err := url.Parse(config.SynoURL)
+	if err != nil {
+		return nil, ErrInvalidSynoURL
+	}
+
+	scheme := strings.ToLower(parsedURL.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return nil, ErrInvalidSynoURL
+	}
+
+	config.IsHTTPS = scheme == "https"
+
 	config.SynoUser = os.Getenv("SYNO_USER")
 	// Required for login – abort if missing (common error 101 [DSM API Guide §2.4 p8])
 	if config.SynoUser == "" {
@@ -266,7 +282,8 @@ func parseContainerName() (string, error) {
 	return name, nil
 }
 
-// newClient creates an *http.Client with the configured timeout and optional insecure TLS transport.
+// newClient creates an *http.Client with the configured timeout and
+// optional insecure TLS transport.
 func newClient(config *Config) *http.Client {
 	transport := &http.Transport{}
 	// User explicitly disabled certificate verification
@@ -300,7 +317,15 @@ func authenticate(client *http.Client, config *Config) (string, string, error) {
 
 	authURL := config.SynoURL + apiAuthPath + "?" + params.Encode()
 
-	body, err := doHTTPRequest(client, authURL, http.MethodGet, nil, "", "")
+	body, err := doHTTPRequest(
+		client,
+		config,
+		authURL,
+		http.MethodGet,
+		nil,
+		"",
+		"",
+	)
 	if err != nil {
 		return "", "", err
 	}
@@ -354,7 +379,7 @@ func stopContainer(
 	// Headers required by DSM API [DSM API Guide §2.3]
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	req.Header.Set("X-Syno-Token", synoToken) // CSRF protection [DSM API Guide §3.2]
-	req.AddCookie(&http.Cookie{Name: "id", Value: sid})
+	req.AddCookie(buildCookie("id", sid, config.IsHTTPS))
 
 	resp, err := client.Do(req)
 	// Network or timeout error
@@ -385,6 +410,19 @@ func stopContainer(
 	return nil
 }
 
+// buildCookie creates an http.Cookie with Secure set based on whether the endpoint uses HTTPS.
+//
+//nolint:gosec // G124: Secure flag set based on parsed SYNO_URL scheme
+func buildCookie(name, value string, isHTTPS bool) *http.Cookie {
+	return &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Secure:   isHTTPS,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	}
+}
+
 // logout terminates the DSM session using SYNO.API.Auth logout (best-effort, non-critical) [DSM API Guide §3.2].
 func logout(client *http.Client, config *Config, sid string) error {
 	params := url.Values{}
@@ -394,12 +432,17 @@ func logout(client *http.Client, config *Config, sid string) error {
 	params.Set("session", "Docker")
 	logoutURL := config.SynoURL + apiAuthPath + "?" + params.Encode()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, logoutURL, nil)
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		logoutURL,
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create logout request: %w", err)
 	}
 
-	req.AddCookie(&http.Cookie{Name: "id", Value: sid})
+	req.AddCookie(buildCookie("id", sid, config.IsHTTPS))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -410,21 +453,28 @@ func logout(client *http.Client, config *Config, sid string) error {
 	return nil
 }
 
-// doHTTPRequest centralises common DSM API request logic (sid cookie, SynoToken, Content-Type) [DSM API Guide §2.3].
+// doHTTPRequest centralises common DSM API request logic
+// (sid cookie, SynoToken, Content-Type) [DSM API Guide §2.3].
 func doHTTPRequest(
 	client *http.Client,
+	config *Config,
 	urlStr, method string,
 	body io.Reader,
 	sid, synoToken string,
 ) ([]byte, error) {
-	req, err := http.NewRequestWithContext(context.Background(), method, urlStr, body)
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		method,
+		urlStr,
+		body,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Attach session cookie if provided
 	if sid != "" {
-		req.AddCookie(&http.Cookie{Name: "id", Value: sid})
+		req.AddCookie(buildCookie("id", sid, config.IsHTTPS))
 	}
 	// Attach CSRF token if provided
 	if synoToken != "" {

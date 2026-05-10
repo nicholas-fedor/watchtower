@@ -12,13 +12,13 @@ trim_trailing_whitespace = true
 [*.md]
 indent_style = space
 indent_size = 2
-trim_trailing_whitespace = true
+trim_trailing_whitespace = false
 
 # MkDocs documentation (Python Markdown - 4 spaces)
 [docs/**/*.md]
 indent_style = space
 indent_size = 4
-trim_trailing_whitespace = true
+trim_trailing_whitespace = false
 
 # Configuration files
 [*.{yml,yaml}]
@@ -28,7 +28,7 @@ trim_trailing_whitespace = true
 
 [*.toml]
 indent_style = space
-indent_size = 4
+indent_size = 2
 trim_trailing_whitespace = true
 
 [*.json]
@@ -38,7 +38,7 @@ trim_trailing_whitespace = true
 
 # Scripts
 [*.sh]
-indent_style = tab
+indent_style = space
 indent_size = 4
 trim_trailing_whitespace = true
 
@@ -61,7 +61,7 @@ trim_trailing_whitespace = true
 
 # Build files
 [Dockerfile]
-indent_style = tab
+indent_style = space
 indent_size = 4
 trim_trailing_whitespace = true
 
@@ -71,7 +71,7 @@ indent_size = 4
 trim_trailing_whitespace = true
 
 # Git and ignore files
-[*.{gitignore,gitattributes,dockerignore}]
+[{.gitignore,.gitattributes,.dockerignore}]
 indent_style = space
 indent_size = 2
 trim_trailing_whitespace = true
