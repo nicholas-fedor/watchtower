@@ -146,9 +146,8 @@ func SetupAndStartAPI(
 
 			return metric
 		}, opts.UpdateLock)
-		// Use Go 1.22+ method-based routing to restrict to POST and HEAD.
+		// Use Go 1.22+ method-based routing to restrict to POST only.
 		httpAPI.RegisterFunc("POST "+updateHandler.Path, updateHandler.Handle)
-		httpAPI.RegisterFunc("HEAD "+updateHandler.Path, updateHandler.Handle)
 
 		if !opts.UnblockHTTPAPI {
 			opts.WriteStartupMessage(

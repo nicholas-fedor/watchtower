@@ -796,9 +796,9 @@ func TestConcurrentRequests(t *testing.T) {
 	})
 }
 
-// TestHeadFullUpdateReturns202WhenLockAcquired verifies that a HEAD request for a full update
+// TestAsyncFullUpdateReturns202WhenLockAcquired verifies that an async POST request for a full update
 // returns 202 Accepted with an empty body and triggers the update asynchronously.
-func TestHeadFullUpdateReturns202WhenLockAcquired(t *testing.T) {
+func TestAsyncFullUpdateReturns202WhenLockAcquired(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var called atomic.Int32
 
@@ -812,8 +812,8 @@ func TestHeadFullUpdateReturns202WhenLockAcquired(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(
 			context.Background(),
-			http.MethodHead,
-			"/v1/update",
+			http.MethodPost,
+			"/v1/update?async=true",
 			nil,
 		)
 		handler.Handle(rec, req)
@@ -834,9 +834,9 @@ func TestHeadFullUpdateReturns202WhenLockAcquired(t *testing.T) {
 	})
 }
 
-// TestHeadFullUpdateReturns429WhenLocked verifies that a HEAD request for a full update
+// TestAsyncFullUpdateReturns429WhenLocked verifies that an async POST request for a full update
 // returns 429 Too Many Requests when the lock is already held.
-func TestHeadFullUpdateReturns429WhenLocked(t *testing.T) {
+func TestAsyncFullUpdateReturns429WhenLocked(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		customLock := make(chan bool, 1) // lock held (empty)
 
@@ -849,8 +849,8 @@ func TestHeadFullUpdateReturns429WhenLocked(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(
 			context.Background(),
-			http.MethodHead,
-			"/v1/update",
+			http.MethodPost,
+			"/v1/update?async=true",
 			nil,
 		)
 		handler.Handle(rec, req)
@@ -883,9 +883,9 @@ func TestHeadFullUpdateReturns429WhenLocked(t *testing.T) {
 	})
 }
 
-// TestHeadTargetedUpdateBlocksWhenLocked verifies that a HEAD request for a targeted update
+// TestAsyncTargetedUpdateBlocksWhenLocked verifies that an async POST request for a targeted update
 // blocks until the lock becomes available, then returns 202 and triggers the update.
-func TestHeadTargetedUpdateBlocksWhenLocked(t *testing.T) {
+func TestAsyncTargetedUpdateBlocksWhenLocked(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		customLock := make(chan bool, 1) // lock held (empty)
 
@@ -907,8 +907,8 @@ func TestHeadTargetedUpdateBlocksWhenLocked(t *testing.T) {
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequestWithContext(
 				context.Background(),
-				http.MethodHead,
-				"/v1/update?image=myimage:latest",
+				http.MethodPost,
+				"/v1/update?image=myimage:latest&async=true",
 				nil,
 			)
 			handler.Handle(rec, req)
@@ -929,7 +929,7 @@ func TestHeadTargetedUpdateBlocksWhenLocked(t *testing.T) {
 
 		code := <-done
 		if code != http.StatusAccepted {
-			t.Errorf("expected status %d for HEAD targeted update, got %d", http.StatusAccepted, code)
+			t.Errorf("expected status %d for async targeted update, got %d", http.StatusAccepted, code)
 		}
 
 		if called.Load() != 1 {
@@ -1059,8 +1059,8 @@ func TestExecuteUpdateAsyncRecoversFromPanic(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(
 			context.Background(),
-			http.MethodHead,
-			"/v1/update",
+			http.MethodPost,
+			"/v1/update?async=true",
 			nil,
 		)
 		handler.Handle(rec, req)

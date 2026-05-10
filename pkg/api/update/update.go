@@ -71,14 +71,17 @@ func New(updateFn func(images []string) *metrics.Metric, updateLock chan bool) *
 
 // Handle processes HTTP update requests, triggering container updates with lock synchronization.
 //
-// For HEAD requests, it triggers the update asynchronously and returns immediately with HTTP 202 Accepted.
+// When the "async" query parameter is set to true, the update is triggered asynchronously
+// and the handler returns immediately with HTTP 202 Accepted, allowing clients to
+// fire-and-forget without waiting for the update to complete.
 // For targeted updates (with image query parameters), the handler blocks until the lock is available.
 // For full updates (no image query parameters), the handler returns HTTP 429 if another update is running.
-// On success (POST), it returns HTTP 200 with JSON results including summary metrics, timing, and metadata.
+// On success (synchronous POST), it returns HTTP 200 with JSON results including summary metrics, timing, and metadata.
 //
 // Parameters:
 //   - w: HTTP response writer for sending status codes and responses.
-//   - r: HTTP request containing optional "image" query parameters for targeted updates.
+//   - r: HTTP request containing optional "image" query parameters for targeted updates
+//     and optional "async" query parameter for asynchronous execution.
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	logrus.WithFields(logrus.Fields{
 		"method": r.Method,
@@ -100,8 +103,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return // 429 response already sent
 	}
 
-	if r.Method == http.MethodHead {
-		h.handleHead(w, images, result.Token)
+	if r.URL.Query().Get("async") == "true" {
+		h.handleAsync(w, images, result.Token)
 
 		return
 	}
@@ -237,15 +240,15 @@ func (h *Handler) send429Response(w http.ResponseWriter) {
 	}
 }
 
-// handleHead processes a HEAD request by spawning an asynchronous update and returning 202 Accepted.
+// handleAsync processes an asynchronous update request by spawning a goroutine and returning 202 Accepted.
 // The update runs in a separate goroutine, allowing the client to fire-and-forget.
 //
 // Parameters:
 //   - w: HTTP response writer to send the 202 Accepted response.
 //   - images: Slice of image names to update (passed to the async update function).
 //   - lockToken: The lock token to be released by the async goroutine upon completion.
-func (h *Handler) handleHead(w http.ResponseWriter, images []string, lockToken bool) {
-	logrus.Info("Handling HEAD request - spawning async update")
+func (h *Handler) handleAsync(w http.ResponseWriter, images []string, lockToken bool) {
+	logrus.Info("Handling async update request - spawning async update")
 
 	go func() {
 		h.executeUpdateAsync(images, lockToken)
@@ -289,7 +292,7 @@ func (h *Handler) executeUpdateAsync(images []string, lockToken bool) {
 	h.fn(images)
 
 	duration := time.Since(startTime)
-	logrus.WithField("duration", duration).Debug("Handler (HEAD): update function completed")
+	logrus.WithField("duration", duration).Debug("Handler (async): update function completed")
 }
 
 // executeUpdate runs the update function and returns the metric along with duration.
