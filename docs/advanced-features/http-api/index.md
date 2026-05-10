@@ -130,7 +130,7 @@ Content-Type: application/json
 Equivalent example for a targeted async update:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar:latest&async=true
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?image=foo/bar:latest&async=true"
 ```
 
 The same concurrency behavior applies to async requests: full updates return 429 if another update is already in progress, while targeted updates block until the lock is available before spawning the async goroutine.
