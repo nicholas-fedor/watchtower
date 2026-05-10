@@ -617,7 +617,7 @@ func TestHandleConcurrentRequests(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var calledCount atomic.Int32
 
-		mockUpdateFn := func(_ []string) *metrics.Metric { // Use _ for unused images parameter.
+		mockUpdateFn := func(_ []string) *metrics.Metric {
 			calledCount.Add(1)
 
 			return &metrics.Metric{Scanned: 8, Updated: 0, Failed: 0}
@@ -995,7 +995,12 @@ func TestReadRequestBodyRejectsOversizedBody(t *testing.T) {
 		}
 		handler := update.New(mockUpdateFn, nil)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", bytes.NewReader(largeBody))
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodPost,
+			"/v1/update",
+			bytes.NewReader(largeBody),
+		)
 		handler.Handle(rec, req)
 
 		if rec.Code != http.StatusRequestEntityTooLarge {
@@ -1052,7 +1057,12 @@ func TestExecuteUpdateAsyncRecoversFromPanic(t *testing.T) {
 			panic("simulated panic")
 		}, customLock)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodHead, "/v1/update", nil)
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodHead,
+			"/v1/update",
+			nil,
+		)
 		handler.Handle(rec, req)
 
 		if rec.Code != http.StatusAccepted {
@@ -1081,7 +1091,12 @@ func TestSend429ResponseHandlesWriteError(t *testing.T) {
 		customLock := make(chan bool, 1) // locked
 		handler := update.New(mockUpdateFn, customLock)
 		faulty := &faultyResponseWriter{ResponseWriter: httptest.NewRecorder()}
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", nil)
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodPost,
+			"/v1/update",
+			nil,
+		)
 		handler.Handle(faulty, req)
 
 		if faulty.lastStatusCode != http.StatusTooManyRequests {
@@ -1103,7 +1118,12 @@ func TestWriteSuccessResponseHandlesWriteError(t *testing.T) {
 
 		handler := update.New(mockUpdateFn, customLock)
 		faulty := &faultyResponseWriter{ResponseWriter: httptest.NewRecorder()}
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", nil)
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodPost,
+			"/v1/update",
+			nil,
+		)
 		handler.Handle(faulty, req)
 
 		if faulty.lastStatusCode != http.StatusOK {
@@ -1126,7 +1146,12 @@ func TestHandleReturnsEarlyWhenRequestBodyInvalid(t *testing.T) {
 		handler := update.New(mockUpdateFn, nil)
 		faultyReader := &faultyReadCloser{err: errors.New("read error")}
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/update", faultyReader)
+		req := httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodPost,
+			"/v1/update",
+			faultyReader,
+		)
 		handler.Handle(rec, req)
 
 		if rec.Code != http.StatusInternalServerError {
