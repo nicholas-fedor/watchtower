@@ -8,8 +8,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add link to reference linked containers advanced features documentation by @nicholas-fedor in [#1532](https://github.com/nicholas-fedor/watchtower/pull/1532)
+
+### Changed
+
+- Modernize GoReleaser config and GitHub Actions workflows by @nicholas-fedor in [#1607](https://github.com/nicholas-fedor/watchtower/pull/1607)
+- Refactor GitHub Actions lint workflow by @nicholas-fedor in [#1606](https://github.com/nicholas-fedor/watchtower/pull/1606)
+- Enable host network for buildkit driver by @nicholas-fedor in [#1569](https://github.com/nicholas-fedor/watchtower/pull/1569)
+- Reorder containerd snapshotter enablement by @nicholas-fedor in [#1568](https://github.com/nicholas-fedor/watchtower/pull/1568)
+
 ### Chores
 
+- Update module golang.org/x/tools to v0.45.0 by @renovate[bot] in [#1605](https://github.com/nicholas-fedor/watchtower/pull/1605)
+- Update module golang.org/x/net to v0.54.0 by @renovate[bot] in [#1603](https://github.com/nicholas-fedor/watchtower/pull/1603)
+- Update module golang.org/x/mod to v0.36.0 by @renovate[bot] in [#1602](https://github.com/nicholas-fedor/watchtower/pull/1602)
+- Update cimg/go docker tag to v1.26.3 by @renovate[bot] in [#1601](https://github.com/nicholas-fedor/watchtower/pull/1601)
+- Update module golang.org/x/sys to v0.44.0 by @renovate[bot] in [#1600](https://github.com/nicholas-fedor/watchtower/pull/1600)
+- Update module github.com/docker/docker-credential-helpers to v0.9.7 by @renovate[bot] in [#1599](https://github.com/nicholas-fedor/watchtower/pull/1599)
+- Update golang docker tag to v1.26.3 by @renovate[bot] in [#1598](https://github.com/nicholas-fedor/watchtower/pull/1598)
+- Update go module directive to v1.26.3 by @renovate[bot] in [#1597](https://github.com/nicholas-fedor/watchtower/pull/1597)
+- Update cimg/go:1.26.2 docker digest to 0594489 by @renovate[bot] in [#1596](https://github.com/nicholas-fedor/watchtower/pull/1596)
+- Update golang:alpine docker digest to 91eda97 by @renovate[bot] in [#1595](https://github.com/nicholas-fedor/watchtower/pull/1595)
+- Update github/codeql-action digest to 68bde55 by @renovate[bot] in [#1594](https://github.com/nicholas-fedor/watchtower/pull/1594)
+- Update github.com/google/pprof digest to 92041b7 by @renovate[bot] in [#1593](https://github.com/nicholas-fedor/watchtower/pull/1593)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.15.0 by @renovate[bot] in [#1592](https://github.com/nicholas-fedor/watchtower/pull/1592)
+- Update module github.com/docker/cli to v29.4.3+incompatible by @renovate[bot] in [#1591](https://github.com/nicholas-fedor/watchtower/pull/1591)
+- Update module github.com/fsnotify/fsnotify to v1.10.1 by @renovate[bot] in [#1590](https://github.com/nicholas-fedor/watchtower/pull/1590)
+- Update step-security/harden-runner action to v2.19.1 by @renovate[bot] in [#1588](https://github.com/nicholas-fedor/watchtower/pull/1588)
+- Update module github.com/pelletier/go-toml/v2 to v2.3.1 by @renovate[bot] in [#1587](https://github.com/nicholas-fedor/watchtower/pull/1587)
+- Update github/codeql-action digest to e46ed2c by @renovate[bot] in [#1586](https://github.com/nicholas-fedor/watchtower/pull/1586)
+- Update module github.com/docker/cli to v29.4.2+incompatible by @renovate[bot] in [#1585](https://github.com/nicholas-fedor/watchtower/pull/1585)
+- Update module github.com/masterminds/semver/v3 to v3.5.0 by @renovate[bot] in [#1584](https://github.com/nicholas-fedor/watchtower/pull/1584)
+- Update module github.com/fsnotify/fsnotify to v1.10.0 by @renovate[bot] in [#1583](https://github.com/nicholas-fedor/watchtower/pull/1583)
+- Update module github.com/onsi/ginkgo/v2 to v2.28.3 by @renovate[bot] in [#1581](https://github.com/nicholas-fedor/watchtower/pull/1581)
+- Update securego/gosec action to v2.26.1 by @renovate[bot] in [#1580](https://github.com/nicholas-fedor/watchtower/pull/1580)
+- Update module github.com/onsi/ginkgo/v2 to v2.28.2 by @renovate[bot] in [#1579](https://github.com/nicholas-fedor/watchtower/pull/1579)
+- Update module github.com/mattn/go-isatty to v0.0.22 by @renovate[bot] in [#1578](https://github.com/nicholas-fedor/watchtower/pull/1578)
+- Update orhun/git-cliff-action digest to f50e115 by @renovate[bot] in [#1577](https://github.com/nicholas-fedor/watchtower/pull/1577)
+- Update module github.com/docker/cli to v29.4.1+incompatible by @renovate[bot] in [#1574](https://github.com/nicholas-fedor/watchtower/pull/1574)
+- Update module github.com/docker/docker-credential-helpers to v0.9.6 by @renovate[bot] in [#1573](https://github.com/nicholas-fedor/watchtower/pull/1573)
+- Update step-security/harden-runner action to v2.19.0 by @renovate[bot] in [#1571](https://github.com/nicholas-fedor/watchtower/pull/1571)
+- Update golang:1.26.2-alpine3.22 docker digest to 7ef9411 by @renovate[bot] in [#1567](https://github.com/nicholas-fedor/watchtower/pull/1567)
+- Update golang:1.26.2-alpine3.22 docker digest to 6ebcc4e by @renovate[bot] in [#1565](https://github.com/nicholas-fedor/watchtower/pull/1565)
+- Update golang:1.26.2-alpine3.22 docker digest to 18e6f5a by @renovate[bot] in [#1564](https://github.com/nicholas-fedor/watchtower/pull/1564)
+- Update golang:alpine docker digest to f853308 by @renovate[bot] in [#1562](https://github.com/nicholas-fedor/watchtower/pull/1562)
+- Update module github.com/docker/go-connections to v0.7.0 by @renovate[bot] in [#1561](https://github.com/nicholas-fedor/watchtower/pull/1561)
+- Update alpine docker tag to v3.23.4 by @renovate[bot] in [#1560](https://github.com/nicholas-fedor/watchtower/pull/1560)
+- Update golang:alpine docker digest to 27f8293 by @renovate[bot] in [#1559](https://github.com/nicholas-fedor/watchtower/pull/1559)
+- Update github/codeql-action digest to 95e58e9 by @renovate[bot] in [#1558](https://github.com/nicholas-fedor/watchtower/pull/1558)
+- Update step-security/harden-runner action to v2.18.0 by @renovate[bot] in [#1557](https://github.com/nicholas-fedor/watchtower/pull/1557)
+- Update actions/cache digest to 27d5ce7 by @renovate[bot] in [#1556](https://github.com/nicholas-fedor/watchtower/pull/1556)
+- Update module golang.org/x/tools to v0.44.0 by @renovate[bot] in [#1553](https://github.com/nicholas-fedor/watchtower/pull/1553)
+- Update module golang.org/x/net to v0.53.0 by @renovate[bot] in [#1552](https://github.com/nicholas-fedor/watchtower/pull/1552)
+- Update step-security/harden-runner action to v2.17.0 by @renovate[bot] in [#1551](https://github.com/nicholas-fedor/watchtower/pull/1551)
+- Update module golang.org/x/text to v0.36.0 by @renovate[bot] in [#1550](https://github.com/nicholas-fedor/watchtower/pull/1550)
+- Update module golang.org/x/term to v0.42.0 by @renovate[bot] in [#1549](https://github.com/nicholas-fedor/watchtower/pull/1549)
+- Update module golang.org/x/mod to v0.35.0 by @renovate[bot] in [#1548](https://github.com/nicholas-fedor/watchtower/pull/1548)
+- Update module github.com/mattn/go-isatty to v0.0.21 by @renovate[bot] in [#1547](https://github.com/nicholas-fedor/watchtower/pull/1547)
+- Update cimg/go docker tag to v1.26.2 by @renovate[bot] in [#1546](https://github.com/nicholas-fedor/watchtower/pull/1546)
+- Update cimg/go:1.26.1 docker digest to f813931 by @renovate[bot] in [#1545](https://github.com/nicholas-fedor/watchtower/pull/1545)
+- Update module golang.org/x/sys to v0.43.0 by @renovate[bot] in [#1544](https://github.com/nicholas-fedor/watchtower/pull/1544)
+- Update golangci/golangci-lint-action digest to 46c9287 by @renovate[bot] in [#1543](https://github.com/nicholas-fedor/watchtower/pull/1543)
+- Update golang docker tag to v1.26.2 by @renovate[bot] in [#1542](https://github.com/nicholas-fedor/watchtower/pull/1542)
+- Update nicholas-fedor/go-proxy-pull-action digest to 6568a55 by @renovate[bot] in [#1541](https://github.com/nicholas-fedor/watchtower/pull/1541)
+- Update golang:alpine docker digest to c2a1f7b by @renovate[bot] in [#1540](https://github.com/nicholas-fedor/watchtower/pull/1540)
+- Update dependency go to v1.26.2 by @renovate[bot] in [#1539](https://github.com/nicholas-fedor/watchtower/pull/1539)
+- Update docker/dockerfile:1 docker digest to 2780b5c by @renovate[bot] in [#1538](https://github.com/nicholas-fedor/watchtower/pull/1538)
+- Update module go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp to v0.68.0 by @renovate[bot] in [#1537](https://github.com/nicholas-fedor/watchtower/pull/1537)
+- Update module github.com/docker/cli to v29.4.0+incompatible by @renovate[bot] in [#1536](https://github.com/nicholas-fedor/watchtower/pull/1536)
+- Update docker/login-action digest to ba75415 by @renovate[bot] in [#1535](https://github.com/nicholas-fedor/watchtower/pull/1535)
+- Update goreleaser/goreleaser-action digest to 01cbe07 by @renovate[bot] in [#1534](https://github.com/nicholas-fedor/watchtower/pull/1534)
+- Update goreleaser/goreleaser-action digest to 2a473d7 by @renovate[bot] in [#1531](https://github.com/nicholas-fedor/watchtower/pull/1531)
+- Update module go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp to v1.43.0 by @renovate[bot] in [#1530](https://github.com/nicholas-fedor/watchtower/pull/1530)
+- Update module go.opentelemetry.io/otel/metric to v1.43.0 by @renovate[bot] in [#1529](https://github.com/nicholas-fedor/watchtower/pull/1529)
+- Update docker/login-action digest to 4907a6d by @renovate[bot] in [#1526](https://github.com/nicholas-fedor/watchtower/pull/1526)
+- Update github.com/google/pprof digest to 545e8a4 by @renovate[bot] in [#1525](https://github.com/nicholas-fedor/watchtower/pull/1525)
+- Update peter-evans/create-pull-request digest to d32e88d by @renovate[bot] in [#1524](https://github.com/nicholas-fedor/watchtower/pull/1524)
+- Update golangci/golangci-lint-action digest to 36fe29c by @renovate[bot] in [#1523](https://github.com/nicholas-fedor/watchtower/pull/1523)
+- Update docker/setup-qemu-action digest to f4e8dee by @renovate[bot] in [#1522](https://github.com/nicholas-fedor/watchtower/pull/1522)
+- Update docker/setup-buildx-action digest to 2116288 by @renovate[bot] in [#1521](https://github.com/nicholas-fedor/watchtower/pull/1521)
+- Update docker/login-action digest to bb555fc by @renovate[bot] in [#1520](https://github.com/nicholas-fedor/watchtower/pull/1520)
+- Update module google.golang.org/grpc to v1.80.0 by @renovate[bot] in [#1518](https://github.com/nicholas-fedor/watchtower/pull/1518)
 - Update google.golang.org/genproto/googleapis/rpc digest to 9d38bb4 by @renovate[bot] in [#1517](https://github.com/nicholas-fedor/watchtower/pull/1517)
 - Update google.golang.org/genproto/googleapis/api digest to 9d38bb4 by @renovate[bot] in [#1516](https://github.com/nicholas-fedor/watchtower/pull/1516)
 
@@ -67,7 +148,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Correct self-update and add skipped container tracking in HTTP API by @nicholas-fedor in [#1506](https://github.com/nicholas-fedor/watchtower/pull/1506)
 - Retry transient Docker daemon connection failures during container listing by @nicholas-fedor in [#1492](https://github.com/nicholas-fedor/watchtower/pull/1492)
-- Reorganize container tests into dedicated files by @nicholas-fedor in [#1484](https://github.com/nicholas-fedor/watchtower/pull/1484)
 - Deduplicate image removal and grouped notification entries by @nicholas-fedor in [#1483](https://github.com/nicholas-fedor/watchtower/pull/1483)
 - Make Watchtower cleanup non-fatal after self-update by @nicholas-fedor in [#1482](https://github.com/nicholas-fedor/watchtower/pull/1482)
 - Skip self-update when Watchtower has host-bound ports by @nicholas-fedor in [#1481](https://github.com/nicholas-fedor/watchtower/pull/1481)
@@ -77,6 +157,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Differentiate auth, not-found, and transient errors during image pull by @nicholas-fedor in [#1477](https://github.com/nicholas-fedor/watchtower/pull/1477)
 - Replace fragile string-based error checking with typed errors by @nicholas-fedor in [#1476](https://github.com/nicholas-fedor/watchtower/pull/1476)
 - Handle container removed between check and stop by @nicholas-fedor in [#1475](https://github.com/nicholas-fedor/watchtower/pull/1475)
+
+### Tests
+
+- Reorganize container tests into dedicated files by @nicholas-fedor in [#1484](https://github.com/nicholas-fedor/watchtower/pull/1484)
 
 ## [1.15.0] - 2026-03-24
 
@@ -284,8 +368,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Update DNS error pattern in digest test by @nicholas-fedor in [#1324](https://github.com/nicholas-fedor/watchtower/pull/1324)
 - Add service-only matching for cross-project dependencies by @nicholas-fedor in [#1307](https://github.com/nicholas-fedor/watchtower/pull/1307)
+
+### Tests
+
+- Update DNS error pattern in digest test by @nicholas-fedor in [#1324](https://github.com/nicholas-fedor/watchtower/pull/1324)
 
 ## [1.14.1] - 2026-02-03
 
@@ -450,8 +537,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add SkipSelfUpdate parameter to refine self-update behavior by @nicholas-fedor in [#1137](https://github.com/nicholas-fedor/watchtower/pull/1137)
 - Resolve false positive circular reference detection in dependency sorting by @nicholas-fedor in [#1120](https://github.com/nicholas-fedor/watchtower/pull/1120)
 - Implement notification level filtering for report mode by @nicholas-fedor in [#1115](https://github.com/nicholas-fedor/watchtower/pull/1115)
-- Refactor and realign test scope of actions_test.go file by @nicholas-fedor in [#1100](https://github.com/nicholas-fedor/watchtower/pull/1100)
 - Ensure local image staleness checking for --no-pull flag by @nicholas-fedor in [#1099](https://github.com/nicholas-fedor/watchtower/pull/1099)
+
+### Tests
+
+- Refactor and realign test scope of actions_test.go file by @nicholas-fedor in [#1100](https://github.com/nicholas-fedor/watchtower/pull/1100)
 
 ## [1.13.0] - 2025-12-16
 
@@ -737,7 +827,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevent double notification entries for unchanged containers by @nicholas-fedor in [#836](https://github.com/nicholas-fedor/watchtower/pull/836)
 - Implement cleanup detection for update-on-start control by @nicholas-fedor in [#831](https://github.com/nicholas-fedor/watchtower/pull/831)
 - Clear shoutrrr notification queue after sending by @nicholas-fedor in [#824](https://github.com/nicholas-fedor/watchtower/pull/824)
-- Resolve data race in concurrent test logging by @nicholas-fedor in [#800](https://github.com/nicholas-fedor/watchtower/pull/800)
 - Improve Podman detection reliability by @nicholas-fedor in [#799](https://github.com/nicholas-fedor/watchtower/pull/799)
 - Resolve issues with notification split by container feature by @nicholas-fedor in [#775](https://github.com/nicholas-fedor/watchtower/pull/775)
 - Improve WATCHTOWER_UPDATE_ON_START logging messages by @nicholas-fedor in [#768](https://github.com/nicholas-fedor/watchtower/pull/768)
@@ -745,6 +834,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Remove go lint step in favor of golangci-lint --fix by @nicholas-fedor in [#847](https://github.com/nicholas-fedor/watchtower/pull/847)
+
+### Tests
+
+- Resolve data race in concurrent test logging by @nicholas-fedor in [#800](https://github.com/nicholas-fedor/watchtower/pull/800)
 
 ### New Contributors
 
@@ -1778,7 +1871,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update publish-docs.yml by @nicholas-fedor
 - Merge pull request #49 from nicholas-fedor/48-fix-code-scanning-alert---workflow-does-not-contain-permissions by @nicholas-fedor in [#49](https://github.com/nicholas-fedor/watchtower/pull/49)
 - Update greetings.yml by @nicholas-fedor
-- Merge pull request #46 from nicholas-fedor/45-fix-code-scanning-alert---unpinned-tag-for-a-non-immutable-action-in-workflow by @nicholas-fedor in [#46](https://github.com/nicholas-fedor/watchtower/pull/46)
+- Merge pull request #46 from nicholas-fedor/45-fix-code-scanning-alert---unpinned-tag-for-a-non-immutable-action-in-workflow Fix for code scanning alert - Unpinned tags for a non immutable action in workflow by @nicholas-fedor in [#46](https://github.com/nicholas-fedor/watchtower/pull/46)
 - Pin tag for codecov/codecov-action@v5 by @nicholas-fedor
 - Pin tag for golangci/golangci-lint-action@v6 by @nicholas-fedor
 - Pin tag for codecov/codecov-action@v5 by @nicholas-fedor
@@ -2132,7 +2225,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prometheus support by @simskij
 - Cherrypick notification changes from #450 by @simskij
 - Log based on registry known-support - reduce noise on notifications by @tkalus
-- Revert "feat(config): swap viper and cobra for config " by @simskij
+- Revert "feat(config): swap viper and cobra for config" by @simskij
 - Clean up scope builder and remove fmt print by @simskij
 - Make sure all different ref formats are supported by @simskij
 - Swap viper and cobra for config by @piksel
@@ -2656,9 +2749,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Only remove container id network aliases by @piksel
-- Check flag/docs consistency by @piksel
 - Received typo by @testwill
-- Ensure temp files are cleaned up by @piksel
 - Fix env variable name `notification(s)-delay` by @kirbylink
 - Correctly set the delay from options by @Tentoe
 - Empty out the aliases on recreation by @simskij
@@ -2669,7 +2760,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ignore empty challenge fields by @piksel
 - Always add missing slashes to link names by @piksel
 - Update metrics from sessions started via API by @SamKirsch10
-- Refactor/simplify container mock builders by @piksel
 - Use correct modern css color syntax by @piksel
 - Explicitly accept non-commands as root args by @piksel
 - Fix docs generation by @piksel
@@ -2686,10 +2776,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix redirect link by @jiangtj
 - Return appropriate status for unauthorized requests by @hypnoglow
 - Fixing flags usage text to first capital letter. by @dhiemaz
-- Fully reset ghttp server by @piksel
-- Container client tests refactor by @piksel
-- Reduce test output noise by @piksel
-- Refactor client tests by @piksel
 - Default templates and logic by @piksel
 - Check container image info for nil by @piksel
 - Fix version in non-dev dockerfile by @piksel
@@ -2769,6 +2855,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove erroneuos i in goreleaser by @simskij
 - Removed unused mock code. by @stffabi
 - Removed hub_mirror deployment, came in with PR #26.
+
+### Tests
+
+- Check flag/docs consistency by @piksel
+- Ensure temp files are cleaned up by @piksel
+- Refactor/simplify container mock builders by @piksel
+- Fully reset ghttp server by @piksel
+- Container client tests refactor by @piksel
+- Reduce test output noise by @piksel
+- Refactor client tests by @piksel
 
 ### New Contributors
 
