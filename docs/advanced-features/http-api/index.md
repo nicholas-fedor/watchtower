@@ -73,6 +73,7 @@ The `/v1/update` endpoint returns the following HTTP status codes:
 |     401     | Invalid or missing authentication token                                                   |
 |     429     | Another update is already in progress (full updates only) or the request was rate limited |
 |     500     | Internal server error during request processing                                           |
+|     503     | Client cancelled while waiting on update lock (targeted updates only)                     |
 
 #### Error Response Format
 
@@ -143,6 +144,7 @@ The same concurrency behavior applies to async requests: full updates return 429
 |     401     | Invalid or missing authentication token                                                   |
 |     429     | Another update is already in progress (full updates only) or the request was rate limited |
 |     500     | Internal server error during request processing                                           |
+|     503     | Client cancelled while waiting on update lock (targeted updates only)                     |
 
 The following example shows what happens when a full update is requested while another update is already running:
 
