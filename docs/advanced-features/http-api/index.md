@@ -118,7 +118,7 @@ The `/v1/update` endpoint supports an `async` query parameter to trigger updates
 Adding the `?async=true` parameter to a POST request causes the handler to spawn the update in a background goroutine and return immediately with HTTP 202 Accepted.
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?async=true
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?async=true"
 ```
 
 Response:
@@ -149,7 +149,7 @@ The same concurrency behavior applies to async requests: full updates return 429
 The following example shows what happens when a full update is requested while another update is already running:
 
 ```bash
-curl -i -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update
+curl -i -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update"
 ```
 
 Response:
@@ -249,7 +249,7 @@ Watchtower supports using the `image` URL query parameter to filter updates for 
 The following `curl` command would trigger an update of all container images monitored by Watchtower:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update"
 ```
 
 ##### Image Filtering with Tags
@@ -259,7 +259,7 @@ You can specify image tags to target containers running a specific version (e.g.
 For example, to update only containers using `foo/bar:1.0` and `foo/baz:latest`:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar:1.0,foo/baz:latest
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?image=foo/bar:1.0,foo/baz:latest"
 ```
 
 ##### Image Filtering without Tags
@@ -269,7 +269,7 @@ If no tag is provided, Watchtower matches containers regardless of their tag.
 The following `curl` command would trigger an update for the images `foo/bar` and `foo/baz`:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar,foo/baz
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?image=foo/bar,foo/baz"
 ```
 
 #### Using the HTTP API and Periodic Updates
