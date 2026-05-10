@@ -11,7 +11,7 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 |              **Name**              | **Method** | **Endpoint**  |                           **Parameters**                            |                           **Description**                            |
 |:----------------------------------:|:----------:|:-------------:|:-------------------------------------------------------------------:|:--------------------------------------------------------------------:|
-|     [Update](#http_api_update)     |   `POST`   | `/v1/update`  | [`image`](#image_parameter_usage), [`async`](#asynchronous-updates) | Triggers container updates and returns JSON results of the operation |
+|     [Update](#http_api_update)     |   `POST`   | `/v1/update`  | [`image`](#image_parameter_usage), [`async`](#asynchronous_updates) | Triggers container updates and returns JSON results of the operation |
 | [Metrics](../metrics-api/index.md) |   `GET`    | `/v1/metrics` |                                                                     |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
 
 !!! Note
