@@ -14,13 +14,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 )
 
-// retryAfterSeconds is the value for the Retry-After header in 429 responses.
-const retryAfterSeconds = "30"
-
-// maxRequestBodySize defines the maximum request body size (1 MiB) to prevent
-// resource exhaustion from large uploads.
-const maxRequestBodySize = 1 << 20
-
 // Handler triggers container update scans via HTTP.
 //
 // It holds the update function, endpoint path, and concurrency lock for the /v1/update endpoint.
@@ -29,6 +22,20 @@ type Handler struct {
 	Path string                                // API endpoint path (e.g., "/v1/update").
 	lock chan bool                             // Channel for synchronizing updates to prevent concurrency.
 }
+
+// lockResult holds the outcome of an acquireLock attempt.
+type lockResult struct {
+	Token      bool
+	Acquired   bool
+	RequestErr bool
+}
+
+// retryAfterSeconds is the value for the Retry-After header in 429 responses.
+const retryAfterSeconds = "30"
+
+// maxRequestBodySize defines the maximum request body size (1 MiB) to prevent
+// resource exhaustion from large uploads.
+const maxRequestBodySize = 1 << 20
 
 // New creates a new Handler instance.
 //
@@ -84,22 +91,22 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	images := h.extractImages(r)
 
-	lockToken, acquired, requestErr := h.acquireLock(w, r, images)
-	if requestErr {
+	result := h.acquireLock(w, r, images)
+	if result.RequestErr {
 		return
 	}
 
-	if !acquired {
+	if !result.Acquired {
 		return // 429 response already sent
 	}
 
 	if r.Method == http.MethodHead {
-		h.handleHead(w, images, lockToken)
+		h.handleHead(w, images, result.Token)
 
 		return
 	}
 
-	h.handlePost(w, images, lockToken)
+	h.handlePost(w, images, result.Token)
 }
 
 // readRequestBody discards the request body up to the maximum allowed size.
@@ -168,10 +175,8 @@ func (h *Handler) extractImages(r *http.Request) []string {
 //   - images: Slice of image names; determines targeted vs full update strategy.
 //
 // Returns:
-//   - lockToken (bool): The lock token to be returned to the channel when releasing.
-//   - acquired (bool): true if the lock was acquired, false otherwise.
-//   - requestErr (bool): true if an error response was already sent (cancellation), false otherwise.
-func (h *Handler) acquireLock(w http.ResponseWriter, r *http.Request, images []string) (bool, bool, bool) {
+//   - lockResult: the outcome, with fields Token, Acquired, and RequestErr.
+func (h *Handler) acquireLock(w http.ResponseWriter, r *http.Request, images []string) lockResult {
 	logrus.Debug("Handler: trying to acquire lock")
 
 	if len(images) > 0 {
@@ -179,12 +184,12 @@ func (h *Handler) acquireLock(w http.ResponseWriter, r *http.Request, images []s
 		case token := <-h.lock:
 			logrus.Debug("Handler: acquired lock for targeted update")
 
-			return token, true, false
+			return lockResult{Token: token, Acquired: true}
 		case <-r.Context().Done():
 			logrus.Debug("Handler: request cancelled while waiting for lock")
 			http.Error(w, "request cancelled", http.StatusServiceUnavailable)
 
-			return false, false, true
+			return lockResult{RequestErr: true}
 		}
 	}
 
@@ -192,12 +197,12 @@ func (h *Handler) acquireLock(w http.ResponseWriter, r *http.Request, images []s
 	case token := <-h.lock:
 		logrus.Debug("Handler: acquired lock for full update")
 
-		return token, true, false
+		return lockResult{Token: token, Acquired: true}
 	default:
 		logrus.Debug("Skipped update, another update already in progress")
 		h.send429Response(w)
 
-		return false, false, false
+		return lockResult{}
 	}
 }
 
