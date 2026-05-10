@@ -1198,14 +1198,36 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Concurrency Behavior">
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asynchronous_updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asynchronous Updates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asynchronous Updates">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#example_429_response" class="md-nav__link">
+  <a href="#asynchronous_update_trigger" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example 429 Response
+        Asynchronous Update Trigger
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status_codes_for_async_requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Codes for Async Requests
       
     </span>
   </a>
@@ -1759,14 +1781,36 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Concurrency Behavior">
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asynchronous_updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asynchronous Updates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asynchronous Updates">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#example_429_response" class="md-nav__link">
+  <a href="#asynchronous_update_trigger" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example 429 Response
+        Asynchronous Update Trigger
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status_codes_for_async_requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Codes for Async Requests
       
     </span>
   </a>
@@ -2009,7 +2053,7 @@
 <td style="text-align: center;"><a href="#http_api_update">Update</a></td>
 <td style="text-align: center;"><code>POST</code></td>
 <td style="text-align: center;"><code>/v1/update</code></td>
-<td style="text-align: center;"><a href="#image_parameter_usage"><code>image</code></a></td>
+<td style="text-align: center;"><a href="#image_parameter_usage"><code>image</code></a>, <a href="#asynchronous_updates"><code>async</code></a></td>
 <td style="text-align: center;">Triggers container updates and returns JSON results of the operation</td>
 </tr>
 <tr>
@@ -2079,6 +2123,10 @@ Requests with unsupported methods will receive a <code>405 Method Not Allowed</c
 <td style="text-align: left;">Update completed successfully</td>
 </tr>
 <tr>
+<td style="text-align: center;">202</td>
+<td style="text-align: left;">Update triggered successfully and running asynchronously (with <code>?async=true</code>)</td>
+</tr>
+<tr>
 <td style="text-align: center;">401</td>
 <td style="text-align: left;">Invalid or missing authentication token</td>
 </tr>
@@ -2089,6 +2137,10 @@ Requests with unsupported methods will receive a <code>405 Method Not Allowed</c
 <tr>
 <td style="text-align: center;">500</td>
 <td style="text-align: left;">Internal server error during request processing</td>
+</tr>
+<tr>
+<td style="text-align: center;">503</td>
+<td style="text-align: left;">Client cancelled while waiting on update lock (targeted updates only)</td>
 </tr>
 </tbody>
 </table>
@@ -2120,20 +2172,64 @@ Requests with unsupported methods will receive a <code>405 Method Not Allowed</c
 <li>Does not return HTTP 429</li>
 </ul>
 <p>This behavior ensures that full updates (which may be resource-intensive) are not queued up, while targeted updates (which are typically faster) can wait for their turn.</p>
-<h5 id="example_429_response">Example 429 Response<a class="headerlink" href="#example_429_response" title="Permanent link">&para;</a></h5>
-<p>The following example shows what happens when a full update is requested while another update is already running:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-i<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
+<h4 id="asynchronous_updates">Asynchronous Updates<a class="headerlink" href="#asynchronous_updates" title="Permanent link">&para;</a></h4>
+<p>The <code>/v1/update</code> endpoint supports an <code>async</code> query parameter to trigger updates without waiting for completion. This is useful for CI environments or automation that needs to fire-and-forget without maintaining a long-lived connection.</p>
+<h5 id="asynchronous_update_trigger">Asynchronous Update Trigger<a class="headerlink" href="#asynchronous_update_trigger" title="Permanent link">&para;</a></h5>
+<p>Adding the <code>?async=true</code> parameter to a POST request causes the handler to spawn the update in a background goroutine and return immediately with HTTP 202 Accepted.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span><span class="s2">&quot;localhost:8080/v1/update?async=true&quot;</span>
 </code></pre></div>
 <p>Response:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">429</span> <span class="ne">Too Many Requests</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">202</span> <span class="ne">Accepted</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="na">Retry-After</span><span class="o">:</span> <span class="l">30</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">{</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;another update is already running&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">&quot;api_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-01-20T11:30:45Z&quot;</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+</code></pre></div>
+<p>Equivalent example for a targeted async update:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span><span class="s2">&quot;localhost:8080/v1/update?image=foo/bar:latest&amp;async=true&quot;</span>
+</code></pre></div>
+<p>The same concurrency behavior applies to async requests: full updates return 429 if another update is already in progress, while targeted updates block until the lock is available before spawning the async goroutine.</p>
+<h5 id="status_codes_for_async_requests">Status Codes for Async Requests<a class="headerlink" href="#status_codes_for_async_requests" title="Permanent link">&para;</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Status Code</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">202</td>
+<td style="text-align: left;">Update triggered successfully and running asynchronously</td>
+</tr>
+<tr>
+<td style="text-align: center;">401</td>
+<td style="text-align: left;">Invalid or missing authentication token</td>
+</tr>
+<tr>
+<td style="text-align: center;">429</td>
+<td style="text-align: left;">Another update is already in progress (full updates only) or the request was rate limited</td>
+</tr>
+<tr>
+<td style="text-align: center;">500</td>
+<td style="text-align: left;">Internal server error during request processing</td>
+</tr>
+<tr>
+<td style="text-align: center;">503</td>
+<td style="text-align: left;">Client cancelled while waiting on update lock (targeted updates only)</td>
+</tr>
+</tbody>
+</table>
+<p>The following example shows what happens when a full update is requested while another update is already running:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-i<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span><span class="s2">&quot;localhost:8080/v1/update&quot;</span>
+</code></pre></div>
+<p>Response:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">429</span> <span class="ne">Too Many Requests</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="na">Retry-After</span><span class="o">:</span> <span class="l">30</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">{</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;another update is already running&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">&quot;api_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-01-20T11:30:45Z&quot;</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">}</span>
 </code></pre></div>
 <p>The client should wait at least 30 seconds (as indicated by the <code>Retry-After</code> header) before attempting another request.</p>
 <h4 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h4>
@@ -2181,56 +2277,56 @@ Requests with unsupported methods will receive a <code>405 Method Not Allowed</c
 <ul>
 <li>Listen on all interfaces on port 8080 (default):</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>--http-api-port<span class="o">=</span><span class="m">8080</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>--http-api-port<span class="o">=</span><span class="m">8080</span>
 </code></pre></div>
 <ul>
 <li>Listen on localhost only on port 8080:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>--http-api-host<span class="o">=</span><span class="m">127</span>.0.0.1<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">8080</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>--http-api-host<span class="o">=</span><span class="m">127</span>.0.0.1<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">8080</span>
 </code></pre></div>
 <ul>
 <li>Listen on a specific IP and port:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>--http-api-host<span class="o">=</span><span class="m">192</span>.168.1.100<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">9090</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>--http-api-host<span class="o">=</span><span class="m">192</span>.168.1.100<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">9090</span>
 </code></pre></div>
 <h4 id="image_parameter_usage">Image Parameter Usage<a class="headerlink" href="#image_parameter_usage" title="Permanent link">&para;</a></h4>
 <p>Watchtower supports using the <code>image</code> URL query parameter to filter updates for only certain images.</p>
 <h5 id="no_image_filtering">No Image Filtering<a class="headerlink" href="#no_image_filtering" title="Permanent link">&para;</a></h5>
 <p>The following <code>curl</code> command would trigger an update of all container images monitored by Watchtower:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span><span class="s2">&quot;localhost:8080/v1/update&quot;</span>
 </code></pre></div>
 <h5 id="image_filtering_with_tags">Image Filtering with Tags<a class="headerlink" href="#image_filtering_with_tags" title="Permanent link">&para;</a></h5>
 <p>You can specify image tags to target containers running a specific version (e.g., <code>foo/bar:1.0</code>).</p>
 <p>For example, to update only containers using <code>foo/bar:1.0</code> and <code>foo/baz:latest</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar:1.0,foo/baz:latest
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span><span class="s2">&quot;localhost:8080/v1/update?image=foo/bar:1.0,foo/baz:latest&quot;</span>
 </code></pre></div>
 <h5 id="image_filtering_without_tags">Image Filtering without Tags<a class="headerlink" href="#image_filtering_without_tags" title="Permanent link">&para;</a></h5>
 <p>If no tag is provided, Watchtower matches containers regardless of their tag.</p>
 <p>The following <code>curl</code> command would trigger an update for the images <code>foo/bar</code> and <code>foo/baz</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span>localhost:8080/v1/update?image<span class="o">=</span>foo/bar,foo/baz
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer mytoken&quot;</span><span class="w"> </span><span class="s2">&quot;localhost:8080/v1/update?image=foo/bar,foo/baz&quot;</span>
 </code></pre></div>
 <h4 id="using_the_http_api_and_periodic_updates">Using the HTTP API and Periodic Updates<a class="headerlink" href="#using_the_http_api_and_periodic_updates" title="Permanent link">&para;</a></h4>
 <p>By default, enabling the HTTP API prevents periodic updates (i.e. <a href="../../configuration/arguments/#schedule">scheduled</a> or <a href="../../configuration/arguments/#poll_interval">interval</a> polling).</p>
 <p>Use the <a href="../../configuration/arguments/#http_api_periodic_polls">HTTP API Periodic Polls</a> configuration option to enable periodic updates while using the HTTP API.</p>
 <h5 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h5>
-<div class="highlight"><span class="filename">Example Docker Compose Configuration</span><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">app-monitored-by-watchtower</span><span class="p">:</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--http-api-update --http-api-metrics</span>
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=mytoken</span>
-<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
-<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
-<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080:8080</span>
-<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<div class="highlight"><span class="filename">Example Docker Compose Configuration</span><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">app-monitored-by-watchtower</span><span class="p">:</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myapps/monitored-by-watchtower</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=true&quot;</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--http-api-update --http-api-metrics</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=mytoken</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">    </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;com.centurylinklabs.watchtower.enable=false&quot;</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080:8080</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2262,7 +2358,7 @@ Requests with unsupported methods will receive a <code>405 Method Not Allowed</c
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 31, 2026 22:08:29 UTC"><span class="timeago" datetime="2026-03-31T22:08:29+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 31, 2026 22:08:29 UTC">2026-03-31</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 10, 2026 04:30:06 UTC"><span class="timeago" datetime="2026-05-10T04:30:06+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 10, 2026 04:30:06 UTC">2026-05-10</span>
   </span>
 
     
