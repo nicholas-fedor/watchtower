@@ -1,5 +1,5 @@
 // Package update provides an HTTP API handler for triggering Watchtower container updates.
-// It manages update requests with concurrency control and image targeting.
+// It manages update requests with concurrency control, image targeting, and asynchronous execution.
 //
 // Key components:
 //   - Handler: Processes HTTP requests to trigger updates with lock-based synchronization.
@@ -16,5 +16,5 @@
 //
 // The package uses a channel-based lock for concurrency, supports both targeted and
 // full updates with different lock acquisition strategies, and integrates with logrus
-// for logging requests.
+// for logging requests. Asynchronous execution is supported via the "async" query parameter.
 package update

@@ -9,10 +9,10 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 ## Endpoints
 
-|              **Name**              | **Method** | **Endpoint**  |          **Parameters**           |                           **Description**                            |
-|:----------------------------------:|:----------:|:-------------:|:---------------------------------:|:--------------------------------------------------------------------:|
-|     [Update](#http_api_update)     |   `POST`   | `/v1/update`  | [`image`](#image_parameter_usage) | Triggers container updates and returns JSON results of the operation |
-| [Metrics](../metrics-api/index.md) |   `GET`    | `/v1/metrics` |                                   |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
+|              **Name**              | **Method** | **Endpoint**  |                           **Parameters**                            |                           **Description**                            |
+|:----------------------------------:|:----------:|:-------------:|:-------------------------------------------------------------------:|:--------------------------------------------------------------------:|
+|     [Update](#http_api_update)     |   `POST`   | `/v1/update`  | [`image`](#image_parameter_usage), [`async`](#asynchronous-updates) | Triggers container updates and returns JSON results of the operation |
+| [Metrics](../metrics-api/index.md) |   `GET`    | `/v1/metrics` |                                                                     |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
 
 !!! Note
     Endpoints enforce HTTP method restrictions using method-based routing.
@@ -69,6 +69,7 @@ The `/v1/update` endpoint returns the following HTTP status codes:
 | Status Code | Description                                                                               |
 |:-----------:|:------------------------------------------------------------------------------------------|
 |     200     | Update completed successfully                                                             |
+|     202     | Update triggered successfully and running asynchronously (with `?async=true`)             |
 |     401     | Invalid or missing authentication token                                                   |
 |     429     | Another update is already in progress (full updates only) or the request was rate limited |
 |     500     | Internal server error during request processing                                           |
@@ -107,7 +108,41 @@ The `/v1/update` endpoint handles concurrent requests differently based on wheth
 
 This behavior ensures that full updates (which may be resource-intensive) are not queued up, while targeted updates (which are typically faster) can wait for their turn.
 
-##### Example 429 Response
+#### Asynchronous Updates
+
+The `/v1/update` endpoint supports an `async` query parameter to trigger updates without waiting for completion. This is useful for CI environments or automation that needs to fire-and-forget without maintaining a long-lived connection.
+
+##### Asynchronous Update Trigger
+
+Adding the `?async=true` parameter to a POST request causes the handler to spawn the update in a background goroutine and return immediately with HTTP 202 Accepted.
+
+```bash
+curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?async=true
+```
+
+Response:
+
+```http
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+```
+
+Equivalent example for a targeted async update:
+
+```bash
+curl -X POST -H "Authorization: Bearer mytoken" localhost:8080/v1/update?image=foo/bar:latest&async=true
+```
+
+The same concurrency behavior applies to async requests: full updates return 429 if another update is already in progress, while targeted updates block until the lock is available before spawning the async goroutine.
+
+##### Status Codes for Async Requests
+
+| Status Code | Description                                                                               |
+|:-----------:|:------------------------------------------------------------------------------------------|
+|     202     | Update triggered successfully and running asynchronously                                  |
+|     401     | Invalid or missing authentication token                                                   |
+|     429     | Another update is already in progress (full updates only) or the request was rate limited |
+|     500     | Internal server error during request processing                                           |
 
 The following example shows what happens when a full update is requested while another update is already running:
 
