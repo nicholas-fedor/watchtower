@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add async query parameter support by @nicholas-fedor in [#1609](https://github.com/nicholas-fedor/watchtower/pull/1609)
 - Add link to reference linked containers advanced features documentation by @nicholas-fedor in [#1532](https://github.com/nicholas-fedor/watchtower/pull/1532)
 
 ### Changed
