@@ -24,16 +24,20 @@ import (
 
 var _ = ginkgo.Describe("the client", func() {
 	var (
-		docker     *dockerClient.Client
+		mockClient *dockerClient.Client
 		mockServer *ghttp.Server
 	)
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = dockerClient.New(
+
+		var err error
+
+		mockClient, err = dockerClient.New(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
 		)
+		gomega.Expect(err).To(gomega.Succeed())
 		mockServer.AppendHandlers(APIVersionPingHandler())
 	})
 	ginkgo.AfterEach(func() {
@@ -73,7 +77,7 @@ var _ = ginkgo.Describe("the client", func() {
 	ginkgo.When("pulling the latest image", func() {
 		ginkgo.When("the image consist of a pinned hash", func() {
 			ginkgo.It("should gracefully fail with a useful message", func() {
-				i := newImageClient(docker)
+				i := newImageClient(mockClient)
 				pinnedContainer := MockContainer(
 					WithImageName(
 						"sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b",
@@ -94,7 +98,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(docker)
+			i := newImageClient(mockClient)
 			pullContainer := MockContainer(
 				WithImageName("private-registry.io/app:latest"),
 				WithRepoDigests([]string{"private-registry.io/app@sha256:abc"}),
@@ -121,7 +125,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(docker)
+			i := newImageClient(mockClient)
 			pullContainer := MockContainer(
 				WithImageName("nonexistent:latest"),
 				WithRepoDigests([]string{"nonexistent@sha256:def"}),
@@ -147,7 +151,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(docker)
+			i := newImageClient(mockClient)
 			pullContainer := MockContainer(
 				WithImageName("app:latest"),
 				WithRepoDigests([]string{"app@sha256:ghi"}),
@@ -179,7 +183,7 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.RemoveImageHandler(images),
 				)
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
@@ -207,7 +211,7 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.RemoveImageHandler(nil),
 				)
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 				err := c.RemoveImageByID(context.Background(), types.ImageID(image), "test-image")
 				gomega.Expect(cerrdefs.IsNotFound(err)).To(gomega.BeTrue())
 			})
@@ -235,7 +239,7 @@ var _ = ginkgo.Describe("the client", func() {
 						),
 					)
 
-					c := &client{api: docker}
+					c := &client{api: mockClient}
 
 					resetLogrus, _ := captureLogrus(logrus.InfoLevel)
 					defer resetLogrus()
@@ -275,7 +279,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 
 				resetLogrus, _ := captureLogrus(logrus.InfoLevel)
 				defer resetLogrus()
@@ -302,7 +306,7 @@ var _ = ginkgo.Describe("the client", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 
 				_, _, err := c.IsContainerStale(
 					ctx,
@@ -320,7 +324,7 @@ var _ = ginkgo.Describe("the client", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 
 				err := c.RemoveImageByID(ctx, types.ImageID(imageID), "test-image")
 				gomega.Expect(err).To(gomega.MatchError(context.Canceled))
@@ -351,7 +355,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
@@ -393,7 +397,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
@@ -435,7 +439,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := &client{api: docker}
+				c := &client{api: mockClient}
 
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
