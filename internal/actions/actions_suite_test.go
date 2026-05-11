@@ -220,6 +220,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 							mockActions.CreateMockContainerWithConfig(
 								"test-container-new",
@@ -232,6 +233,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 						},
 					},
