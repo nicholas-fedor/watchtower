@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update dependency python to v3.14.5 by @renovate[bot] in [#1611](https://github.com/nicholas-fedor/watchtower/pull/1611)
 - Update module golang.org/x/tools to v0.45.0 by @renovate[bot] in [#1605](https://github.com/nicholas-fedor/watchtower/pull/1605)
 - Update module golang.org/x/net to v0.54.0 by @renovate[bot] in [#1603](https://github.com/nicholas-fedor/watchtower/pull/1603)
 - Update module golang.org/x/mod to v0.36.0 by @renovate[bot] in [#1602](https://github.com/nicholas-fedor/watchtower/pull/1602)
