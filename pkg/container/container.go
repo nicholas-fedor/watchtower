@@ -497,16 +497,6 @@ func (c *Container) VerifyConfiguration() error {
 
 			continue
 		}
-
-		// nat.Port format is "port/protocol"; validate the port part is non-empty.
-		portPart, _, _ := strings.Cut(portStr, "/")
-		if portPart == "" {
-			clog.WithField("port", portStr).
-				Warn("Skipping port binding with empty port number")
-
-			delete(c.containerInfo.HostConfig.PortBindings, port)
-			delete(c.containerInfo.Config.ExposedPorts, port)
-		}
 	}
 
 	clog.Debug("Verified container configuration")
