@@ -84,9 +84,13 @@ func CreateMockContainerWithImageInfoP(
 		Image:   image,
 		Name:    name,
 		Created: created.String(),
+		HostConfig: &dockerContainer.HostConfig{
+			PortBindings: dockerNetwork.PortMap{},
+		},
 		Config: &dockerContainer.Config{
-			Image:  image,
-			Labels: make(map[string]string),
+			Image:        image,
+			Labels:       make(map[string]string),
+			ExposedPorts: dockerNetwork.PortSet{},
 		},
 	}
 
