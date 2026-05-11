@@ -10,12 +10,12 @@ import (
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sirupsen/logrus"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
-	dockerMount "github.com/docker/docker/api/types/mount"
-	dockerNetwork "github.com/docker/docker/api/types/network"
-	dockerNat "github.com/docker/go-connections/nat"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+	dockerMount "github.com/moby/moby/api/types/mount"
+	dockerNetwork "github.com/moby/moby/api/types/network"
+	dockerClient "github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -34,15 +34,13 @@ type MockContainerUpdate func(*dockerContainer.InspectResponse, *dockerImage.Ins
 func MockContainer(updates ...MockContainerUpdate) *Container {
 	// Initialize default container metadata with running state.
 	containerInfo := dockerContainer.InspectResponse{
-		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-			ID:         "container_id",
-			Image:      "image",
-			Name:       "test-watchtower",
-			HostConfig: &dockerContainer.HostConfig{},
-			State: &dockerContainer.State{
-				Running: true,
-				Status:  "running",
-			},
+		ID:         "container_id",
+		Image:      "image",
+		Name:       "test-watchtower",
+		HostConfig: &dockerContainer.HostConfig{},
+		State: &dockerContainer.State{
+			Running: true,
+			Status:  "running",
 		},
 		Config: &dockerContainer.Config{
 			Labels: map[string]string{},
@@ -75,9 +73,15 @@ func MockContainer(updates ...MockContainerUpdate) *Container {
 //   - MockContainerUpdate: Function to apply port bindings to container metadata.
 func WithPortBindings(portBindingSources ...string) MockContainerUpdate {
 	return func(container *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		portBindings := dockerNat.PortMap{}
+		portBindings := dockerNetwork.PortMap{}
+
 		for _, pbs := range portBindingSources {
-			portBindings[dockerNat.Port(pbs)] = []dockerNat.PortBinding{}
+			port, err := dockerNetwork.ParsePort(pbs)
+			if err != nil {
+				panic(fmt.Sprintf("failed to parse port %s: %v", pbs, err))
+			}
+
+			portBindings[port] = []dockerNetwork.PortBinding{}
 		}
 
 		container.HostConfig.PortBindings = portBindings
@@ -372,11 +376,11 @@ func WithBinds(binds []string) MockContainerUpdate {
 
 // MockClient is a mock implementation of the Operations interface for testing container operations.
 type MockClient struct {
-	createFunc        func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerContainer.CreateResponse, error)
-	startFunc         func(context.Context, string, dockerContainer.StartOptions) error
-	removeFunc        func(context.Context, string, dockerContainer.RemoveOptions) error
-	connectFunc       func(context.Context, string, string, *dockerNetwork.EndpointSettings) error
-	renameFunc        func(context.Context, string, string) error
+	createFunc        func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerClient.ContainerCreateResult, error)
+	startFunc         func(context.Context, string, dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error)
+	removeFunc        func(context.Context, string, dockerClient.ContainerRemoveOptions) (dockerClient.ContainerRemoveResult, error)
+	connectFunc       func(context.Context, string, string, *dockerNetwork.EndpointSettings) (dockerClient.NetworkConnectResult, error)
+	renameFunc        func(context.Context, string, string) (dockerClient.ContainerRenameResult, error)
 	removeFuncCalled  atomic.Bool
 	createFuncCalled  atomic.Bool
 	startFuncCalled   atomic.Bool
@@ -399,19 +403,15 @@ type MockClient struct {
 //   - error: Error if the mock create function is set to fail, nil otherwise.
 func (m *MockClient) ContainerCreate(
 	ctx context.Context,
-	config *dockerContainer.Config,
-	hostConfig *dockerContainer.HostConfig,
-	networkingConfig *dockerNetwork.NetworkingConfig,
-	platform *ocispec.Platform,
-	containerName string,
-) (dockerContainer.CreateResponse, error) {
+	options dockerClient.ContainerCreateOptions,
+) (dockerClient.ContainerCreateResult, error) {
 	m.createFuncCalled.Store(true)
 
 	if m.createFunc != nil {
-		return m.createFunc(ctx, config, hostConfig, networkingConfig, platform, containerName)
+		return m.createFunc(ctx, options.Config, options.HostConfig, options.NetworkingConfig, options.Platform, options.Name)
 	}
 
-	return dockerContainer.CreateResponse{ID: "new_container_id"}, nil
+	return dockerClient.ContainerCreateResult{ID: "new_container_id"}, nil
 }
 
 // ContainerStart mocks the start of a container.
@@ -426,15 +426,15 @@ func (m *MockClient) ContainerCreate(
 func (m *MockClient) ContainerStart(
 	ctx context.Context,
 	containerID string,
-	options dockerContainer.StartOptions,
-) error {
+	options dockerClient.ContainerStartOptions,
+) (dockerClient.ContainerStartResult, error) {
 	m.startFuncCalled.Store(true)
 
 	if m.startFunc != nil {
 		return m.startFunc(ctx, containerID, options)
 	}
 
-	return nil
+	return dockerClient.ContainerStartResult{}, nil
 }
 
 // ContainerRemove mocks the removal of a container.
@@ -449,15 +449,15 @@ func (m *MockClient) ContainerStart(
 func (m *MockClient) ContainerRemove(
 	ctx context.Context,
 	containerID string,
-	options dockerContainer.RemoveOptions,
-) error {
+	options dockerClient.ContainerRemoveOptions,
+) (dockerClient.ContainerRemoveResult, error) {
 	m.removeFuncCalled.Store(true)
 
 	if m.removeFunc != nil {
 		return m.removeFunc(ctx, containerID, options)
 	}
 
-	return nil
+	return dockerClient.ContainerRemoveResult{}, nil
 }
 
 // NetworkConnect mocks connecting a container to a network.
@@ -472,16 +472,16 @@ func (m *MockClient) ContainerRemove(
 //   - error: Error if the mock connect function is set to fail, nil otherwise.
 func (m *MockClient) NetworkConnect(
 	ctx context.Context,
-	networkID, containerID string,
-	config *dockerNetwork.EndpointSettings,
-) error {
+	networkID string,
+	options dockerClient.NetworkConnectOptions,
+) (dockerClient.NetworkConnectResult, error) {
 	m.connectFuncCalled.Store(true)
 
 	if m.connectFunc != nil {
-		return m.connectFunc(ctx, networkID, containerID, config)
+		return m.connectFunc(ctx, networkID, options.Container, options.EndpointConfig)
 	}
 
-	return nil
+	return dockerClient.NetworkConnectResult{}, nil
 }
 
 // ContainerRename mocks renaming a container.
@@ -495,15 +495,25 @@ func (m *MockClient) NetworkConnect(
 //   - error: Error if the mock rename function is set to fail, nil otherwise.
 func (m *MockClient) ContainerRename(
 	ctx context.Context,
-	containerID, newContainerName string,
-) error {
+	containerID string,
+	options dockerClient.ContainerRenameOptions,
+) (dockerClient.ContainerRenameResult, error) {
 	m.renameFuncCalled.Store(true)
 
 	if m.renameFunc != nil {
-		return m.renameFunc(ctx, containerID, newContainerName)
+		return m.renameFunc(ctx, containerID, options.NewName)
 	}
 
-	return nil
+	return dockerClient.ContainerRenameResult{}, nil
+}
+
+// APIVersionPingHandler returns a handler that responds to the Docker client's
+// HEAD /_ping request used for API version negotiation.
+func APIVersionPingHandler() http.HandlerFunc {
+	return ghttp.CombineHandlers(
+		ghttp.VerifyRequest("HEAD", "/_ping"),
+		ghttp.RespondWith(http.StatusOK, nil),
+	)
 }
 
 func StopContainerHandler(

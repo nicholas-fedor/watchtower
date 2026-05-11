@@ -3,10 +3,9 @@ package actions_test
 import (
 	"time"
 
-	"github.com/docker/go-connections/nat"
-
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -81,7 +80,7 @@ func getNetworkModeTestData() *mockActions.TestData {
 		&dockerContainer.Config{
 			Image:        "fake-image2:latest",
 			Labels:       make(map[string]string),
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	// Set network mode to container:network-dependency
@@ -107,7 +106,7 @@ func getComposeTestData() *mockActions.TestData {
 			Labels: map[string]string{
 				"com.docker.compose.service": "db",
 			},
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	// Create a web container with service name "web" but container name "myproject_web_1"
@@ -125,7 +124,7 @@ func getComposeTestData() *mockActions.TestData {
 				"com.docker.compose.service":    "web",
 				"com.docker.compose.depends_on": "db",
 			},
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	return &mockActions.TestData{
@@ -149,7 +148,7 @@ func getComposeProjectPrefixedTestData() *mockActions.TestData {
 				"com.docker.compose.project": "myapp",
 				"com.docker.compose.service": "database",
 			},
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	// Create a web container with project and service labels that depends on "database"
@@ -167,7 +166,7 @@ func getComposeProjectPrefixedTestData() *mockActions.TestData {
 				"com.docker.compose.service":    "watchtower-test-app1",
 				"com.docker.compose.depends_on": "database:service_started:true",
 			},
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	return &mockActions.TestData{
@@ -191,7 +190,7 @@ func getComposeMultiHopTestData() *mockActions.TestData {
 			Labels: map[string]string{
 				"com.docker.compose.service": "cache",
 			},
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	dbContainer := mockActions.CreateMockContainerWithConfig(
@@ -207,7 +206,7 @@ func getComposeMultiHopTestData() *mockActions.TestData {
 				"com.docker.compose.service":    "db",
 				"com.docker.compose.depends_on": "cache",
 			},
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	appContainer := mockActions.CreateMockContainerWithConfig(
@@ -223,7 +222,7 @@ func getComposeMultiHopTestData() *mockActions.TestData {
 				"com.docker.compose.service":    "app",
 				"com.docker.compose.depends_on": "db",
 			},
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		})
 
 	return &mockActions.TestData{
@@ -262,7 +261,7 @@ func createDependencyChain(names []string) []types.Container {
 			time.Now().AddDate(0, 0, -1),
 			&dockerContainer.Config{
 				Labels:       labels,
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 	}
 

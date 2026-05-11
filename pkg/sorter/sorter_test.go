@@ -6,7 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -20,9 +20,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				now := time.Now()
 				c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
-					},
+					Created: now.Add(-1 * time.Hour).Format(time.RFC3339Nano),
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -31,9 +29,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano),
-					},
+					Created: now.Add(-3 * time.Hour).Format(time.RFC3339Nano),
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -42,9 +38,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
-					},
+					Created: now.Add(-2 * time.Hour).Format(time.RFC3339Nano),
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -62,9 +56,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 				now := time.Now()
 				c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Created: "invalid-date",
-					},
+					Created: "invalid-date",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -74,9 +66,7 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 
 				c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Created: now.Format(time.RFC3339Nano),
-					},
+					Created: now.Format(time.RFC3339Nano),
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},

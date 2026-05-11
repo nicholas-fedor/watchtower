@@ -11,8 +11,8 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerClient "github.com/docker/docker/client"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerClient "github.com/moby/moby/client"
 	mock "github.com/stretchr/testify/mock"
 
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -598,11 +598,13 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 		ginkgo.BeforeEach(func() {
 			ctx = context.Background()
 			mockServer = ghttp.NewServer()
-			docker, err := dockerClient.NewClientWithOpts(
+			docker, err := dockerClient.New(
 				dockerClient.WithHost(mockServer.URL()),
 				dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			mockServer.AppendHandlers(APIVersionPingHandler())
 
 			dockerAPI = docker
 			testClient = &client{api: dockerAPI}
@@ -742,7 +744,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 				)))
 				gomega.Expect(orchestratorID).To(gomega.BeEmpty())
 				// Verify all handlers were called (including cleanup remove).
-				gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(3))
+				gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(4))
 			})
 		})
 	})

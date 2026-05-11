@@ -10,7 +10,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/spf13/viper"
 
-	dockerImage "github.com/docker/docker/api/types/image"
+	dockerImage "github.com/moby/moby/api/types/image"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"

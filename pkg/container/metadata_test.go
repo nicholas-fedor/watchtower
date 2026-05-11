@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -22,9 +22,7 @@ func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 			name: "PreCheckLabelSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							preCheckLabel: "echo pre-check",
@@ -38,9 +36,7 @@ func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 			name: "PreCheckLabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -68,9 +64,7 @@ func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 			name: "PostCheckLabelSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							postCheckLabel: "echo post-check",
@@ -84,9 +78,7 @@ func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 			name: "PostCheckLabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -114,9 +106,7 @@ func TestContainer_GetLifecyclePreUpdateCommand(t *testing.T) {
 			name: "PreUpdateLabelSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							preUpdateLabel: "echo pre-update",
@@ -130,9 +120,7 @@ func TestContainer_GetLifecyclePreUpdateCommand(t *testing.T) {
 			name: "PreUpdateLabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -160,9 +148,7 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 			name: "PostUpdateLabelSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							postUpdateLabel: "echo post-update",
@@ -176,9 +162,7 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 			name: "PostUpdateLabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -206,9 +190,7 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 			name: "ValidTimeout",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							preUpdateTimeoutLabel: "5",
@@ -222,9 +204,7 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 			name: "InvalidTimeout",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							preUpdateTimeoutLabel: "invalid",
@@ -238,9 +218,7 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 			name: "TimeoutNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -268,9 +246,7 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 			name: "ValidTimeout",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							postUpdateTimeoutLabel: "10",
@@ -284,9 +260,7 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 			name: "InvalidTimeout",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							postUpdateTimeoutLabel: "invalid",
@@ -300,9 +274,7 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 			name: "TimeoutNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -331,9 +303,7 @@ func TestContainer_Enabled(t *testing.T) {
 			name: "EnabledTrue",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							enableLabel: "true",
@@ -348,9 +318,7 @@ func TestContainer_Enabled(t *testing.T) {
 			name: "EnabledFalse",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							enableLabel: "false",
@@ -365,9 +333,7 @@ func TestContainer_Enabled(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -380,9 +346,7 @@ func TestContainer_Enabled(t *testing.T) {
 			name: "InvalidValue",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							enableLabel: "invalid",
@@ -418,9 +382,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 			name: "LabelTruePrecedence",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							monitorOnlyLabel: "true",
@@ -440,9 +402,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 			name: "GlobalTrueNoPrecedence",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							monitorOnlyLabel: "false",
@@ -462,9 +422,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -501,9 +459,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 			name: "LabelTruePrecedence",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							noPullLabel: "true",
@@ -523,9 +479,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 			name: "GlobalTrueNoPrecedence",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							noPullLabel: "false",
@@ -545,9 +499,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -580,9 +532,7 @@ func TestContainer_Scope(t *testing.T) {
 			name: "ScopeSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "test-scope",
@@ -597,9 +547,7 @@ func TestContainer_Scope(t *testing.T) {
 			name: "ScopeNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -628,9 +576,7 @@ func TestContainer_IsWatchtower(t *testing.T) {
 			name: "IsWatchtowerTrue",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							watchtowerLabel: "true",
@@ -644,9 +590,7 @@ func TestContainer_IsWatchtower(t *testing.T) {
 			name: "IsWatchtowerFalse",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							watchtowerLabel: "false",
@@ -660,9 +604,7 @@ func TestContainer_IsWatchtower(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -689,9 +631,7 @@ func TestContainer_StopSignal(t *testing.T) {
 			name: "SignalSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							signalLabel: "SIGTERM",
@@ -705,9 +645,7 @@ func TestContainer_StopSignal(t *testing.T) {
 			name: "SignalNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -729,7 +667,7 @@ func TestContainer_StopTimeout_WhenSet(t *testing.T) {
 	timeout60 := 60
 	c := &Container{
 		containerInfo: &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Name: "/test-container",
 			Config: &dockerContainer.Config{
 				StopTimeout: &timeout60,
 				Labels:      map[string]string{},
@@ -747,7 +685,7 @@ func TestContainer_StopTimeout_WhenSetToZero(t *testing.T) {
 	timeout0 := 0
 	c := &Container{
 		containerInfo: &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
+			Name: "/test-container",
 			Config: &dockerContainer.Config{
 				StopTimeout: &timeout0,
 				Labels:      map[string]string{},
@@ -764,8 +702,8 @@ func TestContainer_StopTimeout_WhenSetToZero(t *testing.T) {
 func TestContainer_StopTimeout_WhenNotSet(t *testing.T) {
 	c := &Container{
 		containerInfo: &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/test-container",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		},
 	}
 
@@ -785,8 +723,8 @@ func TestContainer_StopTimeout_NilContainerInfo(t *testing.T) {
 func TestContainer_StopTimeout_NilConfig(t *testing.T) {
 	c := &Container{
 		containerInfo: &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/test-container"},
-			Config:            nil,
+			Name:   "/test-container",
+			Config: nil,
 		},
 	}
 
@@ -860,9 +798,7 @@ func TestContainer_getLabelValueOrEmpty(t *testing.T) {
 			name: "LabelSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "value",
@@ -877,9 +813,7 @@ func TestContainer_getLabelValueOrEmpty(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -913,9 +847,7 @@ func TestContainer_getLabelValue(t *testing.T) {
 			name: "LabelSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "value",
@@ -931,9 +863,7 @@ func TestContainer_getLabelValue(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -969,9 +899,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 			name: "TrueValue",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "true",
@@ -987,9 +915,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 			name: "FalseValue",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "false",
@@ -1005,9 +931,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 			name: "InvalidValue",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "invalid",
@@ -1023,9 +947,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -1039,9 +961,7 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 			name: "EmptyStringValue",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "",
@@ -1079,9 +999,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 			name: "UIDSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleUIDLabel: "1000",
@@ -1096,9 +1014,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 			name: "UIDNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -1111,9 +1027,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 			name: "InvalidUID",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleUIDLabel: "invalid",
@@ -1128,9 +1042,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 			name: "NegativeUID",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleUIDLabel: "-1",
@@ -1145,9 +1057,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 			name: "TooLargeUID",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleUIDLabel: "3000000000",
@@ -1179,9 +1089,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 			name: "GIDSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleGIDLabel: "1000",
@@ -1196,9 +1104,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 			name: "GIDNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -1211,9 +1117,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 			name: "InvalidGID",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleGIDLabel: "invalid",
@@ -1228,9 +1132,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 			name: "NegativeGID",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleGIDLabel: "-100",
@@ -1245,9 +1147,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 			name: "TooLargeGID",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							lifecycleGIDLabel: "5000000000",
@@ -1285,9 +1185,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 			name: "LabelTruePrecedence",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "true",
@@ -1306,9 +1204,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 			name: "LabelFalseNoPrecedence",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "false",
@@ -1327,9 +1223,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 			name: "LabelNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -1345,9 +1239,7 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 			name: "InvalidLabel",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							"test.label": "invalid",
@@ -1385,9 +1277,7 @@ func TestContainer_GetContainerChain(t *testing.T) {
 			name: "ContainerChainSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							ContainerChainLabel: "chain-value",
@@ -1402,9 +1292,7 @@ func TestContainer_GetContainerChain(t *testing.T) {
 			name: "ContainerChainNotSet",
 			c: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -1443,9 +1331,7 @@ func TestGetEffectiveScope(t *testing.T) {
 			initialScope: "",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -1459,9 +1345,7 @@ func TestGetEffectiveScope(t *testing.T) {
 			initialScope: "",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "",
@@ -1477,9 +1361,7 @@ func TestGetEffectiveScope(t *testing.T) {
 			initialScope: "",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "production",
@@ -1533,9 +1415,7 @@ func cooldownTestContainer(labelValue *string) *Container {
 
 	return &Container{
 		containerInfo: &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-				Name: "/test-container",
-			},
+			Name: "/test-container",
 			Config: &dockerContainer.Config{
 				Labels: labels,
 			},
@@ -1649,9 +1529,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 			initialScope: "",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "none",
@@ -1668,9 +1546,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 			initialScope: "preset",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "none",
@@ -1687,9 +1563,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 			initialScope: "",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{},
 					},
@@ -1704,9 +1578,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 			initialScope: "",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "", // explicitly empty
@@ -1723,9 +1595,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 			initialScope: "",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "none", // transitioning to none
@@ -1742,9 +1612,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 			initialScope: "production",
 			container: &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-						Name: "/test-container",
-					},
+					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
 							scope: "none",

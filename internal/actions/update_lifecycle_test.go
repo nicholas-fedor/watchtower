@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 						},
 					},
@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("the update action", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower.lifecycle.pre-update": "/PreUpdateReturn0.sh",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 						},
 					},
@@ -125,7 +125,7 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn75.sh",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 						},
 					},
@@ -169,7 +169,7 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn0.sh",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 						},
 					},
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					})
 
 				provider.SetStale(true)
@@ -225,7 +225,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "test-container-provider",
 						},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					})
 
 				containers := []types.Container{
@@ -294,7 +294,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					})
 
 				containerB := mockActions.CreateMockContainerWithConfig(
@@ -308,7 +308,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "test-container-c",
 						},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					})
 
 				containerA := mockActions.CreateMockContainerWithConfig(
@@ -322,7 +322,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						Labels: map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "test-container-b",
 						},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					})
 
 				containers := []types.Container{
@@ -364,7 +364,7 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 						},
 					},
@@ -410,7 +410,7 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "190",
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								}),
 						},
 					},

@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
@@ -78,7 +78,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								},
 							),
 						},
@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								},
 							),
 							mockActions.CreateMockContainerWithConfig(
@@ -140,7 +140,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								},
 							),
 						},
@@ -288,7 +288,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								},
 							),
 							// Scoped Watchtower (should be ignored by unscoped cleanup)
@@ -304,7 +304,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 										"com.centurylinklabs.watchtower":       "true",
 										"com.centurylinklabs.watchtower.scope": "prod",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								},
 							),
 							// Unscoped Watchtower (newer)
@@ -319,7 +319,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-									ExposedPorts: map[nat.Port]struct{}{},
+									ExposedPorts: dockerNetwork.PortSet{},
 								},
 							),
 						},

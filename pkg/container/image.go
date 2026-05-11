@@ -9,9 +9,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
-	dockerClient "github.com/docker/docker/client"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
@@ -204,17 +204,23 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 		"image_name": imageName,
 	})
 
-	containers, err := c.api.ContainerList(ctx, dockerContainer.ListOptions{All: true})
+	containers, err := c.api.ContainerList(
+		ctx,
+		dockerClient.ContainerListOptions{All: true},
+	)
 	if err != nil {
 		clog.WithError(err).Warn("Failed to list containers for image usage check, skipping removal")
 
 		return fmt.Errorf("cannot verify image usage: %w", err)
 	}
 
-	for _, container := range containers {
+	for _, container := range containers.Items {
 		state := container.State
 		if container.ImageID == string(imageID) &&
-			(state == dockerContainer.StateRunning || state == dockerContainer.StateRestarting || state == dockerContainer.StatePaused || state == dockerContainer.StateCreated) {
+			(state == dockerContainer.StateRunning ||
+				state == dockerContainer.StateRestarting ||
+				state == dockerContainer.StatePaused ||
+				state == dockerContainer.StateCreated) {
 			return ErrImageInUse
 		}
 	}
@@ -225,7 +231,7 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 	items, err := c.api.ImageRemove(
 		ctx,
 		string(imageID),
-		dockerImage.RemoveOptions{
+		dockerClient.ImageRemoveOptions{
 			Force:         true,
 			PruneChildren: true,
 		},
@@ -244,7 +250,7 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 
 	// Log removal details if debug is enabled.
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		logImageRemovalDetails(items, imageID, imageName)
+		logImageRemovalDetails(items.Items, imageID, imageName)
 	}
 
 	clog.Debug("Cleaned up old image")
@@ -326,7 +332,7 @@ func (c imageClient) shouldSkipPull(
 
 	warn := c.warnOnHeadFailed(sourceContainer, warnOnHeadFailed)
 	// Compare current and remote digests.
-	match, err := digest.CompareDigest(ctx, c.api, sourceContainer, registryAuth)
+	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth)
 	if err != nil {
 		clog.WithFields(logrus.Fields{
 			"match": match,
@@ -376,7 +382,7 @@ func (c imageClient) shouldSkipPull(
 func (c imageClient) performImagePull(
 	ctx context.Context,
 	imageName string,
-	opts dockerImage.PullOptions,
+	opts dockerClient.ImagePullOptions,
 	fields logrus.Fields,
 ) error {
 	clog := logrus.WithFields(fields)

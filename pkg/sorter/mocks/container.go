@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -47,8 +47,8 @@ func (c *SimpleContainer) ContainerInfo() *dockerContainer.InspectResponse {
 	}
 	// Ensure Name includes leading "/" to match Docker API behavior
 	return &dockerContainer.InspectResponse{
-		ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: name},
-		Config:            &dockerContainer.Config{Labels: map[string]string{}},
+		Name:   name,
+		Config: &dockerContainer.Config{Labels: map[string]string{}},
 	}
 }
 

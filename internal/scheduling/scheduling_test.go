@@ -2,6 +2,7 @@ package scheduling_test
 
 import (
 	"context"
+	"net/netip"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -12,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerNat "github.com/docker/go-connections/nat"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
@@ -31,8 +32,13 @@ type testContainerOption func(*dockerContainer.InspectResponse)
 func withPortBindings() testContainerOption {
 	return func(ir *dockerContainer.InspectResponse) {
 		ir.HostConfig = &dockerContainer.HostConfig{
-			PortBindings: map[dockerNat.Port][]dockerNat.PortBinding{
-				dockerNat.Port("8080/tcp"): {{HostIP: "0.0.0.0", HostPort: "8080"}},
+			PortBindings: dockerNetwork.PortMap{
+				dockerNetwork.MustParsePort("8080/tcp"): {
+					{
+						HostIP:   netip.MustParseAddr("0.0.0.0"),
+						HostPort: dockerNetwork.MustParsePort("8080/tcp").Port(),
+					},
+				},
 			},
 		}
 	}
@@ -46,9 +52,7 @@ func createTestContainer(chain string, opts ...testContainerOption) *container.C
 	}
 
 	inspectResponse := &dockerContainer.InspectResponse{
-		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-			ID: "test-container-id",
-		},
+		ID: "test-container-id",
 		Config: &dockerContainer.Config{
 			Hostname: "test-container",
 			Image:    "test-image",

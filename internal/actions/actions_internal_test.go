@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
@@ -985,7 +985,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 			time.Now(),
 			&dockerContainer.Config{
 				Labels:       map[string]string{},
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeFalse())
@@ -1003,7 +1003,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 				Labels: map[string]string{
 					"com.centurylinklabs.watchtower.depends-on": "",
 				},
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeFalse())
@@ -1021,7 +1021,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 				Labels: map[string]string{
 					"com.centurylinklabs.watchtower.depends-on": "other-container",
 				},
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeFalse())
@@ -1039,7 +1039,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 				Labels: map[string]string{
 					"com.centurylinklabs.watchtower.depends-on": "test-container",
 				},
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeTrue())
@@ -1059,7 +1059,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 					Labels: map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "other-container,test-container,another-container",
 					},
-					ExposedPorts: map[nat.Port]struct{}{},
+					ExposedPorts: dockerNetwork.PortSet{},
 				})
 			result := hasSelfDependency(container)
 			gomega.Expect(result).To(gomega.BeTrue())
@@ -1078,7 +1078,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 				Labels: map[string]string{
 					"com.centurylinklabs.watchtower.depends-on": " other-container , test-container , another-container ",
 				},
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeTrue())
@@ -1096,7 +1096,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 				Labels: map[string]string{
 					"com.centurylinklabs.watchtower.depends-on": "/test-container",
 				},
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeTrue())
@@ -1125,7 +1125,7 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 			time.Now(),
 			&dockerContainer.Config{
 				Labels:       nil, // Labels is nil
-				ExposedPorts: map[nat.Port]struct{}{},
+				ExposedPorts: dockerNetwork.PortSet{},
 			})
 		result := hasSelfDependency(container)
 		gomega.Expect(result).To(gomega.BeFalse())
@@ -1598,7 +1598,7 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 						time.Now(),
 						&dockerContainer.Config{
 							Labels:       map[string]string{},
-							ExposedPorts: map[nat.Port]struct{}{},
+							ExposedPorts: dockerNetwork.PortSet{},
 						},
 					)
 					// Mark container for restart so it will be processed.
@@ -1696,7 +1696,7 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -1767,7 +1767,7 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -1847,7 +1847,7 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -1908,7 +1908,7 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -2041,7 +2041,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 						time.Now(),
 						&dockerContainer.Config{
 							Labels:       map[string]string{},
-							ExposedPorts: map[nat.Port]struct{}{},
+							ExposedPorts: dockerNetwork.PortSet{},
 						},
 					)
 					// Mark container for restart so it will be processed.
@@ -2150,7 +2150,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -2230,7 +2230,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -2314,7 +2314,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -2379,7 +2379,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				)
 				c.SetStale(true)
@@ -2434,7 +2434,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				),
 			}
@@ -2496,7 +2496,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 					time.Now(),
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
-						ExposedPorts: map[nat.Port]struct{}{},
+						ExposedPorts: dockerNetwork.PortSet{},
 					},
 				),
 			}

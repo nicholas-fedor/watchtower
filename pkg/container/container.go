@@ -6,13 +6,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
-	dockerNetwork "github.com/docker/docker/api/types/network"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+	dockerNetwork "github.com/moby/moby/api/types/network"
+	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
@@ -28,31 +27,28 @@ const (
 type Operations interface {
 	ContainerCreate(
 		ctx context.Context,
-		config *dockerContainer.Config,
-		hostConfig *dockerContainer.HostConfig,
-		networkingConfig *dockerNetwork.NetworkingConfig,
-		platform *ocispec.Platform,
-		containerName string,
-	) (dockerContainer.CreateResponse, error)
+		options dockerClient.ContainerCreateOptions,
+	) (dockerClient.ContainerCreateResult, error)
 	ContainerStart(
 		ctx context.Context,
 		containerID string,
-		options dockerContainer.StartOptions,
-	) error
+		options dockerClient.ContainerStartOptions,
+	) (dockerClient.ContainerStartResult, error)
 	ContainerRemove(
 		ctx context.Context,
 		containerID string,
-		options dockerContainer.RemoveOptions,
-	) error
+		options dockerClient.ContainerRemoveOptions,
+	) (dockerClient.ContainerRemoveResult, error)
 	NetworkConnect(
 		ctx context.Context,
-		networkID, containerID string,
-		config *dockerNetwork.EndpointSettings,
-	) error
+		networkID string,
+		options dockerClient.NetworkConnectOptions,
+	) (dockerClient.NetworkConnectResult, error)
 	ContainerRename(
 		ctx context.Context,
-		containerID, newContainerName string,
-	) error
+		containerID string,
+		options dockerClient.ContainerRenameOptions,
+	) (dockerClient.ContainerRenameResult, error)
 }
 
 // Container represents a running Docker container managed by Watchtower.
@@ -382,9 +378,9 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 
 	config.Volumes = util.StructMapSubtract(config.Volumes, imageConfig.Volumes)
 
-	for k := range config.ExposedPorts {
-		if _, ok := imageConfig.ExposedPorts[string(k)]; ok {
-			delete(config.ExposedPorts, k) // Remove ports exposed by image.
+	for port := range config.ExposedPorts {
+		if _, ok := imageConfig.ExposedPorts[port.String()]; ok {
+			delete(config.ExposedPorts, port) // Remove ports exposed by image.
 		}
 	}
 
@@ -481,7 +477,7 @@ func (c *Container) VerifyConfiguration() error {
 	// Ensure ExposedPorts is initialized if PortBindings exist.
 	if len(c.containerInfo.HostConfig.PortBindings) > 0 &&
 		c.containerInfo.Config.ExposedPorts == nil {
-		c.containerInfo.Config.ExposedPorts = make(map[nat.Port]struct{})
+		c.containerInfo.Config.ExposedPorts = dockerNetwork.PortSet{}
 
 		clog.Debug("Initialized ExposedPorts due to PortBindings")
 	}
@@ -490,7 +486,7 @@ func (c *Container) VerifyConfiguration() error {
 	// Docker rejects ports with empty port numbers (e.g., "/tcp") with
 	// "invalid port range: value is empty" during ContainerCreate.
 	for port := range c.containerInfo.HostConfig.PortBindings {
-		portStr := string(port)
+		portStr := port.Port()
 
 		// Skip and remove completely empty port entries.
 		if portStr == "" {

@@ -2,15 +2,12 @@ package digest
 
 import (
 	"strings"
-	"sync"
 	"testing"
 )
 
 const (
 	// testDigest is a sample SHA256 digest used in benchmarks.
 	testDigest = "d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547"
-	// dummyWork is a placeholder value used in mutex critical sections.
-	dummyWork = "dummy"
 )
 
 // BenchmarkDigestsMatch benchmarks the DigestsMatch function which compares local digests
@@ -82,127 +79,7 @@ func BenchmarkNormalizeDigest(b *testing.B) {
 	}
 }
 
-// BenchmarkInspectMutexContention benchmarks the per-image inspect lock contention
-// when multiple goroutines attempt to acquire locks for the same image simultaneously.
-// This measures the overhead of the keyed mutex in concurrent scenarios.
-func BenchmarkInspectMutexContention(b *testing.B) {
-	// Simulate per-image lock/unlock with a no-op critical section
-	// This measures only the keyed mutex contention overhead
-	imageName := "nginx:latest"
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			lock, release := getImageInspectLock(imageName)
-
-			lock.Lock()
-			// Simulate minimal work inside the critical section
-			_ = dummyWork
-
-			lock.Unlock()
-			release()
-		}
-	})
-}
-
-// BenchmarkMutexLockUnlock benchmarks the raw lock/unlock operations
-// to isolate mutex overhead from any work done in the critical section.
-func BenchmarkMutexLockUnlock(b *testing.B) {
-	var mu sync.Mutex
-
-	for b.Loop() {
-		mu.Lock()
-
-		_ = dummyWork
-
-		mu.Unlock()
-	}
-}
-
-// BenchmarkMutexLockUnlockParallel benchmarks lock/unlock under concurrent contention.
-func BenchmarkMutexLockUnlockParallel(b *testing.B) {
-	var mu sync.Mutex
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			mu.Lock()
-
-			_ = dummyWork
-
-			mu.Unlock()
-		}
-	})
-}
-
-// BenchmarkStringOperations benchmarks string operations used in digest processing.
-// This includes strings.CutPrefix, strings.Split, and strings.Contains.
-func BenchmarkStringOperations(b *testing.B) {
-	testCases := []struct {
-		name   string
-		input  string
-		prefix string
-	}{
-		{
-			"with sha256 prefix",
-			"sha256:" + testDigest,
-			"sha256:",
-		},
-		{
-			"without prefix",
-			testDigest,
-			"sha256:",
-		},
-		{
-			"docker digest format",
-			"ghcr.io/example/app@sha256:" + testDigest,
-			"@",
-		},
-		{
-			"repo digest split",
-			"ghcr.io/example/app@sha256:" + testDigest,
-			"@",
-		},
-	}
-
-	for b.Loop() {
-		for _, tc := range testCases {
-			// Simulate strings.CutPrefix
-			if after, ok := strings.CutPrefix(tc.input, tc.prefix); ok {
-				_ = after
-			}
-			// Simulate strings.Split
-			_ = strings.Split(tc.input, "@")
-		}
-	}
-}
-
-// BenchmarkConcurrentDigestChecks benchmarks concurrent digest checks
-// to simulate multiple containers being checked simultaneously.
-func BenchmarkConcurrentDigestChecks(b *testing.B) {
-	numGoroutines := 10
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			for i := range numGoroutines {
-				// Simulate the per-image digest fetch pattern: lock, work, unlock.
-				imageName := "image" + string(rune('0'+i))
-
-				lock, release := getImageInspectLock(imageName)
-
-				lock.Lock()
-
-				_ = i // Simulate minimal work
-
-				lock.Unlock()
-				release()
-			}
-		}
-	})
-}
-
-// BenchmarkDigestsMatchEarlyMatch benchmarks DigestsMatch when the first digest matches.
+// BenchmarkNormalizeDigest benchmarks the NormalizeDigest function which strips
 // This is the best case scenario where the loop exits early.
 func BenchmarkDigestsMatchEarlyMatch(b *testing.B) {
 	localDigests := []string{

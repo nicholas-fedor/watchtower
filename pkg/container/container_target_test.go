@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/netip"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
-	dockerNetwork "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+	dockerNetwork "github.com/moby/moby/api/types/network"
+	dockerClient "github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
@@ -145,8 +147,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						NetworkID:  "network_bridge_id",
-						IPAddress:  "172.17.0.2",
-						MacAddress: "02:42:ac:11:00:02",
+						IPAddress:  netip.MustParseAddr("172.17.0.2"),
+						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
 						Aliases:    []string{"test-watchtower"},
 					},
 				}),
@@ -194,8 +196,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 
 		ginkgo.It("should handle ContainerCreate failure", func() {
 			createErr := errors.New("create failed")
-			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainer.CreateResponse, error) {
-				return dockerContainer.CreateResponse{}, createErr
+			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerClient.ContainerCreateResult, error) {
+				return dockerClient.ContainerCreateResult{}, createErr
 			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
@@ -235,8 +237,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 
 		ginkgo.It("should handle ContainerStart failure", func() {
 			startErr := errors.New("start failed")
-			client.startFunc = func(_ context.Context, _ string, _ dockerContainer.StartOptions) error {
-				return startErr
+			client.startFunc = func(_ context.Context, _ string, _ dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error) {
+				return dockerClient.ContainerStartResult{}, startErr
 			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
@@ -249,8 +251,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should handle ContainerCreate Conflict error", func() {
-			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainer.CreateResponse, error) {
-				return dockerContainer.CreateResponse{}, cerrdefs.ErrConflict
+			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerClient.ContainerCreateResult, error) {
+				return dockerClient.ContainerCreateResult{}, cerrdefs.ErrConflict
 			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
@@ -267,8 +269,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should handle ContainerCreate InvalidArgument error", func() {
-			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerContainer.CreateResponse, error) {
-				return dockerContainer.CreateResponse{}, cerrdefs.ErrInvalidArgument
+			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerClient.ContainerCreateResult, error) {
+				return dockerClient.ContainerCreateResult{}, cerrdefs.ErrInvalidArgument
 			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
@@ -280,8 +282,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should handle ContainerStart Conflict error", func() {
-			client.startFunc = func(_ context.Context, _ string, _ dockerContainer.StartOptions) error {
-				return cerrdefs.ErrConflict
+			client.startFunc = func(_ context.Context, _ string, _ dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error) {
+				return dockerClient.ContainerStartResult{}, cerrdefs.ErrConflict
 			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
@@ -298,8 +300,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should handle ContainerStart NotFound error", func() {
-			client.startFunc = func(_ context.Context, _ string, _ dockerContainer.StartOptions) error {
-				return cerrdefs.ErrNotFound
+			client.startFunc = func(_ context.Context, _ string, _ dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error) {
+				return dockerClient.ContainerStartResult{}, cerrdefs.ErrNotFound
 			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
@@ -350,11 +352,11 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			)
 			networkConfig = getNetworkConfig(mockCont, "1.23")
 			connectErr := errors.New("network connect failed")
-			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) error {
-				return connectErr
+			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) (dockerClient.NetworkConnectResult, error) {
+				return dockerClient.NetworkConnectResult{}, connectErr
 			}
-			client.removeFunc = func(_ context.Context, _ string, _ dockerContainer.RemoveOptions) error {
-				return nil
+			client.removeFunc = func(_ context.Context, _ string, _ dockerClient.ContainerRemoveOptions) (dockerClient.ContainerRemoveResult, error) {
+				return dockerClient.ContainerRemoveResult{}, nil
 			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
@@ -372,11 +374,11 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 
-				client.renameFunc = func(_ context.Context, _, _ string) error {
-					return errors.New("rename failed")
+				client.renameFunc = func(_ context.Context, _, _ string) (dockerClient.ContainerRenameResult, error) {
+					return dockerClient.ContainerRenameResult{}, errors.New("rename failed")
 				}
 
-				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerClient.ContainerRemoveOptions) (dockerClient.ContainerRemoveResult, error) {
 					client.removeFuncCalled.Store(true)
 
 					select {
@@ -385,7 +387,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 					default:
 					}
 
-					return nil
+					return dockerClient.ContainerRemoveResult{}, nil
 				}
 
 				newID, err := StartTargetContainer(
@@ -409,11 +411,11 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 
-				client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) error {
-					return errors.New("network connect failed")
+				client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) (dockerClient.NetworkConnectResult, error) {
+					return dockerClient.NetworkConnectResult{}, errors.New("network connect failed")
 				}
 
-				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerContainer.RemoveOptions) error {
+				client.removeFunc = func(cleanupCtx context.Context, _ string, _ dockerClient.ContainerRemoveOptions) (dockerClient.ContainerRemoveResult, error) {
 					client.removeFuncCalled.Store(true)
 
 					select {
@@ -422,7 +424,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 					default:
 					}
 
-					return nil
+					return dockerClient.ContainerRemoveResult{}, nil
 				}
 
 				newID, err := StartTargetContainer(
@@ -452,8 +454,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should return error when rename fails", func() {
-			client.renameFunc = func(_ context.Context, _, _ string) error {
-				return errors.New("rename failed")
+			client.renameFunc = func(_ context.Context, _, _ string) (dockerClient.ContainerRenameResult, error) {
+				return dockerClient.ContainerRenameResult{}, errors.New("rename failed")
 			}
 			mockCont := MockContainer(WithName("old-name"), WithID("test-id"))
 			err := RenameTargetContainer(context.Background(), client, mockCont, "new-name")
@@ -491,8 +493,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should return error when network connect fails", func() {
-			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) error {
-				return errors.New("connect failed")
+			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) (dockerClient.NetworkConnectResult, error) {
+				return dockerClient.NetworkConnectResult{}, errors.New("connect failed")
 			}
 			clog := logrus.WithField("test", "attachNetworks")
 			fullConfig := &dockerNetwork.NetworkingConfig{

@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/docker/api/types/versions"
+	"github.com/moby/moby/client/pkg/versions"
 	"github.com/sirupsen/logrus"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerNetwork "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerNetwork "github.com/moby/moby/api/types/network"
+	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -110,11 +111,12 @@ func StartTargetContainer(
 
 	createdContainer, err := api.ContainerCreate(
 		ctx,
-		config,
-		hostConfig,
-		createNetworkConfig,
-		nil,
-		"",
+		dockerClient.ContainerCreateOptions{
+			Config:           config,
+			HostConfig:       hostConfig,
+			NetworkingConfig: createNetworkConfig,
+			Name:             "",
+		},
 	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to create new container")
@@ -123,23 +125,33 @@ func StartTargetContainer(
 	}
 
 	createdContainerID := types.ContainerID(createdContainer.ID)
-	clog.WithField("new_id", createdContainerID).Debug("Created container successfully")
+	clog.WithField("new_id", createdContainerID).
+		Debug("Created container successfully")
 
 	// Rename the container to the correct name to avoid conflicts during self-update
 	clog.Debug("Renaming container to correct name")
 
-	err = api.ContainerRename(ctx, createdContainer.ID, sourceContainer.Name())
+	_, err = api.ContainerRename(
+		ctx,
+		createdContainer.ID,
+		dockerClient.ContainerRenameOptions{
+			NewName: sourceContainer.Name(),
+		},
+	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 
 		// Clean up the created container to avoid orphaned resources
-		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+		cleanupCtx, cancel := context.WithTimeout(
+			context.WithoutCancel(ctx),
+			cleanupTimeout,
+		)
 		defer cancel()
 
-		rmErr := api.ContainerRemove(
+		_, rmErr := api.ContainerRemove(
 			cleanupCtx,
 			createdContainer.ID,
-			dockerContainer.RemoveOptions{Force: true},
+			dockerClient.ContainerRemoveOptions{Force: true},
 		)
 		if rmErr != nil {
 			clog.WithError(rmErr).Warn("Failed to clean up container after rename error")
@@ -160,13 +172,16 @@ func StartTargetContainer(
 		)
 		if err != nil {
 			// Clean up the created container to avoid orphaned resources.
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+			cleanupCtx, cancel := context.WithTimeout(
+				context.WithoutCancel(ctx),
+				cleanupTimeout,
+			)
 			defer cancel()
 
-			rmErr := api.ContainerRemove(
+			_, rmErr := api.ContainerRemove(
 				cleanupCtx,
 				createdContainer.ID,
-				dockerContainer.RemoveOptions{Force: true},
+				dockerClient.ContainerRemoveOptions{Force: true},
 			)
 			if rmErr != nil {
 				clog.WithError(rmErr).
@@ -186,12 +201,13 @@ func StartTargetContainer(
 	}
 
 	// Start the newly created container.
-	clog.WithField("new_id", createdContainerID).Debug("Starting new container")
+	clog.WithField("new_id", createdContainerID).
+		Debug("Starting new container")
 
-	err = api.ContainerStart(
+	_, err = api.ContainerStart(
 		ctx,
 		createdContainer.ID,
-		dockerContainer.StartOptions{},
+		dockerClient.ContainerStartOptions{},
 	)
 	if err != nil {
 		clog.WithError(err).
@@ -248,7 +264,14 @@ func attachNetworks(
 		if name != initialNetworkName && name != "" {
 			clog.WithField("network", name).Debug("Attaching additional network to container")
 
-			err := api.NetworkConnect(ctx, name, containerID, endpoint)
+			_, err := api.NetworkConnect(
+				ctx,
+				name,
+				dockerClient.NetworkConnectOptions{
+					Container:      containerID,
+					EndpointConfig: endpoint,
+				},
+			)
 			if err != nil {
 				clog.WithError(err).
 					WithField("network", name).
@@ -289,7 +312,13 @@ func RenameTargetContainer(
 	// Attempt to rename the container.
 	clog.Debug("Renaming container")
 
-	err := api.ContainerRename(ctx, string(targetContainer.ID()), targetName)
+	_, err := api.ContainerRename(
+		ctx,
+		string(targetContainer.ID()),
+		dockerClient.ContainerRenameOptions{
+			NewName: targetName,
+		},
+	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to rename container")
 
@@ -335,6 +364,7 @@ func handleCPUSettings(
 			clog.Debug("Detected Docker, copied all CPU settings")
 		}
 	default:
-		clog.WithField("mode", cpuCopyMode).Debug("Unknown CPU copy mode, defaulting to full")
+		clog.WithField("mode", cpuCopyMode).
+			Debug("Unknown CPU copy mode, defaulting to full")
 	}
 }

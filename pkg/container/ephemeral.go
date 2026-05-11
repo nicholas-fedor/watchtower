@@ -10,8 +10,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerNetwork "github.com/docker/docker/api/types/network"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerNetwork "github.com/moby/moby/api/types/network"
+	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -153,11 +154,12 @@ func (c *client) CreateEphemeralOrchestrator(
 	// Create the container without specifying a platform.
 	resp, err := c.api.ContainerCreate(
 		ctx,
-		config,
-		hostConfig,
-		&dockerNetwork.NetworkingConfig{},
-		nil,
-		orchestratorName,
+		dockerClient.ContainerCreateOptions{
+			Config:           config,
+			HostConfig:       hostConfig,
+			NetworkingConfig: &dockerNetwork.NetworkingConfig{},
+			Name:             orchestratorName,
+		},
 	)
 	if err != nil {
 		clog.WithError(err).Error("Failed to create ephemeral orchestrator container")
@@ -171,10 +173,10 @@ func (c *client) CreateEphemeralOrchestrator(
 		Debug("Created ephemeral orchestrator container")
 
 	// Start the orchestrator container.
-	err = c.api.ContainerStart(
+	_, err = c.api.ContainerStart(
 		ctx,
 		resp.ID,
-		dockerContainer.StartOptions{},
+		dockerClient.ContainerStartOptions{},
 	)
 	if err != nil {
 		clog.WithError(err).Error("Failed to start ephemeral orchestrator container")
@@ -188,10 +190,10 @@ func (c *client) CreateEphemeralOrchestrator(
 		defer cancelCleanup()
 
 		//nolint:contextcheck // Fresh context intentional for cleanup to survive parent cancellation.
-		cleanupErr := c.api.ContainerRemove(
+		_, cleanupErr := c.api.ContainerRemove(
 			ctxCleanup,
 			resp.ID,
-			dockerContainer.RemoveOptions{Force: true},
+			dockerClient.ContainerRemoveOptions{Force: true},
 		)
 		if cleanupErr != nil {
 			clog.WithError(cleanupErr).

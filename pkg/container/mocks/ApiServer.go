@@ -13,9 +13,9 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerFilters "github.com/docker/docker/api/types/filters"
-	dockerImage "github.com/docker/docker/api/types/image"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerClient "github.com/moby/moby/client"
+	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -83,8 +83,8 @@ func GetContainerHandlers(containerRefs ...*ContainerRef) []http.HandlerFunc {
 }
 
 // Adds each status as a filter key for Docker API compatibility.
-func createFilterArgs(statuses []string) dockerFilters.Args {
-	args := dockerFilters.NewArgs()
+func createFilterArgs(statuses []string) dockerClient.Filters {
+	args := make(dockerClient.Filters)
 	for _, status := range statuses {
 		args.Add("status", status)
 	}
@@ -227,7 +227,7 @@ func GetImageHandler(imageInfo *dockerImage.InspectResponse) http.HandlerFunc {
 // Filters containers by the given statuses and serves the filtered list.
 func ListContainersHandler(statuses ...string) http.HandlerFunc {
 	filterArgs := createFilterArgs(statuses)
-	bytes, err := filterArgs.MarshalJSON()
+	bytes, err := json.Marshal(filterArgs)
 	gomega.ExpectWithOffset(1, err).ShouldNot(gomega.HaveOccurred())
 
 	query := url.Values{
@@ -236,12 +236,12 @@ func ListContainersHandler(statuses ...string) http.HandlerFunc {
 
 	return ghttp.CombineHandlers(
 		ghttp.VerifyRequest("GET", gomega.HaveSuffix("containers/json"), query.Encode()),
-		respondWithFilteredContainers(filterArgs),
+		respondWithFilteredContainers(statuses),
 	)
 }
 
-// Loads mock data from containers.json and filters it according to the provided args.
-func respondWithFilteredContainers(filters dockerFilters.Args) http.HandlerFunc {
+// Loads mock data from containers.json and filters it according to the provided statuses.
+func respondWithFilteredContainers(statuses []string) http.HandlerFunc {
 	containersJSON, err := getMockJSONFile("./mocks/data/containers.json")
 	gomega.ExpectWithOffset(assertionOffset, err).
 		ShouldNot(gomega.HaveOccurred())
@@ -256,8 +256,8 @@ func respondWithFilteredContainers(filters dockerFilters.Args) http.HandlerFunc 
 		// Offset for nested call depth
 
 	for _, v := range containers {
-		for _, key := range filters.Get("status") {
-			if v.State == key {
+		for _, status := range statuses {
+			if v.State == dockerContainer.ContainerState(status) {
 				filteredContainers = append(filteredContainers, v)
 			}
 		}

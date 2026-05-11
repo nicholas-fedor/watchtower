@@ -12,9 +12,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
-	dockerClient "github.com/docker/docker/client"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+	dockerClient "github.com/moby/moby/client"
 	gomegaTypes "github.com/onsi/gomega/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
@@ -30,9 +30,11 @@ var _ = ginkgo.Describe("the client", func() {
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = dockerClient.NewClientWithOpts(
+		docker, _ = dockerClient.New(
 			dockerClient.WithHost(mockServer.URL()),
-			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
+		)
+		mockServer.AppendHandlers(APIVersionPingHandler())
 	})
 	ginkgo.AfterEach(func() {
 		mockServer.Close()
@@ -87,10 +89,6 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.It("should log at Warn level and return ErrPullImageUnauthorized for auth failures", func() {
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
-					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:abc","RepoDigests":["private-registry.io/app@sha256:abc"]}`),
-				),
-				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
 					ghttp.RespondWith(http.StatusUnauthorized, `{"message":"unauthorized: authentication required"}`),
 				),
@@ -118,10 +116,6 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.It("should log at Debug level and return ErrPullImageNotFound for not found errors", func() {
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
-					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:def","RepoDigests":["nonexistent@sha256:def"]}`),
-				),
-				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
 					ghttp.RespondWith(http.StatusNotFound, `{"message":"manifest for nonexistent:latest not found"}`),
 				),
@@ -147,10 +141,6 @@ var _ = ginkgo.Describe("the client", func() {
 	ginkgo.When("pulling an image with a server error", func() {
 		ginkgo.It("should log at Debug level and return errPullImageFailed for other errors", func() {
 			mockServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", gomega.MatchRegexp("/images/")),
-					ghttp.RespondWith(http.StatusOK, `{"Id":"sha256:ghi","RepoDigests":["app@sha256:ghi"]}`),
-				),
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
 					ghttp.RespondWith(http.StatusInternalServerError, `{"message":"internal server error"}`),
@@ -239,7 +229,7 @@ var _ = ginkgo.Describe("the client", func() {
 							ghttp.RespondWithJSONEncoded(http.StatusOK, []dockerContainer.Summary{
 								{
 									ImageID: imageA,
-									State:   tc.state,
+									State:   dockerContainer.ContainerState(tc.state),
 								},
 							}),
 						),

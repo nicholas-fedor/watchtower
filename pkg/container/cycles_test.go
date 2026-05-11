@@ -4,7 +4,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -16,16 +16,16 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		c1.EXPECT().Name().Return("c1")
 		c1.EXPECT().Links(true).Return(nil)
 		c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c1",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 		c2.EXPECT().Name().Return("c2")
 		c2.EXPECT().Links(true).Return([]string{"c1"})
 		c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c2",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		containers := []types.Container{c1, c2}
@@ -38,16 +38,16 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		c1.EXPECT().Name().Return("c1")
 		c1.EXPECT().Links(true).Return([]string{"c2"})
 		c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c1",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 		c2.EXPECT().Name().Return("c2")
 		c2.EXPECT().Links(true).Return([]string{"c1"})
 		c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c2",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		containers := []types.Container{c1, c2}
@@ -62,24 +62,24 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		c1.EXPECT().Name().Return("c1")
 		c1.EXPECT().Links(true).Return([]string{"c2"})
 		c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c1",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 		c2.EXPECT().Name().Return("c2")
 		c2.EXPECT().Links(true).Return([]string{"c3"})
 		c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c2",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 		c3.EXPECT().Name().Return("c3")
 		c3.EXPECT().Links(true).Return([]string{"c1"})
 		c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c3"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c3",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		containers := []types.Container{c1, c2, c3}
@@ -95,8 +95,8 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		c1.EXPECT().Name().Return("c1")
 		c1.EXPECT().Links(true).Return([]string{"c1"})
 		c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c1",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		containers := []types.Container{c1}
@@ -111,8 +111,8 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		c1.EXPECT().Name().Return("c1")
 		c1.EXPECT().Links(true).Return(nil)
 		c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c1",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		// Cyclic component
@@ -120,16 +120,16 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 		c2.EXPECT().Name().Return("c2")
 		c2.EXPECT().Links(true).Return([]string{"c3"})
 		c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c2",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		c3 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 		c3.EXPECT().Name().Return("c3")
 		c3.EXPECT().Links(true).Return([]string{"c2"})
 		c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c3"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c3",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		containers := []types.Container{c1, c2, c3}
@@ -154,16 +154,16 @@ var _ = ginkgo.Describe("DetectCycles", func() {
 			Return([]string{"c2", "unknown"})
 			// c1 links to c2 (known) and unknown (not in list)
 		c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c1"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c1",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 		c2.EXPECT().Name().Return("c2")
 		c2.EXPECT().Links(true).Return([]string{"c1"}) // c2 links back to c1, creating a cycle
 		c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{Name: "/c2"},
-			Config:            &dockerContainer.Config{Labels: map[string]string{}},
+			Name:   "/c2",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
 		})
 
 		containers := []types.Container{

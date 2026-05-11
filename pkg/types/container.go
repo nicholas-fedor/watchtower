@@ -1,12 +1,11 @@
 package types
 
 import (
-	"context"
 	"strings"
 	"time"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
 )
 
 // Container defines a docker container’s interface in Watchtower.
@@ -47,14 +46,6 @@ type Container interface {
 	GetCreateHostConfig() *dockerContainer.HostConfig // Host creation config.
 	GetContainerChain() (string, bool)                // Container chain label value and presence.
 	HasExposedPorts() bool                            // Exposed ports presence check.
-}
-
-// ImageInspector defines the interface for inspecting Docker images.
-type ImageInspector interface {
-	ImageInspectWithRaw(
-		ctx context.Context,
-		image string,
-	) (dockerImage.InspectResponse, []byte, error)
 }
 
 // ImageID is a hash string for a container image.

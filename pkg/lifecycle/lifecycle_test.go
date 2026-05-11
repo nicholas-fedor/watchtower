@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -22,11 +22,9 @@ import (
 func mockedContainer(options ...func(*container.Container)) *container.Container {
 	c := container.NewContainer(
 		&dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-				ID:         "container_id",
-				HostConfig: &dockerContainer.HostConfig{},
-				Name:       "/test-container",
-			},
+			ID:         "container_id",
+			HostConfig: &dockerContainer.HostConfig{},
+			Name:       "/test-container",
 			Config: &dockerContainer.Config{
 				Labels: map[string]string{},
 			},

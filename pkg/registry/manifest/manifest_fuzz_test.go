@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	dockerImageType "github.com/docker/docker/api/types/image"
+	dockerImageType "github.com/moby/moby/api/types/image"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"

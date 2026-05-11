@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	dockerContainer "github.com/docker/docker/api/types/container"
+	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -279,9 +279,7 @@ func generateCollisionContainers(data []byte) []types.Container {
 			}
 			// Override ContainerInfo to include service label
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{
 						"com.docker.compose.service": "shared-service",
@@ -300,9 +298,7 @@ func generateCollisionContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{
 						"com.docker.compose.service": "",
@@ -321,9 +317,7 @@ func generateCollisionContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{
 						"com.docker.compose.service": fmt.Sprintf("/service%d", i),
@@ -348,9 +342,7 @@ func generateCollisionContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{
 						"com.docker.compose.service": serviceName,
@@ -423,9 +415,7 @@ func generateMalformedLabelContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
@@ -442,9 +432,7 @@ func generateMalformedLabelContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: nil,
 				},
@@ -467,9 +455,7 @@ func generateMalformedLabelContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{
 						"com.docker.compose.service": serviceName,
@@ -497,9 +483,7 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 			ContainerLinks: []string{"/dependency1", "/dependency2"},
 		}
 		container.ContainerInfoField = &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-				Name: "/container1",
-			},
+			Name: "/container1",
 			Config: &dockerContainer.Config{
 				Labels: map[string]string{},
 			},
@@ -514,9 +498,7 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			dep.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/dependency%d", i),
-				},
+				Name: fmt.Sprintf("/dependency%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
@@ -532,9 +514,7 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 			ContainerLinks: []string{"", "dependency1", ""},
 		}
 		container.ContainerInfoField = &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-				Name: "/container1",
-			},
+			Name: "/container1",
 			Config: &dockerContainer.Config{
 				Labels: map[string]string{},
 			},
@@ -547,9 +527,7 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 			ContainerLinks: []string{},
 		}
 		dep.ContainerInfoField = &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-				Name: "/dependency1",
-			},
+			Name: "/dependency1",
 			Config: &dockerContainer.Config{
 				Labels: map[string]string{},
 			},
@@ -564,15 +542,13 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 			ContainerLinks: []string{}, // Will be set via ContainerInfoField
 		}
 		container.ContainerInfoField = &dockerContainer.InspectResponse{
-			ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-				Name: "/container1",
-				HostConfig: &dockerContainer.HostConfig{
-					Links: []string{
-						"dependency1:alias1",
-						"malformed-link",
-						":empty-name",
-						"dependency2:",
-					},
+			Name: "/container1",
+			HostConfig: &dockerContainer.HostConfig{
+				Links: []string{
+					"dependency1:alias1",
+					"malformed-link",
+					":empty-name",
+					"dependency2:",
 				},
 			},
 			Config: &dockerContainer.Config{
@@ -589,9 +565,7 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			dep.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/dependency%d", i),
-				},
+				Name: fmt.Sprintf("/dependency%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
@@ -617,9 +591,7 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 			}
 
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: "/container1",
-				},
+				Name: "/container1",
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
@@ -647,9 +619,7 @@ func generateEmptyIdentifierContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: "", // Empty name
-				},
+				Name: "", // Empty name
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
@@ -678,9 +648,7 @@ func generateEmptyIdentifierContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: fmt.Sprintf("/container%d", i),
-				},
+				Name: fmt.Sprintf("/container%d", i),
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},
@@ -703,9 +671,7 @@ func generateEmptyIdentifierContainers(data []byte) []types.Container {
 				ContainerLinks: []string{},
 			}
 			container.ContainerInfoField = &dockerContainer.InspectResponse{
-				ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-					Name: "/" + name,
-				},
+				Name: "/" + name,
 				Config: &dockerContainer.Config{
 					Labels: map[string]string{},
 				},

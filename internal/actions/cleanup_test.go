@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainer "github.com/docker/docker/api/types/container"
-	dockerImage "github.com/docker/docker/api/types/image"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -1796,23 +1796,21 @@ func createMockContainer(
 	}
 
 	content := dockerContainer.InspectResponse{
-		ContainerJSONBase: &dockerContainer.ContainerJSONBase{
-			ID:    id,
-			Image: image,
-			Name:  name,
-			State: &dockerContainer.State{
-				Running:    running,
-				Restarting: restarting,
-			},
-			Created: created.Format(time.RFC3339Nano),
-			HostConfig: &dockerContainer.HostConfig{
-				PortBindings: map[nat.Port][]nat.PortBinding{},
-			},
+		ID:    id,
+		Image: image,
+		Name:  name,
+		State: &dockerContainer.State{
+			Running:    running,
+			Restarting: restarting,
+		},
+		Created: created.Format(time.RFC3339Nano),
+		HostConfig: &dockerContainer.HostConfig{
+			PortBindings: dockerNetwork.PortMap{},
 		},
 		Config: &dockerContainer.Config{
 			Image:        image,
 			Labels:       labels,
-			ExposedPorts: map[nat.Port]struct{}{},
+			ExposedPorts: dockerNetwork.PortSet{},
 		},
 	}
 
