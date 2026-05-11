@@ -79,7 +79,7 @@ func BenchmarkNormalizeDigest(b *testing.B) {
 	}
 }
 
-// BenchmarkNormalizeDigest benchmarks the NormalizeDigest function which strips
+// BenchmarkDigestsMatchEarlyMatch benchmarks the DigestsMatch function when the first digest matches.
 // This is the best case scenario where the loop exits early.
 func BenchmarkDigestsMatchEarlyMatch(b *testing.B) {
 	localDigests := []string{
