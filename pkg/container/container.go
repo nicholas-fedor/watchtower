@@ -378,6 +378,12 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 
 	config.Volumes = util.StructMapSubtract(config.Volumes, imageConfig.Volumes)
 
+	// Ensure ExposedPorts is initialized before removing image-exposed ports
+	// and adding ports from host config bindings.
+	if config.ExposedPorts == nil {
+		config.ExposedPorts = dockerNetwork.PortSet{}
+	}
+
 	for port := range config.ExposedPorts {
 		if _, ok := imageConfig.ExposedPorts[port.String()]; ok {
 			delete(config.ExposedPorts, port) // Remove ports exposed by image.
