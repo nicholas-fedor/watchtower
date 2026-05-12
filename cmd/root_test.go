@@ -1217,13 +1217,14 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		mockClient.AssertExpectations(t)
 	})
 
-	// Test with timeout context
+ 	// Test with timeout context
 	t.Run("timeout context is propagated to client", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
 		defer cancel()
 
-		// Wait for context to timeout
-		time.Sleep(time.Millisecond)
+		// Wait for context to timeout; use a duration that reliably exceeds
+		// the nanosecond deadline regardless of OS timer resolution.
+		time.Sleep(time.Millisecond * 10)
 
 		// Verify context has expired before proceeding
 		require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
