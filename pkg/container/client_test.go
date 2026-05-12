@@ -46,10 +46,14 @@ var _ = ginkgo.Describe("the client", func() {
 
 	ginkgo.BeforeEach(func() {
 		mockServer = ghttp.NewServer()
-		docker, _ = dockerClient.New(
+
+		var err error
+
+		docker, err = dockerClient.New(
 			dockerClient.WithHost(mockServer.URL()),
 			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
 		)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		mockServer.AppendHandlers(APIVersionPingHandler())
 	})
 
