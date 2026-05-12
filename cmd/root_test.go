@@ -1217,7 +1217,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		mockClient.AssertExpectations(t)
 	})
 
- 	// Test with timeout context
+	// Test with timeout context
 	t.Run("timeout context is propagated to client", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
 		defer cancel()
