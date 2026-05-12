@@ -174,22 +174,24 @@ func GetSourceContainer(
 	containerInfo := &containerResult.Container
 
 	// Resolve network mode if it references another container.
-	netType, netContainerID, found := strings.Cut(string(containerInfo.HostConfig.NetworkMode), ":")
-	if found && netType == "container" {
-		parentResult, err := api.ContainerInspect(ctx, netContainerID, dockerClient.ContainerInspectOptions{})
-		if err != nil {
-			clog.WithError(err).WithFields(logrus.Fields{
-				"container":         util.NormalizeContainerName(containerInfo.Name),
-				"network_container": netContainerID,
-			}).Warn("Unable to resolve network container")
-		} else {
-			containerInfo.HostConfig.NetworkMode = dockerContainer.NetworkMode(
-				"container:" + parentResult.Container.Name,
-			)
-			clog.WithFields(logrus.Fields{
-				"container":         util.NormalizeContainerName(containerInfo.Name),
-				"network_container": util.NormalizeContainerName(parentResult.Container.Name),
-			}).Debug("Resolved network container name")
+	if containerInfo.HostConfig != nil {
+		netType, netContainerID, found := strings.Cut(string(containerInfo.HostConfig.NetworkMode), ":")
+		if found && netType == "container" {
+			parentResult, err := api.ContainerInspect(ctx, netContainerID, dockerClient.ContainerInspectOptions{})
+			if err != nil {
+				clog.WithError(err).WithFields(logrus.Fields{
+					"container":         util.NormalizeContainerName(containerInfo.Name),
+					"network_container": netContainerID,
+				}).Warn("Unable to resolve network container")
+			} else {
+				containerInfo.HostConfig.NetworkMode = dockerContainer.NetworkMode(
+					"container:" + parentResult.Container.Name,
+				)
+				clog.WithFields(logrus.Fields{
+					"container":         util.NormalizeContainerName(containerInfo.Name),
+					"network_container": util.NormalizeContainerName(parentResult.Container.Name),
+				}).Debug("Resolved network container name")
+			}
 		}
 	}
 
