@@ -1489,13 +1489,6 @@ var _ = ginkgo.Describe("the client", func() {
 					ghttp.RespondWith(http.StatusOK, "OK"),
 				),
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
-					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
-						"ApiVersion": "1.44",
-						"Version":    "24.0.0",
-					}),
-				),
-				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/info$`)),
 					ghttp.RespondWith(http.StatusInternalServerError, "TLS connection failed"),
 				),
@@ -1568,13 +1561,6 @@ var _ = ginkgo.Describe("the client", func() {
 						ghttp.VerifyRequest("GET", "/_ping"),
 						ghttp.RespondWith(http.StatusOK, "OK"),
 					),
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
-						ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
-							"ApiVersion": "1.40",
-							"Version":    "20.10.0",
-						}),
-					),
 				)
 
 				restore := withEnvVars(map[string]string{
@@ -1596,9 +1582,6 @@ var _ = ginkgo.Describe("the client", func() {
 				ghttp.CombineHandlers(
 					ghttp.RespondWith(http.StatusOK, "OK"),
 				),
-				ghttp.CombineHandlers(
-					ghttp.RespondWith(http.StatusInternalServerError, "TLS connection failed"),
-				),
 			)
 
 			restore := withEnvVars(map[string]string{
@@ -1616,11 +1599,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 			tlsServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
-					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
-						"ApiVersion": "1.40",
-						"Version":    "20.10.0",
-					}),
+					ghttp.VerifyRequest("GET", "/_ping"),
+					ghttp.RespondWith(http.StatusOK, "OK"),
 				),
 			)
 
@@ -1643,13 +1623,6 @@ var _ = ginkgo.Describe("the client", func() {
 					ghttp.VerifyRequest("GET", "/_ping"),
 					ghttp.RespondWith(http.StatusOK, "OK"),
 				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
-					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
-						"ApiVersion": "1.40",
-						"Version":    "20.10.0",
-					}),
-				),
 			)
 
 			restore := withEnvVars(map[string]string{
@@ -1669,17 +1642,16 @@ var _ = ginkgo.Describe("the client", func() {
 				tlsServer := ghttp.NewTLSServer()
 				defer tlsServer.Close()
 
+				// First ping fails with 404 (forced version too high).
+				// Fallback client retries and succeeds.
 				tlsServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/_ping"),
 						ghttp.RespondWith(http.StatusNotFound, "page not found"),
 					),
 					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", gomega.MatchRegexp(`^/v[0-9.]+/version$`)),
-						ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
-							"ApiVersion": "1.40",
-							"Version":    "20.10.0",
-						}),
+						ghttp.VerifyRequest("GET", "/_ping"),
+						ghttp.RespondWith(http.StatusOK, "OK"),
 					),
 				)
 

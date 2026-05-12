@@ -355,68 +355,48 @@ func NewClient(opts ClientOptions) Client {
 	)
 	defer cancel()
 
-	// Initialize client with autonegotiation, ignoring DOCKER_API_VERSION initially.
+	// Initialize client from environment. FromEnv reads DOCKER_HOST, DOCKER_TLS_VERIFY,
+	// DOCKER_CERT_PATH, and DOCKER_API_VERSION. When DOCKER_API_VERSION is set, the client
+	// uses that fixed version; otherwise, it defaults to the maximum supported version
+	// with automatic negotiation enabled.
 	cli, err := dockerClient.New(dockerClient.FromEnv)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to initialize Docker client")
 	}
-	// Set default filesystem if not provided
+
+	// Set default filesystem if not provided.
 	if opts.Fs == nil {
 		opts.Fs = afero.NewOsFs()
 	}
 
-	// Apply forced API version if set and valid.
-	if version := strings.Trim(os.Getenv("DOCKER_API_VERSION"), "\""); version != "" {
-		pingCli, err := dockerClient.New(
-			dockerClient.FromEnv, // Include env config for TLS, etc.
-			dockerClient.WithAPIVersion(version),
-		)
-		if err != nil {
-			logrus.WithError(err).Fatal("Failed to create test client")
-		}
-
-		_, err = pingCli.Ping(ctx, dockerClient.PingOptions{})
-		switch {
-		case err == nil:
-			// Ping succeeded: use the forced version client
-			cli = pingCli
-		case cerrdefs.IsNotFound(err):
-			logrus.WithFields(logrus.Fields{
-				"version":  version,
-				"error":    err,
-				"endpoint": "/_ping",
-			}).Warn("Invalid API version; falling back to autonegotiation")
-
-			_, _ = cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
-		default:
-			// Other ping failure: fall back to negotiation (don't override with broken client)
-			logrus.WithFields(logrus.Fields{
-				"version":  version,
-				"error":    err,
-				"endpoint": "/_ping",
-			}).Warn("Ping failed with non-version error; falling back to autonegotiation")
-
-			_, _ = cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
-		}
-	} else {
-		_, _ = cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
-	}
-
-	// Log client and server API versions.
-	selectedVersion := cli.ClientVersion()
-
-	serverVersion, err := cli.ServerVersion(ctx, dockerClient.ServerVersionOptions{})
+	// Ping triggers API version negotiation (or validates DOCKER_API_VERSION if set).
+	result, err := cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"error":    err,
-			"endpoint": "/version",
-		}).Error("Failed to retrieve server version")
-	} else {
-		logrus.WithFields(logrus.Fields{
-			"client_version": selectedVersion,
-			"server_version": serverVersion.APIVersion,
-		}).Debug("Initialized Docker client")
+		// If DOCKER_API_VERSION was set to an incompatible value, the ping may fail
+		// with a not-found error. Recreate the client without a fixed version to allow
+		// negotiation to find a compatible API version.
+		if cerrdefs.IsNotFound(err) {
+			logrus.WithError(err).Warn("DOCKER_API_VERSION incompatible with server; falling back to autonegotiation")
+
+			cli, err = dockerClient.New(dockerClient.FromEnv, dockerClient.WithAPIVersion(""))
+			if err != nil {
+				logrus.WithError(err).Fatal("Failed to recreate Docker client")
+			}
+
+			result, err = cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
+		}
+
+		if err != nil {
+			logrus.WithError(err).Warn("Ping failed during initialization; will negotiate on first API call")
+
+			result = dockerClient.PingResult{}
+		}
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"client_version": cli.ClientVersion(),
+		"server_version": result.APIVersion,
+	}).Debug("Initialized Docker client")
 
 	return &client{
 		api:           cli,
