@@ -83,7 +83,7 @@ func CreateMockContainerWithImageInfoP(
 		ID:      id,
 		Image:   image,
 		Name:    name,
-		Created: created.String(),
+		Created: created.Format(time.RFC3339Nano),
 		HostConfig: &dockerContainer.HostConfig{
 			PortBindings: dockerNetwork.PortMap{},
 		},
@@ -186,13 +186,15 @@ func CreateMockContainerWithLinks(
 		ID:      id,
 		Image:   image,
 		Name:    name,
-		Created: created.String(),
+		Created: created.Format(time.RFC3339Nano),
 		HostConfig: &dockerContainer.HostConfig{
-			Links: links,
+			Links:        links,
+			PortBindings: dockerNetwork.PortMap{},
 		},
 		Config: &dockerContainer.Config{
-			Image:  image,
-			Labels: make(map[string]string),
+			Image:        image,
+			Labels:       make(map[string]string),
+			ExposedPorts: dockerNetwork.PortSet{},
 		},
 	}
 
