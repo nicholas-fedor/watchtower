@@ -637,6 +637,12 @@ func validateMacAddresses(
 	foundMac := false
 
 	for networkName, endpoint := range config.EndpointsConfig {
+		if endpoint == nil {
+			clog.WithField("network", networkName).Debug("Skipping nil endpoint in MAC validation")
+
+			continue
+		}
+
 		if len(endpoint.MacAddress) > 0 {
 			foundMac = true
 			// Log the found MAC address at debug level for diagnostic purposes.
