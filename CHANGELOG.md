@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update step-security/harden-runner action to v2.19.2 by @renovate[bot] in [#1617](https://github.com/nicholas-fedor/watchtower/pull/1617)
 
+### Fixed
+
+- Add missing watchtower label to Docker images by @nicholas-fedor in [#1620](https://github.com/nicholas-fedor/watchtower/pull/1620)
+
 ### Tests
 
 - Increase sleep duration to fix timer resolution race by @nicholas-fedor in [#1614](https://github.com/nicholas-fedor/watchtower/pull/1614)
