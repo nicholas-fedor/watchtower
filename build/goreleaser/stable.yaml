@@ -154,6 +154,7 @@ dockers_v2:
       org.opencontainers.image.licenses: "Apache-2.0"
       org.opencontainers.image.url: "https://github.com/nicholas-fedor/watchtower"
       org.opencontainers.image.documentation: "https://watchtower.nickfedor.com"
+      com.centurylinklabs.watchtower: "true"
 
   ##############################################################################
   # Platform-specific images - platform-prefixed tags only
@@ -181,6 +182,7 @@ dockers_v2:
       org.opencontainers.image.licenses: "Apache-2.0"
       org.opencontainers.image.url: "https://github.com/nicholas-fedor/watchtower"
       org.opencontainers.image.documentation: "https://watchtower.nickfedor.com"
+      com.centurylinklabs.watchtower: "true"
 
   - id: "watchtower-i386"
     ids: ["watchtower-binary"]
@@ -205,6 +207,7 @@ dockers_v2:
       org.opencontainers.image.licenses: "Apache-2.0"
       org.opencontainers.image.url: "https://github.com/nicholas-fedor/watchtower"
       org.opencontainers.image.documentation: "https://watchtower.nickfedor.com"
+      com.centurylinklabs.watchtower: "true"
 
   - id: "watchtower-armhf"
     ids: ["watchtower-binary"]
@@ -229,6 +232,7 @@ dockers_v2:
       org.opencontainers.image.licenses: "Apache-2.0"
       org.opencontainers.image.url: "https://github.com/nicholas-fedor/watchtower"
       org.opencontainers.image.documentation: "https://watchtower.nickfedor.com"
+      com.centurylinklabs.watchtower: "true"
 
   - id: "watchtower-arm64v8"
     ids: ["watchtower-binary"]
@@ -253,6 +257,7 @@ dockers_v2:
       org.opencontainers.image.licenses: "Apache-2.0"
       org.opencontainers.image.url: "https://github.com/nicholas-fedor/watchtower"
       org.opencontainers.image.documentation: "https://watchtower.nickfedor.com"
+      com.centurylinklabs.watchtower: "true"
 
   - id: "watchtower-riscv64"
     ids: ["watchtower-binary"]
@@ -277,6 +282,7 @@ dockers_v2:
       org.opencontainers.image.licenses: "Apache-2.0"
       org.opencontainers.image.url: "https://github.com/nicholas-fedor/watchtower"
       org.opencontainers.image.documentation: "https://watchtower.nickfedor.com"
+      com.centurylinklabs.watchtower: "true"
 
 ################################################################################
 # Software Bill of Materials (SBOM) Configuration
