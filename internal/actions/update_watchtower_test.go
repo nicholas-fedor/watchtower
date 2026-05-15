@@ -117,6 +117,51 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.Equal(int32(0)), "RenameContainer should not be called with no-restart")
 		})
 
+		ginkgo.It("should stop and recreate non-Watchtower containers with no-restart", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"nginx",
+							"/nginx",
+							"nginx:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{},
+							}),
+					},
+					Staleness: map[string]bool{
+						"nginx": true,
+					},
+				},
+				false,
+				false,
+			)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:     true,
+					NoRestart:   true,
+					Filter:      filters.NoFilter,
+					CPUCopyMode: "auto",
+				},
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).
+				To(gomega.HaveLen(1), "Non-Watchtower container should be updated with no-restart")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.HaveLen(1), "Cleanup info should be collected for updated container")
+			gomega.Expect(client.TestData.StopContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "Container should be stopped")
+			gomega.Expect(client.TestData.CreateContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "Container should be created with no-restart")
+			gomega.Expect(client.TestData.StartContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "Container should not be started with no-restart")
+		})
+
 		ginkgo.It("should not rename Watchtower container in run-once mode", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{

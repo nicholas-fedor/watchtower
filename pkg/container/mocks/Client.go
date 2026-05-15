@@ -40,6 +40,72 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+// CreateContainer provides a mock function for the type MockClient
+func (_mock *MockClient) CreateContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
+	ret := _mock.Called(ctx, container)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateContainer")
+	}
+
+	var r0 types.ContainerID
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container) (types.ContainerID, error)); ok {
+		return returnFunc(ctx, container)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container) types.ContainerID); ok {
+		r0 = returnFunc(ctx, container)
+	} else {
+		r0 = ret.Get(0).(types.ContainerID)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container) error); ok {
+		r1 = returnFunc(ctx, container)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_CreateContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateContainer'
+type MockClient_CreateContainer_Call struct {
+	*mock.Call
+}
+
+// CreateContainer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - container types.Container
+func (_e *MockClient_Expecter) CreateContainer(ctx interface{}, container interface{}) *MockClient_CreateContainer_Call {
+	return &MockClient_CreateContainer_Call{Call: _e.mock.On("CreateContainer", ctx, container)}
+}
+
+func (_c *MockClient_CreateContainer_Call) Run(run func(ctx context.Context, container types.Container)) *MockClient_CreateContainer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.Container
+		if args[1] != nil {
+			arg1 = args[1].(types.Container)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_CreateContainer_Call) Return(containerID types.ContainerID, err error) *MockClient_CreateContainer_Call {
+	_c.Call.Return(containerID, err)
+	return _c
+}
+
+func (_c *MockClient_CreateContainer_Call) RunAndReturn(run func(ctx context.Context, container types.Container) (types.ContainerID, error)) *MockClient_CreateContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateEphemeralOrchestrator provides a mock function for the type MockClient
 func (_mock *MockClient) CreateEphemeralOrchestrator(ctx context.Context, sourceContainer types.Container, newImage string, containerChain string) (types.ContainerID, error) {
 	ret := _mock.Called(ctx, sourceContainer, newImage, containerChain)

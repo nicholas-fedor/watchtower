@@ -277,7 +277,7 @@ Environment Variable: WATCHTOWER_INCLUDE_RESTARTING
 
 ### Disable Container Restart
 
-Prevents restarting containers after updating.
+Stops and removes the old containers and creates new ones with the updated image, but does not start the new containers.
 This is useful when an external system (e.g., systemd) manages the container lifecycle.
 
 ```text

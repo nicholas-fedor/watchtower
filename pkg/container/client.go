@@ -133,6 +133,18 @@ type Client interface {
 	//   - error: Non-nil if stop/removal fails, nil on success.
 	StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error
 
+	// CreateContainer creates a new container based on the provided
+	// container's configuration, but does not start it.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Source container to replicate.
+	//
+	// Returns:
+	//   - types.ContainerID: ID of the new container.
+	//   - error: Non-nil if creation fails, nil on success.
+	CreateContainer(ctx context.Context, container types.Container) (types.ContainerID, error)
+
 	// StartContainer creates and starts a new container based on the provided
 	// container's configuration.
 	//
@@ -619,6 +631,59 @@ func (c *client) StopAndRemoveContainer(ctx context.Context, container types.Con
 	return nil
 }
 
+// CreateContainer creates a new container based on the provided
+// container's configuration, but does not start it.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - container: Source container to replicate.
+//
+// Returns:
+//   - types.ContainerID: ID of the new container.
+//   - error: Non-nil if creation fails, nil on success.
+func (c *client) CreateContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+	// Determine if the container runtime is Podman to handle runtime-specific differences.
+	//
+	//nolint:contextcheck // getRuntime uses context.Background() internally for cached detection
+	isPodman := c.getRuntime()
+
+	clientVersion := c.GetVersion()
+
+	logrus.WithFields(fields).WithField("client_version", clientVersion).
+		Debug("Obtaining source container network configuration")
+
+	// Get unified network config.
+	networkConfig := getNetworkConfig(container, clientVersion)
+
+	// Create new container with selected config.
+	newID, err := CreateTargetContainer(
+		ctx,
+		c.api,
+		container,
+		networkConfig,
+		clientVersion,
+		flags.DockerAPIMinVersion, // Docker API Version 1.24
+		c.DisableMemorySwappiness,
+		c.CPUCopyMode,
+		isPodman,
+	)
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Debug("Failed to create new container")
+
+		return "", err
+	}
+
+	logrus.WithFields(fields).
+		WithField("new_id", newID.ShortID()).
+		Debug("Created new container")
+
+	return newID, nil
+}
+
 // StartContainer creates and starts a new container based on an
 // existing container's configuration.
 //
@@ -634,6 +699,7 @@ func (c *client) StartContainer(ctx context.Context, container types.Container) 
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
+
 	// Determine if the container runtime is Podman to handle runtime-specific differences.
 	//
 	//nolint:contextcheck // getRuntime uses context.Background() internally for cached detection
