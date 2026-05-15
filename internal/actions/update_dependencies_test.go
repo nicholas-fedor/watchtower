@@ -415,8 +415,9 @@ var _ = ginkgo.Describe("the update action", func() {
 						"container-b": true,
 						"container-c": true,
 					},
-					StopOrder:  []string{},
-					StartOrder: []string{},
+					StopOrder:   []string{},
+					CreateOrder: []string{},
+					StartOrder:  []string{},
 				},
 				false,
 				false,
@@ -432,8 +433,8 @@ var _ = ginkgo.Describe("the update action", func() {
 			// Verify stop order: dependents first (reverse dependency order)
 			gomega.Expect(client.TestData.StopOrder).
 				To(gomega.Equal([]string{"container-a", "container-b", "container-c"}))
-			// Verify start order: dependencies first
-			gomega.Expect(client.TestData.StartOrder).
+			// Verify create order: dependencies first
+			gomega.Expect(client.TestData.CreateOrder).
 				To(gomega.Equal([]string{"container-c", "container-b", "container-a"}))
 		})
 	})
@@ -1297,8 +1298,9 @@ var _ = ginkgo.Describe("the update action", func() {
 						"app-2": false,
 						"app-3": false,
 					},
-					StopOrder:  []string{},
-					StartOrder: []string{},
+					StopOrder:   []string{},
+					CreateOrder: []string{},
+					StartOrder:  []string{},
 				},
 				false,
 				false,
@@ -1330,13 +1332,13 @@ var _ = ginkgo.Describe("the update action", func() {
 			// db should be last in stop order
 			gomega.Expect(stopOrder[len(stopOrder)-1]).To(gomega.Equal("db"))
 
-			// Verify start order: db first, then dependents
-			startOrder := client.TestData.StartOrder
-			gomega.Expect(startOrder).To(gomega.HaveLen(4))
-			gomega.Expect(startOrder[0]).To(gomega.Equal("db"))
-			gomega.Expect(startOrder).To(gomega.ContainElement("app-1"))
-			gomega.Expect(startOrder).To(gomega.ContainElement("app-2"))
-			gomega.Expect(startOrder).To(gomega.ContainElement("app-3"))
+			// Verify create order: db first, then dependents
+			createOrder := client.TestData.CreateOrder
+			gomega.Expect(createOrder).To(gomega.HaveLen(4))
+			gomega.Expect(createOrder[0]).To(gomega.Equal("db"))
+			gomega.Expect(createOrder).To(gomega.ContainElement("app-1"))
+			gomega.Expect(createOrder).To(gomega.ContainElement("app-2"))
+			gomega.Expect(createOrder).To(gomega.ContainElement("app-3"))
 		})
 	})
 
@@ -1743,8 +1745,9 @@ var _ = ginkgo.Describe("the update action", func() {
 						"c-service2": true,
 						"d-service3": true,
 					},
-					StopOrder:  []string{},
-					StartOrder: []string{},
+					StopOrder:   []string{},
+					CreateOrder: []string{},
+					StartOrder:  []string{},
 				},
 				false,
 				false,
@@ -1765,8 +1768,8 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(client.TestData.StopOrder).
 				To(gomega.Equal([]string{"c-service2", "b-service1", "d-service3"}))
 
-			// Verify start order: dependency order
-			gomega.Expect(client.TestData.StartOrder).
+			// Verify create order: dependency order
+			gomega.Expect(client.TestData.CreateOrder).
 				To(gomega.Equal([]string{"d-service3", "b-service1", "c-service2"}))
 
 			// Verify cleanup for updated containers

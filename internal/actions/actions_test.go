@@ -261,10 +261,10 @@ var _ = ginkgo.Describe("Actions", func() {
 
 					gomega.Expect(metric).NotTo(gomega.BeNil())
 					// Only container1 should be updated, container2 should be skipped due to CurrentContainerID
-					gomega.Expect(client.TestData.StartOrder).To(gomega.HaveLen(1))
-					gomega.Expect(client.TestData.StartOrder).
+					gomega.Expect(client.TestData.CreateOrder).To(gomega.HaveLen(1))
+					gomega.Expect(client.TestData.CreateOrder).
 						To(gomega.ContainElement("watchtower-1"))
-					gomega.Expect(client.TestData.StartOrder).
+					gomega.Expect(client.TestData.CreateOrder).
 						To(gomega.Not(gomega.ContainElement("watchtower-2")))
 				},
 			)
@@ -1163,16 +1163,16 @@ var _ = ginkgo.Describe("Actions", func() {
 				wg.Wait()
 
 				// Verify scope isolation through separate TestData tracking
-				// client1 should only start scope1-watchtower
-				gomega.Expect(client1.TestData.StartOrder).
+				// client1 should only create scope1-watchtower
+				gomega.Expect(client1.TestData.CreateOrder).
 					To(gomega.ContainElement("scope1-watchtower"))
-				gomega.Expect(client1.TestData.StartOrder).
+				gomega.Expect(client1.TestData.CreateOrder).
 					NotTo(gomega.ContainElement("scope2-watchtower"))
 
-				// client2 should only start scope2-watchtower
-				gomega.Expect(client2.TestData.StartOrder).
+				// client2 should only create scope2-watchtower
+				gomega.Expect(client2.TestData.CreateOrder).
 					To(gomega.ContainElement("scope2-watchtower"))
-				gomega.Expect(client2.TestData.StartOrder).
+				gomega.Expect(client2.TestData.CreateOrder).
 					NotTo(gomega.ContainElement("scope1-watchtower"))
 			},
 		)

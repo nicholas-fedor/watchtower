@@ -1299,8 +1299,9 @@ var _ = ginkgo.Describe("the update action", func() {
 							"priority-b": false,
 							"priority-a": false,
 						},
-						StopOrder:  []string{},
-						StartOrder: []string{},
+						StopOrder:   []string{},
+						CreateOrder: []string{},
+						StartOrder:  []string{},
 					},
 					false,
 					false,
@@ -1321,10 +1322,10 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 				gomega.Expect(report.Restarted()).To(gomega.HaveLen(2))
 
-				// Verify start order respects dependencies (dependencies first)
-				gomega.Expect(client.TestData.StartOrder).To(gomega.ContainElement("priority-c"))
-				gomega.Expect(client.TestData.StartOrder).To(gomega.ContainElement("priority-b"))
-				gomega.Expect(client.TestData.StartOrder).To(gomega.ContainElement("priority-a"))
+				// Verify create order respects dependencies (dependencies first)
+				gomega.Expect(client.TestData.CreateOrder).To(gomega.ContainElement("priority-c"))
+				gomega.Expect(client.TestData.CreateOrder).To(gomega.ContainElement("priority-b"))
+				gomega.Expect(client.TestData.CreateOrder).To(gomega.ContainElement("priority-a"))
 			})
 
 			ginkgo.It("should handle mixed update types in restart sequences", func() {

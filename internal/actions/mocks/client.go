@@ -52,6 +52,7 @@ type TestData struct {
 	RemoveImageError             error                                 // Error to return from RemoveImageByID (for testing).
 	FailedImageIDs               []types.ImageID                       // List of image IDs that should fail removal.
 	StopOrder                    []string                              // Order in which containers were stopped.
+	CreateOrder                  []string                              // Order in which containers were created.
 	StartOrder                   []string                              // Order in which containers were started.
 	SimulatedLatency             time.Duration                         // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
 	LastContainerChain           string                                // Last container chain passed to CreateEphemeralOrchestrator.
@@ -213,7 +214,7 @@ func (client MockClient) CreateContainer(ctx context.Context, c types.Container)
 		return "", client.TestData.CreateContainerError
 	}
 
-	client.TestData.StartOrder = append(client.TestData.StartOrder, c.Name())
+	client.TestData.CreateOrder = append(client.TestData.CreateOrder, c.Name())
 
 	return c.ID(), nil
 }

@@ -1775,7 +1775,8 @@ func restartStaleContainer(
 	}
 
 	// Create the new container with updated configuration.
-	newContainerID, err := client.CreateContainer(ctx, sourceContainer)
+	//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+	newContainerID, err := client.CreateContainer(detachedCtx, sourceContainer)
 	if err != nil {
 		logrus.WithFields(fields).
 			WithError(err).
@@ -1796,7 +1797,8 @@ func restartStaleContainer(
 		logrus.WithFields(fields).
 			Debug("Starting container with updated configuration")
 
-		err = client.StartContainerByID(ctx, newContainerID)
+		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+		err = client.StartContainerByID(detachedCtx, newContainerID)
 		if err != nil {
 			logrus.WithFields(fields).
 				WithError(err).

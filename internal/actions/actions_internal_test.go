@@ -2436,8 +2436,9 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 						"container-1": true,
 						"container-2": true,
 					},
-					StopOrder:  []string{},
-					StartOrder: []string{},
+					StopOrder:   []string{},
+					CreateOrder: []string{},
+					StartOrder:  []string{},
 				},
 				false,
 				false,
@@ -2455,11 +2456,11 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 				nil,
 			)
 
-			// Verify start order is forward (container-0, container-1, container-2).
-			gomega.Expect(client.TestData.StartOrder).To(gomega.HaveLen(3))
-			gomega.Expect(client.TestData.StartOrder[0]).To(gomega.Equal("container-0"))
-			gomega.Expect(client.TestData.StartOrder[1]).To(gomega.Equal("container-1"))
-			gomega.Expect(client.TestData.StartOrder[2]).To(gomega.Equal("container-2"))
+			// Verify create order is forward (container-0, container-1, container-2).
+			gomega.Expect(client.TestData.CreateOrder).To(gomega.HaveLen(3))
+			gomega.Expect(client.TestData.CreateOrder[0]).To(gomega.Equal("container-0"))
+			gomega.Expect(client.TestData.CreateOrder[1]).To(gomega.Equal("container-1"))
+			gomega.Expect(client.TestData.CreateOrder[2]).To(gomega.Equal("container-2"))
 		})
 	})
 
