@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Restore no-restart flag to only skip container start by @nicholas-fedor in [#1626](https://github.com/nicholas-fedor/watchtower/pull/1626)
 - Add missing watchtower label to Docker images by @nicholas-fedor in [#1620](https://github.com/nicholas-fedor/watchtower/pull/1620)
 
 ### Tests
