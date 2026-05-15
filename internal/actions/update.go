@@ -1830,6 +1830,10 @@ func restartStaleContainer(
 				)
 		}
 
+		logrus.WithFields(fields).
+			WithField("new_id", newContainerID.ShortID()).
+			Info("Started new container")
+
 		// Run post-update lifecycle hooks for restarting containers if enabled.
 		if sourceContainer.ToRestart() && config.LifecycleHooks {
 			logrus.WithFields(fields).
