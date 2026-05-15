@@ -1785,7 +1785,7 @@ func restartStaleContainer(
 			renamed,
 			fmt.Errorf(
 				"%w: %w",
-				errStartContainerFailed,
+				errCreateContainerFailed,
 				err,
 			)
 	}
