@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.0.9 by @renovate[bot] in [#1639](https://github.com/nicholas-fedor/watchtower/pull/1639)
 - Update goreleaser/goreleaser-action action to v7.2.2 by @renovate[bot] in [#1637](https://github.com/nicholas-fedor/watchtower/pull/1637)
 - Update module github.com/docker/cli to v29.5.1+incompatible by @renovate[bot] in [#1635](https://github.com/nicholas-fedor/watchtower/pull/1635)
 - Update codecov/codecov-action action to v6.0.1 by @renovate[bot] in [#1634](https://github.com/nicholas-fedor/watchtower/pull/1634)
