@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.36.0 by @renovate[bot] in [#1660](https://github.com/nicholas-fedor/watchtower/pull/1660)
+- Update docker/login-action action to v4.2.0 by @renovate[bot] in [#1659](https://github.com/nicholas-fedor/watchtower/pull/1659)
 - Update module golang.org/x/net to v0.55.0 by @renovate[bot] in [#1655](https://github.com/nicholas-fedor/watchtower/pull/1655)
 - Update golangci/golangci-lint-action action to v9.2.1 by @renovate[bot] in [#1654](https://github.com/nicholas-fedor/watchtower/pull/1654)
 - Update module golang.org/x/sys to v0.45.0 by @renovate[bot] in [#1651](https://github.com/nicholas-fedor/watchtower/pull/1651)
