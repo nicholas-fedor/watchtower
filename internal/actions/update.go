@@ -1791,9 +1791,10 @@ func restartStaleContainer(
 			)
 	}
 
-	// Start the new container unless restarts are disabled.
-	// Watchtower containers are always started.
-	if !config.NoRestart || sourceContainer.IsWatchtower() {
+	// Start the new container based on restart settings:
+	// - Watchtower containers bypass the NoRestart check
+	// - All containers (including Watchtower) start only if they were running or ReviveStopped is enabled
+	if (!config.NoRestart || sourceContainer.IsWatchtower()) && (sourceContainer.IsRunning() || config.ReviveStopped) {
 		logrus.WithFields(fields).
 			Debug("Starting container with updated configuration")
 
