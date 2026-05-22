@@ -43,6 +43,7 @@ type RunUpdatesWithNotificationsParams struct {
 	Filter                       types.Filter      // Container filter determining which containers are targeted
 	Cleanup                      bool              // Remove old images after container updates
 	NoRestart                    bool              // Prevent containers from being restarted after updates
+	ReviveStopped                bool              // Start stopped containers after update if true.
 	MonitorOnly                  bool              // Monitor containers without performing updates
 	LifecycleHooks               bool              // Enable pre- and post-update lifecycle hook commands
 	RollingRestart               bool              // Update containers sequentially rather than all at once
@@ -102,6 +103,7 @@ func RunUpdatesWithNotifications(
 		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
 		EphemeralSelfUpdate: params.EphemeralSelfUpdate, // Use ephemeral container for self-update if true
 		CooldownDelay:       params.CooldownDelay,       // Minimum time since image creation before allowing updates
+		ReviveStopped:       params.ReviveStopped,       // Start stopped containers after update if true
 	}
 
 	// Execute the container update operation

@@ -9,6 +9,7 @@ type UpdateParams struct {
 	Filter              Filter        // Container filter.
 	Cleanup             bool          // Remove old images if true.
 	NoRestart           bool          // Skip restarts if true.
+	ReviveStopped       bool          // Start stopped containers after update if true.
 	Timeout             time.Duration // Update timeout.
 	MonitorOnly         bool          // Monitor without updating if true.
 	NoPull              bool          // Skip image pulls if true.

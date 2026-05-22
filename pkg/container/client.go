@@ -743,9 +743,9 @@ func (c *client) StartContainer(ctx context.Context, container types.Container) 
 //
 // Unlike StartContainer, this does not create a new container from a source
 // configuration. It directly starts an existing, already-created container
-// using the Docker API's ContainerStart method. This bypasses the reviveStopped
-// check that prevents StartContainer from starting new containers when the
-// source container is stopped.
+// using the Docker API's ContainerStart method. Callers are responsible for
+// checking whether the container should be started (e.g., the reviveStopped
+// and noRestart checks in restartStaleContainer).
 //
 // This method is used by the ephemeral orchestrator to start the new container
 // after the old one has been stopped during the self-update sequence.

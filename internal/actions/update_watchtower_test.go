@@ -162,6 +162,95 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.Equal(int32(0)), "Container should not be started with no-restart")
 		})
 
+		ginkgo.It("should not start a stopped container after update without revive-stopped", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"stopped-nginx",
+							"/stopped-nginx",
+							"nginx:latest",
+							false,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{},
+							}),
+					},
+					Staleness: map[string]bool{
+						"stopped-nginx": true,
+					},
+				},
+				false,
+				false,
+			)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:     true,
+					Filter:      filters.NoFilter,
+					CPUCopyMode: "auto",
+				},
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).
+				To(gomega.HaveLen(1), "Stopped container should be updated")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.HaveLen(1), "Cleanup info should be collected for updated container")
+			gomega.Expect(client.TestData.StopContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "Container should be stopped")
+			gomega.Expect(client.TestData.CreateContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "Container should be created")
+			gomega.Expect(client.TestData.StartContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "Stopped container should not be started without revive-stopped")
+		})
+
+		ginkgo.It("should start a stopped container after update with revive-stopped", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"stopped-nginx",
+							"/stopped-nginx",
+							"nginx:latest",
+							false,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{},
+							}),
+					},
+					Staleness: map[string]bool{
+						"stopped-nginx": true,
+					},
+				},
+				false,
+				false,
+			)
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:       true,
+					Filter:        filters.NoFilter,
+					CPUCopyMode:   "auto",
+					ReviveStopped: true,
+				},
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).
+				To(gomega.HaveLen(1), "Stopped container should be updated with revive-stopped")
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.HaveLen(1), "Cleanup info should be collected for updated container")
+			gomega.Expect(client.TestData.StopContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "Container should be stopped")
+			gomega.Expect(client.TestData.CreateContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "Container should be created")
+			gomega.Expect(client.TestData.StartContainerCount.Load()).
+				To(gomega.Equal(int32(1)), "Stopped container should be started with revive-stopped")
+		})
+
 		ginkgo.It("should not rename Watchtower container in run-once mode", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{

@@ -61,6 +61,12 @@ var (
 	// useful when users prefer manual restart control or want to minimize downtime during updates.
 	noRestart bool
 
+	// reviveStopped is a boolean flag that starts stopped containers after an update.
+	//
+	// It is set in preRun via the --revive-stopped flag or the WATCHTOWER_REVIVE_STOPPED environment variable,
+	// allowing users to have Watchtower start containers that were originally stopped before the update.
+	reviveStopped bool
+
 	// noPull is a boolean flag that skips pulling new images from the registry during updates.
 	//
 	// It is enabled in preRun via the --no-pull flag or the WATCHTOWER_NO_PULL environment variable,
@@ -203,6 +209,18 @@ var (
 	rootCmd = NewRootCommand()
 )
 
+// init registers command-line flags for the root command during package initialization.
+//
+// It invokes functions from the flags package to set default values and register flags for Docker configuration
+// (e.g., --host), system behavior (e.g., --interval), and notifications (e.g., --notifications), establishing
+// the CLI’s configurable parameters before execution begins.
+func init() {
+	flags.SetDefaults()
+	flags.RegisterDockerFlags(rootCmd)
+	flags.RegisterSystemFlags(rootCmd)
+	flags.RegisterNotificationFlags(rootCmd)
+}
+
 // NewRootCommand creates and configures the root command for the Watchtower CLI.
 //
 // It establishes the base usage string ("watchtower"), a short description summarizing its purpose,
@@ -221,18 +239,6 @@ func NewRootCommand() *cobra.Command {
 		PreRun: preRun,
 		Args:   cobra.ArbitraryArgs, // Permits any number of positional arguments, processed as container names later.
 	}
-}
-
-// init registers command-line flags for the root command during package initialization.
-//
-// It invokes functions from the flags package to set default values and register flags for Docker configuration
-// (e.g., --host), system behavior (e.g., --interval), and notifications (e.g., --notifications), establishing
-// the CLI’s configurable parameters before execution begins.
-func init() {
-	flags.SetDefaults()
-	flags.RegisterDockerFlags(rootCmd)
-	flags.RegisterSystemFlags(rootCmd)
-	flags.RegisterNotificationFlags(rootCmd)
 }
 
 // Execute runs the root command and manages any errors encountered during its execution.
@@ -350,7 +356,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 	noPull, _ = flagsSet.GetBool("no-pull")
 	includeStopped, _ := flagsSet.GetBool("include-stopped")
 	includeRestarting, _ := flagsSet.GetBool("include-restarting")
-	reviveStopped, _ := flagsSet.GetBool("revive-stopped")
+	reviveStopped, _ = flagsSet.GetBool("revive-stopped")
 	removeVolumes, _ := flagsSet.GetBool("remove-volumes")
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
 	disableMemorySwappiness, _ := flagsSet.GetBool("disable-memory-swappiness")
@@ -609,6 +615,7 @@ func runMain(cfg types.RunConfig) int {
 			Filter:                       filter,                       // Container filter determining which containers are targeted
 			Cleanup:                      params.Cleanup,               // Remove old images after container updates
 			NoRestart:                    noRestart,                    // Prevent containers from being restarted after updates
+			ReviveStopped:                params.ReviveStopped,         // Start stopped containers after update if true
 			MonitorOnly:                  params.MonitorOnly,           // Monitor containers without performing updates
 			LifecycleHooks:               lifecycleHooks,               // Enable pre- and post-update lifecycle hook commands
 			RollingRestart:               rollingRestart,               // Update containers sequentially rather than all at once
@@ -673,6 +680,7 @@ func runMain(cfg types.RunConfig) int {
 			UseComposeDependsOn: useComposeDependsOn,
 			SkipSelfUpdate:      false, // SkipSelfUpdate is dynamically set in RunUpgradesOnSchedule based on skipFirstRun
 			CooldownDelay:       cooldownDelay,
+			ReviveStopped:       reviveStopped,
 		}
 		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
