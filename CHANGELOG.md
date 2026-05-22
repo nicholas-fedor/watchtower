@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update module github.com/docker/cli to v29.5.2+incompatible by @renovate[bot] in [#1643](https://github.com/nicholas-fedor/watchtower/pull/1643)
 - Update docker/dockerfile:1 docker digest to 87999aa by @renovate[bot] in [#1641](https://github.com/nicholas-fedor/watchtower/pull/1641)
 
+### Fixed
+
+- Restore revive-stopped configuration handling by @nicholas-fedor in [#1657](https://github.com/nicholas-fedor/watchtower/pull/1657)
+
 ## [1.17.1] - 2026-05-19
 
 ### Changed
