@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/net to v0.55.0 by @renovate[bot] in [#1655](https://github.com/nicholas-fedor/watchtower/pull/1655)
+- Update golangci/golangci-lint-action action to v9.2.1 by @renovate[bot] in [#1654](https://github.com/nicholas-fedor/watchtower/pull/1654)
 - Update module golang.org/x/sys to v0.45.0 by @renovate[bot] in [#1651](https://github.com/nicholas-fedor/watchtower/pull/1651)
 - Update cimg/go:1.26.3 docker digest to 9a5aff9 by @renovate[bot] in [#1650](https://github.com/nicholas-fedor/watchtower/pull/1650)
 - Update step-security/harden-runner action to v2.19.4 by @renovate[bot] in [#1647](https://github.com/nicholas-fedor/watchtower/pull/1647)
