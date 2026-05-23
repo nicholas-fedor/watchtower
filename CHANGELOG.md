@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replace curly apostrophes with straight apostrophes by @nicholas-fedor in [#1667](https://github.com/nicholas-fedor/watchtower/pull/1667)
+
 ### Chores
 
 - Update docker/setup-buildx-action action to v4.1.0 by @renovate[bot] in [#1662](https://github.com/nicholas-fedor/watchtower/pull/1662)
