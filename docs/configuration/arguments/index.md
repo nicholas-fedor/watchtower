@@ -932,7 +932,7 @@ Sets the timeout (e.g., `30s`) before forcibly stopping a container during updat
 ```text
             Argument: --stop-timeout
 Environment Variable: WATCHTOWER_TIMEOUT
-                Type: Duration
+                Type: Duration (e.g., 30s, 1m, 5m)
               Default: 30s
 ```
 

@@ -281,9 +281,16 @@ func preRun(cmd *cobra.Command, _ []string) {
 	flags.GetSecretsFromFiles(cmd)
 	cleanup, noRestart, monitorOnly, timeout = flags.ReadFlags(cmd)
 
-	// Validate the timeout value to ensure it’s non-negative, preventing invalid stop durations.
+	// Validate the timeout value to ensure it's non-negative, preventing invalid stop durations.
 	if timeout < 0 {
 		logrus.Fatal("Please specify a positive value for timeout value.")
+	}
+
+	// Warn if timeout is unreasonably small, which likely indicates a configuration
+	// error (such as passing a raw value without a time duration unit).
+	if timeout > 0 && timeout < time.Second {
+		logrus.WithField("timeout", timeout).
+			Warn("WATCHTOWER_TIMEOUT is less than 1 second")
 	}
 
 	// Set additional configuration flags that control update behavior and scope.
