@@ -92,7 +92,7 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"stop-timeout",
 		"t",
 		envDuration("WATCHTOWER_TIMEOUT"),
-		"Timeout before a container is forcefully stopped")
+		"Timeout before a container is forcefully stopped (e.g., 30s, 1m, 5m)")
 
 	flags.StringP(
 		"cooldown-delay",
