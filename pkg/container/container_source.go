@@ -653,12 +653,12 @@ func validateMacAddresses(
 		}
 	}
 
-	// Retrieve container state to determine if it’s running, which affects MAC address expectations.
+	// Retrieve container state to determine if it's running, which affects MAC address expectations.
 	// Non-running containers (e.g., created, exited) typically lack MAC addresses due to inactive network interfaces.
 	containerInfo := sourceContainer.ContainerInfo()
 	isRunning := sourceContainer.IsRunning()
 
-	// Extract the container’s state (e.g., "running", "created", "exited") for logging context.
+	// Extract the container's state (e.g., "running", "created", "exited") for logging context.
 	// Use "unknown" as a fallback if container metadata is incomplete to ensure safe logging.
 	containerState := "unknown"
 	if containerInfo != nil && containerInfo.State != nil {
@@ -680,7 +680,7 @@ func validateMacAddresses(
 		return nil
 	}
 
-	// Handle host network mode, where the container uses the host’s network stack and should not have its own MAC addresses.
+	// Handle host network mode, where the container uses the host's network stack and should not have its own MAC addresses.
 	if isHostNetwork {
 		if foundMac {
 			// MAC addresses in host mode are unexpected and indicate a misconfiguration; log a warning and return an error.
@@ -720,7 +720,7 @@ func validateMacAddresses(
 	return nil
 }
 
-// filterAliases removes the container’s short ID from the list of aliases.
+// filterAliases removes the container's short ID from the list of aliases.
 //
 // Parameters:
 //   - aliases: List of aliases to filter.
@@ -740,7 +740,7 @@ func filterAliases(aliases []string, shortID string) []string {
 	return result
 }
 
-// debugLogMacAddress logs MAC address info for a container’s network config.
+// debugLogMacAddress logs MAC address info for a container's network config.
 //
 // Parameters:
 //   - networkConfig: Network configuration to check.

@@ -43,9 +43,9 @@ var (
 	errOpenFileFailed = errors.New("failed to open secret file")
 	// errReplaceSliceFailed indicates a failure to replace a slice value in a flag.
 	errReplaceSliceFailed = errors.New("failed to replace slice value in flag")
-	// errReadFileFailed indicates a failure to read a file’s contents for secrets.
+	// errReadFileFailed indicates a failure to read a file's contents for secrets.
 	errReadFileFailed = errors.New("failed to read secret file")
-	// errSetFlagFailed indicates a failure to set a flag’s value during configuration.
+	// errSetFlagFailed indicates a failure to set a flag's value during configuration.
 	errSetFlagFailed = errors.New("failed to set flag value")
 	// errInvalidFlagName indicates an invalid flag name was provided for modification.
 	errInvalidFlagName = errors.New("invalid flag name provided")
@@ -1070,7 +1070,7 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 func isFilePath(path string) bool {
 	firstColon := strings.IndexRune(path, ':')
 	if firstColon != 1 && firstColon != -1 {
-		// If ':' exists but isn’t the second character, it’s likely not a file path (e.g., URLs).
+		// If ':' exists but isn't the second character, it's likely not a file path (e.g., URLs).
 		return false
 	}
 
@@ -1323,7 +1323,7 @@ func appendFlagValue(flags *pflag.FlagSet, name string, values ...string) error 
 	return nil
 }
 
-// setFlagIfDefault sets a flag’s default value if unchanged.
+// setFlagIfDefault sets a flag's default value if unchanged.
 //
 // Parameters:
 //   - flags: Flag set.

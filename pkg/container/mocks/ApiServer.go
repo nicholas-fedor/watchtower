@@ -26,7 +26,7 @@ const (
 	assertionOffset      = 2 // Call stack offset for Gomega assertions in nested calls
 )
 
-// Returns the file contents or an error if the file isn’t found.
+// Returns the file contents or an error if the file isn't found.
 func getMockJSONFile(relPath string) ([]byte, error) {
 	absPath, _ := filepath.Abs(relPath)
 
@@ -50,7 +50,7 @@ func RespondWithJSONFile(
 	return handler
 }
 
-// Returns the handler and an error if the file can’t be read.
+// Returns the handler and an error if the file can't be read.
 func respondWithJSONFile(
 	relPath string,
 	statusCode int,
@@ -73,7 +73,7 @@ func GetContainerHandlers(containerRefs ...*ContainerRef) []http.HandlerFunc {
 		for _, ref := range containerRef.references {
 			handlers = append(handlers, getContainerFileHandler(ref))
 		}
-		// Append image handler for each container’s image
+		// Append image handler for each container's image
 		handlers = append(handlers, getImageHandler(containerRef.image.id,
 			RespondWithJSONFile(containerRef.image.getFileName(), http.StatusOK),
 		))
@@ -178,7 +178,7 @@ const (
 	NetSupplierContainerName = "/wt-contnet-producer-1"
 )
 
-// Fails the test if the file can’t be retrieved; returns a 404 handler if the container is missing.
+// Fails the test if the file can't be retrieved; returns a 404 handler if the container is missing.
 func getContainerFileHandler(container *ContainerRef) http.HandlerFunc {
 	if container.isMissing {
 		return containerNotFoundResponse(string(container.id))

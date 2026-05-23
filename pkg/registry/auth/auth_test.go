@@ -32,7 +32,7 @@ import (
 )
 
 // TestAuth executes the registry authentication test suite using the Ginkgo
-// testing framework. It registers Gomega’s fail handler to report test failures
+// testing framework. It registers Gomega's fail handler to report test failures
 // and runs the full set of specifications defined in this file.
 func TestAuth(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -67,21 +67,21 @@ type mockContainer struct {
 	imageName string // Image name used by the container
 }
 
-// ID returns the container’s unique identifier as a types.ContainerID. This method
+// ID returns the container's unique identifier as a types.ContainerID. This method
 // satisfies part of the types.Container interface, allowing the mock to be used
 // in authentication functions requiring an ID.
 func (m mockContainer) ID() types.ContainerID {
 	return types.ContainerID(m.id)
 }
 
-// Name returns the container’s name as a string. This method provides a readable
+// Name returns the container's name as a string. This method provides a readable
 // identifier for the container, fulfilling another requirement of the types.Container
-// interface, though it’s not directly used in these tests.
+// interface, though it's not directly used in these tests.
 func (m mockContainer) Name() string {
 	return m.name
 }
 
-// ImageName returns the container’s image name, such as "ghcr.io/test/image". This
+// ImageName returns the container's image name, such as "ghcr.io/test/image". This
 // method is critical for authentication tests, as it provides the image reference
 // that the auth package processes to fetch tokens or construct URLs.
 func (m mockContainer) ImageName() string {
@@ -104,14 +104,14 @@ func (m mockContainer) ContainerInfo() *dockerContainer.InspectResponse {
 }
 
 // GetCreateConfig returns a pointer to a containertypes.Config, representing the
-// container’s creation configuration. This method satisfies the types.Container interface,
+// container's creation configuration. This method satisfies the types.Container interface,
 // returning nil as a minimal stub since the auth package does not use this data in these tests.
 func (m mockContainer) GetCreateConfig() *dockerContainer.Config {
 	return nil // Minimal stub, not used in these tests
 }
 
 // GetCreateHostConfig returns a pointer to a containertypes.HostConfig, representing the
-// container’s host-specific creation configuration (e.g., port bindings, network settings).
+// container's host-specific creation configuration (e.g., port bindings, network settings).
 // This method satisfies the types.Container interface, returning nil as a minimal stub since
 // the auth package does not use this data in these authentication-focused tests.
 func (m mockContainer) GetCreateHostConfig() *dockerContainer.HostConfig {
@@ -362,12 +362,12 @@ var _ = ginkgo.BeforeSuite(func() {
 })
 
 var _ = ginkgo.Describe("the auth module", func() {
-	// mockID is a constant identifier used across test cases to represent a container’s
+	// mockID is a constant identifier used across test cases to represent a container's
 	// unique ID. It ensures consistency in mock container creation.
 	const mockID = "mock-id"
 
 	// mockName is a constant name used for mock containers in tests. It provides a
-	// human-readable identifier, though it’s not critical for auth functionality.
+	// human-readable identifier, though it's not critical for auth functionality.
 	const mockName = "mock-container"
 
 	// mockImage is the default image name for the initial mock container, representing
@@ -401,7 +401,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 		)
 		defer server.Close()
 
-		// Configure the container with the test server’s address.
+		// Configure the container with the test server's address.
 		serverURL, _ := url.Parse(server.URL())
 		containerInstance := mockContainer{
 			id:        mockID,
@@ -552,7 +552,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 		})
 
-		// Test case: Tests GetToken’s behavior when an HTTP request fails (e.g., due to an
+		// Test case: Tests GetToken's behavior when an HTTP request fails (e.g., due to an
 		// unreachable host). Uses a non-existent URL to trigger a network error, ensuring
 		// the function handles such failures gracefully.
 		ginkgo.It("should handle HTTP request failure", func() {
@@ -591,7 +591,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				)
 				defer server.Close()
 
-				// Parse the server URL to extract the host for the container’s image name.
+				// Parse the server URL to extract the host for the container's image name.
 				serverURL, _ := url.Parse(server.URL())
 				containerInstance := mockContainer{
 					id:        mockID,
@@ -640,7 +640,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 			defer server.Close()
 
-			// Parse the server URL to extract the host for the container’s image name.
+			// Parse the server URL to extract the host for the container's image name.
 			serverURL, _ := url.Parse(server.URL())
 			containerInstance := mockContainer{
 				id:        mockID,
@@ -684,7 +684,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 			defer server.Close()
 
-			// Parse the server URL to extract the host for the container’s image name.
+			// Parse the server URL to extract the host for the container's image name.
 			serverURL, _ := url.Parse(server.URL())
 			containerInstance := mockContainer{
 				id:        mockID,
@@ -732,7 +732,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 			defer server.Close()
 
-			// Parse the server URL to extract the host for the container’s image name.
+			// Parse the server URL to extract the host for the container's image name.
 			serverURL, _ := url.Parse(server.URL())
 			containerInstance := mockContainer{
 				id:        mockID,
@@ -776,7 +776,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 			defer server.Close()
 
-			// Parse the server URL to extract the host for the container’s image name.
+			// Parse the server URL to extract the host for the container's image name.
 			serverURL, _ := url.Parse(server.URL())
 			containerInstance := mockContainer{
 				id:        mockID,
@@ -827,7 +827,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 			defer server.Close()
 
-			// Parse the server URL to extract the host for the container’s image name.
+			// Parse the server URL to extract the host for the container's image name.
 			serverURL, _ := url.Parse(server.URL())
 			containerInstance := mockContainer{
 				id:        mockID,
@@ -835,7 +835,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				imageName: serverURL.Host + "/test/image:latest",
 			}
 
-			// Simulate TLS 1.3, which is incompatible with the test server’s TLS version.
+			// Simulate TLS 1.3, which is incompatible with the test server's TLS version.
 			viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS1.3")
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "")
 
@@ -1098,7 +1098,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				}
 			}
 
-			// Configure container with the first server’s address
+			// Configure container with the first server's address
 			serverURL, _ := url.Parse(servers[0].URL())
 			containerInstance := mockContainer{
 				id:        mockID,
@@ -1199,7 +1199,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			runBearerHeaderTest("user:pass", "auth-token", true)
 		})
 
-		// Test case: Tests GetBearerHeader’s error handling when the HTTP request fails
+		// Test case: Tests GetBearerHeader's error handling when the HTTP request fails
 		// (e.g., due to an unreachable host). Ensures proper error propagation.
 		ginkgo.It("should fail on HTTP request error", func() {
 			client := &testAuthClient{
@@ -1614,7 +1614,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 	})
 })
 
-// getScopeFromImageAuthURL extracts and returns the repository path from an auth URL’s
+// getScopeFromImageAuthURL extracts and returns the repository path from an auth URL's
 // scope parameter for a given image name. It constructs a mock challenge header, builds
 // the auth URL, and strips the "repository:" prefix and ":pull" suffix, providing the
 // clean path used in registry authentication.

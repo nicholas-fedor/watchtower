@@ -907,7 +907,7 @@ func (c *client) WarnOnHeadPullFailed(container types.Container) bool {
 	return registry.WarnOnAPIConsumption(container)
 }
 
-// IsContainerStale checks if a container’s image is outdated.
+// IsContainerStale checks if a container's image is outdated.
 //
 // Parameters:
 //   - container: Container to check.
@@ -1136,7 +1136,7 @@ func (c *client) RemoveImageByID(
 	return nil
 }
 
-// GetVersion returns the client’s API version.
+// GetVersion returns the client's API version.
 //
 // Returns:
 //   - string: Docker API version (e.g., "1.44").

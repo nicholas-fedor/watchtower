@@ -31,7 +31,7 @@ var (
 )
 
 // init registers the notify-upgrade command with the root command.
-// It follows Cobra’s best practice of adding subcommands in an init function,
+// It follows Cobra's best practice of adding subcommands in an init function,
 // avoiding global variables and ensuring proper command hierarchy setup.
 func init() {
 	rootCmd.AddCommand(&cobra.Command{
@@ -59,7 +59,7 @@ func runNotifyUpgrade(cmd *cobra.Command, args []string) {
 //   - cmd: The *cobra.Command instance representing the `notify-upgrade` subcommand, providing access to parsed flags
 //     such as notification types (e.g., --notifications) and other settings that influence notifier behavior.
 //   - _: A slice of strings representing positional arguments, unused here as the command accepts no arguments (enforced
-//     by cobra.NoArgs), included for compatibility with Cobra’s RunE signature.
+//     by cobra.NoArgs), included for compatibility with Cobra's RunE signature.
 //
 // Returns:
 //   - error: An error value if a critical operation fails (e.g., creating or writing to the temporary file), wrapped with
@@ -107,7 +107,7 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 		urlBuilder.WriteString(u)
 	}
 
-	// Write the constructed string to the temporary file. This is a critical step, as the file’s purpose is to store this data.
+	// Write the constructed string to the temporary file. This is a critical step, as the file's purpose is to store this data.
 	_, err = fmt.Fprint(outFile, urlBuilder.String())
 	if err != nil {
 		logrus.WithError(err).
@@ -127,7 +127,7 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("%w: %w", errSyncTempFile, err)
 	}
 
-	// Attempt to retrieve the running container’s ID to provide precise instructions for copying the file from the container.
+	// Attempt to retrieve the running container's ID to provide precise instructions for copying the file from the container.
 	// Use a placeholder ("<CONTAINER>") if this fails, ensuring the user still gets actionable guidance.
 	containerID := "<CONTAINER>"
 

@@ -111,7 +111,7 @@ recursive: true
 # exclude: []
 
 # Include auto-generated files in package discovery when true.
-# When false, skips files matching Go’s generated file convention (e.g., "// Code generated").
+# When false, skips files matching Go's generated file convention (e.g., "// Code generated").
 # Default: true
 # include-auto-generated: false
 
@@ -145,7 +145,7 @@ recursive: true
 # with-expecter: true
 
 # Specify build tags for the generated mock files.
-# Matches Go’s build constraint syntax (e.g., "// +build tag1,tag2").
+# Matches Go's build constraint syntax (e.g., "// +build tag1,tag2").
 # https://pkg.go.dev/cmd/go#hdr-Build_constraints
 # Default: ""
 # mock-build-tags: ""
@@ -179,7 +179,7 @@ pkgname: "mocks"
 # inpackage: true
 
 # Define the output directory for mocks using a Go template.
-# "{{.InterfaceDir}}/mocks" places mocks in a subdirectory of the interface’s source dir.
+# "{{.InterfaceDir}}/mocks" places mocks in a subdirectory of the interface's source dir.
 # Default: "mocks/{{.PackagePath}}"
 dir: "{{.InterfaceDir}}/mocks"
 

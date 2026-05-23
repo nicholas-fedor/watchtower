@@ -12,7 +12,7 @@ type Report interface {
 	All() []ContainerReport       // All unique containers.
 }
 
-// ContainerReport defines a container’s session status.
+// ContainerReport defines a container's session status.
 type ContainerReport interface {
 	ID() ContainerID             // Container ID.
 	Name() string                // Container name.

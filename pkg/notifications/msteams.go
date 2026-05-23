@@ -61,7 +61,7 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 	}
 }
 
-// GetURL generates the Teams service URL from the notifier’s webhook.
+// GetURL generates the Teams service URL from the notifier's webhook.
 //
 // Parameters:
 //   - c: Cobra command (unused here).

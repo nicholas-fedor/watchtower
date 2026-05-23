@@ -31,7 +31,7 @@ const (
 	RestartedStateString = "Restarted"
 )
 
-// ContainerStatus holds a container’s state during a session.
+// ContainerStatus holds a container's state during a session.
 //
 //nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
@@ -53,7 +53,7 @@ type ContainerStatus struct {
 // ID returns the container ID.
 //
 // Returns:
-//   - types.ContainerID: Container’s unique identifier.
+//   - types.ContainerID: Container's unique identifier.
 func (u *ContainerStatus) ID() types.ContainerID {
 	return u.containerID
 }
@@ -61,7 +61,7 @@ func (u *ContainerStatus) ID() types.ContainerID {
 // Name returns the container name.
 //
 // Returns:
-//   - string: Container’s name.
+//   - string: Container's name.
 func (u *ContainerStatus) Name() string {
 	return u.containerName
 }

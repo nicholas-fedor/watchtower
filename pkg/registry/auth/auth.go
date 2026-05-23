@@ -565,7 +565,7 @@ func GetChallengeRequest(ctx context.Context, url url.URL) (*http.Request, error
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control, enabling cancellation or timeouts.
-//   - challenge: Challenge string from the registry’s WWW-Authenticate header.
+//   - challenge: Challenge string from the registry's WWW-Authenticate header.
 //   - imageRef: Normalized image reference for scoping the token request.
 //   - registryAuth: Base64-encoded auth string (e.g., "username:password").
 //   - client: Client instance for executing HTTP requests.
@@ -754,7 +754,7 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 
 // GetRegistryAddress extracts the registry address from an image reference.
 //
-// It returns the domain part of the reference, mapping Docker Hub’s default domain to its canonical host if needed.
+// It returns the domain part of the reference, mapping Docker Hub's default domain to its canonical host if needed.
 //
 // Parameters:
 //   - imageRef: Image reference string (e.g., "docker.io/library/alpine").
@@ -776,7 +776,7 @@ func GetRegistryAddress(imageRef string) (string, error) {
 	// Extract the domain from the normalized reference.
 	address := reference.Domain(normalizedRef)
 
-	// Map Docker Hub’s default domain to its canonical host for registry requests.
+	// Map Docker Hub's default domain to its canonical host for registry requests.
 	if address == DockerRegistryDomain {
 		logrus.WithFields(logrus.Fields{
 			"image_ref": imageRef,

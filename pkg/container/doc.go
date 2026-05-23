@@ -20,6 +20,6 @@
 //	    }
 //	}
 //
-// The package integrates with Docker’s API via docker/docker client libraries and supports
-// Watchtower’s update workflows, including authentication, scope filtering, and custom lifecycle hooks.
+// The package integrates with Docker's API via docker/docker client libraries and supports
+// Watchtower's update workflows, including authentication, scope filtering, and custom lifecycle hooks.
 package container

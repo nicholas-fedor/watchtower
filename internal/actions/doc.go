@@ -1,4 +1,4 @@
-// Package actions provides core logic for Watchtower’s container update operations.
+// Package actions provides core logic for Watchtower's container update operations.
 // It handles container staleness checks, updates, and lifecycle management.
 //
 // Key components:

@@ -86,7 +86,7 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	}
 }
 
-// GetURL generates the SMTP URL from the notifier’s configuration.
+// GetURL generates the SMTP URL from the notifier's configuration.
 //
 // Parameters:
 //   - c: Cobra command (unused here).

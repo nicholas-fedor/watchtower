@@ -234,7 +234,7 @@ func Update(
 			}
 		}
 
-		// Verify the container’s configuration if it’s slated for update to
+		// Verify the container's configuration if it's slated for update to
 		// ensure recreation is possible.
 		if err == nil && shouldUpdate {
 			err = sourceContainer.VerifyConfiguration()
@@ -452,7 +452,7 @@ func Update(
 			}
 		}
 
-		// Update the container’s stale status for dependency sorting.
+		// Update the container's stale status for dependency sorting.
 		// Only mark as stale if the container should actually be updated.
 		filteredContainers[i].SetStale(stale && shouldUpdate)
 
@@ -1023,7 +1023,7 @@ func parseReference(
 	return normalizedRef, nil
 }
 
-// isPinned checks if a container’s image is pinned by a digest reference.
+// isPinned checks if a container's image is pinned by a digest reference.
 //
 // It selects a valid image name from ImageName(), Config.Image,
 // or a fallback (imageInfo.ID or container name),
