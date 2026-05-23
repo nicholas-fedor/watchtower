@@ -32,7 +32,7 @@ var (
 	errStartContainerFailed = errors.New("failed to start container")
 	// errCreateContainerFailed indicates a failure to create a container during the update process.
 	errCreateContainerFailed = errors.New("failed to create container")
-	// errParseImageReference indicates a failure to parse a container’s image reference.
+	// errParseImageReference indicates a failure to parse a container's image reference.
 	errParseImageReference = errors.New("failed to parse image reference")
 	// errInvalidImageReference indicates an invalid image reference that cannot be processed.
 	errInvalidImageReference = errors.New("invalid image reference")

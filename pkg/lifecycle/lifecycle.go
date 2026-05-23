@@ -185,7 +185,7 @@ func ExecutePreUpdateCommand(
 		"timeout":   timeout,
 	})
 
-	// Skip if no command or container isn’t running.
+	// Skip if no command or container isn't running.
 	if len(command) == 0 {
 		clog.Debug("No pre-update command supplied. Skipping")
 

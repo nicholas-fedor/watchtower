@@ -42,7 +42,7 @@ const shutdownGracePeriod = 50 * time.Millisecond
 
 // LocalLog is a logrus logger that does not send entries as notifications.
 //
-// It’s used for internal logging to avoid notification loops.
+// It's used for internal logging to avoid notification loops.
 var LocalLog = logrus.WithField("notify", "no")
 
 // router defines the interface for sending Shoutrrr notifications.

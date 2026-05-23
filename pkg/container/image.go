@@ -43,7 +43,7 @@ type imageClient struct {
 	api dockerClient.APIClient
 }
 
-// IsContainerStale determines if a container’s image is outdated.
+// IsContainerStale determines if a container's image is outdated.
 //
 // It skips pulling if NoPull is set, otherwise pulls and compares images.
 //

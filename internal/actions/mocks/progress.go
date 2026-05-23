@@ -58,7 +58,7 @@ func CreateMockProgressReport(states ...session.State) types.Report {
 			progress.AddScanned(c, c.ImageID(), types.UpdateParams{})
 			progress.MarkRestarted(c.ID())
 		case session.UnknownState, session.ScannedState, session.StaleState:
-			// These states are not explicitly handled in this mock as they’re intermediate or unused here.
+			// These states are not explicitly handled in this mock as they're intermediate or unused here.
 			continue
 		}
 

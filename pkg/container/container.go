@@ -123,7 +123,7 @@ func (c *Container) SetLinkedToRestarting(value bool) {
 	c.LinkedToRestarting = value
 }
 
-// IsStale returns whether the container’s image is outdated.
+// IsStale returns whether the container's image is outdated.
 //
 // Returns:
 //   - bool: True if stale, false otherwise.
@@ -222,7 +222,7 @@ func (c *Container) Name() string {
 	return c.normalizedName
 }
 
-// ImageID returns the ID of the container’s image.
+// ImageID returns the ID of the container's image.
 //
 // Returns:
 //   - types.ImageID: Image ID or empty string if imageInfo is nil.
@@ -234,7 +234,7 @@ func (c *Container) ImageID() types.ImageID {
 	return types.ImageID(c.imageInfo.ID)
 }
 
-// ImageName returns the name of the container’s image.
+// ImageName returns the name of the container's image.
 //
 // It uses the Zodiac label if present, otherwise Config.Image, appending ":latest" if untagged.
 //
@@ -450,7 +450,7 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	return hostConfig
 }
 
-// VerifyConfiguration validates the container’s metadata for recreation.
+// VerifyConfiguration validates the container's metadata for recreation.
 //
 // Returns:
 //   - error: Non-nil if metadata is missing or invalid, nil on success.

@@ -29,7 +29,7 @@ type ContainerRef struct {
 	isMissing  bool
 }
 
-// Uses the explicit file if set, otherwise falls back to the container name; returns an error if the file doesn’t exist.
+// Uses the explicit file if set, otherwise falls back to the container name; returns an error if the file doesn't exist.
 func (cr *ContainerRef) getContainerFile() (string, error) {
 	file := cr.file
 	if file == "" {
@@ -50,7 +50,7 @@ func (cr *ContainerRef) getContainerFile() (string, error) {
 	return containerFile, nil
 }
 
-// ContainerID returns the mock container’s ID.
+// ContainerID returns the mock container's ID.
 func (cr *ContainerRef) ContainerID() types.ContainerID {
 	return cr.id
 }

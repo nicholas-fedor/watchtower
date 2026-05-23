@@ -117,7 +117,7 @@ func getGotifyURL(flags *pflag.FlagSet) string {
 	return gotifyURL
 }
 
-// GetURL generates the Gotify service URL from the notifier’s configuration.
+// GetURL generates the Gotify service URL from the notifier's configuration.
 //
 // Parameters:
 //   - c: Cobra command (unused here).

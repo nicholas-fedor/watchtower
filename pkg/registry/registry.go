@@ -88,7 +88,7 @@ func DefaultAuthHandler(_ context.Context) (string, error) {
 	return "", nil
 }
 
-// WarnOnAPIConsumption determines whether to warn about API consumption for a container’s registry.
+// WarnOnAPIConsumption determines whether to warn about API consumption for a container's registry.
 //
 // It returns true for registries supporting HEAD requests (e.g., Docker Hub, GHCR) or if parsing fails.
 //

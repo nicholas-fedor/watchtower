@@ -213,7 +213,7 @@ var (
 //
 // It invokes functions from the flags package to set default values and register flags for Docker configuration
 // (e.g., --host), system behavior (e.g., --interval), and notifications (e.g., --notifications), establishing
-// the CLI’s configurable parameters before execution begins.
+// the CLI's configurable parameters before execution begins.
 func init() {
 	flags.SetDefaults()
 	flags.RegisterDockerFlags(rootCmd)
@@ -457,7 +457,7 @@ func preRun(cmd *cobra.Command, _ []string) {
 // builds the container filter, and delegates to runMain for core execution,
 // exiting with a status code based on the outcome (0 for success, non-zero for failure).
 //
-// This function bridges flag parsing and the application’s primary workflow.
+// This function bridges flag parsing and the application's primary workflow.
 //
 // Parameters:
 //   - command: The cobra.Command instance being executed, providing access to parsed flags.

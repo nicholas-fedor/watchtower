@@ -264,7 +264,7 @@ func (s SortableContainers) Len() int {
 //   - i, j: Indices to compare.
 //
 // Returns:
-//   - bool: True if i’s ID is less than j’s.
+//   - bool: True if i's ID is less than j's.
 func (s SortableContainers) Less(i, j int) bool {
 	return s[i].ID() < s[j].ID()
 }

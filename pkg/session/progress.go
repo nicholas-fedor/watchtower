@@ -116,7 +116,7 @@ func (m Progress) Add(update *ContainerStatus) {
 	}).Debug("Added container status to progress map")
 }
 
-// MarkForUpdate sets a container’s state to updated.
+// MarkForUpdate sets a container's state to updated.
 //
 // Parameters:
 //   - containerID: ID of container to mark.
@@ -136,7 +136,7 @@ func (m Progress) MarkForUpdate(containerID types.ContainerID) {
 	}).Debug("Marked container for update")
 }
 
-// MarkRestarted sets a container’s state to restarted.
+// MarkRestarted sets a container's state to restarted.
 //
 // Parameters:
 //   - containerID: ID of container to mark.

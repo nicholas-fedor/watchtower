@@ -151,7 +151,7 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 		return "", fmt.Errorf("%w: %w", errFailedLoadDockerConfig, err)
 	}
 
-	// Retrieve credentials from the config’s store.
+	// Retrieve credentials from the config's store.
 	credStore := CredentialsStore(*configFile)
 	credentials, _ := credStore.Get(server)
 

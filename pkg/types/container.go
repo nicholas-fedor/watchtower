@@ -8,7 +8,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 )
 
-// Container defines a docker container’s interface in Watchtower.
+// Container defines a docker container's interface in Watchtower.
 type Container interface {
 	ContainerInfo() *dockerContainer.InspectResponse  // Container metadata.
 	ID() ContainerID                                  // Container ID.

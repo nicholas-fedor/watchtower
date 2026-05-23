@@ -19,11 +19,11 @@ import (
 var (
 	// errMissingTag indicates the parsed image reference lacks a tag.
 	errMissingTag = errors.New("parsed container image reference has no tag")
-	// errFailedParseImageName indicates a failure to parse the container’s image name.
+	// errFailedParseImageName indicates a failure to parse the container's image name.
 	errFailedParseImageName = errors.New("failed to parse image name")
 )
 
-// BuildManifestURL constructs a URL for accessing a container’s image manifest from its registry.
+// BuildManifestURL constructs a URL for accessing a container's image manifest from its registry.
 //
 // It parses the image name into a normalized reference, extracts the registry host, and builds a URL with path and tag,
 // using the provided scheme.

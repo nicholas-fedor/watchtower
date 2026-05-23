@@ -787,7 +787,7 @@ func TestReadFlags_Errors(t *testing.T) {
 	cmd := new(cobra.Command)
 
 	SetDefaults()
-	// Don’t register flags to force errors
+	// Don't register flags to force errors
 	assert.PanicsWithValue(t, "FATAL", func() {
 		ReadFlags(cmd)
 	})
