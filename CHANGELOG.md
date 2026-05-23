@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Add timeout input validation and improve docs by @nicholas-fedor in [#1665](https://github.com/nicholas-fedor/watchtower/pull/1665)
 - Restore revive-stopped configuration handling by @nicholas-fedor in [#1657](https://github.com/nicholas-fedor/watchtower/pull/1657)
 
 ## [1.17.1] - 2026-05-19
