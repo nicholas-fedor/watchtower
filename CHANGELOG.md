@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update module github.com/nicholas-fedor/shoutrrr to v0.15.1 by @renovate[bot] in [#1671](https://github.com/nicholas-fedor/watchtower/pull/1671)
+
 ### Fixed
 
 - Prevent image pull when within cooldown window by @nicholas-fedor in [#1669](https://github.com/nicholas-fedor/watchtower/pull/1669)
