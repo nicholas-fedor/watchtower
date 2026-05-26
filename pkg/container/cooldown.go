@@ -171,6 +171,17 @@ func evalImageAge(creationTime time.Time, delay time.Duration, clog *logrus.Entr
 	}
 
 	if imageAge <= delay {
+		remaining := delay - imageAge
+		ageStr := util.FormatDuration(imageAge)
+		cooldownStr := util.FormatDuration(delay)
+		remainingStr := util.FormatDuration(remaining)
+
+		clog.WithFields(logrus.Fields{
+			"image_age":   ageStr,
+			"cooldown":    cooldownStr,
+			"eligible_in": remainingStr,
+		}).Info("Image is within cooldown period - deferring update")
+
 		return false, buildCooldownError(imageAge, delay)
 	}
 
