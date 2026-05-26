@@ -15,6 +15,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -159,9 +160,10 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 					Containers: []types.Container{
 						mockActions.CreateMockContainer("c1", "c1", imageName, time.Now()),
 					},
-					Staleness: map[string]bool{
-						"c1": true,
-					},
+					// Simulate the new location of the cooldown decision (now inside
+					// pkg/container/image.go IsOutsideCooldown + guarded PullImage,
+					// which returns the sentinel so no layers are pulled).
+					IsContainerStaleError: container.ErrImageCooldown,
 				},
 				Stopped: make(map[string]bool),
 			}
@@ -280,7 +282,8 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 		ginkgo.It("should skip the container with a conservative posture", func() {
 			// Start a server to get a host:port, then immediately close it so that
 			// all subsequent HTTP requests (auth challenge, manifest, blob) fail with
-			// "connection refused", causing fetchImageAge to return an error.
+			// "connection refused", causing the (now lower-layer) cooldown age fetch
+			// inside IsOutsideCooldown to return an error (simulated via mock err).
 			registryServer = ghttp.NewServer()
 			host := extractHost(registryServer.URL())
 			registryServer.Close()
@@ -293,9 +296,10 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 					Containers: []types.Container{
 						mockActions.CreateMockContainer("c1", "c1", imageName, time.Now()),
 					},
-					Staleness: map[string]bool{
-						"c1": true,
-					},
+					// Simulate the lower-layer cooldown age fetch failure (now inside
+					// image.go isOutsideCooldown) by returning the sentinel error from
+					// the mock IsContainerStale.
+					IsContainerStaleError: container.ErrImageCooldown,
 				},
 				Stopped: make(map[string]bool),
 			}

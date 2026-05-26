@@ -14,12 +14,10 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
-	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -256,9 +254,30 @@ func Update(
 			clog.WithError(err).Debug("Cannot update container - skipping")
 
 			stale = false
-			staleCheckFailed++
+
+			if !errors.Is(err, container.ErrImageCooldown) {
+				staleCheckFailed++
+			}
 
 			progress.AddSkipped(sourceContainer, err, config)
+
+			// Restore rich cooldown metadata for reports/notifications (preserves the
+			// structured CooldownAge/Delay/Remaining/Passed fields that the removed
+			// high-level block used to populate via SetCooldownInfo). The rich
+			// *container.CooldownError carries the details.
+			var cooldownErr *container.CooldownError
+			if errors.As(err, &cooldownErr) {
+				progress.SetCooldownInfo(
+					sourceContainer.ID(),
+					cooldownErr.Age,
+					cooldownErr.Delay,
+					cooldownErr.Remaining,
+					cooldownErr.Passed,
+				)
+			} else if errors.Is(err, container.ErrImageCooldown) {
+				// Fallback for plain sentinel (keeps basic deferral visible)
+				progress.SetCooldownInfo(sourceContainer.ID(), "", "", "", false)
+			}
 
 			// Track if Watchtower self-update pull failed for safeguard.
 			// Only set to true if we actually attempted a self-update
@@ -267,163 +286,9 @@ func Update(
 				watchtowerPullFailed = true
 			}
 		} else {
-			// Track cooldown info for setting on the progress entry after AddScanned.
-			var cooldownAge, cooldownDelayStr string
-
-			// Cooldown check: if the container should be updated and cooldown is configured, verify the image age.
-			// Uses per-container label if set, otherwise falls back to global setting.
-			// Skip cooldown check for no-pull and monitor-only containers since they won't be updated.
-			cooldownDelay := sourceContainer.CooldownDelay(config)
-
-			if shouldUpdate &&
-				cooldownDelay > 0 &&
-				!sourceContainer.IsNoPull(config) &&
-				!sourceContainer.IsMonitorOnly(config) {
-				pullOpts, pullErr := registry.GetPullOptions(
-					sourceContainer.ImageName(),
-				)
-				if pullErr != nil {
-					// Conservative posture: if pull options are unavailable, defer the update
-					// and record the container as skipped so it appears in notifications/reports.
-					cooldownStr := util.FormatDuration(cooldownDelay)
-
-					clog.WithError(pullErr).
-						Info("Failed to get pull options for cooldown check - deferring update")
-
-					filteredContainers[i].SetStale(false)
-					progress.AddSkipped(
-						sourceContainer,
-						fmt.Errorf(
-							"%w: could not get pull options for %s (cooldown: %s) - deferring update: %w",
-							errGetPullOptionsFailed,
-							sourceContainer.ImageName(),
-							cooldownStr,
-							pullErr,
-						),
-						config,
-					)
-					// Set cooldown info so split notifications can show the deferral reason.
-					progress.SetCooldownInfo(
-						sourceContainer.ID(),
-						"",
-						cooldownStr,
-						"",
-						false,
-					)
-
-					continue
-				}
-
-				imageAge, ageErr := fetchImageAge(
-					ctx,
-					sourceContainer,
-					pullOpts.RegistryAuth,
-				)
-				if ageErr != nil {
-					// Conservative posture: if we can't determine the age, defer the update.
-					cooldownStr := util.FormatDuration(cooldownDelay)
-
-					clog.WithError(ageErr).
-						Info("Image creation time unavailable - deferring update")
-
-					filteredContainers[i].SetStale(false)
-					progress.AddSkipped(
-						sourceContainer,
-						fmt.Errorf(
-							"%w: could not determine image age (cooldown: %s) - deferring update for safety",
-							errFetchImageAgeFailed,
-							cooldownStr,
-						),
-						config,
-					)
-					// Set cooldown info so split notifications can show the deferral reason.
-					progress.SetCooldownInfo(
-						sourceContainer.ID(),
-						"",
-						cooldownStr,
-						"",
-						false,
-					)
-
-					continue
-				}
-
-				// Negative image age indicates clock skew between the Watchtower host
-				// and the registry (image creation time is in the future). Log a warning
-				// and proceed with the update to avoid indefinite deferral.
-				//
-				// futureTimestamp tracks whether we detected clock skew so that the
-				// "Image age exceeds cooldown" block below is skipped — that block
-				// records cooldown metadata that would be misleading for a negative age.
-				futureTimestamp := false
-
-				if imageAge < 0 {
-					futureTimestamp = true
-					ageStr := util.FormatDuration(imageAge)
-					cooldownStr := util.FormatDuration(cooldownDelay)
-
-					clog.WithFields(
-						logrus.Fields{
-							"image_age": ageStr,
-							"cooldown":  cooldownStr,
-						}).Warn("Image creation time is in the future (possible clock skew) - proceeding with update")
-				} else if imageAge <= cooldownDelay {
-					// Defer when image age is less than or equal to cooldown.
-					// Updates only proceed when imageAge > cooldownDelay.
-					remaining := cooldownDelay - imageAge
-					ageStr := util.FormatDuration(imageAge)
-					cooldownStr := util.FormatDuration(cooldownDelay)
-					remainingStr := util.FormatDuration(remaining)
-
-					clog.WithFields(
-						logrus.Fields{
-							"image_age":   ageStr,
-							"cooldown":    cooldownStr,
-							"eligible_in": remainingStr,
-						}).Info("Image is within cooldown period - deferring update")
-
-					filteredContainers[i].SetStale(false)
-					progress.AddSkipped(
-						sourceContainer,
-						fmt.Errorf(
-							"%w: image age %s is within %s cooldown - eligible in %s",
-							errImageCooldown,
-							ageStr,
-							cooldownStr,
-							remainingStr,
-						),
-						config,
-					)
-					// Set cooldown info AFTER AddSkipped (which creates a new ContainerStatus).
-					progress.SetCooldownInfo(
-						sourceContainer.ID(),
-						ageStr,
-						cooldownStr,
-						remainingStr,
-						false)
-
-					continue
-				}
-
-				// Only record cooldown metadata when the image age is a real
-				// (non-negative) value that exceeds the cooldown window.
-				if !futureTimestamp {
-					ageStr := util.FormatDuration(imageAge)
-					cooldownStr := util.FormatDuration(cooldownDelay)
-
-					clog.WithFields(
-						logrus.Fields{
-							"image_age": ageStr,
-							"cooldown":  cooldownStr,
-						}).Info("Image age exceeds cooldown - proceeding with update")
-
-					// Store for setting after AddScanned.
-					cooldownAge = ageStr
-					cooldownDelayStr = cooldownStr
-				}
-			}
-
-			// For fresh containers, set newestImage to current image ID for proper categorization
+			// For fresh containers, set newestImage to current image ID for proper categorization.
+			// (Cooldown decision and any layer pull now happen inside pkg/container/image.go
+			// IsOutsideCooldown + guarded PullImage, after digest staleness and before layers.)
 			if !stale {
 				newestImage = sourceContainer.ImageID()
 			}
@@ -439,17 +304,6 @@ func Update(
 				newestImage,
 				config,
 			)
-
-			// Set cooldown info AFTER AddScanned, which creates a new ContainerStatus.
-			if cooldownAge != "" {
-				progress.SetCooldownInfo(
-					sourceContainer.ID(),
-					cooldownAge,
-					cooldownDelayStr,
-					"",
-					true,
-				)
-			}
 		}
 
 		// Update the container's stale status for dependency sorting.
@@ -1879,35 +1733,4 @@ func restartStaleContainer(
 	}
 
 	return newContainerID, renamed, nil
-}
-
-// fetchImageAge retrieves the age of the newest image from the registry by fetching
-// its creation timestamp and calculating the elapsed time since then.
-//
-// It uses the provided registryAuth credentials to fetch the image creation time
-// from the registry and returns the duration since creation.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeouts.
-//   - container: Container whose image age to fetch.
-//   - registryAuth: Base64-encoded registry credentials for authentication.
-//
-// Returns:
-//   - time.Duration: Elapsed time since the image was created.
-//   - error: Non-nil if image creation time retrieval fails.
-func fetchImageAge(
-	ctx context.Context,
-	container types.Container,
-	registryAuth string,
-) (time.Duration, error) {
-	creationTime, err := registry.FetchImageCreationTime(
-		ctx,
-		container,
-		registryAuth,
-	)
-	if err != nil {
-		return 0, fmt.Errorf("failed to fetch image creation time: %w", err)
-	}
-
-	return time.Since(creationTime), nil
 }
