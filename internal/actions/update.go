@@ -265,8 +265,7 @@ func Update(
 			// structured CooldownAge/Delay/Remaining/Passed fields that the removed
 			// high-level block used to populate via SetCooldownInfo). The rich
 			// *container.CooldownError carries the details.
-			var cooldownErr *container.CooldownError
-			if errors.As(err, &cooldownErr) {
+			if cooldownErr, ok := errors.AsType[*container.CooldownError](err); ok {
 				progress.SetCooldownInfo(
 					sourceContainer.ID(),
 					cooldownErr.Age,
@@ -281,8 +280,11 @@ func Update(
 
 			// Track if Watchtower self-update pull failed for safeguard.
 			// Only set to true if we actually attempted a self-update
-			// (i.e., SkipSelfUpdate is false)
-			if sourceContainer.IsWatchtower() && !config.SkipSelfUpdate {
+			// (i.e., SkipSelfUpdate is false) and the error is a real
+			// failure, not a cooldown deferral.
+			if sourceContainer.IsWatchtower() &&
+				!config.SkipSelfUpdate &&
+				!errors.Is(err, container.ErrImageCooldown) {
 				watchtowerPullFailed = true
 			}
 		} else {

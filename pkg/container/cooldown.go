@@ -37,7 +37,11 @@ func (e *CooldownError) Error() string {
 func (e *CooldownError) Unwrap() error { return e.err }
 
 func (e *CooldownError) Is(target error) bool {
-	return errors.Is(e.err, target) || target == ErrImageCooldown
+	if target == ErrImageCooldown {
+		return e.err == nil || errors.Is(e.err, ErrImageCooldown)
+	}
+
+	return errors.Is(e.err, target)
 }
 
 // isOutsideCooldown reports whether the container's image is outside its

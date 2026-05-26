@@ -53,9 +53,9 @@ var _ = ginkgo.Describe("CooldownError", func() {
 			gomega.Expect(e.Is(ErrImageCooldown)).To(gomega.BeTrue())
 		})
 
-		ginkgo.It("matches target == ErrImageCooldown even with unrelated wrapped error", func() {
+		ginkgo.It("does not match ErrImageCooldown with unrelated wrapped error", func() {
 			e := &CooldownError{err: errors.New("some other error")}
-			gomega.Expect(e.Is(ErrImageCooldown)).To(gomega.BeTrue())
+			gomega.Expect(e.Is(ErrImageCooldown)).To(gomega.BeFalse())
 		})
 
 		ginkgo.It("does not match an unrelated target", func() {
