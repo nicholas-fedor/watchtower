@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent image pull when within cooldown window by @nicholas-fedor in [#1669](https://github.com/nicholas-fedor/watchtower/pull/1669)
+
+## [1.17.2] - 2026-05-23
+
 ### Changed
 
 - Replace curly apostrophes with straight apostrophes by @nicholas-fedor in [#1667](https://github.com/nicholas-fedor/watchtower/pull/1667)
@@ -3051,7 +3057,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.17.1...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.17.2...HEAD)
+- [1.17.2](https://github.com/nicholas-fedor/watchtower/compare/v1.17.1...v1.17.2)
 - [1.17.1](https://github.com/nicholas-fedor/watchtower/compare/v1.17.0...v1.17.1)
 - [1.17.0](https://github.com/nicholas-fedor/watchtower/compare/v1.16.1...v1.17.0)
 - [1.16.1](https://github.com/nicholas-fedor/watchtower/compare/v1.16.0...v1.16.1)
