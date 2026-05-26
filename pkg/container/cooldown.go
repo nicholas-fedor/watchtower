@@ -43,33 +43,26 @@ func (e *CooldownError) Is(target error) bool {
 // isOutsideCooldown reports whether the container's image is outside its
 // cooldown window (safe to pull and update).
 //
-// It returns false (zero value) unless the image age strictly exceeds the
-// delay (or age is negative). The check runs only after digest staleness
-// and performs only lightweight registry fetches (no layers).
-//
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - sourceContainer: Container whose image age to evaluate.
 //   - params: Update parameters (global cooldown + LabelPrecedence).
 //
 // Returns:
-//   - bool: true if safe to pull/update.
-//   - string: human-readable image age (empty if not checked).
-//   - string: human-readable cooldown delay (empty if not checked).
-//   - string: human-readable remaining time (empty if not checked).
-//   - error: non-nil on hard failures (still yields false).
+//   - bool: true if safe to pull/update, false if deferred.
+//   - error: non-nil when deferred (carries CooldownError for details).
 func (c imageClient) isOutsideCooldown(
 	ctx context.Context,
 	sourceContainer types.Container,
 	params types.UpdateParams,
-) (bool, string, string, string, error) {
+) (bool, error) {
 	cooldownDelay := sourceContainer.CooldownDelay(params)
 	if cooldownDelay <= 0 {
-		return true, "", "", "", nil
+		return true, nil
 	}
 
 	if sourceContainer.IsNoPull(params) || sourceContainer.IsMonitorOnly(params) {
-		return true, "", "", "", nil
+		return true, nil
 	}
 
 	clog := logrus.WithFields(logrus.Fields{
@@ -84,19 +77,15 @@ func (c imageClient) isOutsideCooldown(
 		clog.WithError(err).
 			Info("Failed to get pull options for cooldown check - deferring update")
 
-		return false,
-			"",
-			util.FormatDuration(cooldownDelay),
-			"",
-			&CooldownError{
-				Delay: util.FormatDuration(cooldownDelay),
-				err: fmt.Errorf(
-					"could not get pull options for %s (cooldown: %s): %w",
-					sourceContainer.ImageName(),
-					util.FormatDuration(cooldownDelay),
-					err,
-				),
-			}
+		return false, &CooldownError{
+			Delay: util.FormatDuration(cooldownDelay),
+			err: fmt.Errorf(
+				"could not get pull options for %s (cooldown: %s): %w",
+				sourceContainer.ImageName(),
+				util.FormatDuration(cooldownDelay),
+				err,
+			),
+		}
 	}
 
 	creationTime, err := registry.FetchImageCreationTime(
@@ -108,18 +97,14 @@ func (c imageClient) isOutsideCooldown(
 		clog.WithError(err).
 			Info("Image creation time unavailable - deferring update")
 
-		return false,
-			"",
-			util.FormatDuration(cooldownDelay),
-			"",
-			&CooldownError{
-				Delay: util.FormatDuration(cooldownDelay),
-				err: fmt.Errorf(
-					"could not determine image age (cooldown: %s): %w",
-					util.FormatDuration(cooldownDelay),
-					err,
-				),
-			}
+		return false, &CooldownError{
+			Delay: util.FormatDuration(cooldownDelay),
+			err: fmt.Errorf(
+				"could not determine image age (cooldown: %s): %w",
+				util.FormatDuration(cooldownDelay),
+				err,
+			),
+		}
 	}
 
 	imageAge := time.Since(creationTime)
@@ -132,7 +117,7 @@ func (c imageClient) isOutsideCooldown(
 			"cooldown":  cooldownStr,
 		}).Warn("Image creation time is in the future (possible clock skew) - proceeding with update")
 
-		return true, ageStr, cooldownStr, "", nil
+		return true, nil
 	}
 
 	if imageAge <= cooldownDelay {
@@ -147,7 +132,7 @@ func (c imageClient) isOutsideCooldown(
 			"eligible_in": remainingStr,
 		}).Info("Image is within cooldown period - deferring update")
 
-		return false, ageStr, cooldownStr, remainingStr, &CooldownError{
+		return false, &CooldownError{
 			Age:       ageStr,
 			Delay:     cooldownStr,
 			Remaining: remainingStr,
@@ -155,7 +140,6 @@ func (c imageClient) isOutsideCooldown(
 		}
 	}
 
-	// Outside window (or negative age already handled).
 	ageStr := util.FormatDuration(imageAge)
 	cooldownStr := util.FormatDuration(cooldownDelay)
 	clog.WithFields(logrus.Fields{
@@ -163,5 +147,5 @@ func (c imageClient) isOutsideCooldown(
 		"cooldown":  cooldownStr,
 	}).Info("Image age exceeds cooldown - proceeding with update")
 
-	return true, ageStr, cooldownStr, "", nil
+	return true, nil
 }

@@ -80,8 +80,8 @@ func (c imageClient) IsContainerStale(
 	if err != nil {
 		if errors.Is(err, ErrImageCooldown) {
 			clog.WithError(err).Debug("Cooldown active - pull skipped")
-			// Return as non-stale, no error: upper layer will skip via normal path.
-			return false, sourceContainer.ImageID(), ErrImageCooldown
+			// Return original error to preserve cooldown metadata for progress reporting.
+			return false, sourceContainer.ImageID(), err
 		}
 
 		clog.WithError(err).Debug("Failed to pull image")
@@ -199,25 +199,9 @@ func (c imageClient) PullImage(
 
 	// Perform cooldown check to prevent downloading images that are still
 	// inside the cooldown window.
-	//nolint:dogsled // 5-return signature; only ok and cdErr are needed by this caller.
-	ok, _, _, _, cdErr := c.isOutsideCooldown(
-		ctx,
-		sourceContainer,
-		params,
-	)
-	if cdErr != nil || !ok {
-		if cdErr != nil {
-			return cdErr
-		}
-
-		return &CooldownError{
-			Delay: "unknown",
-			err: fmt.Errorf(
-				"%w: pull deferred by cooldown for %s",
-				ErrImageCooldown,
-				sourceContainer.ImageName(),
-			),
-		}
+	_, cooldownErr := c.isOutsideCooldown(ctx, sourceContainer, params)
+	if cooldownErr != nil {
+		return cooldownErr
 	}
 
 	return c.performImagePull(ctx, sourceContainer.ImageName(), opts, fields)

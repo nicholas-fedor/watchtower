@@ -481,14 +481,11 @@ var _ = ginkgo.Describe("IsOutsideCooldown (cooldown gating before pull)", func(
 			i := newImageClient(nil)
 			c := MockContainer(WithImageName("test:latest"))
 
-			outside, age, delay, rem, err := i.isOutsideCooldown(
+			outside, err := i.isOutsideCooldown(
 				context.Background(), c, types.UpdateParams{},
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(outside).To(gomega.BeTrue())
-			gomega.Expect(age).To(gomega.BeEmpty())
-			gomega.Expect(delay).To(gomega.BeEmpty())
-			gomega.Expect(rem).To(gomega.BeEmpty())
 		})
 	})
 
@@ -497,7 +494,7 @@ var _ = ginkgo.Describe("IsOutsideCooldown (cooldown gating before pull)", func(
 			i := newImageClient(nil)
 			c := MockContainer(WithImageName("test:latest"))
 
-			outside, _, _, _, err := i.isOutsideCooldown(
+			outside, err := i.isOutsideCooldown(
 				context.Background(), c, types.UpdateParams{
 					MonitorOnly:   true,
 					CooldownDelay: 24 * time.Hour,
