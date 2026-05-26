@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -83,7 +84,7 @@ var _ = ginkgo.Describe("the client", func() {
 						"sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b",
 					),
 				)
-				err := i.PullImage(context.Background(), pinnedContainer, WarnAuto)
+				err := i.PullImage(context.Background(), pinnedContainer, WarnAuto, types.UpdateParams{})
 				gomega.Expect(err).
 					To(gomega.MatchError(`image is pinned with sha256, skipping pull`))
 			})
@@ -107,7 +108,7 @@ var _ = ginkgo.Describe("the client", func() {
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 			defer resetLogrus()
 
-			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
+			err := i.PullImage(context.Background(), pullContainer, WarnAuto, types.UpdateParams{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("authentication required"))
 			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeTrue())
@@ -134,7 +135,7 @@ var _ = ginkgo.Describe("the client", func() {
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 			defer resetLogrus()
 
-			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
+			err := i.PullImage(context.Background(), pullContainer, WarnAuto, types.UpdateParams{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("image not found"))
 			gomega.Expect(errors.Is(err, ErrPullImageNotFound)).To(gomega.BeTrue())
@@ -160,7 +161,7 @@ var _ = ginkgo.Describe("the client", func() {
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 			defer resetLogrus()
 
-			err := i.PullImage(context.Background(), pullContainer, WarnAuto)
+			err := i.PullImage(context.Background(), pullContainer, WarnAuto, types.UpdateParams{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to pull image"))
 			gomega.Expect(errors.Is(err, errPullImageFailed)).To(gomega.BeTrue())
@@ -472,3 +473,35 @@ func withContainerImageName(matcher gomegaTypes.GomegaMatcher) gomegaTypes.Gomeg
 		return container.ImageName()
 	}, matcher)
 }
+
+// IsOutsideCooldown tests (white-box, early-out paths require no registry).
+var _ = ginkgo.Describe("IsOutsideCooldown (cooldown gating before pull)", func() {
+	ginkgo.When("no cooldown delay is configured", func() {
+		ginkgo.It("returns true (safe to pull) with no registry calls", func() {
+			i := newImageClient(nil)
+			c := MockContainer(WithImageName("test:latest"))
+
+			outside, err := i.isOutsideCooldown(
+				context.Background(), c, types.UpdateParams{},
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(outside).To(gomega.BeTrue())
+		})
+	})
+
+	ginkgo.When("container is monitor-only or no-pull", func() {
+		ginkgo.It("returns true (bypasses cooldown check)", func() {
+			i := newImageClient(nil)
+			c := MockContainer(WithImageName("test:latest"))
+
+			outside, err := i.isOutsideCooldown(
+				context.Background(), c, types.UpdateParams{
+					MonitorOnly:   true,
+					CooldownDelay: 24 * time.Hour,
+				},
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(outside).To(gomega.BeTrue())
+		})
+	})
+})

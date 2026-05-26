@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -46,17 +47,19 @@ type imageClient struct {
 // IsContainerStale determines if a container's image is outdated.
 //
 // It skips pulling if NoPull is set, otherwise pulls and compares images.
+// If the image is within the cooldown window, it returns false with
+// ErrImageCooldown, indicating the update should be deferred.
 //
 // Parameters:
 //   - ctx: Context for operation control.
 //   - sourceContainer: Container to check.
-//   - params: Update parameters (e.g., NoPull flag).
+//   - params: Update parameters (e.g., NoPull flag, cooldown delay).
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
 //
 // Returns:
 //   - bool: True if image is stale, false otherwise.
 //   - types.ImageID: Latest image ID (or current if not pulled).
-//   - error: Non-nil if pull or inspection fails, nil on success or skipped.
+//   - error: Non-nil if pull or inspection fails or cooldown defers the update.
 func (c imageClient) IsContainerStale(
 	ctx context.Context,
 	sourceContainer types.Container,
@@ -73,8 +76,14 @@ func (c imageClient) IsContainerStale(
 		return c.checkLocalImageStaleness(ctx, sourceContainer, clog)
 	}
 
-	err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed)
+	err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed, params)
 	if err != nil {
+		if errors.Is(err, ErrImageCooldown) {
+			clog.WithError(err).Debug("Cooldown active - pull skipped")
+			// Return original error to preserve cooldown metadata for progress reporting.
+			return false, sourceContainer.ImageID(), err
+		}
+
 		clog.WithError(err).Debug("Failed to pull image")
 
 		return false, sourceContainer.ImageID(), err
@@ -137,18 +146,23 @@ func (c imageClient) HasNewImage(
 
 // PullImage fetches the latest image for a container.
 //
-// It skips pinned images and checks digests before pulling.
+// It skips pinned images, checks digests, and performs a cooldown check
+// before pulling the image.
 //
 // Parameters:
 //   - ctx: Context for operation control.
 //   - sourceContainer: Container whose image to pull.
+//   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
+//   - params: Update parameters (for per-container cooldown via label or global).
 //
 // Returns:
-//   - error: Non-nil if pull fails, nil on success or skip.
+//   - Non-nil error if pull fails or cooldown defers the pull.
+//   - nil on success or skip.
 func (c imageClient) PullImage(
 	ctx context.Context,
 	sourceContainer types.Container,
 	warnOnHeadFailed WarningStrategy,
+	params types.UpdateParams,
 ) error {
 	fields := logrus.Fields{
 		"container": sourceContainer.Name(),
@@ -183,7 +197,13 @@ func (c imageClient) PullImage(
 		return nil
 	}
 
-	// Perform full image pull.
+	// Perform cooldown check to prevent downloading images that are still
+	// inside the cooldown window.
+	_, cooldownErr := c.isOutsideCooldown(ctx, sourceContainer, params)
+	if cooldownErr != nil {
+		return cooldownErr
+	}
+
 	return c.performImagePull(ctx, sourceContainer.ImageName(), opts, fields)
 }
 

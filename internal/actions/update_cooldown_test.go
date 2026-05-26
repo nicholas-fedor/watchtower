@@ -15,6 +15,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -148,20 +149,12 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 
 	ginkgo.When("CooldownDelay is set and image is newer than cooldown", func() {
 		ginkgo.It("should defer the update and skip the container", func() {
-			// Image was created 30 minutes ago; cooldown is 1 hour.
-			registryServer = ghttp.NewServer()
-			registryServer.AppendHandlers(mockRegistryHandlers(time.Now().Add(-30 * time.Minute))...)
-
-			host := extractHost(registryServer.URL())
-			imageName := host + "/myimage:latest"
 			client := mockActions.MockClient{
 				TestData: &mockActions.TestData{
 					Containers: []types.Container{
-						mockActions.CreateMockContainer("c1", "c1", imageName, time.Now()),
+						mockActions.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
-					Staleness: map[string]bool{
-						"c1": true,
-					},
+					IsContainerStaleError: container.ErrImageCooldown,
 				},
 				Stopped: make(map[string]bool),
 			}
@@ -278,24 +271,12 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 
 	ginkgo.When("image age fetch fails", func() {
 		ginkgo.It("should skip the container with a conservative posture", func() {
-			// Start a server to get a host:port, then immediately close it so that
-			// all subsequent HTTP requests (auth challenge, manifest, blob) fail with
-			// "connection refused", causing fetchImageAge to return an error.
-			registryServer = ghttp.NewServer()
-			host := extractHost(registryServer.URL())
-			registryServer.Close()
-			// Set to nil so AfterEach doesn't try to close again.
-			registryServer = nil
-
-			imageName := host + "/myimage:latest"
 			client := mockActions.MockClient{
 				TestData: &mockActions.TestData{
 					Containers: []types.Container{
-						mockActions.CreateMockContainer("c1", "c1", imageName, time.Now()),
+						mockActions.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
-					Staleness: map[string]bool{
-						"c1": true,
-					},
+					IsContainerStaleError: container.ErrImageCooldown,
 				},
 				Stopped: make(map[string]bool),
 			}

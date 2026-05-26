@@ -84,6 +84,12 @@ var (
 	errRemoveImageFailed = errors.New("failed to remove image")
 )
 
+// Errors for image cooldown operations in cooldown.go and image.go.
+var (
+	// ErrImageCooldown indicates the image is within the configured cooldown window and should not be pulled.
+	ErrImageCooldown = errors.New("image is within cooldown period")
+)
+
 // Errors for label operations in metadata.go.
 var (
 	// errLabelNotFound indicates a requested label is not present in the container's metadata.
