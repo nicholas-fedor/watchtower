@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,9 +29,6 @@ const defaultPullFailureDelay = 5 * time.Minute
 
 // defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
 const defaultHealthCheckTimeout = 5 * time.Minute
-
-// projectServiceParts defines the expected number of parts in a project-service link format.
-const projectServiceParts = 2
 
 // Update scans and updates containers based on parameters.
 //
@@ -527,9 +525,11 @@ func hasSelfDependency(c types.Container) bool {
 // continuing until no more containers are marked for restart.
 //
 // Parameters:
-//   - allContainers: List of all containers.
-//   - containers: List of containers to update.
-//   - useComposeDependsOn: Boolean value of use-compose-depends-on configuration
+//   - allContainers: Full list of containers being managed.
+//   - containers: Slice of containers to evaluate and potentially mark for restart.
+//   - useComposeDependsOn: Whether to consider Docker Compose depends_on labels.
+//
+// This function mutates the ToRestart / LinkedToRestarting state on containers in place.
 func UpdateImplicitRestart(
 	allContainers,
 	containers []types.Container,
@@ -539,10 +539,47 @@ func UpdateImplicitRestart(
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
 
-	restartByName := make(map[string]bool, len(allContainers))
+	// Key restart tracking by the canonical identifier (ResolveContainerIdentifier)
+	// so that links produced by c.Links() can be matched directly. We also record
+	// the bare .Name() as an alias to improve exact-match resilience across
+	// different naming conventions (explicit container_name vs. Compose defaults,
+	// with or without replica suffixes).
+	restartByIdentifier := make(map[string]bool, len(allContainers)+len(allContainers))
+	resolvedToContainer := make(map[string]types.Container, len(allContainers)+len(allContainers))
+
 	for _, c := range allContainers {
 		byID[c.ID()] = c
-		restartByName[c.Name()] = c.ToRestart()
+
+		// Fall back through Name then ID to guarantee a non-empty key.
+		resolvedID := container.ResolveContainerIdentifier(c)
+		if resolvedID == "" {
+			resolvedID = c.Name()
+		}
+
+		if resolvedID == "" {
+			resolvedID = string(c.ID())
+		}
+
+		if resolvedID == "" {
+			logrus.WithField("container_id", c.ID()).Debug("Skipping container with empty identifier")
+
+			continue
+		}
+
+		restartByIdentifier[resolvedID] = c.ToRestart()
+		resolvedToContainer[resolvedID] = c
+
+		// Also index by bare name for better exact matching in mixed scenarios
+		bareName := c.Name()
+		if bareName != "" && bareName != resolvedID {
+			if _, exists := restartByIdentifier[bareName]; !exists {
+				restartByIdentifier[bareName] = c.ToRestart()
+			}
+
+			if _, exists := resolvedToContainer[bareName]; !exists {
+				resolvedToContainer[bareName] = c
+			}
+		}
 	}
 
 	markedContainers := []string{}
@@ -569,7 +606,7 @@ func UpdateImplicitRestart(
 
 			if link := linkedIdentifierMarkedForRestart(
 				links,
-				restartByName,
+				restartByIdentifier,
 				c,
 				allContainers,
 			); link != "" {
@@ -582,7 +619,8 @@ func UpdateImplicitRestart(
 
 				if ac, ok := byID[c.ID()]; ok {
 					ac.SetLinkedToRestarting(true)
-					restartByName[ac.Name()] = true
+					resolved := container.ResolveContainerIdentifier(ac)
+					restartByIdentifier[resolved] = true
 				}
 
 				markedContainers = append(markedContainers, c.Name())
@@ -647,38 +685,41 @@ func shouldUpdateContainer(
 	return true
 }
 
-// linkedIdentifierMarkedForRestart finds a restarting linked container by identifier.
+// linkedIdentifierMarkedForRestart returns the identifier of a container in the
+// links list that is marked for restart, or the empty string if none is found.
 //
-// It searches for a container identifier in the links list that is marked for restart,
-// returning its identifier. The matching follows this priority order:
-//
-//  1. Exact match: Direct identifier match in restartByIdentifier map.
-//
-//  2. Project-service format (exactly one dash): Matches containers where both the project
-//     and service name match the linked container's project and service.
-//
-//  3. Service-only format (no dash): Prioritizes same-project matches first, then falls back
-//     to cross-project matches. This ensures that dependencies within the same Docker Compose
-//     project are preferred over external dependencies, while still allowing cross-project
-//     dependencies when no same-project match exists.
+// The function attempts an exact match first. Otherwise it delegates to
+// FindMatchingIdentifiers and selects among the returned candidates using
+// project information from labels (via getProject). For links containing
+// hyphens, a match is only accepted if the link string itself exists in the
+// restart map or a candidate from the same project is available. Short
+// service-name links fall back to a service-only path with the same project
+// preference.
 //
 // Parameters:
-//   - links: List of linked container identifiers.
-//   - restartByIdentifier: Map of container identifiers to restart status.
-//   - dependentContainer: The container that has the dependency.
-//   - allContainers: List of all containers.
+//   - links: List of linked container identifiers (from Container.Links()).
+//   - restartByIdentifier: Map of container identifiers to their restart status.
+//   - dependentContainer: The container whose links are being evaluated.
+//   - allContainers: Full list of containers (used for project lookup and resolution).
 //
 // Returns:
-//   - string: Identifier of restarting linked container, or empty if none.
+//   - string: Identifier of a restarting linked container, or "" if none found.
 func linkedIdentifierMarkedForRestart(
 	links []string,
 	restartByIdentifier map[string]bool,
 	dependentContainer types.Container,
 	allContainers []types.Container,
 ) string {
-	nameToContainer := make(map[string]types.Container, len(allContainers))
+	// Build a lookup that supports both bare names and ResolveContainerIdentifier
+	// results, since the restart map may be populated with either.
+	idToContainer := make(map[string]types.Container, len(allContainers)+len(allContainers))
 	for _, c := range allContainers {
-		nameToContainer[c.Name()] = c
+		idToContainer[c.Name()] = c
+
+		resolved := container.ResolveContainerIdentifier(c)
+		if resolved != "" && resolved != c.Name() {
+			idToContainer[resolved] = c
+		}
 	}
 
 	dependentProject := getProject(dependentContainer)
@@ -690,13 +731,18 @@ func linkedIdentifierMarkedForRestart(
 			"dependentProject":    dependentProject,
 		}).Debug("Searching for restarting linked container")
 
+	// Overall strategy per link:
+	//   1. Exact match against the restart map.
+	//   2. Delegate to FindMatchingIdentifiers (exact / replica / service-only).
+	//   3. Among matches, prefer same-project (via labels).
+	//   4. For links that look qualified, apply an additional guard.
+	//   5. Bare service names have a final ExtractServiceName fallback path.
 	for _, link := range links {
 		logrus.WithField(
 			"checking_link",
 			link,
 		).Debug("Checking link for restarting match")
 
-		// Exact match
 		if restartByIdentifier[link] {
 			logrus.WithField(
 				"found_restarting_identifier",
@@ -706,112 +752,100 @@ func linkedIdentifierMarkedForRestart(
 			return link
 		}
 
-		if strings.Contains(link, "-") && strings.Count(link, "-") == 1 {
-			// project-service format (only if exactly one dash)
-			parts := strings.Split(link, "-")
-			if len(parts) != projectServiceParts {
-				continue
+		// Collect only the identifiers that are currently marked for restart.
+		// This list is passed to FindMatchingIdentifiers for exact/replica/service matching.
+		restartingNames := make([]string, 0, len(restartByIdentifier))
+		for name, restarting := range restartByIdentifier {
+			if restarting {
+				restartingNames = append(restartingNames, name)
 			}
+		}
 
-			linkProject := parts[0]
-			serviceName := parts[1]
+		matches := sorter.FindMatchingIdentifiers(link, restartingNames)
 
-			logrus.WithFields(
-				logrus.Fields{
-					"link":        link,
-					"linkProject": linkProject,
-					"serviceName": serviceName,
-				}).Debug("Checking project-service match")
+		if len(matches) > 0 {
+			dependentProject := getProject(dependentContainer)
 
-			for identifier, restarting := range restartByIdentifier {
-				if restarting && getProject(nameToContainer[identifier]) == linkProject &&
-					strings.Contains(identifier, serviceName) {
-					logrus.WithFields(
-						logrus.Fields{
-							"link":    link,
-							"matched": identifier,
-							"project": linkProject,
-							"service": serviceName,
-						}).Debug("Found restarting linked container via project-service match")
-
-					return identifier
-				}
-			}
-		} else {
-			// service name only, prioritize same project first, then cross-project dependencies
-			logrus.WithFields(
-				logrus.Fields{
-					"link":             link,
-					"dependentProject": dependentProject,
-				}).Debug("Checking service-only match")
-
-			// crossProjectMatch stores the first cross-project match found, used as fallback
-			// when no same-project match exists.
-			//
-			// NOTE: Go map iteration order is non-deterministic, so when multiple cross-project
-			// containers match the service name, the first one encountered during iteration is
-			// selected. This non-determinism is acceptable for fallback scenarios where no exact
-			// or same-project match exists, as it provides a "best effort" approach.
-			//
-			// The strings.Contains matching is intentional for service-only lookups, allowing
-			// service names like "db" to match container identifiers like "project1-db" or
-			// "myapp-db". This flexible matching enables shorthand references without requiring
-			// the full project-service format.
-			var crossProjectMatch string
-
-			// Collect and sort identifiers to ensure deterministic iteration order.
-			// This is critical for reproducible behavior: without sorting, the iteration
-			// order of restartByIdentifier map would be random, causing different
-			// cross-project matches to be selected on each run when multiple candidates
-			// exist. Sorting ensures that:
-			//   1. The same cross-project container is always selected as fallback
-			//   2. Restarts happen in a predictable, testable order
-			//   3. Multiple Watchtower runs produce consistent results
-			identifiers := make([]string, 0, len(restartByIdentifier))
-			for identifier := range restartByIdentifier {
-				identifiers = append(identifiers, identifier)
-			}
-			// Sort alphabetically for deterministic ordering across all identifiers
-			slices.Sort(identifiers)
-
-			for _, identifier := range identifiers {
-				restarting := restartByIdentifier[identifier]
-				if restarting && strings.Contains(identifier, link) {
-					matchProject := getProject(nameToContainer[identifier])
-					// Priority 1: Same-project match - return immediately
-					if matchProject == dependentProject {
-						logrus.WithFields(
-							logrus.Fields{
-								"link":    link,
-								"matched": identifier,
-								"project": matchProject,
-							}).Debug("Found restarting linked container via same-project service match")
-
-						return identifier
-					}
-					// Priority 2: Cross-project match - remember first match for fallback.
-					// We only store the first match to maintain deterministic behavior.
-					// Since identifiers are sorted alphabetically above, the first match
-					// in alphabetical order will be selected, ensuring consistent
-					// cross-project dependency resolution across multiple runs.
-					if crossProjectMatch == "" {
-						crossProjectMatch = identifier
-					}
-				}
-			}
-
-			// If no same-project match was found, return cross-project match as fallback.
-			// See note above about non-deterministic selection when multiple matches exist.
-			if crossProjectMatch != "" {
-				logrus.WithFields(
-					logrus.Fields{
+			// Prefer any candidate that shares the dependent's project (from labels).
+			for _, matchedID := range matches {
+				if getProject(idToContainer[matchedID]) == dependentProject && dependentProject != "" {
+					logrus.WithFields(logrus.Fields{
 						"link":    link,
-						"matched": crossProjectMatch,
-						"project": getProject(nameToContainer[crossProjectMatch]),
-					}).Debug("Found restarting linked container via cross-project service match")
+						"matched": matchedID,
+						"reason":  "same-project via FindMatchingIdentifiers",
+					}).Debug("Found restarting linked container")
 
-				return crossProjectMatch
+					return matchedID
+				}
 			}
+
+			// Guard for qualified links (those containing '-'):
+			// Only promote a match if the original link string is itself marked
+			// for restart (i.e. an explicit full identifier was used) or we
+			// already selected a same-project candidate.
+			if !strings.Contains(link, "-") || restartByIdentifier[link] {
+				chosen := matches[0]
+				logrus.WithFields(logrus.Fields{
+					"link":    link,
+					"matched": chosen,
+					"reason":  "first match via FindMatchingIdentifiers",
+				}).Debug("Found restarting linked container")
+
+				return chosen
+			}
+
+			logrus.WithFields(logrus.Fields{
+				"link": link,
+			}).Debug("Qualified link did not match any restarting candidate")
+		}
+
+		// Only bare service names (links without '-') reach the service-only fallback.
+		// Any link containing a hyphen was either matched earlier or deliberately
+		// skipped by the qualified-link guard above.
+		if strings.Contains(link, "-") {
+			continue
+		}
+
+		dependentProject := getProject(dependentContainer)
+		linkService := sorter.ExtractServiceName(link)
+
+		// Build the list of currently restarting containers that match on service name alone.
+		var serviceCandidates []string
+
+		for _, name := range restartingNames {
+			if sorter.ExtractServiceName(name) == linkService {
+				serviceCandidates = append(serviceCandidates, name)
+			}
+		}
+
+		if len(serviceCandidates) > 0 {
+			// Prefer a candidate from the same project as the dependent.
+			for _, cand := range serviceCandidates {
+				c := idToContainer[cand]
+				if c != nil &&
+					getProject(idToContainer[cand]) == dependentProject &&
+					dependentProject != "" {
+					logrus.WithFields(logrus.Fields{
+						"link":    link,
+						"matched": cand,
+						"reason":  "same-project service fallback",
+					}).Debug("Found restarting linked container")
+
+					return cand
+				}
+			}
+
+			// No same-project service match found; take the first candidate
+			// after sorting for deterministic behavior.
+			sort.Strings(serviceCandidates)
+			chosen := serviceCandidates[0]
+			logrus.WithFields(logrus.Fields{
+				"link":    link,
+				"matched": chosen,
+				"reason":  "first service fallback",
+			}).Debug("Found restarting linked container")
+
+			return chosen
 		}
 	}
 
@@ -821,6 +855,15 @@ func linkedIdentifierMarkedForRestart(
 }
 
 // getProject extracts the project name from a container's compose project label.
+//
+// Falls back to parsing the leading segment of the container name if no project
+// label is present.
+//
+// Parameters:
+//   - c: Container to inspect.
+//
+// Returns:
+//   - string: Project name, or "" if none can be determined.
 func getProject(c types.Container) string {
 	if monitoredContainer, ok := c.(*container.Container); ok {
 		if info := monitoredContainer.ContainerInfo(); info != nil && info.Config != nil {

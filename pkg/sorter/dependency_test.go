@@ -1489,7 +1489,7 @@ var _ = ginkgo.Describe("Identifier Collision Issues", func() {
 var _ = ginkgo.Describe("isPositiveInteger", func() {
 	ginkgo.DescribeTable("validates positive integers correctly",
 		func(input string, expected bool) {
-			result := isPositiveInteger(input)
+			result := IsPositiveInteger(input)
 			gomega.Expect(result).To(gomega.Equal(expected))
 		},
 		ginkgo.Entry("should return true for single digit positive integer", "1", true),
@@ -1508,7 +1508,7 @@ var _ = ginkgo.Describe("isPositiveInteger", func() {
 var _ = ginkgo.Describe("extractServiceName", func() {
 	ginkgo.DescribeTable("extracts service name from container identifier",
 		func(input, expected string) {
-			result := extractServiceName(input)
+			result := ExtractServiceName(input)
 			gomega.Expect(result).To(gomega.Equal(expected))
 		},
 		ginkgo.Entry(
@@ -1862,3 +1862,43 @@ func indexOf(names []string, target string) int {
 
 	return -1
 }
+
+var _ = ginkgo.Describe("FindMatchingIdentifiers", func() {
+	ginkgo.It("should return exact match when present", func() {
+		identifiers := []string{"project-db", "other-db"}
+		matches := FindMatchingIdentifiers("project-db", identifiers)
+		gomega.Expect(matches).To(gomega.Equal([]string{"project-db"}))
+	})
+
+	ginkgo.It("should match replica suffix when link has no replica", func() {
+		identifiers := []string{"project-db-1", "project-db-2", "other"}
+		matches := FindMatchingIdentifiers("project-db", identifiers)
+		gomega.Expect(matches).To(gomega.ConsistOf("project-db-1", "project-db-2"))
+	})
+
+	ginkgo.It("should not match replica when suffix is not a positive integer", func() {
+		identifiers := []string{"project-db-backup"}
+		matches := FindMatchingIdentifiers("project-db", identifiers)
+		gomega.Expect(matches).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should return service-only match when exactly one candidate exists", func() {
+		identifiers := []string{"project1-db"}
+		matches := FindMatchingIdentifiers("db", identifiers)
+		gomega.Expect(matches).To(gomega.Equal([]string{"project1-db"}))
+	})
+
+	ginkgo.It("should return no matches for ambiguous service name across projects", func() {
+		identifiers := []string{"project1-db", "project2-db"}
+		matches := FindMatchingIdentifiers("db", identifiers)
+		gomega.Expect(matches).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should return empty for empty input", func() {
+		matches := FindMatchingIdentifiers("", []string{"db"})
+		gomega.Expect(matches).To(gomega.BeEmpty())
+
+		matches = FindMatchingIdentifiers("db", []string{})
+		gomega.Expect(matches).To(gomega.BeEmpty())
+	})
+})
