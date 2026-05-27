@@ -288,7 +288,7 @@ func buildDependencyGraph(
 					// Only match if the suffix is a positive integer (replica number).
 					// This ensures we don't match "watchtower-test-database" when looking for "watchtower-test-database2",
 					// or create false dependencies between similarly named but distinct services.
-					if isPositiveInteger(suffix) {
+					if IsPositiveInteger(suffix) {
 						matchedKeys = append(matchedKeys, key)
 					}
 				}
@@ -336,7 +336,7 @@ func buildDependencyGraph(
 			var serviceMatchKeys []string
 
 			for key := range containerMap {
-				serviceName := extractServiceName(key)
+				serviceName := ExtractServiceName(key)
 				if serviceName == normalizedLink {
 					serviceMatchKeys = append(serviceMatchKeys, key)
 				}
@@ -359,7 +359,7 @@ func buildDependencyGraph(
 					"matched_key":       serviceMatchKey,
 					"dependent":         normalizedIdentifier,
 					"match_type":        "service_only",
-					"extracted_service": extractServiceName(serviceMatchKey),
+					"extracted_service": ExtractServiceName(serviceMatchKey),
 				}).Debug("Matched dependency via service name fallback")
 
 				// This container depends on the linked container, so increment its indegree
@@ -386,7 +386,7 @@ func buildDependencyGraph(
 	return containerMap, indegree, adjacency, normalizedMap, nil
 }
 
-// isPositiveInteger checks if a string represents a positive integer (1 or greater).
+// IsPositiveInteger checks if a string represents a positive integer (1 or greater).
 //
 // This validation is critical for distinguishing Docker Compose-style replica suffixes
 // (e.g., "db-1", "db-2") from other hyphenated container names (e.g., "db-backup",
@@ -399,13 +399,7 @@ func buildDependencyGraph(
 //
 // This prevents false dependency relationships between unrelated containers with
 // similar names, which could cause incorrect update ordering or circular dependencies.
-//
-// Parameters:
-//   - s: The string to check (typically the suffix after "-" in a container name).
-//
-// Returns:
-//   - bool: True if the string is a valid integer >= 1, false otherwise.
-func isPositiveInteger(s string) bool {
+func IsPositiveInteger(s string) bool {
 	if s == "" {
 		return false
 	}
@@ -415,7 +409,7 @@ func isPositiveInteger(s string) bool {
 	return err == nil && n > 0
 }
 
-// extractServiceName extracts the service name from a container identifier.
+// ExtractServiceName extracts the service name from a container identifier.
 //
 // Container identifiers from ResolveContainerIdentifier() follow the pattern:
 //   - "project-service" when both project and service labels exist
@@ -433,13 +427,7 @@ func isPositiveInteger(s string) bool {
 //   - "myapp" -> "myapp"
 //   - "my-app-service" -> "service" (last segment before any replica number)
 //   - "my-app-service-2" -> "service" (strips replica suffix)
-//
-// Parameters:
-//   - identifier: The full container identifier (e.g., "postgresql-postgres").
-//
-// Returns:
-//   - string: The extracted service name.
-func extractServiceName(identifier string) string {
+func ExtractServiceName(identifier string) string {
 	if identifier == "" {
 		return ""
 	}
@@ -453,13 +441,90 @@ func extractServiceName(identifier string) string {
 
 	// Check if the last part is a replica number (positive integer)
 	// If so, we need to skip it and take the second-to-last part as service name
-	if isPositiveInteger(parts[len(parts)-1]) {
+	if IsPositiveInteger(parts[len(parts)-1]) {
 		// Return the part before the replica number (e.g., "service" from "project-service-1")
 		return parts[len(parts)-2]
 	}
 
 	// No replica number, service name is the last part
 	return parts[len(parts)-1]
+}
+
+// FindMatchingIdentifiers returns the identifiers from the given list that match
+// the provided link. It applies the same three matching strategies used in
+// buildDependencyGraph:
+//
+//  1. Exact match.
+//  2. Replica prefix match: the identifier starts with "<link>-" and the suffix
+//     after the hyphen is a positive integer (Docker Compose replica numbering).
+//  3. Service-only match using ExtractServiceName. This strategy only succeeds
+//     when exactly one candidate matches; multiple matches (e.g. the same
+//     service name in different projects) are treated as ambiguous and return
+//     no results.
+//
+// Parameters:
+//   - link: Dependency link to resolve (typically from Container.Links()).
+//   - identifiers: List of known container identifiers to search within.
+//
+// Returns:
+//   - []string: Matching identifiers. Returns nil or an empty slice when there
+//     is no match or when the service-only strategy finds multiple candidates.
+func FindMatchingIdentifiers(link string, identifiers []string) []string {
+	if link == "" || len(identifiers) == 0 {
+		return nil
+	}
+
+	// Build a temporary lookup for efficiency
+	idSet := make(map[string]bool, len(identifiers))
+	for _, id := range identifiers {
+		idSet[id] = true
+	}
+
+	var matches []string
+
+	// 1. Exact match
+	if idSet[link] {
+		matches = append(matches, link)
+
+		return matches
+	}
+
+	// 2. Replica prefix match (only if suffix is positive integer)
+	var replicaMatches []string
+
+	for id := range idSet {
+		if strings.HasPrefix(id, link+"-") {
+			suffix := id[len(link)+1:]
+			if IsPositiveInteger(suffix) {
+				replicaMatches = append(replicaMatches, id)
+			}
+		}
+	}
+
+	if len(replicaMatches) > 0 {
+		sort.Strings(replicaMatches)
+		matches = append(matches, replicaMatches...)
+
+		return matches
+	}
+
+	// 3. Service-only match using ExtractServiceName.
+	// Only accepted when exactly one candidate matches the service name.
+	// Multiple matches are ambiguous (different projects) and are discarded.
+	var serviceMatches []string
+
+	normalizedLink := ExtractServiceName(link)
+	for id := range idSet {
+		if ExtractServiceName(id) == normalizedLink {
+			serviceMatches = append(serviceMatches, id)
+		}
+	}
+
+	if len(serviceMatches) == 1 {
+		matches = append(matches, serviceMatches[0])
+	}
+
+	return matches
 }
 
 // initializeQueue creates the initial processing queue for Kahn's algorithm.

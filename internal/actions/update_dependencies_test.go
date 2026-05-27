@@ -203,6 +203,46 @@ var _ = ginkgo.Describe("the update action", func() {
 		)
 
 		ginkgo.It(
+			"should propagate restart for hyphenated Compose project names with explicit container_name using real emitted labels",
+			func() {
+				testData := getComposeHyphenatedProjectTestData()
+				containers := testData.Containers
+
+				// base is stale
+				containers[0].SetStale(true)
+
+				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // base
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // dependent
+
+				actions.UpdateImplicitRestart(containers, containers, true)
+
+				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+			},
+		)
+
+		ginkgo.It(
+			"should mark dependents for implicit restart with multi-hyphen Compose project names and explicit container_name",
+			func() {
+				testData := getHyphenatedProjectWithContainerNameTestData()
+				containers := testData.Containers
+
+				// base is stale
+				containers[0].SetStale(true)
+
+				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // base
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // dependent-simple
+				gomega.Expect(containers[2].ToRestart()).To(gomega.BeFalse()) // dependent-network
+
+				actions.UpdateImplicitRestart(containers, containers, true)
+
+				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue(), "dependent-simple should be marked via depends_on")
+				gomega.Expect(containers[2].ToRestart()).To(gomega.BeTrue(), "dependent-network should be marked via depends_on + network_mode")
+			},
+		)
+
+		ginkgo.It(
 			"should NOT propagate restart via compose depends_on when UseComposeDependsOn is false",
 			func() {
 				// Create containers with compose depends_on label
@@ -402,6 +442,208 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 			gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
 		})
+
+		ginkgo.It("should skip containers with no usable identifier without breaking restart propagation", func() {
+			// Container that will cause ResolveContainerIdentifier to return ""
+			// (no name, no ID, no useful labels).
+			badContainer := mockActions.CreateMockContainerWithConfig(
+				"", "",
+				"bad:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			base := mockActions.CreateMockContainerWithConfig(
+				"base",
+				"/base",
+				"base:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project": "test-project",
+						"com.docker.compose.service": "base",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			dependent := mockActions.CreateMockContainerWithConfig(
+				"dependent",
+				"/dependent",
+				"dep:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project":    "test-project",
+						"com.docker.compose.service":    "dependent",
+						"com.docker.compose.depends_on": "base:service_started:false",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			containers := []types.Container{badContainer, base, dependent}
+			base.SetStale(true)
+
+			actions.UpdateImplicitRestart(containers, containers, true)
+
+			// The valid dependent should still be marked despite the bad container
+			gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should allow replica matches for qualified links via hasExactOrReplica even without project label on dependent", func() {
+			// Dependent has no project label and a hyphenated link from compose depends_on.
+			// The restarting candidate is a replica; FindMatchingIdentifiers hits replica
+			// strategy so hasExactOrReplica is true and the qualified-link guard permits it.
+			base := mockActions.CreateMockContainerWithConfig(
+				"project-base-1",
+				"/project-base-1",
+				"base:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project":          "project",
+						"com.docker.compose.service":          "base",
+						"com.docker.compose.container-number": "1",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			// Dependent with no project label
+			dependent := mockActions.CreateMockContainerWithConfig(
+				"dependent",
+				"/dependent",
+				"dep:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.service":    "dependent",
+						"com.docker.compose.depends_on": "project-base:service_started:false",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			containers := []types.Container{base, dependent}
+			base.SetStale(true)
+
+			actions.UpdateImplicitRestart(containers, containers, true)
+
+			// Replica matches for qualified links are permitted by the refined guard.
+			gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should handle the replica special case in ResolveContainerIdentifier for restart decisions", func() {
+			// This tests the early return in ResolveContainerIdentifier:
+			// if the container's runtime name matches the pattern "project-service-N",
+			// it returns the runtime name directly instead of the constructed form.
+			// This can happen with certain container_name configurations.
+
+			// Base container whose Name() will trigger the special case
+			base := mockActions.CreateMockContainerWithConfig(
+				"myproject-db-1", // runtime name matches project-service-N pattern
+				"/myproject-db-1",
+				"db:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project": "myproject",
+						"com.docker.compose.service": "db",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			dependent := mockActions.CreateMockContainerWithConfig(
+				"myproject-app-1",
+				"/myproject-app-1",
+				"app:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project":    "myproject",
+						"com.docker.compose.service":    "app",
+						"com.docker.compose.depends_on": "myproject-db:service_started:false",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			containers := []types.Container{base, dependent}
+			base.SetStale(true)
+
+			actions.UpdateImplicitRestart(containers, containers, true)
+
+			// The dependent should still be marked, even though the base resolved
+			// to its runtime name "myproject-db-1" due to the special case.
+			gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should resolve dependencies that come only from network_mode via host config", func() {
+			// This covers the case where a container has no com.docker.compose.depends_on
+			// label and no watchtower depends-on label, so the link must come from
+			// getLinksFromHostConfig (network_mode: container:xxx).
+			base := mockActions.CreateMockContainerWithConfig(
+				"base",
+				"/base",
+				"base:latest",
+				true,
+				false,
+				time.Now().AddDate(0, 0, -1),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project": "test",
+						"com.docker.compose.service": "base",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+
+			// Dependent that declares the relationship only via HostConfig.NetworkMode
+			// (no compose depends_on label, no watchtower depends-on label).
+			dependent := mockActions.CreateMockContainerWithConfig(
+				"dependent",
+				"/dependent",
+				"dep:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.docker.compose.project": "test",
+						"com.docker.compose.service": "dependent",
+					},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+			dependent.ContainerInfo().HostConfig.NetworkMode = "container:base"
+
+			containers := []types.Container{base, dependent}
+			base.SetStale(true)
+
+			actions.UpdateImplicitRestart(containers, containers, true)
+
+			gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
+		})
+
 		ginkgo.It("should ensure dependencies are stopped and started in correct order", func() {
 			// Create dependency chain: A depends on B, B depends on C
 			containers := createDependencyChain(
@@ -1813,6 +2055,50 @@ var _ = ginkgo.Describe("the update action", func() {
 					To(gomega.Equal("network-dependent"))
 					// dependent container
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+			},
+		)
+
+		ginkgo.It(
+			"should restart containers with both compose depends_on and network_mode dependency",
+			func() {
+				testData := getComposeDependsOnWithNetworkModeTestData()
+				client := mockActions.CreateMockClient(testData, false, false)
+
+				report, cleanupImageInfos, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).
+					To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos).To(gomega.HaveLen(1))
+				gomega.Expect(cleanupImageInfos[0].ContainerName).
+					To(gomega.Equal("download-stack-vpn-1"))
+
+				containers := testData.Containers
+				gomega.Expect(containers[0].Name()).
+					To(gomega.Equal("download-stack-vpn-1"))
+				gomega.Expect(containers[1].Name()).
+					To(gomega.Equal("download-stack-web-1"))
+
+				// The dependent container should be marked for restart via compose depends_on
+				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
+
+				// Verify stop order: dependent first, then dependency (reverse sorted order)
+				gomega.Expect(client.TestData.StopOrder).
+					To(gomega.Equal([]string{"download-stack-web-1", "download-stack-vpn-1"}))
+
+				// Verify create order: dependency first, then dependent
+				gomega.Expect(client.TestData.CreateOrder).
+					To(gomega.Equal([]string{"download-stack-vpn-1", "download-stack-web-1"}))
+
+				// Verify the dependent container preserves the network mode referencing the dependency
+				newDependent := containers[1]
+				networkMode := newDependent.ContainerInfo().HostConfig.NetworkMode
+				gomega.Expect(string(networkMode)).
+					To(gomega.Equal("container:download-stack-vpn-1"))
 			},
 		)
 	})
