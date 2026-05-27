@@ -925,6 +925,37 @@ var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart project-service format
 			gomega.Expect(result).To(gomega.Equal("production-api-gateway"))
 		},
 	)
+
+	ginkgo.It("should accept replica match for qualified hyphenated link via hasExactOrReplica", func() {
+		// Exercises the refined guard: link contains '-', not present as exact key in
+		// restartByIdent, but FindMatchingIdentifiers returns replica match so
+		// hasExactOrReplica becomes true and the match is accepted.
+		restartByIdent := map[string]bool{
+			"myapp-db-1": true,
+		}
+		links := []string{"myapp-db"}
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"dependent",
+			"myapp-web",
+			"web:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		restarting := mockActions.CreateMockContainerWithConfig(
+			"myapp-db-1",
+			"myapp-db-1",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, restarting}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("myapp-db-1"))
+	})
 })
 
 var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart cross-project fallback", func() {
@@ -1013,6 +1044,37 @@ var _ = ginkgo.Describe("linkedIdentifierMarkedForRestart cross-project fallback
 		allContainers := []types.Container{dependent, restarting}
 		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
 		gomega.Expect(result).To(gomega.Equal("otherproject-db"))
+	})
+
+	ginkgo.It("should resolve bare hyphenated service name via service-only fallback", func() {
+		// The link is a bare service name (exactly as declared in another compose
+		// file) that contains hyphens. It must resolve via the service-only path
+		// even though the actual identifier in the restart map is project-qualified.
+		restartByIdent := map[string]bool{
+			"database1-watchtower-test-database-1": true,
+		}
+		links := []string{"watchtower-test-database"}
+		dependent := mockActions.CreateMockContainerWithConfig(
+			"app1-foo-1",
+			"app1-foo-1",
+			"foo:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		db := mockActions.CreateMockContainerWithConfig(
+			"database1-watchtower-test-database-1",
+			"database1-watchtower-test-database-1",
+			"db:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{},
+		)
+		allContainers := []types.Container{dependent, db}
+		result := linkedIdentifierMarkedForRestart(links, restartByIdent, dependent, allContainers)
+		gomega.Expect(result).To(gomega.Equal("database1-watchtower-test-database-1"))
 	})
 })
 

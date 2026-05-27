@@ -343,6 +343,7 @@ func getHyphenatedProjectWithContainerNameTestData() *mockActions.TestData {
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
 		})
+	dependentNetwork.ContainerInfo().HostConfig.NetworkMode = "container:base"
 
 	return &mockActions.TestData{
 		Staleness: map[string]bool{

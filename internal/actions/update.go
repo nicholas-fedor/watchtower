@@ -545,7 +545,6 @@ func UpdateImplicitRestart(
 	// different naming conventions (explicit container_name vs. Compose defaults,
 	// with or without replica suffixes).
 	restartByIdentifier := make(map[string]bool, len(allContainers)+len(allContainers))
-	resolvedToContainer := make(map[string]types.Container, len(allContainers)+len(allContainers))
 
 	for _, c := range allContainers {
 		byID[c.ID()] = c
@@ -567,17 +566,12 @@ func UpdateImplicitRestart(
 		}
 
 		restartByIdentifier[resolvedID] = c.ToRestart()
-		resolvedToContainer[resolvedID] = c
 
 		// Also index by bare name for better exact matching in mixed scenarios
 		bareName := c.Name()
 		if bareName != "" && bareName != resolvedID {
 			if _, exists := restartByIdentifier[bareName]; !exists {
 				restartByIdentifier[bareName] = c.ToRestart()
-			}
-
-			if _, exists := resolvedToContainer[bareName]; !exists {
-				resolvedToContainer[bareName] = c
 			}
 		}
 	}
@@ -617,10 +611,17 @@ func UpdateImplicitRestart(
 					}).Debug("Marked container as linked to restarting")
 				containers[i].SetLinkedToRestarting(true)
 
-				if ac, ok := byID[c.ID()]; ok {
-					ac.SetLinkedToRestarting(true)
-					resolved := container.ResolveContainerIdentifier(ac)
+				if allContainer, ok := byID[c.ID()]; ok {
+					allContainer.SetLinkedToRestarting(true)
+					resolved := container.ResolveContainerIdentifier(allContainer)
 					restartByIdentifier[resolved] = true
+
+					bareName := allContainer.Name()
+					if bareName != "" && bareName != resolved {
+						restartByIdentifier[bareName] = true
+					}
+
+					restartByIdentifier[string(allContainer.ID())] = true
 				}
 
 				markedContainers = append(markedContainers, c.Name())
@@ -688,13 +689,12 @@ func shouldUpdateContainer(
 // linkedIdentifierMarkedForRestart returns the identifier of a container in the
 // links list that is marked for restart, or the empty string if none is found.
 //
-// The function attempts an exact match first. Otherwise it delegates to
-// FindMatchingIdentifiers and selects among the returned candidates using
-// project information from labels (via getProject). For links containing
-// hyphens, a match is only accepted if the link string itself exists in the
-// restart map or a candidate from the same project is available. Short
-// service-name links fall back to a service-only path with the same project
-// preference.
+// The function attempts an exact match first, then delegates to
+// FindMatchingIdentifiers (exact/replica/service-only strategies) with
+// same-project preference. A hyphenated link is only treated as an explicit
+// project-qualified reference (restricting pure service-only results) when
+// it begins with a known project prefix from the container set. Bare service
+// names, including hyphenated ones, reach the service-only fallback.
 //
 // Parameters:
 //   - links: List of linked container identifiers (from Container.Links()).
@@ -724,6 +724,17 @@ func linkedIdentifierMarkedForRestart(
 
 	dependentProject := getProject(dependentContainer)
 
+	// Collect known projects so we can distinguish bare service-name references
+	// (which may contain hyphens) from explicit project-qualified identifiers
+	// the caller wrote in a label.
+	knownProjects := map[string]bool{}
+
+	for _, c := range allContainers {
+		if p := getProject(c); p != "" {
+			knownProjects[p] = true
+		}
+	}
+
 	logrus.WithFields(
 		logrus.Fields{
 			"links":               links,
@@ -735,13 +746,31 @@ func linkedIdentifierMarkedForRestart(
 	//   1. Exact match against the restart map.
 	//   2. Delegate to FindMatchingIdentifiers (exact / replica / service-only).
 	//   3. Among matches, prefer same-project (via labels).
-	//   4. For links that look qualified, apply an additional guard.
-	//   5. Bare service names have a final ExtractServiceName fallback path.
+	//   4. Only treat a hyphenated link as an explicit project-qualified reference
+	//      (and therefore restrict pure service-only resolution) when the link
+	//      begins with a known project prefix. Bare service names are allowed to
+	//      use the service fallback even when they contain hyphens.
 	for _, link := range links {
 		logrus.WithField(
 			"checking_link",
 			link,
 		).Debug("Checking link for restarting match")
+
+		// Determine once per link whether it is written as an explicit
+		// project-qualified identifier (starts with a known project- prefix).
+		// Bare service names, even when they contain hyphens, must be allowed
+		// to reach the service-only fallback.
+		isExplicitProjectRef := false
+
+		if strings.Contains(link, "-") {
+			for p := range knownProjects {
+				if strings.HasPrefix(link, p+"-") {
+					isExplicitProjectRef = true
+
+					break
+				}
+			}
+		}
 
 		if restartByIdentifier[link] {
 			logrus.WithField(
@@ -784,11 +813,34 @@ func linkedIdentifierMarkedForRestart(
 				}
 			}
 
-			// Guard for qualified links (those containing '-'):
-			// Only promote a match if the original link string is itself marked
-			// for restart (i.e. an explicit full identifier was used) or we
-			// already selected a same-project candidate.
-			if !strings.Contains(link, "-") || restartByIdentifier[link] {
+			// Determine if any match from FindMatchingIdentifiers was an
+			// exact or replica match (vs pure service-only). We are more
+			// permissive with exact/replica results.
+			hasExactOrReplica := false
+
+			for _, matchID := range matches {
+				if matchID == link {
+					hasExactOrReplica = true
+
+					break
+				}
+
+				if strings.HasPrefix(matchID, link+"-") {
+					suffix := matchID[len(link)+1:]
+					if sorter.IsPositiveInteger(suffix) {
+						hasExactOrReplica = true
+
+						break
+					}
+				}
+			}
+
+			// Only treat the link as an explicit project-qualified reference (and
+			// therefore block a pure service-only result) when it starts with a
+			// known project prefix. Bare service names (even hyphenated ones such
+			// as "watchtower-test-database") are permitted to resolve via the
+			// service fallback.
+			if !isExplicitProjectRef || restartByIdentifier[link] || hasExactOrReplica {
 				chosen := matches[0]
 				logrus.WithFields(logrus.Fields{
 					"link":    link,
@@ -804,10 +856,9 @@ func linkedIdentifierMarkedForRestart(
 			}).Debug("Qualified link did not match any restarting candidate")
 		}
 
-		// Only bare service names (links without '-') reach the service-only fallback.
-		// Any link containing a hyphen was either matched earlier or deliberately
-		// skipped by the qualified-link guard above.
-		if strings.Contains(link, "-") {
+		// Skip the bare service-name fallback for links that are explicit
+		// project-qualified references.
+		if isExplicitProjectRef {
 			continue
 		}
 

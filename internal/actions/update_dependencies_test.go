@@ -500,9 +500,10 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
 		})
 
-		ginkgo.It("should not promote cross-project replica matches for qualified links when dependent has no project label", func() {
-			// Dependent has no project label, uses a hyphenated link via compose depends_on.
-			// Base exists only as a replica form in the restart map.
+		ginkgo.It("should allow replica matches for qualified links via hasExactOrReplica even without project label on dependent", func() {
+			// Dependent has no project label and a hyphenated link from compose depends_on.
+			// The restarting candidate is a replica; FindMatchingIdentifiers hits replica
+			// strategy so hasExactOrReplica is true and the qualified-link guard permits it.
 			base := mockActions.CreateMockContainerWithConfig(
 				"project-base-1",
 				"/project-base-1",
@@ -542,11 +543,8 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			actions.UpdateImplicitRestart(containers, containers, true)
 
-			// Because the link "project-base" contains hyphens and the exact link
-			// is not in the restart map (only "project-base-1" is), and the
-			// dependent has no project label for same-project preference,
-			// the guard should prevent incorrectly marking the dependent.
-			gomega.Expect(dependent.ToRestart()).To(gomega.BeFalse())
+			// Replica matches for qualified links are permitted by the refined guard.
+			gomega.Expect(dependent.ToRestart()).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should handle the replica special case in ResolveContainerIdentifier for restart decisions", func() {
@@ -601,7 +599,8 @@ var _ = ginkgo.Describe("the update action", func() {
 
 		ginkgo.It("should resolve dependencies that come only from network_mode via host config", func() {
 			// This covers the case where a container has no com.docker.compose.depends_on
-			// label, so the link must come from getLinksFromHostConfig (network_mode: service:xxx).
+			// label and no watchtower depends-on label, so the link must come from
+			// getLinksFromHostConfig (network_mode: container:xxx).
 			base := mockActions.CreateMockContainerWithConfig(
 				"base",
 				"/base",
@@ -618,9 +617,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 			)
 
-			// Dependent that only declares the relationship via a watchtower depends-on label
-			// (no compose depends_on label). This simulates links coming from external
-			// sources such as network_mode / host config parsing.
+			// Dependent that declares the relationship only via HostConfig.NetworkMode
+			// (no compose depends_on label, no watchtower depends-on label).
 			dependent := mockActions.CreateMockContainerWithConfig(
 				"dependent",
 				"/dependent",
@@ -630,13 +628,13 @@ var _ = ginkgo.Describe("the update action", func() {
 				time.Now(),
 				&dockerContainer.Config{
 					Labels: map[string]string{
-						"com.docker.compose.project":                "test",
-						"com.docker.compose.service":                "dependent",
-						"com.centurylinklabs.watchtower.depends-on": "base",
+						"com.docker.compose.project": "test",
+						"com.docker.compose.service": "dependent",
 					},
 					ExposedPorts: dockerNetwork.PortSet{},
 				},
 			)
+			dependent.ContainerInfo().HostConfig.NetworkMode = "container:base"
 
 			containers := []types.Container{base, dependent}
 			base.SetStale(true)
