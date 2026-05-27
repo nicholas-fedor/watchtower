@@ -421,6 +421,14 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	hostConfigCopy := *c.containerInfo.HostConfig
 	hostConfig := &hostConfigCopy
 
+	// Deep copy slices that will be mutated to avoid modifying the original
+	// under a read lock.
+	if len(hostConfig.Devices) > 0 {
+		devicesCopy := make([]dockerContainer.DeviceMapping, len(hostConfig.Devices))
+		copy(devicesCopy, hostConfig.Devices)
+		hostConfig.Devices = devicesCopy
+	}
+
 	// Adjust link format for each entry (and drop invalid ones).
 	adjusted := make([]string, 0, len(hostConfig.Links))
 	for _, link := range hostConfig.Links {
