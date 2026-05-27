@@ -421,6 +421,14 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	hostConfigCopy := *c.containerInfo.HostConfig
 	hostConfig := &hostConfigCopy
 
+	// Deep copy slices that will be mutated to avoid modifying the original
+	// under a read lock.
+	if len(hostConfig.Devices) > 0 {
+		devicesCopy := make([]dockerContainer.DeviceMapping, len(hostConfig.Devices))
+		copy(devicesCopy, hostConfig.Devices)
+		hostConfig.Devices = devicesCopy
+	}
+
 	// Adjust link format for each entry (and drop invalid ones).
 	adjusted := make([]string, 0, len(hostConfig.Links))
 	for _, link := range hostConfig.Links {
@@ -446,6 +454,20 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	}
 
 	hostConfig.Links = adjusted
+
+	// Normalize device CgroupPermissions for Podman compatibility.
+	//
+	// Podman leaves CgroupPermissions empty in Docker API inspect responses.
+	// Both Docker and Podman treat bare device specifications (without explicit
+	// permissions) as "rwm". Defaulting here prevents "empty device mode"
+	// errors when recreating containers.
+	for i := range hostConfig.Devices {
+		if hostConfig.Devices[i].CgroupPermissions == "" {
+			hostConfig.Devices[i].CgroupPermissions = "rwm"
+			clog.WithField("device", hostConfig.Devices[i].PathOnHost).
+				Debug("Defaulted empty device CgroupPermissions to 'rwm'")
+		}
+	}
 
 	return hostConfig
 }

@@ -374,6 +374,26 @@ func WithBinds(binds []string) MockContainerUpdate {
 	}
 }
 
+// WithDevices sets device mappings on the mock container's HostConfig.
+//
+// This is primarily used to test device permission normalization (empty
+// CgroupPermissions defaulting to "rwm") for Podman compatibility.
+//
+// Parameters:
+//   - devices: Slice of DeviceMapping structs.
+//
+// Returns:
+//   - MockContainerUpdate: Function to set devices in container HostConfig.
+func WithDevices(devices []dockerContainer.DeviceMapping) MockContainerUpdate {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainer.HostConfig{}
+		}
+
+		c.HostConfig.Devices = devices
+	}
+}
+
 // MockClient is a mock implementation of the Operations interface for testing container operations.
 type MockClient struct {
 	createFunc        func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerClient.ContainerCreateResult, error)
