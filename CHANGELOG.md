@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Set Detach true in ExecStart to prevent blocking on command execution by @nicholas-fedor in [#1683](https://github.com/nicholas-fedor/watchtower/pull/1683)
 - Rewrite implicit restart resolution and dependency matching by @nicholas-fedor in [#1677](https://github.com/nicholas-fedor/watchtower/pull/1677)
 - Interpret bare numeric timeout as seconds by @nicholas-fedor in [#1675](https://github.com/nicholas-fedor/watchtower/pull/1675)
 - Default empty device CgroupPermissions to 'rwm' for Podman compatibility by @nicholas-fedor in [#1673](https://github.com/nicholas-fedor/watchtower/pull/1673)
