@@ -447,6 +447,20 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 
 	hostConfig.Links = adjusted
 
+	// Normalize device CgroupPermissions for Podman compatibility.
+	//
+	// Podman leaves CgroupPermissions empty in Docker API inspect responses.
+	// Both Docker and Podman treat bare device specifications (without explicit
+	// permissions) as "rwm". Defaulting here prevents "empty device mode"
+	// errors when recreating containers.
+	for i := range hostConfig.Devices {
+		if hostConfig.Devices[i].CgroupPermissions == "" {
+			hostConfig.Devices[i].CgroupPermissions = "rwm"
+			clog.WithField("device", hostConfig.Devices[i].PathOnHost).
+				Debug("Defaulted empty device CgroupPermissions to 'rwm'")
+		}
+	}
+
 	return hostConfig
 }
 

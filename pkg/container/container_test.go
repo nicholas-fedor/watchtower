@@ -1118,5 +1118,35 @@ var _ = ginkgo.Describe("Container", func() {
 			gomega.Expect(mount.VolumeOptions.Subpath).
 				To(gomega.Equal("ha/nest"), "Subpath should be preserved")
 		})
+
+		ginkgo.It("defaults empty device CgroupPermissions to 'rwm' for Podman compatibility", func() {
+			devices := []dockerContainer.DeviceMapping{
+				{
+					PathOnHost:        "/dev/net/tun",
+					PathInContainer:   "/dev/net/tun",
+					CgroupPermissions: "", // empty, as returned by Podman inspect
+				},
+				{
+					PathOnHost:        "/dev/dri/renderD128",
+					PathInContainer:   "/dev/dri/renderD128",
+					CgroupPermissions: "rw", // explicit value should be preserved
+				},
+			}
+
+			container := MockContainer(WithDevices(devices))
+			hostConfig := container.GetCreateHostConfig()
+
+			gomega.Expect(hostConfig.Devices).To(gomega.HaveLen(2))
+
+			// Empty permissions must be defaulted (this fixes the Podman "empty device mode" error)
+			gomega.Expect(hostConfig.Devices[0].PathOnHost).To(gomega.Equal("/dev/net/tun"))
+			gomega.Expect(hostConfig.Devices[0].CgroupPermissions).
+				To(gomega.Equal("rwm"), "empty CgroupPermissions should default to 'rwm'")
+
+			// Explicit permissions must be left untouched
+			gomega.Expect(hostConfig.Devices[1].PathOnHost).To(gomega.Equal("/dev/dri/renderD128"))
+			gomega.Expect(hostConfig.Devices[1].CgroupPermissions).
+				To(gomega.Equal("rw"), "explicit CgroupPermissions must be preserved")
+		})
 	})
 })
