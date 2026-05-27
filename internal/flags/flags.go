@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -597,6 +599,8 @@ func envBool(key string) bool {
 
 // envDuration fetches a duration from an environment variable.
 //
+// Bare values without a time unit are treated as seconds.
+//
 // Parameters:
 //   - key: Environment variable key.
 //
@@ -605,7 +609,61 @@ func envBool(key string) bool {
 func envDuration(key string) time.Duration {
 	viper.MustBindEnv(key)
 
+	// Check the raw env var so bare numbers are treated as seconds before
+	// viper/cast turns them into nanoseconds.
+	if raw := os.Getenv(key); raw != "" {
+		trimmed := strings.TrimSpace(raw)
+		if isPureNumeric(trimmed) {
+			val, err := strconv.ParseFloat(trimmed, 64)
+			if err == nil {
+				nanos := val * float64(time.Second)
+
+				if nanos > float64(math.MaxInt64) {
+					return time.Duration(math.MaxInt64)
+				}
+
+				if nanos < float64(math.MinInt64) {
+					return time.Duration(math.MinInt64)
+				}
+
+				return time.Duration(nanos)
+			}
+		}
+	}
+
 	return viper.GetDuration(key)
+}
+
+// isPureNumeric reports whether str is a bare number (integer or float,
+// possibly signed) with no duration unit characters.
+func isPureNumeric(str string) bool {
+	if str == "" {
+		return false
+	}
+
+	sawDigit := false
+	sawDot := false
+
+	for i, char := range str {
+		switch {
+		case char >= '0' && char <= '9':
+			sawDigit = true
+		case char == '.':
+			if sawDot {
+				return false
+			}
+
+			sawDot = true
+		case char == '-' || char == '+':
+			if i != 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	return sawDigit
 }
 
 // filterEmptyStrings removes empty or whitespace-only strings from a slice.

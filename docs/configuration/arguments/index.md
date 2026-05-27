@@ -936,6 +936,10 @@ Environment Variable: WATCHTOWER_TIMEOUT
               Default: 30s
 ```
 
+!!! Note
+    Bare numeric values (e.g., `60` or `1.5`) without a time unit are interpreted as seconds.
+    Using a unit suffix (`s`, `m`, etc.) is recommended and required for other time units.
+
 ### Cooldown Delay
 
 Sets a global minimum image age before Watchtower will perform the update.
