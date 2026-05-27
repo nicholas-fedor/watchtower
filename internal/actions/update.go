@@ -768,7 +768,12 @@ func linkedIdentifierMarkedForRestart(
 
 			// Prefer any candidate that shares the dependent's project (from labels).
 			for _, matchedID := range matches {
-				if getProject(idToContainer[matchedID]) == dependentProject && dependentProject != "" {
+				matchedContainer, ok := idToContainer[matchedID]
+				if !ok || matchedContainer == nil {
+					continue
+				}
+
+				if getProject(matchedContainer) == dependentProject && dependentProject != "" {
 					logrus.WithFields(logrus.Fields{
 						"link":    link,
 						"matched": matchedID,
@@ -821,9 +826,12 @@ func linkedIdentifierMarkedForRestart(
 		if len(serviceCandidates) > 0 {
 			// Prefer a candidate from the same project as the dependent.
 			for _, cand := range serviceCandidates {
-				c := idToContainer[cand]
-				if c != nil &&
-					getProject(idToContainer[cand]) == dependentProject &&
+				c, ok := idToContainer[cand]
+				if !ok || c == nil {
+					continue
+				}
+
+				if getProject(c) == dependentProject &&
 					dependentProject != "" {
 					logrus.WithFields(logrus.Fields{
 						"link":    link,
