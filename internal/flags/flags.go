@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"regexp"
@@ -615,7 +616,17 @@ func envDuration(key string) time.Duration {
 		if isPureNumeric(trimmed) {
 			val, err := strconv.ParseFloat(trimmed, 64)
 			if err == nil {
-				return time.Duration(val * float64(time.Second))
+				nanos := val * float64(time.Second)
+
+				if nanos > float64(math.MaxInt64) {
+					return time.Duration(math.MaxInt64)
+				}
+
+				if nanos < float64(math.MinInt64) {
+					return time.Duration(math.MinInt64)
+				}
+
+				return time.Duration(nanos)
 			}
 		}
 	}

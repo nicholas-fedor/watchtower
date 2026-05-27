@@ -3,6 +3,7 @@ package flags
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -1794,9 +1795,14 @@ func TestEnvDuration_LegacyBareNumberAsSeconds(t *testing.T) {
 			expected: 30 * time.Second,
 		},
 		{
-			name:     "very large integer (overflow fallback to zero)",
+			name:     "very large integer (out of range, viper fallback to zero)",
 			envValue: "1" + strings.Repeat("0", 1000),
 			expected: 0,
+		},
+		{
+			name:     "overflow clamps to max int64",
+			envValue: "9223372038",
+			expected: time.Duration(math.MaxInt64),
 		},
 	}
 
