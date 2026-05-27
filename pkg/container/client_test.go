@@ -1184,6 +1184,37 @@ var _ = ginkgo.Describe("the client", func() {
 				gomega.Expect(skipUpdate).To(gomega.BeFalse())
 			})
 		})
+		ginkgo.When("ExecStart is called", func() {
+			ginkgo.It("should use Detach true to prevent blocking on command execution", func() {
+				client := &client{
+					api:           docker,
+					ClientOptions: ClientOptions{},
+				}
+
+				containerID := types.ContainerID("detach-test-cont-id")
+				execID := "detach-test-exec-id"
+				cmd := "detach-test-cmd"
+
+				// Set up standard handlers
+				setupExecMockHandlers(mockServer, string(containerID), execID, cmd, -1, -1, 0, false, false)
+
+				container, err := client.GetContainer(context.Background(), containerID)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				skipUpdate, err := client.ExecuteCommand(context.Background(), container, cmd, 1, 0, 0)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(skipUpdate).To(gomega.BeFalse())
+
+				// Verify the ExecStart request contained Detach: true
+				// by inspecting the last request body received by the mock server.
+				// The setupExecMockHandlers already verifies this via VerifyJSONRepresenting,
+				// but we add this test to explicitly document the requirement:
+				// ExecStart must use Detach: true so that the daemon does not block
+				// until the command finishes. Without Detach: true, ExecStart blocks,
+				// and a subsequent ExecAttach receives "exec command is already running"
+				// which causes exit code 126 and aborts the update.
+			})
+		})
 	})
 
 	// Test suite for captureExecOutput.
@@ -2075,7 +2106,8 @@ func setupExecMockHandlers(
 				gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/exec/%s/start$", execID)),
 			),
 			ghttp.VerifyJSONRepresenting(dockerContainer.ExecStartRequest{
-				Tty: true,
+				Detach: true,
+				Tty:    true,
 			}),
 			ghttp.RespondWith(http.StatusOK, nil),
 		),

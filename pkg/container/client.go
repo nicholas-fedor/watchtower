@@ -1022,7 +1022,7 @@ func (c *client) ExecuteCommand(
 	// Start the exec instance.
 	clog.WithField("exec_id", exec.ID).Debug("Starting exec instance")
 
-	execStartCheck := dockerClient.ExecStartOptions{TTY: true}
+	execStartCheck := dockerClient.ExecStartOptions{Detach: true, TTY: true}
 
 	_, err = c.api.ExecStart(ctx, exec.ID, execStartCheck)
 	if err != nil {
