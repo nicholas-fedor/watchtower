@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -1720,6 +1721,160 @@ func TestNotificationURLParsingComprehensive(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, tc.expected, urls)
+		})
+	}
+}
+
+// TestEnvDuration_LegacyBareNumberAsSeconds verifies that bare numeric
+// values supplied for WATCHTOWER_TIMEOUT are interpreted as seconds.
+func TestEnvDuration_LegacyBareNumberAsSeconds(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string // "" means ensure unset for default case
+		expected time.Duration
+	}{
+		{
+			name:     "default (no env) is 30s",
+			envValue: "",
+			expected: 30 * time.Second,
+		},
+		{
+			name:     "bare integer as seconds (common legacy)",
+			envValue: "60",
+			expected: 60 * time.Second,
+		},
+		{
+			name:     "larger bare integer",
+			envValue: "300",
+			expected: 300 * time.Second,
+		},
+		{
+			name:     "bare float seconds",
+			envValue: "1.5",
+			expected: 1500 * time.Millisecond,
+		},
+		{
+			name:     "with explicit unit s",
+			envValue: "45s",
+			expected: 45 * time.Second,
+		},
+		{
+			name:     "with unit m",
+			envValue: "2m",
+			expected: 2 * time.Minute,
+		},
+		{
+			name:     "zero value",
+			envValue: "0",
+			expected: 0,
+		},
+		{
+			name:     "negative (parsed as negative; validation in preRun will fatal)",
+			envValue: "-10",
+			expected: -10 * time.Second,
+		},
+		{
+			name:     "invalid non-numeric (viper fallback to zero)",
+			envValue: "abc",
+			expected: 0,
+		},
+		{
+			name:     "invalid multiple decimal points (viper fallback to zero)",
+			envValue: "12.34.56",
+			expected: 0,
+		},
+		{
+			name:     "positive sign prefix",
+			envValue: "+10",
+			expected: 10 * time.Second,
+		},
+		{
+			name:     "whitespace trimmed by envDuration",
+			envValue: "  30  ",
+			expected: 30 * time.Second,
+		},
+		{
+			name:     "very large integer (overflow fallback to zero)",
+			envValue: "1" + strings.Repeat("0", 1000),
+			expected: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.envValue != "" {
+				t.Setenv("WATCHTOWER_TIMEOUT", tc.envValue)
+			} else {
+				_ = os.Unsetenv("WATCHTOWER_TIMEOUT")
+			}
+
+			// Register (with t.Setenv isolation) to capture value via (patched) envDuration at flag creation time
+			SetDefaults()
+
+			cmd := &cobra.Command{}
+			RegisterSystemFlags(cmd)
+
+			got, err := cmd.PersistentFlags().GetDuration("stop-timeout")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+// TestIsPureNumeric verifies isPureNumeric behavior with table-driven cases.
+func TestIsPureNumeric(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// Valid cases
+		{name: "zero", input: "0", want: true},
+		{name: "positive integer", input: "42", want: true},
+		{name: "large integer (legacy common case)", input: "300", want: true},
+		{name: "simple float", input: "1.5", want: true},
+		{name: "leading dot", input: ".5", want: true},
+		{name: "trailing dot", input: "1.", want: true},
+		{name: "negative integer", input: "-10", want: true},
+		{name: "explicit positive", input: "+3", want: true},
+		{name: "negative float", input: "-1.5", want: true},
+		{name: "positive leading dot", input: "+.5", want: true},
+		{name: "negative leading dot", input: "-.5", want: true},
+
+		// Invalid: no digits
+		{name: "empty string", input: "", want: false},
+		{name: "just decimal point", input: ".", want: false},
+		{name: "just plus sign", input: "+", want: false},
+		{name: "just minus sign", input: "-", want: false},
+		{name: "plus and dot only", input: "+.", want: false},
+		{name: "minus and dot only", input: "-.", want: false},
+
+		// Invalid: multiple dots
+		{name: "multiple dots", input: "1.2.3", want: false},
+		{name: "double dot", input: "1..2", want: false},
+		{name: "three dots", input: "1.2.3.4", want: false},
+
+		// Invalid: misplaced or multiple signs
+		{name: "minus after digit", input: "1-2", want: false},
+		{name: "plus at end", input: "12+", want: false},
+		{name: "plus in middle", input: "1+2", want: false},
+		{name: "trailing minus", input: "5-", want: false},
+		{name: "multiple signs at start", input: "+-1", want: false},
+		{name: "mixed signs", input: "-+5", want: false},
+
+		// Invalid: other characters
+		{name: "contains letter", input: "1a", want: false},
+		{name: "scientific notation", input: "1e3", want: false},
+		{name: "thousands separator", input: "1,000", want: false},
+		{name: "duration unit seconds", input: "30s", want: false},
+		{name: "duration unit minutes", input: "2m", want: false},
+		{name: "embedded space", input: "1 2", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isPureNumeric(tc.input)
+			assert.Equal(t, tc.want, got, "isPureNumeric(%q)", tc.input)
 		})
 	}
 }
