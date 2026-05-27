@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -223,6 +224,8 @@ func RunUpgradesOnSchedule(
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
 	if scheduleSpec != "" {
+		scheduleSpec = strings.Trim(scheduleSpec, `"'`)
+
 		_, err := scheduler.AddFunc(
 			scheduleSpec,
 			scheduledUpdateFunc)

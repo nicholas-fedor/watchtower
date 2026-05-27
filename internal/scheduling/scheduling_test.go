@@ -308,6 +308,95 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 	}
 }
 
+func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
+	tests := []struct {
+		name         string
+		scheduleSpec string
+		expectError  bool
+	}{
+		{
+			name:         "double-quoted cron spec from Docker Compose",
+			scheduleSpec: `"0 0 2 * * *"`,
+			expectError:  false,
+		},
+		{
+			name:         "single-quoted cron spec",
+			scheduleSpec: `'0 0 2 * * *'`,
+			expectError:  false,
+		},
+		{
+			name:         "double-quoted descriptor",
+			scheduleSpec: `"@hourly"`,
+			expectError:  false,
+		},
+		{
+			name:         "unquoted cron spec",
+			scheduleSpec: `0 0 2 * * *`,
+			expectError:  false,
+		},
+		{
+			name:         "unquoted descriptor",
+			scheduleSpec: `@hourly`,
+			expectError:  false,
+		},
+		{
+			name:         "double-quoted invalid spec still errors",
+			scheduleSpec: `"invalid cron spec"`,
+			expectError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+			ctx := t.Context()
+
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
+			}
+
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
+			defer timeoutCancel()
+
+			err := scheduling.RunUpgradesOnSchedule(
+				timeoutCtx,
+				cmd,
+				filters.NoFilter,
+				"test filter",
+				nil,
+				false,
+				tt.scheduleSpec,
+				writeStartupMessage,
+				runUpdatesWithNotifications,
+				client,
+				"",
+				nil,
+				"v1.0.0",
+				false, // monitorOnly
+				false, // updateOnStart
+				false, // skipFirstRun
+				nil,   // currentWatchtowerContainer
+				false, // startupMessageSent
+				false, // ephemeralSelfUpdate
+			)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
