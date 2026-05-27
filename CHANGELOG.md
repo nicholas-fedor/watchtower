@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Default empty device CgroupPermissions to 'rwm' for Podman compatibility by @nicholas-fedor in [#1673](https://github.com/nicholas-fedor/watchtower/pull/1673)
 - Prevent image pull when within cooldown window by @nicholas-fedor in [#1669](https://github.com/nicholas-fedor/watchtower/pull/1669)
 
 ## [1.17.2] - 2026-05-23
