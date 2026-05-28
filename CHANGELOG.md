@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Docker registry mirror support for digest comparison by @nicholas-fedor in [#1693](https://github.com/nicholas-fedor/watchtower/pull/1693)
 
+### Changed
+
+- Update allcontributors emoji key link to use canonical URL by @nicholas-fedor in [#1696](https://github.com/nicholas-fedor/watchtower/pull/1696)
+
 ### Chores
 
 - Update module go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp to v0.69.0 by @renovate[bot] in [#1688](https://github.com/nicholas-fedor/watchtower/pull/1688)
