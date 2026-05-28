@@ -191,22 +191,27 @@ func FetchDigest(
 	return fetchDigest(ctx, container, authToken, http.MethodGet, endpoints...)
 }
 
-// BuildManifestURL constructs and validates the manifest URL for a container.
+// BuildManifestURL constructs and validates a manifest URL for a container.
 //
-// It determines the appropriate scheme based on WATCHTOWER_REGISTRY_TLS_SKIP,
-// builds the initial manifest URL using the container's image information,
-// parses it to extract the host, optionally overrides the host if provided,
-// and validates that the host is present.
+// It determines the scheme from WATCHTOWER_REGISTRY_TLS_SKIP, builds the initial URL via
+// manifest.BuildManifestURL (which always uses the canonical host from the image reference),
+// then overrides the host and scheme if hostOverride is a non-empty bare host or full endpoint
+// URL (e.g. "https://mirror.example.com"). It returns the final URL, the original host before
+// override, and the parsed URL object.
+//
+// The hostOverride parameter accepts either a bare host or a full URL. When a full URL is
+// supplied, its scheme (if present) takes precedence over the global TLS setting.
 //
 // Parameters:
 //   - container: Container whose manifest URL is being built.
-//   - hostOverride: Optional host to override the parsed host (empty string to use original).
+//   - hostOverride: Optional host or endpoint URL to use instead of the canonical host.
+//     An empty string uses the canonical host.
 //
 // Returns:
-//   - string: The constructed manifest URL.
-//   - string: The original host extracted from the URL (before override).
-//   - *url.URL: Parsed URL object.
-//   - error: Non-nil if URL construction or validation fails, nil on success.
+//   - string: The final manifest URL.
+//   - string: The original host before applying hostOverride.
+//   - *url.URL: The parsed URL object.
+//   - error: Non-nil if construction or validation fails.
 func BuildManifestURL(
 	container types.Container,
 	hostOverride string,
@@ -266,7 +271,20 @@ func BuildManifestURL(
 	}
 
 	if hostOverride != "" {
-		parsedURL.Host = hostOverride
+		// Support full endpoint strings (e.g. "https://mirror.example.com" or "http://mirror:5000")
+		// similar to how GetChallengeURL handles the endpoint parameter. This allows registry
+		// mirrors (including those configured with explicit schemes in daemon.json) to be used
+		// for manifest requests.
+		overrideURL, parseErr := url.Parse(hostOverride)
+		if parseErr == nil && overrideURL.Host != "" {
+			parsedURL.Host = overrideURL.Host
+			if overrideURL.Scheme != "" {
+				parsedURL.Scheme = overrideURL.Scheme
+			}
+		} else {
+			parsedURL.Host = hostOverride
+		}
+
 		manifestURL = parsedURL.String()
 	}
 
@@ -366,24 +384,28 @@ func fetchDigest(
 				Debug("Received challenge host and redirect flag from GetToken")
 		}
 
-		// Build the manifest URL, using redirect host when redirected.
+		// Decide which host to use for this manifest request attempt.
+		// Priority:
+		// 1. Registry redirect host (from auth challenge, e.g. lscr.io → ghcr.io)
+		// 2. Current mirror endpoint (when using registry mirrors)
+		// 3. Canonical host (empty string)
+		hostForManifest := ""
+		if redirectHost != "" && redirectHost != originalHost && redirected {
+			hostForManifest = redirectHost
+		} else if endpoint != "" {
+			// Use the current registry mirror endpoint for the manifest request.
+			hostForManifest = endpoint
+		}
+
 		var (
 			manifestURL string
 			parsedURL   *url.URL
 		)
 
-		if redirectHost != "" && redirectHost != originalHost && redirected {
-			manifestURL, _, parsedURL, err = BuildManifestURL(
-				container,
-				redirectHost,
-			)
-		} else {
-			manifestURL, _, parsedURL, err = BuildManifestURL(
-				container,
-				"",
-			)
-		}
-
+		manifestURL, _, parsedURL, err = BuildManifestURL(
+			container,
+			hostForManifest,
+		)
 		if err != nil {
 			logrus.WithError(err).WithFields(fields).WithFields(epFields).
 				Debug("Failed to build manifest URL")
