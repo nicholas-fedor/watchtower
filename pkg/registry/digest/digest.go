@@ -351,8 +351,16 @@ func fetchDigest(
 
 	for _, endpoint := range endpoints {
 		epFields := logrus.Fields{}
+
 		if endpoint != "" {
-			epFields["registry_endpoint"] = endpoint
+			sanitized := "<redacted>"
+
+			u, err := url.Parse(endpoint)
+			if err == nil && u.Host != "" {
+				sanitized = u.Host
+			}
+
+			epFields["registry_endpoint"] = sanitized
 		}
 
 		// Obtain an authentication token from the current endpoint.

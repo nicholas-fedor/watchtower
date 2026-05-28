@@ -415,10 +415,27 @@ func GetToken(
 
 	// Extract the challenge header.
 	wwwAuthHeader := res.Header.Get(ChallengeHeader)
+	// Log endpoint in sanitized form (host only) to avoid leaking credentials.
+	sanitizedEndpoint := endpoint
+	if endpoint != "" {
+		sanitizedEndpoint = "<redacted>"
+
+		u, err := url.Parse(endpoint)
+		if err == nil && u.Host != "" {
+			sanitizedEndpoint = u.Host
+		}
+	}
+
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"status":  res.Status,
 		"header":  wwwAuthHeader,
-		"mirrors": endpoint,
+		"mirrors": sanitizedEndpoint,
+	}).Debug("Received challenge response")
+
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"status":  res.Status,
+		"header":  wwwAuthHeader,
+		"mirrors": sanitizedEndpoint,
 	}).Debug("Received challenge response")
 
 	// If the header is empty, assume no authentication is required.

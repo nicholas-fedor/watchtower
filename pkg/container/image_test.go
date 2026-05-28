@@ -196,8 +196,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 			err := i.PullImage(context.Background(), pullContainer, WarnAuto, types.UpdateParams{})
 			// Should proceed to pull (shouldSkipPull returns false since no mirrors and
-			// canonical registry request fails), resulting in an error from the pull attempt.
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			// canonical registry request fails), resulting in ErrPullImageUnauthorized.
+			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should handle Info() API failure gracefully and fall back to canonical", func() {
@@ -222,10 +222,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 			err := i.PullImage(context.Background(), pullContainer, WarnAuto, types.UpdateParams{})
 			// Info() fails, so resolveRegistryMirrorConfig returns nil, buildMirrorEndpoints
-			// returns nil, and shouldSkipPull falls back to canonical host. Since AllowUnhandledRequests
-			// is true, the canonical digest check gets a handled response, and skip returns false,
-			// proceeding to the pull which returns 401.
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			// returns nil, and shouldSkipPull falls back to canonical host.
+			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeTrue())
 		})
 	})
 

@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"net/url"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -44,8 +45,18 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		return nil
 	}
 
+	sanitized := make([]string, 0, len(info.Info.RegistryConfig.Mirrors))
+	for _, m := range info.Info.RegistryConfig.Mirrors {
+		u, err := url.Parse(m)
+		if err == nil && u.Host != "" {
+			sanitized = append(sanitized, u.Host)
+		} else {
+			sanitized = append(sanitized, "<redacted>")
+		}
+	}
+
 	logrus.WithFields(logrus.Fields{
-		"global_mirrors": info.Info.RegistryConfig.Mirrors,
+		"global_mirrors": sanitized,
 	}).Debug("Resolved registry mirror configuration from Docker daemon")
 
 	return &info.Info
