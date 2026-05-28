@@ -356,7 +356,7 @@ func (c imageClient) shouldSkipPull(
 	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
 
 	// Build candidate endpoints: mirrors first, then canonical (empty string).
-	endpoints := c.buildMirrorEndpoints(sourceContainer, mirrorInfo)
+	endpoints := c.buildMirrorEndpoints(mirrorInfo)
 
 	// Compare current and remote digests, trying each endpoint.
 	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth, endpoints...)

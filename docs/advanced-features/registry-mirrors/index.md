@@ -7,7 +7,7 @@ Registry mirrors provide alternative locations for pulling Docker images, useful
 When the Docker daemon is configured with registry mirrors, Watchtower automatically detects and uses them during its update checks. This means:
 
 - **Digest comparisons** — Watchtower fetches image manifests from mirrors before falling back to the canonical registry, so it can detect updates even when the primary registry is inaccessible.
-- **All registries supported** — Mirrors can be configured globally (for all registries) or per-registry (e.g., a dedicated mirror for Docker Hub and a separate one for a private registry).
+- **All registries supported** — Global mirrors apply to all image registries (Docker Hub, GHCR, private registries, etc.).
 
 !!! Note
     Mirror support in Watchtower covers **digest comparison only** — determining whether a newer image exists. The actual image pull is handled by the Docker daemon, which already uses configured mirrors natively.
@@ -28,7 +28,7 @@ After making changes, restart the daemon:
 sudo systemctl restart docker
 ```
 
-### Global Mirrors
+### Configuration Format
 
 Global mirrors apply to all image registries. Add them under the `registry-mirrors` key:
 
@@ -42,43 +42,20 @@ Global mirrors apply to all image registries. Add them under the `registry-mirro
 
 When multiple mirrors are listed, they are tried in order until one succeeds.
 
-### Per-Registry Mirrors
-
-For more granular control, configure mirrors for specific registries using the `registries` key. Each entry maps a registry name to its list of mirrors:
-
-```json title="/etc/docker/daemon.json"
-{
-    "registries": {
-        "docker.io": [
-            "https://docker-hub-mirror.example.com"
-        ],
-        "registry.example.com": [
-            "https://private-mirror.example.com"
-        ]
-    }
-}
-```
-
-This is useful when different registries have different mirrors — for example, a local Harbor instance for Docker Hub and a separate Artifactory for a private registry.
-
 ### Command-Line Configuration
 
-Global mirrors can also be set via the `dockerd` command line:
+Mirrors can also be set via the `dockerd` command line:
 
 ```bash
 dockerd --registry-mirror https://mirror.example.com
 ```
 
-!!! Note
-    Per-registry mirrors can only be configured in `daemon.json`, not via command-line flags.
-
-## How Watchtower Selects a Mirror
+## How Watchtower Uses Mirrors
 
 When checking if a container's image has been updated, Watchtower resolves the mirror to use in this order:
 
-1. **Per-registry mirrors** — If the image's registry (e.g., `docker.io`) has dedicated mirrors configured, those are tried first.
-2. **Global mirrors** — If no per-registry mirrors exist (or they all fail), the global mirror list is tried.
-3. **Canonical registry** — If all mirrors fail, Watchtower falls back to the original registry (e.g., `index.docker.io`).
+1. **Configured mirrors** — The global mirror list from the Docker daemon is tried first.
+2. **Canonical registry** — If all mirrors fail, Watchtower falls back to the original registry (e.g., `index.docker.io`).
 
 The first mirror to successfully respond with the image manifest wins. This means a fast, nearby mirror is preferred over a distant canonical registry.
 
@@ -106,26 +83,6 @@ Mirrors are tried in the order listed. If the first is unreachable, the next is 
         "https://primary-mirror.company.com",
         "https://backup-mirror.company.com"
     ]
-}
-```
-
-### Dedicated Mirrors per Registry
-
-Different registries use different mirrors. This is useful in corporate environments where each registry has its own local cache:
-
-```json title="/etc/docker/daemon.json"
-{
-    "registries": {
-        "docker.io": [
-            "https://docker-hub-mirror.company.com"
-        ],
-        "ghcr.io": [
-            "https://ghcr-mirror.company.com"
-        ],
-        "registry.internal.company.com": [
-            "https://harbor.internal.company.com"
-        ]
-    }
 }
 ```
 
