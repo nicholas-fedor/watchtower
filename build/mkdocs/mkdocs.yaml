@@ -188,6 +188,7 @@ nav:
       - Lifecycle Hooks: advanced-features/lifecycle-hooks/index.md
       - Linked Containers: advanced-features/linked-containers/index.md
       - Metrics API: advanced-features/metrics-api/index.md
+      - Registry Mirrors: advanced-features/registry-mirrors/index.md
       - Remote Hosts: advanced-features/remote-hosts/index.md
       - Running Multiple Instances: advanced-features/running-multiple-instances/index.md
       - Stop Signals: advanced-features/stop-signals/index.md
