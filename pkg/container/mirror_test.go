@@ -165,6 +165,62 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 			},
 			want: []string{"https://mirror.example.com", ""},
 		},
+		{
+			name:           "invalid image name returns nil",
+			containerImage: "!!!invalid:reference",
+			info: &dockerSystem.Info{
+				RegistryConfig: &dockerRegistry.ServiceConfig{
+					Mirrors: []string{"https://mirror.example.com"},
+				},
+			},
+			want: nil,
+		},
+		{
+			name:           "per-registry with empty mirrors falls back to global",
+			containerImage: "docker.io/library/nginx:latest",
+			info: &dockerSystem.Info{
+				RegistryConfig: &dockerRegistry.ServiceConfig{
+					Mirrors: []string{"https://global.example.com"},
+					IndexConfigs: map[string]*dockerRegistry.IndexInfo{
+						"docker.io": {Mirrors: []string{}},
+					},
+				},
+			},
+			want: []string{"https://global.example.com", ""},
+		},
+		{
+			name:           "per-registry with empty mirrors and no global returns nil",
+			containerImage: "docker.io/library/nginx:latest",
+			info: &dockerSystem.Info{
+				RegistryConfig: &dockerRegistry.ServiceConfig{
+					Mirrors: []string{},
+					IndexConfigs: map[string]*dockerRegistry.IndexInfo{
+						"docker.io": {Mirrors: []string{}},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name:           "mirror URL with path and query is kept verbatim",
+			containerImage: "docker.io/library/nginx:latest",
+			info: &dockerSystem.Info{
+				RegistryConfig: &dockerRegistry.ServiceConfig{
+					Mirrors: []string{"https://mirror.example.com/v2/?foo=bar#baz"},
+				},
+			},
+			want: []string{"https://mirror.example.com/v2/?foo=bar#baz", ""},
+		},
+		{
+			name:           "ipv6 mirror address is supported",
+			containerImage: "docker.io/library/nginx:latest",
+			info: &dockerSystem.Info{
+				RegistryConfig: &dockerRegistry.ServiceConfig{
+					Mirrors: []string{"https://[2001:db8::1]:5000"},
+				},
+			},
+			want: []string{"https://[2001:db8::1]:5000", ""},
+		},
 	}
 
 	for _, tt := range tests {
