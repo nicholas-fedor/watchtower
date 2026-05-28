@@ -138,7 +138,7 @@ When using internal mirrors that may use self-signed certificates:
     "registry-mirrors": [
         "https://harbor.internal.company.com"
     ],
-  "insecure-registries": [
+    "insecure-registries": [
         "harbor.internal.company.com"
     ]
 }
