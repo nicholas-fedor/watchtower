@@ -246,6 +246,12 @@ var _ = ginkgo.Describe("PullImage cooldown gate", func() {
 		)
 		gomega.Expect(err).To(gomega.Succeed())
 		mockServer.AppendHandlers(APIVersionPingHandler())
+		mockServer.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", gomega.MatchRegexp(`/info$`)),
+				ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{}),
+			),
+		)
 	})
 
 	ginkgo.AfterEach(func() {

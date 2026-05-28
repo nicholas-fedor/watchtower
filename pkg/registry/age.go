@@ -138,6 +138,7 @@ func FetchImageCreationTime(
 		container,
 		registryAuth,
 		client,
+		"",
 	)
 	if err != nil {
 		logrus.WithError(err).

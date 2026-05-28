@@ -25,15 +25,17 @@ var (
 
 // BuildManifestURL constructs a URL for accessing a container's image manifest from its registry.
 //
-// It parses the image name into a normalized reference, extracts the registry host, and builds a URL with path and tag,
-// using the provided scheme.
+// It parses the image name into a normalized reference and builds the manifest URL using the
+// registry host derived from that reference (the canonical host) together with the provided scheme.
+// The function does not support host overrides; callers that need to target registry mirrors apply
+// overrides after obtaining the canonical URL (see digest.BuildManifestURL).
 //
 // Parameters:
 //   - container: Container with image info for URL construction.
 //   - scheme: The scheme to use for the URL (e.g., "https" or "http").
 //
 // Returns:
-//   - string: Manifest URL (e.g., "https://index.docker.io/v2/library/alpine/manifests/latest") if successful.
+//   - string: Manifest URL using the canonical registry host from the image reference.
 //   - error: Non-nil if parsing or tagging fails, nil on success.
 func BuildManifestURL(container types.Container, scheme string) (string, error) {
 	// Set up logging fields for consistent tracking.
@@ -63,8 +65,6 @@ func BuildManifestURL(container types.Container, scheme string) (string, error) 
 	// Extract the registry host and image components.
 	host, _ := auth.GetRegistryAddress(normalizedTaggedRef.Name())
 	img, tag := reference.Path(normalizedTaggedRef), normalizedTaggedRef.Tag()
-
-	// Use the provided scheme.
 
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"host":       host,

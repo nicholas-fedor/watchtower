@@ -351,8 +351,15 @@ func (c imageClient) shouldSkipPull(
 	clog.Debug("Checking if pull is needed")
 
 	warn := c.warnOnHeadFailed(sourceContainer, warnOnHeadFailed)
-	// Compare current and remote digests.
-	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth)
+
+	// Resolve registry mirror configuration from Docker daemon.
+	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
+
+	// Build candidate endpoints: mirrors first, then canonical (empty string).
+	endpoints := c.buildMirrorEndpoints(mirrorInfo)
+
+	// Compare current and remote digests, trying each endpoint.
+	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth, endpoints...)
 	if err != nil {
 		clog.WithFields(logrus.Fields{
 			"match": match,

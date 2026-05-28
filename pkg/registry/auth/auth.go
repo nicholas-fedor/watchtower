@@ -331,11 +331,16 @@ func handleBearerAuth(
 
 // GetToken fetches a token and the challenge host for the registry hosting the provided image.
 //
+// When endpoint is non-empty, it is used as the registry host for the challenge URL
+// instead of the canonical registry host. This enables digest checks against configured
+// Docker registry mirrors.
+//
 // Parameters:
 //   - ctx: Context for request lifecycle control.
 //   - container: Container with image info.
 //   - registryAuth: Base64-encoded auth string.
 //   - client: Client for HTTP requests.
+//   - endpoint: Optional registry host override (e.g., mirror address). Empty string uses canonical host.
 //
 // Returns:
 //   - string: Authentication token (e.g., "Basic ..." or "Bearer ...").
@@ -348,6 +353,7 @@ func GetToken(
 	container types.Container,
 	registryAuth string,
 	client Client,
+	endpoint string,
 ) (string, string, bool, string, error) {
 	fields := logrus.Fields{
 		"image": container.ImageName(),
@@ -361,8 +367,8 @@ func GetToken(
 		return "", "", false, "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
-	// Generate the challenge URL.
-	challengeURL := GetChallengeURL(normalizedRef)
+	// Generate the challenge URL, using the endpoint override if provided.
+	challengeURL := GetChallengeURL(normalizedRef, endpoint)
 	logrus.WithFields(fields).
 		WithField("url", challengeURL.String()).
 		Debug("Constructed challenge URL")
@@ -409,9 +415,27 @@ func GetToken(
 
 	// Extract the challenge header.
 	wwwAuthHeader := res.Header.Get(ChallengeHeader)
+	// Log endpoint in sanitized form (host only) to avoid leaking credentials.
+	sanitizedEndpoint := endpoint
+	if endpoint != "" {
+		sanitizedEndpoint = "<redacted>"
+
+		u, err := url.Parse(endpoint)
+		if err == nil && u.Host != "" {
+			sanitizedEndpoint = u.Host
+		}
+	}
+
 	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"status": res.Status,
-		"header": wwwAuthHeader,
+		"status":  res.Status,
+		"header":  wwwAuthHeader,
+		"mirrors": sanitizedEndpoint,
+	}).Debug("Received challenge response")
+
+	logrus.WithFields(fields).WithFields(logrus.Fields{
+		"status":  res.Status,
+		"header":  wwwAuthHeader,
+		"mirrors": sanitizedEndpoint,
 	}).Debug("Received challenge response")
 
 	// If the header is empty, assume no authentication is required.
@@ -822,13 +846,17 @@ func TransformAuth(registryAuth string) string {
 
 // GetChallengeURL generates a challenge URL for accessing an image's registry.
 //
+// When endpoint is non-empty, it is used as the host for the challenge URL instead
+// of the canonical registry host. The endpoint may include a scheme (e.g.,
+// "https://mirror.example.com") or be a bare hostname.
+//
 // Parameters:
 //   - imageRef: Normalized image reference.
+//   - endpoint: Optional registry host override (e.g., mirror address). Empty string uses canonical host.
 //
 // Returns:
 //   - url.URL: Generated challenge URL.
-func GetChallengeURL(imageRef reference.Named) url.URL {
-	// Extract registry host from the image reference.
+func GetChallengeURL(imageRef reference.Named, endpoint string) url.URL {
 	host, _ := GetRegistryAddress(imageRef.Name())
 
 	// Special handling for lscr.io registry: use ghcr.io for challenge URL
@@ -843,6 +871,21 @@ func GetChallengeURL(imageRef reference.Named) url.URL {
 
 		logrus.WithField("host", host).
 			Debug("Using HTTP scheme due to WATCHTOWER_REGISTRY_TLS_SKIP")
+	}
+
+	// When an endpoint is provided, parse it to extract host and scheme.
+	if endpoint != "" {
+		endpointURL, err := url.Parse(endpoint)
+		if err == nil && endpointURL.Host != "" {
+			host = endpointURL.Host
+
+			if endpointURL.Scheme != "" {
+				scheme = endpointURL.Scheme
+			}
+		} else {
+			// If parsing fails, use the endpoint as a bare host.
+			host = endpoint
+		}
 	}
 
 	URL := url.URL{

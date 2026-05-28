@@ -104,7 +104,7 @@ func BenchmarkGetChallengeURL(b *testing.B) {
 
 	for b.Loop() {
 		for _, ref := range refs {
-			_ = GetChallengeURL(ref)
+			_ = GetChallengeURL(ref, "")
 		}
 	}
 }

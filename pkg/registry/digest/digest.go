@@ -81,10 +81,14 @@ func NormalizeDigest(digest string) string {
 // so it returns true to indicate the image should not be updated. This avoids
 // unnecessary HTTP requests and confusing error messages for locally built images.
 //
+// When endpoints are provided (registry mirror hosts), each is tried in order.
+// An empty string in the endpoints list means use the canonical registry host.
+//
 // Parameters:
 //   - ctx: Context for request lifecycle control.
 //   - container: Container whose digest is being compared.
 //   - registryAuth: Base64-encoded auth string.
+//   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
 //
 // Returns:
 //   - bool: True if digests match (image is up-to-date), false otherwise.
@@ -93,6 +97,7 @@ func CompareDigest(
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
+	endpoints ...string,
 ) (bool, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
@@ -129,6 +134,7 @@ func CompareDigest(
 		container,
 		registryAuth,
 		http.MethodHead,
+		endpoints...,
 	)
 	if err != nil {
 		return false, err
@@ -144,6 +150,7 @@ func CompareDigest(
 			ctx,
 			container,
 			registryAuth,
+			endpoints...,
 		)
 		if err != nil {
 			return false, err
@@ -170,6 +177,7 @@ func CompareDigest(
 //   - ctx: The context controlling the request's lifecycle, enabling cancellation or timeouts.
 //   - container: The container whose image digest is being fetched, providing the image name and reference.
 //   - authToken: A base64-encoded authentication string for registry access.
+//   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
 //
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if successful.
@@ -178,26 +186,32 @@ func FetchDigest(
 	ctx context.Context,
 	container types.Container,
 	authToken string,
+	endpoints ...string,
 ) (string, error) {
-	return fetchDigest(ctx, container, authToken, http.MethodGet)
+	return fetchDigest(ctx, container, authToken, http.MethodGet, endpoints...)
 }
 
-// BuildManifestURL constructs and validates the manifest URL for a container.
+// BuildManifestURL constructs and validates a manifest URL for a container.
 //
-// It determines the appropriate scheme based on WATCHTOWER_REGISTRY_TLS_SKIP,
-// builds the initial manifest URL using the container's image information,
-// parses it to extract the host, optionally overrides the host if provided,
-// and validates that the host is present.
+// It determines the scheme from WATCHTOWER_REGISTRY_TLS_SKIP, builds the initial URL via
+// manifest.BuildManifestURL (which always uses the canonical host from the image reference),
+// then overrides the host and scheme if hostOverride is a non-empty bare host or full endpoint
+// URL (e.g. "https://mirror.example.com"). It returns the final URL, the original host before
+// override, and the parsed URL object.
+//
+// The hostOverride parameter accepts either a bare host or a full URL. When a full URL is
+// supplied, its scheme (if present) takes precedence over the global TLS setting.
 //
 // Parameters:
 //   - container: Container whose manifest URL is being built.
-//   - hostOverride: Optional host to override the parsed host (empty string to use original).
+//   - hostOverride: Optional host or endpoint URL to use instead of the canonical host.
+//     An empty string uses the canonical host.
 //
 // Returns:
-//   - string: The constructed manifest URL.
-//   - string: The original host extracted from the URL (before override).
-//   - *url.URL: Parsed URL object.
-//   - error: Non-nil if URL construction or validation fails, nil on success.
+//   - string: The final manifest URL.
+//   - string: The original host before applying hostOverride.
+//   - *url.URL: The parsed URL object.
+//   - error: Non-nil if construction or validation fails.
 func BuildManifestURL(
 	container types.Container,
 	hostOverride string,
@@ -257,7 +271,18 @@ func BuildManifestURL(
 	}
 
 	if hostOverride != "" {
-		parsedURL.Host = hostOverride
+		// Parse hostOverride to support full endpoint URLs (with scheme) in addition to bare hosts.
+		// Mirrors from daemon.json may include schemes; mirrors the logic in GetChallengeURL.
+		overrideURL, parseErr := url.Parse(hostOverride)
+		if parseErr == nil && overrideURL.Host != "" {
+			parsedURL.Host = overrideURL.Host
+			if overrideURL.Scheme != "" {
+				parsedURL.Scheme = overrideURL.Scheme
+			}
+		} else {
+			parsedURL.Host = hostOverride
+		}
+
 		manifestURL = parsedURL.String()
 	}
 
@@ -266,11 +291,16 @@ func BuildManifestURL(
 
 // fetchDigest retrieves an image digest using the specified HTTP method.
 //
+// When endpoints are provided, each mirror host is tried in order. An empty string
+// endpoint means use the canonical registry host. If all endpoints fail, the last
+// error is returned.
+//
 // Parameters:
 //   - ctx: Context for request lifecycle control.
 //   - container: Container whose digest is being retrieved.
 //   - registryAuth: Base64-encoded auth string.
 //   - method: HTTP method ("HEAD" or "GET").
+//   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
 //
 // Returns:
 //   - string: Normalized digest.
@@ -280,6 +310,7 @@ func fetchDigest(
 	container types.Container,
 	registryAuth string,
 	method string,
+	endpoints ...string,
 ) (string, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
@@ -299,7 +330,7 @@ func fetchDigest(
 	// Create an authentication client for registry requests.
 	client := auth.NewAuthClient()
 
-	// Build initial manifest URL to get original host
+	// Build initial manifest URL to get canonical host
 	_, originalHost, _, err := BuildManifestURL(container, "")
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
@@ -311,131 +342,165 @@ func fetchDigest(
 		WithField("original_host", originalHost).
 		Debug("Extracted original host from manifest URL")
 
-	// Obtain an authentication token and challenge host for the registry.
-	token, challengeHost, redirected, redirectHost, err := auth.GetToken(
-		ctx,
-		container,
-		registryAuth,
-		client,
-	)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to get token")
-
-		return "", fmt.Errorf("%w: %w", errFailedGetToken, err)
+	// If no endpoints specified, use a single empty endpoint (canonical host).
+	if len(endpoints) == 0 {
+		endpoints = []string{""}
 	}
 
-	// If no token is returned, authentication is not required.
-	if token == "" {
-		logrus.WithFields(fields).
-			Debug("No authentication required, proceeding with request")
-	} else {
-		logrus.WithFields(fields).
-			WithField("challenge_host", challengeHost).
-			WithField("redirected", redirected).
-			WithField("redirect_host", redirectHost).
-			Debug("Received challenge host and redirect flag from GetToken")
-	}
+	var lastErr error
 
-	// Build the manifest URL, using redirect host when redirected
-	var (
-		manifestURL string
-		parsedURL   *url.URL
-	)
+	for _, endpoint := range endpoints {
+		epFields := logrus.Fields{}
 
-	if redirectHost != "" && redirectHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = BuildManifestURL(
-			container,
-			redirectHost,
-		)
-	} else {
-		manifestURL, _, parsedURL, err = BuildManifestURL(
-			container,
-			"",
-		)
-	}
+		if endpoint != "" {
+			sanitized := "<redacted>"
 
-	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to build manifest URL")
+			u, err := url.Parse(endpoint)
+			if err == nil && u.Host != "" {
+				sanitized = u.Host
+			}
 
-		return "", err
-	}
+			epFields["registry_endpoint"] = sanitized
+		}
 
-	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"method": method,
-		"url":    manifestURL,
-	}).Debug("Fetching digest")
-
-	// Create the HTTP request for the manifest.
-	req, err := makeManifestRequest(ctx, method, manifestURL, token)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
-			"method": method,
-			"url":    manifestURL,
-		}).Debug("Failed to create request")
-
-		return "", err
-	}
-
-	// Execute the initial request.
-	resp, err := client.Do(req)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).WithFields(logrus.Fields{
-			"method": method,
-			"url":    manifestURL,
-		}).Debug("Failed to execute request")
-
-		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	// Handle the manifest response, checking for redirects and extracting digest.
-	digest, updatedURL, retry, err := HandleManifestResponse(
-		resp,
-		method,
-		originalHost,
-		challengeHost,
-		redirected,
-		parsedURL,
-		parsedURL.Host,
-	)
-	if err != nil {
-		logrus.WithError(err).WithFields(fields).WithField("status", resp.Status).
-			Debug("Failed to handle manifest response")
-
-		return "", err
-	}
-
-	if retry && updatedURL != "" {
-		logrus.WithFields(fields).
-			WithField("retry_url", updatedURL).
-			Debug("Retrying manifest request with updated URL")
-
-		digest, err = retryManifestRequest(
+		// Obtain an authentication token from the current endpoint.
+		token, challengeHost, redirected, redirectHost, err := auth.GetToken(
 			ctx,
+			container,
+			registryAuth,
+			client,
+			endpoint,
+		)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithFields(epFields).
+				Debug("Failed to get token from endpoint")
+			lastErr = fmt.Errorf("%w: %w", errFailedGetToken, err)
+
+			continue
+		}
+
+		if token == "" {
+			logrus.WithFields(fields).WithFields(epFields).
+				Debug("No authentication required, proceeding with request")
+		} else {
+			logrus.WithFields(fields).WithFields(epFields).
+				WithField("challenge_host", challengeHost).
+				WithField("redirected", redirected).
+				WithField("redirect_host", redirectHost).
+				Debug("Received challenge host and redirect flag from GetToken")
+		}
+
+		// Decide which host to use for this manifest request attempt.
+		// Priority:
+		// 1. Registry redirect host (from auth challenge, e.g. lscr.io → ghcr.io)
+		// 2. Current mirror endpoint (when using registry mirrors)
+		// 3. Canonical host (empty string)
+		hostForManifest := ""
+		if redirectHost != "" && redirectHost != originalHost && redirected {
+			hostForManifest = redirectHost
+		} else if endpoint != "" {
+			// Use the current registry mirror endpoint for the manifest request.
+			hostForManifest = endpoint
+		}
+
+		var (
+			manifestURL string
+			parsedURL   *url.URL
+		)
+
+		manifestURL, _, parsedURL, err = BuildManifestURL(
+			container,
+			hostForManifest,
+		)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithFields(epFields).
+				Debug("Failed to build manifest URL")
+			lastErr = err
+
+			continue
+		}
+
+		logrus.WithFields(fields).WithFields(epFields).WithFields(logrus.Fields{
+			"method": method,
+			"url":    manifestURL,
+		}).Debug("Fetching digest")
+
+		// Create the HTTP request for the manifest.
+		req, err := makeManifestRequest(ctx, method, manifestURL, token)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithFields(epFields).WithFields(logrus.Fields{
+				"method": method,
+				"url":    manifestURL,
+			}).Debug("Failed to create request")
+			lastErr = err
+
+			continue
+		}
+
+		// Execute the initial request.
+		resp, err := client.Do(req)
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithFields(epFields).WithFields(logrus.Fields{
+				"method": method,
+				"url":    manifestURL,
+			}).Debug("Failed to execute request")
+			lastErr = fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
+
+			continue
+		}
+
+		// Handle the manifest response, checking for redirects and extracting digest.
+		digest, updatedURL, retry, err := HandleManifestResponse(
+			resp,
 			method,
-			updatedURL,
-			token,
 			originalHost,
 			challengeHost,
 			redirected,
 			parsedURL,
-			client,
+			parsedURL.Host,
 		)
-		if err != nil {
-			logrus.WithError(err).WithFields(fields).WithField("retry_url", updatedURL).
-				Debug("Failed to retry manifest request")
+		_ = resp.Body.Close()
 
-			return "", err
+		if err != nil {
+			logrus.WithError(err).WithFields(fields).WithFields(epFields).WithField("status", resp.Status).
+				Debug("Failed to handle manifest response")
+			lastErr = err
+
+			continue
 		}
+
+		if retry && updatedURL != "" {
+			logrus.WithFields(fields).WithFields(epFields).
+				WithField("retry_url", updatedURL).
+				Debug("Retrying manifest request with updated URL")
+
+			digest, err = retryManifestRequest(
+				ctx,
+				method,
+				updatedURL,
+				token,
+				originalHost,
+				challengeHost,
+				redirected,
+				parsedURL,
+				client,
+			)
+			if err != nil {
+				logrus.WithError(err).WithFields(fields).WithFields(epFields).WithField("retry_url", updatedURL).
+					Debug("Failed to retry manifest request")
+				lastErr = err
+
+				continue
+			}
+		}
+
+		logrus.WithFields(fields).WithFields(epFields).WithField("remote_digest", digest).
+			Debug("Fetched remote digest")
+
+		return digest, nil
 	}
 
-	logrus.WithFields(fields).WithField("remote_digest", digest).
-		Debug("Fetched remote digest")
-
-	return digest, nil
+	return "", lastErr
 }
 
 // HandleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
