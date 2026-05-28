@@ -11,13 +11,13 @@
       
       
       
-        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/getting-started/installation/">
+        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/advanced-features/registry-mirrors/">
       
       
-        <link rel="prev" href="../overview/">
+        <link rel="prev" href="../metrics-api/">
       
       
-        <link rel="next" href="../usage/">
+        <link rel="next" href="../remote-hosts/">
       
       
         
@@ -28,7 +28,7 @@
     
     
       
-        <title>Installation - Watchtower</title>
+        <title>Registry Mirrors - Watchtower</title>
       
     
     
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#registry_mirrors" class="md-skip">
           Skip to content
         </a>
       
@@ -138,7 +138,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Registry Mirrors
             
           </span>
         </div>
@@ -286,13 +286,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../overview/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../getting-started/overview/" class="md-tabs__link">
           
   
   
@@ -348,11 +346,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../advanced-features/http-api/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../http-api/" class="md-tabs__link">
           
   
   
@@ -472,31 +472,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -514,7 +511,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -532,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../../getting-started/overview/" class="md-nav__link">
         
   
   
@@ -557,37 +554,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -603,115 +573,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#sources" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sources
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Sources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#container_image" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Container Image
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#binary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Binary
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cli_commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CLI Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="CLI Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#pulling_the_container_image" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pulling the Container Image
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#downloading_the_binary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Downloading the Binary
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#supported_architectures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supported Architectures
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -724,7 +585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
+      <a href="../../getting-started/usage/" class="md-nav__link">
         
   
   
@@ -752,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../updating-watchtower/" class="md-nav__link">
+      <a href="../../getting-started/updating-watchtower/" class="md-nav__link">
         
   
   
@@ -1102,28 +963,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1141,7 +1005,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1159,7 +1023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/http-api/" class="md-nav__link">
+      <a href="../http-api/" class="md-nav__link">
         
   
   
@@ -1187,7 +1051,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/image-cooldown/" class="md-nav__link">
+      <a href="../image-cooldown/" class="md-nav__link">
         
   
   
@@ -1215,7 +1079,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/lifecycle-hooks/" class="md-nav__link">
+      <a href="../lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -1243,7 +1107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/linked-containers/" class="md-nav__link">
+      <a href="../linked-containers/" class="md-nav__link">
         
   
   
@@ -1271,7 +1135,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/metrics-api/" class="md-nav__link">
+      <a href="../metrics-api/" class="md-nav__link">
         
   
   
@@ -1296,10 +1160,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../advanced-features/registry-mirrors/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registry Mirrors
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1315,6 +1206,209 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuring_registry_mirrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuring Registry Mirrors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuring Registry Mirrors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration File
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-line_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command-Line Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how_watchtower_uses_mirrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Watchtower Uses Mirrors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration_examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single_global_mirror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single Global Mirror
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple_mirrors_with_redundancy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple Mirrors with Redundancy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#corporate_proxy_environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Corporate Proxy Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mirrors_not_being_used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mirrors Not Being Used
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authentication_issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssltls_errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SSL/TLS Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related_features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1327,7 +1421,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/remote-hosts/" class="md-nav__link">
+      <a href="../remote-hosts/" class="md-nav__link">
         
   
   
@@ -1355,7 +1449,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/running-multiple-instances/" class="md-nav__link">
+      <a href="../running-multiple-instances/" class="md-nav__link">
         
   
   
@@ -1383,7 +1477,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/stop-signals/" class="md-nav__link">
+      <a href="../stop-signals/" class="md-nav__link">
         
   
   
@@ -1438,22 +1532,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#sources" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sources
+        Overview
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Sources">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuring_registry_mirrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuring Registry Mirrors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuring Registry Mirrors">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#container_image" class="md-nav__link">
+  <a href="#configuration_file" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Container Image
+        Configuration File
       
     </span>
   </a>
@@ -1461,10 +1566,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#binary" class="md-nav__link">
+  <a href="#configuration_format" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Binary
+        Configuration Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-line_configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command-Line Configuration
       
     </span>
   </a>
@@ -1477,22 +1593,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cli_commands" class="md-nav__link">
+  <a href="#how_watchtower_uses_mirrors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CLI Commands
+        How Watchtower Uses Mirrors
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="CLI Commands">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration_examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Examples">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pulling_the_container_image" class="md-nav__link">
+  <a href="#single_global_mirror" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pulling the Container Image
+        Single Global Mirror
       
     </span>
   </a>
@@ -1500,10 +1627,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#downloading_the_binary" class="md-nav__link">
+  <a href="#multiple_mirrors_with_redundancy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Downloading the Binary
+        Multiple Mirrors with Redundancy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#corporate_proxy_environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Corporate Proxy Environment
       
     </span>
   </a>
@@ -1516,10 +1654,60 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#supported_architectures" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Supported Architectures
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mirrors_not_being_used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mirrors Not Being Used
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authentication_issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssltls_errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SSL/TLS Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related_features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Features
       
     </span>
   </a>
@@ -1546,61 +1734,110 @@
   
 
 
-<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<h2 id="sources">Sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
-<h3 id="container_image">Container Image<a class="headerlink" href="#container_image" title="Permanent link">&para;</a></h3>
+<h1 id="registry_mirrors">Registry Mirrors<a class="headerlink" href="#registry_mirrors" title="Permanent link">&para;</a></h1>
+<p>Registry mirrors provide alternative locations for pulling Docker images, useful when access to the default registry is slow, unreliable, or restricted by network policy. Watchtower uses these mirrors when checking whether containers need updates, ensuring it can detect new images even when the primary registry is unreachable.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>When the Docker daemon is configured with registry mirrors, Watchtower automatically detects and uses them during its update checks. This means:</p>
 <ul>
-<li><a href="https://hub.docker.com/r/nickfedor/watchtower" rel="noopener noreferrer" target="_blank">Docker Hub</a></li>
-<li><a href="https://github.com/nicholas-fedor/watchtower/pkgs/container/watchtower" rel="noopener noreferrer" target="_blank">GitHub Container Registry</a></li>
+<li><strong>Digest comparisons</strong> — Watchtower fetches image manifests from mirrors before falling back to the canonical registry, so it can detect updates even when the primary registry is inaccessible.</li>
+<li><strong>All registries supported</strong> — Global mirrors apply to all image registries (Docker Hub, GHCR, private registries, etc.).</li>
 </ul>
-<h3 id="binary">Binary<a class="headerlink" href="#binary" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="https://github.com/nicholas-fedor/watchtower/releases" rel="noopener noreferrer" target="_blank">GitHub Releases</a></li>
-</ul>
-<h2 id="cli_commands">CLI Commands<a class="headerlink" href="#cli_commands" title="Permanent link">&para;</a></h2>
-<h3 id="pulling_the_container_image">Pulling the Container Image<a class="headerlink" href="#pulling_the_container_image" title="Permanent link">&para;</a></h3>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker Hub</label><label for="__tabbed_1_2">GitHub</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>nickfedor/watchtower:latest
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/nicholas-fedor/watchtower:latest
-</code></pre></div>
-</div>
-</div>
-</div>
-<h3 id="downloading_the_binary">Downloading the Binary<a class="headerlink" href="#downloading_the_binary" title="Permanent link">&para;</a></h3>
-<p>The following will download and extract the binary to the current directory:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Windows (amd64)</label><label for="__tabbed_2_2">Linux (amd64)</label><label for="__tabbed_2_3">macOS (amd64)</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="highlight"><span class="filename">PowerShell</span><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">iwr </span><span class="p">(</span><span class="nb">iwr </span><span class="n">https</span><span class="p">://</span><span class="n">api</span><span class="p">.</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">repos</span><span class="p">/</span><span class="n">nicholas-fedor</span><span class="p">/</span><span class="n">watchtower</span><span class="p">/</span><span class="n">releases</span><span class="p">/</span><span class="n">latest</span> <span class="p">|</span> <span class="nb">ConvertFrom-Json</span><span class="p">).</span><span class="n">assets</span><span class="p">.</span><span class="n">where</span><span class="p">({</span><span class="nv">$_</span><span class="p">.</span><span class="n">name</span> <span class="o">-like</span> <span class="s2">&quot;*windows_amd64*.zip&quot;</span><span class="p">}).</span><span class="n">browser_download_url</span> <span class="n">-OutFile</span> <span class="n">watchtower</span><span class="p">.</span><span class="n">zip</span><span class="p">;</span> <span class="nb">Add-Type</span> <span class="n">-AssemblyName</span> <span class="n">System</span><span class="p">.</span><span class="n">IO</span><span class="p">.</span><span class="n">Compression</span><span class="p">.</span><span class="n">FileSystem</span><span class="p">;</span> <span class="nv">$zip</span> <span class="p">=</span> <span class="no">[System.IO.Compression.ZipFile]</span><span class="p">::</span><span class="n">OpenRead</span><span class="p">(</span><span class="s2">&quot;$PWD\watchtower.zip&quot;</span><span class="p">);</span> <span class="nv">$zip</span><span class="p">.</span><span class="n">Entries</span> <span class="p">|</span> <span class="nb">Where-Object</span> <span class="p">{</span><span class="nv">$_</span><span class="p">.</span><span class="n">Name</span> <span class="o">-eq</span> <span class="s1">&#39;watchtower.exe&#39;</span><span class="p">}</span> <span class="p">|</span> <span class="k">ForEach</span><span class="n">-Object</span> <span class="p">{</span><span class="no">[System.IO.Compression.ZipFileExtensions]</span><span class="p">::</span><span class="n">ExtractToFile</span><span class="p">(</span><span class="nv">$_</span><span class="p">,</span> <span class="s2">&quot;$PWD\watchtower.exe&quot;</span><span class="p">,</span> <span class="nv">$true</span><span class="p">)};</span> <span class="nv">$zip</span><span class="p">.</span><span class="n">Dispose</span><span class="p">();</span> <span class="nb">Remove-Item</span> <span class="n">watchtower</span><span class="p">.</span><span class="n">zip</span><span class="p">;</span> <span class="k">if</span> <span class="p">(</span><span class="nb">Test-Path</span> <span class="s2">&quot;.\watchtower.exe&quot;</span><span class="p">)</span> <span class="p">{</span> <span class="nb">Write-Host</span> <span class="s2">&quot;Successfully installed watchtower.exe to current directory&quot;</span> <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="nb">Write-Host</span> <span class="s2">&quot;Failed to install watchtower.exe&quot;</span> <span class="p">}</span>
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><span class="filename">Bash</span><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-L<span class="w"> </span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>https://api.github.com/repos/nicholas-fedor/watchtower/releases/latest<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-o<span class="w"> </span><span class="s1">&#39;https://[^&quot;]*linux_amd64[^&quot;]*\.tar\.gz&#39;</span><span class="k">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>-xz<span class="w"> </span>-C<span class="w"> </span>.<span class="w"> </span>watchtower<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-f<span class="w"> </span>./watchtower<span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Successfully installed watchtower to current directory&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Failed to install watchtower&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">fi</span>
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><span class="filename">Bash</span><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-L<span class="w"> </span><span class="k">$(</span>curl<span class="w"> </span>-s<span class="w"> </span>https://api.github.com/repos/nicholas-fedor/watchtower/releases/latest<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-o<span class="w"> </span><span class="s1">&#39;https://[^&quot;]*darwin_amd64[^&quot;]*\.tar\.gz&#39;</span><span class="k">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>-xz<span class="w"> </span>-C<span class="w"> </span>.<span class="w"> </span>watchtower<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-f<span class="w"> </span>./watchtower<span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Successfully installed watchtower to current directory&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Failed to install watchtower&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">fi</span>
-</code></pre></div>
-</div>
-</div>
-</div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Review the <a href="https://github.com/nicholas-fedor/watchtower/releases" rel="noopener noreferrer" target="_blank">release page</a> for additional architectures (e.g., arm, arm64, i386, riscv64).</p>
+<p>Mirror support in Watchtower covers <strong>digest comparison only</strong> — determining whether a newer image exists. The actual image pull is handled by the Docker daemon, which already uses configured mirrors natively.</p>
 </div>
-<h2 id="supported_architectures">Supported Architectures<a class="headerlink" href="#supported_architectures" title="Permanent link">&para;</a></h2>
-<p>Watchtower supports the following architectures:</p>
+<h2 id="configuring_registry_mirrors">Configuring Registry Mirrors<a class="headerlink" href="#configuring_registry_mirrors" title="Permanent link">&para;</a></h2>
+<p>Registry mirrors are configured in the Docker daemon, not in Watchtower itself.</p>
+<h3 id="configuration_file">Configuration File<a class="headerlink" href="#configuration_file" title="Permanent link">&para;</a></h3>
 <ul>
-<li>amd64</li>
-<li>i386</li>
-<li>armhf</li>
-<li>arm64v8</li>
-<li>riscv64</li>
+<li><strong>Linux</strong>: <code>/etc/docker/daemon.json</code></li>
+<li><strong>Windows</strong>: <code>C:\ProgramData\docker\config\daemon.json</code></li>
+<li><strong>Rootless mode</strong>: <code>~/.config/docker/daemon.json</code></li>
+</ul>
+<p>After making changes, restart the daemon:</p>
+<div class="highlight"><span class="filename">Linux with systemd</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>docker
+</code></pre></div>
+<h3 id="configuration_format">Configuration Format<a class="headerlink" href="#configuration_format" title="Permanent link">&para;</a></h3>
+<p>Global mirrors apply to all image registries. Add them under the <code>registry-mirrors</code> key:</p>
+<div class="highlight"><span class="filename">/etc/docker/daemon.json</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nt">&quot;registry-mirrors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">        </span><span class="s2">&quot;https://mirror.example.com&quot;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">}</span>
+</code></pre></div>
+<p>When multiple mirrors are listed, they are tried in order until one succeeds.</p>
+<h3 id="command-line_configuration">Command-Line Configuration<a class="headerlink" href="#command-line_configuration" title="Permanent link">&para;</a></h3>
+<p>Mirrors can also be set via the <code>dockerd</code> command line:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>dockerd<span class="w"> </span>--registry-mirror<span class="w"> </span>https://mirror.example.com
+</code></pre></div>
+<h2 id="how_watchtower_uses_mirrors">How Watchtower Uses Mirrors<a class="headerlink" href="#how_watchtower_uses_mirrors" title="Permanent link">&para;</a></h2>
+<p>When checking if a container's image has been updated, Watchtower resolves the mirror to use in this order:</p>
+<ol>
+<li><strong>Configured mirrors</strong> — The global mirror list from the Docker daemon is tried first.</li>
+<li><strong>Canonical registry</strong> — If all mirrors fail, Watchtower falls back to the original registry (e.g., <code>index.docker.io</code>).</li>
+</ol>
+<p>The first mirror to successfully respond with the image manifest wins. This means a fast, nearby mirror is preferred over a distant canonical registry.</p>
+<h2 id="configuration_examples">Configuration Examples<a class="headerlink" href="#configuration_examples" title="Permanent link">&para;</a></h2>
+<h3 id="single_global_mirror">Single Global Mirror<a class="headerlink" href="#single_global_mirror" title="Permanent link">&para;</a></h3>
+<p>A single mirror used for all registries:</p>
+<div class="highlight"><span class="filename">/etc/docker/daemon.json</span><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nt">&quot;registry-mirrors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">        </span><span class="s2">&quot;https://docker-mirror.company.com&quot;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="multiple_mirrors_with_redundancy">Multiple Mirrors with Redundancy<a class="headerlink" href="#multiple_mirrors_with_redundancy" title="Permanent link">&para;</a></h3>
+<p>Mirrors are tried in the order listed. If the first is unreachable, the next is used:</p>
+<div class="highlight"><span class="filename">/etc/docker/daemon.json</span><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">&quot;registry-mirrors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">        </span><span class="s2">&quot;https://primary-mirror.company.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">        </span><span class="s2">&quot;https://backup-mirror.company.com&quot;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="corporate_proxy_environment">Corporate Proxy Environment<a class="headerlink" href="#corporate_proxy_environment" title="Permanent link">&para;</a></h3>
+<p>When using internal mirrors that may use self-signed certificates:</p>
+<div class="highlight"><span class="filename">/etc/docker/daemon.json</span><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">&quot;registry-mirrors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="s2">&quot;https://harbor.internal.company.com&quot;</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">&quot;insecure-registries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">        </span><span class="s2">&quot;harbor.internal.company.com&quot;</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="mirrors_not_being_used">Mirrors Not Being Used<a class="headerlink" href="#mirrors_not_being_used" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Verify daemon configuration</strong> — Confirm that <code>/etc/docker/daemon.json</code> contains valid JSON and the Docker daemon has been restarted since the last change.</li>
+<li>
+<p><strong>Enable debug logging</strong> — Run Watchtower with debug logging to see mirror resolution in action:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_DEBUG</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>nickfedor/watchtower
+</code></pre></div>
+<p>Look for log output containing <code>Resolved registry mirror configuration</code>.
+3. <strong>Check network access</strong> — Ensure the host can reach the mirror URLs (e.g., <code>curl -I https://mirror.example.com/v2/</code>).
+4. <strong>Verify mirror content</strong> — Confirm the mirror is operational and has the required images.</p>
+</li>
+</ol>
+<h3 id="authentication_issues">Authentication Issues<a class="headerlink" href="#authentication_issues" title="Permanent link">&para;</a></h3>
+<p>If a mirror requires authentication, configure credentials in the Docker daemon (e.g., <code>docker login</code>). Watchtower uses the same credentials for mirrors as for the canonical registry.</p>
+<h3 id="ssltls_errors">SSL/TLS Errors<a class="headerlink" href="#ssltls_errors" title="Permanent link">&para;</a></h3>
+<p>For mirrors using self-signed or internal CA certificates, add them to the <code>insecure-registries</code> list:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&quot;insecure-registries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;internal-mirror.company.com&quot;</span><span class="p">]</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="p">}</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Insecure registries accept HTTPS with untrusted certificates. Only use this for internal mirrors under your control.</p>
+</div>
+<h2 id="related_features">Related Features<a class="headerlink" href="#related_features" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../configuration/private-registries/">Private Registries</a> — Authenticating with private image registries</li>
+<li><a href="../../configuration/secure-connections/">Secure Connections</a> — TLS and certificate configuration</li>
 </ul>
 
 
@@ -1624,7 +1861,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 22:31:03 UTC"><span class="timeago" datetime="2026-05-28T22:31:03+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 22:31:03 UTC">2026-05-28</span>
   </span>
 
     
@@ -1634,7 +1871,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 22:31:03 UTC"><span class="timeago" datetime="2026-05-28T22:31:03+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 22:31:03 UTC">2026-05-28</span>
   </span>
 
     
