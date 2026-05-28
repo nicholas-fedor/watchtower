@@ -32,7 +32,7 @@ var (
 //
 // Parameters:
 //   - container: Container with image info for URL construction.
-//   - scheme: The scheme to use for the URL (e.g., "https" or "http"). Empty string defaults to "https".
+//   - scheme: The scheme to use for the URL (e.g., "https" or "http").
 //
 // Returns:
 //   - string: Manifest URL using the canonical registry host from the image reference.
