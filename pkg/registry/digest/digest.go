@@ -271,10 +271,8 @@ func BuildManifestURL(
 	}
 
 	if hostOverride != "" {
-		// Support full endpoint strings (e.g. "https://mirror.example.com" or "http://mirror:5000")
-		// similar to how GetChallengeURL handles the endpoint parameter. This allows registry
-		// mirrors (including those configured with explicit schemes in daemon.json) to be used
-		// for manifest requests.
+		// Parse hostOverride to support full endpoint URLs (with scheme) in addition to bare hosts.
+		// Mirrors from daemon.json may include schemes; mirrors the logic in GetChallengeURL.
 		overrideURL, parseErr := url.Parse(hostOverride)
 		if parseErr == nil && overrideURL.Host != "" {
 			parsedURL.Host = overrideURL.Host
