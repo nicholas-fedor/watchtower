@@ -44,7 +44,7 @@ var commonTemplates = map[string]string{
 {{- else if eq $msg "Successfully removed all excess Watchtower instances" -}}
     Successfully removed {{index $e.Data "removed_instances"}} excess Watchtower{{if eq (index $e.Data "removed_instances") 1}} instance{{else}} instances{{end}}
 {{- else if eq $msg "Image is within cooldown period - deferring update" -}}
-    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created less than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - eligible in {{with (index $e.Data "eligible_in")}}{{.}}{{else}}unknown{{end}}
+    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created less than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - eligible in {{with (index $e.Data "eligible_in")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "eligible_at")}}{{RFC1123 .}}{{else}}unknown{{end}})
 {{- else if eq $msg "Image age exceeds cooldown - proceeding with update" -}}
     {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created more than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - proceeding with update
 {{- else if eq $msg "Image creation time unavailable - deferring update" -}}

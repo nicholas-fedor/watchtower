@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -389,49 +390,54 @@ func TestContainerStatus_RestartedStateWithMissingData(t *testing.T) {
 
 func TestContainerStatus_SetCooldownInfo(t *testing.T) {
 	tests := []struct {
-		name      string
-		u         *ContainerStatus
-		age       string
-		delay     string
-		remaining string
-		passed    bool
+		name       string
+		u          *ContainerStatus
+		age        string
+		delay      string
+		remaining  string
+		eligibleAt time.Time
+		passed     bool
 	}{
 		{
-			name:      "cooldown passed with age",
-			u:         &ContainerStatus{containerID: "cont1"},
-			age:       "47 days, 11 hours",
-			delay:     "24 hours",
-			remaining: "",
-			passed:    true,
+			name:       "cooldown passed with age",
+			u:          &ContainerStatus{containerID: "cont1"},
+			age:        "47 days, 11 hours",
+			delay:      "24 hours",
+			remaining:  "",
+			eligibleAt: time.Time{},
+			passed:     true,
 		},
 		{
-			name:      "cooldown not passed with remaining",
-			u:         &ContainerStatus{containerID: "cont2"},
-			age:       "2 hours",
-			delay:     "24 hours",
-			remaining: "22 hours",
-			passed:    false,
+			name:       "cooldown not passed with remaining",
+			u:          &ContainerStatus{containerID: "cont2"},
+			age:        "2 hours",
+			delay:      "24 hours",
+			remaining:  "22 hours",
+			eligibleAt: time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC),
+			passed:     false,
 		},
 		{
-			name:      "empty values",
-			u:         &ContainerStatus{containerID: "cont3"},
-			age:       "",
-			delay:     "",
-			remaining: "",
-			passed:    false,
+			name:       "empty values",
+			u:          &ContainerStatus{containerID: "cont3"},
+			age:        "",
+			delay:      "",
+			remaining:  "",
+			eligibleAt: time.Time{},
+			passed:     false,
 		},
 		{
-			name:      "overwrites previous values",
-			u:         &ContainerStatus{containerID: "cont4", cooldownAge: "old age", cooldownDelay: "old delay", cooldownRemaining: "old remaining", cooldownPassed: true},
-			age:       "new age",
-			delay:     "new delay",
-			remaining: "new remaining",
-			passed:    false,
+			name:       "overwrites previous values",
+			u:          &ContainerStatus{containerID: "cont4", cooldownAge: "old age", cooldownDelay: "old delay", cooldownRemaining: "old remaining", cooldownPassed: true},
+			age:        "new age",
+			delay:      "new delay",
+			remaining:  "new remaining",
+			eligibleAt: time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC),
+			passed:     false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.u.SetCooldownInfo(tt.age, tt.delay, tt.remaining, tt.passed)
+			tt.u.SetCooldownInfo(tt.age, tt.delay, tt.remaining, tt.eligibleAt, tt.passed)
 
 			if got := tt.u.CooldownAge(); got != tt.age {
 				t.Errorf("CooldownAge() = %v, want %v", got, tt.age)
@@ -447,6 +453,10 @@ func TestContainerStatus_SetCooldownInfo(t *testing.T) {
 
 			if got := tt.u.CooldownPassed(); got != tt.passed {
 				t.Errorf("CooldownPassed() = %v, want %v", got, tt.passed)
+			}
+
+			if got := tt.u.CooldownEligibleAt(); got != tt.eligibleAt {
+				t.Errorf("CooldownEligibleAt() = %v, want %v", got, tt.eligibleAt)
 			}
 		})
 	}
@@ -470,15 +480,21 @@ func TestContainerStatus_CooldownDefaults(t *testing.T) {
 	if got := u.CooldownRemaining(); got != "" {
 		t.Errorf("CooldownRemaining() default = %v, want empty", got)
 	}
+
+	if !u.CooldownEligibleAt().IsZero() {
+		t.Errorf("CooldownEligibleAt() default = %v, want zero", u.CooldownEligibleAt())
+	}
 }
 
 func TestContainerStatus_CooldownGettersReturnDirectValues(t *testing.T) {
+	eligibleAt := time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC)
 	u := &ContainerStatus{
-		containerID:       "cont1",
-		cooldownPassed:    true,
-		cooldownAge:       "3 days",
-		cooldownDelay:     "48 hours",
-		cooldownRemaining: "12 hours",
+		containerID:        "cont1",
+		cooldownPassed:     true,
+		cooldownAge:        "3 days",
+		cooldownDelay:      "48 hours",
+		cooldownRemaining:  "12 hours",
+		cooldownEligibleAt: eligibleAt,
 	}
 
 	if got := u.CooldownPassed(); got != true {
@@ -495,6 +511,10 @@ func TestContainerStatus_CooldownGettersReturnDirectValues(t *testing.T) {
 
 	if got := u.CooldownRemaining(); got != "12 hours" {
 		t.Errorf("CooldownRemaining() = %v, want '12 hours'", got)
+	}
+
+	if got := u.CooldownEligibleAt(); got != eligibleAt {
+		t.Errorf("CooldownEligibleAt() = %v, want %v", got, eligibleAt)
 	}
 }
 

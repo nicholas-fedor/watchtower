@@ -1030,6 +1030,7 @@ func sendSplitNotifications(
 						"image_age":   containerStatus.CooldownAge(),
 						"cooldown":    containerStatus.CooldownDelay(),
 						"eligible_in": containerStatus.CooldownRemaining(),
+						"eligible_at": containerStatus.CooldownEligibleAt().Format(time.RFC3339),
 					},
 					Time: now,
 				}

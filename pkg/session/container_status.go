@@ -1,6 +1,8 @@
 package session
 
 import (
+	"time"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -35,19 +37,20 @@ const (
 //
 //nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
-	containerID       types.ContainerID // Container ID.
-	oldImage          types.ImageID     // Original image ID.
-	newImage          types.ImageID     // Latest image ID.
-	containerName     string            // Container name.
-	imageName         string            // Image name with tag.
-	containerError    error             // Error encountered, if any.
-	state             State             // Current state.
-	monitorOnly       bool              // Monitor-only flag.
-	newContainerID    types.ContainerID // New container ID after update.
-	cooldownPassed    bool              // True if image passed cooldown check.
-	cooldownAge       string            // Human-readable image age (e.g., "47 days, 11 hours").
-	cooldownDelay     string            // Human-readable cooldown duration (e.g., "24 hours").
-	cooldownRemaining string            // Human-readable remaining time (empty if passed).
+	containerID        types.ContainerID // Container ID.
+	oldImage           types.ImageID     // Original image ID.
+	newImage           types.ImageID     // Latest image ID.
+	containerName      string            // Container name.
+	imageName          string            // Image name with tag.
+	containerError     error             // Error encountered, if any.
+	state              State             // Current state.
+	monitorOnly        bool              // Monitor-only flag.
+	newContainerID     types.ContainerID // New container ID after update.
+	cooldownPassed     bool              // True if image passed cooldown check.
+	cooldownAge        string            // Human-readable image age (e.g., "47 days, 11 hours").
+	cooldownDelay      string            // Human-readable cooldown duration (e.g., "24 hours").
+	cooldownRemaining  string            // Human-readable remaining time (empty if passed).
+	cooldownEligibleAt time.Time         // Time when the container becomes eligible for update.
 }
 
 // ID returns the container ID.
@@ -159,12 +162,28 @@ func (u *ContainerStatus) SetNewContainerID(newID types.ContainerID) {
 //   - age: Human-readable image age (e.g., "47 days, 11 hours").
 //   - delay: Human-readable cooldown duration (e.g., "24 hours").
 //   - remaining: Human-readable remaining time (empty if passed).
+//   - eligibleAt: Time when the container becomes eligible for update.
 //   - passed: True if the image passed the cooldown check.
-func (u *ContainerStatus) SetCooldownInfo(age, delay, remaining string, passed bool) {
+func (u *ContainerStatus) SetCooldownInfo(
+	age,
+	delay,
+	remaining string,
+	eligibleAt time.Time,
+	passed bool,
+) {
 	u.cooldownPassed = passed
 	u.cooldownAge = age
 	u.cooldownDelay = delay
 	u.cooldownRemaining = remaining
+	u.cooldownEligibleAt = eligibleAt
+}
+
+// CooldownEligibleAt returns the time when the container becomes eligible for update.
+//
+// Returns:
+//   - time.Time: The eligible-at timestamp (zero if not set).
+func (u *ContainerStatus) CooldownEligibleAt() time.Time {
+	return u.cooldownEligibleAt
 }
 
 // CooldownPassed returns whether the image passed the cooldown check.

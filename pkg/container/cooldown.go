@@ -19,11 +19,12 @@ import (
 // while still extracting the fields needed for progress reports and
 // rich notifications.
 type CooldownError struct {
-	Age       string
-	Delay     string
-	Remaining string
-	Passed    bool
-	err       error
+	Age        string
+	Delay      string
+	Remaining  string
+	EligibleAt time.Time
+	Passed     bool
+	err        error
 }
 
 func (e *CooldownError) Error() string {
@@ -179,14 +180,16 @@ func evalImageAge(creationTime time.Time, delay time.Duration, clog *logrus.Entr
 		ageStr := util.FormatDuration(imageAge)
 		cooldownStr := util.FormatDuration(delay)
 		remainingStr := util.FormatDuration(remaining)
+		eligibleAt := time.Now().Add(remaining)
 
 		clog.WithFields(logrus.Fields{
 			"image_age":   ageStr,
 			"cooldown":    cooldownStr,
 			"eligible_in": remainingStr,
+			"eligible_at": eligibleAt.Format(time.RFC3339),
 		}).Info("Image is within cooldown period - deferring update")
 
-		return false, buildCooldownError(imageAge, delay)
+		return false, buildCooldownError(imageAge, delay, eligibleAt)
 	}
 
 	logCooldownExceeded(imageAge, delay, clog)
@@ -200,17 +203,19 @@ func evalImageAge(creationTime time.Time, delay time.Duration, clog *logrus.Entr
 // Parameters:
 //   - imageAge: Elapsed time since the image was created.
 //   - delay: The configured cooldown delay.
+//   - eligibleAt: Precomputed time when the container becomes eligible.
 //
 // Returns:
 //   - *CooldownError: Populated with formatted age, delay, and remaining strings.
-func buildCooldownError(imageAge, delay time.Duration) *CooldownError {
+func buildCooldownError(imageAge, delay time.Duration, eligibleAt time.Time) *CooldownError {
 	remaining := delay - imageAge
 
 	return &CooldownError{
-		Age:       util.FormatDuration(imageAge),
-		Delay:     util.FormatDuration(delay),
-		Remaining: util.FormatDuration(remaining),
-		err:       ErrImageCooldown,
+		Age:        util.FormatDuration(imageAge),
+		Delay:      util.FormatDuration(delay),
+		Remaining:  util.FormatDuration(remaining),
+		EligibleAt: eligibleAt,
+		err:        ErrImageCooldown,
 	}
 }
 

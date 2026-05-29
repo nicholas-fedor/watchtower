@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	testifyMock "github.com/stretchr/testify/mock"
 
@@ -1157,6 +1158,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 		age         string
 		delay       string
 		remaining   string
+		eligibleAt  time.Time
 		passed      bool
 	}
 
@@ -1176,16 +1178,18 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 				age:         "47 days, 11 hours",
 				delay:       "24 hours",
 				remaining:   "",
+				eligibleAt:  time.Time{},
 				passed:      true,
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
-					containerID:       "cont1",
-					state:             ScannedState,
-					cooldownPassed:    true,
-					cooldownAge:       "47 days, 11 hours",
-					cooldownDelay:     "24 hours",
-					cooldownRemaining: "",
+					containerID:        "cont1",
+					state:              ScannedState,
+					cooldownPassed:     true,
+					cooldownAge:        "47 days, 11 hours",
+					cooldownDelay:      "24 hours",
+					cooldownRemaining:  "",
+					cooldownEligibleAt: time.Time{},
 				},
 			},
 		},
@@ -1199,16 +1203,18 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 				age:         "2 hours",
 				delay:       "24 hours",
 				remaining:   "22 hours",
+				eligibleAt:  time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC),
 				passed:      false,
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
-					containerID:       "cont1",
-					state:             SkippedState,
-					cooldownPassed:    false,
-					cooldownAge:       "2 hours",
-					cooldownDelay:     "24 hours",
-					cooldownRemaining: "22 hours",
+					containerID:        "cont1",
+					state:              SkippedState,
+					cooldownPassed:     false,
+					cooldownAge:        "2 hours",
+					cooldownDelay:      "24 hours",
+					cooldownRemaining:  "22 hours",
+					cooldownEligibleAt: time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC),
 				},
 			},
 		},
@@ -1220,6 +1226,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 				age:         "1 day",
 				delay:       "24 hours",
 				remaining:   "",
+				eligibleAt:  time.Time{},
 				passed:      true,
 			},
 			want: Progress{},
@@ -1241,16 +1248,18 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 				age:         "new age",
 				delay:       "new delay",
 				remaining:   "new remaining",
+				eligibleAt:  time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC),
 				passed:      true,
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
-					containerID:       "cont1",
-					state:             ScannedState,
-					cooldownPassed:    true,
-					cooldownAge:       "new age",
-					cooldownDelay:     "new delay",
-					cooldownRemaining: "new remaining",
+					containerID:        "cont1",
+					state:              ScannedState,
+					cooldownPassed:     true,
+					cooldownAge:        "new age",
+					cooldownDelay:      "new delay",
+					cooldownRemaining:  "new remaining",
+					cooldownEligibleAt: time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC),
 				},
 			},
 		},
@@ -1264,6 +1273,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 				age:         "",
 				delay:       "",
 				remaining:   "",
+				eligibleAt:  time.Time{},
 				passed:      false,
 			},
 			want: Progress{
@@ -1280,7 +1290,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.SetCooldownInfo(tt.args.containerID, tt.args.age, tt.args.delay, tt.args.remaining, tt.args.passed)
+			tt.m.SetCooldownInfo(tt.args.containerID, tt.args.age, tt.args.delay, tt.args.remaining, tt.args.eligibleAt, tt.args.passed)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf(
@@ -1339,6 +1349,15 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 						wantStatus.cooldownRemaining,
 					)
 				}
+
+				if gotStatus.CooldownEligibleAt() != wantStatus.cooldownEligibleAt {
+					t.Errorf(
+						"Progress.SetCooldownInfo() CooldownEligibleAt for %v = %v, want %v",
+						id,
+						gotStatus.CooldownEligibleAt(),
+						wantStatus.cooldownEligibleAt,
+					)
+				}
 			}
 		})
 	}
@@ -1356,13 +1375,13 @@ func TestProgress_SetCooldownInfo_Concurrent(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		m.SetCooldownInfo("cont1", "1 day", "24 hours", "", true)
+		m.SetCooldownInfo("cont1", "1 day", "24 hours", "", time.Time{}, true)
 	}()
 
 	go func() {
 		defer wg.Done()
 
-		m.SetCooldownInfo("cont2", "2 hours", "24 hours", "22 hours", false)
+		m.SetCooldownInfo("cont2", "2 hours", "24 hours", "22 hours", time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC), false)
 	}()
 
 	wg.Wait()
