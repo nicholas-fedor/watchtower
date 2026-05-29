@@ -9,11 +9,11 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 ## Endpoints
 
-|              **Name**              | **Method** | **Endpoint**  |                           **Parameters**                            |                           **Description**                            |
-|:----------------------------------:|:----------:|:-------------:|:-------------------------------------------------------------------:|:--------------------------------------------------------------------:|
-|     [Update](#http_api_update)     |   `POST`   | `/v1/update`  | [`image`](#image_parameter_usage), [`async`](#asynchronous_updates) | Triggers container updates and returns JSON results of the operation |
-| [Metrics](../metrics-api/index.md) |   `GET`    | `/v1/metrics` |                                                                     |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
-|  [Containers](#http_api_containers)  |   `GET`    | `/v1/containers` |                                                                     | Lists watched containers and their current running image digests |
+|              **Name**              | **Method** |   **Endpoint**   |                           **Parameters**                            |                           **Description**                            |
+|:----------------------------------:|:----------:|:----------------:|:-------------------------------------------------------------------:|:--------------------------------------------------------------------:|
+|     [Update](#http_api_update)     |   `POST`   |   `/v1/update`   | [`image`](#image_parameter_usage), [`async`](#asynchronous_updates) | Triggers container updates and returns JSON results of the operation |
+| [Metrics](../metrics-api/index.md) |   `GET`    |  `/v1/metrics`   |                                                                     |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
+| [Containers](#http_api_containers) |   `GET`    | `/v1/containers` |                                                                     |   Lists watched containers and their current running image digests   |
 
 !!! Note
     Endpoints enforce HTTP method restrictions using method-based routing.
@@ -320,17 +320,17 @@ The `/v1/containers` endpoint returns a JSON array of watched containers:
 
 ```json
 {
-  "containers": [
-    {
-      "name": "beacon",
-      "image": "ethpandaops/lighthouse:latest",
-      "image_id": "sha256:1111...",
-      "running_digest": "sha256:2222..."
-    }
-  ],
-  "count": 1,
-  "timestamp": "2025-01-20T11:30:45Z",
-  "api_version": "v1"
+    "containers": [
+        {
+            "name": "nginx",
+            "image": "nginx:latest",
+            "image_id": "sha256:1111...",
+            "running_digest": "sha256:2222..."
+        }
+    ],
+    "count": 1,
+    "timestamp": "2025-01-20T11:30:45Z",
+    "api_version": "v1"
 }
 ```
 
