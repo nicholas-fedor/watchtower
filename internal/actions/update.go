@@ -269,11 +269,12 @@ func Update(
 					cooldownErr.Age,
 					cooldownErr.Delay,
 					cooldownErr.Remaining,
+					cooldownErr.EligibleAt,
 					cooldownErr.Passed,
 				)
 			} else if errors.Is(err, container.ErrImageCooldown) {
 				// Fallback for plain sentinel (keeps basic deferral visible)
-				progress.SetCooldownInfo(sourceContainer.ID(), "", "", "", false)
+				progress.SetCooldownInfo(sourceContainer.ID(), "", "", "", time.Time{}, false)
 			}
 
 			// Track if Watchtower self-update pull failed for safeguard.

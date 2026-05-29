@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
@@ -25,6 +26,7 @@ var Funcs = template.FuncMap{
 	"ToLower": strings.ToLower,
 	"ToJSON":  toJSON,
 	"Title":   cases.Title(language.AmericanEnglish).String,
+	"RFC1123": formatRFC1123,
 }
 
 // toJSON marshals a value to a formatted JSON string for use in templates.
@@ -40,4 +42,15 @@ func toJSON(v any) string {
 	}
 
 	return string(bytes)
+}
+
+// formatRFC1123 parses an RFC3339 timestamp string and formats it as RFC1123.
+// If parsing fails, it returns the original string unchanged.
+func formatRFC1123(s string) string {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return s
+	}
+
+	return t.Format(time.RFC1123)
 }
