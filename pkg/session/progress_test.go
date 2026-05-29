@@ -1349,6 +1349,15 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 						wantStatus.cooldownRemaining,
 					)
 				}
+
+				if gotStatus.CooldownEligibleAt() != wantStatus.cooldownEligibleAt {
+					t.Errorf(
+						"Progress.SetCooldownInfo() CooldownEligibleAt for %v = %v, want %v",
+						id,
+						gotStatus.CooldownEligibleAt(),
+						wantStatus.cooldownEligibleAt,
+					)
+				}
 			}
 		})
 	}

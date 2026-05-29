@@ -45,12 +45,15 @@ func toJSON(v any) string {
 }
 
 // formatRFC1123 parses an RFC3339 timestamp string and formats it as RFC1123.
-// If parsing fails, it returns the original string unchanged.
-func formatRFC1123(s string) string {
-	t, err := time.Parse(time.RFC3339, s)
+// If parsing fails, it logs a warning and returns the original string.
+func formatRFC1123(value string) string {
+	timestamp, err := time.Parse(time.RFC3339, value)
 	if err != nil {
-		return s
+		logrus.WithError(err).WithField("value", value).
+			Warn("Failed to parse RFC3339 timestamp in notification template")
+
+		return value
 	}
 
-	return t.Format(time.RFC1123)
+	return timestamp.Format(time.RFC1123)
 }
