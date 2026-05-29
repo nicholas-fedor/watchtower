@@ -84,17 +84,6 @@ type Options struct {
 	WriteStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
 }
 
-// normalizeRepoDigest extracts the "sha256:..." portion from a RepoDigest entry
-// such as "repo@sha256:abc...". If no "@" is present, the input is returned
-// unchanged.
-func normalizeRepoDigest(repoDigest string) string {
-	if at := strings.LastIndex(repoDigest, "@"); at >= 0 {
-		return repoDigest[at+1:]
-	}
-
-	return repoDigest
-}
-
 // GetAPIAddr formats the API address string based on host and port.
 func GetAPIAddr(host, port string) string {
 	address := host + ":" + port
@@ -216,7 +205,9 @@ func SetupAndStartAPI(
 
 				if c.HasImageInfo() {
 					if digests := c.ImageInfo().RepoDigests; len(digests) > 0 {
-						status.RunningDigest = normalizeRepoDigest(digests[0])
+						// Extract digest from "repo@sha256:..." format.
+						_, digest, _ := strings.Cut(digests[0], "@")
+						status.RunningDigest = digest
 					}
 				}
 
