@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nicholas-fedor/watchtower/pkg/api"
+	containersAPI "github.com/nicholas-fedor/watchtower/pkg/api/containers"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -45,6 +46,8 @@ type Options struct {
 	EnableUpdateAPI bool
 	// EnableMetricsAPI enables the HTTP metrics API endpoint.
 	EnableMetricsAPI bool
+	// EnableContainersAPI enables the read-only containers API endpoint.
+	EnableContainersAPI bool
 	// UnblockHTTPAPI allows periodic polling alongside the HTTP API.
 	UnblockHTTPAPI bool
 	// NoStartupMessage suppresses startup messages if true.
@@ -168,6 +171,59 @@ func SetupAndStartAPI(
 		metricsHandler := metricsAPI.New()
 		// Use Go 1.22+ method-based routing to restrict to GET only.
 		httpAPI.RegisterHandler("GET "+metricsHandler.Path, metricsHandler.Handle)
+	}
+
+	// Register the read-only containers API endpoint if enabled, exposing the
+	// running image identity of each watched container for external orchestrators.
+	if opts.EnableContainersAPI {
+		client := opts.Client
+		filter := opts.Filter
+
+		containersHandler := containersAPI.New(func(ctx context.Context) ([]containersAPI.Status, error) {
+			var (
+				list []types.Container
+				err  error
+			)
+
+			if filter != nil {
+				list, err = client.ListContainers(ctx, filter)
+			} else {
+				list, err = client.ListContainers(ctx)
+			}
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to list containers: %w", err)
+			}
+
+			statuses := make([]containersAPI.Status, 0, len(list))
+			for _, c := range list {
+				status := containersAPI.Status{
+					Name:    c.Name(),
+					Image:   c.ImageName(),
+					ImageID: string(c.ImageID()),
+				}
+
+				if info := c.ImageInfo(); info != nil {
+					if digests := info.RepoDigests; len(digests) > 0 {
+						_, digest, found := strings.Cut(digests[0], "@")
+						if found {
+							status.Digest = digest
+						} else {
+							logrus.WithFields(logrus.Fields{
+								"container": c.Name(),
+								"digest":    digests[0],
+							}).Debug("RepoDigest in unexpected format, missing @ separator")
+						}
+					}
+				}
+
+				statuses = append(statuses, status)
+			}
+
+			return statuses, nil
+		})
+		// Use Go 1.22+ method-based routing to restrict to GET only.
+		httpAPI.RegisterFunc("GET "+containersHandler.Path, containersHandler.Handle)
 	}
 
 	// Warn once at startup when self-update will be skipped due to host-bound port conflicts.

@@ -223,6 +223,11 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"",
 		envBool("WATCHTOWER_HTTP_API_METRICS"),
 		"Runs Watchtower with the Prometheus metrics API enabled")
+	flags.BoolP(
+		"http-api-containers",
+		"",
+		envBool("WATCHTOWER_HTTP_API_CONTAINERS"),
+		"Runs Watchtower with the read-only containers API enabled, exposing each watched container's current image digest")
 
 	flags.StringP(
 		"http-api-host",

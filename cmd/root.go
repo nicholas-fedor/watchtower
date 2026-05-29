@@ -497,6 +497,7 @@ func run(command *cobra.Command, args []string) {
 	updateOnStart, _ := command.PersistentFlags().GetBool("update-on-start")
 	enableUpdateAPI, _ := command.PersistentFlags().GetBool("http-api-update")
 	enableMetricsAPI, _ := command.PersistentFlags().GetBool("http-api-metrics")
+	enableContainersAPI, _ := command.PersistentFlags().GetBool("http-api-containers")
 	unblockHTTPAPI, _ := command.PersistentFlags().GetBool("http-api-periodic-polls")
 	noStartupMessage, _ := command.PersistentFlags().GetBool("no-startup-message")
 	apiToken, _ := command.PersistentFlags().GetString("http-api-token")
@@ -551,20 +552,21 @@ func run(command *cobra.Command, args []string) {
 
 	// Set configuration for core execution, encapsulating all operational parameters.
 	cfg := types.RunConfig{
-		Command:          command,
-		Names:            normalizedContainerNames,
-		Filter:           filter,
-		FilterDesc:       filterDesc,
-		RunOnce:          runOnce,
-		UpdateOnStart:    updateOnStart,
-		EnableUpdateAPI:  enableUpdateAPI,
-		EnableMetricsAPI: enableMetricsAPI,
-		UnblockHTTPAPI:   unblockHTTPAPI,
-		NoStartupMessage: noStartupMessage,
-		APIToken:         apiToken,
-		APIHost:          apiHost,
-		APIPort:          apiPort,
-		APIRateLimit:     apiRateLimit,
+		Command:             command,
+		Names:               normalizedContainerNames,
+		Filter:              filter,
+		FilterDesc:          filterDesc,
+		RunOnce:             runOnce,
+		UpdateOnStart:       updateOnStart,
+		EnableUpdateAPI:     enableUpdateAPI,
+		EnableMetricsAPI:    enableMetricsAPI,
+		EnableContainersAPI: enableContainersAPI,
+		UnblockHTTPAPI:      unblockHTTPAPI,
+		NoStartupMessage:    noStartupMessage,
+		APIToken:            apiToken,
+		APIHost:             apiHost,
+		APIPort:             apiPort,
+		APIRateLimit:        apiRateLimit,
 	}
 
 	// Execute core logic and exit with the returned status code (0 for success, 1 for failure).
@@ -782,6 +784,7 @@ func runMain(cfg types.RunConfig) int {
 			RateLimit:                   cfg.APIRateLimit,
 			EnableUpdateAPI:             cfg.EnableUpdateAPI,
 			EnableMetricsAPI:            cfg.EnableMetricsAPI,
+			EnableContainersAPI:         cfg.EnableContainersAPI,
 			UnblockHTTPAPI:              cfg.UnblockHTTPAPI,
 			NoStartupMessage:            cfg.NoStartupMessage,
 			Filter:                      cfg.Filter,
