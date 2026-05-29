@@ -480,6 +480,10 @@ func TestContainerStatus_CooldownDefaults(t *testing.T) {
 	if got := u.CooldownRemaining(); got != "" {
 		t.Errorf("CooldownRemaining() default = %v, want empty", got)
 	}
+
+	if !u.CooldownEligibleAt().IsZero() {
+		t.Errorf("CooldownEligibleAt() default = %v, want zero", u.CooldownEligibleAt())
+	}
 }
 
 func TestContainerStatus_CooldownGettersReturnDirectValues(t *testing.T) {
