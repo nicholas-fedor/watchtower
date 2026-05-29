@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/mattn/go-colorable to v0.1.15 by @renovate[bot] in [#1701](https://github.com/nicholas-fedor/watchtower/pull/1701)
 - Update module go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp to v0.69.0 by @renovate[bot] in [#1688](https://github.com/nicholas-fedor/watchtower/pull/1688)
 - Update opentelemetry-go monorepo to v1.44.0 by @renovate[bot] in [#1681](https://github.com/nicholas-fedor/watchtower/pull/1681)
 - Update docker/setup-qemu-action action to v4.1.0 by @renovate[bot] in [#1679](https://github.com/nicholas-fedor/watchtower/pull/1679)
