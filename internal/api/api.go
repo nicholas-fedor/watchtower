@@ -203,11 +203,17 @@ func SetupAndStartAPI(
 					ImageID: string(c.ImageID()),
 				}
 
-				if c.HasImageInfo() {
-					if digests := c.ImageInfo().RepoDigests; len(digests) > 0 {
-						// Extract digest from "repo@sha256:..." format.
-						_, digest, _ := strings.Cut(digests[0], "@")
-						status.RunningDigest = digest
+				if info := c.ImageInfo(); info != nil {
+					if digests := info.RepoDigests; len(digests) > 0 {
+						_, digest, found := strings.Cut(digests[0], "@")
+						if found {
+							status.RunningDigest = digest
+						} else {
+							logrus.WithFields(logrus.Fields{
+								"container": c.Name(),
+								"digest":    digests[0],
+							}).Debug("RepoDigest in unexpected format, missing @ separator")
+						}
 					}
 				}
 

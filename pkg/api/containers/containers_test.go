@@ -96,16 +96,20 @@ var _ = ginkgo.Describe("the containers API", func() {
 		})
 
 		ginkgo.It("should return empty list when no containers are watched", func() {
-			httpAPI := api.New(token, ":8080", rateLimit60)
-			handler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
+			emptyHTTPAPI := api.New(token, ":8080", rateLimit60)
+			emptyHandler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 				return []containersAPI.Status{}, nil
 			})
-			handleReq := httpAPI.RequireToken(handler.Handle)
+			emptyTokenHandler := emptyHTTPAPI.RequireToken(emptyHandler.Handle)
 
 			emptyServer := ghttp.NewServer()
 			defer emptyServer.Close()
 
-			emptyServer.RouteToHandler("GET", "/v1/containers", handleReq)
+			emptyServer.RouteToHandler("GET", "/v1/containers", ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v1/containers"),
+				ghttp.VerifyHeaderKV("Authorization", "Bearer "+token),
+				emptyTokenHandler,
+			))
 
 			req, _ := http.NewRequestWithContext(
 				context.Background(),
@@ -135,8 +139,8 @@ var _ = ginkgo.Describe("the containers API", func() {
 		})
 
 		ginkgo.It("should return multiple containers when multiple are watched", func() {
-			httpAPI := api.New(token, ":8080", rateLimit60)
-			handler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
+			multiHTTPAPI := api.New(token, ":8080", rateLimit60)
+			multiHandler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 				return []containersAPI.Status{
 					{
 						Name:          "test-container-1",
@@ -152,12 +156,16 @@ var _ = ginkgo.Describe("the containers API", func() {
 					},
 				}, nil
 			})
-			handleReq := httpAPI.RequireToken(handler.Handle)
+			multiTokenHandler := multiHTTPAPI.RequireToken(multiHandler.Handle)
 
 			multiServer := ghttp.NewServer()
 			defer multiServer.Close()
 
-			multiServer.RouteToHandler("GET", "/v1/containers", handleReq)
+			multiServer.RouteToHandler("GET", "/v1/containers", ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v1/containers"),
+				ghttp.VerifyHeaderKV("Authorization", "Bearer "+token),
+				multiTokenHandler,
+			))
 
 			req, _ := http.NewRequestWithContext(
 				context.Background(),
@@ -192,21 +200,24 @@ var _ = ginkgo.Describe("the containers API", func() {
 
 	ginkgo.Describe("Authentication", func() {
 		ginkgo.It("should return 401 Unauthorized without token", func() {
-			httpAPI := api.New(token, ":8080", rateLimit60)
-			handler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
+			noAuthHTTPAPI := api.New(token, ":8080", rateLimit60)
+			noAuthHandler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 				return []containersAPI.Status{}, nil
 			})
-			handleReq := httpAPI.RequireToken(handler.Handle)
+			noAuthTokenHandler := noAuthHTTPAPI.RequireToken(noAuthHandler.Handle)
 
-			authTestServer := ghttp.NewServer()
-			defer authTestServer.Close()
+			noAuthServer := ghttp.NewServer()
+			defer noAuthServer.Close()
 
-			authTestServer.RouteToHandler("GET", "/v1/containers", handleReq)
+			noAuthServer.RouteToHandler("GET", "/v1/containers", ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v1/containers"),
+				noAuthTokenHandler,
+			))
 
 			req, _ := http.NewRequestWithContext(
 				context.Background(),
 				http.MethodGet,
-				authTestServer.URL()+"/v1/containers",
+				noAuthServer.URL()+"/v1/containers",
 				nil,
 			)
 
@@ -219,21 +230,24 @@ var _ = ginkgo.Describe("the containers API", func() {
 		})
 
 		ginkgo.It("should return 401 Unauthorized with invalid token", func() {
-			httpAPI := api.New(token, ":8080", rateLimit60)
-			handler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
+			invalidHTTPAPI := api.New(token, ":8080", rateLimit60)
+			invalidHandler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 				return []containersAPI.Status{}, nil
 			})
-			handleReq := httpAPI.RequireToken(handler.Handle)
+			invalidTokenHandler := invalidHTTPAPI.RequireToken(invalidHandler.Handle)
 
-			authTestServer := ghttp.NewServer()
-			defer authTestServer.Close()
+			invalidServer := ghttp.NewServer()
+			defer invalidServer.Close()
 
-			authTestServer.RouteToHandler("GET", "/v1/containers", handleReq)
+			invalidServer.RouteToHandler("GET", "/v1/containers", ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v1/containers"),
+				invalidTokenHandler,
+			))
 
 			req, _ := http.NewRequestWithContext(
 				context.Background(),
 				http.MethodGet,
-				authTestServer.URL()+"/v1/containers",
+				invalidServer.URL()+"/v1/containers",
 				nil,
 			)
 			req.Header.Add("Authorization", "Bearer invalid-token")
@@ -247,21 +261,24 @@ var _ = ginkgo.Describe("the containers API", func() {
 		})
 
 		ginkgo.It("should return 401 Unauthorized with malformed Authorization header", func() {
-			httpAPI := api.New(token, ":8080", rateLimit60)
-			handler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
+			malformedHTTPAPI := api.New(token, ":8080", rateLimit60)
+			malformedHandler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 				return []containersAPI.Status{}, nil
 			})
-			handleReq := httpAPI.RequireToken(handler.Handle)
+			malformedTokenHandler := malformedHTTPAPI.RequireToken(malformedHandler.Handle)
 
-			authTestServer := ghttp.NewServer()
-			defer authTestServer.Close()
+			malformedServer := ghttp.NewServer()
+			defer malformedServer.Close()
 
-			authTestServer.RouteToHandler("GET", "/v1/containers", handleReq)
+			malformedServer.RouteToHandler("GET", "/v1/containers", ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v1/containers"),
+				malformedTokenHandler,
+			))
 
 			req, _ := http.NewRequestWithContext(
 				context.Background(),
 				http.MethodGet,
-				authTestServer.URL()+"/v1/containers",
+				malformedServer.URL()+"/v1/containers",
 				nil,
 			)
 			req.Header.Add("Authorization", "InvalidFormat token")
