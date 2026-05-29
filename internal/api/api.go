@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nicholas-fedor/watchtower/pkg/api"
+	containersAPI "github.com/nicholas-fedor/watchtower/pkg/api/containers"
 	metricsAPI "github.com/nicholas-fedor/watchtower/pkg/api/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -45,6 +46,8 @@ type Options struct {
 	EnableUpdateAPI bool
 	// EnableMetricsAPI enables the HTTP metrics API endpoint.
 	EnableMetricsAPI bool
+	// EnableContainersAPI enables the read-only containers API endpoint.
+	EnableContainersAPI bool
 	// UnblockHTTPAPI allows periodic polling alongside the HTTP API.
 	UnblockHTTPAPI bool
 	// NoStartupMessage suppresses startup messages if true.
@@ -79,6 +82,17 @@ type Options struct {
 	DefaultMetrics func() *metrics.Metrics
 	// WriteStartupMessage writes the startup message.
 	WriteStartupMessage func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
+}
+
+// normalizeRepoDigest extracts the "sha256:..." portion from a RepoDigest entry
+// such as "repo@sha256:abc...". If no "@" is present, the input is returned
+// unchanged.
+func normalizeRepoDigest(repoDigest string) string {
+	if at := strings.LastIndex(repoDigest, "@"); at >= 0 {
+		return repoDigest[at+1:]
+	}
+
+	return repoDigest
 }
 
 // GetAPIAddr formats the API address string based on host and port.
@@ -168,6 +182,51 @@ func SetupAndStartAPI(
 		metricsHandler := metricsAPI.New()
 		// Use Go 1.22+ method-based routing to restrict to GET only.
 		httpAPI.RegisterHandler("GET "+metricsHandler.Path, metricsHandler.Handle)
+	}
+
+	// Register the read-only containers API endpoint if enabled, exposing the
+	// running image identity of each watched container for external orchestrators.
+	if opts.EnableContainersAPI {
+		client := opts.Client
+		filter := opts.Filter
+
+		containersHandler := containersAPI.New(func(ctx context.Context) ([]containersAPI.Status, error) {
+			var (
+				list []types.Container
+				err  error
+			)
+
+			if filter != nil {
+				list, err = client.ListContainers(ctx, filter)
+			} else {
+				list, err = client.ListContainers(ctx)
+			}
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to list containers: %w", err)
+			}
+
+			statuses := make([]containersAPI.Status, 0, len(list))
+			for _, c := range list {
+				status := containersAPI.Status{
+					Name:    c.Name(),
+					Image:   c.ImageName(),
+					ImageID: string(c.ImageID()),
+				}
+
+				if c.HasImageInfo() {
+					if digests := c.ImageInfo().RepoDigests; len(digests) > 0 {
+						status.RunningDigest = normalizeRepoDigest(digests[0])
+					}
+				}
+
+				statuses = append(statuses, status)
+			}
+
+			return statuses, nil
+		})
+		// Use Go 1.22+ method-based routing to restrict to GET only.
+		httpAPI.RegisterFunc("GET "+containersHandler.Path, containersHandler.Handle)
 	}
 
 	// Warn once at startup when self-update will be skipped due to host-bound port conflicts.

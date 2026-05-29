@@ -763,6 +763,19 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
 
 !!! Note "See the [Metrics API documentation](../../advanced-features/metrics-api/index.md) for details"
 
+### HTTP API Containers
+
+Enables a read-only endpoint that lists watched containers and their current running image digests.
+
+```text
+            Argument: --http-api-containers
+Environment Variable: WATCHTOWER_HTTP_API_CONTAINERS
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_containers) for details"
+
 ### HTTP API Host
 
 Sets the host interface for binding the HTTP API.

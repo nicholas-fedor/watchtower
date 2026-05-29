@@ -13,6 +13,7 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 |:----------------------------------:|:----------:|:-------------:|:-------------------------------------------------------------------:|:--------------------------------------------------------------------:|
 |     [Update](#http_api_update)     |   `POST`   | `/v1/update`  | [`image`](#image_parameter_usage), [`async`](#asynchronous_updates) | Triggers container updates and returns JSON results of the operation |
 | [Metrics](../metrics-api/index.md) |   `GET`    | `/v1/metrics` |                                                                     |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
+|  [Containers](#http_api_containers)  |   `GET`    | `/v1/containers` |                                                                     | Lists watched containers and their current running image digests |
 
 !!! Note
     Endpoints enforce HTTP method restrictions using method-based routing.
@@ -306,3 +307,37 @@ services:
 
 !!! Warning
     Enabling the HTTP API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation. See [Updating Watchtower](../../getting-started/updating-watchtower/index.md#port-configuration-limitation) for more details.
+
+### HTTP API Containers
+
+To enable this read-only endpoint, use the `--http-api-containers` CLI argument or the `WATCHTOWER_HTTP_API_CONTAINERS` environment variable.
+
+It lists the containers Watchtower watches along with their current image identity, so an external orchestrator can compare what is actually running against a registry without pulling any image layers.
+
+#### Response Format
+
+The `/v1/containers` endpoint returns a JSON array of watched containers:
+
+```json
+{
+  "containers": [
+    {
+      "name": "beacon",
+      "image": "ethpandaops/lighthouse:latest",
+      "image_id": "sha256:1111...",
+      "running_digest": "sha256:2222..."
+    }
+  ],
+  "count": 1,
+  "timestamp": "2025-01-20T11:30:45Z",
+  "api_version": "v1"
+}
+```
+
+- `name`: Container name
+- `image`: Image reference with tag
+- `image_id`: Local image config ID
+- `running_digest`: Registry manifest digest the running image was pulled from (from the image's `RepoDigests`), directly comparable to a registry's `Docker-Content-Digest`. Empty for locally-built images with no registry reference.
+
+!!! Note
+    `--http-api-containers` can be enabled alongside `--http-api-update` and `--http-api-metrics`.
