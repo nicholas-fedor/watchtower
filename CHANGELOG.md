@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add read-only /v1/containers endpoint by @barnabasbusa in [#1700](https://github.com/nicholas-fedor/watchtower/pull/1700)
 - Add eligible_at timestamp to cooldown deferral logs and notifications by @nicholas-fedor in [#1698](https://github.com/nicholas-fedor/watchtower/pull/1698)
 - Add Docker registry mirror support for digest comparison by @nicholas-fedor in [#1693](https://github.com/nicholas-fedor/watchtower/pull/1693)
 
@@ -34,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interpret bare numeric timeout as seconds by @nicholas-fedor in [#1675](https://github.com/nicholas-fedor/watchtower/pull/1675)
 - Default empty device CgroupPermissions to 'rwm' for Podman compatibility by @nicholas-fedor in [#1673](https://github.com/nicholas-fedor/watchtower/pull/1673)
 - Prevent image pull when within cooldown window by @nicholas-fedor in [#1669](https://github.com/nicholas-fedor/watchtower/pull/1669)
+
+### New Contributors
+
+- @barnabasbusa made their first contribution in [#1700](https://github.com/nicholas-fedor/watchtower/pull/1700)
 
 ## [1.17.2] - 2026-05-23
 
