@@ -325,7 +325,7 @@ The `/v1/containers` endpoint returns a JSON array of watched containers:
             "name": "nginx",
             "image": "nginx:latest",
             "image_id": "sha256:1111...",
-            "running_digest": "sha256:2222..."
+            "digest": "sha256:2222..."
         }
     ],
     "count": 1,
@@ -337,7 +337,7 @@ The `/v1/containers` endpoint returns a JSON array of watched containers:
 - `name`: Container name
 - `image`: Image reference with tag
 - `image_id`: Local image config ID
-- `running_digest`: Registry manifest digest the running image was pulled from (from the image's `RepoDigests`), directly comparable to a registry's `Docker-Content-Digest`. Empty for locally-built images with no registry reference.
+- `digest`: Registry manifest digest the image was pulled from (from the image's `RepoDigests`), directly comparable to a registry's `Docker-Content-Digest`. Empty for locally-built images with no registry reference.
 
 !!! Note
     `--http-api-containers` can be enabled alongside `--http-api-update` and `--http-api-metrics`.

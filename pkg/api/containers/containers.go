@@ -18,11 +18,11 @@ type Status struct {
 	Image string `json:"image"`
 	// ImageID is the local image config ID (sha256:...).
 	ImageID string `json:"image_id"`
-	// RunningDigest is the registry manifest digest the running image was pulled
-	// from (sha256:...), derived from the image's RepoDigests. It is directly
+	// Digest is the registry manifest digest the image was pulled from
+	// (sha256:...), derived from the image's RepoDigests. It is directly
 	// comparable to a registry's Docker-Content-Digest. Empty for locally-built
 	// images with no registry reference.
-	RunningDigest string `json:"running_digest"`
+	Digest string `json:"digest"`
 }
 
 // ListFunc returns the current status of all watched containers.

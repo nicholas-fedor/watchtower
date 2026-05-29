@@ -37,10 +37,10 @@ var _ = ginkgo.Describe("the containers API", func() {
 		handler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 			return []containersAPI.Status{
 				{
-					Name:          "test-container-1",
-					Image:         "example/test-image:latest",
-					ImageID:       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-					RunningDigest: "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+					Name:    "test-container-1",
+					Image:   "example/test-image:latest",
+					ImageID: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+					Digest:  "sha256:2222222222222222222222222222222222222222222222222222222222222222",
 				},
 			}, nil
 		})
@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("the containers API", func() {
 			gomega.Expect(parsed.Containers[0].Name).To(gomega.Equal("test-container-1"))
 			gomega.Expect(parsed.Containers[0].Image).To(gomega.Equal("example/test-image:latest"))
 			gomega.Expect(parsed.Containers[0].ImageID).To(gomega.Equal("sha256:1111111111111111111111111111111111111111111111111111111111111111"))
-			gomega.Expect(parsed.Containers[0].RunningDigest).
+			gomega.Expect(parsed.Containers[0].Digest).
 				To(gomega.Equal("sha256:2222222222222222222222222222222222222222222222222222222222222222"))
 			gomega.Expect(parsed.Timestamp).ToNot(gomega.BeEmpty())
 		})
@@ -143,16 +143,16 @@ var _ = ginkgo.Describe("the containers API", func() {
 			multiHandler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 				return []containersAPI.Status{
 					{
-						Name:          "test-container-1",
-						Image:         "example/test-image:latest",
-						ImageID:       "sha256:1111",
-						RunningDigest: "sha256:2222",
+						Name:    "test-container-1",
+						Image:   "example/test-image:latest",
+						ImageID: "sha256:1111",
+						Digest:  "sha256:2222",
 					},
 					{
-						Name:          "test-container-2",
-						Image:         "example/other-image:latest",
-						ImageID:       "sha256:3333",
-						RunningDigest: "",
+						Name:    "test-container-2",
+						Image:   "example/other-image:latest",
+						ImageID: "sha256:3333",
+						Digest:  "",
 					},
 				}, nil
 			})
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("the containers API", func() {
 			gomega.Expect(parsed.Containers).To(gomega.HaveLen(2))
 			gomega.Expect(parsed.Containers[0].Name).To(gomega.Equal("test-container-1"))
 			gomega.Expect(parsed.Containers[1].Name).To(gomega.Equal("test-container-2"))
-			gomega.Expect(parsed.Containers[1].RunningDigest).To(gomega.BeEmpty())
+			gomega.Expect(parsed.Containers[1].Digest).To(gomega.BeEmpty())
 		})
 	})
 
@@ -339,18 +339,18 @@ func TestHandleReturns500OnListError(t *testing.T) {
 	gomega.Expect(string(body)).To(gomega.ContainSubstring("failed to list containers"))
 }
 
-// TestHandleReturnsEmptyRunningDigestForLocalImages verifies that RunningDigest
+// TestHandleReturnsEmptyDigestForLocalImages verifies that Digest
 // is empty for locally-built images with no registry reference.
-func TestHandleReturnsEmptyRunningDigestForLocalImages(t *testing.T) {
+func TestHandleReturnsEmptyDigestForLocalImages(t *testing.T) {
 	t.Parallel()
 
 	handler := containersAPI.New(func(_ context.Context) ([]containersAPI.Status, error) {
 		return []containersAPI.Status{
 			{
-				Name:          "test-container-local",
-				Image:         "local-image:latest",
-				ImageID:       "sha256:abc123",
-				RunningDigest: "",
+				Name:    "test-container-local",
+				Image:   "local-image:latest",
+				ImageID: "sha256:abc123",
+				Digest:  "",
 			},
 		}, nil
 	})
@@ -373,7 +373,7 @@ func TestHandleReturnsEmptyRunningDigestForLocalImages(t *testing.T) {
 
 	gomega.Expect(json.Unmarshal(rec.Body.Bytes(), &parsed)).To(gomega.Succeed())
 	gomega.Expect(parsed.Containers).To(gomega.HaveLen(1))
-	gomega.Expect(parsed.Containers[0].RunningDigest).To(gomega.BeEmpty())
+	gomega.Expect(parsed.Containers[0].Digest).To(gomega.BeEmpty())
 }
 
 // TestNewHandlerSetsCorrectPath verifies that New creates a handler with the

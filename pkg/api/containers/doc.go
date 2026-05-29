@@ -7,7 +7,7 @@
 //
 // Key components:
 //   - Handler: Serves the /v1/containers endpoint with container status information.
-//   - Status: Data model for container image identity (name, image, image ID, running digest).
+//   - Status: Data model for container image identity (name, image, image ID, digest).
 //   - New: Creates a handler with a list function for fetching container statuses.
 //
 // Usage example:

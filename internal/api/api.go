@@ -207,7 +207,7 @@ func SetupAndStartAPI(
 					if digests := info.RepoDigests; len(digests) > 0 {
 						_, digest, found := strings.Cut(digests[0], "@")
 						if found {
-							status.RunningDigest = digest
+							status.Digest = digest
 						} else {
 							logrus.WithFields(logrus.Fields{
 								"container": c.Name(),
