@@ -1,6 +1,7 @@
 package containers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -76,10 +77,21 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		"api_version": "v1",
 	}
 
+	var buf bytes.Buffer
+
+	err = json.NewEncoder(&buf).Encode(response)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to encode containers response")
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logrus.WithError(err).Error("Failed to encode containers response")
+	_, err = w.Write(buf.Bytes())
+	if err != nil {
+		logrus.WithError(err).Error("Failed to write containers response")
 	}
 }
