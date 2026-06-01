@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add barnabasbusa as a contributor for code and doc by @allcontributors[bot] in [#1706](https://github.com/nicholas-fedor/watchtower/pull/1706)
 - Add read-only /v1/containers endpoint by @barnabasbusa in [#1700](https://github.com/nicholas-fedor/watchtower/pull/1700)
 - Add eligible_at timestamp to cooldown deferral logs and notifications by @nicholas-fedor in [#1698](https://github.com/nicholas-fedor/watchtower/pull/1698)
 - Add Docker registry mirror support for digest comparison by @nicholas-fedor in [#1693](https://github.com/nicholas-fedor/watchtower/pull/1693)
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update securego/gosec action to v2.27.1 by @renovate[bot] in [#1707](https://github.com/nicholas-fedor/watchtower/pull/1707)
 - Update module github.com/prometheus/common to v0.68.0 by @renovate[bot] in [#1703](https://github.com/nicholas-fedor/watchtower/pull/1703)
 - Update module github.com/mattn/go-colorable to v0.1.15 by @renovate[bot] in [#1701](https://github.com/nicholas-fedor/watchtower/pull/1701)
 - Update module go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp to v0.69.0 by @renovate[bot] in [#1688](https://github.com/nicholas-fedor/watchtower/pull/1688)
