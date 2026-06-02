@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.16.0 by @renovate[bot] in [#1716](https://github.com/nicholas-fedor/watchtower/pull/1716)
+- Update go module directive to v1.26.4 by @renovate[bot] in [#1715](https://github.com/nicholas-fedor/watchtower/pull/1715)
 - Update github/codeql-action action to v4.36.1 by @renovate[bot] in [#1711](https://github.com/nicholas-fedor/watchtower/pull/1711)
 - Update actions/checkout action to v6.0.3 by @renovate[bot] in [#1710](https://github.com/nicholas-fedor/watchtower/pull/1710)
 - Update securego/gosec action to v2.27.1 by @renovate[bot] in [#1707](https://github.com/nicholas-fedor/watchtower/pull/1707)
