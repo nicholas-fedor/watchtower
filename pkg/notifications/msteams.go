@@ -46,10 +46,6 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 		)
 	}
 
-	// Get data inclusion flag.
-	withData, _ := flags.GetBool("notification-msteams-data")
-	clog.WithField("with_data", withData).Debug("Initializing Microsoft Teams notifier")
-
 	return &msTeamsTypeNotifier{webHookURL: webHookURL}
 }
 

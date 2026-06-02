@@ -491,12 +491,6 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		envString("WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL"),
 		"The MSTeams WebHook URL to send notifications to")
 
-	flags.BoolP(
-		"notification-msteams-data",
-		"",
-		envBool("WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA"),
-		"The MSTeams notifier will try to extract log entry fields as MSTeams message facts")
-
 	flags.StringP(
 		"notification-gotify-url",
 		"",
