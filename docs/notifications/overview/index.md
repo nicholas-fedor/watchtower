@@ -792,7 +792,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATIONS=msteams \
-      -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
+      -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX" \
       -e WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA=true \
       nickfedor/watchtower
     ```
@@ -805,7 +805,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
       -v /var/run/docker.sock:/var/run/docker.sock \
       nickfedor/watchtower \
       --notifications msteams \
-      --notification-msteams-hook "https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
+      --notification-msteams-hook "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX" \
       --notification-msteams-data
     ```
 
@@ -817,7 +817,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
         image: nickfedor/watchtower:latest
         environment:
           WATCHTOWER_NOTIFICATIONS: msteams
-          WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz"
+           WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
           WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA: true
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
@@ -831,7 +831,7 @@ Watchtower supports the following Microsoft Teams-related options:
 
 #### MSTeams Hook URL
 
-The Microsoft Teams webhook URL for notifications.
+The Microsoft Teams Power Automate workflow webhook URL for notifications.
 
 ```text
             Argument: --notification-msteams-hook
