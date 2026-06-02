@@ -241,6 +241,8 @@ func getChainedContainers(
 			currentScope = "none"
 		}
 
+		found := false
+
 		for _, c := range allContainers {
 			if !c.IsWatchtower() || container.IsOldNamedContainer(c.Name()) {
 				continue
@@ -256,8 +258,13 @@ func getChainedContainers(
 			}
 
 			effectiveCurrent = c
+			found = true
 
 			break
+		}
+
+		if !found {
+			effectiveCurrent = nil
 		}
 	}
 

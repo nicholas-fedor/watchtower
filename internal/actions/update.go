@@ -1681,6 +1681,8 @@ func restartStaleContainer(
 			logrus.WithFields(fields).
 				WithField("target_name", targetOldName).
 				Debug("Skipping rename of already-renamed Watchtower container")
+
+			renamed = true
 		} else {
 			newName := targetOldName
 

@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 		testContainer := client.TestData.Containers[0]
 		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		gomega.Expect(renamed).To(gomega.BeFalse())
+		gomega.Expect(renamed).To(gomega.BeTrue())
 		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
 		gomega.Expect(newID).NotTo(gomega.BeEmpty())
 	})
