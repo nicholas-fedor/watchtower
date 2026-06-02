@@ -187,14 +187,58 @@ func getFilteredContainers(
 
 	currentID := string(currentContainer.ID())
 	if container.IsOldNamedContainer(currentContainer.Name()) {
-		// Detection selected an old-named predecessor. Use the non-old-named
-		// successor as the effective "current" to keep.
-		for _, c := range filteredContainers {
-			if !container.IsOldNamedContainer(c.Name()) {
-				currentID = string(c.ID())
+		// Detection selected an old-named predecessor. Resolve the true
+		// successor by lineage: prefer a non-old-named container whose
+		// chain label contains the old container's ID, confirming it is
+		// the direct successor in the self-update chain.
+		currentScope, currentHasScope := currentContainer.Scope()
+		if !currentHasScope || currentScope == "" {
+			currentScope = "none"
+		}
 
+		chainMatchID := ""
+		scopeMatchID := ""
+
+		for _, c := range filteredContainers {
+			if container.IsOldNamedContainer(c.Name()) {
+				continue
+			}
+
+			candidateScope, candidateHasScope := c.Scope()
+			if !candidateHasScope || candidateScope == "" {
+				candidateScope = "none"
+			}
+
+			if candidateScope != currentScope {
+				continue
+			}
+
+			if scopeMatchID == "" {
+				scopeMatchID = string(c.ID())
+			}
+
+			chainValue, hasChain := c.GetContainerChain()
+			if !hasChain || chainValue == "" {
+				continue
+			}
+
+			for chainID := range strings.SplitSeq(chainValue, ",") {
+				if strings.TrimSpace(chainID) == string(currentContainer.ID()) {
+					chainMatchID = string(c.ID())
+
+					break
+				}
+			}
+
+			if chainMatchID != "" {
 				break
 			}
+		}
+
+		if chainMatchID != "" {
+			currentID = chainMatchID
+		} else if scopeMatchID != "" {
+			currentID = scopeMatchID
 		}
 	}
 
@@ -233,15 +277,16 @@ func getChainedContainers(
 
 	effectiveCurrent := currentContainer
 	if currentContainer != nil && container.IsOldNamedContainer(currentContainer.Name()) {
-		// Detection selected old-named. Prefer the non-old-named successor
-		// which carries the updated chain label. Match by scope to avoid
-		// selecting a Watchtower from a different lineage.
+		// Detection selected old-named. Resolve the true successor by
+		// lineage: prefer a non-old-named Watchtower container whose chain
+		// label contains the old container's ID. Fall back to scope-only
+		// matching if no explicit lineage link exists.
 		currentScope, currentHasScope := currentContainer.Scope()
 		if !currentHasScope || currentScope == "" {
 			currentScope = "none"
 		}
 
-		found := false
+		chainMatch := false
 
 		for _, c := range allContainers {
 			if !c.IsWatchtower() || container.IsOldNamedContainer(c.Name()) {
@@ -257,13 +302,30 @@ func getChainedContainers(
 				continue
 			}
 
-			effectiveCurrent = c
-			found = true
+			chainValue, hasChain := c.GetContainerChain()
+			if !hasChain || chainValue == "" {
+				if !chainMatch {
+					effectiveCurrent = c
+				}
 
-			break
+				continue
+			}
+
+			for chainID := range strings.SplitSeq(chainValue, ",") {
+				if strings.TrimSpace(chainID) == string(currentContainer.ID()) {
+					effectiveCurrent = c
+					chainMatch = true
+
+					break
+				}
+			}
+
+			if chainMatch {
+				break
+			}
 		}
 
-		if !found {
+		if !chainMatch && effectiveCurrent == currentContainer {
 			effectiveCurrent = nil
 		}
 	}

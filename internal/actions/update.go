@@ -1673,7 +1673,7 @@ func restartStaleContainer(
 			return "", renamed, nil
 		}
 
-		targetOldName := "watchtower-old-" + sourceContainer.ID().ShortID()
+		targetOldName := container.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
 
 		// Redundant rename guard: the lingering old instance already has the
 		// target name from a prior rename. Skip to avoid a same-name error.
