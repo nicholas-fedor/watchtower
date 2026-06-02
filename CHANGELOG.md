@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.36.1 by @renovate[bot] in [#1711](https://github.com/nicholas-fedor/watchtower/pull/1711)
+- Update actions/checkout action to v6.0.3 by @renovate[bot] in [#1710](https://github.com/nicholas-fedor/watchtower/pull/1710)
 - Update securego/gosec action to v2.27.1 by @renovate[bot] in [#1707](https://github.com/nicholas-fedor/watchtower/pull/1707)
 - Update module github.com/prometheus/common to v0.68.0 by @renovate[bot] in [#1703](https://github.com/nicholas-fedor/watchtower/pull/1703)
 - Update module github.com/mattn/go-colorable to v0.1.15 by @renovate[bot] in [#1701](https://github.com/nicholas-fedor/watchtower/pull/1701)
