@@ -65,12 +65,16 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("url", n.webHookURL)
 	clog.Debug("Generating Microsoft Teams service URL")
 
-	// Validate the webhook URL is parseable.
-	_, err := url.Parse(n.webHookURL)
+	// Validate the webhook URL is parseable and absolute.
+	parsed, err := url.Parse(n.webHookURL)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to parse Microsoft Teams webhook URL")
 
 		return "", fmt.Errorf("%w: %w", errParseWebhookFailed, err)
+	}
+
+	if parsed.Scheme != "https" || parsed.Host == "" {
+		return "", fmt.Errorf("%w: expected https URL", errParseWebhookFailed)
 	}
 
 	// Create Teams config with the full webhook URL as the host.
