@@ -723,6 +723,139 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
 
+		ginkgo.It("should cleanup old-named container via name belt even when current detection points to the old-named one", func() {
+			oldID := types.ContainerID("old123")
+
+			oldContainer := createMockContainer(
+				string(oldID),
+				"watchtower-old-old123",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{
+					"com.centurylinklabs.watchtower": "true",
+				},
+			)
+
+			newID := types.ContainerID("new456")
+
+			newContainer := createMockContainer(
+				string(newID),
+				"watchtower",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				map[string]string{
+					"com.centurylinklabs.watchtower":                 "true",
+					"com.centurylinklabs.watchtower.container-chain": string(oldID),
+				},
+			)
+
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			mockClient.EXPECT().
+				ListContainers(mock.Anything, mock.Anything).
+				Return([]types.Container{oldContainer, newContainer}, nil)
+			mockClient.EXPECT().
+				StopAndRemoveContainer(context.Background(), oldContainer, 10*time.Minute).
+				Return(nil).
+				Times(1)
+
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			// Belt case: current detection selected the old-named predecessor.
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				context.Background(),
+				mockClient,
+				true,
+				"",
+				&cleanupImageInfos,
+				oldContainer,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
+			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should select same-scope successor when resolving old-named current container", func() {
+			// Old-named current in scope-a with two non-old successors in different scopes.
+			// Must pick the scope-a successor, not the scope-b one.
+			oldID := types.ContainerID("old-scoped-a")
+
+			oldContainer := createMockContainer(
+				string(oldID),
+				"watchtower-old-scoped-a",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now().Add(-2*time.Hour),
+				map[string]string{
+					"com.centurylinklabs.watchtower":       "true",
+					"com.centurylinklabs.watchtower.scope": "scope-a",
+				},
+			)
+
+			scopeANewID := types.ContainerID("new-scoped-a")
+
+			scopeANewContainer := createMockContainer(
+				string(scopeANewID),
+				"watchtower",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				map[string]string{
+					"com.centurylinklabs.watchtower":                 "true",
+					"com.centurylinklabs.watchtower.scope":           "scope-a",
+					"com.centurylinklabs.watchtower.container-chain": string(oldID),
+				},
+			)
+
+			scopeBNewID := types.ContainerID("new-scoped-b")
+
+			scopeBNewContainer := createMockContainer(
+				string(scopeBNewID),
+				"watchtower",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{
+					"com.centurylinklabs.watchtower":       "true",
+					"com.centurylinklabs.watchtower.scope": "scope-b",
+				},
+			)
+
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			// scope-b container appears first in the list to test that it is skipped
+			mockClient.EXPECT().
+				ListContainers(mock.Anything, mock.Anything).
+				Return([]types.Container{scopeBNewContainer, oldContainer, scopeANewContainer}, nil)
+			mockClient.EXPECT().
+				StopAndRemoveContainer(context.Background(), oldContainer, 10*time.Minute).
+				Return(nil).
+				Times(1)
+
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				context.Background(),
+				mockClient,
+				true,
+				"scope-a",
+				&cleanupImageInfos,
+				oldContainer,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cleanupOccurred).To(gomega.Equal(1))
+			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
+		})
+
 		ginkgo.It("should respect scope boundaries when cleaning up container chains", func() {
 			oldID := types.ContainerID("old-scoped")
 

@@ -32,6 +32,28 @@ var (
 	ReadCgroupFunc    = os.ReadFile
 )
 
+// IsOldNamedContainer reports whether the container's runtime name (from Name()
+// or raw inspect) indicates a predecessor renamed during Watchtower self-update.
+// It trims any leading '/' (as Docker names have) and checks for the
+// "watchtower-old-" prefix convention. Used for disambiguation in hostname
+// fallback, forcing excess cleanup of old instances, skipping redundant renames,
+// and suppressing notifs for self-cleanup of prior incarnations.
+//
+// Parameters:
+//   - name: The container name (may be empty, with or without leading '/').
+//
+// Returns:
+//   - bool: true if the (normalized) name has the old- prefix.
+func IsOldNamedContainer(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	n := strings.TrimLeft(name, "/")
+
+	return strings.HasPrefix(n, "watchtower-old-")
+}
+
 // GetCurrentContainerID retrieves the current container ID using a fallback strategy.
 // It attempts multiple detection methods in order of preference and reliability.
 //
@@ -278,10 +300,21 @@ func GetContainerIDFromHostname(ctx context.Context, client Client) (types.Conta
 				firstMatchID = c.ID()
 			}
 
-			// Track the Watchtower container separately to prefer it over non-Watchtower matches.
-			// Only capture the first Watchtower match to mirror firstMatchID's behavior.
-			if c.IsWatchtower() && watchtowerMatch == "" {
-				watchtowerMatch = c.ID()
+			// Prefer non-old-named WT to avoid selecting a lingering predecessor
+			// as "current" for the running (successor) process.
+			if c.IsWatchtower() {
+				contName := c.Name()
+				if contName == "" {
+					contName = containerInfo.Name
+				}
+
+				isOldNamed := IsOldNamedContainer(contName)
+
+				if watchtowerMatch == "" {
+					watchtowerMatch = c.ID()
+				} else if !isOldNamed {
+					watchtowerMatch = c.ID()
+				}
 			}
 		}
 	}

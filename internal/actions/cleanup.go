@@ -185,8 +185,21 @@ func getFilteredContainers(
 
 	var excessContainers []types.Container
 
+	currentID := string(currentContainer.ID())
+	if container.IsOldNamedContainer(currentContainer.Name()) {
+		// Detection selected an old-named predecessor. Use the non-old-named
+		// successor as the effective "current" to keep.
+		for _, c := range filteredContainers {
+			if !container.IsOldNamedContainer(c.Name()) {
+				currentID = string(c.ID())
+
+				break
+			}
+		}
+	}
+
 	for _, c := range filteredContainers {
-		if string(c.ID()) != string(currentContainer.ID()) {
+		if string(c.ID()) != currentID {
 			excessContainers = append(excessContainers, c)
 		}
 	}
@@ -218,8 +231,42 @@ func getChainedContainers(
 ) []types.Container {
 	var chainedContainers []types.Container
 
-	// Get the current Watchtower container's com.centurylinklabs.watchtower.container-chain label.
-	chainLabelValue, present := currentContainer.GetContainerChain()
+	effectiveCurrent := currentContainer
+	if currentContainer != nil && container.IsOldNamedContainer(currentContainer.Name()) {
+		// Detection selected old-named. Prefer the non-old-named successor
+		// which carries the updated chain label. Match by scope to avoid
+		// selecting a Watchtower from a different lineage.
+		currentScope, currentHasScope := currentContainer.Scope()
+		if !currentHasScope || currentScope == "" {
+			currentScope = "none"
+		}
+
+		for _, c := range allContainers {
+			if !c.IsWatchtower() || container.IsOldNamedContainer(c.Name()) {
+				continue
+			}
+
+			candidateScope, candidateHasScope := c.Scope()
+			if !candidateHasScope || candidateScope == "" {
+				candidateScope = "none"
+			}
+
+			if candidateScope != currentScope {
+				continue
+			}
+
+			effectiveCurrent = c
+
+			break
+		}
+	}
+
+	if effectiveCurrent == nil {
+		return []types.Container{}
+	}
+
+	// Get the (effective) current Watchtower container's com.centurylinklabs.watchtower.container-chain label.
+	chainLabelValue, present := effectiveCurrent.GetContainerChain()
 
 	// If it's not present, there are no chained containers.
 	if !present {
@@ -240,11 +287,11 @@ func getChainedContainers(
 		containerChainMap[id] = struct{}{}
 	}
 
-	// Filter containers that are in the chain, present on the host, and not the current container.
+	// Filter containers that are in the chain, present on the host, and not the effective current.
 	// Chained containers are parent containers that must be removed regardless of scope.
 	for _, c := range allContainers {
 		if _, exists := containerChainMap[string(c.ID())]; exists &&
-			c.ID() != currentContainer.ID() {
+			c.ID() != effectiveCurrent.ID() {
 			chainedContainers = append(chainedContainers, c)
 		}
 	}
