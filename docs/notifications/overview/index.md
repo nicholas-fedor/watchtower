@@ -815,7 +815,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
         image: nickfedor/watchtower:latest
         environment:
           WATCHTOWER_NOTIFICATIONS: msteams
-           WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
+          WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
     ```
