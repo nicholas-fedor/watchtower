@@ -96,6 +96,41 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(1)))
 		gomega.Expect(newID).NotTo(gomega.BeEmpty())
 	})
+
+	ginkgo.It("should skip rename if source container is already named with the target old name", func() {
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"abc123def456",
+						"/watchtower-old-abc123def456",
+						"watchtower:latest",
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower": "true",
+							},
+						}),
+				},
+				Staleness: map[string]bool{
+					"watchtower": true,
+				},
+			},
+			false,
+			false,
+		)
+		params := types.UpdateParams{
+			RunOnce: false,
+		}
+		testContainer := client.TestData.Containers[0]
+		newID, renamed, err := restartStaleContainer(context.Background(), testContainer, client, params)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(renamed).To(gomega.BeTrue())
+		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
+		gomega.Expect(newID).NotTo(gomega.BeEmpty())
+	})
 })
 
 var _ = ginkgo.Describe("handleUpdateResult", func() {

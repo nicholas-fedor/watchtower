@@ -1673,38 +1673,50 @@ func restartStaleContainer(
 			return "", renamed, nil
 		}
 
-		newName := "watchtower-old-" + sourceContainer.ID().ShortID()
+		targetOldName := container.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
 
-		err := client.RenameContainer(
-			ctx,
-			sourceContainer,
-			newName,
-		)
-		if err != nil {
-			logrus.WithError(err).
-				WithFields(
-					logrus.Fields{
-						"container": sourceContainer.Name(),
-						"new_name":  newName,
-					}).
-				Debug("Failed to rename Watchtower container")
+		// Redundant rename guard: the lingering old instance already has the
+		// target name from a prior rename. Skip to avoid a same-name error.
+		if container.IsOldNamedContainer(sourceContainer.Name()) {
+			logrus.WithFields(fields).
+				WithField("target_name", targetOldName).
+				Debug("Skipping rename of already-renamed Watchtower container")
 
-			return "",
-				false,
-				fmt.Errorf(
-					"%w: %w",
-					errRenameWatchtowerFailed,
-					err,
-				)
-		}
+			renamed = true
+		} else {
+			newName := targetOldName
 
-		logrus.WithFields(fields).
-			WithField(
-				"new_name",
+			err := client.RenameContainer(
+				ctx,
+				sourceContainer,
 				newName,
-			).Debug("Renamed Watchtower container")
+			)
+			if err != nil {
+				logrus.WithError(err).
+					WithFields(
+						logrus.Fields{
+							"container": sourceContainer.Name(),
+							"new_name":  newName,
+						}).
+					Debug("Failed to rename Watchtower container")
 
-		renamed = true
+				return "",
+					false,
+					fmt.Errorf(
+						"%w: %w",
+						errRenameWatchtowerFailed,
+						err,
+					)
+			}
+
+			logrus.WithFields(fields).
+				WithField(
+					"new_name",
+					newName,
+				).Debug("Renamed Watchtower container")
+
+			renamed = true
+		}
 	}
 
 	// For Watchtower self-updates, accumulate container ID chain in labels.
