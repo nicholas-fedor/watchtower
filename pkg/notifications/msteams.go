@@ -19,16 +19,11 @@ const msTeamsType = "msteams"
 var (
 	// errParseWebhookFailed indicates a failure to parse the Microsoft Teams webhook URL.
 	errParseWebhookFailed = errors.New("failed to parse Microsoft Teams webhook URL")
-	// errConfigWebhookFailed indicates a failure to create a Teams config from the webhook URL.
-	errConfigWebhookFailed = errors.New("failed to create Microsoft Teams config from webhook URL")
 )
 
 // msTeamsTypeNotifier handles Microsoft Teams notifications via webhook.
-//
-// It supports optional data inclusion for detailed messages.
 type msTeamsTypeNotifier struct {
 	webHookURL string
-	data       bool
 }
 
 // newMsTeamsNotifier creates a Teams notifier from command-line flags.
@@ -51,14 +46,7 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 		)
 	}
 
-	// Get data inclusion flag.
-	withData, _ := flags.GetBool("notification-msteams-data")
-	clog.WithField("with_data", withData).Debug("Initializing Microsoft Teams notifier")
-
-	return &msTeamsTypeNotifier{
-		webHookURL: webHookURL,
-		data:       withData,
-	}
+	return &msTeamsTypeNotifier{webHookURL: webHookURL}
 }
 
 // GetURL generates the Teams service URL from the notifier's webhook.
@@ -68,32 +56,28 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 //
 // Returns:
 //   - string: Teams service URL.
-//   - error: Non-nil if parsing or config fails, nil on success.
+//   - error: Non-nil if parsing fails, nil on success.
 func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("url", n.webHookURL)
 	clog.Debug("Generating Microsoft Teams service URL")
 
-	// Parse the webhook URL.
-	webhookURL, err := url.Parse(n.webHookURL)
+	// Validate the webhook URL is parseable and absolute.
+	parsed, err := url.Parse(n.webHookURL)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to parse Microsoft Teams webhook URL")
 
 		return "", fmt.Errorf("%w: %w", errParseWebhookFailed, err)
 	}
 
-	clog.Debug("Parsed Microsoft Teams webhook URL")
-
-	// Create Teams config from webhook.
-	config, err := teams.ConfigFromWebhookURL(webhookURL)
-	if err != nil {
-		clog.WithError(err).
-			Debug("Failed to create Microsoft Teams config from webhook URL")
-
-		return "", fmt.Errorf("%w: %w", errConfigWebhookFailed, err)
+	if parsed.Scheme != "https" || parsed.Host == "" {
+		return "", fmt.Errorf("%w: expected https URL", errParseWebhookFailed)
 	}
 
-	// Set predefined color and generate URL.
-	config.Color = ColorHex
+	// Create Teams config with the full webhook URL as the host.
+	config := &teams.Config{
+		Host:  n.webHookURL,
+		Color: ColorHex,
+	}
 
 	urlStr := config.GetURL().String()
 	clog.WithField("service_url", urlStr).Debug("Generated Microsoft Teams service URL")

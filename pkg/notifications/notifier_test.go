@@ -434,30 +434,14 @@ var _ = ginkgo.Describe("notifications", func() {
 				command := cmd.NewRootCommand()
 				flags.RegisterNotificationFlags(command)
 
-				tokenA := "11111111-4444-4444-8444-cccccccccccc"            // Group
-				tokenB := "22222222-4444-4444-8444-cccccccccccc"            // Tenant
-				tokenC := "33333301222222222233333333333344"                // AltID
-				tokenD := "44444444-4444-4444-8444-cccccccccccc"            // GroupOwner
-				extraID := "V2ESyij_gAljSoUQHvZoZYzlpAoAXExyOl26dlf1xHEx05" // ExtraID from shoutrrr test
 				color := url.QueryEscape(notifications.ColorHex)
 
-				// Use a more specific org domain instead of "test"
-				hookURL := fmt.Sprintf(
-					"https://myorg.webhook.office.com/webhookb2/%s@%s/IncomingWebhook/%s/%s/%s",
-					tokenA,
-					tokenB,
-					tokenC,
-					tokenD,
-					extraID,
-				)
+				// Power Automate workflow incoming webhook URL.
+				hookURL := "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
 				expectedOutput := fmt.Sprintf(
-					"teams://%s@%s/%s/%s/%s?color=%s&host=myorg.webhook.office.com",
-					tokenA,
-					tokenB,
-					tokenC,
-					tokenD,
-					extraID,
+					"teams:?color=%s&host=%s",
 					color,
+					url.QueryEscape(hookURL),
 				)
 
 				args := []string{

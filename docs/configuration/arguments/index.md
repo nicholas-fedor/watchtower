@@ -38,7 +38,7 @@ Certain flags support referencing a file, using its contents as the value, to se
 | `--http-api-token`                     | `WATCHTOWER_HTTP_API_TOKEN`                     |
 | `--notification-email-server-password` | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD` |
 | `--notification-gotify-token`          | `WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN`          |
-| `--notification-msteams-hook`          | `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK`          |
+| `--notification-msteams-hook`          | `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL`      |
 | `--notification-slack-hook-url`        | `WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL`        |
 | `--notification-url`                   | `WATCHTOWER_NOTIFICATION_URL`                   |
 
@@ -897,7 +897,7 @@ Can reference a file for security.
 
 ```text
             Argument: --notification-msteams-hook
-Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK
+Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
                 Type: String
              Default: None
 ```

@@ -792,8 +792,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATIONS=msteams \
-      -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
-      -e WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA=true \
+      -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX" \
       nickfedor/watchtower
     ```
 
@@ -805,8 +804,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
       -v /var/run/docker.sock:/var/run/docker.sock \
       nickfedor/watchtower \
       --notifications msteams \
-      --notification-msteams-hook "https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz" \
-      --notification-msteams-data
+      --notification-msteams-hook "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
     ```
 
 === "Docker Compose"
@@ -817,8 +815,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
         image: nickfedor/watchtower:latest
         environment:
           WATCHTOWER_NOTIFICATIONS: msteams
-          WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://outlook.office.com/webhook/xxxxxxxx@xxxxxxx/IncomingWebhook/yyyyyyyy/zzzzzzzzzz"
-          WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA: true
+          WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
     ```
@@ -827,11 +824,11 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
 
 To receive notifications in Microsoft Teams, add `msteams` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
 
-Watchtower supports the following Microsoft Teams-related options:
+Watchtower supports the following Microsoft Teams-related option:
 
 #### MSTeams Hook URL
 
-The Microsoft Teams webhook URL for notifications.
+The Microsoft Teams Power Automate workflow webhook URL for notifications.
 
 ```text
             Argument: --notification-msteams-hook
@@ -843,16 +840,8 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
 !!! Note
     This option can also reference a file, in which case the contents of the file are used.
 
-#### MSTeams Use Log Data
-
-Enable sending keys/values filled by `log.WithField` or `log.WithFields` as Microsoft Teams message facts.
-
-```text
-            Argument: --notification-msteams-data
-Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_USE_LOG_DATA
-                Type: Boolean
-             Default: false
-```
+!!! Warning
+    The value of `--notification-msteams-hook` **must** be an absolute URL using the `https://` scheme (including the host). Relative URLs and non-HTTPS schemes are rejected at runtime.
 
 ## Gotify Notifications
 
