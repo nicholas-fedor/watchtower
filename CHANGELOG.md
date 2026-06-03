@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/common to v0.68.1 by @renovate[bot] in [#1726](https://github.com/nicholas-fedor/watchtower/pull/1726)
 - Update golang:alpine docker digest to f23e8b2 by @renovate[bot] in [#1724](https://github.com/nicholas-fedor/watchtower/pull/1724)
 - Update golang:1.26.4-alpine3.22 docker digest to 727cfc3 by @renovate[bot] in [#1723](https://github.com/nicholas-fedor/watchtower/pull/1723)
 - Update golang docker tag to v1.26.4 by @renovate[bot] in [#1721](https://github.com/nicholas-fedor/watchtower/pull/1721)
