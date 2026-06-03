@@ -840,6 +840,9 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
 !!! Note
     This option can also reference a file, in which case the contents of the file are used.
 
+!!! Warning
+    The value of `--notification-msteams-hook` **must** be an absolute URL using the `https://` scheme (including the host). Relative URLs and non-HTTPS schemes are rejected at runtime.
+
 ## Gotify Notifications
 
 === "Docker CLI (Env Vars)"
