@@ -1,5 +1,20 @@
 # Arguments
 
+## Deprecation Notice
+
+!!! Warning "Watchtower v2 Legacy Notification Deprecation"
+    **Watchtower has a number of legacy notification options that will be removed with the release of Watchtower v2:**
+
+    - [Email Notifications](../../notifications/overview/index.md#email_notifications)
+    - [Slack Notifications](../../notifications/overview/index.md#slack_notifications)
+    - [Microsoft Teams Notifications](../../notifications/overview/index.md#microsoft_teams_notifications)
+    - [Gotify Notifications](../../notifications/overview/index.md#gotify_notifications)
+    - [Signal Notifications](../../notifications/overview/index.md#signal_notifications)
+
+    Migration to the [`NOTIFICATION URL`](#notification_url) with the appropriate Shoutrrr URL scheme is strongly recommended.
+
+    Use [`watchtower notify-upgrade`](../../notifications/overview/index.md#migrating_deprecated_smtp_notifications_to_shoutrrr_urls) to help convert legacy email configurations to Shoutrrr URLs or use the [Shoutrrr Playground](https://shoutrrr.nickfedor.com/latest/playground/){target="_blank" rel="noopener noreferrer"} to help convert configurations for other services to Shoutrrr URLs.
+
 ## Overview
 
 By default, Watchtower monitors all containers running on the Docker daemon it connects to (typically the local daemon, configurable via the `--host` flag).
@@ -33,14 +48,18 @@ This command triggers an update attempt for "nginx" and "redis" containers, disp
 
 Certain flags support referencing a file, using its contents as the value, to securely handle sensitive data like passwords or tokens, avoiding exposure in configuration files or command lines.
 
-| Flag                                   | Environment Variable                            |
-|----------------------------------------|-------------------------------------------------|
-| `--http-api-token`                     | `WATCHTOWER_HTTP_API_TOKEN`                     |
-| `--notification-email-server-password` | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD` |
-| `--notification-gotify-token`          | `WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN`          |
-| `--notification-msteams-hook`          | `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL`      |
-| `--notification-slack-hook-url`        | `WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL`        |
-| `--notification-url`                   | `WATCHTOWER_NOTIFICATION_URL`                   |
+| Flag                                   | Environment Variable                            | Deprecated |
+|----------------------------------------|-------------------------------------------------|------------|
+| `--http-api-token`                     | `WATCHTOWER_HTTP_API_TOKEN`                     | No         |
+| `--notification-email-server-password` | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD` | Yes        |
+| `--notification-gotify-token`          | `WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN`          | Yes        |
+| `--notification-msteams-hook`          | `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL`      | Yes        |
+| `--notification-slack-hook-url`        | `WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL`        | Yes        |
+| `--notification-url`                   | `WATCHTOWER_NOTIFICATION_URL`                   | No         |
+
+!!! Warning "Watchtower v2 Legacy Notification Deprecation"
+    Deprecated flags / environment variables will be removed with the release of Watchtower v2.
+    Use the the [`NOTIFICATION URL`](#notification_url) with the appropriate Shoutrrr URL scheme instead.
 
 ### Example Docker Compose Usage
 
@@ -868,6 +887,10 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER
 
 ### Notification Email Server Password
 
+!!! Warning "Watchtower v2 Legacy Notification Deprecation"
+    This flag will be removed with the release of Watchtower v2.
+    Use the [`NOTIFICATION URL`](#notification_url) with the appropriate Shoutrrr `smtp://` URL instead.
+
 Sets the password for the email notification server.
 Can reference a file for security.
 
@@ -879,6 +902,10 @@ Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
 ```
 
 ### Notification Slack Hook URL
+
+!!! Warning "Watchtower v2 Legacy Notification Deprecation"
+    This flag will be removed with the release of Watchtower v2.
+    Use the [`NOTIFICATION URL`](#notification_url) with the appropriate Shoutrrr `discord://` URL instead.
 
 Sets the Slack webhook URL for notifications.
 Can reference a file for security.
@@ -892,6 +919,10 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
 
 ### Notification Microsoft Teams Hook
 
+!!! Warning "Watchtower v2 Legacy Notification Deprecation"
+    This flag will be removed with the release of Watchtower v2.
+    Use the [`NOTIFICATION URL`](#notification_url) with the appropriate Shoutrrr `teams://` URL instead.
+
 Sets the Microsoft Teams webhook URL for notifications.
 Can reference a file for security.
 
@@ -903,6 +934,10 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
 ```
 
 ### Notification Gotify Token
+
+!!! Warning "Watchtower v2 Legacy Notification Deprecation"
+    This flag will be removed with the release of Watchtower v2.
+    Use the [`NOTIFICATION URL`](#notification_url) with the appropriate Shoutrrr `gotify://` URL instead.
 
 Sets the Gotify token for notifications.
 Can reference a file for security.

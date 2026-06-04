@@ -13,6 +13,13 @@ import (
 )
 
 // msTeamsType is the identifier for Microsoft Teams notifications.
+//
+// Deprecated: Legacy msteams notification type is deprecated.
+// Use --notification-url with a teams:// URL instead.
+//
+// TODO: Remove msTeamsType constant for the v2 release.
+//
+//nolint:godox
 const msTeamsType = "msteams"
 
 // Errors for Microsoft Teams notification configuration.
@@ -22,6 +29,13 @@ var (
 )
 
 // msTeamsTypeNotifier handles Microsoft Teams notifications via webhook.
+//
+// Deprecated: Legacy msteams notifier is deprecated.
+// Use --notification-url with a teams:// URL instead.
+//
+// TODO: Remove msTeamsTypeNotifier for the v2 release.
+//
+//nolint:godox
 type msTeamsTypeNotifier struct {
 	webHookURL string
 }
@@ -33,6 +47,13 @@ type msTeamsTypeNotifier struct {
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Teams notifier instance.
+//
+// Deprecated: Legacy msteams notifier is deprecated.
+// Use --notification-url with a teams:// URL instead.
+//
+// TODO: Remove newMsTeamsNotifier for the v2 release.
+//
+//nolint:godox
 func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 	flags := cmd.Flags()
 
@@ -57,6 +78,9 @@ func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
 // Returns:
 //   - string: Teams service URL.
 //   - error: Non-nil if parsing fails, nil on success.
+//
+// Deprecated: This method is part of the legacy msteams notifier and will be removed
+// for the v2 release. Use --notification-url with a teams:// URL instead.
 func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("url", n.webHookURL)
 	clog.Debug("Generating Microsoft Teams service URL")
@@ -89,6 +113,9 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 //
 // Returns:
 //   - []*logrus.Entry: Always nil.
+//
+// Deprecated: This method is part of the legacy msteams notifier and will be removed
+// for the v2 release.
 func (n *msTeamsTypeNotifier) GetEntries() []*logrus.Entry {
 	return nil
 }
@@ -98,6 +125,9 @@ func (n *msTeamsTypeNotifier) GetEntries() []*logrus.Entry {
 // Parameters:
 //   - entries: Ignored.
 //   - report: Ignored.
+//
+// Deprecated: This method is part of the legacy msteams notifier and will be removed
+// for the v2 release.
 func (n *msTeamsTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
 	// Legacy notifiers do not support filtered entries.
 }

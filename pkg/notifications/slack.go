@@ -13,11 +13,25 @@ import (
 )
 
 // slackType is the identifier for Slack notifications.
+//
+// Deprecated: Legacy slack notification type is deprecated.
+// Use --notification-url with a slack:// or discord:// URL instead.
+//
+// TODO: Remove slackType constant for the v2 release.
+//
+//nolint:godox
 const slackType = "slack"
 
 // slackTypeNotifier handles Slack notifications via webhook.
 //
 // It supports custom username, channel, and icons.
+//
+// Deprecated: Legacy slack notifier is deprecated.
+// Use --notification-url with a slack:// or discord:// URL instead.
+//
+// TODO: Remove slackTypeNotifier for the v2 release.
+//
+//nolint:godox
 type slackTypeNotifier struct {
 	HookURL   string // Slack webhook URL.
 	Username  string // Notification username.
@@ -33,6 +47,13 @@ type slackTypeNotifier struct {
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Slack notifier instance.
+//
+// Deprecated: Legacy slack notifier is deprecated.
+// Use --notification-url with a slack:// or discord:// URL instead.
+//
+// TODO: Remove newSlackNotifier for the v2 release.
+//
+//nolint:godox
 func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
@@ -71,6 +92,9 @@ func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 // Returns:
 //   - string: Service URL (Slack or Discord).
 //   - error: Non-nil if token parsing fails, nil on success.
+//
+// Deprecated: This method is part of the legacy slack notifier and will be removed
+// for the v2 release. Use --notification-url with a slack:// URL instead.
 func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("hook_url", s.HookURL)
 	clog.Debug("Generating Slack service URL")
@@ -136,6 +160,9 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 //
 // Returns:
 //   - []*logrus.Entry: Always nil.
+//
+// Deprecated: This method is part of the legacy slack notifier and will be removed
+// for the v2 release.
 func (s *slackTypeNotifier) GetEntries() []*logrus.Entry {
 	return nil
 }
@@ -145,6 +172,9 @@ func (s *slackTypeNotifier) GetEntries() []*logrus.Entry {
 // Parameters:
 //   - entries: Ignored.
 //   - report: Ignored.
+//
+// Deprecated: This method is part of the legacy slack notifier and will be removed
+// for the v2 release.
 func (s *slackTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
 	// Legacy notifiers do not support filtered entries.
 }

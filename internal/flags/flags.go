@@ -379,7 +379,7 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		filterEmptyStrings(
 			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATIONS"), -1),
 		),
-		"Notification types to send (valid: email, slack, msteams, gotify, shoutrrr)",
+		"Notification types to send [legacy types (email, slack, msteams, gotify) are deprecated. Use a Shoutrrr URL instead]",
 	)
 
 	flags.String(
@@ -399,6 +399,11 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"",
 		envString("WATCHTOWER_NOTIFICATIONS_HOSTNAME"),
 		"Custom hostname for notification titles")
+
+	//nolint:godox
+	// TODO: Remove legacy notification flags below for the v2 release.
+	// They are kept for backwards compatibility but are deprecated.
+	// Use --notification-url instead.
 
 	flags.StringP(
 		"notification-email-from",
@@ -555,10 +560,49 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"",
 		envBool("WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER"),
 		"Send separate notifications for each updated container instead of grouping them")
+
+	//nolint:godox
+	// TODO: Remove just before v2 Release.
+	// Mark legacy notification flags as deprecated.
+	// These flags are still functional but will be removed in the v2 release.
+	// Users should migrate to --notification-url instead.
+	markFlagDeprecated(flags, "notification-email-from", "Use --notification-url with an smtp:// URL.")
+	markFlagDeprecated(flags, "notification-email-to", "Use --notification-url with an smtp:// URL.")
+	markFlagDeprecated(flags, "notification-email-delay", "Use --notifications-delay instead.")
+	markFlagDeprecated(flags, "notification-email-server", "Use --notification-url with an smtp:// URL.")
+	markFlagDeprecated(flags, "notification-email-server-port", "Use --notification-url with an smtp:// URL.")
+	markFlagDeprecated(flags, "notification-email-server-tls-skip-verify", "Use --notification-url with an smtp:// URL.")
+	markFlagDeprecated(flags, "notification-email-server-user", "Use --notification-url with an smtp:// URL.")
+	markFlagDeprecated(flags, "notification-email-server-password", "Use --notification-url with an smtp:// URL.")
+	markFlagDeprecated(flags, "notification-email-subjecttag", "Use --notification-title-tag instead.")
+	markFlagDeprecated(flags, "notification-slack-hook-url", "Use --notification-url with a slack:// or discord:// URL.")
+	markFlagDeprecated(flags, "notification-slack-identifier", "Use --notification-url with a slack:// or discord:// URL.")
+	markFlagDeprecated(flags, "notification-slack-channel", "Use --notification-url with a slack:// or discord:// URL.")
+	markFlagDeprecated(flags, "notification-slack-icon-emoji", "Use --notification-url with a slack:// or discord:// URL.")
+	markFlagDeprecated(flags, "notification-slack-icon-url", "Use --notification-url with a slack:// or discord:// URL.")
+	markFlagDeprecated(flags, "notification-msteams-hook", "Use --notification-url with a teams:// URL.")
+	markFlagDeprecated(flags, "notification-gotify-url", "Use --notification-url with a gotify:// URL.")
+	markFlagDeprecated(flags, "notification-gotify-token", "Use --notification-url with a gotify:// URL.")
+	markFlagDeprecated(flags, "notification-gotify-tls-skip-verify", "Use --notification-url with a gotify:// URL.")
 }
 
-// envString fetches a string from an environment variable.
+// markFlagDeprecated marks a pflag as deprecated with a migration hint.
 //
+// Parameters:
+//   - flags: Flag set containing the flag.
+//   - name: Flag name.
+//   - hint: Migration hint message.
+//
+// TODO: Remove markFlagDeprecated and all legacy flags in the v2 release.
+//
+//nolint:godox
+func markFlagDeprecated(flags *pflag.FlagSet, name, hint string) {
+	if f := flags.Lookup(name); f != nil {
+		f.Deprecated = hint
+		f.Hidden = false // Keep visible so users see the hint in --help
+	}
+}
+
 // Parameters:
 //   - key: Environment variable key.
 //

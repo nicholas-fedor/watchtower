@@ -14,11 +14,25 @@ import (
 )
 
 // gotifyType is the identifier for Gotify notifications.
+//
+// Deprecated: Legacy gotify notification type is deprecated.
+// Use --notification-url with a gotify:// URL instead.
+//
+// TODO: Remove gotifyType constant for the v2 release.
+//
+//nolint:godox
 const gotifyType = "gotify"
 
 // gotifyTypeNotifier handles Gotify notifications.
 //
 // It configures URL, token, and TLS settings.
+//
+// Deprecated: Legacy gotify notifier is deprecated.
+// Use --notification-url with a gotify:// URL instead.
+//
+// TODO: Remove gotifyTypeNotifier for the v2 release.
+//
+//nolint:godox
 type gotifyTypeNotifier struct {
 	gotifyURL                string // Gotify server URL.
 	gotifyAppToken           string // Gotify application token.
@@ -32,6 +46,13 @@ type gotifyTypeNotifier struct {
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Gotify notifier instance.
+//
+// Deprecated: Legacy gotify notifier is deprecated.
+// Use --notification-url with a gotify:// URL instead.
+//
+// TODO: Remove newGotifyNotifier for the v2 release.
+//
+//nolint:godox
 func newGotifyNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
@@ -65,6 +86,9 @@ func newGotifyNotifier(c *cobra.Command) types.ConvertibleNotifier {
 //
 // Returns:
 //   - string: Token value (fatal if empty).
+//
+// Deprecated: This function is part of the legacy gotify notifier and will be removed
+// for the v2 release. Use --notification-url with a gotify:// URL instead.
 func getGotifyToken(flags *pflag.FlagSet) string {
 	gotifyToken, _ := flags.GetString("notification-gotify-token")
 	clog := logrus.WithField("flag", "notification-gotify-token")
@@ -88,6 +112,9 @@ func getGotifyToken(flags *pflag.FlagSet) string {
 //
 // Returns:
 //   - string: Validated URL (fatal if empty or malformed).
+//
+// Deprecated: This function is part of the legacy gotify notifier and will be removed
+// for the v2 release. Use --notification-url with a gotify:// URL instead.
 func getGotifyURL(flags *pflag.FlagSet) string {
 	gotifyURL, _ := flags.GetString("notification-gotify-url")
 	clog := logrus.WithFields(logrus.Fields{
@@ -125,6 +152,9 @@ func getGotifyURL(flags *pflag.FlagSet) string {
 // Returns:
 //   - string: Gotify service URL.
 //   - error: Non-nil if URL parsing fails, nil on success.
+//
+// Deprecated: This method is part of the legacy gotify notifier and will be removed
+// for the v2 release. Use --notification-url with a gotify:// URL instead.
 func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithField("url", n.gotifyURL)
 	clog.Debug("Generating Gotify service URL")
@@ -158,6 +188,9 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 //
 // Returns:
 //   - []*logrus.Entry: Always nil.
+//
+// Deprecated: This method is part of the legacy gotify notifier and will be removed
+// for the v2 release.
 func (n *gotifyTypeNotifier) GetEntries() []*logrus.Entry {
 	return nil
 }
@@ -167,6 +200,9 @@ func (n *gotifyTypeNotifier) GetEntries() []*logrus.Entry {
 // Parameters:
 //   - entries: Ignored.
 //   - report: Ignored.
+//
+// Deprecated: This method is part of the legacy gotify notifier and will be removed
+// for the v2 release.
 func (n *gotifyTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
 	// Legacy notifiers do not support filtered entries.
 }
