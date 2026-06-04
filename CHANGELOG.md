@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to 7023385 by @renovate[bot] in [#1733](https://github.com/nicholas-fedor/watchtower/pull/1733)
 - Update module github.com/docker/cli to v29.5.3+incompatible by @renovate[bot] in [#1731](https://github.com/nicholas-fedor/watchtower/pull/1731)
 - Update cimg/go docker tag to v1.26.4 by @renovate[bot] in [#1728](https://github.com/nicholas-fedor/watchtower/pull/1728)
 - Update module github.com/prometheus/common to v0.68.1 by @renovate[bot] in [#1726](https://github.com/nicholas-fedor/watchtower/pull/1726)
