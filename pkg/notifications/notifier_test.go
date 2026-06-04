@@ -69,6 +69,8 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 		})
 		ginkgo.When("legacy email tag is set", func() {
+			//nolint:godox
+			// TODO: Remove legacy email subjecttag test when legacy notification types are removed.
 			ginkgo.It("should use the prefix in the title", func() {
 				command := cmd.NewRootCommand()
 				flags.RegisterNotificationFlags(command)
@@ -120,6 +122,8 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 		})
 		ginkgo.When("legacy delay is defined", func() {
+			//nolint:godox
+			// TODO: Remove legacy delay tests when legacy notification types are removed.
 			ginkgo.It("should use the specified legacy delay", func() {
 				command := cmd.NewRootCommand()
 				flags.RegisterNotificationFlags(command)
@@ -128,6 +132,8 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 		})
 		ginkgo.When("legacy delay and delay is defined", func() {
+			//nolint:godox
+			// TODO: Remove legacy delay tests when legacy notification types are removed.
 			ginkgo.It(
 				"should use the specified legacy delay and ignore the specified delay",
 				func() {
@@ -174,6 +180,8 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 		})
 	})
+	//nolint:godox
+	// TODO: Remove legacy slack notifier tests when legacy notification types are removed.
 	ginkgo.Describe("the slack notifier", func() {
 		// builderFn := notifications.NewSlackNotifier
 		ginkgo.When("passing a discord url to the slack notifier", func() {
@@ -341,6 +349,8 @@ var _ = ginkgo.Describe("notifications", func() {
 		})
 	})
 
+	//nolint:godox
+	// TODO: Remove legacy gotify notifier tests when legacy notification types are removed.
 	ginkgo.Describe("the gotify notifier", func() {
 		ginkgo.When("converting a gotify service config into a shoutrrr url", func() {
 			ginkgo.It("should return the expected URL", func() {
@@ -425,6 +435,8 @@ var _ = ginkgo.Describe("notifications", func() {
 		})
 	})
 
+	//nolint:godox
+	// TODO: Remove legacy msteams notifier tests when legacy notification types are removed.
 	ginkgo.Describe("the teams notifier", func() {
 		ginkgo.BeforeEach(func() {
 			logrus.SetLevel(logrus.DebugLevel) // Ensure debug logs are visible
@@ -456,6 +468,8 @@ var _ = ginkgo.Describe("notifications", func() {
 		})
 	})
 
+	//nolint:godox
+	// TODO: Remove legacy email notifier tests when legacy notification types are removed.
 	ginkgo.Describe("the email notifier", func() {
 		ginkgo.When("converting an email service config into a shoutrrr url", func() {
 			ginkgo.It("should set the from address in the URL", func() {
@@ -527,6 +541,9 @@ var _ = ginkgo.Describe("notifications", func() {
 	})
 })
 
+// TODO: Remove buildExpectedURL helper when legacy notification tests are removed.
+//
+//nolint:godox
 func buildExpectedURL(
 	username string,
 	password string,
@@ -546,6 +563,9 @@ func buildExpectedURL(
 		url.QueryEscape(destAddress))
 }
 
+// TODO: Remove testURL helper when legacy notification tests are removed.
+//
+//nolint:godox
 func testURL(args []string, expectedURL string, expectedDelay time.Duration) {
 	defer ginkgo.GinkgoRecover()
 

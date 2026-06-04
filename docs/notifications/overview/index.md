@@ -1,5 +1,19 @@
 # Configuration
 
+## Deprecation Notice
+
+!!! Warning "Watchtower v2 Legacy Notification Deprecation"
+    **Watchtower has a number of legacy notification options that will be removed with the release of Watchtower v2:**
+
+    - [Email Notifications](#email_notifications)
+    - [Slack Notifications](#slack_notifications)
+    - [Microsoft Teams Notifications](#microsoft_teams_notifications)
+    - [Gotify Notifications](#gotify_notifications)
+
+    Migration to the [`NOTIFICATION URL`](../../configuration/arguments/index.md#notification_url) with the appropriate Shoutrrr URL scheme is strongly recommended.
+
+    Use [`watchtower notify-upgrade`](#migrating_deprecated_smtp_notifications_to_shoutrrr_urls) to help convert legacy email configurations to Shoutrrr URLs or use the [Shoutrrr Playground](https://shoutrrr.nickfedor.com/latest/playground/){target="_blank" rel="noopener noreferrer"} to help convert configurations for other services to Shoutrrr URLs.
+
 ## Overview
 
 Watchtower uses [Shoutrrr](https://github.com/nicholas-fedor/shoutrrr){target="_blank" rel="noopener noreferrer"} to provide notification functionality.
@@ -28,7 +42,7 @@ For most Watchtower deployments via Docker Compose, this is best achieved via us
 When running Watchtower via the Docker CLI, the [`--notification-url`](../../configuration/arguments/index.md#notification_url) CLI flag can be used multiple times, or use a comma-separated list.
 
 !!! Note "Environment Variable Format"
-    - Both `WATCHTOWER_NOTIFICATION_URL` and `WATCHTOWER_NOTIFICATIONS` support comma-separated and space-separated values via custom parsers that bypass Viper's default behavior.
+    - `WATCHTOWER_NOTIFICATION_URL` supports comma-separated and space-separated values.
     - Commas within URLs (e.g., in query parameters) are preserved.
     - For Docker Compose, the YAML array syntax is the recommended approach.
 
@@ -147,7 +161,8 @@ Environment Variable: WATCHTOWER_NOTIFICATIONS_LEVEL
 ```
 
 !!! Note
-    The notification level setting applies to both report mode (`--notification-report=true`) and legacy mode (`--notification-report=false`).
+    The notification level setting applies to both report mode (`--notification-report=true`) and legacy (log-only) mode (`--notification-report=false`).
+    Legacy mode is **deprecated**; use report mode with `--notification-url` for new configurations.
 
 ### Hostname
 
@@ -231,8 +246,7 @@ To enable separate notifications per container:
 docker run -d \
   --name watchtower \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -e WATCHTOWER_NOTIFICATIONS=slack \
-  -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/xxx/yyyyyyyyyyyyyyy" \
+  -e WATCHTOWER_NOTIFICATION_URL="slack://hook:xxxx-yyyy-zzzz@webhook?botname=watchtower" \
   -e WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER=true \
   nickfedor/watchtower
 ```
@@ -258,11 +272,42 @@ For detailed information about template syntax, available data structures, and e
 
 Watchtower uses Shoutrrr's [smtp service](https://shoutrrr.nickfedor.com/services/email/){target="_blank" rel="noopener noreferrer"} to send email notifications.
 
-Either legacy email notification flags or Shoutrrr URLs can be used; however, directly using URLs is recommended for greater control and clarity, especially for configuring TLS settings (e.g., STARTTLS or Implicit TLS).
+!!! Warning "Deprecated"
+    Legacy email notification flags (e.g., `--notification-email-from`, `--notification-email-to`, `--notification-email-server`) are **deprecated**. Use `--notification-url` with an `smtp://` URL instead. See [Transitioning from Legacy Email Notifications to Shoutrrr](#transitioning-from-legacy-email-notifications-to-shoutrrr) below.
 
-To send notifications via e-mail, add `email` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
+To send notifications via e-mail, use an `smtp://` URL with `--notification-url`:
 
-Email notification flags (e.g., `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, `WATCHTOWER_NOTIFICATION_EMAIL_FROM`) are automatically converted to a Shoutrrr SMTP URL internally.
+=== "Docker CLI (Env Vars)"
+
+    ```bash
+    docker run -d \
+    --name watchtower \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -e WATCHTOWER_NOTIFICATION_URL="smtp://user:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com" \
+    nickfedor/watchtower
+    ```
+
+=== "Docker CLI (Flags)"
+
+    ```bash
+    docker run -d \
+    --name watchtower \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    nickfedor/watchtower \
+    --notification-url "smtp://user:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com"
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+    watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+        WATCHTOWER_NOTIFICATION_URL: smtp://user:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com
+        volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+    ```
 
 ### Common SMTP Configurations
 
@@ -355,7 +400,114 @@ Email notification flags (e.g., `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, `WATCHTO
     * Test connectivity with `telnet ${SMTP_HOST} ${SMTP_PORT}` inside the container.
 <!-- markdownlint-restore -->
 
-### Example Legacy Email Configuration
+/// details | The following legacy smtp configuration options and examples are deprecated and will be removed with the release of Watchtower v2.
+    type: warning
+
+### Deprecated SMTP Configuration Options
+
+#### Email From
+
+The e-mail address from which notifications will be sent.
+
+```text
+            Argument: --notification-email-from
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_FROM
+                Type: String
+             Default: None
+```
+
+#### Email To
+
+The e-mail address to which notifications will be sent.
+
+```text
+            Argument: --notification-email-to
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_TO
+                Type: String
+             Default: None
+```
+
+#### Email Server
+
+The SMTP server (IP or FQDN) to send notifications through.
+
+```text
+            Argument: --notification-email-server
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER
+                Type: String
+             Default: None
+```
+
+#### Email Server TLS Skip Verify
+
+Skip verification of the server certificate when using TLS.
+
+```text
+            Argument: --notification-email-server-tls-skip-verify
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY
+                Type: Boolean
+             Default: false
+```
+
+#### Email Server User
+
+The username for the SMTP server if it requires authentication.
+
+```text
+            Argument: --notification-email-server-user
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER
+                Type: String
+             Default: None
+```
+
+#### Email Server Password
+
+The password for the SMTP server if it requires authentication.
+
+```text
+            Argument: --notification-email-server-password
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
+                Type: String
+             Default: None
+```
+
+!!! Note
+    This option can also reference a file, in which case the contents of the file are used.
+
+#### Email Subject Tag
+
+Subject prefix tag for notifications via mail.
+
+```text
+            Argument: --notification-email-subjecttag
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG
+                Type: String
+             Default: ""
+```
+
+#### Email Server Port
+
+The port the SMTP server listens on.
+
+```text
+            Argument: --notification-email-server-port
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT
+                Type: Integer
+             Default: 25
+```
+
+#### Email Delay
+
+The delay (in seconds) between sending notifications if multiple containers are updated at once.
+
+```text
+            Argument: --notification-email-delay
+Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_DELAY
+                Type: Integer
+             Default: None
+```
+
+### Deprecated SMTP Configuration Examples
 
 === "Docker CLI"
 
@@ -468,113 +620,14 @@ Email notification flags (e.g., `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, `WATCHTO
 
             If you also want to enable DKIM or other features on the SMTP server, then you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay){target="_blank" rel="noopener noreferrer"}
 
-### Legacy Notification Flags
+///
 
-#### Email From
+### Migrating Deprecated SMTP Notifications to Shoutrrr URLs
 
-The e-mail address from which notifications will be sent.
+!!! Important
+    Legacy email notification flags are **deprecated**. Follow the steps below to migrate to `--notification-url` with an `smtp://` URL.
 
-```text
-            Argument: --notification-email-from
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_FROM
-                Type: String
-             Default: None
-```
-
-#### Email To
-
-The e-mail address to which notifications will be sent.
-
-```text
-            Argument: --notification-email-to
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_TO
-                Type: String
-             Default: None
-```
-
-#### Email Server
-
-The SMTP server (IP or FQDN) to send notifications through.
-
-```text
-            Argument: --notification-email-server
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER
-                Type: String
-             Default: None
-```
-
-#### Email Server TLS Skip Verify
-
-Skip verification of the server certificate when using TLS.
-
-```text
-            Argument: --notification-email-server-tls-skip-verify
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY
-                Type: Boolean
-             Default: false
-```
-
-#### Email Server User
-
-The username for the SMTP server if it requires authentication.
-
-```text
-            Argument: --notification-email-server-user
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER
-                Type: String
-             Default: None
-```
-
-#### Email Server Password
-
-The password for the SMTP server if it requires authentication.
-
-```text
-            Argument: --notification-email-server-password
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD
-                Type: String
-             Default: None
-```
-
-!!! Note
-    This option can also reference a file, in which case the contents of the file are used.
-
-#### Email Subject Tag
-
-Subject prefix tag for notifications via mail.
-
-```text
-            Argument: --notification-email-subjecttag
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG
-                Type: String
-             Default: ""
-```
-
-#### Email Server Port
-
-The port the SMTP server listens on.
-
-```text
-            Argument: --notification-email-server-port
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT
-                Type: Integer
-             Default: 25
-```
-
-#### Email Delay
-
-The delay (in seconds) between sending notifications if multiple containers are updated at once.
-
-```text
-            Argument: --notification-email-delay
-Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_DELAY
-                Type: Integer
-             Default: None
-```
-
-### Transitioning from Legacy Email Notifications to Shoutrrr
-
-Watchtower includes a `watchtower notify-upgrade` command to convert legacy flags to a Shoutrrr URL.
+Watchtower includes a `watchtower notify-upgrade` command to automatically convert legacy flags to a Shoutrrr URL.
 
 The output is written to a temporary file, which you can copy using:
 
@@ -648,7 +701,7 @@ Example Legacy Configuration:
       smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes
       ```
 
-2. Replace the legacy flags with:
+2. Replace the deprecated configuration with:
 <!-- markdownlint-disable -->
 === "Docker CLI (Env Vars)"
 
@@ -656,10 +709,9 @@ Example Legacy Configuration:
     docker run -d \
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
-      -e WATCHTOWER_NOTIFICATIONS=shoutrrr \
       -e WATCHTOWER_NOTIFICATION_URL=smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
-      -e WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG=Watchtower \
+      -e WATCHTOWER_NOTIFICATIONS_DELAY=10 \
+      -e WATCHTOWER_NOTIFICATION_TITLE_TAG=Watchtower \
       nickfedor/watchtower
     ```
 
@@ -670,10 +722,9 @@ Example Legacy Configuration:
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       nickfedor/watchtower \
-      --notifications shoutrrr \
       --notification-url "smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes" \
-      --notification-email-delay 10 \
-      --notification-email-subjecttag Watchtower
+      --notifications-delay 10 \
+      --notification-title-tag Watchtower
     ```
 
 === "Docker Compose"
@@ -683,10 +734,9 @@ Example Legacy Configuration:
       watchtower:
         image: nickfedor/watchtower:latest
         environment:
-          WATCHTOWER_NOTIFICATIONS: shoutrrr
           WATCHTOWER_NOTIFICATION_URL: smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes
-          WATCHTOWER_NOTIFICATION_EMAIL_DELAY: "10"
-          WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG: Watchtower
+          WATCHTOWER_NOTIFICATIONS_DELAY: "10"
+          WATCHTOWER_NOTIFICATION_TITLE_TAG: Watchtower
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
     ```
@@ -694,11 +744,92 @@ Example Legacy Configuration:
 !!! Note
     Avoid using unrecognized flags like `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_SSL`, as they are ignored and may cause confusion.
 
-    Use `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY` to disable TLS verification if needed (not recommended for production).
+    Use the `encryption` and `usestarttls` URL parameters in the `smtp://` URL to control TLS behavior rather than deprecated flags.
 
 ## Slack Notifications
 
+!!! Warning "Deprecated"
+    Legacy Slack flags (`--notification-slack-hook-url`, `--notification-slack-identifier`, etc.) are **deprecated**. Use `--notification-url` with a `slack://` URL instead.
+
 ### Example Slack Configuration
+
+To receive notifications in Slack, use a `slack://` or `discord://` URL with `--notification-url`:
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notification-url "slack://hook:AAAA-BBBB-CCCC@webhook?botname=watchtower"
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATION_URL: "slack://hook:AAAA-BBBB-CCCC@webhook?botname=watchtower"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+
+/// details | The following legacy Slack configuration options and examples are deprecated and will be removed with the release of Watchtower v2.
+    type: warning
+
+### Slack Legacy Configuration Options
+
+The following legacy Slack flags are **deprecated**. Use `--notification-url` with a `slack://` URL instead.
+
+#### Slack Hook URL
+
+!!! Deprecated
+    Use `--notification-url` with a `slack://` URL.
+
+The Slack webhook URL for notifications.
+
+```text
+            Argument: --notification-slack-hook-url
+Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
+                Type: String
+             Default: None
+```
+
+#### Slack Identifier
+
+!!! Deprecated
+    Use the `botname` query parameter in the `slack://` URL.
+
+Custom name under which messages are sent.
+
+```text
+            Argument: --notification-slack-identifier
+Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER
+                Type: String
+             Default: watchtower
+```
+
+#### Slack Channel
+
+!!! Deprecated
+    Configure the channel in your Slack webhook settings or use the appropriate `slack://` URL parameters.
+
+A string which overrides the webhook's default channel (optional).
+
+```text
+            Argument: --notification-slack-channel
+Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
+                Type: String
+             Default: None
+```
+
+### Slack Legacy Configuration Examples
+
+!!! Deprecated
+    The following examples use deprecated legacy Slack flags. Migrate to `--notification-url` with a `slack://` URL.
 
 === "Docker CLI (Env Vars)"
 
@@ -741,49 +872,44 @@ Example Legacy Configuration:
           - /var/run/docker.sock:/var/run/docker.sock
     ```
 
-### Slack Configuration Options
-
-To receive notifications in Slack, add `slack` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
-
-Watchtower supports the following Slack-related options:
-
-#### Slack Hook URL
-
-The Slack webhook URL for notifications.
-
-```text
-            Argument: --notification-slack-hook-url
-Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL
-                Type: String
-             Default: None
-```
-
-!!! Note
-    This option can also reference a file, in which case the contents of the file are used.
-
-#### Slack Identifier
-
-Custom name under which messages are sent.
-
-```text
-            Argument: --notification-slack-identifier
-Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER
-                Type: String
-             Default: watchtower
-```
-
-#### Slack Channel
-
-A string which overrides the webhook's default channel (optional).
-
-```text
-            Argument: --notification-slack-channel
-Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
-                Type: String
-             Default: None
-```
+///
 
 ## Microsoft Teams Notifications
+
+!!! Warning "Deprecated"
+    Legacy MSTeams flags (`--notification-msteams-hook`) are **deprecated**. Use `--notification-url` with a `teams://` URL instead.
+
+### Example MSTeams Configuration
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notification-url "teams:?color=%23406170&host=https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATION_URL: "teams:?color=%23406170&host=https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+
+/// details | The following legacy Microsoft Teams configuration options and examples are deprecated and will be removed with the release of Watchtower v2.
+    type: warning
+
+### Legacy MSTeams Configuration (Deprecated)
+
+!!! Deprecated
+    The following examples use deprecated legacy MSTeams flags.
 
 === "Docker CLI (Env Vars)"
 
@@ -822,11 +948,12 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SLACK_CHANNEL
 
 ### Microsoft Teams Configuration Options
 
-To receive notifications in Microsoft Teams, add `msteams` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
-
-Watchtower supports the following Microsoft Teams-related option:
+The following legacy MSTeams flag is **deprecated**. Use `--notification-url` with a `teams://` URL instead.
 
 #### MSTeams Hook URL
+
+!!! Deprecated
+    Use `--notification-url` with a `teams://` URL.
 
 The Microsoft Teams Power Automate workflow webhook URL for notifications.
 
@@ -837,13 +964,46 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
              Default: None
 ```
 
-!!! Note
-    This option can also reference a file, in which case the contents of the file are used.
-
 !!! Warning
     The value of `--notification-msteams-hook` **must** be an absolute URL using the `https://` scheme (including the host). Relative URLs and non-HTTPS schemes are rejected at runtime.
 
+///
+
 ## Gotify Notifications
+
+!!! Warning "Deprecated"
+    Legacy Gotify flags (`--notification-gotify-url`, `--notification-gotify-token`, `--notification-gotify-tls-skip-verify`) are **deprecated**. Use `--notification-url` with a `gotify://` URL instead.
+
+### Example Gotify Configuration
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notification-url "gotify://my.gotify.tld/SuperSecretToken"
+    ```
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      watchtower:
+        image: nickfedor/watchtower:latest
+        environment:
+          WATCHTOWER_NOTIFICATION_URL: "gotify://my.gotify.tld/SuperSecretToken"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+    ```
+/// details | The following legacy Gotify configuration options and examples are deprecated and will be removed with the release of Watchtower v2.
+    type: warning
+
+### Legacy Gotify Configuration (Deprecated)
+
+!!! Deprecated
+    The following examples use deprecated legacy Gotify flags.
 
 === "Docker CLI (Env Vars)"
 
@@ -888,11 +1048,12 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
 
 ### Gotify Configuration Options
 
-To push a notification to your Gotify instance, add `gotify` to the `--notifications` option or the `WATCHTOWER_NOTIFICATIONS` environment variable.
-
-Watchtower supports the following Gotify-related options:
+The following legacy Gotify flags are **deprecated**. Use `--notification-url` with a `gotify://` URL instead.
 
 #### Gotify URL
+
+!!! Deprecated
+    Use `--notification-url` with a `gotify://` URL.
 
 The URL of the Gotify instance.
 
@@ -905,6 +1066,9 @@ Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_URL
 
 #### Gotify Token
 
+!!! Deprecated
+    Use `--notification-url` with a `gotify://` URL (token is part of the URL path).
+
 The app token for the Gotify instance.
 
 ```text
@@ -914,10 +1078,10 @@ Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN
              Default: None
 ```
 
-!!! Note
-    This option can also reference a file, in which case the contents of the file are used.
-
 #### Gotify TLS Skip Verify
+
+!!! Deprecated
+    Use `disabletls=yes` query parameter in the `gotify://` URL.
 
 Skip verification of the server certificate when using TLS.
 
@@ -927,6 +1091,8 @@ Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY
                 Type: Boolean
              Default: false
 ```
+
+///
 
 ## Signal Notifications
 

@@ -13,6 +13,13 @@ import (
 )
 
 // emailType is the identifier for email notifications.
+//
+// Deprecated: Legacy email notification type is deprecated.
+// Use --notification-url with an smtp:// URL instead.
+//
+// TODO: Remove emailType constant for the v2 release.
+//
+//nolint:godox
 const emailType = "email"
 
 // defaultTimeout is the default duration for SMTP operations.
@@ -27,6 +34,13 @@ var (
 // emailTypeNotifier handles email notifications via SMTP.
 //
 // It batches log entries with a configurable delay.
+//
+// Deprecated: Legacy email notifier is deprecated.
+// Use --notification-url with an smtp:// URL instead.
+//
+// TODO: Remove emailTypeNotifier for the v2 release.
+//
+//nolint:godox
 type emailTypeNotifier struct {
 	From, To               string          // Sender and recipient email addresses.
 	Server, User, Password string          // SMTP server details.
@@ -43,6 +57,13 @@ type emailTypeNotifier struct {
 //
 // Returns:
 //   - types.ConvertibleNotifier: New email notifier instance.
+//
+// Deprecated: Legacy email notifier is deprecated.
+// Use --notification-url with an smtp:// URL instead.
+//
+// TODO: Remove newEmailNotifier for the v2 release.
+//
+//nolint:godox
 func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 	flags := c.Flags()
 
@@ -94,6 +115,9 @@ func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
 // Returns:
 //   - string: SMTP URL.
 //   - error: Non-nil if port is invalid, nil on success.
+//
+// Deprecated: This method is part of the legacy email notifier and will be removed
+// for the v2 release. Use --notification-url with an smtp:// URL instead.
 func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog := logrus.WithFields(logrus.Fields{
 		"from":   e.From,
@@ -157,6 +181,9 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 //
 // Returns:
 //   - time.Duration: Configured delay.
+//
+// Deprecated: This method is part of the legacy email notifier and will be removed
+// for the v2 release. Use --notifications-delay instead.
 func (e *emailTypeNotifier) GetDelay() time.Duration {
 	clog := logrus.WithFields(logrus.Fields{
 		"from":   e.From,
@@ -173,6 +200,9 @@ func (e *emailTypeNotifier) GetDelay() time.Duration {
 //
 // Returns:
 //   - []*logrus.Entry: Always nil.
+//
+// Deprecated: This method is part of the legacy email notifier and will be removed
+// for the v2 release.
 func (e *emailTypeNotifier) GetEntries() []*logrus.Entry {
 	return nil
 }
@@ -182,6 +212,9 @@ func (e *emailTypeNotifier) GetEntries() []*logrus.Entry {
 // Parameters:
 //   - entries: Ignored.
 //   - report: Ignored.
+//
+// Deprecated: This method is part of the legacy email notifier and will be removed
+// for the v2 release.
 func (e *emailTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
 	// Legacy notifiers do not support filtered entries.
 }

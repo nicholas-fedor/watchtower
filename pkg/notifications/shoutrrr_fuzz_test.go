@@ -16,7 +16,8 @@ func FuzzGetShoutrrrTemplate(f *testing.F) {
 	f.Add(strings.Repeat("a", 1000))
 
 	f.Fuzz(func(_ *testing.T, tplString string) {
-		// Test both legacy and non-legacy modes
+		//nolint:godox
+		// TODO: Remove legacy mode fuzzing when legacy notification types are removed.
 		_, _ = getShoutrrrTemplate(tplString, true)
 		_, _ = getShoutrrrTemplate(tplString, false)
 	})

@@ -648,7 +648,9 @@ func TestSetupLogging(t *testing.T) {
 // TestFlagsArePresentInDocumentation verifies that all flags are documented.
 // It checks documentation files for flag and environment variable mentions.
 func TestFlagsArePresentInDocumentation(t *testing.T) {
-	// Legacy notifications ignored due to soft deprecation.
+	//nolint:godox
+	// TODO: Remove legacy flags from ignoredEnvs/ignoredFlags when legacy notification types are removed.
+	// Legacy notifications are ignored due to soft deprecation.
 	ignoredEnvs := map[string]string{
 		"WATCHTOWER_NOTIFICATION_SLACK_ICON_EMOJI": "legacy",
 		"WATCHTOWER_NOTIFICATION_SLACK_ICON_URL":   "legacy",

@@ -125,8 +125,8 @@ markdown_extensions:
   # https://squidfunk.github.io/mkdocs-material/setup/extensions/python-markdown/#definition-lists
   - def_list:
   # Enables collapsible details blocks.
-  # https://facelessuser.github.io/pymdown-extensions/extensions/details/
-  - pymdownx.details:
+  # https://facelessuser.github.io/pymdown-extensions/extensions/blocks/plugins/details/
+  - pymdownx.blocks.details:
   # Enables code highlighting for fenced code blocks.
   # https://facelessuser.github.io/pymdown-extensions/extensions/highlight/
   - pymdownx.highlight:

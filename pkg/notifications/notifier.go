@@ -86,6 +86,13 @@ func NewNotifier(c *cobra.Command) types.Notifier {
 // Returns:
 //   - []string: Updated URL list.
 //   - time.Duration: Notification delay.
+//
+// Deprecated: Legacy notification types are deprecated.
+// Use --notification-url instead.
+//
+// TODO: Remove AppendLegacyUrls for the v2 release.
+//
+//nolint:godox
 func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duration) {
 	clog := logrus.WithField("function", "AppendLegacyUrls")
 	clog.Debug("Appending legacy notification URLs")
@@ -105,12 +112,28 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 
 		switch notificationType {
 		case emailType:
+			clog.Warn(
+				"Legacy email notification type is deprecated; use --notification-url with an smtp:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+			)
+
 			legacyNotifier = newEmailNotifier(cmd)
 		case slackType:
+			clog.Warn(
+				"Legacy slack notification type is deprecated; use --notification-url with a slack:// or discord:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+			)
+
 			legacyNotifier = newSlackNotifier(cmd)
 		case msTeamsType:
+			clog.Warn(
+				"Legacy msteams notification type is deprecated; use --notification-url with a teams:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+			)
+
 			legacyNotifier = newMsTeamsNotifier(cmd)
 		case gotifyType:
+			clog.Warn(
+				"Legacy gotify notification type is deprecated; use --notification-url with a gotify:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+			)
+
 			legacyNotifier = newGotifyNotifier(cmd)
 		case shoutrrrType:
 			continue
@@ -162,6 +185,10 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 //
 // Returns:
 //   - time.Duration: Selected delay.
+//
+// TODO: Simplify GetDelay to only use --notifications-delay when legacy types are removed.
+//
+//nolint:godox
 func GetDelay(c *cobra.Command, legacyDelay time.Duration) time.Duration {
 	clog := logrus.WithField("legacy_delay", legacyDelay)
 	clog.Debug("Determining notification delay")
@@ -252,7 +279,8 @@ func GetTemplateData(c *cobra.Command) StaticData {
 		if tag == "" {
 			// Check legacy email tag.
 			tag, _ = flag.GetString("notification-email-subjecttag")
-			clog.WithField("tag", tag).Debug("Using legacy email subject tag")
+			clog.WithField("tag", tag).
+				Warn("Using deprecated email subject tag flag: --notification-email-subjecttag. Use --notification-title-tag instead.")
 		}
 
 		title = GetTitle(hostname, tag)
