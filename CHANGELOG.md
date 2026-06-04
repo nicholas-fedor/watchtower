@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Deprecate legacy notification types for v2 removal by @nicholas-fedor in [#1737](https://github.com/nicholas-fedor/watchtower/pull/1737)
 - Update github/codeql-action action to v4.36.2 by @renovate[bot] in [#1735](https://github.com/nicholas-fedor/watchtower/pull/1735)
 - Update github.com/google/pprof digest to 7023385 by @renovate[bot] in [#1733](https://github.com/nicholas-fedor/watchtower/pull/1733)
 - Update module github.com/docker/cli to v29.5.3+incompatible by @renovate[bot] in [#1731](https://github.com/nicholas-fedor/watchtower/pull/1731)
