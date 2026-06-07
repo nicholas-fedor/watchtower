@@ -80,6 +80,18 @@ func ExcludeOldNamedWatchtowerFilter(c types.FilterableContainer) bool {
 	return true
 }
 
+// IsOldNamedWatchtower reports whether the container is an old Watchtower
+// instance renamed during self-update (prefixed with "watchtower-old-").
+//
+// This is the positive counterpart to ExcludeOldNamedWatchtowerFilter and is
+// intended for guard clauses where a positive check reads more naturally.
+//
+// Returns:
+//   - bool: True if the container is an old-named Watchtower instance.
+func IsOldNamedWatchtower(c types.FilterableContainer) bool {
+	return c.IsWatchtower() && strings.HasPrefix(strings.TrimLeft(c.Name(), "/"), types.WatchtowerOldPrefix)
+}
+
 // ExcludeOldNamedWatchtowerFilterChain wraps a base filter with old-named
 // Watchtower exclusion. It chains the exclusion check before the base filter,
 // ensuring old-named containers are rejected early in the pipeline.
@@ -365,7 +377,6 @@ func BuildFilter(
 	// Start with no filter and chain additional filters.
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
-	filter = ExcludeOldNamedWatchtowerFilterChain(filter)
 	filter = FilterByNames(normalizedNames, filter)
 	filter = FilterByDisableNames(normalizedDisableNames, filter)
 
@@ -420,6 +431,10 @@ func BuildFilter(
 
 	// Exclude explicitly disabled containers.
 	filter = FilterByDisabledLabel(filter)
+
+	// Exclude old-named Watchtower containers (predecessors from self-update).
+	// Applied last so it wraps the entire chain and short-circuits first.
+	filter = ExcludeOldNamedWatchtowerFilterChain(filter)
 
 	// Build filter description.
 	filterDesc := "Checking all containers (except explicitly disabled with label)"

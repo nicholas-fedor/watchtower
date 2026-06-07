@@ -173,8 +173,10 @@ func CleanupOldWatchtowerContainers(
 			continue
 		}
 
-		// Don't remove the current container (shouldn't happen since current
-		// is never old-named, but guard anyway)
+		// The updater's self-detection handles the case where the current
+		// container is old-named (it exits before reaching this point), but
+		// we still guard here for safety in case this function is called from
+		// a different code path.
 		if c.ID() == currentContainerID {
 			continue
 		}
@@ -193,13 +195,24 @@ func CleanupOldWatchtowerContainers(
 		"containers": containerNames(oldContainers),
 	}).Info("Found old-named Watchtower containers, cleaning up")
 
+	// Find the current container in the list so image collection works
+	var currentContainerObj types.Container
+
+	for _, c := range allContainers {
+		if c.ID() == currentContainerID {
+			currentContainerObj = c
+
+			break
+		}
+	}
+
 	// Reuse the existing removal logic for excess containers
 	removed, err := removeExcessContainers(
 		ctx,
 		client,
 		oldContainers,
 		cleanupImages,
-		nil, // no current container needed for image comparison
+		currentContainerObj,
 		removeImageInfos,
 	)
 	if err != nil {

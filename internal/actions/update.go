@@ -74,6 +74,37 @@ func Update(
 	// Initialize a slice to collect cleaned image info for cleanup after updates.
 	cleanupImageInfos := []types.RemovedImageInfo{}
 
+	// Self-check: if the current container is an old-named Watchtower instance,
+	// update its restart policy to "no" and exit to prevent Docker from
+	// restarting it. This catches cases where the startup check was bypassed
+	// or the container was restarted despite other safeguards.
+	if config.CurrentContainerID != "" {
+		for _, c := range allContainers {
+			if c.ID() == config.CurrentContainerID && c.IsWatchtower() {
+				if container.IsOldNamedContainer(c.Name()) {
+					logrus.WithField("container", c.Name()).
+						Debug("Current container is an old-named Watchtower instance, stopping self")
+
+					updateConfig := dockerContainer.UpdateConfig{
+						RestartPolicy: dockerContainer.RestartPolicy{
+							Name: "no",
+						},
+					}
+
+					err := client.UpdateContainer(ctx, c, updateConfig)
+					if err != nil {
+						logrus.WithError(err).
+							Warn("Failed to update restart policy to 'no' for old container")
+					}
+
+					return nil, nil, errOldNamedSelfDetected
+				}
+
+				break
+			}
+		}
+	}
+
 	// Clean up any old-named Watchtower containers that linger from a previous
 	// self-update. This runs each update cycle to catch containers that the
 	// startup cleanup may have missed (e.g., they were still stopping at startup).
@@ -87,7 +118,7 @@ func Update(
 		)
 
 		if currentScope == "" {
-			logrus.Debug("Skipping old-named container cleanup: current container scope unknown")
+			logrus.Debug("Skipping old-named container cleanup: current container not found in list")
 		} else {
 			_, cleanupErr := CleanupOldWatchtowerContainers(
 				ctx,
@@ -698,7 +729,7 @@ func shouldUpdateContainer(
 
 	// Skip old-named Watchtower containers — they are predecessors from a
 	// self-update and should only be removed, never updated.
-	if !filters.ExcludeOldNamedWatchtowerFilter(container) {
+	if filters.IsOldNamedWatchtower(container) {
 		return false
 	}
 

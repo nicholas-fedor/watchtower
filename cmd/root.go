@@ -443,6 +443,33 @@ func preRun(cmd *cobra.Command, _ []string) {
 		logrus.Info(
 			"Detected invalid restart of old Watchtower container, stopping Watchtower container now",
 		)
+
+		if currentWatchtowerContainer != nil {
+			updateConfig := dockerContainer.UpdateConfig{
+				RestartPolicy: dockerContainer.RestartPolicy{
+					Name: "no",
+				},
+			}
+
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				containerLookupTimeout,
+			)
+			defer cancel()
+
+			err := client.UpdateContainer(
+				ctx,
+				currentWatchtowerContainer,
+				updateConfig,
+			)
+			if err != nil {
+				logrus.WithError(err).
+					Warn("Failed to update restart policy to 'no' for old Watchtower container")
+			} else {
+				logrus.Debug("Updated restart policy to 'no' for old Watchtower container")
+			}
+		}
+
 		logrus.Exit(0)
 	}
 

@@ -47,6 +47,40 @@ func TestExcludeOldNamedWatchtowerFilter(t *testing.T) {
 	similarPrefix.AssertExpectations(t)
 }
 
+func TestIsOldNamedWatchtower(t *testing.T) {
+	t.Parallel()
+
+	nonWatchtower := new(mockContainer.FilterableContainer)
+	nonWatchtower.On("IsWatchtower").Return(false)
+	nonWatchtower.On("Name").Return("/regular-app").Maybe()
+	assert.False(t, IsOldNamedWatchtower(nonWatchtower))
+	nonWatchtower.AssertExpectations(t)
+
+	watchtower := new(mockContainer.FilterableContainer)
+	watchtower.On("IsWatchtower").Return(true)
+	watchtower.On("Name").Return("/watchtower")
+	assert.False(t, IsOldNamedWatchtower(watchtower))
+	watchtower.AssertExpectations(t)
+
+	oldNamed := new(mockContainer.FilterableContainer)
+	oldNamed.On("IsWatchtower").Return(true)
+	oldNamed.On("Name").Return("/watchtower-old-abc123")
+	assert.True(t, IsOldNamedWatchtower(oldNamed))
+	oldNamed.AssertExpectations(t)
+
+	oldNamedNoSlash := new(mockContainer.FilterableContainer)
+	oldNamedNoSlash.On("IsWatchtower").Return(true)
+	oldNamedNoSlash.On("Name").Return("watchtower-old-def456")
+	assert.True(t, IsOldNamedWatchtower(oldNamedNoSlash))
+	oldNamedNoSlash.AssertExpectations(t)
+
+	similarPrefix := new(mockContainer.FilterableContainer)
+	similarPrefix.On("IsWatchtower").Return(true)
+	similarPrefix.On("Name").Return("/watchtower-oldinstance")
+	assert.False(t, IsOldNamedWatchtower(similarPrefix))
+	similarPrefix.AssertExpectations(t)
+}
+
 func TestWatchtowerContainersFilter(t *testing.T) {
 	t.Parallel()
 

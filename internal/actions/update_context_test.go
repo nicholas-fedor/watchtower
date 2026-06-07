@@ -10,6 +10,8 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	dockerContainer "github.com/moby/moby/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -207,6 +209,123 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 				t.Fatal("expected some failed operations due to cancellation")
 			}
 		}
+	})
+
+	ginkgo.When("the current container is an old-named Watchtower instance", func() {
+		ginkgo.It("should detect self as old-named and return error without updating", func() {
+			config := &dockerContainer.Config{
+				Image:  "watchtower:latest",
+				Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
+			}
+			oldContainer := mockActions.CreateMockContainerWithConfig(
+				"old-container-id",
+				"watchtower-old-abc123",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				config,
+			)
+			testData := &mockActions.TestData{
+				Containers: []types.Container{oldContainer},
+			}
+			client := mockActions.CreateMockClient(testData, false, false)
+
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:            true,
+					CPUCopyMode:        "auto",
+					CurrentContainerID: "old-container-id",
+				},
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("old-named Watchtower instance"))
+			gomega.Expect(report).To(gomega.BeNil())
+			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should update restart policy to no when detecting self as old-named", func() {
+			config := &dockerContainer.Config{
+				Image:  "watchtower:latest",
+				Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
+			}
+			oldContainer := mockActions.CreateMockContainerWithConfig(
+				"old-container-id",
+				"watchtower-old-abc123",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				config,
+			)
+			testData := &mockActions.TestData{
+				Containers: []types.Container{oldContainer},
+			}
+			client := mockActions.CreateMockClient(testData, false, false)
+
+			_, _, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:            true,
+					CPUCopyMode:        "auto",
+					CurrentContainerID: "old-container-id",
+				},
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.LastUpdateConfig).NotTo(gomega.BeNil())
+			gomega.Expect(client.TestData.LastUpdateConfig.RestartPolicy.Name).To(gomega.BeEquivalentTo("no"))
+		})
+
+		ginkgo.It("should proceed normally when current container is not old-named", func() {
+			normalContainer := mockActions.CreateMockContainer(
+				"current-id",
+				"watchtower",
+				"watchtower:latest",
+				time.Now(),
+			)
+			testData := &mockActions.TestData{
+				Containers: []types.Container{normalContainer},
+			}
+			client := mockActions.CreateMockClient(testData, false, false)
+
+			report, _, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:            true,
+					CPUCopyMode:        "auto",
+					CurrentContainerID: "current-id",
+				},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report).NotTo(gomega.BeNil())
+		})
+
+		ginkgo.It("should proceed normally when current container ID is empty", func() {
+			testData := &mockActions.TestData{
+				Containers: []types.Container{},
+			}
+			client := mockActions.CreateMockClient(testData, false, false)
+
+			report, _, err := actions.Update(
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:     true,
+					CPUCopyMode: "auto",
+				},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report).NotTo(gomega.BeNil())
+		})
 	})
 }
 
