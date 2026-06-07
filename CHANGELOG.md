@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/actionlint-action action to v1.0.4 by @renovate[bot] in [#1741](https://github.com/nicholas-fedor/watchtower/pull/1741)
 - Update codecov/codecov-action action to v7 by @renovate[bot] in [#1739](https://github.com/nicholas-fedor/watchtower/pull/1739)
 - Deprecate legacy notification types for v2 removal by @nicholas-fedor in [#1737](https://github.com/nicholas-fedor/watchtower/pull/1737)
 - Update github/codeql-action action to v4.36.2 by @renovate[bot] in [#1735](https://github.com/nicholas-fedor/watchtower/pull/1735)
