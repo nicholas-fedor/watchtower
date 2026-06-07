@@ -475,6 +475,13 @@ func TestBuildFilterNoneScope(t *testing.T) {
 
 	scoped.AssertExpectations(t)
 	unscoped.AssertExpectations(t)
+
+	oldNamed := new(mockContainer.FilterableContainer)
+	oldNamed.On("IsWatchtower").Return(true)
+	oldNamed.On("Name").Return("/watchtower-old-abc123")
+
+	assert.False(t, filter(oldNamed))
+	oldNamed.AssertExpectations(t)
 }
 
 func TestFilterByDisabledLabel(t *testing.T) {

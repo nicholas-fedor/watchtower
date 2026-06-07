@@ -70,7 +70,7 @@ func ExcludeOldNamedWatchtowerFilter(c types.FilterableContainer) bool {
 		return true
 	}
 
-	if strings.HasPrefix(strings.TrimLeft(c.Name(), "/"), types.WatchtowerOldPrefix) {
+	if IsOldNamedWatchtower(c) {
 		logrus.WithField("container", c.Name()).
 			Debug("Excluding old-named Watchtower container from update cycle")
 

@@ -109,17 +109,22 @@ func Update(
 	// self-update. This runs each update cycle to catch containers that the
 	// startup cleanup may have missed (e.g., they were still stopping at startup).
 	// Scope is derived from the current container to avoid crossing scope boundaries.
-	// When scope is unknown (derived as ""), cleanup is skipped to prevent
-	// accidentally removing old containers from other scoped instances.
+	// When the current container isn't found in the list, cleanup is
+	// skipped to prevent accidentally removing old containers from other
+	// scoped instances. Unscoped containers ("") are normalized to "none".
 	if config.CurrentContainerID != "" {
-		currentScope := deriveScopeFromCurrentContainer(
+		currentScope, found := deriveScopeFromCurrentContainer(
 			allContainers,
 			config.CurrentContainerID,
 		)
 
-		if currentScope == "" {
+		if !found {
 			logrus.Debug("Skipping old-named container cleanup: current container not found in list")
 		} else {
+			if currentScope == "" {
+				currentScope = "none"
+			}
+
 			_, cleanupErr := CleanupOldWatchtowerContainers(
 				ctx,
 				client,
@@ -129,8 +134,6 @@ func Update(
 				&cleanupImageInfos,
 			)
 			if cleanupErr != nil {
-				// Log but don't fail the update cycle — the old container may
-				// still be in the process of stopping from a prior cleanup.
 				logrus.WithError(cleanupErr).
 					Warn("Failed to clean up old-named Watchtower containers, continuing update cycle")
 			}
@@ -1923,25 +1926,27 @@ func restartStaleContainer(
 }
 
 // deriveScopeFromCurrentContainer finds the current container by ID in the
-// provided list and returns its scope. Returns "none" for unscoped containers
-// and empty string "" if the current container can't be found (unknown scope).
+// provided list and returns its scope and whether it was found. Returns ""
+// for unscoped containers (found but no scope) and found=false when the
+// container ID isn't in the list. The caller normalizes "" to "none" for
+// cleanup and skips cleanup when found=false.
 func deriveScopeFromCurrentContainer(
 	allContainers []types.Container,
 	currentContainerID types.ContainerID,
-) string {
+) (string, bool) {
 	for _, c := range allContainers {
 		if c.ID() == currentContainerID {
 			containerScope, containerHasScope := c.Scope()
 			if !containerHasScope || containerScope == "" {
-				return "none"
+				return "", true
 			}
 
-			return containerScope
+			return containerScope, true
 		}
 	}
 
 	logrus.WithField("current_container_id", currentContainerID).
-		Debug("Current container not found in list, returning unknown scope")
+		Debug("Current container not found in list")
 
-	return ""
+	return "", false
 }
