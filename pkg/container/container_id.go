@@ -32,11 +32,6 @@ var (
 	ReadCgroupFunc    = os.ReadFile
 )
 
-// WatchtowerOldPrefix is the prefix used when renaming Watchtower containers
-// during self-update. It is the single source of truth for both rename
-// generation and old-name detection to prevent cross-file protocol drift.
-const WatchtowerOldPrefix = "watchtower-old-"
-
 // IsOldNamedContainer reports whether the container's runtime name (from Name()
 // or raw inspect) indicates a predecessor renamed during Watchtower self-update.
 // It trims any leading '/' (as Docker names have) and checks for the
@@ -56,7 +51,7 @@ func IsOldNamedContainer(name string) bool {
 
 	n := strings.TrimLeft(name, "/")
 
-	return strings.HasPrefix(n, WatchtowerOldPrefix)
+	return strings.HasPrefix(n, types.WatchtowerOldPrefix)
 }
 
 // GetCurrentContainerID retrieves the current container ID using a fallback strategy.

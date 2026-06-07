@@ -104,6 +104,111 @@ func RemoveExcessWatchtowerInstances(
 	return removed, nil
 }
 
+// CleanupOldWatchtowerContainers removes old-named Watchtower containers that
+// linger from a previous self-update. Unlike RemoveExcessWatchtowerInstances
+// (which runs once at startup), this is designed to be called during each update
+// cycle to catch any old containers that the startup cleanup may have missed.
+//
+// It identifies containers matching the watchtower-old- prefix within the same
+// scope as the current container, stops them, and optionally cleans up their
+// images. This ensures that even if an old container survives the initial
+// cleanup (e.g., it was still stopping), it won't persist across update cycles.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - cleanupImages: Remove images if true.
+//   - scope: Scope to filter Watchtower instances (empty for unscoped).
+//   - currentContainerID: ID of the currently running Watchtower container.
+//   - removeImageInfos: Pointer to slice of images to remove after stopping old instances.
+//
+// Returns:
+//   - int: Number of removed old Watchtower instances.
+//   - error: Non-nil if removal fails, nil if none found or successful removal.
+func CleanupOldWatchtowerContainers(
+	ctx context.Context,
+	client container.Client,
+	cleanupImages bool,
+	scope string,
+	currentContainerID types.ContainerID,
+	removeImageInfos *[]types.RemovedImageInfo,
+) (int, error) {
+	logrus.WithFields(logrus.Fields{
+		"scope":          scope,
+		"current_id":     currentContainerID,
+		"cleanup_images": cleanupImages,
+	}).Debug("Checking for old-named Watchtower containers")
+
+	// List all containers to find old-named instances
+	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	// Find old-named Watchtower containers within the same scope
+	var oldContainers []types.Container
+
+	for _, c := range allContainers {
+		if !c.IsWatchtower() {
+			continue
+		}
+
+		if !container.IsOldNamedContainer(c.Name()) {
+			continue
+		}
+
+		// Scope check: only clean up old containers in the same scope
+		containerScope, containerHasScope := c.Scope()
+		if !containerHasScope || containerScope == "" {
+			containerScope = "none"
+		}
+
+		if containerScope != scope {
+			logrus.WithFields(logrus.Fields{
+				"container":       c.Name(),
+				"container_scope": containerScope,
+				"current_scope":   scope,
+			}).Debug("Skipping old-named container in different scope")
+
+			continue
+		}
+
+		// Don't remove the current container (shouldn't happen since current
+		// is never old-named, but guard anyway)
+		if c.ID() == currentContainerID {
+			continue
+		}
+
+		oldContainers = append(oldContainers, c)
+	}
+
+	if len(oldContainers) == 0 {
+		logrus.Debug("No old-named Watchtower containers found")
+
+		return 0, nil
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"count":      len(oldContainers),
+		"containers": containerNames(oldContainers),
+	}).Info("Found old-named Watchtower containers, cleaning up")
+
+	// Reuse the existing removal logic for excess containers
+	removed, err := removeExcessContainers(
+		ctx,
+		client,
+		oldContainers,
+		cleanupImages,
+		nil, // no current container needed for image comparison
+		removeImageInfos,
+	)
+	if err != nil {
+		return removed, err
+	}
+
+	return removed, nil
+}
+
 // getExcessContainers retrieves a list of excess Watchtower containers that should be removed.
 //
 // It identifies containers that are duplicates within the same scope or part of a container chain,

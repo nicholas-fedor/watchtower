@@ -55,6 +55,51 @@ func UnscopedWatchtowerContainersFilter(c types.FilterableContainer) bool {
 	return false
 }
 
+// ExcludeOldNamedWatchtowerFilter rejects containers that are old Watchtower
+// instances renamed during self-update (prefixed with "watchtower-old-").
+//
+// These containers are predecessors that should only be removed, never updated
+// or included in update cycles. This filter ensures they are excluded from
+// regular container processing regardless of scope.
+//
+// Returns:
+//   - bool: True if the container should be included, false if it is an old
+//     Watchtower instance that should be excluded.
+func ExcludeOldNamedWatchtowerFilter(c types.FilterableContainer) bool {
+	if !c.IsWatchtower() {
+		return true
+	}
+
+	if strings.HasPrefix(strings.TrimLeft(c.Name(), "/"), types.WatchtowerOldPrefix) {
+		logrus.WithField("container", c.Name()).
+			Debug("Excluding old-named Watchtower container from update cycle")
+
+		return false
+	}
+
+	return true
+}
+
+// ExcludeOldNamedWatchtowerFilterChain wraps a base filter with old-named
+// Watchtower exclusion. It chains the exclusion check before the base filter,
+// ensuring old-named containers are rejected early in the pipeline.
+//
+// Parameters:
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function that excludes old-named Watchtower containers
+//     and applies the base filter.
+func ExcludeOldNamedWatchtowerFilterChain(baseFilter types.Filter) types.Filter {
+	return func(c types.FilterableContainer) bool {
+		if !ExcludeOldNamedWatchtowerFilter(c) {
+			return false
+		}
+
+		return baseFilter(c)
+	}
+}
+
 // NoFilter allows all containers through.
 //
 // Returns:
@@ -320,6 +365,7 @@ func BuildFilter(
 	// Start with no filter and chain additional filters.
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
+	filter = ExcludeOldNamedWatchtowerFilterChain(filter)
 	filter = FilterByNames(normalizedNames, filter)
 	filter = FilterByDisableNames(normalizedDisableNames, filter)
 
