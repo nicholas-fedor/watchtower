@@ -27,4 +27,4 @@ jobs:
           persist-credentials: false
 
       - name: Run actionlint
-        uses: nicholas-fedor/actionlint-action@cfb3d059a17ba00c4b5717a9fa057fa434abb44f # v1.0.3
+        uses: nicholas-fedor/actionlint-action@d389a8605fd107ab42d50e8971a28b4249edd7a0 # v1.0.4
