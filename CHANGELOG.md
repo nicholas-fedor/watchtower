@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/sync to v0.21.0 by @renovate[bot] in [#1750](https://github.com/nicholas-fedor/watchtower/pull/1750)
+- Update module golang.org/x/mod to v0.37.0 by @renovate[bot] in [#1749](https://github.com/nicholas-fedor/watchtower/pull/1749)
 - Update nicholas-fedor/govulncheck-action action to v1.0.5 by @renovate[bot] in [#1746](https://github.com/nicholas-fedor/watchtower/pull/1746)
 - Update nicholas-fedor/actionlint-action action to v1.0.5 by @renovate[bot] in [#1744](https://github.com/nicholas-fedor/watchtower/pull/1744)
 - Update nicholas-fedor/actionlint-action action to v1.0.4 by @renovate[bot] in [#1741](https://github.com/nicholas-fedor/watchtower/pull/1741)
