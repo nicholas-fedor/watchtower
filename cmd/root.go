@@ -443,6 +443,33 @@ func preRun(cmd *cobra.Command, _ []string) {
 		logrus.Info(
 			"Detected invalid restart of old Watchtower container, stopping Watchtower container now",
 		)
+
+		if currentWatchtowerContainer != nil {
+			updateConfig := dockerContainer.UpdateConfig{
+				RestartPolicy: dockerContainer.RestartPolicy{
+					Name: "no",
+				},
+			}
+
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				containerLookupTimeout,
+			)
+			defer cancel()
+
+			err := client.UpdateContainer(
+				ctx,
+				currentWatchtowerContainer,
+				updateConfig,
+			)
+			if err != nil {
+				logrus.WithError(err).
+					Warn("Failed to update restart policy to 'no' for old Watchtower container")
+			} else {
+				logrus.Debug("Updated restart policy to 'no' for old Watchtower container")
+			}
+		}
+
 		logrus.Exit(0)
 	}
 
@@ -722,7 +749,7 @@ func runMain(cfg types.RunConfig) int {
 		logrus.Warn("Current container not cached for cleanup")
 	}
 
-	// Check for and cleanup excess Watchtower instances within scope.
+	// Check for and cleanup old Watchtower containers within scope.
 	totalRemovedInstances, err := actions.RemoveExcessWatchtowerInstances(
 		ctx,
 		client,
@@ -736,7 +763,7 @@ func runMain(cfg types.RunConfig) int {
 		// The old container may still be stopping; forcing exit would leave
 		// no Watchtower running. Continuing ensures the new instance operates
 		// even if the old container couldn't be fully cleaned up.
-		logrus.WithError(err).Warn("Failed to clean up excess Watchtower instances, continuing anyway")
+		logrus.WithError(err).Warn("Failed to clean up old Watchtower containers, continuing anyway")
 	}
 
 	// Check for and cleanup orphaned ephemeral orchestrator containers.
@@ -762,7 +789,7 @@ func runMain(cfg types.RunConfig) int {
 	if cleanupOccurred {
 		cfg.UpdateOnStart = false
 
-		logrus.Debug("Disabled update-on-start due to cleanup of excess Watchtower instances")
+		logrus.Debug("Disabled update-on-start due to cleanup of old Watchtower containers")
 	}
 
 	// Configure and start the HTTP API, handling any startup errors.

@@ -27,6 +27,13 @@ import (
 // testContainerOption configures optional fields on the InspectResponse for testing.
 type testContainerOption func(*dockerContainer.InspectResponse)
 
+// withName sets the container runtime name (stored in InspectResponse.Name).
+func withName(name string) testContainerOption {
+	return func(ir *dockerContainer.InspectResponse) {
+		ir.Name = name
+	}
+}
+
 // withPortBindings adds host-bound port bindings to the container, making
 // HasExposedPorts() return true.
 func withPortBindings() testContainerOption {
@@ -546,6 +553,30 @@ func TestShouldExitDueToInvalidRestart(t *testing.T) {
 			container:    createTestContainer("test-container-id,parent-id"),
 			runOnceFlag:  false,
 			expectedExit: true,
+		},
+		{
+			name:         "old container with run-once false",
+			container:    createTestContainer("", withName("watchtower-old-abc123")),
+			runOnceFlag:  false,
+			expectedExit: true,
+		},
+		{
+			name:         "old container with run-once true",
+			container:    createTestContainer("", withName("watchtower-old-abc123")),
+			runOnceFlag:  true,
+			expectedExit: false,
+		},
+		{
+			name:         "old container with leading slash",
+			container:    createTestContainer("", withName("/watchtower-old-def456")),
+			runOnceFlag:  false,
+			expectedExit: true,
+		},
+		{
+			name:         "non-old container continues",
+			container:    createTestContainer("", withName("watchtower")),
+			runOnceFlag:  false,
+			expectedExit: false,
 		},
 	}
 

@@ -71,12 +71,79 @@ func Update(
 		return nil, nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
+	// Initialize a slice to collect cleaned image info for cleanup after updates.
+	cleanupImageInfos := []types.RemovedImageInfo{}
+
+	// Self-check: if the current container is an old Watchtower container,
+	// update its restart policy to "no" and exit to prevent Docker from
+	// restarting it. This catches cases where the startup check was bypassed
+	// or the container was restarted despite other safeguards.
+	if config.CurrentContainerID != "" {
+		for _, c := range allContainers {
+			if c.ID() == config.CurrentContainerID && c.IsWatchtower() {
+				if container.IsOldContainer(c.Name()) {
+					logrus.WithField("container", c.Name()).
+						Debug("Current container is an old Watchtower container, stopping self")
+
+					updateConfig := dockerContainer.UpdateConfig{
+						RestartPolicy: dockerContainer.RestartPolicy{
+							Name: "no",
+						},
+					}
+
+					err := client.UpdateContainer(ctx, c, updateConfig)
+					if err != nil {
+						logrus.WithError(err).
+							Warn("Failed to update restart policy to 'no' for old Watchtower container")
+					}
+
+					return nil, nil, errOldSelfDetected
+				}
+
+				break
+			}
+		}
+	}
+
+	// Clean up any old Watchtower containers that linger from a previous
+	// self-update. This runs each update cycle to catch containers that the
+	// startup cleanup may have missed (e.g., they were still stopping at startup).
+	// Scope is derived from the current container to avoid crossing scope boundaries.
+	// When the current container isn't found in the list, cleanup is
+	// skipped to prevent accidentally removing old containers from other
+	// scoped instances. Unscoped containers ("") are normalized to "none".
+	if config.CurrentContainerID != "" {
+		currentScope, found := deriveScopeFromCurrentContainer(
+			allContainers,
+			config.CurrentContainerID,
+		)
+
+		if !found {
+			logrus.Debug("Skipping old container cleanup: current container not found in list")
+		} else {
+			if currentScope == "" {
+				currentScope = "none"
+			}
+
+			_, cleanupErr := CleanupOldWatchtowerContainers(
+				ctx,
+				client,
+				config.Cleanup,
+				currentScope,
+				config.CurrentContainerID,
+				&cleanupImageInfos,
+			)
+			if cleanupErr != nil {
+				logrus.WithError(cleanupErr).
+					Warn("Failed to clean up old Watchtower containers, continuing update cycle")
+			}
+		}
+	}
+
 	// Create a progress tracker for reporting scanned, updated, and skipped containers.
 	progress := &session.Progress{}
 	// Track the number of stale containers for logging.
 	staleCount := 0
-	// Initialize a slice to collect cleaned image info for cleanup after updates.
-	cleanupImageInfos := []types.RemovedImageInfo{}
 	// Track if Watchtower self-update pull failed to add safeguard delay.
 	watchtowerPullFailed := false
 
@@ -660,6 +727,12 @@ func shouldUpdateContainer(
 ) bool {
 	// Must be stale to update
 	if !stale {
+		return false
+	}
+
+	// Skip old Watchtower containers — they are predecessors from a
+	// self-update and should only be removed, never updated.
+	if filters.IsOldWatchtower(container) {
 		return false
 	}
 
@@ -1673,11 +1746,11 @@ func restartStaleContainer(
 			return "", renamed, nil
 		}
 
-		targetOldName := container.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
+		targetOldName := types.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
 
 		// Redundant rename guard: the lingering old instance already has the
 		// target name from a prior rename. Skip to avoid a same-name error.
-		if container.IsOldNamedContainer(sourceContainer.Name()) {
+		if container.IsOldContainer(sourceContainer.Name()) {
 			logrus.WithFields(fields).
 				WithField("target_name", targetOldName).
 				Debug("Skipping rename of already-renamed Watchtower container")
@@ -1850,4 +1923,30 @@ func restartStaleContainer(
 	}
 
 	return newContainerID, renamed, nil
+}
+
+// deriveScopeFromCurrentContainer finds the current container by ID in the
+// provided list and returns its scope and whether it was found. Returns ""
+// for unscoped containers (found but no scope) and found=false when the
+// container ID isn't in the list. The caller normalizes "" to "none" for
+// cleanup and skips cleanup when found=false.
+func deriveScopeFromCurrentContainer(
+	allContainers []types.Container,
+	currentContainerID types.ContainerID,
+) (string, bool) {
+	for _, c := range allContainers {
+		if c.ID() == currentContainerID {
+			containerScope, containerHasScope := c.Scope()
+			if !containerHasScope || containerScope == "" {
+				return "", true
+			}
+
+			return containerScope, true
+		}
+	}
+
+	logrus.WithField("current_container_id", currentContainerID).
+		Debug("Current container not found in list")
+
+	return "", false
 }

@@ -55,6 +55,63 @@ func UnscopedWatchtowerContainersFilter(c types.FilterableContainer) bool {
 	return false
 }
 
+// ExcludeOldWatchtowerFilter rejects containers that are old Watchtower
+// containers renamed during self-update (prefixed with "watchtower-old-").
+//
+// These containers are predecessors that should only be removed, never updated
+// or included in update cycles. This filter ensures they are excluded from
+// regular container processing regardless of scope.
+//
+// Returns:
+//   - bool: True if the container should be included, false if it is an old
+//     Watchtower container that should be excluded.
+func ExcludeOldWatchtowerFilter(c types.FilterableContainer) bool {
+	if !c.IsWatchtower() {
+		return true
+	}
+
+	if IsOldWatchtower(c) {
+		logrus.WithField("container", c.Name()).
+			Debug("Excluding old Watchtower container from update cycle")
+
+		return false
+	}
+
+	return true
+}
+
+// IsOldWatchtower reports whether the container is an old Watchtower
+// container renamed during self-update (prefixed with "watchtower-old-").
+//
+// This is the positive counterpart to ExcludeOldWatchtowerFilter and is
+// intended for guard clauses where a positive check reads more naturally.
+//
+// Returns:
+//   - bool: True if the container is an old Watchtower container.
+func IsOldWatchtower(c types.FilterableContainer) bool {
+	return c.IsWatchtower() && strings.HasPrefix(strings.TrimLeft(c.Name(), "/"), types.WatchtowerOldPrefix)
+}
+
+// ExcludeOldWatchtowerFilterChain wraps a base filter with old
+// Watchtower exclusion. It chains the exclusion check before the base filter,
+// ensuring old Watchtower containers are rejected early in the pipeline.
+//
+// Parameters:
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function that excludes old Watchtower containers
+//     and applies the base filter.
+func ExcludeOldWatchtowerFilterChain(baseFilter types.Filter) types.Filter {
+	return func(c types.FilterableContainer) bool {
+		if !ExcludeOldWatchtowerFilter(c) {
+			return false
+		}
+
+		return baseFilter(c)
+	}
+}
+
 // NoFilter allows all containers through.
 //
 // Returns:
@@ -374,6 +431,10 @@ func BuildFilter(
 
 	// Exclude explicitly disabled containers.
 	filter = FilterByDisabledLabel(filter)
+
+	// Exclude old Watchtower containers (predecessors from self-update).
+	// Applied last so it wraps the entire chain and short-circuits first.
+	filter = ExcludeOldWatchtowerFilterChain(filter)
 
 	// Build filter description.
 	filterDesc := "Checking all containers (except explicitly disabled with label)"

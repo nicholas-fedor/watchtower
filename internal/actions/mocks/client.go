@@ -56,6 +56,7 @@ type TestData struct {
 	StartOrder                   []string                              // Order in which containers were started.
 	SimulatedLatency             time.Duration                         // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
 	LastContainerChain           string                                // Last container chain passed to CreateEphemeralOrchestrator.
+	LastUpdateConfig             *dockerContainer.UpdateConfig          // Last UpdateContainer config received.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -269,8 +270,9 @@ func (client MockClient) RenameContainer(ctx context.Context, _ types.Container,
 
 // UpdateContainer simulates updating a container's configuration.
 // It increments the UpdateContainerCount and returns the configured error if set.
-func (client MockClient) UpdateContainer(ctx context.Context, _ types.Container, _ dockerContainer.UpdateConfig) error {
+func (client MockClient) UpdateContainer(ctx context.Context, _ types.Container, config dockerContainer.UpdateConfig) error {
 	client.TestData.UpdateContainerCount.Add(1)
+	client.TestData.LastUpdateConfig = &config
 
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return err

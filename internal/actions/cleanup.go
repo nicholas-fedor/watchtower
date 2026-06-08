@@ -29,10 +29,10 @@ const maxRemovalAttempts = 30
 // RemovalRetryDelay sets the delay before retrying removal operations.
 var RemovalRetryDelay = 1 * time.Second
 
-// RemoveExcessWatchtowerInstances ensures a single Watchtower instance within the same scope.
+// RemoveExcessWatchtowerInstances ensures a single Watchtower container within the same scope.
 //
 // It identifies multiple Watchtower containers within the same scope, stops all but the current,
-// and collects removed images for deferred removal if enabled, preventing conflicts from concurrent instances.
+// and collects removed images for deferred removal if enabled, preventing conflicts from concurrent containers.
 // Chain identification uses the current container's labels to determine old containers to remove.
 // Scoped instances only remove other instances in the same scope, allowing coexistence with different scopes.
 // Removal operations respect scope boundaries to prevent cross-scope interference.
@@ -41,12 +41,12 @@ var RemovalRetryDelay = 1 * time.Second
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - cleanupImages: Remove images if true.
-//   - watchtowerScope: Scope to filter Watchtower instances.
-//   - removeImageInfos: Pointer to slice of images to remove after stopping excess instances.
+//   - watchtowerScope: Scope to filter Watchtower containers.
+//   - removeImageInfos: Pointer to slice of images to remove after stopping excess containers.
 //   - currentContainer: The current running Watchtower container.
 //
 // Returns:
-//   - int: Number of removed Watchtower instances.
+//   - int: Number of removed Watchtower containers.
 //   - error: Non-nil if removal fails, nil if single instance or successful removal.
 func RemoveExcessWatchtowerInstances(
 	ctx context.Context,
@@ -66,7 +66,7 @@ func RemoveExcessWatchtowerInstances(
 
 			return ""
 		}(),
-	}).Debug("Starting removal of excess Watchtower instances")
+	}).Debug("Starting removal of excess Watchtower containers")
 
 	// List all containers to find excess instances
 	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
@@ -74,7 +74,7 @@ func RemoveExcessWatchtowerInstances(
 		return 0, fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	// Retrieve containers that are excess Watchtower instances within the same scope
+	// Retrieve containers that are excess Watchtower containers within the same scope
 	excessWatchtowerContainers := getExcessContainers(
 		scope,
 		currentContainer,
@@ -95,6 +95,134 @@ func RemoveExcessWatchtowerInstances(
 		excessWatchtowerContainers,
 		cleanupImages,
 		currentContainer,
+		removeImageInfos,
+	)
+	if err != nil {
+		return removed, err
+	}
+
+	return removed, nil
+}
+
+// CleanupOldWatchtowerContainers removes old Watchtower containers that
+// linger from a previous self-update. Unlike RemoveExcessWatchtowerInstances
+// (which runs once at startup), this is designed to be called during each update
+// cycle to catch any old containers that the startup cleanup may have missed.
+//
+// It identifies containers matching the watchtower-old- prefix within the same
+// scope as the current container, stops them, and optionally cleans up their
+// images. This ensures that even if an old container survives the initial
+// cleanup (e.g., it was still stopping), it won't persist across update cycles.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - cleanupImages: Remove images if true.
+//   - scope: Scope to filter Watchtower containers (empty for unscoped).
+//   - currentContainerID: ID of the currently running Watchtower container.
+//   - removeImageInfos: Pointer to slice of images to remove after stopping old containers.
+//
+// Returns:
+//   - int: Number of removed old Watchtower containers.
+//   - error: Non-nil if removal fails, nil if none found or successful removal.
+func CleanupOldWatchtowerContainers(
+	ctx context.Context,
+	client container.Client,
+	cleanupImages bool,
+	scope string,
+	currentContainerID types.ContainerID,
+	removeImageInfos *[]types.RemovedImageInfo,
+) (int, error) {
+	logrus.WithFields(logrus.Fields{
+		"scope":          scope,
+		"current_id":     currentContainerID,
+		"cleanup_images": cleanupImages,
+	}).Debug("Checking for old Watchtower containers")
+
+	// Normalize empty scope to "none" for consistent comparison.
+	if scope == "" {
+		scope = "none"
+	}
+
+	// List all containers to find old instances
+	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	// Find old Watchtower containers within the same scope
+	var oldContainers []types.Container
+
+	// Iterate all containers to find old Watchtower containers that
+	// should be cleaned up. Non-Watchtower containers and containers with
+	// normal names are skipped immediately.
+	for _, c := range allContainers {
+		// Skip non-Watchtower containers
+		if !c.IsWatchtower() {
+			continue
+		}
+
+		// Skip containers that are not old predecessors
+		if !container.IsOldContainer(c.Name()) {
+			continue
+		}
+
+		// Scope check: only clean up old containers in the same scope
+		containerScope, containerHasScope := c.Scope()
+		if !containerHasScope || containerScope == "" {
+			containerScope = "none"
+		}
+
+		if containerScope != scope {
+			logrus.WithFields(logrus.Fields{
+				"container":       c.Name(),
+				"container_scope": containerScope,
+				"current_scope":   scope,
+			}).Debug("Skipping old Watchtower container in different scope")
+
+			continue
+		}
+
+		// The updater's self-detection handles the case where the current
+		// container is old (it exits before reaching this point), but
+		// we still guard here for safety in case this function is called from
+		// a different code path.
+		if c.ID() == currentContainerID {
+			continue
+		}
+
+		oldContainers = append(oldContainers, c)
+	}
+
+	if len(oldContainers) == 0 {
+		logrus.Debug("No old Watchtower containers found")
+
+		return 0, nil
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"count":      len(oldContainers),
+		"containers": containerNames(oldContainers),
+	}).Info("Found old Watchtower containers, cleaning up")
+
+	// Find the current container in the list so image collection works
+	var currentContainerObj types.Container
+
+	for _, c := range allContainers {
+		if c.ID() == currentContainerID {
+			currentContainerObj = c
+
+			break
+		}
+	}
+
+	// Reuse the existing removal logic for old containers
+	removed, err := removeExcessContainers(
+		ctx,
+		client,
+		oldContainers,
+		cleanupImages,
+		currentContainerObj,
 		removeImageInfos,
 	)
 	if err != nil {
@@ -186,9 +314,9 @@ func getFilteredContainers(
 	var excessContainers []types.Container
 
 	currentID := string(currentContainer.ID())
-	if container.IsOldNamedContainer(currentContainer.Name()) {
-		// Detection selected an old-named predecessor. Resolve the true
-		// successor by lineage: prefer a non-old-named container whose
+	if container.IsOldContainer(currentContainer.Name()) {
+		// Detection selected an old predecessor. Resolve the true
+		// successor by lineage: prefer a non-old container whose
 		// chain label contains the old container's ID, confirming it is
 		// the direct successor in the self-update chain.
 		currentScope, currentHasScope := currentContainer.Scope()
@@ -200,7 +328,7 @@ func getFilteredContainers(
 		scopeMatchID := ""
 
 		for _, c := range filteredContainers {
-			if container.IsOldNamedContainer(c.Name()) {
+			if container.IsOldContainer(c.Name()) {
 				continue
 			}
 
@@ -276,9 +404,9 @@ func getChainedContainers(
 	var chainedContainers []types.Container
 
 	effectiveCurrent := currentContainer
-	if currentContainer != nil && container.IsOldNamedContainer(currentContainer.Name()) {
-		// Detection selected old-named. Resolve the true successor by
-		// lineage: prefer a non-old-named Watchtower container whose chain
+	if currentContainer != nil && container.IsOldContainer(currentContainer.Name()) {
+		// Detection selected old. Resolve the true successor by
+		// lineage: prefer a non-old Watchtower container whose chain
 		// label contains the old container's ID. Fall back to scope-only
 		// matching if no explicit lineage link exists.
 		currentScope, currentHasScope := currentContainer.Scope()
@@ -289,7 +417,7 @@ func getChainedContainers(
 		chainMatch := false
 
 		for _, c := range allContainers {
-			if !c.IsWatchtower() || container.IsOldNamedContainer(c.Name()) {
+			if !c.IsWatchtower() || container.IsOldContainer(c.Name()) {
 				continue
 			}
 
@@ -544,7 +672,7 @@ func removeExcessContainers(
 	}
 
 	logrus.WithField("removed_instances", excessInstancesRemoved).
-		Info("Successfully removed all excess Watchtower instances")
+		Info("Successfully removed all excess Watchtower containers")
 
 	return excessInstancesRemoved, nil
 }

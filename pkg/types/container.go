@@ -8,6 +8,11 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 )
 
+// WatchtowerOldPrefix is the prefix used when renaming Watchtower containers
+// during self-update. It is the single source of truth for both rename
+// generation and old-name detection to prevent cross-file protocol drift.
+const WatchtowerOldPrefix = "watchtower-old-"
+
 // Container defines a docker container's interface in Watchtower.
 type Container interface {
 	ContainerInfo() *dockerContainer.InspectResponse  // Container metadata.

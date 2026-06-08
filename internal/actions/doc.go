@@ -4,7 +4,7 @@
 // Key components:
 //   - Update: Scans and updates containers based on parameters.
 //   - ValidateRollingRestartDependencies: Validates environment for rolling restarts.
-//   - CheckForMultipleWatchtowerInstances: Ensures single Watchtower instance.
+//   - CheckForMultipleWatchtowerContainers: Ensures single Watchtower container.
 //   - RunUpdatesWithNotifications: Performs container updates and sends notifications about the results.
 //   - CleanupImages: Removes specified image IDs from the Docker environment.
 //   - UpdateImplicitRestart: Marks containers linked to restarting ones for proper restart order.
