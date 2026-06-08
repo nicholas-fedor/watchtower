@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Add additional safeguards to address persistent old Watchtower containers by @nicholas-fedor in [#1743](https://github.com/nicholas-fedor/watchtower/pull/1743)
 - Update Shoutrrr MS Teams integration by @nicholas-fedor in [#1718](https://github.com/nicholas-fedor/watchtower/pull/1718)
 - Resolve stale watchtower container ambiguity in detection and cleanup by @nicholas-fedor in [#1713](https://github.com/nicholas-fedor/watchtower/pull/1713)
 - Strip quotes from cron schedule spec before parsing by @nicholas-fedor in [#1686](https://github.com/nicholas-fedor/watchtower/pull/1686)
