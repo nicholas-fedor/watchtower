@@ -139,6 +139,11 @@ func CleanupOldWatchtowerContainers(
 		"cleanup_images": cleanupImages,
 	}).Debug("Checking for old Watchtower containers")
 
+	// Normalize empty scope to "none" for consistent comparison.
+	if scope == "" {
+		scope = "none"
+	}
+
 	// List all containers to find old instances
 	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
 	if err != nil {
