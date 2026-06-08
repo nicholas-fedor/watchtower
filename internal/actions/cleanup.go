@@ -148,11 +148,16 @@ func CleanupOldWatchtowerContainers(
 	// Find old-named Watchtower containers within the same scope
 	var oldContainers []types.Container
 
+	// Iterate all containers to find old-named Watchtower instances that
+	// should be cleaned up. Non-Watchtower containers and containers with
+	// normal names are skipped immediately.
 	for _, c := range allContainers {
+		// Skip non-Watchtower containers
 		if !c.IsWatchtower() {
 			continue
 		}
 
+		// Skip containers that are not old-named predecessors
 		if !container.IsOldNamedContainer(c.Name()) {
 			continue
 		}
