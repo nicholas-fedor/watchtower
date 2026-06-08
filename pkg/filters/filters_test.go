@@ -8,76 +8,76 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
 
-func TestExcludeOldNamedWatchtowerFilter(t *testing.T) {
+func TestExcludeOldWatchtowerFilter(t *testing.T) {
 	t.Parallel()
 
 	// Test non-Watchtower container (should pass)
 	nonWatchtower := new(mockContainer.FilterableContainer)
 	nonWatchtower.On("IsWatchtower").Return(false)
 	nonWatchtower.On("Name").Return("/regular-app").Maybe()
-	assert.True(t, ExcludeOldNamedWatchtowerFilter(nonWatchtower))
+	assert.True(t, ExcludeOldWatchtowerFilter(nonWatchtower))
 	nonWatchtower.AssertExpectations(t)
 
 	// Test regular Watchtower container (should pass)
 	watchtower := new(mockContainer.FilterableContainer)
 	watchtower.On("IsWatchtower").Return(true)
 	watchtower.On("Name").Return("/watchtower")
-	assert.True(t, ExcludeOldNamedWatchtowerFilter(watchtower))
+	assert.True(t, ExcludeOldWatchtowerFilter(watchtower))
 	watchtower.AssertExpectations(t)
 
-	// Test old-named Watchtower container (should be excluded)
-	oldNamed := new(mockContainer.FilterableContainer)
-	oldNamed.On("IsWatchtower").Return(true)
-	oldNamed.On("Name").Return("/watchtower-old-abc123")
-	assert.False(t, ExcludeOldNamedWatchtowerFilter(oldNamed))
-	oldNamed.AssertExpectations(t)
+	// Test old Watchtower container (should be excluded)
+	oldContainer := new(mockContainer.FilterableContainer)
+	oldContainer.On("IsWatchtower").Return(true)
+	oldContainer.On("Name").Return("/watchtower-old-abc123")
+	assert.False(t, ExcludeOldWatchtowerFilter(oldContainer))
+	oldContainer.AssertExpectations(t)
 
-	// Test old-named Watchtower container without leading slash (should be excluded)
-	oldNamedNoSlash := new(mockContainer.FilterableContainer)
-	oldNamedNoSlash.On("IsWatchtower").Return(true)
-	oldNamedNoSlash.On("Name").Return("watchtower-old-def456")
-	assert.False(t, ExcludeOldNamedWatchtowerFilter(oldNamedNoSlash))
-	oldNamedNoSlash.AssertExpectations(t)
+	// Test old Watchtower container without leading slash (should be excluded)
+	oldContainerNoSlash := new(mockContainer.FilterableContainer)
+	oldContainerNoSlash.On("IsWatchtower").Return(true)
+	oldContainerNoSlash.On("Name").Return("watchtower-old-def456")
+	assert.False(t, ExcludeOldWatchtowerFilter(oldContainerNoSlash))
+	oldContainerNoSlash.AssertExpectations(t)
 
 	// Test container with similar but different prefix (should pass)
 	similarPrefix := new(mockContainer.FilterableContainer)
 	similarPrefix.On("IsWatchtower").Return(true)
 	similarPrefix.On("Name").Return("/watchtower-oldinstance")
-	assert.True(t, ExcludeOldNamedWatchtowerFilter(similarPrefix))
+	assert.True(t, ExcludeOldWatchtowerFilter(similarPrefix))
 	similarPrefix.AssertExpectations(t)
 }
 
-func TestIsOldNamedWatchtower(t *testing.T) {
+func TestIsOldWatchtower(t *testing.T) {
 	t.Parallel()
 
 	nonWatchtower := new(mockContainer.FilterableContainer)
 	nonWatchtower.On("IsWatchtower").Return(false)
 	nonWatchtower.On("Name").Return("/regular-app").Maybe()
-	assert.False(t, IsOldNamedWatchtower(nonWatchtower))
+	assert.False(t, IsOldWatchtower(nonWatchtower))
 	nonWatchtower.AssertExpectations(t)
 
 	watchtower := new(mockContainer.FilterableContainer)
 	watchtower.On("IsWatchtower").Return(true)
 	watchtower.On("Name").Return("/watchtower")
-	assert.False(t, IsOldNamedWatchtower(watchtower))
+	assert.False(t, IsOldWatchtower(watchtower))
 	watchtower.AssertExpectations(t)
 
-	oldNamed := new(mockContainer.FilterableContainer)
-	oldNamed.On("IsWatchtower").Return(true)
-	oldNamed.On("Name").Return("/watchtower-old-abc123")
-	assert.True(t, IsOldNamedWatchtower(oldNamed))
-	oldNamed.AssertExpectations(t)
+	oldContainer := new(mockContainer.FilterableContainer)
+	oldContainer.On("IsWatchtower").Return(true)
+	oldContainer.On("Name").Return("/watchtower-old-abc123")
+	assert.True(t, IsOldWatchtower(oldContainer))
+	oldContainer.AssertExpectations(t)
 
-	oldNamedNoSlash := new(mockContainer.FilterableContainer)
-	oldNamedNoSlash.On("IsWatchtower").Return(true)
-	oldNamedNoSlash.On("Name").Return("watchtower-old-def456")
-	assert.True(t, IsOldNamedWatchtower(oldNamedNoSlash))
-	oldNamedNoSlash.AssertExpectations(t)
+	oldContainerNoSlash := new(mockContainer.FilterableContainer)
+	oldContainerNoSlash.On("IsWatchtower").Return(true)
+	oldContainerNoSlash.On("Name").Return("watchtower-old-def456")
+	assert.True(t, IsOldWatchtower(oldContainerNoSlash))
+	oldContainerNoSlash.AssertExpectations(t)
 
 	similarPrefix := new(mockContainer.FilterableContainer)
 	similarPrefix.On("IsWatchtower").Return(true)
 	similarPrefix.On("Name").Return("/watchtower-oldinstance")
-	assert.False(t, IsOldNamedWatchtower(similarPrefix))
+	assert.False(t, IsOldWatchtower(similarPrefix))
 	similarPrefix.AssertExpectations(t)
 }
 

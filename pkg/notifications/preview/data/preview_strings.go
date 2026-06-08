@@ -95,7 +95,7 @@ var infoMessages = []string{
 	"Detected multiple Watchtower instances - initiating cleanup",
 	"Stopping container",
 	"Removing image",
-	"Successfully cleaned up excess Watchtower instances",
+	"Successfully cleaned up old Watchtower containers",
 	"Watchtower v1.11.7 using Docker API v1.51",
 	"Using notifications: gotify",
 	"Checking all containers (except explicitly disabled with label)",

@@ -46,9 +46,9 @@ var (
 var (
 	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
 	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
-	// errStopWatchtowerFailed flags failures in stopping excess Watchtower instances.
+	// errStopWatchtowerFailed flags failures in stopping excess Watchtower containers.
 	errStopWatchtowerFailed = errors.New("errors occurred while stopping watchtower containers")
-	// errOldNamedSelfDetected indicates the current container is an old-named
-	// Watchtower instance that should not be running.
-	errOldNamedSelfDetected = errors.New("current container is an old-named Watchtower instance")
+	// errOldSelfDetected indicates the current container is an old
+	// Watchtower container that should not be running.
+	errOldSelfDetected = errors.New("current container is an old Watchtower container")
 )

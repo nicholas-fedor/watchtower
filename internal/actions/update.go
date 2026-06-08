@@ -74,16 +74,16 @@ func Update(
 	// Initialize a slice to collect cleaned image info for cleanup after updates.
 	cleanupImageInfos := []types.RemovedImageInfo{}
 
-	// Self-check: if the current container is an old-named Watchtower instance,
+	// Self-check: if the current container is an old Watchtower container,
 	// update its restart policy to "no" and exit to prevent Docker from
 	// restarting it. This catches cases where the startup check was bypassed
 	// or the container was restarted despite other safeguards.
 	if config.CurrentContainerID != "" {
 		for _, c := range allContainers {
 			if c.ID() == config.CurrentContainerID && c.IsWatchtower() {
-				if container.IsOldNamedContainer(c.Name()) {
+				if container.IsOldContainer(c.Name()) {
 					logrus.WithField("container", c.Name()).
-						Debug("Current container is an old-named Watchtower instance, stopping self")
+						Debug("Current container is an old Watchtower container, stopping self")
 
 					updateConfig := dockerContainer.UpdateConfig{
 						RestartPolicy: dockerContainer.RestartPolicy{
@@ -94,10 +94,10 @@ func Update(
 					err := client.UpdateContainer(ctx, c, updateConfig)
 					if err != nil {
 						logrus.WithError(err).
-							Warn("Failed to update restart policy to 'no' for old container")
+							Warn("Failed to update restart policy to 'no' for old Watchtower container")
 					}
 
-					return nil, nil, errOldNamedSelfDetected
+					return nil, nil, errOldSelfDetected
 				}
 
 				break
@@ -105,7 +105,7 @@ func Update(
 		}
 	}
 
-	// Clean up any old-named Watchtower containers that linger from a previous
+	// Clean up any old Watchtower containers that linger from a previous
 	// self-update. This runs each update cycle to catch containers that the
 	// startup cleanup may have missed (e.g., they were still stopping at startup).
 	// Scope is derived from the current container to avoid crossing scope boundaries.
@@ -119,7 +119,7 @@ func Update(
 		)
 
 		if !found {
-			logrus.Debug("Skipping old-named container cleanup: current container not found in list")
+			logrus.Debug("Skipping old container cleanup: current container not found in list")
 		} else {
 			if currentScope == "" {
 				currentScope = "none"
@@ -135,7 +135,7 @@ func Update(
 			)
 			if cleanupErr != nil {
 				logrus.WithError(cleanupErr).
-					Warn("Failed to clean up old-named Watchtower containers, continuing update cycle")
+					Warn("Failed to clean up old Watchtower containers, continuing update cycle")
 			}
 		}
 	}
@@ -730,9 +730,9 @@ func shouldUpdateContainer(
 		return false
 	}
 
-	// Skip old-named Watchtower containers — they are predecessors from a
+	// Skip old Watchtower containers — they are predecessors from a
 	// self-update and should only be removed, never updated.
-	if filters.IsOldNamedWatchtower(container) {
+	if filters.IsOldWatchtower(container) {
 		return false
 	}
 
@@ -1750,7 +1750,7 @@ func restartStaleContainer(
 
 		// Redundant rename guard: the lingering old instance already has the
 		// target name from a prior rename. Skip to avoid a same-name error.
-		if container.IsOldNamedContainer(sourceContainer.Name()) {
+		if container.IsOldContainer(sourceContainer.Name()) {
 			logrus.WithFields(fields).
 				WithField("target_name", targetOldName).
 				Debug("Skipping rename of already-renamed Watchtower container")

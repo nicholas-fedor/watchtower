@@ -723,7 +723,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
 
-		ginkgo.It("should cleanup old-named container via name belt even when current detection points to the old-named one", func() {
+		ginkgo.It("should cleanup old container via name belt even when current detection points to the old one", func() {
 			oldID := types.ContainerID("old123")
 
 			oldContainer := createMockContainer(
@@ -765,7 +765,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			// Belt case: current detection selected the old-named predecessor.
+			// Belt case: current detection selected the old predecessor.
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
 				context.Background(),
 				mockClient,
@@ -780,8 +780,8 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
 
-		ginkgo.It("should select same-scope successor when resolving old-named current container", func() {
-			// Old-named current in scope-a with two non-old successors in different scopes.
+		ginkgo.It("should select same-scope successor when resolving old current container", func() {
+			// Old current in scope-a with two non-old successors in different scopes.
 			// Must pick the scope-a successor, not the scope-b one.
 			oldID := types.ContainerID("old-scoped-a")
 

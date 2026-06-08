@@ -91,8 +91,8 @@ var _ = ginkgo.Describe("the update action", func() {
 		)
 	})
 
-	ginkgo.When("the current container is an old-named Watchtower instance", func() {
-		ginkgo.It("should detect self as old-named and return error without updating", func() {
+	ginkgo.When("the current container is an old Watchtower container", func() {
+		ginkgo.It("should detect self as old and return error without updating", func() {
 			config := &dockerContainer.Config{
 				Image:  "watchtower:latest",
 				Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
@@ -122,12 +122,12 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("old-named Watchtower instance"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("old Watchtower container"))
 			gomega.Expect(report).To(gomega.BeNil())
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
 
-		ginkgo.It("should update restart policy to no when detecting self as old-named", func() {
+		ginkgo.It("should update restart policy to no when detecting self as old", func() {
 			config := &dockerContainer.Config{
 				Image:  "watchtower:latest",
 				Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(client.TestData.LastUpdateConfig.RestartPolicy.Name).To(gomega.BeEquivalentTo("no"))
 		})
 
-		ginkgo.It("should proceed normally when current container is not old-named", func() {
+		ginkgo.It("should proceed normally when current container is not old", func() {
 			normalContainer := mockActions.CreateMockContainer(
 				"current-id",
 				"watchtower",

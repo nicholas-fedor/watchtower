@@ -294,7 +294,7 @@ func RunUpgradesOnSchedule(
 //     an ancestor in the self-update lineage.
 //
 // If either condition is true and the run-once flag is not set, the program should exit
-// to prevent a stale Watchtower instance from running.
+// to prevent an old Watchtower container from running.
 //
 // Parameters:
 //   - c: The current Watchtower container to check.
@@ -310,7 +310,7 @@ func ShouldExitDueToInvalidRestart(
 		return false
 	}
 
-	if container.IsOldNamedContainer(c.Name()) {
+	if container.IsOldContainer(c.Name()) {
 		runOnce, _ := flags.GetBool("run-once")
 		if !runOnce {
 			return true
