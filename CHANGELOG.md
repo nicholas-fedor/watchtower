@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/govulncheck-action action to v1.0.5 by @renovate[bot] in [#1746](https://github.com/nicholas-fedor/watchtower/pull/1746)
 - Update nicholas-fedor/actionlint-action action to v1.0.5 by @renovate[bot] in [#1744](https://github.com/nicholas-fedor/watchtower/pull/1744)
 - Update nicholas-fedor/actionlint-action action to v1.0.4 by @renovate[bot] in [#1741](https://github.com/nicholas-fedor/watchtower/pull/1741)
 - Update codecov/codecov-action action to v7 by @renovate[bot] in [#1739](https://github.com/nicholas-fedor/watchtower/pull/1739)
