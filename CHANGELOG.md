@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update alpine docker tag to v3.24.0 by @renovate[bot] in [#1767](https://github.com/nicholas-fedor/watchtower/pull/1767)
+
+## [1.18.0] - 2026-06-09
+
 ### Added
 
 - Add barnabasbusa as a contributor for code and doc by @allcontributors[bot] in [#1706](https://github.com/nicholas-fedor/watchtower/pull/1706)
@@ -3117,7 +3123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.17.2...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.18.0...HEAD)
+- [1.18.0](https://github.com/nicholas-fedor/watchtower/compare/v1.17.2...v1.18.0)
 - [1.17.2](https://github.com/nicholas-fedor/watchtower/compare/v1.17.1...v1.17.2)
 - [1.17.1](https://github.com/nicholas-fedor/watchtower/compare/v1.17.0...v1.17.1)
 - [1.17.0](https://github.com/nicholas-fedor/watchtower/compare/v1.16.1...v1.17.0)
