@@ -57,8 +57,9 @@ const (
 	// inside the container) before updating the container.
 	hostPreUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.host-pre-update"
 	// hostPreStartLabel specifies a command to run on the Watchtower host after the old
-	// container has been stopped and removed but before the new container is started.
-	// This host-only phase (the container is not running) is useful for backing up volumes.
+	// container has been stopped but before it is removed and the new container is started.
+	// The container is stopped yet still present, so this host-only phase can inspect it
+	// (e.g. to resolve volumes) and is useful for backing up volumes.
 	hostPreStartLabel = "com.centurylinklabs.watchtower.lifecycle.host-pre-start"
 	// postUpdateLabel specifies a command to run after updating the container.
 	postUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.post-update"
@@ -135,8 +136,8 @@ func (c *Container) GetLifecycleHostPreUpdateCommand() string {
 // GetLifecycleHostPreStartCommand returns the host pre-start command from labels.
 //
 // This command is intended to be executed on the Watchtower host (the process running
-// Watchtower) after the old container has been stopped and removed but before the new
-// container is started. It has no in-container counterpart, as the container is not
+// Watchtower) after the old container has been stopped but before it is removed and the
+// new container is started. It has no in-container counterpart, as the container is not
 // running at this point.
 //
 // Returns:

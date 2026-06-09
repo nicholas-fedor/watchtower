@@ -1040,6 +1040,63 @@ func (_c *MockClient_StopAndRemoveContainer_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// RemoveStoppedContainer provides a mock function for the type MockClient
+func (_mock *MockClient) RemoveStoppedContainer(ctx context.Context, container types.Container) error {
+	ret := _mock.Called(ctx, container)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveStoppedContainer")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container) error); ok {
+		r0 = returnFunc(ctx, container)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_RemoveStoppedContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveStoppedContainer'
+type MockClient_RemoveStoppedContainer_Call struct {
+	*mock.Call
+}
+
+// RemoveStoppedContainer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - container types.Container
+func (_e *MockClient_Expecter) RemoveStoppedContainer(ctx interface{}, container interface{}) *MockClient_RemoveStoppedContainer_Call {
+	return &MockClient_RemoveStoppedContainer_Call{Call: _e.mock.On("RemoveStoppedContainer", ctx, container)}
+}
+
+func (_c *MockClient_RemoveStoppedContainer_Call) Run(run func(ctx context.Context, container types.Container)) *MockClient_RemoveStoppedContainer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.Container
+		if args[1] != nil {
+			arg1 = args[1].(types.Container)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_RemoveStoppedContainer_Call) Return(err error) *MockClient_RemoveStoppedContainer_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_RemoveStoppedContainer_Call) RunAndReturn(run func(ctx context.Context, container types.Container) error) *MockClient_RemoveStoppedContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StopContainer provides a mock function for the type MockClient
 func (_mock *MockClient) StopContainer(ctx context.Context, container types.Container, timeout time.Duration) error {
 	ret := _mock.Called(ctx, container, timeout)

@@ -133,6 +133,19 @@ type Client interface {
 	//   - error: Non-nil if stop/removal fails, nil on success.
 	StopAndRemoveContainer(ctx context.Context, container types.Container, timeout time.Duration) error
 
+	// RemoveStoppedContainer removes an already-stopped container, honoring the
+	// configured volume-removal and AutoRemove behavior. It is the removal half of
+	// StopAndRemoveContainer, exposed so callers can act (e.g. run host lifecycle hooks)
+	// while the container is stopped but still present on the host.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to remove (expected to already be stopped).
+	//
+	// Returns:
+	//   - error: Non-nil if removal fails, nil on success.
+	RemoveStoppedContainer(ctx context.Context, container types.Container) error
+
 	// CreateContainer creates a new container based on the provided
 	// container's configuration, but does not start it.
 	//
@@ -627,6 +640,34 @@ func (c *client) StopAndRemoveContainer(ctx context.Context, container types.Con
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}).Debug("Stopped and removed container")
+
+	return nil
+}
+
+// RemoveStoppedContainer removes an already-stopped container, honoring the configured
+// volume-removal and AutoRemove behavior.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - container: Container to remove (expected to already be stopped).
+//
+// Returns:
+//   - error: Non-nil if removal fails, nil on success.
+func (c *client) RemoveStoppedContainer(ctx context.Context, container types.Container) error {
+	err := RemoveSourceContainer(ctx, c.api, container, c.RemoveVolumes)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		}).Debug("Failed to remove stopped container")
+
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}).Debug("Removed stopped container")
 
 	return nil
 }

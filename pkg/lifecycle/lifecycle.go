@@ -441,15 +441,16 @@ func ExecuteHostPreUpdateCommand(ctx context.Context, container types.Container)
 // ExecuteHostPreStartCommand executes the host pre-start hook for a container.
 //
 // The command runs on the Watchtower host (the process running Watchtower) after the
-// old container has been stopped and removed but before the new container is started.
-// Because the container is not running at this point, this hook is host-only and has
-// no in-container counterpart; it is well suited to backing up volumes while they are
-// idle. The triggering container's name, ID, and image are exposed via
-// WT_CONTAINER_NAME, WT_CONTAINER_ID, and WT_CONTAINER_IMAGE_NAME environment
-// variables.
+// old container has been stopped but before it is removed and the new container is
+// started. Because the container is stopped yet still present at this point, the hook
+// can inspect it (e.g. `docker inspect` to resolve volumes) while no process is writing
+// to its data — making it well suited to backing up volumes. This hook is host-only and
+// has no in-container counterpart, as the container is not running. The triggering
+// container's name, ID, and image are exposed via WT_CONTAINER_NAME, WT_CONTAINER_ID,
+// and WT_CONTAINER_IMAGE_NAME environment variables.
 //
-// A non-zero exit code is logged but does not abort the restart, since the old
-// container is already gone and should not be left stopped.
+// A non-zero exit code is logged but does not abort the restart, to avoid leaving the
+// service down because, for example, a backup failed.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout.

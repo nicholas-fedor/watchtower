@@ -413,6 +413,12 @@ func (client MockClient) RemoveContainer(ctx context.Context, _ types.Container)
 	return nil
 }
 
+// RemoveStoppedContainer simulates removing an already-stopped container.
+// It delegates to RemoveContainer to mirror the production removal behavior.
+func (client MockClient) RemoveStoppedContainer(ctx context.Context, c types.Container) error {
+	return client.RemoveContainer(ctx, c)
+}
+
 // CreateEphemeralOrchestrator simulates creating an ephemeral orchestrator container.
 // It records the container chain parameter for test verification and returns a mock
 // container ID for the orchestrator and nil error to indicate success.

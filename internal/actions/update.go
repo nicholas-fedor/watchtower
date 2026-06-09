@@ -1489,7 +1489,15 @@ func stopStaleContainer(
 		}
 	}
 
-	// Stop the container with the configured timeout.
+	// When a host pre-start hook is configured, split the stop and removal so the hook
+	// can run while the old container is stopped but still present on the host (e.g. so a
+	// backup script can resolve its volumes via `docker inspect`). Otherwise, stop and
+	// remove in a single operation.
+	if config.LifecycleHooks && container.GetLifecycleHostPreStartCommand() != "" {
+		return stopRemoveWithHostPreStart(ctx, container, client, config, fields)
+	}
+
+	// Stop and remove the container with the configured timeout.
 	err := client.StopAndRemoveContainer(
 		ctx,
 		container,
@@ -1509,6 +1517,70 @@ func stopStaleContainer(
 		logrus.WithFields(fields).
 			WithError(err).
 			Error("Failed to stop container")
+
+		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
+	}
+
+	return nil
+}
+
+// stopRemoveWithHostPreStart stops a container, runs the host pre-start lifecycle hook
+// while the container is stopped but not yet removed, then removes it.
+//
+// This ordering lets host pre-start hooks inspect the still-present container (for
+// example, to discover its mounts/volumes via `docker inspect`) before backing them up.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - container: Container to stop and remove.
+//   - client: Container client for Docker operations.
+//   - config: Update options controlling stop/removal behavior.
+//   - fields: Pre-populated log fields for the container.
+//
+// Returns:
+//   - error: Non-nil if stopping or removing the container fails, nil on success.
+func stopRemoveWithHostPreStart(
+	ctx context.Context,
+	container types.Container,
+	client container.Client,
+	config types.UpdateParams,
+	fields logrus.Fields,
+) error {
+	// Stop the container without removing it.
+	if err := client.StopContainer(ctx, container, config.Timeout); err != nil {
+		if cerrdefs.IsNotFound(err) {
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Container not found, treating as already stopped")
+
+			return nil
+		}
+
+		logrus.WithFields(fields).
+			WithError(err).
+			Error("Failed to stop container")
+
+		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
+	}
+
+	// Run the host pre-start hook while the container is stopped but still present.
+	logrus.WithFields(fields).
+		Debug("Executing host pre-start command")
+	lifecycle.ExecuteHostPreStartCommand(ctx, container)
+
+	// Remove the now-stopped container, honoring volume/AutoRemove configuration.
+	if err := client.RemoveStoppedContainer(ctx, container); err != nil {
+		if cerrdefs.IsNotFound(err) {
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Container not found, treating as already removed")
+
+			return nil
+		}
+
+		logrus.WithFields(fields).
+			WithError(err).
+			Error("Failed to remove container")
 
 		return fmt.Errorf("%w: %w", errStopContainerFailed, err)
 	}
@@ -1833,16 +1905,6 @@ func restartStaleContainer(
 					Debug("Updated container chain label for Watchtower self-update")
 			}
 		}
-	}
-
-	// Run host pre-start lifecycle hook if enabled, after the old container has been
-	// stopped and removed but before the new container is created and started. This
-	// host-only window (the container is not running) is suited to backing up volumes.
-	if config.LifecycleHooks {
-		logrus.WithFields(fields).
-			Debug("Executing host pre-start command")
-		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-		lifecycle.ExecuteHostPreStartCommand(detachedCtx, sourceContainer)
 	}
 
 	// Create the new container with updated configuration.

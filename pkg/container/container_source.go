@@ -330,16 +330,42 @@ func StopAndRemoveSourceContainer(
 	timeout time.Duration,
 	removeVolumes bool,
 ) error {
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"id":        sourceContainer.ID().ShortID(),
-	})
-
 	// Stop the container first
 	err := StopSourceContainer(ctx, api, sourceContainer, timeout)
 	if err != nil {
 		return err
 	}
+
+	// Remove the now-stopped container, honoring AutoRemove and volume options.
+	return RemoveSourceContainer(ctx, api, sourceContainer, removeVolumes)
+}
+
+// RemoveSourceContainer removes an already-stopped container using the Docker API.
+//
+// It honors the container's AutoRemove configuration (skipping explicit removal when
+// Docker already removes the container automatically) and optionally removes associated
+// volumes. This is the removal half of StopAndRemoveSourceContainer, exposed separately
+// so callers can run logic (such as host lifecycle hooks) while the container is stopped
+// but still present.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client for interacting with the Docker daemon.
+//   - sourceContainer: Container object to remove, containing metadata like name and ID.
+//   - removeVolumes: Boolean indicating whether to remove associated volumes during removal.
+//
+// Returns:
+//   - error: Non-nil if removing the container fails, nil on successful completion.
+func RemoveSourceContainer(
+	ctx context.Context,
+	api dockerClient.APIClient,
+	sourceContainer types.Container,
+	removeVolumes bool,
+) error {
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"id":        sourceContainer.ID().ShortID(),
+	})
 
 	// Check if the container has AutoRemove enabled in its HostConfig, which automatically removes
 	// the container after stopping, eliminating the need for an explicit removal call.
@@ -359,7 +385,7 @@ func StopAndRemoveSourceContainer(
 
 	// Call the Docker API's ContainerRemove to delete the container, forcing termination of any
 	// lingering processes (via SIGKILL if needed) and removing volumes if specified.
-	_, err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerClient.ContainerRemoveOptions{
+	_, err := api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerClient.ContainerRemoveOptions{
 		Force:         true,          // Ensure any lingering processes are terminated before removal.
 		RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
 	})

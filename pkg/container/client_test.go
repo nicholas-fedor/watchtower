@@ -1768,6 +1768,48 @@ func TestStopAndRemoveContainer_ContainerDoesNotExistAfterStopping(t *testing.T)
 	})
 }
 
+func TestRemoveStoppedContainer_RemovesContainer(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		removed := false
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/containers/") {
+				removed = true
+
+				w.WriteHeader(http.StatusNoContent)
+
+				return
+			}
+			// A stop must not be issued: the container is expected to already be stopped.
+			if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/stop") {
+				t.Errorf("unexpected stop call in RemoveStoppedContainer")
+			}
+		}))
+		defer server.Close()
+
+		docker, _ := dockerClient.New(
+			dockerClient.WithHost(server.URL),
+			dockerClient.WithHTTPClient(server.Client()),
+		)
+
+		// Container already stopped.
+		mockedContainer := MockContainer(
+			WithContainerState(dockerContainer.State{Running: false}),
+		)
+
+		err := (&client{api: docker}).RemoveStoppedContainer(
+			context.Background(),
+			mockedContainer,
+		)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		if !removed {
+			t.Errorf("expected container to be removed")
+		}
+	})
+}
+
 func TestStopContainer_StoppingFailsWithUnexpectedError(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
