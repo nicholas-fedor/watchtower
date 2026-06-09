@@ -166,6 +166,15 @@ func (m mockContainer) GetLifecycleHostPreUpdateCommand() string {
 	return "" // Minimal stub, not used in these tests
 }
 
+// GetLifecycleHostPreStartCommand returns a string representing the command to run
+// on the Watchtower host between stopping the old container and starting the new one.
+// This method satisfies the types.Container interface, returning an empty string as a
+// minimal stub since the auth package does not rely on this functionality in these
+// authentication-focused tests.
+func (m mockContainer) GetLifecycleHostPreStartCommand() string {
+	return "" // Minimal stub, not used in these tests
+}
+
 // GetLifecyclePostUpdateCommand returns a string representing the command to run
 // after a lifecycle update (e.g., post-update actions). This method satisfies the
 // types.Container interface, returning an empty string as a minimal stub since the auth

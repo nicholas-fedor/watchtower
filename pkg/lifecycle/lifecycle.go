@@ -22,6 +22,7 @@ const (
 	hookTypePreCheck   = "pre-check"
 	hookTypePostCheck  = "post-check"
 	hookTypePreUpdate  = "pre-update"
+	hookTypePreStart   = "pre-start"
 	hookTypePostUpdate = "post-update"
 )
 
@@ -435,6 +436,45 @@ func ExecuteHostPreUpdateCommand(ctx context.Context, container types.Container)
 	clog.WithField("skip_update", skipUpdate).Debug("Host pre-update command executed")
 
 	return skipUpdate, nil
+}
+
+// ExecuteHostPreStartCommand executes the host pre-start hook for a container.
+//
+// The command runs on the Watchtower host (the process running Watchtower) after the
+// old container has been stopped and removed but before the new container is started.
+// Because the container is not running at this point, this hook is host-only and has
+// no in-container counterpart; it is well suited to backing up volumes while they are
+// idle. The triggering container's name, ID, and image are exposed via
+// WT_CONTAINER_NAME, WT_CONTAINER_ID, and WT_CONTAINER_IMAGE_NAME environment
+// variables.
+//
+// A non-zero exit code is logged but does not abort the restart, since the old
+// container is already gone and should not be left stopped.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout.
+//   - container: Container to process.
+func ExecuteHostPreStartCommand(ctx context.Context, container types.Container) {
+	timeout := container.PreUpdateTimeout()
+	command := container.GetLifecycleHostPreStartCommand()
+	clog := logrus.WithFields(logrus.Fields{
+		"container": container.Name(),
+		"timeout":   timeout,
+	})
+
+	// Skip if no command is set.
+	if len(command) == 0 {
+		clog.Debug("No host pre-start command supplied. Skipping")
+
+		return
+	}
+
+	// Execute command with the pre-update timeout, as backups may be long-running.
+	clog.WithField("command", command).Debug("Executing host pre-start command")
+
+	if _, err := executeHostCommand(ctx, command, timeout, hostCommandEnv(container, hookTypePreStart)); err != nil {
+		clog.WithError(err).Debug("Host pre-start command failed")
+	}
 }
 
 // ExecutePostUpdateCommand executes the post-update hook for a container.

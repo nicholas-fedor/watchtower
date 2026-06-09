@@ -107,6 +107,7 @@ func (c *SimpleContainer) GetLifecyclePostCheckCommand() string             { re
 func (c *SimpleContainer) GetLifecycleHostPostCheckCommand() string         { return "" }
 func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string             { return "" }
 func (c *SimpleContainer) GetLifecycleHostPreUpdateCommand() string         { return "" }
+func (c *SimpleContainer) GetLifecycleHostPreStartCommand() string          { return "" }
 func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string            { return "" }
 func (c *SimpleContainer) GetLifecycleHostPostUpdateCommand() string        { return "" }
 func (c *SimpleContainer) GetLifecycleUID() (int, bool)                     { return 0, false }

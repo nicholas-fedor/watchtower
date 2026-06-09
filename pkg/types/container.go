@@ -37,6 +37,7 @@ type Container interface {
 	GetLifecycleHostPostCheckCommand() string         // Host post-check command (runs on the host).
 	GetLifecyclePreUpdateCommand() string             // Pre-update command.
 	GetLifecycleHostPreUpdateCommand() string         // Host pre-update command (runs on the host).
+	GetLifecycleHostPreStartCommand() string          // Host pre-start command (runs on the host between stop and start).
 	GetLifecyclePostUpdateCommand() string            // Post-update command.
 	GetLifecycleHostPostUpdateCommand() string        // Host post-update command (runs on the host).
 	GetLifecycleUID() (int, bool)                     // UID for lifecycle hooks, with presence.

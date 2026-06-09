@@ -306,6 +306,48 @@ func TestContainer_GetLifecycleHostPreUpdateCommand(t *testing.T) {
 	}
 }
 
+func TestContainer_GetLifecycleHostPreStartCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		c    *Container
+		want string
+	}{
+		{
+			name: "HostPreStartLabelSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							hostPreStartLabel: "echo host-pre-start",
+						},
+					},
+				},
+			},
+			want: "echo host-pre-start",
+		},
+		{
+			name: "HostPreStartLabelNotSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.c.GetLifecycleHostPreStartCommand()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestContainer_GetLifecycleHostPostUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name string

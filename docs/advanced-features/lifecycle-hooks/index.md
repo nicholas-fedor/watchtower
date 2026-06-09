@@ -29,6 +29,7 @@ In addition to the in-container hooks above, Watchtower supports **host-side** h
 |----------------------|--------------------------------------------------------------------------------------|---------------------------------------------|
 | **Host pre-check**   | Executed on the Watchtower host for each filtered container before the update cycle  | Per container, before scanning containers   |
 | **Host pre-update**  | Executed on the Watchtower host before stopping the old container                    | Per container, immediately before stopping  |
+| **Host pre-start**   | Executed on the Watchtower host after the old container is stopped/removed but before the new one starts | Per container, between stop and start   |
 | **Host post-update** | Executed on the Watchtower host after starting the new container                     | Per container, immediately after starting   |
 | **Host post-check**  | Executed on the Watchtower host for each filtered container after the update cycle   | Per container, after all updates            |
 
@@ -81,22 +82,23 @@ LABEL com.centurylinklabs.watchtower.lifecycle.post-check="echo 'Update cycle co
 
 Most lifecycle hooks run *inside* the monitored container via Docker's exec API. The **host** hooks are different: their commands run on the Watchtower host itself (the process running Watchtower), using the host's `sh`. This is useful when the action you want to perform — sending a notification, touching a file, calling an external API — does not have the required tooling installed inside the monitored container.
 
-Each in-container hook has a host-side counterpart, configured with a `host-` prefixed label. They fire at the same point in the update cycle as their in-container equivalent (the host hook runs first):
+Most host hooks have an in-container counterpart, configured with a `host-` prefixed label, and fire at the same point in the update cycle as their in-container equivalent (the host hook runs first). The **host pre-start** hook is host-only — it has no in-container equivalent because it runs in the window between the old container being stopped/removed and the new container being started, when nothing is running:
 
 ```dockerfile title="Host hook labels (each runs on the Watchtower host) "
 LABEL com.centurylinklabs.watchtower.lifecycle.host-pre-check="echo \"Scanning $WT_CONTAINER_NAME\" >> /var/log/watchtower-hooks.log"
 LABEL com.centurylinklabs.watchtower.lifecycle.host-pre-update="/opt/scripts/snapshot.sh"
+LABEL com.centurylinklabs.watchtower.lifecycle.host-pre-start="/opt/scripts/backup-volumes.sh"
 LABEL com.centurylinklabs.watchtower.lifecycle.host-post-update="curl -X POST -d \"$WT_CONTAINER_NAME updated\" http://notifier/local"
 LABEL com.centurylinklabs.watchtower.lifecycle.host-post-check="echo \"Cycle done\" >> /var/log/watchtower-hooks.log"
 ```
 
-The commands run as the Watchtower process's user and inherit Watchtower's environment. Host check hooks use the same fixed 1-minute timeout as their in-container counterparts; host pre/post-update hooks use the configurable `pre-update-timeout` / `post-update-timeout` values.
+The commands run as the Watchtower process's user and inherit Watchtower's environment. Host check hooks use the same fixed 1-minute timeout as their in-container counterparts; host pre-update, pre-start, and post-update hooks use the configurable `pre-update-timeout` / `post-update-timeout` values (the pre-start hook uses `pre-update-timeout`, so raise it for long-running backups).
 
 Unlike the in-container pre-update hook, the host pre-update hook runs regardless of whether the container is currently running (it executes on the host, not inside the container).
 
 ##### Exit code handling
 
-- **Host pre-check / host-post-check / host-post-update**: a non-zero exit code is logged but does not stop the update cycle.
+- **Host pre-check / host-pre-start / host-post-check / host-post-update**: a non-zero exit code is logged but does not stop the update cycle. (For host pre-start in particular, the old container has already been removed, so the new container is started regardless to avoid leaving it down.)
 - **Host pre-update**: mirrors the in-container pre-update semantics — exit code `0` continues, exit code `75` (`EX_TEMPFAIL`) skips updating that container, and any other non-zero exit aborts the update for that container.
 
 !!! Important
@@ -109,7 +111,63 @@ Host hook commands receive details about the triggering container through dedica
 | `WT_CONTAINER_NAME`       | Container name                                                  | `/my-app`        |
 | `WT_CONTAINER_ID`         | Full container ID                                               | `abc123def456…`  |
 | `WT_CONTAINER_IMAGE_NAME` | Container image name with tag                                   | `nginx:latest`   |
-| `WT_HOOK_TYPE`            | Lifecycle phase that triggered the command                      | `pre-check`, `post-check`, `pre-update`, `post-update` |
+| `WT_HOOK_TYPE`            | Lifecycle phase that triggered the command                      | `pre-check`, `post-check`, `pre-update`, `pre-start`, `post-update` |
+
+##### Backing Up Volumes with `host-pre-start`
+
+The `host-pre-start` hook is designed for this case: it runs on the host after the old container has been stopped and removed, but before the new container starts. At that moment nothing is writing to the container's volumes, so it is safe to snapshot or archive them. Because the command runs on the host, the backup tooling (e.g. `tar`, `restic`, `rsync`) only needs to be available on the host, not inside the monitored image.
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+      app:
+        image: myorg/app:latest
+        volumes:
+          - app_data:/data
+        labels:
+          # Archive the named volume's contents on the host before the new container starts.
+          - "com.centurylinklabs.watchtower.lifecycle.host-pre-start=/opt/scripts/backup-volume.sh"
+          # Backups can be slow, so allow up to 30 minutes (uses the pre-update timeout).
+          - "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout=30"
+
+      watchtower:
+        image: nickfedor/watchtower
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+          # The backup script and its destination must be reachable from the Watchtower container,
+          # since "host" means the environment Watchtower itself runs in.
+          - /opt/scripts:/opt/scripts:ro
+          - /var/lib/docker/volumes:/var/lib/docker/volumes:ro
+          - /srv/backups:/srv/backups
+        environment:
+          - WATCHTOWER_LIFECYCLE_HOOKS=true
+
+    volumes:
+      app_data:
+    ```
+
+=== "Backup script (`/opt/scripts/backup-volume.sh`)"
+
+    ```bash
+    #!/bin/sh
+    set -eu
+
+    # Watchtower exposes the triggering container's details as environment variables.
+    NAME=$(echo "$WT_CONTAINER_NAME" | sed 's#^/##')
+    STAMP=$(date +%Y%m%d-%H%M%S)
+    DEST="/srv/backups/${NAME}-${STAMP}.tar.gz"
+
+    echo "[$WT_HOOK_TYPE] Backing up volumes for ${NAME} to ${DEST}"
+
+    # The container is stopped at this point, so the data is in a consistent state.
+    tar -czf "$DEST" -C /var/lib/docker/volumes "${NAME}_app_data"
+
+    echo "Backup complete: ${DEST}"
+    ```
+
+!!! Note
+    A failing `host-pre-start` command is logged but does **not** abort the update — the old container has already been removed, so the new one is started regardless to avoid leaving the service down. If you need the update to stop when a backup fails, perform the backup in a `host-pre-update` hook instead and exit non-zero (which aborts the update before the container is stopped).
 
 ### Advanced Configuration
 
@@ -521,7 +579,8 @@ flowchart TD
     LOOPSTART --> PREUPDATE
     PREUPDATE[Pre-update hook]
     PREUPDATE --> STOP[Stop old container]
-    STOP --> STARTNEW[Start new container]
+    STOP --> PRESTART[Host pre-start hook<br/>host-only]
+    PRESTART --> STARTNEW[Start new container]
     STARTNEW --> POSTUPDATE[Post-update hook]
     POSTUPDATE --> LOOPEND{All containers<br/>processed?}
     LOOPEND -->|No| LOOPSTART
@@ -533,7 +592,7 @@ flowchart TD
     classDef action fill:#003343,stroke:#000,stroke-width:2px;
     classDef decision fill:#003343,stroke:#000,stroke-width:2px;
 
-    class PRECHECK,PREUPDATE,POSTUPDATE,POSTCHECK hook
+    class PRECHECK,PREUPDATE,PRESTART,POSTUPDATE,POSTCHECK hook
     class SCAN,STOP,STARTNEW,LOOPSTART action
     class DECISION,LOOPEND decision
 ```
@@ -544,6 +603,7 @@ flowchart TD
 |-----------------|--------------------------------------------|------------------------------------------|----------------------------------------------------------------------|------------------------------------|
 | **Pre-check**   | Per filtered container                     | Beginning of update cycle                | Command defined + hooks enabled                                      | Ignored                            |
 | **Pre-update**  | Individual containers being updated        | Immediately before stopping              | Command defined + hooks enabled + container running + not restarting | Must be running and not restarting |
+| **Host pre-start** (host-only) | Individual containers being restarted | After stop/removal, before new container starts | Command defined + hooks enabled | Stopped (not yet recreated) |
 | **Post-update** | Individual containers successfully updated | Immediately after starting new container | Command defined + hooks enabled + update successful                  | New container running              |
 | **Post-check**  | Per filtered container                     | End of update cycle                      | Command defined + hooks enabled                                      | Ignored                            |
 

@@ -1835,6 +1835,16 @@ func restartStaleContainer(
 		}
 	}
 
+	// Run host pre-start lifecycle hook if enabled, after the old container has been
+	// stopped and removed but before the new container is created and started. This
+	// host-only window (the container is not running) is suited to backing up volumes.
+	if config.LifecycleHooks {
+		logrus.WithFields(fields).
+			Debug("Executing host pre-start command")
+		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+		lifecycle.ExecuteHostPreStartCommand(detachedCtx, sourceContainer)
+	}
+
 	// Create the new container with updated configuration.
 	//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
 	newContainerID, err := client.CreateContainer(detachedCtx, sourceContainer)

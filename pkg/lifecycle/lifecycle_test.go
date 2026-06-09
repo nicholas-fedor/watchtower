@@ -457,6 +457,49 @@ func TestExecuteHostPreUpdateCommand(t *testing.T) {
 	}
 }
 
+// TestExecuteHostPreStartCommand tests the ExecuteHostPreStartCommand function.
+func TestExecuteHostPreStartCommand(t *testing.T) {
+	tests := []struct {
+		name           string
+		container      types.Container
+		expectedLogMsg string
+	}{
+		{
+			name:           "no command",
+			container:      mockedContainer(),
+			expectedLogMsg: "No host pre-start command supplied",
+		},
+		{
+			name: "command succeeds",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-pre-start": "true",
+			})),
+			expectedLogMsg: "Executing host pre-start command",
+		},
+		{
+			name: "command fails",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-pre-start": "exit 1",
+			})),
+			expectedLogMsg: "Host pre-start command failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := test.NewGlobal()
+
+			logrus.SetLevel(logrus.DebugLevel)
+			hook.Reset()
+
+			ExecuteHostPreStartCommand(context.Background(), tt.container)
+
+			assertLogContains(t, hook.Entries, tt.expectedLogMsg)
+
+			hook.Reset()
+		})
+	}
+}
+
 // TestExecuteHostPostUpdateCommand tests the ExecuteHostPostUpdateCommand function.
 func TestExecuteHostPostUpdateCommand(t *testing.T) {
 	tests := []struct {
