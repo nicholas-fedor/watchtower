@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.16.1 by @renovate[bot] in [#1765](https://github.com/nicholas-fedor/watchtower/pull/1765)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.1 by @renovate[bot] in [#1763](https://github.com/nicholas-fedor/watchtower/pull/1763)
 - Update module golang.org/x/text to v0.38.0 by @renovate[bot] in [#1758](https://github.com/nicholas-fedor/watchtower/pull/1758)
 - Update module golang.org/x/term to v0.44.0 by @renovate[bot] in [#1756](https://github.com/nicholas-fedor/watchtower/pull/1756)
