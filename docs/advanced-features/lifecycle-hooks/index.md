@@ -162,12 +162,16 @@ The `host-pre-start` hook is designed for this case: it runs on the host after t
     echo "[$WT_HOOK_TYPE] Backing up volumes for ${NAME} (${WT_CONTAINER_ID}) to ${DEST}"
 
     # The container is stopped but not yet removed, so we can inspect it to find the
-    # host paths of its named volumes. Anonymous/bind mounts can be filtered as needed.
+    # host paths of its mounts. This matches both named volumes (host path lives under
+    # /var/lib/docker/volumes) and bind mounts (.Source is an arbitrary host path).
+    # NOTE: every path emitted here must also be reachable from the Watchtower container
+    # for `tar` to read it — see the compose volumes above. Adjust the filter (e.g. drop
+    # "bind", or skip read-only mounts) to match what you actually want backed up.
     SOURCES=$(docker inspect "$WT_CONTAINER_ID" \
-      --format '{{ range .Mounts }}{{ if eq .Type "volume" }}{{ .Source }}{{ "\n" }}{{ end }}{{ end }}')
+      --format '{{ range .Mounts }}{{ if or (eq .Type "volume") (eq .Type "bind") }}{{ .Source }}{{ "\n" }}{{ end }}{{ end }}')
 
     if [ -z "$SOURCES" ]; then
-      echo "No named volumes to back up for ${NAME}"
+      echo "No volumes or bind mounts to back up for ${NAME}"
       exit 0
     fi
 
