@@ -134,7 +134,10 @@ flags.StringSlice(
 - `TestBuildFilterImageNames` : nouveau cas couvrant inclusion **et** exclusion par image,
   et vérification de la `filterDesc`.
 
-Mocks : utiliser le `FilterableContainer` de test existant en renseignant `ImageName()`.
+Mocks : réutiliser le mock Mockery généré `mockContainer.FilterableContainer`
+(`pkg/types/mocks/FilterableContainer.go`) avec `container.On("ImageName").Return(...)`.
+**Aucune régénération de mock** (`make mocks`) n'est nécessaire : l'interface
+`types.FilterableContainer` n'est pas modifiée — `ImageName()` y existe déjà.
 
 ## Documentation
 
@@ -144,6 +147,18 @@ Mocks : utiliser le `FilterableContainer` de test existant en renseignant `Image
   Regex.
 - `docs/configuration/container-selection/index.md` : mention que le filtrage par image
   supporte aussi les regex (renvoi vers la section « Regex Pattern Matching » existante).
+
+## Conventions de contribution (`CONTRIBUTING.md`)
+
+À respecter lors de l'implémentation :
+
+- **Formatage** : `make fmt` (golangci-lint).
+- **Lint** : `make lint` (config `build/golangci-lint/golangci-lint.yaml`, lance `--fix`).
+- **Tests** : `make test` (`go test -timeout 30s -v -coverprofile coverage.out
+  -covermode atomic`). Tous les tests doivent passer dans la limite de 30 s.
+- **Mocks** : pas de `make mocks` requis (interface inchangée).
+- **Commits** : messages au format [Conventional Commits](https://www.conventionalcommits.org/)
+  (p. ex. `feat(filters): filter containers by image name`), commits **signés GPG**.
 
 ## Hors périmètre (YAGNI)
 
