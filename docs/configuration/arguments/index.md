@@ -430,7 +430,7 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
 ```
 
 !!! Note
-    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex-pattern-matching) for details.
+    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching) for details.
 
 ### Include Specific Images
 
