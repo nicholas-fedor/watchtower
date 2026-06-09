@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os/exec"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -46,6 +48,7 @@ func ExecutePreChecks(ctx context.Context, client container.Client, params types
 	clog.WithField("count", len(containers)).Debug("Found containers for pre-checks")
 
 	for _, currentContainer := range containers {
+		ExecuteHostPreCheckCommand(ctx, currentContainer)
 		ExecutePreCheckCommand(ctx, client, currentContainer, uid, gid)
 	}
 }
@@ -116,6 +119,76 @@ func ExecutePreCheckCommand(ctx context.Context, client container.Client, contai
 	if err != nil {
 		clog.WithError(err).Debug("Pre-check command failed")
 	}
+}
+
+// ExecuteHostPreCheckCommand executes the host pre-check hook for a container.
+//
+// Unlike ExecutePreCheckCommand, the command runs on the Watchtower host (the
+// process running Watchtower) instead of inside the container. The triggering
+// container's name, ID, and image are exposed to the command via environment
+// variables (WT_CONTAINER_NAME, WT_CONTAINER_ID, WT_CONTAINER_IMAGE_NAME).
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout.
+//   - container: Container to process.
+func ExecuteHostPreCheckCommand(ctx context.Context, container types.Container) {
+	clog := logrus.WithField("container", container.Name())
+	command := container.GetLifecycleHostPreCheckCommand()
+
+	// Skip if no command is set.
+	if len(command) == 0 {
+		clog.Debug("No host pre-check command supplied. Skipping")
+
+		return
+	}
+
+	// Host check commands are lightweight and use the same fixed short timeout
+	// as in-container check commands (1 minute).
+	clog.WithField("command", command).Debug("Executing host pre-check command")
+
+	env := []string{
+		"WT_CONTAINER_NAME=" + container.Name(),
+		"WT_CONTAINER_ID=" + string(container.ID()),
+		"WT_CONTAINER_IMAGE_NAME=" + container.ImageName(),
+	}
+
+	if err := executeHostCommand(ctx, command, checkCommandTimeout, env); err != nil {
+		clog.WithError(err).Debug("Host pre-check command failed")
+	}
+}
+
+// executeHostCommand runs a shell command on the Watchtower host.
+//
+// Parameters:
+//   - ctx: Context for cancellation.
+//   - command: Command to execute via "sh -c".
+//   - timeout: Minutes to wait before timeout (0 for no timeout).
+//   - env: Additional environment variables (appended to the host environment).
+//
+// Returns:
+//   - error: Non-nil if the command fails or times out, nil on success.
+func executeHostCommand(ctx context.Context, command string, timeout int, env []string) error {
+	// Apply a timeout when configured, otherwise inherit the parent context.
+	if timeout > 0 {
+		var cancel context.CancelFunc
+
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
+		defer cancel()
+	}
+
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd.Env = append(cmd.Environ(), env...)
+
+	output, err := cmd.CombinedOutput()
+	if len(output) > 0 {
+		logrus.WithField("output", string(output)).Debug("Host command output")
+	}
+
+	if err != nil {
+		return fmt.Errorf("host command execution failed: %w", err)
+	}
+
+	return nil
 }
 
 // ExecutePostCheckCommand executes the post-check hook for a container.

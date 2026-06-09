@@ -1,5 +1,7 @@
 // Package lifecycle manages execution of lifecycle hooks for Watchtower containers.
-// It runs pre-check, post-check, pre-update, and post-update commands during updates.
+// It runs pre-check, post-check, pre-update, and post-update commands during updates,
+// as well as host-side hooks (e.g. host-pre-check) that execute on the Watchtower host
+// rather than inside the monitored container.
 //
 // Key components:
 //   - Execute Functions: Handle lifecycle hook execution (e.g., ExecutePreUpdateCommand).

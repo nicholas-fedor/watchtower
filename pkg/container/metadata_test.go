@@ -54,6 +54,48 @@ func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 	}
 }
 
+func TestContainer_GetLifecycleHostPreCheckCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		c    *Container
+		want string
+	}{
+		{
+			name: "HostPreCheckLabelSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							hostPreCheckLabel: "echo host-pre-check",
+						},
+					},
+				},
+			},
+			want: "echo host-pre-check",
+		},
+		{
+			name: "HostPreCheckLabelNotSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.c.GetLifecycleHostPreCheckCommand()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 	tests := []struct {
 		name string

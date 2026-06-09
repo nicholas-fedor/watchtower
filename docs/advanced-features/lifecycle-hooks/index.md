@@ -23,6 +23,12 @@ Watchtower supports four distinct lifecycle hook types that execute at different
 | **Post-update** | Executed after starting the new container                             | Per container, immediately after starting  |
 | **Post-check**  | Executed for each filtered container after the update cycle completes | Per container, after all updates           |
 
+In addition to the in-container hooks above, Watchtower supports **host-side** hooks that run on the Watchtower host (the process running Watchtower) instead of inside the monitored container:
+
+| Hook Type          | Description                                                                      | Execution Timing                          |
+|--------------------|----------------------------------------------------------------------------------|-------------------------------------------|
+| **Host pre-check** | Executed on the Watchtower host for each filtered container before the update cycle | Per container, before scanning containers |
+
 ## Configuration
 
 ### Enabling Lifecycle Hooks
@@ -67,6 +73,27 @@ LABEL com.centurylinklabs.watchtower.lifecycle.post-check="echo 'Update cycle co
 
 !!! Note
     If the container is not running, lifecycle hooks (including pre-update hooks) cannot run, as the stop phase is skipped, and the update proceeds directly to removal (if applicable) or completion.
+
+#### Host-Side Hooks
+
+Most lifecycle hooks run *inside* the monitored container via Docker's exec API. The **host pre-check** hook is different: its command runs on the Watchtower host itself (the process running Watchtower), using the host's `sh`. This is useful when the action you want to perform — sending a notification, touching a file, calling an external API — does not have the required tooling installed inside the monitored container.
+
+```dockerfile title="Example host pre-check hook (runs on the Watchtower host) "
+LABEL com.centurylinklabs.watchtower.lifecycle.host-pre-check="echo \"Scanning $WT_CONTAINER_NAME\" >> /var/log/watchtower-hooks.log"
+```
+
+The command is run as the Watchtower process's user and inherits Watchtower's environment. It uses the same fixed 1-minute timeout as the in-container check hooks. As with the in-container pre-check, a non-zero exit code is logged but does not stop the update cycle.
+
+!!! Important
+    Because host pre-check commands execute on the Watchtower host, ensure any tooling they invoke is available there. If Watchtower itself runs in a container, "host" refers to that Watchtower container's environment, not the underlying Docker host.
+
+Host pre-check commands receive details about the triggering container through dedicated environment variables (the JSON `WT_CONTAINER` variable used by in-container hooks is **not** provided):
+
+| Variable                  | Description                       | Example          |
+|---------------------------|-----------------------------------|------------------|
+| `WT_CONTAINER_NAME`       | Container name                    | `/my-app`        |
+| `WT_CONTAINER_ID`         | Full container ID                 | `abc123def456…`  |
+| `WT_CONTAINER_IMAGE_NAME` | Container image name with tag     | `nginx:latest`   |
 
 ### Advanced Configuration
 

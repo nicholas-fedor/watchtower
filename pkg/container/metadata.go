@@ -43,6 +43,9 @@ const (
 const (
 	// preCheckLabel specifies a command to run before checking for updates.
 	preCheckLabel = "com.centurylinklabs.watchtower.lifecycle.pre-check"
+	// hostPreCheckLabel specifies a command to run on the Watchtower host (rather than
+	// inside the container) before checking for updates.
+	hostPreCheckLabel = "com.centurylinklabs.watchtower.lifecycle.host-pre-check"
 	// postCheckLabel specifies a command to run after checking for updates.
 	postCheckLabel = "com.centurylinklabs.watchtower.lifecycle.post-check"
 	// preUpdateLabel specifies a command to run before updating the container.
@@ -65,6 +68,17 @@ const (
 //   - string: Pre-check command or empty if unset.
 func (c *Container) GetLifecyclePreCheckCommand() string {
 	return c.getLabelValueOrEmpty(preCheckLabel)
+}
+
+// GetLifecycleHostPreCheckCommand returns the host pre-check command from labels.
+//
+// Unlike the pre-check command, this command is intended to be executed on the
+// Watchtower host (the process running Watchtower) rather than inside the container.
+//
+// Returns:
+//   - string: Host pre-check command or empty if unset.
+func (c *Container) GetLifecycleHostPreCheckCommand() string {
+	return c.getLabelValueOrEmpty(hostPreCheckLabel)
 }
 
 // GetLifecyclePostCheckCommand returns the post-check command from labels.

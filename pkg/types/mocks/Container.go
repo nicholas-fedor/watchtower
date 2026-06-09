@@ -520,6 +520,50 @@ func (_c *MockContainer_GetLifecyclePreCheckCommand_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetLifecycleHostPreCheckCommand provides a mock function for the type MockContainer
+func (_mock *MockContainer) GetLifecycleHostPreCheckCommand() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLifecycleHostPreCheckCommand")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainer_GetLifecycleHostPreCheckCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLifecycleHostPreCheckCommand'
+type MockContainer_GetLifecycleHostPreCheckCommand_Call struct {
+	*mock.Call
+}
+
+// GetLifecycleHostPreCheckCommand is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) GetLifecycleHostPreCheckCommand() *MockContainer_GetLifecycleHostPreCheckCommand_Call {
+	return &MockContainer_GetLifecycleHostPreCheckCommand_Call{Call: _e.mock.On("GetLifecycleHostPreCheckCommand")}
+}
+
+func (_c *MockContainer_GetLifecycleHostPreCheckCommand_Call) Run(run func()) *MockContainer_GetLifecycleHostPreCheckCommand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPreCheckCommand_Call) Return(s string) *MockContainer_GetLifecycleHostPreCheckCommand_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPreCheckCommand_Call) RunAndReturn(run func() string) *MockContainer_GetLifecycleHostPreCheckCommand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLifecyclePreUpdateCommand provides a mock function for the type MockContainer
 func (_mock *MockContainer) GetLifecyclePreUpdateCommand() string {
 	ret := _mock.Called()

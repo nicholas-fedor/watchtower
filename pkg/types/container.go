@@ -32,6 +32,7 @@ type Container interface {
 	HasImageInfo() bool                               // Image metadata presence.
 	ImageInfo() *dockerImage.InspectResponse          // Image metadata.
 	GetLifecyclePreCheckCommand() string              // Pre-check command.
+	GetLifecycleHostPreCheckCommand() string          // Host pre-check command (runs on the host).
 	GetLifecyclePostCheckCommand() string             // Post-check command.
 	GetLifecyclePreUpdateCommand() string             // Pre-update command.
 	GetLifecyclePostUpdateCommand() string            // Post-update command.

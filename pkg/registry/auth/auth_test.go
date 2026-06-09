@@ -126,6 +126,14 @@ func (m mockContainer) GetLifecyclePreCheckCommand() string {
 	return "" // Minimal stub, not used in these tests
 }
 
+// GetLifecycleHostPreCheckCommand returns a string representing the command to run
+// on the Watchtower host before a lifecycle check. This method satisfies the
+// types.Container interface, returning an empty string as a minimal stub since the auth
+// package does not rely on this functionality in these authentication-focused tests.
+func (m mockContainer) GetLifecycleHostPreCheckCommand() string {
+	return "" // Minimal stub, not used in these tests
+}
+
 // GetLifecyclePostCheckCommand returns a string representing the command to run
 // after a lifecycle check (e.g., post-update verification). This method satisfies the
 // types.Container interface, returning an empty string as a minimal stub since the auth

@@ -102,6 +102,7 @@ func (c *SimpleContainer) StopTimeout() *int {
 func (c *SimpleContainer) HasImageInfo() bool                               { return false }
 func (c *SimpleContainer) ImageInfo() *dockerImage.InspectResponse          { return nil }
 func (c *SimpleContainer) GetLifecyclePreCheckCommand() string              { return "" }
+func (c *SimpleContainer) GetLifecycleHostPreCheckCommand() string          { return "" }
 func (c *SimpleContainer) GetLifecyclePostCheckCommand() string             { return "" }
 func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string             { return "" }
 func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string            { return "" }

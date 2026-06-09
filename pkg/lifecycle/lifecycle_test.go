@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -81,7 +82,7 @@ func TestExecutePreChecks(t *testing.T) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 0, 0).
 					Return(true, nil)
 			},
-			expectedLogs:   13, // Listing, Found, UID not found x2, UID not set x2, GID not found x2, GID not set x2, Execute, Label not found, Skip
+			expectedLogs:   17, // Listing, Found, host-pre-check label not found x2 + skip x2, UID not found x2, UID not set x2, GID not found x2, GID not set x2, Execute, Label not found, Skip
 			expectedLogMsg: "Listing containers for pre-checks",
 		},
 		{
@@ -278,6 +279,60 @@ func TestExecutePreCheckCommand(t *testing.T) {
 					tt.expectedLogMsg,
 				)
 			}
+
+			hook.Reset()
+		})
+	}
+}
+
+// TestExecuteHostPreCheckCommand tests the ExecuteHostPreCheckCommand function.
+func TestExecuteHostPreCheckCommand(t *testing.T) {
+	tests := []struct {
+		name           string
+		container      types.Container
+		expectedLogMsg string
+	}{
+		{
+			name:           "no command",
+			container:      mockedContainer(),
+			expectedLogMsg: "No host pre-check command supplied",
+		},
+		{
+			name: "command succeeds",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-pre-check": "true",
+			})),
+			expectedLogMsg: "Executing host pre-check command",
+		},
+		{
+			name: "command fails",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-pre-check": "exit 1",
+			})),
+			expectedLogMsg: "Host pre-check command failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := test.NewGlobal()
+
+			logrus.SetLevel(logrus.DebugLevel)
+			hook.Reset()
+
+			ExecuteHostPreCheckCommand(context.Background(), tt.container)
+
+			require.NotEmpty(t, hook.Entries, "expected at least one log entry")
+
+			found := false
+			for _, entry := range hook.Entries {
+				if strings.Contains(entry.Message, tt.expectedLogMsg) {
+					found = true
+
+					break
+				}
+			}
+
+			assert.True(t, found, "expected a log entry containing %q", tt.expectedLogMsg)
 
 			hook.Reset()
 		})
