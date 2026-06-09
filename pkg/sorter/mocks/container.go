@@ -104,8 +104,11 @@ func (c *SimpleContainer) ImageInfo() *dockerImage.InspectResponse          { re
 func (c *SimpleContainer) GetLifecyclePreCheckCommand() string              { return "" }
 func (c *SimpleContainer) GetLifecycleHostPreCheckCommand() string          { return "" }
 func (c *SimpleContainer) GetLifecyclePostCheckCommand() string             { return "" }
+func (c *SimpleContainer) GetLifecycleHostPostCheckCommand() string         { return "" }
 func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string             { return "" }
+func (c *SimpleContainer) GetLifecycleHostPreUpdateCommand() string         { return "" }
 func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string            { return "" }
+func (c *SimpleContainer) GetLifecycleHostPostUpdateCommand() string        { return "" }
 func (c *SimpleContainer) GetLifecycleUID() (int, bool)                     { return 0, false }
 func (c *SimpleContainer) GetLifecycleGID() (int, bool)                     { return 0, false }
 func (c *SimpleContainer) GetContainerChain() (string, bool)                { return "", false }

@@ -222,6 +222,132 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 	}
 }
 
+func TestContainer_GetLifecycleHostPostCheckCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		c    *Container
+		want string
+	}{
+		{
+			name: "HostPostCheckLabelSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							hostPostCheckLabel: "echo host-post-check",
+						},
+					},
+				},
+			},
+			want: "echo host-post-check",
+		},
+		{
+			name: "HostPostCheckLabelNotSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.c.GetLifecycleHostPostCheckCommand()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestContainer_GetLifecycleHostPreUpdateCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		c    *Container
+		want string
+	}{
+		{
+			name: "HostPreUpdateLabelSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							hostPreUpdateLabel: "echo host-pre-update",
+						},
+					},
+				},
+			},
+			want: "echo host-pre-update",
+		},
+		{
+			name: "HostPreUpdateLabelNotSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.c.GetLifecycleHostPreUpdateCommand()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestContainer_GetLifecycleHostPostUpdateCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		c    *Container
+		want string
+	}{
+		{
+			name: "HostPostUpdateLabelSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{
+							hostPostUpdateLabel: "echo host-post-update",
+						},
+					},
+				},
+			},
+			want: "echo host-post-update",
+		},
+		{
+			name: "HostPostUpdateLabelNotSet",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: map[string]string{},
+					},
+				},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.c.GetLifecycleHostPostUpdateCommand()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestContainer_PreUpdateTimeout(t *testing.T) {
 	tests := []struct {
 		name string

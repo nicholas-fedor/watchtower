@@ -142,6 +142,14 @@ func (m mockContainer) GetLifecyclePostCheckCommand() string {
 	return "" // Minimal stub, not used in these tests
 }
 
+// GetLifecycleHostPostCheckCommand returns a string representing the command to run
+// on the Watchtower host after a lifecycle check. This method satisfies the
+// types.Container interface, returning an empty string as a minimal stub since the auth
+// package does not rely on this functionality in these authentication-focused tests.
+func (m mockContainer) GetLifecycleHostPostCheckCommand() string {
+	return "" // Minimal stub, not used in these tests
+}
+
 // GetLifecyclePreUpdateCommand returns a string representing the command to run
 // before a lifecycle update (e.g., pre-update actions). This method satisfies the
 // types.Container interface, returning an empty string as a minimal stub since the auth
@@ -150,11 +158,27 @@ func (m mockContainer) GetLifecyclePreUpdateCommand() string {
 	return "" // Minimal stub, not used in these tests
 }
 
+// GetLifecycleHostPreUpdateCommand returns a string representing the command to run
+// on the Watchtower host before a lifecycle update. This method satisfies the
+// types.Container interface, returning an empty string as a minimal stub since the auth
+// package does not rely on this functionality in these authentication-focused tests.
+func (m mockContainer) GetLifecycleHostPreUpdateCommand() string {
+	return "" // Minimal stub, not used in these tests
+}
+
 // GetLifecyclePostUpdateCommand returns a string representing the command to run
 // after a lifecycle update (e.g., post-update actions). This method satisfies the
 // types.Container interface, returning an empty string as a minimal stub since the auth
 // package does not rely on this functionality in these authentication-focused tests.
 func (m mockContainer) GetLifecyclePostUpdateCommand() string {
+	return "" // Minimal stub, not used in these tests
+}
+
+// GetLifecycleHostPostUpdateCommand returns a string representing the command to run
+// on the Watchtower host after a lifecycle update. This method satisfies the
+// types.Container interface, returning an empty string as a minimal stub since the auth
+// package does not rely on this functionality in these authentication-focused tests.
+func (m mockContainer) GetLifecycleHostPostUpdateCommand() string {
 	return "" // Minimal stub, not used in these tests
 }
 

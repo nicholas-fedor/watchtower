@@ -56,6 +56,21 @@ func withContainerState(state dockerContainer.State) func(*container.Container) 
 	}
 }
 
+// assertLogContains asserts that at least one log entry contains the given message.
+func assertLogContains(t *testing.T, entries []logrus.Entry, msg string) {
+	t.Helper()
+
+	require.NotEmpty(t, entries, "expected at least one log entry")
+
+	for _, entry := range entries {
+		if strings.Contains(entry.Message, msg) {
+			return
+		}
+	}
+
+	t.Errorf("expected a log entry containing %q", msg)
+}
+
 var (
 	errListingFailed = errors.New("listing failed")
 	errExecFailed    = errors.New("exec failed")
@@ -153,7 +168,7 @@ func TestExecutePostChecks(t *testing.T) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 0, 0).
 					Return(true, nil)
 			},
-			expectedLogs:   13, // Listing, Found, UID not found x2, UID not set x2, GID not found x2, GID not set x2, Execute, Label not found, Skip
+			expectedLogs:   17, // Listing, Found, host-post-check label not found x2 + skip x2, UID not found x2, UID not set x2, GID not found x2, GID not set x2, Execute, Label not found, Skip
 			expectedLogMsg: "Listing containers for post-checks",
 		},
 		{
@@ -321,18 +336,172 @@ func TestExecuteHostPreCheckCommand(t *testing.T) {
 
 			ExecuteHostPreCheckCommand(context.Background(), tt.container)
 
-			require.NotEmpty(t, hook.Entries, "expected at least one log entry")
+			assertLogContains(t, hook.Entries, tt.expectedLogMsg)
 
-			found := false
-			for _, entry := range hook.Entries {
-				if strings.Contains(entry.Message, tt.expectedLogMsg) {
-					found = true
+			hook.Reset()
+		})
+	}
+}
 
-					break
-				}
+// TestExecuteHostPostCheckCommand tests the ExecuteHostPostCheckCommand function.
+func TestExecuteHostPostCheckCommand(t *testing.T) {
+	tests := []struct {
+		name           string
+		container      types.Container
+		expectedLogMsg string
+	}{
+		{
+			name:           "no command",
+			container:      mockedContainer(),
+			expectedLogMsg: "No host post-check command supplied",
+		},
+		{
+			name: "command succeeds",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-post-check": "true",
+			})),
+			expectedLogMsg: "Executing host post-check command",
+		},
+		{
+			name: "command fails",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-post-check": "exit 1",
+			})),
+			expectedLogMsg: "Host post-check command failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := test.NewGlobal()
+
+			logrus.SetLevel(logrus.DebugLevel)
+			hook.Reset()
+
+			ExecuteHostPostCheckCommand(context.Background(), tt.container)
+
+			assertLogContains(t, hook.Entries, tt.expectedLogMsg)
+
+			hook.Reset()
+		})
+	}
+}
+
+// TestExecuteHostPreUpdateCommand tests the ExecuteHostPreUpdateCommand function.
+func TestExecuteHostPreUpdateCommand(t *testing.T) {
+	tests := []struct {
+		name           string
+		container      types.Container
+		expectedSkip   bool
+		expectError    bool
+		expectedLogMsg string
+	}{
+		{
+			name:           "no command",
+			container:      mockedContainer(),
+			expectedLogMsg: "No host pre-update command supplied",
+		},
+		{
+			name: "command succeeds",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-pre-update": "true",
+			})),
+			expectedLogMsg: "Host pre-update command executed",
+		},
+		{
+			name: "exit code 75 requests skip",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-pre-update": "exit 75",
+			})),
+			expectedSkip:   true,
+			expectedLogMsg: "Host pre-update command executed",
+		},
+		{
+			name: "command fails",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.host-pre-update": "exit 1",
+			})),
+			expectError:    true,
+			expectedLogMsg: "Host pre-update command failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := test.NewGlobal()
+
+			logrus.SetLevel(logrus.DebugLevel)
+			hook.Reset()
+
+			skip, err := ExecuteHostPreUpdateCommand(context.Background(), tt.container)
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 
-			assert.True(t, found, "expected a log entry containing %q", tt.expectedLogMsg)
+			assert.Equal(t, tt.expectedSkip, skip)
+			assertLogContains(t, hook.Entries, tt.expectedLogMsg)
+
+			hook.Reset()
+		})
+	}
+}
+
+// TestExecuteHostPostUpdateCommand tests the ExecuteHostPostUpdateCommand function.
+func TestExecuteHostPostUpdateCommand(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupClient    func(*mockContainer.MockClient)
+		expectedLogMsg string
+	}{
+		{
+			name: "command succeeds",
+			setupClient: func(c *mockContainer.MockClient) {
+				c.On("GetContainer", mock.Anything, types.ContainerID("test")).
+					Return(mockedContainer(withLabels(map[string]string{
+						"com.centurylinklabs.watchtower.lifecycle.host-post-update": "true",
+					})), nil)
+			},
+			expectedLogMsg: "Executing host post-update command",
+		},
+		{
+			name: "no command",
+			setupClient: func(c *mockContainer.MockClient) {
+				c.On("GetContainer", mock.Anything, types.ContainerID("test")).Return(mockedContainer(), nil)
+			},
+			expectedLogMsg: "No host post-update command supplied",
+		},
+		{
+			name: "container retrieval error",
+			setupClient: func(c *mockContainer.MockClient) {
+				c.On("GetContainer", mock.Anything, types.ContainerID("test")).Return(nil, errNotFound)
+			},
+			expectedLogMsg: "Failed to get container for host post-update",
+		},
+		{
+			name: "command fails",
+			setupClient: func(c *mockContainer.MockClient) {
+				c.On("GetContainer", mock.Anything, types.ContainerID("test")).
+					Return(mockedContainer(withLabels(map[string]string{
+						"com.centurylinklabs.watchtower.lifecycle.host-post-update": "exit 1",
+					})), nil)
+			},
+			expectedLogMsg: "Host post-update command failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hook := test.NewGlobal()
+
+			logrus.SetLevel(logrus.DebugLevel)
+
+			client := mockContainer.NewMockClient(t)
+			tt.setupClient(client)
+			hook.Reset()
+
+			ExecuteHostPostUpdateCommand(context.Background(), client, types.ContainerID("test"))
+
+			assertLogContains(t, hook.Entries, tt.expectedLogMsg)
 
 			hook.Reset()
 		})

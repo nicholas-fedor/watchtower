@@ -564,6 +564,138 @@ func (_c *MockContainer_GetLifecycleHostPreCheckCommand_Call) RunAndReturn(run f
 	return _c
 }
 
+// GetLifecycleHostPostCheckCommand provides a mock function for the type MockContainer
+func (_mock *MockContainer) GetLifecycleHostPostCheckCommand() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLifecycleHostPostCheckCommand")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainer_GetLifecycleHostPostCheckCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLifecycleHostPostCheckCommand'
+type MockContainer_GetLifecycleHostPostCheckCommand_Call struct {
+	*mock.Call
+}
+
+// GetLifecycleHostPostCheckCommand is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) GetLifecycleHostPostCheckCommand() *MockContainer_GetLifecycleHostPostCheckCommand_Call {
+	return &MockContainer_GetLifecycleHostPostCheckCommand_Call{Call: _e.mock.On("GetLifecycleHostPostCheckCommand")}
+}
+
+func (_c *MockContainer_GetLifecycleHostPostCheckCommand_Call) Run(run func()) *MockContainer_GetLifecycleHostPostCheckCommand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPostCheckCommand_Call) Return(s string) *MockContainer_GetLifecycleHostPostCheckCommand_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPostCheckCommand_Call) RunAndReturn(run func() string) *MockContainer_GetLifecycleHostPostCheckCommand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetLifecycleHostPreUpdateCommand provides a mock function for the type MockContainer
+func (_mock *MockContainer) GetLifecycleHostPreUpdateCommand() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLifecycleHostPreUpdateCommand")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainer_GetLifecycleHostPreUpdateCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLifecycleHostPreUpdateCommand'
+type MockContainer_GetLifecycleHostPreUpdateCommand_Call struct {
+	*mock.Call
+}
+
+// GetLifecycleHostPreUpdateCommand is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) GetLifecycleHostPreUpdateCommand() *MockContainer_GetLifecycleHostPreUpdateCommand_Call {
+	return &MockContainer_GetLifecycleHostPreUpdateCommand_Call{Call: _e.mock.On("GetLifecycleHostPreUpdateCommand")}
+}
+
+func (_c *MockContainer_GetLifecycleHostPreUpdateCommand_Call) Run(run func()) *MockContainer_GetLifecycleHostPreUpdateCommand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPreUpdateCommand_Call) Return(s string) *MockContainer_GetLifecycleHostPreUpdateCommand_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPreUpdateCommand_Call) RunAndReturn(run func() string) *MockContainer_GetLifecycleHostPreUpdateCommand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetLifecycleHostPostUpdateCommand provides a mock function for the type MockContainer
+func (_mock *MockContainer) GetLifecycleHostPostUpdateCommand() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLifecycleHostPostUpdateCommand")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainer_GetLifecycleHostPostUpdateCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLifecycleHostPostUpdateCommand'
+type MockContainer_GetLifecycleHostPostUpdateCommand_Call struct {
+	*mock.Call
+}
+
+// GetLifecycleHostPostUpdateCommand is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) GetLifecycleHostPostUpdateCommand() *MockContainer_GetLifecycleHostPostUpdateCommand_Call {
+	return &MockContainer_GetLifecycleHostPostUpdateCommand_Call{Call: _e.mock.On("GetLifecycleHostPostUpdateCommand")}
+}
+
+func (_c *MockContainer_GetLifecycleHostPostUpdateCommand_Call) Run(run func()) *MockContainer_GetLifecycleHostPostUpdateCommand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPostUpdateCommand_Call) Return(s string) *MockContainer_GetLifecycleHostPostUpdateCommand_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainer_GetLifecycleHostPostUpdateCommand_Call) RunAndReturn(run func() string) *MockContainer_GetLifecycleHostPostUpdateCommand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLifecyclePreUpdateCommand provides a mock function for the type MockContainer
 func (_mock *MockContainer) GetLifecyclePreUpdateCommand() string {
 	ret := _mock.Called()

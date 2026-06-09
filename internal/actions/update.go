@@ -1449,6 +1449,23 @@ func stopStaleContainer(
 
 	// Execute pre-update lifecycle hooks if enabled, checking for skip conditions.
 	if config.LifecycleHooks {
+		// Host pre-update runs on the Watchtower host before the in-container hook.
+		hostSkipUpdate, err := lifecycle.ExecuteHostPreUpdateCommand(ctx, container)
+		if err != nil {
+			logrus.WithFields(fields).
+				WithError(err).
+				Debug("Host pre-update command execution failed")
+
+			return fmt.Errorf("%w: %w", errPreUpdateFailed, err)
+		}
+
+		if hostSkipUpdate {
+			logrus.WithFields(fields).
+				Debug("Skipping container due to host pre-update exit code 75")
+
+			return errSkipUpdate
+		}
+
 		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(
 			ctx,
 			client,
@@ -1883,6 +1900,15 @@ func restartStaleContainer(
 
 		// Run post-update lifecycle hooks for restarting containers if enabled.
 		if sourceContainer.ToRestart() && config.LifecycleHooks {
+			logrus.WithFields(fields).
+				Debug("Executing host post-update command")
+			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+			lifecycle.ExecuteHostPostUpdateCommand(
+				detachedCtx,
+				client,
+				newContainerID,
+			)
+
 			logrus.WithFields(fields).
 				Debug("Executing post-update command")
 			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation

@@ -34,8 +34,11 @@ type Container interface {
 	GetLifecyclePreCheckCommand() string              // Pre-check command.
 	GetLifecycleHostPreCheckCommand() string          // Host pre-check command (runs on the host).
 	GetLifecyclePostCheckCommand() string             // Post-check command.
+	GetLifecycleHostPostCheckCommand() string         // Host post-check command (runs on the host).
 	GetLifecyclePreUpdateCommand() string             // Pre-update command.
+	GetLifecycleHostPreUpdateCommand() string         // Host pre-update command (runs on the host).
 	GetLifecyclePostUpdateCommand() string            // Post-update command.
+	GetLifecycleHostPostUpdateCommand() string        // Host post-update command (runs on the host).
 	GetLifecycleUID() (int, bool)                     // UID for lifecycle hooks, with presence.
 	GetLifecycleGID() (int, bool)                     // GID for lifecycle hooks, with presence.
 	VerifyConfiguration() error                       // Config validation.

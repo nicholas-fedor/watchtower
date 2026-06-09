@@ -48,10 +48,19 @@ const (
 	hostPreCheckLabel = "com.centurylinklabs.watchtower.lifecycle.host-pre-check"
 	// postCheckLabel specifies a command to run after checking for updates.
 	postCheckLabel = "com.centurylinklabs.watchtower.lifecycle.post-check"
+	// hostPostCheckLabel specifies a command to run on the Watchtower host (rather than
+	// inside the container) after checking for updates.
+	hostPostCheckLabel = "com.centurylinklabs.watchtower.lifecycle.host-post-check"
 	// preUpdateLabel specifies a command to run before updating the container.
 	preUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.pre-update"
+	// hostPreUpdateLabel specifies a command to run on the Watchtower host (rather than
+	// inside the container) before updating the container.
+	hostPreUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.host-pre-update"
 	// postUpdateLabel specifies a command to run after updating the container.
 	postUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.post-update"
+	// hostPostUpdateLabel specifies a command to run on the Watchtower host (rather than
+	// inside the container) after updating the container.
+	hostPostUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.host-post-update"
 	// preUpdateTimeoutLabel sets the timeout (in minutes) for the pre-update command.
 	preUpdateTimeoutLabel = "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout"
 	// postUpdateTimeoutLabel sets the timeout (in minutes) for the post-update command.
@@ -89,6 +98,17 @@ func (c *Container) GetLifecyclePostCheckCommand() string {
 	return c.getLabelValueOrEmpty(postCheckLabel)
 }
 
+// GetLifecycleHostPostCheckCommand returns the host post-check command from labels.
+//
+// Unlike the post-check command, this command is intended to be executed on the
+// Watchtower host (the process running Watchtower) rather than inside the container.
+//
+// Returns:
+//   - string: Host post-check command or empty if unset.
+func (c *Container) GetLifecycleHostPostCheckCommand() string {
+	return c.getLabelValueOrEmpty(hostPostCheckLabel)
+}
+
 // GetLifecyclePreUpdateCommand returns the pre-update command from labels.
 //
 // Returns:
@@ -97,12 +117,34 @@ func (c *Container) GetLifecyclePreUpdateCommand() string {
 	return c.getLabelValueOrEmpty(preUpdateLabel)
 }
 
+// GetLifecycleHostPreUpdateCommand returns the host pre-update command from labels.
+//
+// Unlike the pre-update command, this command is intended to be executed on the
+// Watchtower host (the process running Watchtower) rather than inside the container.
+//
+// Returns:
+//   - string: Host pre-update command or empty if unset.
+func (c *Container) GetLifecycleHostPreUpdateCommand() string {
+	return c.getLabelValueOrEmpty(hostPreUpdateLabel)
+}
+
 // GetLifecyclePostUpdateCommand returns the post-update command from labels.
 //
 // Returns:
 //   - string: Post-update command or empty if unset.
 func (c *Container) GetLifecyclePostUpdateCommand() string {
 	return c.getLabelValueOrEmpty(postUpdateLabel)
+}
+
+// GetLifecycleHostPostUpdateCommand returns the host post-update command from labels.
+//
+// Unlike the post-update command, this command is intended to be executed on the
+// Watchtower host (the process running Watchtower) rather than inside the container.
+//
+// Returns:
+//   - string: Host post-update command or empty if unset.
+func (c *Container) GetLifecycleHostPostUpdateCommand() string {
+	return c.getLabelValueOrEmpty(hostPostUpdateLabel)
 }
 
 // PreUpdateTimeout returns the pre-update command timeout in minutes.
