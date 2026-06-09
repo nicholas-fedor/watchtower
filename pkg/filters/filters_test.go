@@ -854,3 +854,78 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 }
+
+func TestFilterByImageNames(t *testing.T) {
+	t.Parallel()
+
+	imageNames := make([]string, 0, 1)
+
+	filter := FilterByImageNames(imageNames, nil)
+	assert.Nil(t, filter)
+
+	imageNames = append(imageNames, "nginx:latest")
+	filter = FilterByImageNames(imageNames, NoFilter)
+	assert.NotNil(t, filter)
+
+	// Image matches -> kept.
+	container := new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginx:latest")
+	assert.True(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Image does not match -> excluded.
+	container = new(mockContainer.FilterableContainer)
+	container.On("Name").Return("cache")
+	container.On("ImageName").Return("redis:latest")
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+}
+
+func TestFilterByImageNamesRegex(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByImageNames([]string{"nginx:.*"}, NoFilter)
+	assert.NotNil(t, filter)
+
+	// Anchored regex matches any nginx tag.
+	container := new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginx:1.25")
+	assert.True(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Anchored regex does not match a different image name.
+	container = new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginxx:1.25")
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+}
+
+func TestFilterByDisableImageNames(t *testing.T) {
+	t.Parallel()
+
+	disableImageNames := make([]string, 0, 1)
+
+	filter := FilterByDisableImageNames(disableImageNames, nil)
+	assert.Nil(t, filter)
+
+	disableImageNames = append(disableImageNames, "nginx:latest")
+	filter = FilterByDisableImageNames(disableImageNames, NoFilter)
+	assert.NotNil(t, filter)
+
+	// Excluded image.
+	container := new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginx:latest")
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Non-excluded image passes through baseFilter.
+	container = new(mockContainer.FilterableContainer)
+	container.On("Name").Return("cache")
+	container.On("ImageName").Return("redis:latest")
+	assert.True(t, filter(container))
+	container.AssertExpectations(t)
+}

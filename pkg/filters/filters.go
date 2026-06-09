@@ -190,6 +190,76 @@ func FilterByDisableNames(normalizedDisableNames []string, baseFilter types.Filt
 	}
 }
 
+// FilterByImageNames selects containers whose image matches specified names.
+//
+// Parameters:
+//   - imageNames: List of image names or regex patterns to match.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function combining image name check with base filter.
+func FilterByImageNames(imageNames []string, baseFilter types.Filter) types.Filter {
+	if len(imageNames) == 0 {
+		return baseFilter
+	}
+
+	return func(c types.FilterableContainer) bool {
+		imageName := c.ImageName()
+		clog := logrus.WithFields(logrus.Fields{
+			"container":  c.Name(),
+			"image":      imageName,
+			"imageNames": imageNames,
+		})
+
+		for _, pattern := range imageNames {
+			if matchesName(imageName, pattern) {
+				clog.Debug("Matched container by image name/pattern")
+
+				return baseFilter(c)
+			}
+		}
+
+		clog.Debug("Container image did not match any filter")
+
+		return false
+	}
+}
+
+// FilterByDisableImageNames excludes containers whose image matches specified names.
+//
+// Parameters:
+//   - disableImageNames: Image names or regex patterns to exclude.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function excluding image names and applying base filter.
+func FilterByDisableImageNames(disableImageNames []string, baseFilter types.Filter) types.Filter {
+	if len(disableImageNames) == 0 {
+		return baseFilter
+	}
+
+	return func(c types.FilterableContainer) bool {
+		imageName := c.ImageName()
+		clog := logrus.WithFields(logrus.Fields{
+			"container":         c.Name(),
+			"image":             imageName,
+			"disableImageNames": disableImageNames,
+		})
+
+		for _, pattern := range disableImageNames {
+			if matchesName(imageName, pattern) {
+				clog.Debug("Container excluded by disable image name/pattern")
+
+				return false
+			}
+		}
+
+		clog.Debug("Container not excluded by disable image names")
+
+		return baseFilter(c)
+	}
+}
+
 // FilterByEnableLabel selects containers with enable label set.
 //
 // Parameters:
