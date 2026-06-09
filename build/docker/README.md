@@ -58,6 +58,56 @@ docker buildx build . -f build/docker/Dockerfile.native-binary \
 ./bin/watchtower --run-once
 ```
 
+### Run it on a schedule with systemd
+
+Instead of running Watchtower as a long-lived daemon, you can drop the binary on the host
+and have a systemd timer invoke `--run-once` periodically. Install the binary first:
+
+```bash
+sudo install -m 0755 ./bin/watchtower /usr/local/bin/watchtower
+```
+
+`/etc/systemd/system/watchtower.service` — a `oneshot` unit that runs a single update pass:
+
+```ini
+[Unit]
+Description=Watchtower update run
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/watchtower --run-once --cleanup
+```
+
+`/etc/systemd/system/watchtower.timer` — fires the service daily at 4 AM. This mirrors
+Watchtower's own `--schedule "0 0 4 * * *"` cron expression; `OnCalendar` is systemd's
+equivalent of that schedule:
+
+```ini
+[Unit]
+Description=Run Watchtower daily at 4 AM
+
+[Timer]
+# Equivalent to Watchtower's --schedule "0 0 4 * * *" (daily at 4 AM)
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable and start the timer (not the service — the timer pulls it in):
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now watchtower.timer
+
+# Inspect schedule and last run:
+systemctl list-timers watchtower.timer
+journalctl -u watchtower.service
+```
+
 ## Build a runnable image from local changes (`Dockerfile.self-local`)
 
 If you want a runnable image instead of a bare binary:
