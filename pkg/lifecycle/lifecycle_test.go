@@ -300,6 +300,16 @@ func TestExecutePreCheckCommand(t *testing.T) {
 	}
 }
 
+// TestHostCommandEnv verifies the environment variables exposed to host hooks,
+// including the WT_HOOK_TYPE phase identifier.
+func TestHostCommandEnv(t *testing.T) {
+	env := hostCommandEnv(mockedContainer(), hookTypePreUpdate)
+
+	assert.Contains(t, env, "WT_CONTAINER_NAME=test-container")
+	assert.Contains(t, env, "WT_CONTAINER_ID=container_id")
+	assert.Contains(t, env, "WT_HOOK_TYPE=pre-update")
+}
+
 // TestExecuteHostPreCheckCommand tests the ExecuteHostPreCheckCommand function.
 func TestExecuteHostPreCheckCommand(t *testing.T) {
 	tests := []struct {

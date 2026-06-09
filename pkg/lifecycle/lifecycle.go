@@ -16,6 +16,15 @@ import (
 // checkCommandTimeout is the timeout in minutes for check commands (pre/post check hooks).
 const checkCommandTimeout = 1
 
+// Hook type identifiers exposed to host commands via the WT_HOOK_TYPE environment
+// variable, allowing a single script to branch on the phase that triggered it.
+const (
+	hookTypePreCheck   = "pre-check"
+	hookTypePostCheck  = "post-check"
+	hookTypePreUpdate  = "pre-update"
+	hookTypePostUpdate = "post-update"
+)
+
 // Errors for lifecycle hook execution.
 var (
 	// errPreUpdateFailed indicates a failure in executing the pre-update command.
@@ -153,7 +162,7 @@ func ExecuteHostPreCheckCommand(ctx context.Context, container types.Container) 
 	// as in-container check commands (1 minute).
 	clog.WithField("command", command).Debug("Executing host pre-check command")
 
-	if _, err := executeHostCommand(ctx, command, checkCommandTimeout, hostCommandEnv(container)); err != nil {
+	if _, err := executeHostCommand(ctx, command, checkCommandTimeout, hostCommandEnv(container, hookTypePreCheck)); err != nil {
 		clog.WithError(err).Debug("Host pre-check command failed")
 	}
 }
@@ -161,18 +170,21 @@ func ExecuteHostPreCheckCommand(ctx context.Context, container types.Container) 
 // hostCommandEnv builds the environment variables exposed to host lifecycle commands.
 //
 // These mirror the fields of the in-container WT_CONTAINER metadata that are
-// meaningful on the host, exposed as discrete variables.
+// meaningful on the host, exposed as discrete variables, plus WT_HOOK_TYPE
+// identifying the lifecycle phase that triggered the command.
 //
 // Parameters:
 //   - container: Container the command is being run for.
+//   - hookType: Lifecycle phase identifier (e.g. "pre-check", "post-update").
 //
 // Returns:
 //   - []string: Environment variables in "KEY=value" form.
-func hostCommandEnv(container types.Container) []string {
+func hostCommandEnv(container types.Container, hookType string) []string {
 	return []string{
 		"WT_CONTAINER_NAME=" + container.Name(),
 		"WT_CONTAINER_ID=" + string(container.ID()),
 		"WT_CONTAINER_IMAGE_NAME=" + container.ImageName(),
+		"WT_HOOK_TYPE=" + hookType,
 	}
 }
 
@@ -294,7 +306,7 @@ func ExecuteHostPostCheckCommand(ctx context.Context, container types.Container)
 	// as in-container check commands (1 minute).
 	clog.WithField("command", command).Debug("Executing host post-check command")
 
-	if _, err := executeHostCommand(ctx, command, checkCommandTimeout, hostCommandEnv(container)); err != nil {
+	if _, err := executeHostCommand(ctx, command, checkCommandTimeout, hostCommandEnv(container, hookTypePostCheck)); err != nil {
 		clog.WithError(err).Debug("Host post-check command failed")
 	}
 }
@@ -408,7 +420,7 @@ func ExecuteHostPreUpdateCommand(ctx context.Context, container types.Container)
 	// Execute command with configured timeout.
 	clog.WithField("command", command).Debug("Executing host pre-update command")
 
-	skipUpdate, err := executeHostCommand(ctx, command, timeout, hostCommandEnv(container))
+	skipUpdate, err := executeHostCommand(ctx, command, timeout, hostCommandEnv(container, hookTypePreUpdate))
 	if err != nil {
 		clog.WithError(err).Debug("Host pre-update command failed")
 
@@ -531,7 +543,7 @@ func ExecuteHostPostUpdateCommand(
 	// Execute command with configured timeout.
 	clog.WithField("command", command).Debug("Executing host post-update command")
 
-	if _, err := executeHostCommand(ctx, command, timeout, hostCommandEnv(newContainer)); err != nil {
+	if _, err := executeHostCommand(ctx, command, timeout, hostCommandEnv(newContainer, hookTypePostUpdate)); err != nil {
 		clog.WithError(err).WithField("container_id", newContainerID.ShortID()).
 			Debug("Host post-update command failed")
 	}

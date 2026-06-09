@@ -104,11 +104,12 @@ Unlike the in-container pre-update hook, the host pre-update hook runs regardles
 
 Host hook commands receive details about the triggering container through dedicated environment variables (the JSON `WT_CONTAINER` variable used by in-container hooks is **not** provided):
 
-| Variable                  | Description                       | Example          |
-|---------------------------|-----------------------------------|------------------|
-| `WT_CONTAINER_NAME`       | Container name                    | `/my-app`        |
-| `WT_CONTAINER_ID`         | Full container ID                 | `abc123def456…`  |
-| `WT_CONTAINER_IMAGE_NAME` | Container image name with tag     | `nginx:latest`   |
+| Variable                  | Description                                                      | Example          |
+|---------------------------|-----------------------------------------------------------------|------------------|
+| `WT_CONTAINER_NAME`       | Container name                                                  | `/my-app`        |
+| `WT_CONTAINER_ID`         | Full container ID                                               | `abc123def456…`  |
+| `WT_CONTAINER_IMAGE_NAME` | Container image name with tag                                   | `nginx:latest`   |
+| `WT_HOOK_TYPE`            | Lifecycle phase that triggered the command                      | `pre-check`, `post-check`, `pre-update`, `post-update` |
 
 ### Advanced Configuration
 
