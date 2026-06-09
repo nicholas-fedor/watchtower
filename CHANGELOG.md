@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.38.0 by @renovate[bot] in [#1758](https://github.com/nicholas-fedor/watchtower/pull/1758)
 - Update module golang.org/x/term to v0.44.0 by @renovate[bot] in [#1756](https://github.com/nicholas-fedor/watchtower/pull/1756)
 - Update nicholas-fedor/actionlint-action action to v1.0.6 by @renovate[bot] in [#1755](https://github.com/nicholas-fedor/watchtower/pull/1755)
 - Update module golang.org/x/sys to v0.46.0 by @renovate[bot] in [#1753](https://github.com/nicholas-fedor/watchtower/pull/1753)
