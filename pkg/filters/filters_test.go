@@ -454,7 +454,7 @@ func TestFilterByNoneScope_MixedHandling(t *testing.T) {
 func TestBuildFilterNoneScope(t *testing.T) {
 	t.Parallel()
 
-	filter, desc := BuildFilter(nil, nil, false, "none")
+	filter, desc := BuildFilter(nil, nil, nil, nil, false, "none")
 
 	assert.Contains(t, desc, "without a scope")
 
@@ -689,7 +689,7 @@ func TestBuildFilter(t *testing.T) {
 
 	names := []string{"test", "valid"}
 
-	filter, desc := BuildFilter(names, []string{}, false, "")
+	filter, desc := BuildFilter(names, []string{}, nil, nil, false, "")
 	assert.Contains(t, desc, "test")
 	assert.Contains(t, desc, "or")
 	assert.Contains(t, desc, "valid")
@@ -745,7 +745,7 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 	names := make([]string, 0, 1)
 	names = append(names, "test")
 
-	filter, desc := BuildFilter(names, []string{}, true, "")
+	filter, desc := BuildFilter(names, []string{}, nil, nil, true, "")
 	assert.Contains(t, desc, "using enable label")
 
 	container := new(mockContainer.FilterableContainer)
@@ -786,7 +786,7 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 func TestBuildFilterDisableContainer(t *testing.T) {
 	t.Parallel()
 
-	filter, desc := BuildFilter([]string{}, []string{"excluded", "notfound"}, false, "")
+	filter, desc := BuildFilter([]string{}, []string{"excluded", "notfound"}, nil, nil, false, "")
 	assert.Contains(t, desc, "not named")
 	assert.Contains(t, desc, "excluded")
 	assert.Contains(t, desc, "or")
@@ -852,5 +852,135 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
 	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+}
+
+func TestFilterByImageNames(t *testing.T) {
+	t.Parallel()
+
+	imageNames := make([]string, 0, 1)
+
+	filter := FilterByImageNames(imageNames, nil)
+	assert.Nil(t, filter)
+
+	imageNames = append(imageNames, "nginx:latest")
+	filter = FilterByImageNames(imageNames, NoFilter)
+	assert.NotNil(t, filter)
+
+	// Image matches -> kept.
+	container := new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginx:latest")
+	assert.True(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Image does not match -> excluded.
+	container = new(mockContainer.FilterableContainer)
+	container.On("Name").Return("cache")
+	container.On("ImageName").Return("redis:latest")
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+}
+
+func TestFilterByImageNamesRegex(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByImageNames([]string{"nginx:.*"}, NoFilter)
+	assert.NotNil(t, filter)
+
+	// Anchored regex matches any nginx tag.
+	container := new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginx:1.25")
+	assert.True(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Anchored regex does not match a different image name.
+	container = new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginxx:1.25")
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+}
+
+func TestFilterByDisableImageNames(t *testing.T) {
+	t.Parallel()
+
+	disableImageNames := make([]string, 0, 1)
+
+	filter := FilterByDisableImageNames(disableImageNames, nil)
+	assert.Nil(t, filter)
+
+	disableImageNames = append(disableImageNames, "nginx:latest")
+	filter = FilterByDisableImageNames(disableImageNames, NoFilter)
+	assert.NotNil(t, filter)
+
+	// Excluded image.
+	container := new(mockContainer.FilterableContainer)
+	container.On("Name").Return("web")
+	container.On("ImageName").Return("nginx:latest")
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Non-excluded image passes through baseFilter.
+	container = new(mockContainer.FilterableContainer)
+	container.On("Name").Return("cache")
+	container.On("ImageName").Return("redis:latest")
+	assert.True(t, filter(container))
+	container.AssertExpectations(t)
+}
+
+func TestBuildFilterImageNames(t *testing.T) {
+	t.Parallel()
+
+	filter, desc := BuildFilter(
+		nil, nil,
+		[]string{"nginx:.*", "redis:.*"},
+		[]string{"redis:latest"},
+		false, "",
+	)
+	assert.Contains(t, desc, "which image matches")
+	assert.Contains(t, desc, "nginx:.*")
+	assert.Contains(t, desc, "whose image is not one of")
+	assert.Contains(t, desc, "redis:latest")
+
+	// Image matches an include pattern and is not disabled -> kept.
+	container := new(mockContainer.FilterableContainer)
+	container.On("IsWatchtower").Return(false).Maybe()
+	container.On("Name").Return("/web").Maybe()
+	container.On("ImageName").Return("nginx:1.25").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe()
+	assert.True(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Image matches no include pattern -> excluded.
+	container = new(mockContainer.FilterableContainer)
+	container.On("IsWatchtower").Return(false).Maybe()
+	container.On("Name").Return("/api").Maybe()
+	container.On("ImageName").Return("api:latest").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe()
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Image matches an include pattern but is explicitly disabled -> excluded.
+	container = new(mockContainer.FilterableContainer)
+	container.On("IsWatchtower").Return(false).Maybe()
+	container.On("Name").Return("/cache").Maybe()
+	container.On("ImageName").Return("redis:latest").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe()
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Image matches include pattern and disable pattern does not match -> kept.
+	container = new(mockContainer.FilterableContainer)
+	container.On("IsWatchtower").Return(false).Maybe()
+	container.On("Name").Return("/cache2").Maybe()
+	container.On("ImageName").Return("redis:7").Maybe()
+	container.On("Enabled").Return(false, false).Maybe()
+	container.On("Scope").Return("", false).Maybe()
+	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 }

@@ -430,7 +430,43 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
 ```
 
 !!! Note
-    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex-pattern-matching) for details.
+    Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching) for details.
+
+### Include Specific Images
+
+Restricts monitoring to containers whose image name matches one of the supplied
+values, even if other selection criteria would include them.
+
+```text
+            Argument: --image-names
+Environment Variable: WATCHTOWER_IMAGE_NAMES
+                Type: Comma- or space-separated string list
+             Default: None
+```
+
+!!! Note
+    Image names include the tag (for example `nginx:latest`). Regex patterns are
+    supported and anchored to the **full** image name. See
+    [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching)
+    for details.
+
+### Disable Specific Images
+
+Excludes containers by image name from monitoring, even if they have the enable
+label set to `true`.
+
+```text
+            Argument: --disable-image-names
+Environment Variable: WATCHTOWER_DISABLE_IMAGE_NAMES
+                Type: Comma- or space-separated string list
+             Default: None
+```
+
+!!! Note
+    Image names include the tag (for example `nginx:latest`). Regex patterns are
+    supported and anchored to the **full** image name. See
+    [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching)
+    for details.
 
 ### Scope Filter
 

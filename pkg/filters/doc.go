@@ -7,7 +7,7 @@
 //
 // Usage example:
 //
-//	filter, desc := filters.BuildFilter(names, disableNames, true, "scope")
+//	filter, desc := filters.BuildFilter(names, disableNames, imageNames, disableImageNames, true, "scope")
 //	containers, _ := client.ListContainers(filter)
 //	logrus.Info(desc)
 //

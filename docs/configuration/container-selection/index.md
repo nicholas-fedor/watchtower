@@ -90,6 +90,8 @@ When the label is specified on a container, Watchtower treats that container exa
 
 Both container inclusion (positional arguments) and exclusion  ([`--disable-containers`/`WATCHTOWER_DISABLE_CONTAINERS`](../arguments/index.md#disable_specific_containers)) support regular expression patterns for matching container names.
 
+Image-name selection ([`--image-names`/`WATCHTOWER_IMAGE_NAMES`](../arguments/index.md#include_specific_images) and [`--disable-image-names`/`WATCHTOWER_DISABLE_IMAGE_NAMES`](../arguments/index.md#disable_specific_images)) supports the same regex syntax, matching against the **full image name including its tag** (for example `nginx:latest`). To match every tag of an image, use a pattern such as `nginx:.*`.
+
 !!! Note "Patterns are anchored to match the **full container name**"
     Use `.*` (period + asterisk) for wildcards instead of just an `*` (asterisk)
 

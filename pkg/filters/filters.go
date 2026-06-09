@@ -190,6 +190,76 @@ func FilterByDisableNames(normalizedDisableNames []string, baseFilter types.Filt
 	}
 }
 
+// FilterByImageNames selects containers whose image matches specified names.
+//
+// Parameters:
+//   - imageNames: List of image names or regex patterns to match.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function combining image name check with base filter.
+func FilterByImageNames(imageNames []string, baseFilter types.Filter) types.Filter {
+	if len(imageNames) == 0 {
+		return baseFilter
+	}
+
+	return func(c types.FilterableContainer) bool {
+		imageName := c.ImageName()
+		clog := logrus.WithFields(logrus.Fields{
+			"container":  c.Name(),
+			"image":      imageName,
+			"imageNames": imageNames,
+		})
+
+		for _, pattern := range imageNames {
+			if matchesName(imageName, pattern) {
+				clog.Debug("Matched container by image name/pattern")
+
+				return baseFilter(c)
+			}
+		}
+
+		clog.Debug("Container image did not match any filter")
+
+		return false
+	}
+}
+
+// FilterByDisableImageNames excludes containers whose image matches specified names.
+//
+// Parameters:
+//   - disableImageNames: Image names or regex patterns to exclude.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function excluding image names and applying base filter.
+func FilterByDisableImageNames(disableImageNames []string, baseFilter types.Filter) types.Filter {
+	if len(disableImageNames) == 0 {
+		return baseFilter
+	}
+
+	return func(c types.FilterableContainer) bool {
+		imageName := c.ImageName()
+		clog := logrus.WithFields(logrus.Fields{
+			"container":         c.Name(),
+			"image":             imageName,
+			"disableImageNames": disableImageNames,
+		})
+
+		for _, pattern := range disableImageNames {
+			if matchesName(imageName, pattern) {
+				clog.Debug("Container excluded by disable image name/pattern")
+
+				return false
+			}
+		}
+
+		clog.Debug("Container not excluded by disable image names")
+
+		return baseFilter(c)
+	}
+}
+
 // FilterByEnableLabel selects containers with enable label set.
 //
 // Parameters:
@@ -353,7 +423,9 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 //
 // Parameters:
 //   - normalizedNames: Normalized names or regex patterns to include.
-//   - disableNames: Normalized names or regex patterns to exclude.
+//   - normalizedDisableNames: Normalized names or regex patterns to exclude.
+//   - imageNames: Image names or regex patterns to include.
+//   - disableImageNames: Image names or regex patterns to exclude.
 //   - enableLabel: Require enable label if true.
 //   - scope: Scope to match.
 //
@@ -363,14 +435,18 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 func BuildFilter(
 	normalizedNames []string,
 	normalizedDisableNames []string,
+	imageNames []string,
+	disableImageNames []string,
 	enableLabel bool,
 	scope string,
 ) (types.Filter, string) {
 	clog := logrus.WithFields(logrus.Fields{
-		"names":        normalizedNames,
-		"disableNames": normalizedDisableNames,
-		"enableLabel":  enableLabel,
-		"scope":        scope,
+		"names":             normalizedNames,
+		"disableNames":      normalizedDisableNames,
+		"imageNames":        imageNames,
+		"disableImageNames": disableImageNames,
+		"enableLabel":       enableLabel,
+		"scope":             scope,
 	})
 	clog.Debug("Building container filter")
 
@@ -379,6 +455,8 @@ func BuildFilter(
 	filter := NoFilter
 	filter = FilterByNames(normalizedNames, filter)
 	filter = FilterByDisableNames(normalizedDisableNames, filter)
+	filter = FilterByImageNames(imageNames, filter)
+	filter = FilterByDisableImageNames(disableImageNames, filter)
 
 	// Add name-based filter description.
 	if len(normalizedNames) > 0 {
@@ -403,6 +481,36 @@ func BuildFilter(
 			stringBuilder.WriteString(n)
 
 			if i < len(normalizedDisableNames)-1 {
+				stringBuilder.WriteString(`" or "`)
+			}
+		}
+
+		stringBuilder.WriteString(`", `)
+	}
+
+	// Add image-name-based filter description.
+	if len(imageNames) > 0 {
+		stringBuilder.WriteString("which image matches \"")
+
+		for i, n := range imageNames {
+			stringBuilder.WriteString(n)
+
+			if i < len(imageNames)-1 {
+				stringBuilder.WriteString(`" or "`)
+			}
+		}
+
+		stringBuilder.WriteString(`", `)
+	}
+
+	// Add disable-image-name-based filter description.
+	if len(disableImageNames) > 0 {
+		stringBuilder.WriteString("whose image is not one of \"")
+
+		for i, n := range disableImageNames {
+			stringBuilder.WriteString(n)
+
+			if i < len(disableImageNames)-1 {
 				stringBuilder.WriteString(`" or "`)
 			}
 		}
