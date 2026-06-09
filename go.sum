@@ -86,8 +86,8 @@ github.com/moby/moby/client v0.4.1 h1:DMQgisVoMkmMs7fp3ROSdiBnoAu8+vo3GggFl06M/w
 github.com/moby/moby/client v0.4.1/go.mod h1:z52C9O2POPOsnxZAy//WtKcQ32P+jT/NGeXu/7nfjGQ=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/nicholas-fedor/shoutrrr v0.16.0 h1:oUKfFZDM7CoENuZMsE/8sK/KbED92/urTWR0wv2BAq8=
-github.com/nicholas-fedor/shoutrrr v0.16.0/go.mod h1:l0IveCVC6V2uyjxCeK22JTRlzoiQp2c0Dam/HE6OLBk=
+github.com/nicholas-fedor/shoutrrr v0.16.1 h1:MOzl3U6zprA45lOTKaTbQW/9wzkR7SC36IFrTr5xfkU=
+github.com/nicholas-fedor/shoutrrr v0.16.1/go.mod h1:lii4gQKKSV2c32b+D93ysEdKpEzVla6HTbyOajpNDpo=
 github.com/onsi/ginkgo/v2 v2.29.0 h1:rfh+ZFjgJhYWRoIqVf3Uwx/W20yLrcrE2h2GmYVRaag=
 github.com/onsi/ginkgo/v2 v2.29.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.41.0 h1:OwKp4pXNgVxf6sCplzYo794OFNuoL2q2SBMU5NSWOjA=
