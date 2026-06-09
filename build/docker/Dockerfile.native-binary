@@ -1,0 +1,46 @@
+# Dockerfile.native-binary
+#
+# Builds the Watchtower binary inside Docker and exports just the binary to the host,
+# rather than producing a runnable image. Use it with `docker build --output` to drop
+# the compiled binary onto your machine without keeping an image around.
+#
+# See README.md in this folder for usage.
+
+ARG BASE_IMAGE=golang:alpine@sha256:f23e8b227fb4493eabe03bede4d5a32d04092da71962f1fb79b5f7d1e6c2a17f
+
+# Builder Stage
+FROM ${BASE_IMAGE} AS builder
+
+# git is required for version stamping via `git describe`.
+RUN apk add --no-cache git
+
+WORKDIR /watchtower
+
+# Download dependencies first so this layer is cached across source-only changes.
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+COPY . /watchtower
+
+# Target OS/arch. With `docker buildx --platform`, TARGETOS/TARGETARCH are populated
+# automatically; otherwise they default to the builder's platform (host architecture).
+ARG TARGETOS=linux
+ARG TARGETARCH
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+    -trimpath \
+    -ldflags "\
+    -s -w \
+    -X github.com/nicholas-fedor/watchtower/internal/meta.Version=$(git describe --tags --always) \
+    " \
+    -o /out/watchtower \
+    .
+
+# Export Stage
+#
+# A scratch image containing only the binary, so `--output type=local` writes just the
+# binary to the host destination.
+FROM scratch AS export
+
+COPY --from=builder /out/watchtower /watchtower
