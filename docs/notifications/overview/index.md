@@ -692,7 +692,7 @@ Example Legacy Configuration:
 1. Run the following CLI command:
 
     ```bash
-    docker compose exec watchtower watchtower notify-upgrade
+    docker compose exec watchtower /watchtower notify-upgrade
     ```
 
     Converted Shoutrrr URL:
