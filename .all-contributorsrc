@@ -964,6 +964,15 @@
         "code",
         "doc"
       ]
+    },
+    {
+      "login": "Thubo",
+      "name": "Matthias Thubauville",
+      "avatar_url": "https://avatars.githubusercontent.com/u/4083975?v=4",
+      "profile": "https://github.com/Thubo",
+      "contributions": [
+        "doc"
+      ]
     }
   ],
   "contributorsPerLine": 7,
