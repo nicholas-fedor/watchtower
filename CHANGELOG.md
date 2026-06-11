@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:alpine docker digest to a6a091e by @renovate[bot] in [#1780](https://github.com/nicholas-fedor/watchtower/pull/1780)
+- Update golang:alpine docker digest to bd14630 by @renovate[bot] in [#1778](https://github.com/nicholas-fedor/watchtower/pull/1778)
+- Update module golang.org/x/net to v0.56.0 by @renovate[bot] in [#1776](https://github.com/nicholas-fedor/watchtower/pull/1776)
+- Update dependency python to v3.14.6 by @renovate[bot] in [#1775](https://github.com/nicholas-fedor/watchtower/pull/1775)
 - Update alpine:3.24.0 docker digest to a2d49ea by @renovate[bot] in [#1771](https://github.com/nicholas-fedor/watchtower/pull/1771)
 - Update alpine:3.24.0 docker digest to 8ddefa9 by @renovate[bot] in [#1769](https://github.com/nicholas-fedor/watchtower/pull/1769)
 - Update alpine docker tag to v3.24.0 by @renovate[bot] in [#1767](https://github.com/nicholas-fedor/watchtower/pull/1767)
