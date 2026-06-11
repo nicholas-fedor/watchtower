@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update alpine:3.24.0 docker digest to 8ddefa9 by @renovate[bot] in [#1769](https://github.com/nicholas-fedor/watchtower/pull/1769)
 - Update alpine docker tag to v3.24.0 by @renovate[bot] in [#1767](https://github.com/nicholas-fedor/watchtower/pull/1767)
 
+### Fixed
+
+- Fix notify-upgrade exec command by @Thubo in [#1774](https://github.com/nicholas-fedor/watchtower/pull/1774)
+
+### New Contributors
+
+- @Thubo made their first contribution in [#1774](https://github.com/nicholas-fedor/watchtower/pull/1774)
+
 ## [1.18.0] - 2026-06-09
 
 ### Added
