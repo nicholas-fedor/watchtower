@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Thubo as a contributor for docs by @allcontributors[bot] in [#1783](https://github.com/nicholas-fedor/watchtower/pull/1783)
+
 ### Chores
 
 - Update golang:alpine docker digest to a6a091e by @renovate[bot] in [#1780](https://github.com/nicholas-fedor/watchtower/pull/1780)
@@ -20,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Suppress deprecation warning when legacy email subject tag is empty by @nicholas-fedor in [#1785](https://github.com/nicholas-fedor/watchtower/pull/1785)
 - Fix notify-upgrade exec command by @Thubo in [#1774](https://github.com/nicholas-fedor/watchtower/pull/1774)
 
 ### New Contributors
