@@ -279,8 +279,10 @@ func GetTemplateData(c *cobra.Command) StaticData {
 		if tag == "" {
 			// Check legacy email tag.
 			tag, _ = flag.GetString("notification-email-subjecttag")
-			clog.WithField("tag", tag).
-				Warn("Using deprecated email subject tag flag: --notification-email-subjecttag. Use --notification-title-tag instead.")
+			if tag != "" {
+				clog.WithField("tag", tag).
+					Warn("Using deprecated email subject tag flag: --notification-email-subjecttag. Use --notification-title-tag instead.")
+			}
 		}
 
 		title = GetTitle(hostname, tag)
