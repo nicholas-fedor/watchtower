@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update golang:alpine docker digest to 7a3e500 by @renovate[bot] in [#1787](https://github.com/nicholas-fedor/watchtower/pull/1787)
+
+## [1.18.1] - 2026-06-11
+
 ### Added
 
 - Add Thubo as a contributor for docs by @allcontributors[bot] in [#1783](https://github.com/nicholas-fedor/watchtower/pull/1783)
@@ -3142,7 +3148,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.18.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...HEAD)
+- [1.18.1](https://github.com/nicholas-fedor/watchtower/compare/v1.18.0...v1.18.1)
 - [1.18.0](https://github.com/nicholas-fedor/watchtower/compare/v1.17.2...v1.18.0)
 - [1.17.2](https://github.com/nicholas-fedor/watchtower/compare/v1.17.1...v1.17.2)
 - [1.17.1](https://github.com/nicholas-fedor/watchtower/compare/v1.17.0...v1.17.1)
