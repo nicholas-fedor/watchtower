@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/onsi/ginkgo/v2 to v2.30.0 by @renovate[bot] in [#1791](https://github.com/nicholas-fedor/watchtower/pull/1791)
+- Update module github.com/felixge/httpsnoop to v1.1.0 by @renovate[bot] in [#1788](https://github.com/nicholas-fedor/watchtower/pull/1788)
 - Update golang:alpine docker digest to 7a3e500 by @renovate[bot] in [#1787](https://github.com/nicholas-fedor/watchtower/pull/1787)
 
 ## [1.18.1] - 2026-06-11
