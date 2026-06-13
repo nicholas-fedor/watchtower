@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.2 by @renovate[bot] in [#1794](https://github.com/nicholas-fedor/watchtower/pull/1794)
+- Update module golang.org/x/tools to v0.46.0 by @renovate[bot] in [#1792](https://github.com/nicholas-fedor/watchtower/pull/1792)
 - Update module github.com/onsi/ginkgo/v2 to v2.30.0 by @renovate[bot] in [#1791](https://github.com/nicholas-fedor/watchtower/pull/1791)
 - Update module github.com/felixge/httpsnoop to v1.1.0 by @renovate[bot] in [#1788](https://github.com/nicholas-fedor/watchtower/pull/1788)
 - Update golang:alpine docker digest to 7a3e500 by @renovate[bot] in [#1787](https://github.com/nicholas-fedor/watchtower/pull/1787)
@@ -1530,7 +1532,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add andriibratanin as a contributor for doc by @allcontributors[bot]
 - Add nothub as a contributor for code by @allcontributors[bot]
 - Add nothub as a contributor for doc by @allcontributors[bot]
-- Add a warning about using Watchtower in production by @simskij
+- Add a warning about using Watchtower in production by @simonaronsson
 - Add linking and output messages by @piksel
 - Add support for "none" scope by @piksel
 - Add unit test for volume subpath preservation by @nicholas-fedor in [#265](https://github.com/nicholas-fedor/watchtower/pull/265)
@@ -1541,8 +1543,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Merge pull request #278 from nicholas-fedor/fix/commit-history-2 by @nicholas-fedor in [#278](https://github.com/nicholas-fedor/watchtower/pull/278)
 - Merge containrrr/main to resolve 37 commits behind, keeping local file state by @nicholas-fedor
 - Docs for "image" query parameter by @nothub
-- Update notifications.md by @simskij
-- Document how to skip empty notifications using templates by @simskij
+- Update notifications.md by @simonaronsson
+- Document how to skip empty notifications using templates by @simonaronsson
 
 ### Chores
 
@@ -2153,24 +2155,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add DasSkelett as a contributor by @allcontributors[bot]
 - Add ksurl as a contributor by @allcontributors[bot]
 - Add ghcr by @ksurl
-- Add version info to goreleasers ldflags by @simskij
-- Add dockerhub login step by @simskij
-- Add gh token to goreleaser by @simskij
+- Add version info to goreleasers ldflags by @simonaronsson
+- Add dockerhub login step by @simonaronsson
+- Add gh token to goreleaser by @simonaronsson
 - Add reinout as a contributor by @allcontributors[bot]
 - Add hydrargyrum as a contributor by @allcontributors[bot]
 - Add nymous as a contributor by @allcontributors[bot]
 - Add SrihariThalla as a contributor by @allcontributors[bot]
 - Add zoispag as a contributor by @allcontributors[bot]
 - Add SrihariThalla as a contributor by @allcontributors[bot]
-- Add macos to the testing matrix by @simskij
-- Add names to steps by @simskij
+- Add macos to the testing matrix by @simonaronsson
+- Add names to steps by @simonaronsson
 - Add WATCHTOWER_INCLUDE_RESTARTING env for include-restarting flag by @ilike2burnthing
 - Add details/summary to issue template by @piksel
 - Added a link to HTTP API documentation by @jeroenrnl
 - Add tkalus as a contributor by @allcontributors[bot]
-- Add defered closer calls for the http clients by @simskij
+- Add defered closer calls for the http clients by @simonaronsson
 - Add rg9400 as a contributor by @allcontributors[bot]
-- Add http head based digest comparison to avoid dockerhub rate limits by @simskij
+- Add http head based digest comparison to avoid dockerhub rate limits by @simonaronsson
 - Add ksurl as a contributor by @allcontributors[bot]
 - Add yrien30 as a contributor by @allcontributors[bot]
 - Add chander as a contributor by @allcontributors[bot]
@@ -2184,9 +2186,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add string functions for lowercase, uppercase and capitalize to shoutrrr templates by @PssbleTrngle
 - Add bugficks as a contributor by @allcontributors[bot]
 - Add MihailITPlace as a contributor by @allcontributors[bot]
-- Add files via upload by @simskij
-- Add files via upload by @simskij
-- Add files via upload by @simskij
+- Add files via upload by @simonaronsson
+- Add files via upload by @simonaronsson
+- Add files via upload by @simonaronsson
 - Add mattdoran as a contributor by @allcontributors[bot]
 - Add pgrimaud as a contributor by @allcontributors[bot]
 - Add andrewjmetzger as a contributor by @allcontributors[bot]
@@ -2199,8 +2201,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add ogmueller as a contributor by @allcontributors[bot]
 - Added documentation using an SMTP relay to #508 by @ogmueller
 - Add bopoh24 as a contributor by @allcontributors[bot]
-- Add logo to repo by @simskij
-- Add automatic issue locking by @simskij
+- Add logo to repo by @simonaronsson
+- Add automatic issue locking by @simonaronsson
 - Add Saicheg as a contributor by @allcontributors[bot]
 - Add ability to overrider depending containers with special label by @Saicheg
 - Add victorcmoura as a contributor by @allcontributors[bot]
@@ -2208,59 +2210,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add shoutrrr.go by @mbrandau
 - Add shoutrrr by @mbrandau
 - Add additional note on gcloud credentials
-- Add timeout override for pre-update lifecycle hook by @simskij
+- Add timeout override for pre-update lifecycle hook by @simonaronsson
 - Add auanasgheps as a contributor by @allcontributors[bot]
 - Add --no-startup-message flag
-- Add "help needed" section to readme by @simskij
+- Add "help needed" section to readme by @simonaronsson
 - Add github action to build and publish dev image to dockerhub by @zoispag
-- #387 fix: add comments to pass linting by @simskij
-- Add support for multiple email recipients by @simskij
+- #387 fix: add comments to pass linting by @simonaronsson
+- Add support for multiple email recipients by @simonaronsson
 - Adds development self-contained builds instructions to CONTRIBUTING.md by @victorcmoura
 - Adds self-contained dev Dockerfile by @victorcmoura
 - Added full path to config file by @jnidzwetzki
 - Add missing arguments by @pjknkda
-- Added Mail Subject Tag to email.go by @simskij
+- Added Mail Subject Tag to email.go by @simonaronsson
 - Add --revive-stopped flag to start stopped containers after an update by @zoispag
 - Add lifecycle hooks to documentation nav by @zoispag
 - Add foosel as a contributor by @allcontributors[bot]
 - Add pre/post update check lifecycle hooks
-- Add optional email delay by @simskij
+- Add optional email delay by @simonaronsson
 - Add sixth as a contributor by @allcontributors[bot]
 - Add kaloyan-raev as a contributor by @allcontributors[bot]
 - Add docker api version parameter by @kaloyan-raev
-- Add new documentation to menu by @simskij
-- Add information on how to use credential helpers by @simskij
+- Add new documentation to menu by @simonaronsson
+- Add information on how to use credential helpers by @simonaronsson
 - Add rjbudke as a contributor by @allcontributors[bot]
 - Add noplanman as a contributor by @allcontributors[bot]
-- Add docker pull count badge by @simskij
+- Add docker pull count badge by @simonaronsson
 - Add chugunov as a contributor by @allcontributors[bot]
 - Add alexandremenif as a contributor by @allcontributors[bot]
 - Add support for Gotify notifications by @lukapeschke
 - Add lukapeschke as a contributor by @allcontributors[bot]
-- Add githubs fingerprint to known host for mkdocs by @simskij
-- Add sponsorship option by @simskij
+- Add githubs fingerprint to known host for mkdocs by @simonaronsson
+- Add sponsorship option by @simonaronsson
 - Add Ansem93 as a contributor by @allcontributors[bot]
-- Add probot: welcome by @simskij
-- Add probot: stale by @simskij
-- Add all contributors by @simskij
+- Add probot: welcome by @simonaronsson
+- Add probot: stale by @simonaronsson
+- Add all contributors by @simonaronsson
 - Add bdehamer as a contributor by @allcontributors[bot]
 - Add rosscado as a contributor by @allcontributors[bot]
 - Add stffabi as a contributor by @allcontributors[bot]
 - Add Codelica as a contributor by @allcontributors[bot]
 - Add kopfkrieg as a contributor by @allcontributors[bot]
 - Add a Gitter chat badge to README.md by @gitter-badger
-- Add tests for check action, resolve wt cleanup bug by @simskij
+- Add tests for check action, resolve wt cleanup bug by @simonaronsson
 - Add Dockerfile.self-contained by @svengo
-- Add placeholder client test by @simskij
-- Add test coverage badge by @simskij
-- Add additional login due to manifest shenanigans by @simskij
+- Add placeholder client test by @simonaronsson
+- Add test coverage badge by @simonaronsson
+- Add additional login due to manifest shenanigans by @simonaronsson
 - Additional release logic to try to push manifested releases on publish by @thelamer
 - Additional release logic to try to push manifested releases on publish by @thelamer
-- Add licensing badge and latest semver badge by @simskij
-- Add new flag to readme by @simskij
+- Add licensing badge and latest semver badge by @simonaronsson
+- Add new flag to readme by @simonaronsson
 - Add Slack Channel, IconEmoji, and IconURL options by @mariotacke
-- Add a monitor only flag by @simskij
-- Add a logo and spice up the top part of the readme by @simskij
+- Add a monitor only flag by @simonaronsson
+- Add a logo and spice up the top part of the readme by @simonaronsson
 - Add reminder to pull proper image for ARM users by @connormcmk
 - Add documentation for how to pass env variables by @connormcmk
 - Add a "Reviewed by Hound" badge by @salbertson
@@ -2310,7 +2312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preparations for soft deprecation of legacy notification args by @piksel
 - [StepSecurity] ci: Harden GitHub Actions by @step-security-bot
 - Use pull_request_target for greeting by @piksel
-- Delete FUNDING.yml by @simskij
+- Delete FUNDING.yml by @simonaronsson
 - Allow log level to be set to any level by @matthewmcneely
 - Create dependabot.yml to update versions for GitHub Actions, Go modules and Docker images by @jauderho
 - Regex container name filtering by @mateuszdrab
@@ -2321,8 +2323,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clarify container label usage by @EDIflyer
 - Optional query parameter to update only containers of a specified image by @Foxite
 - Bump shoutrrr to v0.5.3 by @piksel
-- Update greetings.yml by @simskij
-- Bump vulnerable packages by @simskij
+- Update greetings.yml by @simonaronsson
+- Bump vulnerable packages by @simonaronsson
 - Fix typo on --http-api-update environment variable and add warning note for --http-api-periodic-polls by @jamesmacwhite
 - Fix docker-compose syntax in quick-start. GH #1105 by @atombrella
 - Bump version of vulnerable dependencies by @piksel
@@ -2331,7 +2333,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve session result logging by @piksel
 - Use a more specific error type for no container info by @MorrisLaw
 - Prefer long flags in quick start example by @rootulp
-- Create pull_request_template.md by @simskij
+- Create pull_request_template.md by @simonaronsson
 - Update README.md by @modem7
 - Update dependencies (sane go.mod) by @piksel
 - Update to v0.5 by @piksel
@@ -2347,18 +2349,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move docs to separate action by @piksel
 - Documentation updates by @piksel
 - Check container config before update by @piksel
-- Feat/head failure toggle by @simskij
+- Feat/head failure toggle by @simonaronsson
 - Update shoutrrr to v0.4.4 by @piksel
 - Make head pull failure warning toggleable by @piksel
-- Update bug_report.md by @simskij
-- Move token logs to trace by @simskij
-- Create SECURITY.md by @simskij
+- Update bug_report.md by @simonaronsson
+- Move token logs to trace by @simonaronsson
+- Create SECURITY.md by @simonaronsson
 - Use short image/container IDs in logs by @piksel
 - Suggest mounting localtime, not of timezone by @piksel
-- Rem vals we dont need or use from the gr config by @simskij
-- Permanently disable cgo for production releases by @simskij
-- Update release.yml by @simskij
-- Update release-dev.yaml by @simskij
+- Rem vals we dont need or use from the gr config by @simonaronsson
+- Permanently disable cgo for production releases by @simonaronsson
+- Update release.yml by @simonaronsson
+- Update release-dev.yaml by @simonaronsson
 - Include additional info in startup by @piksel
 - Doc fix: default interval is 24h instead of 5m by @reinout
 - Update Shoutrrr to v0.4 by @piksel
@@ -2366,27 +2368,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Typo in --http-api by @kopiro
 - Update HTTP API docs by @dapplion
 - Update changed contributor username by @jokay
-- Delete unused circleci config by @simskij
+- Delete unused circleci config by @simonaronsson
 - Fix arguments doc formatting by @nymous
 - Update code of conduct URL in github action by @zoispag
 - Add codeQL analysis checks by @zoispag
-- Make test command windows compatible by @simskij
-- Update README.md by @simskij
-- Update README.md by @simskij
-- Cleanup readme by @simskij
+- Make test command windows compatible by @simonaronsson
+- Update README.md by @simonaronsson
+- Update README.md by @simonaronsson
+- Cleanup readme by @simonaronsson
 - Fix notifications and old instance cleanup by @piksel
-- Create post-release.yml by @simskij
-- Prometheus support by @simskij
-- Cherrypick notification changes from #450 by @simskij
+- Create post-release.yml by @simonaronsson
+- Prometheus support by @simonaronsson
+- Cherrypick notification changes from #450 by @simonaronsson
 - Log based on registry known-support - reduce noise on notifications by @tkalus
-- Revert "feat(config): swap viper and cobra for config" by @simskij
-- Clean up scope builder and remove fmt print by @simskij
-- Make sure all different ref formats are supported by @simskij
+- Revert "feat(config): swap viper and cobra for config" by @simonaronsson
+- Clean up scope builder and remove fmt print by @simonaronsson
+- Make sure all different ref formats are supported by @simonaronsson
 - Swap viper and cobra for config by @piksel
 - Move secret value "credentials" to trace log by @piksel
 - Fix syntax highlight and typo in docs by @piksel
 - Documentation theme updates by @piksel
-- Actually fix it by @simskij
+- Actually fix it by @simonaronsson
 - Allow watchtower to update rebooting containers
 - Update README to reflect migration to GitHub discussions by @TheCoolBlackCat
 - Update to improve the private registry docs by @chander
@@ -2399,136 +2401,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lifecycle logs as Debug instead of Info by @MichaelSp
 - Document DOCKER_CONFIG environment variable by @piksel
 - Update private-registries.md by @bugficks
-- Create code_of_conduct.md by @simskij
-- Delete code of conduct in favor of org-wide one by @simskij
-- Update README.md by @simskij
-- Delete logo.png by @simskij
-- Make background transparent by @simskij
-- Update README.md by @simskij
-- Update README.md by @simskij
-- Create CODEOWNERS by @simskij
+- Create code_of_conduct.md by @simonaronsson
+- Delete code of conduct in favor of org-wide one by @simonaronsson
+- Update README.md by @simonaronsson
+- Delete logo.png by @simonaronsson
+- Make background transparent by @simonaronsson
+- Update README.md by @simonaronsson
+- Update README.md by @simonaronsson
+- Create CODEOWNERS by @simonaronsson
 - Allows flags containing sensitive stuff to be passed as files by @tammert
 - Image of running container no longer needed locally by @tammert
 - Notification docs: Add SMTP port to gmail configuration by @mattdoran
 - `config.json` symlink workaround described by @tammert
-- Create config.yml by @simskij
+- Create config.yml by @simonaronsson
 - Update shoutrrr to get latest and updated services by @arnested
-- Update README.md by @simskij
-- Update README.md by @simskij
-- Update README.md by @simskij
-- Update .all-contributorsrc by @simskij
-- Only run greeting on issues for the time being by @simskij
+- Update README.md by @simonaronsson
+- Update README.md by @simonaronsson
+- Update README.md by @simonaronsson
+- Update .all-contributorsrc by @simonaronsson
+- Only run greeting on issues for the time being by @simonaronsson
 - Fix typos by @pgrimaud
-- Disable godacov by @simskij
-- Comment out test that is incompatible with CircleCI by @simskij
-- Bump minimum API version to 1.25 by @simskij
+- Disable godacov by @simonaronsson
+- Comment out test that is incompatible with CircleCI by @simonaronsson
+- Bump minimum API version to 1.25 by @simonaronsson
 - Increases stopContainer timeout to 10min by @bopoh24
-- Update README.md by @simskij
+- Update README.md by @simonaronsson
 - Increases stopContainer timeout from 60 seconds to 10min by @victorcmoura
 - Watchtower HTTP API based updates by @victorcmoura
 - Typo Correction by @patski123
-- Merge pull request #494 from containrrr/all-contributors/add-mbrandau by @simskij
-- Merge branch 'master' into all-contributors/add-mbrandau by @simskij
-- Merge pull request #493 from containrrr/all-contributors/add-arnested by @simskij
+- Merge pull request #494 from containrrr/all-contributors/add-mbrandau by @simonaronsson
+- Merge branch 'master' into all-contributors/add-mbrandau by @simonaronsson
+- Merge pull request #493 from containrrr/all-contributors/add-arnested by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #470 from mbrandau/add-shoutrrr by @simskij
+- Merge pull request #470 from mbrandau/add-shoutrrr by @simonaronsson
 - Update shoutrrr by @mbrandau
 - Update documentation by @mbrandau
 - Reuse router by @mbrandau
 - Adjust documentation by @mbrandau
 - Use CreateSender instead of calling Send multiple times by @mbrandau
 - Adjust flags by @mbrandau
-- Merge pull request #491 from containrrr/all-contributors/add-piksel by @simskij
+- Merge pull request #491 from containrrr/all-contributors/add-piksel by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #490 from containrrr/fix-cron-doc-link by @simskij
+- Merge pull request #490 from containrrr/fix-cron-doc-link by @simonaronsson
 - Update cron docs link by @piksel
-- Merge pull request #486 from containrrr/all-contributors/add-sixcorners by @simskij
+- Merge pull request #486 from containrrr/all-contributors/add-sixcorners by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #483 from sixcorners/patch-2 by @simskij
+- Merge pull request #483 from sixcorners/patch-2 by @simonaronsson
 - Copy note about setting both interval and schedule by @sixcorners
-- Merge pull request #480 from containrrr/feature/367 by @simskij
-- Feature/367 fix: skip container if pre-update command fails by @simskij
-- Merge pull request #485 from containrrr/all-contributors/add-aneisch by @simskij
+- Merge pull request #480 from containrrr/feature/367 by @simonaronsson
+- Feature/367 fix: skip container if pre-update command fails by @simonaronsson
+- Merge pull request #485 from containrrr/all-contributors/add-aneisch by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #484 from aneisch/patch-1 by @simskij
-- Update arguments.md by @simskij
+- Merge pull request #484 from aneisch/patch-1 by @simonaronsson
+- Update arguments.md by @simonaronsson
 - Update arguments.md by @aneisch
-- Update container-selection.md by @simskij
-- Clarify container selection by @simskij
-- Merge pull request #482 from containrrr/all-contributors/add-mbrandau by @simskij
-- Merge pull request #477 from mbrandau/no-startup-message by @simskij
+- Update container-selection.md by @simonaronsson
+- Clarify container selection by @simonaronsson
+- Merge pull request #482 from containrrr/all-contributors/add-mbrandau by @simonaronsson
+- Merge pull request #477 from mbrandau/no-startup-message by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #481 from containrrr/all-contributors/add-victorcmoura by @simskij
+- Merge pull request #481 from containrrr/all-contributors/add-victorcmoura by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
 - Time Zone improvements
 - Start up notification
-- Merge pull request #469 from containrrr/all-contributors/add-lukwil by @simskij
+- Merge pull request #469 from containrrr/all-contributors/add-lukwil by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #465 from lukwil/feature/443 by @simskij
+- Merge pull request #465 from lukwil/feature/443 by @simonaronsson
 - Fix according to remarks
-- Merge pull request #455 from pagdot/patch-1 by @simskij
+- Merge pull request #455 from pagdot/patch-1 by @simonaronsson
 - Return on error after http.Post to gotify instance by @pagdot
-- Update README.md by @simskij
-- Merge pull request #463 from containrrr/all-contributors/add-Germs2004 by @simskij
+- Update README.md by @simonaronsson
+- Merge pull request #463 from containrrr/all-contributors/add-Germs2004 by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #461 from Germs2004/patch-1 by @simskij
+- Merge pull request #461 from Germs2004/patch-1 by @simonaronsson
 - Document the TZ environment variable by @Germs2004
-- Merge pull request #459 from containrrr/all-contributors/add-jsclayton by @simskij
+- Merge pull request #459 from containrrr/all-contributors/add-jsclayton by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #418 from jsclayton/fix/retain-cmd by @simskij
-- Merge branch 'master' into fix/retain-cmd by @simskij
-- Merge pull request #449 from containrrr/all-contributors/add-raymondelooff by @simskij
+- Merge pull request #418 from jsclayton/fix/retain-cmd by @simonaronsson
+- Merge branch 'master' into fix/retain-cmd by @simonaronsson
+- Merge pull request #449 from containrrr/all-contributors/add-raymondelooff by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #448 from raymondelooff/bugfix/188 by @simskij
+- Merge pull request #448 from raymondelooff/bugfix/188 by @simonaronsson
 - Unset Hostname when NetworkMode is container by @raymondelooff
-- Update .all-contributorsrc by @simskij
-- Tidy up mod and sum files by @simskij
-- Extract code from the container package by @simskij
-- Update publish-dev-dockerimage.yaml by @simskij
-- Merge pull request #438 from zoispag/feature/437-push-latest-dev-on-master-commit by @simskij
-- #387 fix: switch to image id map and add additional tests by @simskij
-- Merge pull request #436 from containrrr/feature/multiple-email-recipients by @simskij
-- Merge pull request #431 from victorcmoura/feature/430 by @simskij
+- Update .all-contributorsrc by @simonaronsson
+- Tidy up mod and sum files by @simonaronsson
+- Extract code from the container package by @simonaronsson
+- Update publish-dev-dockerimage.yaml by @simonaronsson
+- Merge pull request #438 from zoispag/feature/437-push-latest-dev-on-master-commit by @simonaronsson
+- #387 fix: switch to image id map and add additional tests by @simonaronsson
+- Merge pull request #436 from containrrr/feature/multiple-email-recipients by @simonaronsson
+- Merge pull request #431 from victorcmoura/feature/430 by @simonaronsson
 - Merge branch 'master' of https://github.com/containrrr/watchtower into feature/430 by @victorcmoura
-- Merge pull request #434 from containrrr/all-contributors/add-codingCoffee by @simskij
+- Merge pull request #434 from containrrr/all-contributors/add-codingCoffee by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #433 from codingCoffee/bump_version by @simskij
+- Merge pull request #433 from codingCoffee/bump_version by @simonaronsson
 - Edits goreleaser to match exclusive dockerfiles folder by @victorcmoura
 - Moved dockerfiles to an exclusive folder by @victorcmoura
-- Merge pull request #425 from containrrr/all-contributors/add-mindrunner by @simskij
+- Merge pull request #425 from containrrr/all-contributors/add-mindrunner by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #393 from mindrunner/master by @simskij
-- Merge branch 'master' into master by @simskij
+- Merge pull request #393 from mindrunner/master by @simonaronsson
+- Merge branch 'master' into master by @simonaronsson
 - Proper set implementation by @mindrunner
 - Do not delete same image twice when cleaning up by @mindrunner
-- Merge pull request #423 from zoispag/feature/413-change-initial-log-from-debug-to-info by @simskij
+- Merge pull request #423 from zoispag/feature/413-change-initial-log-from-debug-to-info by @simonaronsson
 - #413 Change initial logging message from debug to info by @zoispag
 - Sync by @zoispag
-- Merge pull request #424 from jnidzwetzki/documentation-private-registries by @simskij
-- Update private-registries.md by @simskij
+- Merge pull request #424 from jnidzwetzki/documentation-private-registries by @simonaronsson
+- Update private-registries.md by @simonaronsson
 - Update private-registries.md by @jnidzwetzki
 - Documented private registries by @jnidzwetzki
 - Renamed documentation file by @jnidzwetzki
-- Merge pull request #422 from containrrr/all-contributors/add-zoispag by @simskij
-- Merge branch 'master' into all-contributors/add-zoispag by @simskij
-- Merge pull request #421 from containrrr/all-contributors/add-jnidzwetzki by @simskij
+- Merge pull request #422 from containrrr/all-contributors/add-zoispag by @simonaronsson
+- Merge branch 'master' into all-contributors/add-zoispag by @simonaronsson
+- Merge pull request #421 from containrrr/all-contributors/add-jnidzwetzki by @simonaronsson
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
-- Merge pull request #420 from jnidzwetzki/bugfix-doc-credential by @simskij
+- Merge pull request #420 from jnidzwetzki/bugfix-doc-credential by @simonaronsson
 - Fixed small typo by @jnidzwetzki
 - Update credential-helpers.md by @jnidzwetzki
 - Changed codeblock language by @jnidzwetzki
@@ -2536,18 +2538,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update .all-contributorsrc [skip ci] by @allcontributors[bot]
 - Update README.md [skip ci] by @allcontributors[bot]
 - Don’t delete cmd when runtime entrypoint is different by @jsclayton
-- Update instruction on multiple notifications by @simskij
-- Update notifications.md by @simskij
-- Update greetings.yml by @simskij
-- Greet new reporters and contributors using actions by @simskij
-- Merge pull request #409 from containrrr/all-contributors/add-pjknkda by @simskij
+- Update instruction on multiple notifications by @simonaronsson
+- Update notifications.md by @simonaronsson
+- Update greetings.yml by @simonaronsson
+- Greet new reporters and contributors using actions by @simonaronsson
+- Merge pull request #409 from containrrr/all-contributors/add-pjknkda by @simonaronsson
 - Update .all-contributorsrc by @allcontributors[bot]
 - Update README.md by @allcontributors[bot]
-- Merge pull request #404 from pjknkda/master by @simskij
-- Merge pull request #408 from containrrr/all-contributors/add-8ear by @simskij
+- Merge pull request #404 from pjknkda/master by @simonaronsson
+- Merge pull request #408 from containrrr/all-contributors/add-8ear by @simonaronsson
 - Update .all-contributorsrc by @allcontributors[bot]
 - Update README.md by @allcontributors[bot]
-- Update notifications.md by @simskij
+- Update notifications.md by @simonaronsson
 - Update flags.go by @8ear
 - Update flags.go by @8ear
 - Update email.go by @8ear
@@ -2556,77 +2558,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update email.go by @8ear
 - Insert nota bene about docker-compose into notification doc page by @foxbit19
 - Fix a small typo by @foosel
-- Update FUNDING.yml by @simskij
+- Update FUNDING.yml by @simonaronsson
 - Update check.go by @sixth
 - Wording clarification on "Filter by enable label" by @rjbudke
 - Correcting a few typos and text styling. by @noplanman
 - Fix typo in arguments docs by @chugunov
-- Feat/lifecycle hooks by @simskij
-- Split out more code into separate files by @simskij
-- Move actions into internal by @simskij
-- Move actions into pkg by @simskij
-- Move container into pkg by @simskij
-- Extract types and pkgs to new files by @simskij
-- Merge branch 'all-contributors/add-zoispag' of https://github.com/containrrr/watchtower by @simskij
+- Feat/lifecycle hooks by @simonaronsson
+- Split out more code into separate files by @simonaronsson
+- Move actions into internal by @simonaronsson
+- Move actions into pkg by @simonaronsson
+- Move container into pkg by @simonaronsson
+- Extract types and pkgs to new files by @simonaronsson
+- Merge branch 'all-contributors/add-zoispag' of https://github.com/containrrr/watchtower by @simonaronsson
 - Update .all-contributorsrc by @allcontributors[bot]
 - Update README.md by @allcontributors[bot]
 - Re-apply based on new go flags package by @zoispag
-- Turn on publish filter again by @simskij
-- Change fingerprint by @simskij
-- Inject ssh key during publish by @simskij
-- Resolve pip issue by @simskij
-- Switch urfave to cobra by @simskij
-- Also keep the original markdown docs :P~ by @simskij
-- Delete _config.yml by @simskij
-- Move documentation from readme to gh pages by @simskij
-- Update stale.yml by @simskij
-- Ansem93 patch 1 by @simskij
-- Fix layout by @simskij
-- Update emoji-key by @simskij
-- Update .all-contributorsrc by @simskij
-- Update README.md by @simskij
-- Make it possible to use watchtower to update exited or created containers as well by @simskij
-- Set theme jekyll-theme-minimal by @simskij
-- Set theme jekyll-theme-tactile by @simskij
-- Update tls example by @simskij
-- Exclude markdown files from coverage analysis by @simskij
-- Fix linting errors by @simskij
-- Improve test coverage and add an api-server mock by @simskij
-- Improve test coverage by @simskij
-- Pin down dockerfile alpine version by @simskij
-- Send coverage to codacy by @simskij
-- Update issue templates by @simskij
-- Delete .hound.yml by @simskij
-- Merge pull request #282 from techknowlogick/check-if-len-gt-0 by @simskij
+- Turn on publish filter again by @simonaronsson
+- Change fingerprint by @simonaronsson
+- Inject ssh key during publish by @simonaronsson
+- Resolve pip issue by @simonaronsson
+- Switch urfave to cobra by @simonaronsson
+- Also keep the original markdown docs :P~ by @simonaronsson
+- Delete _config.yml by @simonaronsson
+- Move documentation from readme to gh pages by @simonaronsson
+- Update stale.yml by @simonaronsson
+- Ansem93 patch 1 by @simonaronsson
+- Fix layout by @simonaronsson
+- Update emoji-key by @simonaronsson
+- Update .all-contributorsrc by @simonaronsson
+- Update README.md by @simonaronsson
+- Make it possible to use watchtower to update exited or created containers as well by @simonaronsson
+- Set theme jekyll-theme-minimal by @simonaronsson
+- Set theme jekyll-theme-tactile by @simonaronsson
+- Update tls example by @simonaronsson
+- Exclude markdown files from coverage analysis by @simonaronsson
+- Fix linting errors by @simonaronsson
+- Improve test coverage and add an api-server mock by @simonaronsson
+- Improve test coverage by @simonaronsson
+- Pin down dockerfile alpine version by @simonaronsson
+- Send coverage to codacy by @simonaronsson
+- Update issue templates by @simonaronsson
+- Delete .hound.yml by @simonaronsson
+- Merge pull request #282 from techknowlogick/check-if-len-gt-0 by @simonaronsson
 - Check if schedule len > 0 to prevent collisions by @techknowlogick
-- Switch from hound to codacy by @simskij
-- Strip v. from tag when creating manifests by @simskij
-- Utilize goreleaser builtins and reformat code by @simskij
-- Update CONTRIBUTING.md by @simskij
-- Update CONTRIBUTING.md by @simskij
-- Reduce to one dockerfile as they have the exact same content by @simskij
-- Merge pull request #273 from containrrr/KopfKrieg-patch-1 by @simskij
+- Switch from hound to codacy by @simonaronsson
+- Strip v. from tag when creating manifests by @simonaronsson
+- Utilize goreleaser builtins and reformat code by @simonaronsson
+- Update CONTRIBUTING.md by @simonaronsson
+- Update CONTRIBUTING.md by @simonaronsson
+- Reduce to one dockerfile as they have the exact same content by @simonaronsson
+- Merge pull request #273 from containrrr/KopfKrieg-patch-1 by @simonaronsson
 - Updated README.md: v2tech → containrrr by @KopfKrieg
-- Merge branch 'thelamer-master' by @simskij
+- Merge branch 'thelamer-master' by @simonaronsson
 - Github/v2tec/watchtower#114 adding if statement to accept the oneshot flag to run once and exit by @thelamer
-- Update question.md by @simskij
-- Update issue templates by @simskij
-- Create CODE_OF_CONDUCT.md by @simskij
-- Update README.md by @simskij
-- Merge branch 'prashanthjbabu-32bitsupport' by @simskij
-- Minor changes to make it work with new goreleaser version by @simskij
+- Update question.md by @simonaronsson
+- Update issue templates by @simonaronsson
+- Create CODE_OF_CONDUCT.md by @simonaronsson
+- Update README.md by @simonaronsson
+- Merge branch 'prashanthjbabu-32bitsupport' by @simonaronsson
+- Minor changes to make it work with new goreleaser version by @simonaronsson
 - 32bit support
-- Update README.md by @simskij
-- Print to log if multiple watchtower instances are detected by @simskij
-- Setup a working pipeline by @simskij
-- Merge pull request #266 from waja/fix_hub_account by @simskij
+- Update README.md by @simonaronsson
+- Print to log if multiple watchtower instances are detected by @simonaronsson
+- Setup a working pipeline by @simonaronsson
+- Merge pull request #266 from waja/fix_hub_account by @simonaronsson
 - Fixing name of Docker Hub account by @waja
-- Change repo paths by @simskij
-- Change push dir for image by @simskij
-- Merge pull request #208 from cnrmck/master by @simskij
+- Change repo paths by @simonaronsson
+- Change push dir for image by @simonaronsson
+- Merge pull request #208 from cnrmck/master by @simonaronsson
 - Fix confusing word by @connormcmk
-- Switch refs in readme by @simskij
-- Merge pull request #242 from salbertson/patch-1 by @simskij
+- Switch refs in readme by @simonaronsson
+- Merge pull request #242 from salbertson/patch-1 by @simonaronsson
 - Merge pull request #182 from huddlesj/README by @stffabi
 - Spelling updates for README.md by @huddlesj
 - Merge pull request #178 from napstr/master by @stffabi
@@ -2894,11 +2896,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix badge url for contributors and docker pulls by @DaxServer
 - Update Badges on Docs by @DaxServer
 - Disable fail-fast for pr tests by @piksel
-- Add coverage upload by @simskij
-- Set up release workflow by @simskij
-- Add manual dispatch by @simskij
-- Rename workflow by @simskij
-- Move to github actions by @simskij
+- Add coverage upload by @simonaronsson
+- Set up release workflow by @simonaronsson
+- Add manual dispatch by @simonaronsson
+- Rename workflow by @simonaronsson
+- Move to github actions by @simonaronsson
 
 ### Fixed
 
@@ -2906,7 +2908,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Received typo by @testwill
 - Fix env variable name `notification(s)-delay` by @kirbylink
 - Correctly set the delay from options by @Tentoe
-- Empty out the aliases on recreation by @simskij
+- Empty out the aliases on recreation by @simonaronsson
 - Always use container interface by @piksel
 - Image name parsing behavior by @Pwuts
 - Fix anchor links in the metrics part by @louis-genestier
@@ -2944,51 +2946,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix manifest creation in release job by @piksel
 - Use default http transport for head by @piksel
 - Merge artifacts and broken shoutrrr tests by @piksel
-- Fix depends on behavior and simplify some of its logic by @simskij
+- Fix depends on behavior and simplify some of its logic by @simonaronsson
 - Move notify URL to trace log by @piksel
 - Don't panic on unconfigured notifier by @piksel
-- Fix docker secrets by @simskij
-- Fix tag name parsing, hopefully by @simskij
+- Fix docker secrets by @simonaronsson
+- Fix tag name parsing, hopefully by @simonaronsson
 - Fix broken markup of "HTTP API Token" by @hydrargyrum
 - Disallow log level 'trace' by @zoispag
 - Set log level to debug for message about API token by @zoispag
-- Set correct get url for linter by @simskij
-- Fix doc typo by @simskij
+- Set correct get url for linter by @simonaronsson
+- Fix doc typo by @simonaronsson
 - Fix manifest tag index in manifest.go by @piksel
-- Fix linting issues by @simskij
+- Fix linting issues by @simonaronsson
 - Fix cleanup for rolling updates by @piksel
 - Fix typo by @rg9400
 - Fix default interval to be the intended value by @piksel
-- Fix erroneous poll interval change by @simskij
+- Fix erroneous poll interval change by @simonaronsson
 - Fix host flag by @ksurl
 - Return nil imageinfo when retrieve fails by @piksel
-- Fix fmt and vetting issues by @simskij
+- Fix fmt and vetting issues by @simonaronsson
 - Fix environment variable name typo
 - Make shoutrrr init failure a fatal error by @piksel
 - Display errors on init failure by @piksel
 - Always use configured delay for notifications by @piksel
-- Fix linting and formatting by @simskij
+- Fix linting and formatting by @simonaronsson
 - Fix some errors and clean up
-- Improve logging by @simskij
-- Update mock client for tests by @simskij
+- Improve logging by @simonaronsson
+- Update mock client for tests by @simonaronsson
 - Fix #472 by @mbrandau
 - 🐛 bump alpine version by @codingCoffee
-- Fix some var ref errors by @simskij
-- Switch exit code for run once to 0 by @simskij
-- Fix exempt labels by @simskij
-- Resolve merge issues by @simskij
-- Remove linting issues by @simskij
-- Remove unnecessary cronSet check by @simskij
-- Fix port typing issue introduced in 998e805 by @simskij
-- Fix linter errors by @simskij
-- Stop marking milestone issues as stale by @simskij
-- Fix format by @simskij
-- Fix mail notification regression by @simskij
-- Fix tag splitting by @simskij
-- Fix readme by @simskij
-- Fix merge conflicts and do some refactoring by @simskij
-- Fix linting errors by @simskij
-- Fix some minor issues by @simskij
+- Fix some var ref errors by @simonaronsson
+- Switch exit code for run once to 0 by @simonaronsson
+- Fix exempt labels by @simonaronsson
+- Resolve merge issues by @simonaronsson
+- Remove linting issues by @simonaronsson
+- Remove unnecessary cronSet check by @simonaronsson
+- Fix port typing issue introduced in 998e805 by @simonaronsson
+- Fix linter errors by @simonaronsson
+- Stop marking milestone issues as stale by @simonaronsson
+- Fix format by @simonaronsson
+- Fix mail notification regression by @simonaronsson
+- Fix tag splitting by @simonaronsson
+- Fix readme by @simonaronsson
+- Fix merge conflicts and do some refactoring by @simonaronsson
+- Fix linting errors by @simonaronsson
+- Fix some minor issues by @simonaronsson
 
 ### Removed
 
@@ -2996,17 +2998,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove broken badge and fix docker-compose snippet by @djquan
 - Remove stray paragraph in notifications by @piksel
 - Remove the explicit file name from edit url by @piksel
-- Remove cgo_enable flag for the test step by @simskij
-- Remove gitter badge by @simskij
+- Remove cgo_enable flag for the test step by @simonaronsson
+- Remove gitter badge by @simonaronsson
 - Removed accidental dot by @tammert
-- Remove issue template for questions by @simskij
-- Remove dockerhub readme sync by @simskij
+- Remove issue template for questions by @simonaronsson
+- Remove dockerhub readme sync by @simonaronsson
 - Removed all potential debug password prints, both plaintext and encoded by @tammert
 - Remove old shoutrrr version by @mbrandau
-- Remove welcome bot config by @simskij
-- Remove dead code and goverage dependency by @simskij
-- Remove (another) erroneuos i in goreleaser by @simskij
-- Remove erroneuos i in goreleaser by @simskij
+- Remove welcome bot config by @simonaronsson
+- Remove dead code and goverage dependency by @simonaronsson
+- Remove (another) erroneuos i in goreleaser by @simonaronsson
+- Remove erroneuos i in goreleaser by @simonaronsson
 - Removed unused mock code. by @stffabi
 - Removed hub_mirror deployment, came in with PR #26.
 
