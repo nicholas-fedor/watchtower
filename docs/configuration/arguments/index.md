@@ -420,7 +420,7 @@ Environment Variable: WATCHTOWER_LABEL_ENABLE
 
 ### Disable Specific Containers
 
-Excludes containers by name from monitoring, even if they have the enable label set to `true`.
+Excludes containers by container name from monitoring, even if they have the enable label set to `true`.
 
 ```text
             Argument: --disable-containers, -x
@@ -432,40 +432,40 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
 !!! Note
     Regex patterns are supported. See [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching) for details.
 
-### Include Specific Images
+### Monitor Specific Images
 
 Restricts monitoring to containers whose image name matches one of the supplied
-values, even if other selection criteria would include them.
+image name patterns, even if other selection criteria would include them.
 
 ```text
-            Argument: --image-names
-Environment Variable: WATCHTOWER_IMAGE_NAMES
-                Type: Comma- or space-separated string list
+            Argument: --monitor-image-names
+Environment Variable: WATCHTOWER_MONITOR_IMAGE_NAMES
+                Type: Comma or space-separated string list
              Default: None
 ```
 
 !!! Note
-    Image names include the tag (for example `nginx:latest`). Regex patterns are
-    supported and anchored to the **full** image name. See
-    [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching)
+    Image name patterns include the tag (for example `nginx:latest`).
+    Regex patterns are supported and anchored to the **full** image name.
+    See [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching)
     for details.
 
-### Disable Specific Images
+### Skip Specific Images
 
-Excludes containers by image name from monitoring, even if they have the enable
+Excludes containers by image name pattern from monitoring , even if they have the enable
 label set to `true`.
 
 ```text
-            Argument: --disable-image-names
-Environment Variable: WATCHTOWER_DISABLE_IMAGE_NAMES
-                Type: Comma- or space-separated string list
+            Argument: --skip-image-names
+Environment Variable: WATCHTOWER_SKIP_IMAGE_NAMES
+                Type: Comma or space-separated string list
              Default: None
 ```
 
 !!! Note
-    Image names include the tag (for example `nginx:latest`). Regex patterns are
-    supported and anchored to the **full** image name. See
-    [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching)
+    Image name patterns include the tag (for example `nginx:latest`).
+    Regex patterns are supported and anchored to the **full** image name.
+    See [Regex Pattern Matching](../container-selection/index.md#regex_pattern_matching)
     for details.
 
 ### Scope Filter
