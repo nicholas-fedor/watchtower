@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/actionlint-action action to v1.0.7 by @renovate[bot] in [#1797](https://github.com/nicholas-fedor/watchtower/pull/1797)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.2 by @renovate[bot] in [#1794](https://github.com/nicholas-fedor/watchtower/pull/1794)
 - Update module golang.org/x/tools to v0.46.0 by @renovate[bot] in [#1792](https://github.com/nicholas-fedor/watchtower/pull/1792)
 - Update module github.com/onsi/ginkgo/v2 to v2.30.0 by @renovate[bot] in [#1791](https://github.com/nicholas-fedor/watchtower/pull/1791)
