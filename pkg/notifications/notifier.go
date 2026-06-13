@@ -113,25 +113,25 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 		switch notificationType {
 		case emailType:
 			clog.Warn(
-				"Legacy email notification type is deprecated; use --notification-url with an smtp:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+				"Legacy email notification type is deprecated; use --notification-url with an smtp:// URL instead. See https://watchtower.nickfedor.com/latest/notifications/overview/ for migration guidance.",
 			)
 
 			legacyNotifier = newEmailNotifier(cmd)
 		case slackType:
 			clog.Warn(
-				"Legacy slack notification type is deprecated; use --notification-url with a slack:// or discord:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+				"Legacy slack notification type is deprecated; use --notification-url with a slack:// or discord:// URL instead. See https://watchtower.nickfedor.com/latest/notifications/overview/ for migration guidance.",
 			)
 
 			legacyNotifier = newSlackNotifier(cmd)
 		case msTeamsType:
 			clog.Warn(
-				"Legacy msteams notification type is deprecated; use --notification-url with a teams:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+				"Legacy msteams notification type is deprecated; use --notification-url with a teams:// URL instead. See https://watchtower.nickfedor.com/latest/notifications/overview/ for migration guidance.",
 			)
 
 			legacyNotifier = newMsTeamsNotifier(cmd)
 		case gotifyType:
 			clog.Warn(
-				"Legacy gotify notification type is deprecated; use --notification-url with a gotify:// URL instead. See https://docs.nickfedor.com/watchtower/notifications/ for migration guidance.",
+				"Legacy gotify notification type is deprecated; use --notification-url with a gotify:// URL instead. See https://watchtower.nickfedor.com/latest/notifications/overview/ for migration guidance.",
 			)
 
 			legacyNotifier = newGotifyNotifier(cmd)
