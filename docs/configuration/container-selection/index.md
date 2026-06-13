@@ -13,10 +13,10 @@ A container is monitored only if it passes every filter in the chain. The filter
 | 1 | Old Watchtower container exclusion                        | Watchtower containers renamed with a `watchtower-old-` prefix during self-updates are always excluded.                           |
 | 2 | [Disabled label check](#enabledisable_labels)             | Containers with the Docker label `com.centurylinklabs.watchtower.enable=false` are excluded.                                     |
 | 3 | [Scope filter](#monitoring_scopes)                        | Only containers matching the configured scope are included (default: `"none"`).                                                  |
-| 4 | [Image skip patterns](#exclude_specific_images)           | Containers whose image matches a [skip pattern](../arguments/index.md#skip_specific_images) are excluded.                        |
-| 5 | [Monitored image name patterns](#include_specific_images) | If set, only containers whose image matches a [monitored pattern](../arguments/index.md#monitor_specific_images) are included.   |
-| 6 | [Disabled container names](#exclude_specific_containers)  | Containers whose name matches a [disable pattern](../arguments/index.md#disable_specific_containers) are excluded.               |
-| 7 | [Enable label filter](#enabledisable_labels)              | If [label enable](../arguments/index.md#enable_label_filter) is set, only containers with the enable label present are included. |
+| 4 | [Enable label filter](#enabledisable_labels)              | If [label enable](../arguments/index.md#enable_label_filter) is set, only containers with the enable label present are included. |
+| 5 | [Image skip patterns](#exclude_specific_images)           | Containers whose image matches a [skip pattern](../arguments/index.md#skip_specific_images) are excluded.                        |
+| 6 | [Monitored image name patterns](#monitor_specific_images) | If set, only containers whose image matches a [monitored pattern](../arguments/index.md#monitor_specific_images) are included.   |
+| 7 | [Disabled container names](#exclude_specific_containers)  | Containers whose name matches a [disable pattern](../arguments/index.md#disable_specific_containers) are excluded.               |
 | 8 | [Container name arguments](#container_name_filtering)     | If positional name arguments are provided, only containers matching at least one are included.                                   |
 
 !!! Note
@@ -51,7 +51,7 @@ Two configuration options extend this to include additional states:
 
 The `com.centurylinklabs.watchtower.enable` label controls whether Watchtower manages a container.
 
-!!!Note "This label is set on the container you want to manage, not on the Watchtower instance."
+!!! Note "This label is set on the container you want to manage, not on the Watchtower instance."
 
 ### Default Behavior
 
@@ -200,7 +200,7 @@ Watchtower can filter containers based on their image name using [Go regex patte
 
 Image name patterns match against the **full image name including its tag** (e.g., `nginx:latest`, `docker.io/library/nginx:1.25`).
 
-!!!Note "If no tag is specified in the image reference, `:latest` is assumed."
+!!! Note "If no tag is specified in the image reference, `:latest` is assumed."
 
 ### Monitor Specific Images
 
@@ -354,7 +354,7 @@ docker run -d nickfedor/watchtower "db-.*" "cache-.*"
 Monitor only containers using nginx or redis images with any tag:
 
 ```bash
-docker run -d -e WATCHTOWER_IMAGE_NAMES="nginx:.*,redis:.*" nickfedor/watchtower
+docker run -d -e WATCHTOWER_MONITOR_IMAGE_NAMES="nginx:.*,redis:.*" nickfedor/watchtower
 ```
 
 ## Label Precedence
@@ -383,8 +383,8 @@ This applies to the `monitor-only` and `no-pull` settings.
 |-------------------------------|------------------------------------|----------|---------|---------------------------------------|
 | *(positional args)*           | N/A                                | []string | []      | Container names/patterns to include   |
 | `--disable-containers` / `-x` | `WATCHTOWER_DISABLE_CONTAINERS`    | []string | []      | Container names/patterns to exclude   |
-| `--image-names`               | `WATCHTOWER_IMAGE_NAMES`           | []string | []      | Image name patterns to include        |
-| `--disable-image-names`       | `WATCHTOWER_DISABLE_IMAGE_NAMES`   | []string | []      | Image name patterns to exclude        |
+| `--monitor-image-names`       | `WATCHTOWER_MONITOR_IMAGE_NAMES`   | []string | []      | Image name patterns to monitor        |
+| `--skip-image-names`          | `WATCHTOWER_SKIP_IMAGE_NAMES`      | []string | []      | Image name patterns to exclude        |
 | `--label-enable` / `-e`       | `WATCHTOWER_LABEL_ENABLE`          | bool     | false   | Require enable label on containers    |
 | `--scope`                     | `WATCHTOWER_SCOPE`                 | string   | ""      | Monitoring scope                      |
 | `--include-stopped` / `-S`    | `WATCHTOWER_INCLUDE_STOPPED`       | bool     | false   | Include created and exited containers |
@@ -443,7 +443,7 @@ Monitor only images from your private registry:
 
 ```bash
 docker run -d \
-  -e WATCHTOWER_IMAGE_NAMES="registry.example.com/.*" \
+  -e WATCHTOWER_MONITOR_IMAGE_NAMES="registry.example.com/.*" \
   nickfedor/watchtower
 ```
 

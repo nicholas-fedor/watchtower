@@ -452,7 +452,7 @@ Environment Variable: WATCHTOWER_MONITOR_IMAGE_NAMES
 
 ### Skip Specific Images
 
-Excludes containers by image name pattern from monitoring , even if they have the enable
+Excludes containers by image name pattern from monitoring, even if they have the enable
 label set to `true`.
 
 ```text
