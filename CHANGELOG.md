@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add image name filters by @Greite in [#1762](https://github.com/nicholas-fedor/watchtower/pull/1762)
+
 ### Chores
 
 - Update nicholas-fedor/actionlint-action action to v1.0.7 by @renovate[bot] in [#1797](https://github.com/nicholas-fedor/watchtower/pull/1797)
@@ -20,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Correct deprecation notice url by @nicholas-fedor in [#1795](https://github.com/nicholas-fedor/watchtower/pull/1795)
+
+### New Contributors
+
+- @Greite made their first contribution in [#1762](https://github.com/nicholas-fedor/watchtower/pull/1762)
 
 ## [1.18.1] - 2026-06-11
 
