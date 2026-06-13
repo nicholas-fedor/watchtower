@@ -190,6 +190,80 @@ func FilterByDisableNames(normalizedDisableNames []string, baseFilter types.Filt
 	}
 }
 
+// FilterByMonitoredImageNamePatterns restricts monitoring to containers whose image name
+// matches specified patterns. When set, only matching containers are monitored.
+//
+// Parameters:
+//   - namePatterns: Image name regex patterns.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function restricting to matching image names, then
+//     applying base filter.
+func FilterByMonitoredImageNamePatterns(namePatterns []string, baseFilter types.Filter) types.Filter {
+	if len(namePatterns) == 0 {
+		return baseFilter
+	}
+
+	return func(c types.FilterableContainer) bool {
+		imageName := c.ImageName()
+		clog := logrus.WithFields(logrus.Fields{
+			"container":    c.Name(),
+			"image":        imageName,
+			"namePatterns": namePatterns,
+		})
+
+		for _, pattern := range namePatterns {
+			if matchesImageName(imageName, pattern) {
+				clog.Debug("Container image matched pattern")
+
+				return baseFilter(c)
+			}
+		}
+
+		clog.Debug("Container image did not match any pattern")
+
+		return false
+	}
+}
+
+// FilterBySkippedImageNamePatterns prevents monitoring of containers whose image name
+// matches specified patterns. Matching containers are excluded from monitoring.
+//
+// Parameters:
+//   - namePatterns: Image name regex patterns.
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - types.Filter: Filter function excluding matching image names, then applying
+//     base filter.
+func FilterBySkippedImageNamePatterns(namePatterns []string, baseFilter types.Filter) types.Filter {
+	if len(namePatterns) == 0 {
+		return baseFilter
+	}
+
+	return func(c types.FilterableContainer) bool {
+		imageName := c.ImageName()
+		clog := logrus.WithFields(logrus.Fields{
+			"container":    c.Name(),
+			"image":        imageName,
+			"namePatterns": namePatterns,
+		})
+
+		for _, pattern := range namePatterns {
+			if matchesImageName(imageName, pattern) {
+				clog.Debug("Container image matched skip pattern")
+
+				return false
+			}
+		}
+
+		clog.Debug("Container not skipped by image name patterns")
+
+		return baseFilter(c)
+	}
+}
+
 // FilterByEnableLabel selects containers with enable label set.
 //
 // Parameters:
@@ -303,23 +377,34 @@ func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
 	}
 }
 
+// matchesImageName checks if a container's image name matches a given pattern (exact or regex).
+// Returns true if it matches, false otherwise.
+// Invalid regex patterns are treated as literal strings for exact matching.
+func matchesImageName(imageName, pattern string) bool {
+	if pattern == imageName {
+		return true
+	}
+
+	regex, err := regexp.Compile("^" + pattern + "$")
+	if err != nil {
+		return false
+	}
+
+	return regex.MatchString(imageName)
+}
+
 // matchesName checks if a container name matches a given pattern (exact or regex).
 // Returns true if it matches, false otherwise.
 // Invalid regex patterns are treated as literal strings for exact matching.
 func matchesName(containerName, pattern string) bool {
-	// Normalize the pattern by trimming leading slash.
-	// This is retained to ensure robust handling, despite existing input normalization.
 	pattern = strings.TrimPrefix(pattern, "/")
 
-	// Exact match first.
 	if pattern == containerName {
 		return true
 	}
 
-	// Try regex match (anchored to match whole string).
 	regex, err := regexp.Compile("^" + pattern + "$")
 	if err != nil {
-		// Treat invalid regex as literal string (exact match already checked above).
 		return false
 	}
 
@@ -352,8 +437,14 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 // BuildFilter constructs a composite filter for containers.
 //
 // Parameters:
-//   - normalizedNames: Normalized names or regex patterns to include.
-//   - disableNames: Normalized names or regex patterns to exclude.
+//   - normalizedNames: Normalized container names or regex patterns. When set, only
+//     containers matching these patterns are monitored.
+//   - normalizedDisableNames: Container names or regex patterns to skip. Matching
+//     containers are excluded from monitoring.
+//   - monitoredImageNamePatterns: Image name regex patterns. When set, only containers whose
+//     image matches one of these patterns are monitored.
+//   - skippedImageNamePatterns: Image name regex patterns. Containers whose image
+//     matches one of these patterns are excluded from monitoring.
 //   - enableLabel: Require enable label if true.
 //   - scope: Scope to match.
 //
@@ -363,22 +454,27 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 func BuildFilter(
 	normalizedNames []string,
 	normalizedDisableNames []string,
+	monitoredImageNamePatterns []string,
+	skippedImageNamePatterns []string,
 	enableLabel bool,
 	scope string,
 ) (types.Filter, string) {
 	clog := logrus.WithFields(logrus.Fields{
-		"names":        normalizedNames,
-		"disableNames": normalizedDisableNames,
-		"enableLabel":  enableLabel,
-		"scope":        scope,
+		"names":                      normalizedNames,
+		"disableNames":               normalizedDisableNames,
+		"monitoredImageNamePatterns": monitoredImageNamePatterns,
+		"skippedImageNamePatterns":   skippedImageNamePatterns,
+		"enableLabel":                enableLabel,
+		"scope":                      scope,
 	})
 	clog.Debug("Building container filter")
 
-	// Start with no filter and chain additional filters.
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
 	filter = FilterByNames(normalizedNames, filter)
 	filter = FilterByDisableNames(normalizedDisableNames, filter)
+	filter = FilterByMonitoredImageNamePatterns(monitoredImageNamePatterns, filter)
+	filter = FilterBySkippedImageNamePatterns(skippedImageNamePatterns, filter)
 
 	// Add name-based filter description.
 	if len(normalizedNames) > 0 {
@@ -410,6 +506,34 @@ func BuildFilter(
 		stringBuilder.WriteString(`", `)
 	}
 
+	if len(monitoredImageNamePatterns) > 0 {
+		stringBuilder.WriteString("which image matches \"")
+
+		for i, n := range monitoredImageNamePatterns {
+			stringBuilder.WriteString(n)
+
+			if i < len(monitoredImageNamePatterns)-1 {
+				stringBuilder.WriteString(`" or "`)
+			}
+		}
+
+		stringBuilder.WriteString(`", `)
+	}
+
+	if len(skippedImageNamePatterns) > 0 {
+		stringBuilder.WriteString("whose image is not one of \"")
+
+		for i, n := range skippedImageNamePatterns {
+			stringBuilder.WriteString(n)
+
+			if i < len(skippedImageNamePatterns)-1 {
+				stringBuilder.WriteString(`" or "`)
+			}
+		}
+
+		stringBuilder.WriteString(`", `)
+	}
+
 	// Apply enable label filter if specified.
 	if enableLabel {
 		filter = FilterByEnableLabel(filter)
@@ -417,8 +541,7 @@ func BuildFilter(
 		stringBuilder.WriteString("using enable label, ")
 	}
 
-	// Apply scope filter based on value.
-	if scope == noScope || scope == "" { // "none" or empty (unscoped)
+	if scope == noScope || scope == "" {
 		filter = FilterByScope(noScope, filter)
 
 		stringBuilder.WriteString(`without a scope`)

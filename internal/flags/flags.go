@@ -146,6 +146,20 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		),
 		"Comma-separated list of containers to explicitly exclude from watching.")
 
+	flags.StringSlice(
+		"monitor-image-names",
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_MONITOR_IMAGE_NAMES"), -1),
+		),
+		"Comma-separated list of image names to monitor.")
+
+	flags.StringSlice(
+		"skip-image-names",
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_SKIP_IMAGE_NAMES"), -1),
+		),
+		"Comma-separated list of image names to explicitly exclude from monitoring.")
+
 	flags.StringP(
 		"log-format",
 		"l",

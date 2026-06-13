@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -90,6 +91,23 @@ var (
 	// It is populated in preRun from the --disable-containers flag or the WATCHTOWER_DISABLE_CONTAINERS environment variable,
 	// allowing users to blacklist specific containers from Watchtower's operations.
 	disableContainers []string
+
+	// monitoredImageNamePatterns is a slice of image name patterns that
+	// restricts which containers are monitored.
+	//
+	// When set, only containers whose image matches one of these patterns are monitored.
+	// It is populated in preRun from the --monitored-image-name-patterns flag or the
+	// WATCHTOWER_MONITORED_IMAGE_NAME_PATTERNS environment variable, allowing users to
+	// configure specific image patterns for Watchtower's monitoring scope.
+	monitoredImageNamePatterns []string
+
+	// skippedImageNamePatterns is a slice of image name patterns for
+	// containers to exclude from monitoring.
+	//
+	// Matching containers are not monitored. It is populated in preRun from the
+	// --skipped-image-name-patterns flag or the WATCHTOWER_SKIPPED_IMAGE_NAME_PATTERNS
+	// environment variable, providing a way to blacklist specific image patterns.
+	skippedImageNamePatterns []string
 
 	// notifier is the notification system instance responsible for sending update status messages to configured channels.
 	//
@@ -300,6 +318,18 @@ func preRun(cmd *cobra.Command, _ []string) {
 	disableContainers, _ = flagsSet.GetStringSlice("disable-containers")
 	for i := range disableContainers {
 		disableContainers[i] = util.NormalizeContainerName(disableContainers[i])
+	}
+
+	// Set image name patterns to define which respective containers are monitored.
+	monitoredImageNamePatterns, _ = flagsSet.GetStringSlice("monitor-image-names")
+	for i := range monitoredImageNamePatterns {
+		monitoredImageNamePatterns[i] = strings.TrimSpace(monitoredImageNamePatterns[i])
+	}
+
+	// Set image name patterns for respective containers to skip during monitoring.
+	skippedImageNamePatterns, _ = flagsSet.GetStringSlice("skip-image-names")
+	for i := range skippedImageNamePatterns {
+		skippedImageNamePatterns[i] = strings.TrimSpace(skippedImageNamePatterns[i])
 	}
 
 	// Enable/disable execution of scripts before or after updates.
@@ -514,7 +544,9 @@ func run(command *cobra.Command, args []string) {
 	// Build the filter and its description based on normalized names, exclusions, and label settings.
 	filter, filterDesc := filters.BuildFilter(
 		normalizedContainerNames,
-		disableContainers, // Normalized container names
+		disableContainers,
+		monitoredImageNamePatterns,
+		skippedImageNamePatterns,
 		enableLabel,
 		scope,
 	)
