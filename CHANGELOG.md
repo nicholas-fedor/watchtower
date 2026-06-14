@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add Greite as a contributor for code, test, and doc by @allcontributors[bot] in [#1800](https://github.com/nicholas-fedor/watchtower/pull/1800)
 - Add image name filters by @Greite in [#1762](https://github.com/nicholas-fedor/watchtower/pull/1762)
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.3 by @renovate[bot] in [#1802](https://github.com/nicholas-fedor/watchtower/pull/1802)
+- Update nicholas-fedor/actionlint-action action to v1.0.8 by @renovate[bot] in [#1801](https://github.com/nicholas-fedor/watchtower/pull/1801)
 - Update nicholas-fedor/actionlint-action action to v1.0.7 by @renovate[bot] in [#1797](https://github.com/nicholas-fedor/watchtower/pull/1797)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.2 by @renovate[bot] in [#1794](https://github.com/nicholas-fedor/watchtower/pull/1794)
 - Update module golang.org/x/tools to v0.46.0 by @renovate[bot] in [#1792](https://github.com/nicholas-fedor/watchtower/pull/1792)
