@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/actionlint-action action to v1.0.9 by @renovate[bot] in [#1809](https://github.com/nicholas-fedor/watchtower/pull/1809)
+- Update module github.com/onsi/gomega to v1.42.0 by @renovate[bot] in [#1805](https://github.com/nicholas-fedor/watchtower/pull/1805)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.4 by @renovate[bot] in [#1807](https://github.com/nicholas-fedor/watchtower/pull/1807)
 - Update module github.com/onsi/ginkgo/v2 to v2.31.0 by @renovate[bot] in [#1804](https://github.com/nicholas-fedor/watchtower/pull/1804)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.3 by @renovate[bot] in [#1802](https://github.com/nicholas-fedor/watchtower/pull/1802)
