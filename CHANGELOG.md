@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update alpine:3.24.1 docker digest to 28bd5fe by @renovate[bot] in [#1814](https://github.com/nicholas-fedor/watchtower/pull/1814)
 - Update alpine docker tag to v3.24.1 by @renovate[bot] in [#1812](https://github.com/nicholas-fedor/watchtower/pull/1812)
 - Update golang:alpine docker digest to f1ddd9f by @renovate[bot] in [#1810](https://github.com/nicholas-fedor/watchtower/pull/1810)
 - Update nicholas-fedor/actionlint-action action to v1.0.9 by @renovate[bot] in [#1809](https://github.com/nicholas-fedor/watchtower/pull/1809)
