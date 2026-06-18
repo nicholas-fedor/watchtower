@@ -80,8 +80,8 @@ github.com/mfridman/tparse v0.18.0 h1:wh6dzOKaIwkUGyKgOntDW4liXSo37qg5AXbIhkMV3v
 github.com/mfridman/tparse v0.18.0/go.mod h1:gEvqZTuCgEhPbYk/2lS3Kcxg1GmTxxU7kTC8DvP0i/A=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
-github.com/moby/moby/api v1.54.2 h1:wiat9QAhnDQjA7wk1kh/TqHz2I1uUA7M7t9SAl/JNXg=
-github.com/moby/moby/api v1.54.2/go.mod h1:+RQ6wluLwtYaTd1WnPLykIDPekkuyD/ROWQClE83pzs=
+github.com/moby/moby/api v1.55.0 h1:2/sexvQyqIWS8pRSCFddBfpW2qE7vR7FCL+vN8pxwMc=
+github.com/moby/moby/api v1.55.0/go.mod h1:+RQ6wluLwtYaTd1WnPLykIDPekkuyD/ROWQClE83pzs=
 github.com/moby/moby/client v0.4.1 h1:DMQgisVoMkmMs7fp3ROSdiBnoAu8+vo3GggFl06M/wY=
 github.com/moby/moby/client v0.4.1/go.mod h1:z52C9O2POPOsnxZAy//WtKcQ32P+jT/NGeXu/7nfjGQ=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
