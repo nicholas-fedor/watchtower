@@ -10,7 +10,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.5.3+incompatible
 	github.com/moby/docker-image-spec v1.3.1
-	github.com/moby/moby/api v1.54.2
+	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.4.1
 	github.com/nicholas-fedor/shoutrrr v0.16.1
 	github.com/onsi/ginkgo/v2 v2.31.0
