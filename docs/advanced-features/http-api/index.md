@@ -15,6 +15,21 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 | [Metrics](../metrics-api/index.md) |   `GET`    |  `/v1/metrics`   |                                                                     |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
 | [Containers](#http_api_containers) |   `GET`    | `/v1/containers` |                                                                     |   Lists watched containers and their current running image digests   |
 
+## Health Probes
+
+Watchtower exposes standard Kubernetes health probe endpoints for orchestration and monitoring:
+
+| **Endpoint** | **Description**                                                                                        |
+|:------------:|:-------------------------------------------------------------------------------------------------------|
+|   `/livez`   | Liveness probe — returns `200 OK` when the server is running                                           |
+|  `/readyz`   | Readiness probe — returns `200 OK` when the Docker client is connected and responsive, `503` otherwise |
+| `/startupz`  | Startup probe — returns `200 OK` once the server has started                                           |
+
+Health probes are registered unconditionally when the API server is enabled and require no authentication. They respond only to `GET` requests.
+
+!!! Note
+    Health probe paths follow the [Kubernetes health probe convention](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes) and are not versioned under `/v1/`.
+
 !!! Note
     Endpoints enforce HTTP method restrictions using method-based routing.
     Requests with unsupported methods will receive a `405 Method Not Allowed` response.
@@ -72,6 +87,7 @@ The `/v1/update` endpoint returns the following HTTP status codes:
 |     200     | Update completed successfully                                                             |
 |     202     | Update triggered successfully and running asynchronously (with `?async=true`)             |
 |     401     | Invalid or missing authentication token                                                   |
+|     408     | Update handler timed out (exceeded 10-minute limit)                                       |
 |     429     | Another update is already in progress (full updates only) or the request was rate limited |
 |     500     | Internal server error during request processing                                           |
 |     503     | Client cancelled while waiting on update lock (targeted updates only)                     |
@@ -143,6 +159,7 @@ The same concurrency behavior applies to async requests: full updates return 429
 |:-----------:|:------------------------------------------------------------------------------------------|
 |     202     | Update triggered successfully and running asynchronously                                  |
 |     401     | Invalid or missing authentication token                                                   |
+|     408     | Update handler timed out (exceeded 10-minute limit)                                       |
 |     429     | Another update is already in progress (full updates only) or the request was rate limited |
 |     500     | Internal server error during request processing                                           |
 |     503     | Client cancelled while waiting on update lock (targeted updates only)                     |
@@ -176,8 +193,9 @@ The client should wait at least 30 seconds (as indicated by the `Retry-After` he
 Watchtower uses token-based, header authentication for the HTTP API.
 
 - This should be set using the [HTTP API Token](../../configuration/arguments/index.md#http_api_token) configuration option.
-- All HTTP API endpoints (`/v1/update` and `/v1/metrics`) require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
-- Invalid token attempts for any endpoint requiring auth (`/v1/update` and `/v1/metrics`) are logged with the token length (not the token value)
+- All authenticated HTTP API endpoints (`/v1/update`, `/v1/metrics`, `/v1/containers`) require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
+- Invalid token attempts are logged with the client IP address.
+- Health probe endpoints (`/livez`, `/readyz`, `/startupz`) do not require authentication.
 
 ##### Rate Limiting
 
@@ -185,8 +203,8 @@ Watchtower enforces two independent mechanisms that can each return HTTP 429 (To
 
 **Per-IP request-rate limiting** (applies globally to all HTTP API endpoints):
 
-- Every incoming request to any HTTP API endpoint (`/v1/update`, `/v1/metrics`, etc.) is checked against a per-IP rate limiter **before** authentication is evaluated.
-- Default limit: 60 requests per minute with a burst capacity of 10 requests.
+- Every incoming request is checked against a per-IP rate limiter using a **sliding window** algorithm **before** authentication is evaluated.
+- Default limit: 60 requests per minute.
 - Configurable via [`--http-api-rate-limit`](../../configuration/arguments/index.md#http_api_rate_limit) flag or `WATCHTOWER_HTTP_API_RATE_LIMIT` environment variable.
 - Rate-limited requests receive HTTP 429 with no body.
 - Rate limit state is tracked per client IP address.
@@ -203,6 +221,13 @@ Watchtower enforces two independent mechanisms that can each return HTTP 429 (To
 
 - Request bodies are capped at 1 MiB to prevent resource exhaustion from large uploads
 - Requests exceeding this limit will be rejected with HTTP 413 (Payload Too Large)
+
+##### Update Handler Timeout
+
+- The `/v1/update` handler has a 10-minute timeout enforced by Fiber's timeout middleware.
+- The timeout covers the full lifecycle: waiting for the concurrency lock, performing the container update scan, and returning results.
+- When the timeout is exceeded, the handler returns HTTP 408 (Request Timeout) and the handler goroutine is abandoned.
+- The handler listens on `c.Context().Done()` for cooperative cancellation — targeted updates waiting for the lock will return HTTP 503 when the request context is cancelled.
 
 #### Address and Port Configuration
 

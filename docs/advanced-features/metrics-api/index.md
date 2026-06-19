@@ -11,7 +11,7 @@ as well as creating a port mapping for your container for port `8080`.
 !!! Warning
     Enabling the metrics API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation. See [Updating Watchtower](../../getting-started/updating-watchtower/index.md#port-configuration-limitation) for more details.
 
-The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible metrics. This is separate from the [`/v1/update`](../http-api/index.md#http_api_update) endpoint which triggers updates and returns JSON results.
+The metrics API endpoint is `/v1/metrics` and provides Prometheus-compatible metrics. This is separate from the [`/v1/update`](../http-api/index.md#http_api_update) endpoint which triggers updates and returns JSON results, and the [`/v1/containers`](../http-api/index.md#http_api_containers) endpoint which lists watched container image identities.
 
 !!! Note
     The `/v1/metrics` endpoint only accepts `GET` requests. Requests with other HTTP methods will receive a `405 Method Not Allowed` response.

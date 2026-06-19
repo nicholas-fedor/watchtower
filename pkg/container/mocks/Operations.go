@@ -72,7 +72,7 @@ type MockOperations_ContainerCreate_Call struct {
 // ContainerCreate is a helper method to define mock.On call
 //   - ctx context.Context
 //   - options client.ContainerCreateOptions
-func (_e *MockOperations_Expecter) ContainerCreate(ctx interface{}, options interface{}) *MockOperations_ContainerCreate_Call {
+func (_e *MockOperations_Expecter) ContainerCreate(ctx any, options any) *MockOperations_ContainerCreate_Call {
 	return &MockOperations_ContainerCreate_Call{Call: _e.mock.On("ContainerCreate", ctx, options)}
 }
 
@@ -139,7 +139,7 @@ type MockOperations_ContainerRemove_Call struct {
 //   - ctx context.Context
 //   - containerID string
 //   - options client.ContainerRemoveOptions
-func (_e *MockOperations_Expecter) ContainerRemove(ctx interface{}, containerID interface{}, options interface{}) *MockOperations_ContainerRemove_Call {
+func (_e *MockOperations_Expecter) ContainerRemove(ctx any, containerID any, options any) *MockOperations_ContainerRemove_Call {
 	return &MockOperations_ContainerRemove_Call{Call: _e.mock.On("ContainerRemove", ctx, containerID, options)}
 }
 
@@ -211,7 +211,7 @@ type MockOperations_ContainerRename_Call struct {
 //   - ctx context.Context
 //   - containerID string
 //   - options client.ContainerRenameOptions
-func (_e *MockOperations_Expecter) ContainerRename(ctx interface{}, containerID interface{}, options interface{}) *MockOperations_ContainerRename_Call {
+func (_e *MockOperations_Expecter) ContainerRename(ctx any, containerID any, options any) *MockOperations_ContainerRename_Call {
 	return &MockOperations_ContainerRename_Call{Call: _e.mock.On("ContainerRename", ctx, containerID, options)}
 }
 
@@ -283,7 +283,7 @@ type MockOperations_ContainerStart_Call struct {
 //   - ctx context.Context
 //   - containerID string
 //   - options client.ContainerStartOptions
-func (_e *MockOperations_Expecter) ContainerStart(ctx interface{}, containerID interface{}, options interface{}) *MockOperations_ContainerStart_Call {
+func (_e *MockOperations_Expecter) ContainerStart(ctx any, containerID any, options any) *MockOperations_ContainerStart_Call {
 	return &MockOperations_ContainerStart_Call{Call: _e.mock.On("ContainerStart", ctx, containerID, options)}
 }
 
@@ -355,7 +355,7 @@ type MockOperations_NetworkConnect_Call struct {
 //   - ctx context.Context
 //   - networkID string
 //   - options client.NetworkConnectOptions
-func (_e *MockOperations_Expecter) NetworkConnect(ctx interface{}, networkID interface{}, options interface{}) *MockOperations_NetworkConnect_Call {
+func (_e *MockOperations_Expecter) NetworkConnect(ctx any, networkID any, options any) *MockOperations_NetworkConnect_Call {
 	return &MockOperations_NetworkConnect_Call{Call: _e.mock.On("NetworkConnect", ctx, networkID, options)}
 }
 

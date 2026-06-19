@@ -871,9 +871,9 @@ Environment Variable: WATCHTOWER_HTTP_API_RATE_LIMIT
 
 !!! Note
     Rate limiting is enforced per client IP address and applies to all HTTP API endpoints
-    (`/v1/update` and `/v1/metrics`). When the limit is exceeded, the client receives
-    HTTP 429 (Too Many Requests). The burst capacity is fixed at 10 requests to allow short
-    bursts of legitimate activity (e.g., concurrent dashboard updates).
+    (`/v1/update`, `/v1/metrics`, `/v1/containers`). When the limit is exceeded, the client receives
+    HTTP 429 (Too Many Requests). The sliding window algorithm smooths out bursts by considering
+    request history across window boundaries.
 
 ## Notifications
 

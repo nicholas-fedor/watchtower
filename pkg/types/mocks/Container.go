@@ -110,7 +110,7 @@ type MockContainer_CooldownDelay_Call struct {
 
 // CooldownDelay is a helper method to define mock.On call
 //   - params types.UpdateParams
-func (_e *MockContainer_Expecter) CooldownDelay(params interface{}) *MockContainer_CooldownDelay_Call {
+func (_e *MockContainer_Expecter) CooldownDelay(params any) *MockContainer_CooldownDelay_Call {
 	return &MockContainer_CooldownDelay_Call{Call: _e.mock.On("CooldownDelay", params)}
 }
 
@@ -951,7 +951,7 @@ type MockContainer_IsMonitorOnly_Call struct {
 
 // IsMonitorOnly is a helper method to define mock.On call
 //   - params types.UpdateParams
-func (_e *MockContainer_Expecter) IsMonitorOnly(params interface{}) *MockContainer_IsMonitorOnly_Call {
+func (_e *MockContainer_Expecter) IsMonitorOnly(params any) *MockContainer_IsMonitorOnly_Call {
 	return &MockContainer_IsMonitorOnly_Call{Call: _e.mock.On("IsMonitorOnly", params)}
 }
 
@@ -1002,7 +1002,7 @@ type MockContainer_IsNoPull_Call struct {
 
 // IsNoPull is a helper method to define mock.On call
 //   - params types.UpdateParams
-func (_e *MockContainer_Expecter) IsNoPull(params interface{}) *MockContainer_IsNoPull_Call {
+func (_e *MockContainer_Expecter) IsNoPull(params any) *MockContainer_IsNoPull_Call {
 	return &MockContainer_IsNoPull_Call{Call: _e.mock.On("IsNoPull", params)}
 }
 
@@ -1231,7 +1231,7 @@ type MockContainer_Links_Call struct {
 
 // Links is a helper method to define mock.On call
 //   - useComposeDependsOn bool
-func (_e *MockContainer_Expecter) Links(useComposeDependsOn interface{}) *MockContainer_Links_Call {
+func (_e *MockContainer_Expecter) Links(useComposeDependsOn any) *MockContainer_Links_Call {
 	return &MockContainer_Links_Call{Call: _e.mock.On("Links", useComposeDependsOn)}
 }
 
@@ -1456,7 +1456,7 @@ type MockContainer_SetLinkedToRestarting_Call struct {
 
 // SetLinkedToRestarting is a helper method to define mock.On call
 //   - status bool
-func (_e *MockContainer_Expecter) SetLinkedToRestarting(status interface{}) *MockContainer_SetLinkedToRestarting_Call {
+func (_e *MockContainer_Expecter) SetLinkedToRestarting(status any) *MockContainer_SetLinkedToRestarting_Call {
 	return &MockContainer_SetLinkedToRestarting_Call{Call: _e.mock.On("SetLinkedToRestarting", status)}
 }
 
@@ -1496,7 +1496,7 @@ type MockContainer_SetStale_Call struct {
 
 // SetStale is a helper method to define mock.On call
 //   - status bool
-func (_e *MockContainer_Expecter) SetStale(status interface{}) *MockContainer_SetStale_Call {
+func (_e *MockContainer_Expecter) SetStale(status any) *MockContainer_SetStale_Call {
 	return &MockContainer_SetStale_Call{Call: _e.mock.On("SetStale", status)}
 }
 

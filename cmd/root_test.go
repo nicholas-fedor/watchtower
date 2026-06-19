@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/signal"
 	"sync"
@@ -16,6 +15,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -26,11 +26,11 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
+	"github.com/nicholas-fedor/watchtower/internal/api/update"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/internal/util"
-	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
@@ -350,152 +350,148 @@ func TestUpdateLockSerialization(t *testing.T) {
 // TestConcurrentScheduledAndFullAPIUpdate verifies that a full API-triggered update (no image params)
 // returns 429 immediately when a scheduled update is in progress, rather than blocking indefinitely.
 func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// Enable debug logging to see lock acquisition logs
-		originalLevel := logrus.GetLevel()
+	originalLevel := logrus.GetLevel()
 
-		logrus.SetLevel(logrus.DebugLevel)
-		defer logrus.SetLevel(originalLevel)
+	logrus.SetLevel(logrus.DebugLevel)
+	defer logrus.SetLevel(originalLevel)
 
-		// Initialize the update lock channel with the same pattern as in runMain
-		updateLock := make(chan bool, 1)
-		updateLock <- true
+	updateLock := make(chan bool, 1)
+	updateLock <- true
 
-		// Channels to signal when scheduled update starts and completes
-		scheduledStarted := make(chan struct{})
-		scheduledCompleted := make(chan struct{})
+	scheduledStarted := make(chan struct{})
+	scheduledCompleted := make(chan struct{})
 
-		// Mock update function for API handler - should NOT be called for full updates when locked
-		updateFn := func(_ []string) *metrics.Metric {
-			t.Error("API update function should not be called when lock is held for full updates")
+	updateFn := func(_ context.Context, _ []string) *metrics.Metric {
+		t.Error("API update function should not be called when lock is held for full updates")
 
-			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-		}
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
 
-		// Create the update handler with the shared lock
-		handler := update.New(updateFn, updateLock)
+	handler := update.New(updateFn, updateLock)
 
-		// Simulate scheduled update (longer duration)
-		go func() {
-			v := <-updateLock
+	go func() {
+		v := <-updateLock
 
-			t.Log("Scheduled: acquired lock")
-			close(scheduledStarted)
-			synctest.Wait() // Simulate scheduled update work
-			close(scheduledCompleted)
-			t.Log("Scheduled: releasing lock")
+		t.Log("Scheduled: acquired lock")
+		close(scheduledStarted)
+		time.Sleep(50 * time.Millisecond)
+		close(scheduledCompleted)
+		t.Log("Scheduled: releasing lock")
 
-			updateLock <- v
-		}()
+		updateLock <- v
+	}()
 
-		// Wait for scheduled update to start
-		<-scheduledStarted
+	<-scheduledStarted
 
-		// Simulate full API update request (no image params) - should get 429 immediately
-		w := httptest.NewRecorder()
+	testApp := fiber.New(fiber.Config{})
+	testApp.Post(handler.Path, handler.Handle)
 
-		req, err := http.NewRequestWithContext(
-			context.Background(),
-			http.MethodPost,
-			"/v1/update",
-			http.NoBody,
-		)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		"/v1/update",
+		http.NoBody,
+	)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
 
-		handler.Handle(w, req)
+	resp, err := testApp.Test(req)
+	if err != nil {
+		t.Fatalf("Failed to test request: %v", err)
+	}
+	defer resp.Body.Close()
 
-		// Should return 429 immediately without blocking
-		assert.Equal(t, http.StatusTooManyRequests, w.Code,
-			"Full update should return 429 when scheduled update is running")
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode,
+		"Full update should return 429 when scheduled update is running")
 
-		// Wait for scheduled update to complete
-		<-scheduledCompleted
-	})
+	<-scheduledCompleted
 }
 
 // TestConcurrentScheduledAndTargetedAPIUpdate verifies that a targeted API-triggered update
 // (with image params) blocks until the scheduled update completes, ensuring the specific images are updated.
 func TestConcurrentScheduledAndTargetedAPIUpdate(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// Enable debug logging to see lock acquisition logs
-		originalLevel := logrus.GetLevel()
+	originalLevel := logrus.GetLevel()
 
-		logrus.SetLevel(logrus.DebugLevel)
-		defer logrus.SetLevel(originalLevel)
+	logrus.SetLevel(logrus.DebugLevel)
+	defer logrus.SetLevel(originalLevel)
 
-		// Initialize the update lock channel with the same pattern as in runMain
-		updateLock := make(chan bool, 1)
-		updateLock <- true
+	updateLock := make(chan bool, 1)
+	updateLock <- true
 
-		// Channels to signal when each update type starts and completes
-		scheduledStarted := make(chan struct{})
-		scheduledCompleted := make(chan struct{})
-		apiStarted := make(chan struct{})
-		apiCompleted := make(chan struct{})
+	scheduledStarted := make(chan struct{})
+	scheduledCompleted := make(chan struct{})
+	apiStarted := make(chan struct{})
+	apiCompleted := make(chan struct{})
 
-		// Mock update function for API handler that signals start and completion
-		updateFn := func(_ []string) *metrics.Metric {
-			close(apiStarted)
-			synctest.Wait() // Simulate API update work
-			close(apiCompleted)
+	updateFn := func(_ context.Context, _ []string) *metrics.Metric {
+		close(apiStarted)
+		time.Sleep(50 * time.Millisecond)
+		close(apiCompleted)
 
-			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
+
+	handler := update.New(updateFn, updateLock)
+
+	go func() {
+		v := <-updateLock
+
+		t.Log("Scheduled: acquired lock")
+		close(scheduledStarted)
+		time.Sleep(50 * time.Millisecond)
+		close(scheduledCompleted)
+		t.Log("Scheduled: releasing lock")
+
+		updateLock <- v
+	}()
+
+	<-scheduledStarted
+
+	go func() {
+		testApp := fiber.New(fiber.Config{})
+		testApp.Post(handler.Path, handler.Handle)
+
+		req, err := http.NewRequestWithContext(
+			context.Background(),
+			http.MethodPost,
+			"/v1/update?image=myapp:latest",
+			http.NoBody,
+		)
+		if err != nil {
+			t.Errorf("Failed to create request: %v", err)
+
+			return
 		}
 
-		// Create the update handler with the shared lock
-		handler := update.New(updateFn, updateLock)
+		resp, err := testApp.Test(req)
+		if err != nil {
+			t.Errorf("Failed to test request: %v", err)
 
-		// Simulate scheduled update (longer duration)
-		go func() {
-			v := <-updateLock
-
-			t.Log("Scheduled: acquired lock")
-			close(scheduledStarted)
-			synctest.Wait() // Simulate scheduled update work
-			close(scheduledCompleted)
-			t.Log("Scheduled: releasing lock")
-
-			updateLock <- v
-		}()
-
-		// Wait for scheduled update to start
-		<-scheduledStarted
-
-		// Simulate targeted API update request (with image params) - should block until lock is available
-		go func() {
-			req, err := http.NewRequestWithContext(
-				context.Background(),
-				http.MethodPost,
-				"/v1/update?image=myapp:latest",
-				http.NoBody,
-			)
-			if err != nil {
-				t.Errorf("Failed to create request: %v", err)
-
-				return
-			}
-
-			w := httptest.NewRecorder()
-			handler.Handle(w, req)
-		}()
-
-		// Verify API update has not started yet (should be blocked by lock)
-		select {
-		case <-apiStarted:
-			t.Error("Targeted API update should not have started while scheduled update is running")
-		default:
-			// Expected: API is blocked
+			return
 		}
+		defer resp.Body.Close()
+	}()
 
-		// Wait for scheduled update to complete
-		<-scheduledCompleted
+	select {
+	case <-apiStarted:
+		t.Error("Targeted API update should not have started while scheduled update is running")
+	default:
+	}
 
-		// Now targeted API update should start and complete
-		<-apiStarted
-		<-apiCompleted
-	})
+	<-scheduledCompleted
+
+	select {
+	case <-apiStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for API update to start")
+	}
+
+	select {
+	case <-apiCompleted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for API update to complete")
+	}
 }
 
 // TestUpdateOnStartTriggersImmediateUpdate verifies that the --update-on-start flag

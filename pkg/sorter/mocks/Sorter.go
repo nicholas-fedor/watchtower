@@ -61,7 +61,7 @@ type MockSorter_Sort_Call struct {
 // Sort is a helper method to define mock.On call
 //   - containers []types.Container
 //   - useComposeDependsOn bool
-func (_e *MockSorter_Expecter) Sort(containers interface{}, useComposeDependsOn interface{}) *MockSorter_Sort_Call {
+func (_e *MockSorter_Expecter) Sort(containers any, useComposeDependsOn any) *MockSorter_Sort_Call {
 	return &MockSorter_Sort_Call{Call: _e.mock.On("Sort", containers, useComposeDependsOn)}
 }
 

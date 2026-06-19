@@ -255,7 +255,7 @@ type MockNotifier_SendFilteredEntries_Call struct {
 // SendFilteredEntries is a helper method to define mock.On call
 //   - entries []*logrus.Entry
 //   - report types.Report
-func (_e *MockNotifier_Expecter) SendFilteredEntries(entries interface{}, report interface{}) *MockNotifier_SendFilteredEntries_Call {
+func (_e *MockNotifier_Expecter) SendFilteredEntries(entries any, report any) *MockNotifier_SendFilteredEntries_Call {
 	return &MockNotifier_SendFilteredEntries_Call{Call: _e.mock.On("SendFilteredEntries", entries, report)}
 }
 
@@ -300,7 +300,7 @@ type MockNotifier_SendNotification_Call struct {
 
 // SendNotification is a helper method to define mock.On call
 //   - reportType types.Report
-func (_e *MockNotifier_Expecter) SendNotification(reportType interface{}) *MockNotifier_SendNotification_Call {
+func (_e *MockNotifier_Expecter) SendNotification(reportType any) *MockNotifier_SendNotification_Call {
 	return &MockNotifier_SendNotification_Call{Call: _e.mock.On("SendNotification", reportType)}
 }
 
@@ -351,7 +351,7 @@ type MockNotifier_ShouldSendNotification_Call struct {
 
 // ShouldSendNotification is a helper method to define mock.On call
 //   - report types.Report
-func (_e *MockNotifier_Expecter) ShouldSendNotification(report interface{}) *MockNotifier_ShouldSendNotification_Call {
+func (_e *MockNotifier_Expecter) ShouldSendNotification(report any) *MockNotifier_ShouldSendNotification_Call {
 	return &MockNotifier_ShouldSendNotification_Call{Call: _e.mock.On("ShouldSendNotification", report)}
 }
 
@@ -391,7 +391,7 @@ type MockNotifier_StartNotification_Call struct {
 
 // StartNotification is a helper method to define mock.On call
 //   - suppressSummary bool
-func (_e *MockNotifier_Expecter) StartNotification(suppressSummary interface{}) *MockNotifier_StartNotification_Call {
+func (_e *MockNotifier_Expecter) StartNotification(suppressSummary any) *MockNotifier_StartNotification_Call {
 	return &MockNotifier_StartNotification_Call{Call: _e.mock.On("StartNotification", suppressSummary)}
 }
 
