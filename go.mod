@@ -11,7 +11,7 @@ require (
 	github.com/docker/cli v29.6.0+incompatible
 	github.com/moby/docker-image-spec v1.3.1
 	github.com/moby/moby/api v1.55.0
-	github.com/moby/moby/client v0.4.1
+	github.com/moby/moby/client v0.5.0
 	github.com/nicholas-fedor/shoutrrr v0.16.1
 	github.com/onsi/ginkgo/v2 v2.31.0
 	github.com/onsi/gomega v1.42.0
