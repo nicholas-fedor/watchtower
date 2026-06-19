@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/checkout action to v7 by @renovate[bot] in [#1827](https://github.com/nicholas-fedor/watchtower/pull/1827)
+- Update module github.com/moby/moby/client to v0.5.0 by @renovate[bot] in [#1825](https://github.com/nicholas-fedor/watchtower/pull/1825)
 - Update module github.com/docker/cli to v29.6.0+incompatible by @renovate[bot] in [#1824](https://github.com/nicholas-fedor/watchtower/pull/1824)
 - Update module github.com/moby/moby/api to v1.55.0 by @renovate[bot] in [#1822](https://github.com/nicholas-fedor/watchtower/pull/1822)
 - Update golang:alpine docker digest to 3ad5730 by @renovate[bot] in [#1821](https://github.com/nicholas-fedor/watchtower/pull/1821)
