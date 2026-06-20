@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -37,6 +38,11 @@ type Metrics struct {
 	dropped        prometheus.Counter // Counter for dropped metrics.
 	stopCh         chan struct{}      // Channel for shutdown signaling.
 	shutdownOnce   sync.Once          // Ensures shutdown is called only once.
+	lastMetric     *Metric            // Last scan metric for status endpoint.
+	lastMetricMu   sync.RWMutex       // Protects lastMetric.
+	history        []HistoryEntry     // Ring buffer of scan history.
+	historyIdx     int                // Current write position in the ring buffer.
+	historyMu      sync.RWMutex       // Protects history and historyIdx.
 	//nolint:containedctx
 	ctx    context.Context    // Context for cancellation.
 	cancel context.CancelFunc // Cancel function for the context.
@@ -213,6 +219,82 @@ func (m *Metrics) Shutdown() {
 	})
 }
 
+// GetLastScan returns the most recent scan metric, or nil if no scan has
+// completed yet.
+//
+// Returns:
+//   - *Metric: Last scan metric, or nil.
+func (m *Metrics) GetLastScan() *Metric {
+	m.lastMetricMu.RLock()
+	defer m.lastMetricMu.RUnlock()
+
+	return m.lastMetric
+}
+
+// historyBufferSize defines the maximum number of scan history entries
+// retained in the in-memory ring buffer.
+const historyBufferSize = 500
+
+// HistoryEntry represents a single scan record in the history ring buffer.
+type HistoryEntry struct {
+	Timestamp time.Time `json:"timestamp"`
+	Scanned   int       `json:"scanned"`
+	Updated   int       `json:"updated"`
+	Failed    int       `json:"failed"`
+	Restarted int       `json:"restarted"`
+	Skipped   int       `json:"skipped"`
+}
+
+// RecordHistory stores a scan result in the ring buffer.
+// When the buffer is full, the oldest entry is overwritten.
+func (m *Metrics) RecordHistory(metric *Metric) {
+	m.historyMu.Lock()
+	defer m.historyMu.Unlock()
+
+	entry := HistoryEntry{
+		Timestamp: time.Now().UTC(),
+		Scanned:   metric.Scanned,
+		Updated:   metric.Updated,
+		Failed:    metric.Failed,
+		Restarted: metric.Restarted,
+		Skipped:   metric.Skipped,
+	}
+
+	if len(m.history) < historyBufferSize {
+		m.history = append(m.history, entry)
+	} else {
+		m.history[m.historyIdx] = entry
+		m.historyIdx = (m.historyIdx + 1) % historyBufferSize
+	}
+}
+
+// GetHistory returns a copy of the history entries, optionally filtered
+// by since/until timestamps and limited to the most recent N entries.
+func (m *Metrics) GetHistory(since, until *time.Time, limit int) []HistoryEntry {
+	m.historyMu.RLock()
+	defer m.historyMu.RUnlock()
+
+	result := make([]HistoryEntry, 0, len(m.history))
+
+	for _, entry := range m.history {
+		if since != nil && entry.Timestamp.Before(*since) {
+			continue
+		}
+
+		if until != nil && entry.Timestamp.After(*until) {
+			continue
+		}
+
+		result = append(result, entry)
+	}
+
+	if limit > 0 && limit < len(result) {
+		result = result[len(result)-limit:]
+	}
+
+	return result
+}
+
 // HandleUpdate processes metrics from the channel.
 func (m *Metrics) HandleUpdate() {
 	for {
@@ -243,6 +325,12 @@ func (m *Metrics) HandleUpdate() {
 			m.restarted.Set(float64(change.Restarted))
 			m.skipped.Set(float64(change.Skipped))
 			m.restartedTotal.Add(float64(change.Restarted))
+
+			m.lastMetricMu.Lock()
+			m.lastMetric = change
+			m.lastMetricMu.Unlock()
+
+			m.RecordHistory(change)
 		case <-m.stopCh:
 			return
 		case <-m.ctx.Done():

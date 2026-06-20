@@ -361,7 +361,7 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 	scheduledStarted := make(chan struct{})
 	scheduledCompleted := make(chan struct{})
 
-	updateFn := func(_ context.Context, _ []string) *metrics.Metric {
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		t.Error("API update function should not be called when lock is held for full updates")
 
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
@@ -424,7 +424,7 @@ func TestConcurrentScheduledAndTargetedAPIUpdate(t *testing.T) {
 	apiStarted := make(chan struct{})
 	apiCompleted := make(chan struct{})
 
-	updateFn := func(_ context.Context, _ []string) *metrics.Metric {
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		close(apiStarted)
 		time.Sleep(50 * time.Millisecond)
 		close(apiCompleted)

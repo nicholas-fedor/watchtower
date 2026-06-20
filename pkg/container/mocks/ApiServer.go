@@ -14,8 +14,8 @@ import (
 	"github.com/onsi/gomega/ghttp"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
-	dockerClient "github.com/moby/moby/client"
 	dockerImage "github.com/moby/moby/api/types/image"
+	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )

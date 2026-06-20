@@ -18,13 +18,13 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	updateFn := func(_ context.Context, _ []string) *metrics.Metric {
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}
 
 	tests := []struct {
 		name       string
-		updateFn   func(ctx context.Context, images []string) *metrics.Metric
+		updateFn   func(ctx context.Context, images, containers []string) *metrics.Metric
 		updateLock chan bool
 		wantPath   string
 	}{
@@ -56,7 +56,7 @@ func TestHandler_Handle_Sync(t *testing.T) {
 
 	expectedMetric := &metrics.Metric{Scanned: 5, Updated: 2, Failed: 1, Restarted: 1, Skipped: 0}
 
-	updateFn := func(_ context.Context, images []string) *metrics.Metric {
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		called.Add(1)
 
 		return expectedMetric
@@ -86,7 +86,7 @@ func TestHandler_Handle_Async(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		called.Add(1)
 
 		return &metrics.Metric{}
@@ -109,7 +109,7 @@ func TestHandler_Handle_Async(t *testing.T) {
 
 func TestHandler_Handle_FullUpdateLocked(t *testing.T) {
 	lock := make(chan bool, 1)
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		t.Error("update function should not be called when lock is held")
 
 		return &metrics.Metric{}
@@ -138,7 +138,7 @@ func TestHandler_Handle_FullUpdateLocked(t *testing.T) {
 func TestHandler_Handle_TargetedUpdateBlocks(t *testing.T) {
 	var called atomic.Int32
 
-	updateFn := func(_ context.Context, images []string) *metrics.Metric {
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		called.Add(1)
 
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
@@ -178,9 +178,52 @@ func TestHandler_Handle_TargetedUpdateBlocks(t *testing.T) {
 	assert.Equal(t, int32(1), called.Load())
 }
 
+func TestHandler_Handle_TargetedContainerUpdateBlocks(t *testing.T) {
+	var called atomic.Int32
+
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
+		called.Add(1)
+
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
+
+	lock := make(chan bool, 1)
+	h := New(updateFn, lock)
+
+	app := fiber.New(fiber.Config{})
+	app.Post("/v1/update", h.Handle)
+
+	done := make(chan int, 1)
+
+	go func() {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update?container=mycontainer", nil)
+
+		resp, err := app.Test(req)
+		if err != nil {
+			done <- 0
+
+			return
+		}
+		defer resp.Body.Close()
+
+		done <- resp.StatusCode
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	assert.Equal(t, int32(0), called.Load())
+
+	lock <- true
+
+	time.Sleep(50 * time.Millisecond)
+
+	code := <-done
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, int32(1), called.Load())
+}
+
 func TestHandler_Handle_ContextCancellation(t *testing.T) {
 	lock := make(chan bool, 1)
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
@@ -217,7 +260,7 @@ func TestHandler_Handle_PanicRecovery(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		panic("simulated panic")
 	}, lock)
 
@@ -242,7 +285,7 @@ func TestHandler_Handle_PanicRecovery(t *testing.T) {
 }
 
 func TestExtractImages_Unit(t *testing.T) {
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, nil)
 
@@ -330,8 +373,165 @@ func TestExtractImages_Unit(t *testing.T) {
 	}
 }
 
+func TestExtractContainers_Unit(t *testing.T) {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		return &metrics.Metric{}
+	}, nil)
+
+	tests := []struct {
+		name      string
+		query     string
+		wantLen   int
+		wantFirst string
+	}{
+		{
+			name:      "single container",
+			query:     "container=mycontainer",
+			wantLen:   1,
+			wantFirst: "mycontainer",
+		},
+		{
+			name:      "comma-separated containers",
+			query:     "container=container1,container2",
+			wantLen:   2,
+			wantFirst: "container1",
+		},
+		{
+			name:      "multiple container params",
+			query:     "container=container1&container=container2",
+			wantLen:   2,
+			wantFirst: "container1",
+		},
+		{
+			name:      "regex pattern",
+			query:     "container=^web-.*",
+			wantLen:   1,
+			wantFirst: "^web-.*",
+		},
+		{
+			name:    "no container param",
+			query:   "other=value",
+			wantLen: 0,
+		},
+		{
+			name:    "empty query",
+			query:   "",
+			wantLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedContainers []string
+
+			app := fiber.New(fiber.Config{})
+			app.Get("/test", func(c fiber.Ctx) error {
+				capturedContainers = h.extractContainers(c)
+
+				return nil
+			})
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?"+tt.query, nil)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			defer resp.Body.Close()
+
+			assert.Len(t, capturedContainers, tt.wantLen, "container count mismatch")
+
+			if tt.wantLen > 0 {
+				assert.Equal(t, tt.wantFirst, capturedContainers[0], "first container mismatch")
+			}
+		})
+	}
+}
+
+func TestContainerFilter(t *testing.T) {
+	tests := []struct {
+		name      string
+		patterns  []string
+		inputName string
+		wantMatch bool
+	}{
+		{
+			name:      "exact match",
+			patterns:  []string{"mycontainer"},
+			inputName: "mycontainer",
+			wantMatch: true,
+		},
+		{
+			name:      "exact mismatch",
+			patterns:  []string{"othercontainer"},
+			inputName: "mycontainer",
+			wantMatch: false,
+		},
+		{
+			name:      "regex match with prefix",
+			patterns:  []string{"^web-.*"},
+			inputName: "web-server",
+			wantMatch: true,
+		},
+		{
+			name:      "regex match with suffix",
+			patterns:  []string{".*-prod$"},
+			inputName: "api-prod",
+			wantMatch: true,
+		},
+		{
+			name:      "regex no match",
+			patterns:  []string{"^web-.*"},
+			inputName: "api-server",
+			wantMatch: false,
+		},
+		{
+			name:      "multiple patterns first matches",
+			patterns:  []string{"^web-.*", "^api-.*"},
+			inputName: "web-server",
+			wantMatch: true,
+		},
+		{
+			name:      "multiple patterns second matches",
+			patterns:  []string{"^web-.*", "^api-.*"},
+			inputName: "api-server",
+			wantMatch: true,
+		},
+		{
+			name:      "multiple patterns none match",
+			patterns:  []string{"^web-.*", "^api-.*"},
+			inputName: "db-server",
+			wantMatch: false,
+		},
+		{
+			name:      "empty patterns",
+			patterns:  nil,
+			inputName: "anything",
+			wantMatch: false,
+		},
+		{
+			name:      "invalid regex falls back to exact",
+			patterns:  []string{"[invalid"},
+			inputName: "[invalid",
+			wantMatch: true,
+		},
+		{
+			name:      "invalid regex no match",
+			patterns:  []string{"[invalid"},
+			inputName: "other",
+			wantMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := ContainerFilter(tt.patterns)
+			got := filter(tt.inputName, true)
+			assert.Equal(t, tt.wantMatch, got)
+		})
+	}
+}
+
 func Test_send429Response(t *testing.T) {
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, nil)
 
@@ -362,11 +562,11 @@ func Test_send429Response(t *testing.T) {
 func Test_executeUpdate(t *testing.T) {
 	expected := &metrics.Metric{Scanned: 10, Updated: 5, Failed: 2}
 
-	h := New(func(_ context.Context, images []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return expected
 	}, nil)
 
-	metric, duration := h.executeUpdate(t.Context(), []string{"nginx:latest"})
+	metric, duration := h.executeUpdate(t.Context(), []string{"nginx:latest"}, nil)
 	assert.Equal(t, expected, metric)
 	assert.GreaterOrEqual(t, duration, time.Duration(0))
 }
@@ -377,14 +577,14 @@ func Test_executeUpdateAsync(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		called.Add(1)
 
 		return &metrics.Metric{}
 	}, lock)
 
 	token := <-lock
-	h.executeUpdateAsync(t.Context(), nil, token)
+	h.executeUpdateAsync(t.Context(), nil, nil, token)
 
 	assert.Equal(t, int32(1), called.Load())
 
@@ -397,7 +597,7 @@ func Test_executeUpdateAsync(t *testing.T) {
 
 func Test_releaseLock(t *testing.T) {
 	lock := make(chan bool, 1)
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
@@ -419,7 +619,7 @@ func Test_handleSync(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return expected
 	}, lock)
 
@@ -451,7 +651,7 @@ func Test_handleSync_JSONStructure(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return expected
 	}, lock)
 
@@ -488,13 +688,13 @@ func Test_handleAsync(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _ []string) *metrics.Metric {
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
 	app := fiber.New(fiber.Config{})
 	app.Post("/test", func(c fiber.Ctx) error {
-		return h.handleAsync(c, nil, true)
+		return h.handleAsync(c, nil, nil, true)
 	})
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)

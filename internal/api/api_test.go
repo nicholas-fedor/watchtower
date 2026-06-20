@@ -34,6 +34,10 @@ func testLogger() *logrus.Logger {
 	return l
 }
 
+func makeFilter(_ *testing.T) types.Filter {
+	return func(_ types.FilterableContainer) bool { return true }
+}
+
 func TestGetAPIAddr(t *testing.T) {
 	tests := []struct {
 		name string
@@ -338,12 +342,30 @@ func Test_registerRoutes(t *testing.T) {
 		enableUpdateAPI     bool
 		enableMetricsAPI    bool
 		enableContainersAPI bool
+		enableHistoryAPI    bool
+		enableImagesAPI     bool
+		enableConfigAPI     bool
+		enableEventsAPI     bool
 		wantCount           int
 	}{
 		{name: "only update", enableUpdateAPI: true, wantCount: 1},
 		{name: "only metrics", enableMetricsAPI: true, wantCount: 1},
-		{name: "only containers", enableContainersAPI: true, wantCount: 1},
-		{name: "all APIs", enableUpdateAPI: true, enableMetricsAPI: true, enableContainersAPI: true, wantCount: 3},
+		{name: "only containers", enableContainersAPI: true, wantCount: 2},
+		{name: "only history", enableHistoryAPI: true, wantCount: 1},
+		{name: "only images", enableImagesAPI: true, wantCount: 1},
+		{name: "only config", enableConfigAPI: true, wantCount: 1},
+		{name: "only events", enableEventsAPI: true, wantCount: 1},
+		{
+			name:                "all APIs",
+			enableUpdateAPI:     true,
+			enableMetricsAPI:    true,
+			enableContainersAPI: true,
+			enableHistoryAPI:    true,
+			enableImagesAPI:     true,
+			enableConfigAPI:     true,
+			enableEventsAPI:     true,
+			wantCount:           8,
+		},
 		{name: "none", wantCount: 0},
 	}
 
@@ -367,7 +389,12 @@ func Test_registerRoutes(t *testing.T) {
 				DefaultMetrics:              func() *metrics.Metrics { return testMetrics },
 				EnableMetricsAPI:            tt.enableMetricsAPI,
 				EnableContainersAPI:         tt.enableContainersAPI,
+				EnableHistoryAPI:            tt.enableHistoryAPI,
+				EnableImagesAPI:             tt.enableImagesAPI,
+				EnableConfigAPI:             tt.enableConfigAPI,
+				EnableEventsAPI:             tt.enableEventsAPI,
 				Client:                      containermocks.NewMockClient(t),
+				Filter:                      makeFilter(t),
 			}
 
 			registerRoutes(app, auth, opts)
@@ -376,7 +403,9 @@ func Test_registerRoutes(t *testing.T) {
 			apiCount := 0
 
 			for _, r := range routes {
-				if r.Path == "/v1/update" || r.Path == "/v1/metrics" || r.Path == "/v1/containers" {
+				if r.Path == "/v1/update" || r.Path == "/v1/metrics" || r.Path == "/v1/containers" || r.Path == "/v1/containers/details" || r.Path == "/v1/history" || r.Path == "/v1/images" ||
+					r.Path == "/v1/config" ||
+					r.Path == "/v1/events" {
 					apiCount++
 				}
 			}
@@ -420,7 +449,12 @@ func Test_registerMetricsRoute(t *testing.T) {
 	app := New(testLogger(), 60)
 	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
 
-	registerMetricsRoute(app, auth)
+	opts := Options{
+		EnableMetricsAPI: true,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+	}
+
+	registerMetricsRoute(app, auth, opts)
 
 	routes := app.GetRoutes()
 	found := false
@@ -462,6 +496,83 @@ func Test_registerContainersRoute(t *testing.T) {
 	}
 
 	assert.True(t, found, "GET /v1/containers should be registered")
+}
+
+func Test_registerHistoryRoute(t *testing.T) {
+	app := New(testLogger(), 60)
+	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+
+	opts := Options{
+		EnableHistoryAPI: true,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+	}
+
+	registerHistoryRoute(app, auth, opts)
+
+	routes := app.GetRoutes()
+	found := false
+
+	for _, r := range routes {
+		if r.Path == "/v1/history" && r.Method == http.MethodGet {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "GET /v1/history should be registered")
+}
+
+func Test_registerImagesRoute(t *testing.T) {
+	app := New(testLogger(), 60)
+	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+	mockClient := containermocks.NewMockClient(t)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
+
+	opts := Options{
+		EnableImagesAPI: true,
+		Client:          mockClient,
+		Filter:          func(_ types.FilterableContainer) bool { return true },
+	}
+
+	registerImagesRoute(app, auth, opts)
+
+	routes := app.GetRoutes()
+	found := false
+
+	for _, r := range routes {
+		if r.Path == "/v1/images" && r.Method == http.MethodGet {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "GET /v1/images should be registered")
+}
+
+func Test_registerConfigRoute(t *testing.T) {
+	app := New(testLogger(), 60)
+	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+
+	opts := Options{
+		EnableConfigAPI: true,
+	}
+
+	registerConfigRoute(app, auth, opts)
+
+	routes := app.GetRoutes()
+	found := false
+
+	for _, r := range routes {
+		if r.Path == "/v1/config" && r.Method == http.MethodGet {
+			found = true
+
+			break
+		}
+	}
+
+	assert.True(t, found, "GET /v1/config should be registered")
 }
 
 func Test_validateUpdateOptions(t *testing.T) {
@@ -540,6 +651,7 @@ func TestIntegration_HealthLiveness_And_Startup(t *testing.T) {
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())

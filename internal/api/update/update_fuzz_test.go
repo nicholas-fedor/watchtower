@@ -65,7 +65,7 @@ func FuzzHandlerNew(f *testing.F) {
 			lock = make(chan bool, 1)
 		}
 
-		h := New(func(_ context.Context, _ []string) *metrics.Metric {
+		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, lock)
 

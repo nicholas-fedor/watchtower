@@ -17,6 +17,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
+	"github.com/nicholas-fedor/watchtower/internal/api/events"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -138,6 +139,18 @@ var (
 	// It is configured in preRun via the --rolling-restart flag or the WATCHTOWER_ROLLING_RESTART environment variable,
 	// reducing downtime by restarting containers one-by-one during updates.
 	rollingRestart bool
+
+	// includeStopped indicates whether stopped containers are included in updates.
+	//
+	// It is set in preRun via the --include-stopped flag or the WATCHTOWER_INCLUDE_STOPPED environment variable,
+	// allowing Watchtower to manage containers that are not currently running.
+	includeStopped bool
+
+	// includeRestarting indicates whether restarting containers are included in updates.
+	//
+	// It is set in preRun via the --include-restarting flag or the WATCHTOWER_INCLUDE_RESTARTING environment variable,
+	// allowing Watchtower to manage containers that are in the process of restarting.
+	includeRestarting bool
 
 	// scope defines a specific operational scope for Watchtower, limiting updates to containers matching this scope.
 	//
@@ -391,8 +404,8 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Retrieve flags controlling container inclusion and image handling behavior.
 	noPull, _ = flagsSet.GetBool("no-pull")
-	includeStopped, _ := flagsSet.GetBool("include-stopped")
-	includeRestarting, _ := flagsSet.GetBool("include-restarting")
+	includeStopped, _ = flagsSet.GetBool("include-stopped")
+	includeRestarting, _ = flagsSet.GetBool("include-restarting")
 	reviveStopped, _ = flagsSet.GetBool("revive-stopped")
 	removeVolumes, _ := flagsSet.GetBool("remove-volumes")
 	warnOnHeadPullFailed, _ := flagsSet.GetString("warn-on-head-failure")
@@ -555,8 +568,16 @@ func run(command *cobra.Command, args []string) {
 	runOnce, _ := command.PersistentFlags().GetBool("run-once")
 	updateOnStart, _ := command.PersistentFlags().GetBool("update-on-start")
 	enableUpdateAPI, _ := command.PersistentFlags().GetBool("http-api-update")
+	enableCheckAPI, _ := command.PersistentFlags().GetBool("http-api-check")
 	enableMetricsAPI, _ := command.PersistentFlags().GetBool("http-api-metrics")
 	enableContainersAPI, _ := command.PersistentFlags().GetBool("http-api-containers")
+	enableSwaggerAPI, _ := command.PersistentFlags().GetBool("http-api-swagger")
+	enableHealthAPI, _ := command.PersistentFlags().GetBool("http-api-health")
+	enableHistoryAPI, _ := command.PersistentFlags().GetBool("http-api-history")
+	enableImagesAPI, _ := command.PersistentFlags().GetBool("http-api-images")
+	enableConfigAPI, _ := command.PersistentFlags().GetBool("http-api-config")
+	enableEventsAPI, _ := command.PersistentFlags().GetBool("http-api-events")
+	enableFullAPI, _ := command.PersistentFlags().GetBool("http-api-full")
 	unblockHTTPAPI, _ := command.PersistentFlags().GetBool("http-api-periodic-polls")
 	noStartupMessage, _ := command.PersistentFlags().GetBool("no-startup-message")
 	apiToken, _ := command.PersistentFlags().GetString("http-api-token")
@@ -618,8 +639,16 @@ func run(command *cobra.Command, args []string) {
 		RunOnce:             runOnce,
 		UpdateOnStart:       updateOnStart,
 		EnableUpdateAPI:     enableUpdateAPI,
+		EnableCheckAPI:      enableCheckAPI,
 		EnableMetricsAPI:    enableMetricsAPI,
 		EnableContainersAPI: enableContainersAPI,
+		EnableSwaggerAPI:    enableSwaggerAPI,
+		EnableHealthAPI:     enableHealthAPI,
+		EnableHistoryAPI:    enableHistoryAPI,
+		EnableImagesAPI:     enableImagesAPI,
+		EnableConfigAPI:     enableConfigAPI,
+		EnableEventsAPI:     enableEventsAPI,
+		EnableFullAPI:       enableFullAPI,
 		UnblockHTTPAPI:      unblockHTTPAPI,
 		NoStartupMessage:    noStartupMessage,
 		APIToken:            apiToken,
@@ -728,6 +757,9 @@ func runMain(cfg types.RunConfig) int {
 	// Initialize a lock channel to prevent concurrent updates.
 	updateLock := make(chan bool, 1)
 	updateLock <- true
+
+	// Initialize the event broadcaster for SSE subscribers.
+	eventsBroadcaster := events.NewBroadcaster()
 
 	// Handle one-time update mode, executing updates and registering metrics.
 	if cfg.RunOnce {
@@ -842,8 +874,16 @@ func runMain(cfg types.RunConfig) int {
 			Token:                       cfg.APIToken,
 			RateLimit:                   cfg.APIRateLimit,
 			EnableUpdateAPI:             cfg.EnableUpdateAPI,
+			EnableCheckAPI:              cfg.EnableCheckAPI,
 			EnableMetricsAPI:            cfg.EnableMetricsAPI,
 			EnableContainersAPI:         cfg.EnableContainersAPI,
+			EnableSwaggerAPI:            cfg.EnableSwaggerAPI,
+			EnableHealthAPI:             cfg.EnableHealthAPI,
+			EnableHistoryAPI:            cfg.EnableHistoryAPI,
+			EnableImagesAPI:             cfg.EnableImagesAPI,
+			EnableConfigAPI:             cfg.EnableConfigAPI,
+			EnableEventsAPI:             cfg.EnableEventsAPI,
+			EnableFullAPI:               cfg.EnableFullAPI,
 			UnblockHTTPAPI:              cfg.UnblockHTTPAPI,
 			NoStartupMessage:            cfg.NoStartupMessage,
 			Filter:                      cfg.Filter,
@@ -852,6 +892,13 @@ func runMain(cfg types.RunConfig) int {
 			UpdateLock:                  updateLock,
 			Cleanup:                     cleanup,
 			MonitorOnly:                 monitorOnly,
+			NoPull:                      noPull,
+			NoRestart:                   noRestart,
+			RollingRestart:              rollingRestart,
+			IncludeStopped:              includeStopped,
+			IncludeRestarting:           includeRestarting,
+			LifecycleHooks:              lifecycleHooks,
+			LabelEnable:                 enableLabel,
 			SkipSelfUpdate:              skipSelfUpdate,
 			Client:                      client,
 			Notifier:                    notifier,
@@ -861,6 +908,7 @@ func runMain(cfg types.RunConfig) int {
 			FilterByImage:               filters.FilterByImage,
 			DefaultMetrics:              metrics.Default,
 			WriteStartupMessage:         logging.WriteStartupMessage,
+			EventBroadcaster:            eventsBroadcaster,
 		},
 	)
 	if err != nil {

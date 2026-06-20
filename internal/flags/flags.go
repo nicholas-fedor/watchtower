@@ -228,6 +228,11 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Restart containers one at a time")
 
 	flags.BoolP(
+		"http-api-full",
+		"",
+		envBool("WATCHTOWER_HTTP_API_FULL"),
+		"Enables all HTTP API endpoints ")
+	flags.BoolP(
 		"http-api-update",
 		"",
 		envBool("WATCHTOWER_HTTP_API_UPDATE"),
@@ -242,6 +247,41 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"",
 		envBool("WATCHTOWER_HTTP_API_CONTAINERS"),
 		"Runs Watchtower with the read-only containers API enabled, exposing each watched container's current image digest")
+	flags.BoolP(
+		"http-api-check",
+		"",
+		envBool("WATCHTOWER_HTTP_API_CHECK"),
+		"Runs Watchtower with the read-only check API enabled, allowing checking for available updates without triggering them")
+	flags.BoolP(
+		"http-api-swagger",
+		"",
+		envBool("WATCHTOWER_HTTP_API_SWAGGER"),
+		"Runs Watchtower with the Swagger UI enabled for API documentation")
+	flags.BoolP(
+		"http-api-health",
+		"",
+		envBool("WATCHTOWER_HTTP_API_HEALTH"),
+		"Runs Watchtower with the health probe endpoints enabled (/livez, /readyz, /startupz)")
+	flags.BoolP(
+		"http-api-history",
+		"",
+		envBool("WATCHTOWER_HTTP_API_HISTORY"),
+		"Runs Watchtower with the scan history API enabled, exposing GET /v1/history")
+	flags.BoolP(
+		"http-api-images",
+		"",
+		envBool("WATCHTOWER_HTTP_API_IMAGES"),
+		"Runs Watchtower with the images API enabled, exposing GET /v1/images")
+	flags.BoolP(
+		"http-api-config",
+		"",
+		envBool("WATCHTOWER_HTTP_API_CONFIG"),
+		"Runs Watchtower with the config API enabled, exposing GET /v1/config")
+	flags.BoolP(
+		"http-api-events",
+		"",
+		envBool("WATCHTOWER_HTTP_API_EVENTS"),
+		"Runs Watchtower with the real-time events API enabled, exposing GET /v1/events")
 
 	flags.StringP(
 		"http-api-host",

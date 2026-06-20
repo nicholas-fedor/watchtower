@@ -46,6 +46,17 @@ func New(list ListFunc) *Handler {
 }
 
 // Handle responds with the JSON status of every watched container.
+//
+//	@Summary		List watched container statuses
+//	@Description	Returns the current image identity and digest for every watched container. Optionally filter by container name or image name.
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	query		string					false	"Filter by container name (exact match)"
+//	@Param			image	query		string					false	"Filter by image name (exact match)"
+//	@Success		200		{object}	map[string]interface{}	"Container statuses with count and timestamp"
+//	@Failure		500		{string}	string					"Failed to list containers"
+//	@Router			/v1/containers [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
@@ -64,6 +75,13 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
+	nameFilter := c.Query("name")
+	imageFilter := c.Query("image")
+
+	if nameFilter != "" || imageFilter != "" {
+		statuses = filterStatuses(statuses, nameFilter, imageFilter)
+	}
+
 	err = c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"containers":  statuses,
 		"count":       len(statuses),
@@ -75,6 +93,25 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	}
 
 	return nil
+}
+
+// filterStatuses filters a slice of statuses by name and image query parameters.
+func filterStatuses(statuses []Status, name, image string) []Status {
+	var filtered []Status
+
+	for _, status := range statuses {
+		if name != "" && status.Name != name {
+			continue
+		}
+
+		if image != "" && status.Image != image {
+			continue
+		}
+
+		filtered = append(filtered, status)
+	}
+
+	return filtered
 }
 
 // ListContainerStatuses fetches all containers from the client and transforms

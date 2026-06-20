@@ -831,6 +831,110 @@ Environment Variable: WATCHTOWER_HTTP_API_CONTAINERS
 
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_containers) for details"
 
+### HTTP API Check
+
+Enables a read-only endpoint that checks containers for available updates without pulling or restarting.
+
+```text
+            Argument: --http-api-check
+Environment Variable: WATCHTOWER_HTTP_API_CHECK
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_check) for details"
+
+### HTTP API Swagger
+
+Enables the Swagger UI endpoint for interactive API documentation.
+
+```text
+            Argument: --http-api-swagger
+Environment Variable: WATCHTOWER_HTTP_API_SWAGGER
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md) for details"
+
+### HTTP API Health
+
+Enables the health probe endpoints (`/livez`, `/readyz`, `/startupz`).
+
+```text
+            Argument: --http-api-health
+Environment Variable: WATCHTOWER_HTTP_API_HEALTH
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#health-probes) for details"
+
+### HTTP API Full
+
+Enables all HTTP API endpoints. Individual endpoints can still be disabled with their respective configuration option.
+
+```text
+            Argument: --http-api-full
+Environment Variable: WATCHTOWER_HTTP_API_FULL
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http-api-full) for details"
+
+### HTTP API History
+
+Enables the scan history API endpoint (`/v1/history`), which returns historical scan results from an in-memory ring buffer (up to 500 entries).
+
+```text
+            Argument: --http-api-history
+Environment Variable: WATCHTOWER_HTTP_API_HISTORY
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_history) for details"
+
+### HTTP API Images
+
+Enables the images API endpoint (`/v1/images`), which returns the current image identity and digest for every image tracked by Watchtower.
+
+```text
+            Argument: --http-api-images
+Environment Variable: WATCHTOWER_HTTP_API_IMAGES
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_images) for details"
+
+### HTTP API Config
+
+Enables the config API endpoint (`/v1/config`), which returns the active Watchtower configuration settings.
+
+```text
+            Argument: --http-api-config
+Environment Variable: WATCHTOWER_HTTP_API_CONFIG
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_config) for details"
+
+### HTTP API Events
+
+Enables the real-time events API endpoint (`/v1/events`), which streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.
+
+```text
+            Argument: --http-api-events
+Environment Variable: WATCHTOWER_HTTP_API_EVENTS
+                Type: Boolean
+             Default: false
+```
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_events) for details"
+
 ### HTTP API Host
 
 Sets the host interface for binding the HTTP API.

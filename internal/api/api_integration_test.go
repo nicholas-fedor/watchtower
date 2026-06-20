@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
+	"github.com/nicholas-fedor/watchtower/internal/api/events"
 	"github.com/nicholas-fedor/watchtower/internal/api/mocks"
 	containermocks "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
@@ -45,6 +45,9 @@ func makeListContainersMock(t *testing.T) *containermocks.MockClient {
 func makeFilter(_ *testing.T) types.Filter {
 	return func(_ types.FilterableContainer) bool { return true }
 }
+
+// NewEventsBroadcasterHelper creates an event broadcaster for integration tests.
+func NewEventsBroadcasterHelper() *events.Broadcaster { return events.NewBroadcaster() }
 
 func runServerAndShutdown(t *testing.T, opts api.Options) {
 	t.Helper()
@@ -78,6 +81,7 @@ func TestIntegration_HealthProbes_ViaFullSetup(t *testing.T) {
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return helperMetrics },
 	}
 	runServerAndShutdown(t, opts)
 }
@@ -122,6 +126,7 @@ func TestIntegration_SetupAndStartAPI_MetricsOnly(t *testing.T) {
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return helperMetrics },
 	})
 }
 
@@ -223,6 +228,7 @@ func TestIntegration_GracefulShutdown_MetricsAPI(t *testing.T) {
 			Token:            "test-token",
 			EnableMetricsAPI: true,
 			RateLimit:        60,
+			DefaultMetrics:   func() *metrics.Metrics { return helperMetrics },
 		})
 	}()
 
@@ -348,10 +354,6 @@ func TestIntegration_GetAPIAddr(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_ConcurrentRequests(t *testing.T) {
-	// Verify the app handles sequential requests correctly.
-	// Note: api.New() creates an app with middleware but no routes.
-	// Routes are registered by SetupAndStartAPI. Here we just verify
-	// the app doesn't panic on repeated Test() calls.
 	app := api.New(testLogger(), 60)
 
 	for range 10 {
@@ -359,7 +361,6 @@ func TestIntegration_ConcurrentRequests(t *testing.T) {
 		resp, err := app.Test(req)
 		require.NoError(t, err)
 		resp.Body.Close()
-		// 404 is expected since no routes are registered
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	}
 }
@@ -374,14 +375,23 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 		enableUpdateAPI     bool
 		enableMetricsAPI    bool
 		enableContainersAPI bool
+		enableHistoryAPI    bool
+		enableImagesAPI     bool
+		enableConfigAPI     bool
+		enableEventsAPI     bool
 	}{
 		{name: "metrics only", enableMetricsAPI: true},
 		{name: "containers only", enableContainersAPI: true},
 		{name: "update only", enableUpdateAPI: true},
+		{name: "history only", enableHistoryAPI: true},
+		{name: "images only", enableImagesAPI: true},
+		{name: "config only", enableConfigAPI: true},
+		{name: "events only", enableEventsAPI: true},
 		{name: "update+metrics", enableUpdateAPI: true, enableMetricsAPI: true},
 		{name: "update+containers", enableUpdateAPI: true, enableContainersAPI: true},
 		{name: "metrics+containers", enableMetricsAPI: true, enableContainersAPI: true},
-		{name: "all APIs", enableUpdateAPI: true, enableMetricsAPI: true, enableContainersAPI: true},
+		{name: "all read-only APIs", enableMetricsAPI: true, enableContainersAPI: true, enableHistoryAPI: true, enableImagesAPI: true, enableConfigAPI: true, enableEventsAPI: true},
+		{name: "all APIs", enableUpdateAPI: true, enableMetricsAPI: true, enableContainersAPI: true, enableHistoryAPI: true, enableImagesAPI: true, enableConfigAPI: true, enableEventsAPI: true},
 	}
 
 	for _, c := range combinations {
@@ -391,6 +401,10 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 				EnableUpdateAPI:     c.enableUpdateAPI,
 				EnableMetricsAPI:    c.enableMetricsAPI,
 				EnableContainersAPI: c.enableContainersAPI,
+				EnableHistoryAPI:    c.enableHistoryAPI,
+				EnableImagesAPI:     c.enableImagesAPI,
+				EnableConfigAPI:     c.enableConfigAPI,
+				EnableEventsAPI:     c.enableEventsAPI,
 				RateLimit:           60,
 				Client:              makeListContainersMock(t),
 				Filter:              makeFilter(t),
@@ -407,10 +421,62 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Container status with mock data
+// History API
 // ---------------------------------------------------------------------------
 
-func TestIntegration_ContainerStatusWithData(t *testing.T) {
+func TestIntegration_HistoryAPI(t *testing.T) {
+	runServerAndShutdown(t, api.Options{
+		Token:            "test-token",
+		EnableHistoryAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return helperMetrics },
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Images API
+// ---------------------------------------------------------------------------
+
+func TestIntegration_ImagesAPI(t *testing.T) {
+	runServerAndShutdown(t, api.Options{
+		Token:           "test-token",
+		EnableImagesAPI: true,
+		RateLimit:       60,
+		Client:          makeListContainersMock(t),
+		Filter:          makeFilter(t),
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Config API
+// ---------------------------------------------------------------------------
+
+func TestIntegration_ConfigAPI(t *testing.T) {
+	runServerAndShutdown(t, api.Options{
+		Token:           "test-token",
+		EnableConfigAPI: true,
+		RateLimit:       60,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Events API
+// ---------------------------------------------------------------------------
+
+func TestIntegration_EventsAPI(t *testing.T) {
+	runServerAndShutdown(t, api.Options{
+		Token:            "test-token",
+		EnableEventsAPI:  true,
+		RateLimit:        60,
+		EventBroadcaster: NewEventsBroadcasterHelper(),
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Container Details API
+// ---------------------------------------------------------------------------
+
+func TestIntegration_ContainerDetailsAPI(t *testing.T) {
 	runServerAndShutdown(t, api.Options{
 		Token:               "test-token",
 		EnableContainersAPI: true,
@@ -418,42 +484,6 @@ func TestIntegration_ContainerStatusWithData(t *testing.T) {
 		Client:              makeListContainersMock(t),
 		Filter:              makeFilter(t),
 	})
-}
-
-// ---------------------------------------------------------------------------
-// Update API with mock update function
-// ---------------------------------------------------------------------------
-
-func TestIntegration_UpdateAPIMocked(t *testing.T) {
-	var updateCalled atomic.Int32
-
-	opts := api.Options{
-		Token:            "test-token",
-		EnableUpdateAPI:  true,
-		EnableMetricsAPI: true,
-		RateLimit:        60,
-		Client:           makeListContainersMock(t),
-		Filter:           makeFilter(t),
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
-			updateCalled.Add(1)
-
-			return &metrics.Metric{Scanned: 3, Updated: 1, Failed: 0}
-		},
-		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
-		DefaultMetrics: func() *metrics.Metrics { return helperMetrics },
-		UnblockHTTPAPI: true,
-	}
-
-	runServerAndShutdown(t, opts)
-	assert.Equal(t, int32(0), updateCalled.Load())
-}
-
-// ---------------------------------------------------------------------------
-// ShutdownGracePeriod constant
-// ---------------------------------------------------------------------------
-
-func TestIntegration_ShutdownGracePeriod(t *testing.T) {
-	assert.Equal(t, 5*time.Second, api.ShutdownGracePeriod)
 }
 
 // ---------------------------------------------------------------------------

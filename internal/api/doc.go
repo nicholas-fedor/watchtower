@@ -1,21 +1,29 @@
 // Package api provides Watchtower's HTTP API server, built on Fiber v3.
 //
 // It handles token-authenticated requests for triggering container updates,
-// serving Prometheus metrics, and listing watched container image identities.
-// It also exposes standard Kubernetes health probe endpoints.
+// checking update availability, serving Prometheus metrics, listing watched
+// container image identities, and streaming real-time events via SSE.
 //
 // Endpoints:
 //
-//	GET  /livez              Liveness probe — always returns 200 OK
-//	GET  /readyz             Readiness probe — checks Docker client connectivity
-//	GET  /startupz           Startup probe — always returns 200 OK
-//	POST /v1/update          Trigger container update scan (requires auth)
-//	GET  /v1/metrics         Prometheus metrics (requires auth)
-//	GET  /v1/containers      List watched container image identities (requires auth)
+//	GET  /livez                  Liveness probe — always returns 200 OK
+//	GET  /readyz                 Readiness probe — checks Docker client connectivity
+//	GET  /startupz               Startup probe — always returns 200 OK
+//	POST /v1/update              Trigger container update scan (requires auth)
+//	POST /v1/check               Check for available updates (requires auth)
+//	GET  /v1/metrics             Prometheus metrics (requires auth)
+//	GET  /v1/status              Last scan results as JSON (requires auth)
+//	GET  /v1/containers          List watched container statuses (requires auth)
+//	GET  /v1/containers/details  Detailed container info with config flags (requires auth)
+//	GET  /v1/history             Historical scan results from ring buffer (requires auth)
+//	GET  /v1/images              Tracked images with digests and container counts (requires auth)
+//	GET  /v1/config              Active configuration settings (requires auth)
+//	GET  /v1/events              Real-time operational events via SSE (no auth)
+//	GET  /swagger/*              Swagger UI (requires --http-api-swagger)
 //
 // Health probes (/livez, /readyz, /startupz) are registered unconditionally
-// and require no authentication. All /v1/* endpoints require Bearer token
-// authentication.
+// and require no authentication. All /v1/* endpoints except /v1/events require
+// Bearer token authentication.
 //
 // Key components:
 //   - New: Creates a Fiber application with the configured middleware stack.

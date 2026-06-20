@@ -56,7 +56,7 @@ type TestData struct {
 	StartOrder                   []string                              // Order in which containers were started.
 	SimulatedLatency             time.Duration                         // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
 	LastContainerChain           string                                // Last container chain passed to CreateEphemeralOrchestrator.
-	LastUpdateConfig             *dockerContainer.UpdateConfig          // Last UpdateContainer config received.
+	LastUpdateConfig             *dockerContainer.UpdateConfig         // Last UpdateContainer config received.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.

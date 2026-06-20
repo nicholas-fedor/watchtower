@@ -3,6 +3,8 @@ package update
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,7 +18,7 @@ import (
 //
 // It holds the update function, endpoint path, and concurrency lock for the /v1/update endpoint.
 type Handler struct {
-	fn   func(ctx context.Context, images []string) *metrics.Metric
+	fn   func(ctx context.Context, images, containers []string) *metrics.Metric
 	Path string
 	lock chan bool
 }
@@ -36,11 +38,11 @@ const (
 // New creates a new Handler instance.
 //
 // Parameters:
-//   - updateFn: Function to execute container updates, accepting a context and
-//     a list of image names and returning metrics.
+//   - updateFn: Function to execute container updates, accepting a context,
+//     a list of image names, a list of container name patterns, and returning metrics.
 //   - updateLock: Optional lock channel for synchronizing updates; if nil, a
 //     new channel is created.
-func New(updateFn func(ctx context.Context, images []string) *metrics.Metric, updateLock chan bool) *Handler {
+func New(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool) *Handler {
 	var hLock chan bool
 	if updateLock != nil {
 		hLock = updateLock
@@ -60,24 +62,27 @@ func New(updateFn func(ctx context.Context, images []string) *metrics.Metric, up
 	}
 }
 
-// Handle processes HTTP update requests. It extracts image targets from query
-// parameters, acquires the concurrency lock, and dispatches to either async or
-// sync execution.
+// Handle processes HTTP update requests. It extracts image and container targets
+// from query parameters, acquires the concurrency lock, and dispatches to either
+// async or sync execution.
 //
-// Query parameters:
-//   - image: Comma-separated image names, repeatable (e.g., ?image=a&image=b).
-//     When provided, the request is a targeted update and blocks until the lock
-//     is available. When absent, the request is a full update and returns 429
-//     if another update is already running.
-//   - async: When "true", spawns the update in a goroutine and returns 202
-//     Accepted immediately.
+//	@Summary		Trigger container update scan
+//	@Description	Scans watched containers for image updates and applies them. Supports both full scans and targeted updates filtered by image name or container name. Container patterns support Go
 //
-// Returns:
-//   - 200 OK with JSON results on synchronous success.
-//   - 202 Accepted on asynchronous dispatch.
-//   - 429 Too Many Requests when the lock is held for a full update.
-//   - 503 Service Unavailable when the request context is cancelled while
-//     waiting for the lock.
+// regex syntax.
+//
+//	@Tags			update
+//	@Accept			json
+//	@Produce		json
+//	@Param			image		query		string					false	"Comma-separated image names to update (repeatable)"
+//	@Param			container	query		string					false	"Comma-separated container name patterns to update (repeatable, supports Go regex)"
+//	@Param			async		query		string					false	"When 'true', runs update asynchronously and returns 202 Accepted"
+//	@Success		200			{object}	map[string]interface{}	"Synchronous update results with summary and timing"
+//	@Success		202			{string}	string					"Asynchronous update accepted"
+//	@Failure		429			{string}	string					"Another update is already running"
+//	@Header			429			{string}	Retry-After				"Seconds to wait before retrying"
+//	@Failure		503			{string}	string					"Request cancelled while waiting for lock"
+//	@Router			/v1/update [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
@@ -85,8 +90,9 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	}).Info("Received HTTP API update request")
 
 	images := h.extractImages(c)
+	containers := h.extractContainers(c)
 
-	result := h.acquireLock(c, images)
+	result := h.acquireLock(c, images, containers)
 	if result.RequestErr {
 		return fiber.ErrServiceUnavailable
 	}
@@ -96,10 +102,10 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	}
 
 	if c.Query("async") == "true" {
-		return h.handleAsync(c, images, result.Token)
+		return h.handleAsync(c, images, containers, result.Token)
 	}
 
-	return h.handleSync(c, images, result.Token)
+	return h.handleSync(c, images, containers, result.Token)
 }
 
 // extractImages parses the "image" query parameters into a slice of image
@@ -125,15 +131,65 @@ func (h *Handler) extractImages(c fiber.Ctx) []string {
 	return images
 }
 
+// extractContainers parses the "container" query parameters into a slice of
+// container name patterns. Supports comma-separated values and repeated params.
+func (h *Handler) extractContainers(c fiber.Ctx) []string {
+	var containers []string
+
+	queryArgs := c.Request().URI().QueryArgs()
+	values := queryArgs.PeekMulti("container")
+
+	for _, v := range values {
+		parts := strings.Split(string(v), ",")
+		containers = append(containers, parts...)
+	}
+
+	if len(containers) > 0 {
+		logrus.WithField("containers", containers).Debug("Extracted container patterns from query parameters")
+	} else {
+		logrus.Debug("No container query parameters provided")
+	}
+
+	return containers
+}
+
+// ContainerFilter creates a filter function that matches containers by name
+// pattern using Go regex syntax. Invalid regex patterns are treated as literal
+// strings for exact matching.
+func ContainerFilter(patterns []string) func(string, bool) bool {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	exact := make([]string, 0, len(patterns))
+
+	for _, p := range patterns {
+		re, err := regexp.Compile("^" + p + "$")
+		if err == nil {
+			compiled = append(compiled, re)
+		} else {
+			exact = append(exact, p)
+		}
+	}
+
+	return func(name string, _ bool) bool {
+		for _, re := range compiled {
+			if re.MatchString(name) {
+				return true
+			}
+		}
+
+		return slices.Contains(exact, name)
+	}
+}
+
 // acquireLock attempts to acquire the update lock.
 //
-// For targeted updates (len(images) > 0), it blocks until the lock is available
-// or the request is cancelled. For full updates, it attempts a non-blocking
-// acquire and returns a 429 response if the lock is held.
-func (h *Handler) acquireLock(c fiber.Ctx, images []string) lockResult {
+// For targeted updates (len(images) > 0 or len(containers) > 0), it blocks
+// until the lock is available or the request is cancelled. For full updates,
+// it attempts a non-blocking acquire and returns a 429 response if the lock
+// is held.
+func (h *Handler) acquireLock(c fiber.Ctx, images, containers []string) lockResult {
 	logrus.Debug("Handler: trying to acquire lock")
 
-	if len(images) > 0 {
+	if len(images) > 0 || len(containers) > 0 {
 		select {
 		case token := <-h.lock:
 			logrus.Debug("Handler: acquired lock for targeted update")
@@ -176,10 +232,10 @@ func (h *Handler) send429Response(c fiber.Ctx) {
 
 // handleAsync processes an asynchronous update request by spawning a
 // goroutine and returning 202 Accepted.
-func (h *Handler) handleAsync(c fiber.Ctx, images []string, lockToken bool) error {
+func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToken bool) error {
 	logrus.Info("Handling async update request - spawning async update")
 
-	go h.executeUpdateAsync(c.Context(), images, lockToken)
+	go h.executeUpdateAsync(c.Context(), images, containers, lockToken)
 
 	err := c.SendStatus(fiber.StatusAccepted)
 	if err != nil {
@@ -191,10 +247,10 @@ func (h *Handler) handleAsync(c fiber.Ctx, images []string, lockToken bool) erro
 
 // handleSync processes a synchronous update request, returning the update
 // results as JSON.
-func (h *Handler) handleSync(c fiber.Ctx, images []string, lockToken bool) error {
+func (h *Handler) handleSync(c fiber.Ctx, images, containers []string, lockToken bool) error {
 	defer h.releaseLock(lockToken)
 
-	metric, duration := h.executeUpdate(c.Context(), images)
+	metric, duration := h.executeUpdate(c.Context(), images, containers)
 
 	err := c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"summary": fiber.Map{
@@ -220,7 +276,7 @@ func (h *Handler) handleSync(c fiber.Ctx, images []string, lockToken bool) error
 
 // executeUpdateAsync runs the update function in a goroutine, ensuring the
 // lock is released when done.
-func (h *Handler) executeUpdateAsync(ctx context.Context, images []string, lockToken bool) {
+func (h *Handler) executeUpdateAsync(ctx context.Context, images, containers []string, lockToken bool) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			logrus.WithField("panic", rec).Error("Update goroutine panicked")
@@ -231,7 +287,7 @@ func (h *Handler) executeUpdateAsync(ctx context.Context, images []string, lockT
 
 	startTime := time.Now()
 
-	h.fn(ctx, images)
+	h.fn(ctx, images, containers)
 
 	duration := time.Since(startTime)
 	logrus.WithField("duration", duration).Debug("Handler (async): update function completed")
@@ -239,11 +295,11 @@ func (h *Handler) executeUpdateAsync(ctx context.Context, images []string, lockT
 
 // executeUpdate runs the update function and returns the metric along with
 // duration.
-func (h *Handler) executeUpdate(ctx context.Context, images []string) (*metrics.Metric, time.Duration) {
+func (h *Handler) executeUpdate(ctx context.Context, images, containers []string) (*metrics.Metric, time.Duration) {
 	logrus.Debug("Handler: executing update function")
 
 	startTime := time.Now()
-	metric := h.fn(ctx, images)
+	metric := h.fn(ctx, images, containers)
 	duration := time.Since(startTime)
 
 	logrus.Debug("Handler: update function completed")

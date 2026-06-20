@@ -1,0 +1,170 @@
+package details
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/gofiber/fiber/v3"
+	"github.com/sirupsen/logrus"
+
+	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// ContainerDetails holds detailed information about a single watched container.
+type ContainerDetails struct {
+	// Name is the container name.
+	Name string `json:"name"`
+	// Image is the image reference with tag.
+	Image string `json:"image"`
+	// ImageID is the local image config ID (sha256:...).
+	ImageID string `json:"image_id"`
+	// Digest is the registry manifest digest (sha256:...).
+	Digest string `json:"digest"`
+	// Running indicates whether the container is currently running.
+	Running bool `json:"running"`
+	// Watchtower indicates whether this is the Watchtower container itself.
+	Watchtower bool `json:"watchtower"`
+	// MonitorOnly indicates whether the container is in monitor-only mode.
+	MonitorOnly bool `json:"monitor_only"`
+	// NoPull indicates whether image pulling is disabled for this container.
+	NoPull bool `json:"no_pull"`
+	// Enabled indicates whether the container is enabled for watching.
+	Enabled bool `json:"enabled"`
+	// Stale indicates whether the container's image is outdated.
+	Stale bool `json:"stale"`
+	// Scope is the monitoring scope of the container.
+	Scope string `json:"scope"`
+}
+
+// GetFunc returns detailed container status for all watched containers.
+type GetFunc func(ctx context.Context, name, image string) ([]ContainerDetails, error)
+
+// Handler serves the /v1/containers/details endpoint.
+type Handler struct {
+	getDetails GetFunc
+	Path       string
+}
+
+// New creates a new container details handler backed by the given function.
+func New(getDetails GetFunc) *Handler {
+	return &Handler{
+		getDetails: getDetails,
+		Path:       "/v1/containers/details",
+	}
+}
+
+// Handle responds with detailed container information as JSON.
+//
+//	@Summary		Detailed container status
+//	@Description	Returns detailed information about each watched container, including running state, image identity, and configuration flags. Optionally filter by container name or image name.
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	query		string					false	"Filter by container name (exact match)"
+//	@Param			image	query		string					false	"Filter by image name (exact match)"
+//	@Success		200		{object}	map[string]interface{}	"Container details with count and timestamp"
+//	@Failure		500		{string}	string					"Failed to get container details"
+//	@Router			/v1/containers/details [get]
+func (h *Handler) Handle(c fiber.Ctx) error {
+	logrus.WithFields(logrus.Fields{
+		"method": c.Method(),
+		"path":   c.Path(),
+	}).Debug("Received HTTP API container details request")
+
+	nameFilter := c.Query("name")
+	imageFilter := c.Query("image")
+
+	details, err := h.getDetails(c.Context(), nameFilter, imageFilter)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to get container details for API")
+
+		sendErr := c.Status(fiber.StatusInternalServerError).SendString("failed to get container details")
+		if sendErr != nil {
+			return fmt.Errorf("failed to send error response: %w", sendErr)
+		}
+
+		return fiber.ErrInternalServerError
+	}
+
+	err = c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"containers":  details,
+		"count":       len(details),
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+		"api_version": "v1",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to send JSON response: %w", err)
+	}
+
+	return nil
+}
+
+// GetContainerDetails fetches detailed information for all watched containers.
+func GetContainerDetails(ctx context.Context, client container.Client, filter types.Filter, nameFilter, imageFilter string) ([]ContainerDetails, error) {
+	list, err := listContainers(ctx, client, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	details := make([]ContainerDetails, 0, len(list))
+	params := types.UpdateParams{}
+
+	for _, c := range list {
+		if nameFilter != "" && c.Name() != nameFilter {
+			continue
+		}
+
+		if imageFilter != "" && c.ImageName() != imageFilter {
+			continue
+		}
+
+		enabled, _ := c.Enabled()
+		scope, _ := c.Scope()
+
+		containerDetails := ContainerDetails{
+			Name:        c.Name(),
+			Image:       c.ImageName(),
+			ImageID:     string(c.ImageID()),
+			Running:     c.IsRunning(),
+			Watchtower:  c.IsWatchtower(),
+			MonitorOnly: c.IsMonitorOnly(params),
+			NoPull:      c.IsNoPull(params),
+			Enabled:     enabled,
+			Stale:       c.IsStale(),
+			Scope:       scope,
+		}
+
+		if info := c.ImageInfo(); info != nil && len(info.RepoDigests) > 0 {
+			_, digest, found := strings.Cut(info.RepoDigests[0], "@")
+			if found {
+				containerDetails.Digest = digest
+			}
+		}
+
+		details = append(details, containerDetails)
+	}
+
+	return details, nil
+}
+
+func listContainers(ctx context.Context, client container.Client, filter types.Filter) ([]types.Container, error) {
+	var (
+		list []types.Container
+		err  error
+	)
+
+	if filter != nil {
+		list, err = client.ListContainers(ctx, filter)
+	} else {
+		list, err = client.ListContainers(ctx)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers for details: %w", err)
+	}
+
+	return list, nil
+}
