@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.5 by @renovate[bot] in [#1830](https://github.com/nicholas-fedor/watchtower/pull/1830)
+- Update nicholas-fedor/actionlint-action action to v1.0.10 by @renovate[bot] in [#1828](https://github.com/nicholas-fedor/watchtower/pull/1828)
 - Update actions/checkout action to v7 by @renovate[bot] in [#1827](https://github.com/nicholas-fedor/watchtower/pull/1827)
 - Update module github.com/moby/moby/client to v0.5.0 by @renovate[bot] in [#1825](https://github.com/nicholas-fedor/watchtower/pull/1825)
 - Update module github.com/docker/cli to v29.6.0+incompatible by @renovate[bot] in [#1824](https://github.com/nicholas-fedor/watchtower/pull/1824)
