@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/actionlint-action action to v1.0.13 by @renovate[bot] in [#1836](https://github.com/nicholas-fedor/watchtower/pull/1836)
+- Update module github.com/pelletier/go-toml/v2 to v2.4.1 by @renovate[bot] in [#1835](https://github.com/nicholas-fedor/watchtower/pull/1835)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.7 by @renovate[bot] in [#1833](https://github.com/nicholas-fedor/watchtower/pull/1833)
 - Update nicholas-fedor/actionlint-action action to v1.0.12 by @renovate[bot] in [#1832](https://github.com/nicholas-fedor/watchtower/pull/1832)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.5 by @renovate[bot] in [#1830](https://github.com/nicholas-fedor/watchtower/pull/1830)
