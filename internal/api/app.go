@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/logger"
@@ -39,35 +40,95 @@ const (
 // shut down gracefully.
 const ShutdownGracePeriod = 5 * time.Second
 
+// ProxyConfig holds configuration for reverse proxy support.
+type ProxyConfig struct {
+	// TrustedProxies is a list of trusted proxy IPs/CIDRs.
+	TrustedProxies []string
+	// ProxyHeader is the header for the real client IP (e.g. X-Forwarded-For).
+	ProxyHeader string
+}
+
+// CORSConfig holds configuration for CORS middleware.
+type CORSConfig struct {
+	// AllowedOrigins is a list of origins allowed to make cross-origin requests.
+	// Use ["*"] to allow all origins.
+	AllowedOrigins []string
+	// AllowedMethods is a list of HTTP methods allowed for cross-origin requests.
+	AllowedMethods []string
+	// AllowedHeaders is a list of headers allowed in cross-origin requests.
+	AllowedHeaders []string
+}
+
 // New creates a new Fiber-based API application with the configured middleware
 // stack and lifecycle hooks.
 //
-// The rateLimitPerMinute parameter sets the maximum requests per minute per IP.
-// It is clamped to defaultRateLimitPerMinute if non-positive.
+// Parameters:
+//   - logrusLogger: Logger for the Fiber middleware.
+//   - rateLimitPerMinute: Maximum requests per minute per IP. Values <= 0 fall
+//     back to defaultRateLimitPerMinute (60).
+//   - proxyCfg: Reverse proxy configuration.
+//   - corsCfg: CORS middleware configuration.
 //
-// Per-handler timeouts (e.g., for the update endpoint) are applied at the
-// route level via Fiber's timeout middleware, not at the app config level.
-func New(logrusLogger *logrus.Logger, rateLimitPerMinute int) *fiber.App {
+// Returns:
+//   - *fiber.App: Configured Fiber application.
+func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConfig, corsCfg CORSConfig) *fiber.App {
 	rateLimit := rateLimitPerMinute
 	if rateLimit <= 0 {
 		rateLimit = defaultRateLimitPerMinute
 	}
 
-	app := fiber.New(fiber.Config{
+	fiberCfg := fiber.Config{
 		BodyLimit:     bodyLimit,
 		ReadTimeout:   readTimeout,
 		IdleTimeout:   idleTimeout,
 		StrictRouting: true,
 		CaseSensitive: true,
-	})
+	}
+
+	// Configure reverse proxy support
+	if len(proxyCfg.TrustedProxies) > 0 {
+		fiberCfg.TrustProxy = true
+
+		fiberCfg.TrustProxyConfig = fiber.TrustProxyConfig{
+			Proxies: proxyCfg.TrustedProxies,
+		}
+		if proxyCfg.ProxyHeader != "" {
+			fiberCfg.ProxyHeader = proxyCfg.ProxyHeader
+		} else {
+			fiberCfg.ProxyHeader = fiber.HeaderXForwardedFor
+		}
+	}
+
+	app := fiber.New(fiberCfg)
+
+	// Configure CORS
+	corsOrigins := corsCfg.AllowedOrigins
+	if len(corsOrigins) == 0 {
+		corsOrigins = []string{"*"}
+	}
+
+	corsMethods := corsCfg.AllowedMethods
+	if len(corsMethods) == 0 {
+		corsMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	}
+
+	corsHeaders := corsCfg.AllowedHeaders
+	if len(corsHeaders) == 0 {
+		corsHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	}
 
 	app.Use(
 		recover.New(),
 		helmet.New(),
+		cors.New(cors.Config{
+			AllowOrigins: corsOrigins,
+			AllowMethods: corsMethods,
+			AllowHeaders: corsHeaders,
+		}),
 		requestid.New(),
 		logger.New(logger.Config{
 			Stream: &logrusWriter{logger: logrusLogger},
-			Format: "${time} ${requestid} ${latency} ${status} - ${method} ${path}\n",
+			Format: "${status} - ${method} ${path}\n",
 		}),
 		compress.New(compress.Config{
 			Level: compress.LevelBestSpeed,

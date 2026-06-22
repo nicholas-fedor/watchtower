@@ -25,7 +25,8 @@ type Broadcaster struct {
 	subscribers []chan Event
 }
 
-// NewBroadcaster creates a new event broadcaster.
+// NewBroadcaster creates a new event broadcaster for distributing Watchtower
+// operational events to SSE subscribers.
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
 		subscribers: make([]chan Event, 0, maxSubscribers),
@@ -33,7 +34,6 @@ func NewBroadcaster() *Broadcaster {
 }
 
 // Subscribe registers a new subscriber and returns a channel for receiving events.
-// The done channel should be closed when the subscriber wants to unsubscribe.
 func (b *Broadcaster) Subscribe() <-chan Event {
 	subCh := make(chan Event, subscriberChannelSize)
 

@@ -316,6 +316,41 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Maximum authentication requests per minute per IP address for the HTTP API (default: 60)",
 	)
 
+	flags.StringP(
+		"http-api-tls-cert",
+		"",
+		envString("WATCHTOWER_HTTP_API_TLS_CERT"),
+		"Path to TLS certificate file for the HTTP API")
+
+	flags.StringP(
+		"http-api-tls-key",
+		"",
+		envString("WATCHTOWER_HTTP_API_TLS_KEY"),
+		"Path to TLS key file for the HTTP API")
+
+	flags.StringSliceP(
+		"http-api-trusted-proxies",
+		"",
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_HTTP_API_TRUSTED_PROXIES"), -1),
+		),
+		"Comma-separated list of trusted proxy IP addresses or CIDR ranges for reverse proxy support (e.g. 10.0.0.0/8,172.16.0.0/12). When set, enables proxy header processing for client IP and scheme detection",
+	)
+
+	flags.StringP(
+		"http-api-proxy-header",
+		"",
+		envString("WATCHTOWER_HTTP_API_PROXY_HEADER"),
+		"Header to use for real client IP when behind a reverse proxy (default: X-Forwarded-For). Only used when --http-api-trusted-proxies is set")
+
+	flags.StringSliceP(
+		"http-api-cors-origins",
+		"",
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_HTTP_API_CORS_ORIGINS"), -1),
+		),
+		"Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). Defaults to '*' (all origins) if unset")
+
 	// https://no-color.org/
 	flags.BoolP(
 		"no-color",

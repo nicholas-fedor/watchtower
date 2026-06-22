@@ -1,7 +1,6 @@
 package check
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -17,125 +16,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
-
-func TestNew(t *testing.T) {
-	tests := []struct {
-		name  string
-		check CheckFunc
-	}{
-		{
-			name:  "with check function",
-			check: func(_ context.Context, _, _ []string) ([]ContainerCheck, error) { return nil, nil },
-		},
-		{
-			name:  "with nil check function",
-			check: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.check)
-			require.NotNil(t, h)
-			assert.Equal(t, "/v1/check", h.Path)
-		})
-	}
-}
-
-func TestHandler_Handle(t *testing.T) {
-	tests := []struct {
-		name       string
-		checkFunc  CheckFunc
-		wantStatus int
-	}{
-		{
-			name: "successful check returns 200",
-			checkFunc: func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
-				return []ContainerCheck{
-					{Name: "container1", Image: "nginx:latest", ImageID: "sha256:abc", UpdateAvailable: true},
-				}, nil
-			},
-			wantStatus: http.StatusOK,
-		},
-		{
-			name: "empty results returns 200",
-			checkFunc: func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
-				return []ContainerCheck{}, nil
-			},
-			wantStatus: http.StatusOK,
-		},
-		{
-			name: "check error returns 500",
-			checkFunc: func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
-				return nil, errors.New("docker error")
-			},
-			wantStatus: http.StatusInternalServerError,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.checkFunc)
-			app := fiber.New(fiber.Config{})
-			app.Post("/v1/check", h.Handle)
-
-			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/check", nil)
-			resp, err := app.Test(req)
-			require.NoError(t, err)
-
-			defer resp.Body.Close()
-
-			assert.Equal(t, tt.wantStatus, resp.StatusCode)
-		})
-	}
-}
-
-func TestHandler_Handle_WithFilters(t *testing.T) {
-	tests := []struct {
-		name       string
-		query      string
-		wantStatus int
-	}{
-		{
-			name:       "with image filter",
-			query:      "?image=nginx",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "with name filter",
-			query:      "?name=my-container",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "with multiple filters",
-			query:      "?image=nginx&name=my-container",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "with comma-separated filters",
-			query:      "?name=container1,container2",
-			wantStatus: http.StatusOK,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := New(func(ctx context.Context, images, names []string) ([]ContainerCheck, error) {
-				return []ContainerCheck{}, nil
-			})
-			app := fiber.New(fiber.Config{})
-			app.Post("/v1/check", h.Handle)
-
-			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/check"+tt.query, nil)
-			resp, err := app.Test(req)
-			require.NoError(t, err)
-
-			defer resp.Body.Close()
-
-			assert.Equal(t, tt.wantStatus, resp.StatusCode)
-		})
-	}
-}
 
 func TestCheckForUpdates(t *testing.T) {
 	tests := []struct {
@@ -185,29 +65,6 @@ func TestCheckForUpdates(t *testing.T) {
 			},
 			wantLen:   1,
 			wantStale: []bool{false},
-		},
-		{
-			name: "filter by image name excludes non-matching",
-			client: func(t *testing.T) *containermocks.MockClient {
-				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container1 := typemocks.NewMockContainer(t)
-				container1.EXPECT().Name().Return("app1").Maybe()
-				container1.EXPECT().ImageName().Return("nginx:latest").Maybe()
-				container1.EXPECT().ImageID().Return(types.ImageID("sha256:abc")).Maybe()
-				container1.EXPECT().ImageInfo().Return(nil).Maybe()
-
-				container2 := typemocks.NewMockContainer(t)
-				container2.EXPECT().Name().Return("app2").Maybe()
-				container2.EXPECT().ImageName().Return("redis:latest").Maybe()
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container1, container2}, nil)
-				c.EXPECT().IsContainerStale(mock.Anything, container1, mock.Anything).
-					Return(false, types.ImageID("sha256:abc"), nil)
-
-				return c
-			},
-			images:  []string{"nginx:latest"},
-			wantLen: 1,
 		},
 		{
 			name: "filter by image name excludes non-matching",

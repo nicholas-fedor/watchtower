@@ -31,9 +31,9 @@ const docTemplate = `{
     "paths": {
         "/livez": {
             "get": {
-                "description": "Always returns 200 OK when the server is running.",
+                "description": "Returns 200 OK if the Watchtower HTTP server is running. Used by orchestrators (e.g., Kubernetes) to determine if the process is alive.",
                 "produces": [
-                    "application/json"
+                    "text/plain"
                 ],
                 "tags": [
                     "health"
@@ -41,7 +41,7 @@ const docTemplate = `{
                 "summary": "Liveness probe",
                 "responses": {
                     "200": {
-                        "description": "Server is alive",
+                        "description": "OK",
                         "schema": {
                             "type": "string"
                         }
@@ -51,9 +51,9 @@ const docTemplate = `{
         },
         "/readyz": {
             "get": {
-                "description": "Verifies Docker client connectivity. Returns 200 OK if connected, 503 otherwise.",
+                "description": "Returns 200 OK if the Watchtower HTTP server is running and the Docker client is connected and responsive. Used by orchestrators to determine if the service is ready to accept",
                 "produces": [
-                    "application/json"
+                    "text/plain"
                 ],
                 "tags": [
                     "health"
@@ -61,7 +61,7 @@ const docTemplate = `{
                 "summary": "Readiness probe",
                 "responses": {
                     "200": {
-                        "description": "Server is ready",
+                        "description": "OK",
                         "schema": {
                             "type": "string"
                         }
@@ -77,9 +77,9 @@ const docTemplate = `{
         },
         "/startupz": {
             "get": {
-                "description": "Always returns 200 OK once the server has started.",
+                "description": "Returns 200 OK if the Watchtower HTTP server has started. Used by orchestrators (e.g., Kubernetes) to determine if the process has finished startup.",
                 "produces": [
-                    "application/json"
+                    "text/plain"
                 ],
                 "tags": [
                     "health"
@@ -87,7 +87,7 @@ const docTemplate = `{
                 "summary": "Startup probe",
                 "responses": {
                     "200": {
-                        "description": "Server has started",
+                        "description": "OK",
                         "schema": {
                             "type": "string"
                         }
@@ -266,14 +266,6 @@ const docTemplate = `{
                     "events"
                 ],
                 "summary": "Real-time events stream",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Resume from event ID",
-                        "name": "last_event_id",
-                        "in": "query"
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "Event stream",

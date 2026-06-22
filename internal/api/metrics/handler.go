@@ -14,6 +14,23 @@ import (
 )
 
 // Handler serves the /v1/metrics endpoint.
+type Handler struct {
+	Path string
+}
+
+// New creates a new metrics Handler backed by the default Prometheus registry.
+//
+// It initializes the default Watchtower metrics instance (registering gauges
+// and counters with prometheus.DefaultRegisterer).
+func New() *Handler {
+	metrics.Default()
+
+	return &Handler{
+		Path: "/v1/metrics",
+	}
+}
+
+// Handle serves Prometheus exposition format metrics.
 //
 //	@Summary		Prometheus metrics
 //	@Description	Returns Watchtower scan metrics in Prometheus exposition format.
@@ -21,25 +38,8 @@ import (
 //	@Produce		plain
 //	@Success		200	{string}	string	"Prometheus exposition format metrics"
 //	@Router			/v1/metrics [get]
-type Handler struct {
-	Path   string
-	Handle fiber.Handler
-}
-
-// New creates a new metrics Handler backed by the default Prometheus registry.
-//
-// It initializes the default Watchtower metrics instance (registering gauges
-// and counters with prometheus.DefaultRegisterer) and returns a Fiber handler
-// that serves Prometheus exposition format metrics.
-func New() *Handler {
-	metrics.Default()
-
-	handler := adaptor.HTTPHandler(promhttp.Handler())
-
-	return &Handler{
-		Path:   "/v1/metrics",
-		Handle: handler,
-	}
+func (h *Handler) Handle(c fiber.Ctx) error {
+	return adaptor.HTTPHandler(promhttp.Handler())(c)
 }
 
 // StatusHandler serves the /v1/status endpoint.
@@ -50,6 +50,10 @@ type StatusHandler struct {
 
 // NewStatusHandler creates a new status handler that returns the last scan
 // results as JSON.
+//
+// Parameters:
+//   - getLast: Function that returns the last scan metric, or nil if no scan
+//     has completed.
 func NewStatusHandler(getLast func() *metrics.Metric) *StatusHandler {
 	return &StatusHandler{
 		Path:    "/v1/status",
@@ -57,7 +61,7 @@ func NewStatusHandler(getLast func() *metrics.Metric) *StatusHandler {
 	}
 }
 
-// Handle responds with the last scan results as JSON.
+// Handle responds with the last scan results.
 //
 //	@Summary		Last scan status
 //	@Description	Returns the summary of the most recent Watchtower scan, including counts of scanned, updated, failed, restarted, and skipped containers.

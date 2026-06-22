@@ -43,7 +43,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := New(tt.logrusLogger, tt.rateLimitPerMinute)
+			got := New(tt.logrusLogger, tt.rateLimitPerMinute, ProxyConfig{}, CORSConfig{})
 			if tt.wantNil {
 				assert.Nil(t, got)
 			} else {

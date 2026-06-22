@@ -90,7 +90,7 @@ func TestIntegration_HealthProbes_CustomRoute(t *testing.T) {
 	mc := containermocks.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
 
-	app := api.New(testLogger(), 60)
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
 	app.Get("/health/custom", func(c fiber.Ctx) error {
 		_, err := mc.ListContainers(c.Context())
 		if err != nil {
@@ -354,7 +354,7 @@ func TestIntegration_GetAPIAddr(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_ConcurrentRequests(t *testing.T) {
-	app := api.New(testLogger(), 60)
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
 
 	for range 10 {
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/nonexistent", nil)

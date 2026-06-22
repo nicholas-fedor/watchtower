@@ -242,7 +242,7 @@ Environment Variable: WATCHTOWER_POLL_INTERVAL
 
 ### HTTP API Periodic Polls
 
-Enables periodic updates when HTTP API mode is active, allowing both API-triggered and scheduled updates.
+Enables periodic updates when HTTP API mode is active.
 
 ```text
             Argument: --http-api-periodic-polls
@@ -782,7 +782,7 @@ docker run -d \
 
 ### HTTP API Mode
 
-Runs Watchtower in HTTP API mode, allowing updates only via HTTP requests, with support for tag-specific filtering (e.g., `image=foo/bar:1.0`).
+Runs Watchtower in HTTP API mode, allowing updates only via HTTP requests.
 
 ```text
             Argument: --http-api-update
@@ -791,12 +791,28 @@ Environment Variable: WATCHTOWER_HTTP_API_UPDATE
              Default: false
 ```
 
+!!! Note
+    Supports tag-specific filtering (e.g., `image=foo/bar:1.0`).
+
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md) for details"
 
-### HTTP API Token
+### HTTP API Full
+
+Enables all HTTP API endpoints at once.
+
+```text
+            Argument: --http-api-full
+Environment Variable: WATCHTOWER_HTTP_API_FULL
+                Type: Boolean
+             Default: false
+```
+
+!!! Note
+    Individual endpoints can still be disabled with their respective flags.
+
+!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http-api-full) for details"
 
 Sets an authentication token for HTTP API requests.
-Can reference a file for security.
 
 ```text
             Argument: --http-api-token
@@ -804,6 +820,9 @@ Environment Variable: WATCHTOWER_HTTP_API_TOKEN
                 Type: String
              Default: None
 ```
+
+!!! Note
+    Supports file path for Docker Secrets (e.g., `/run/secrets/http_api_token`).
 
 ### HTTP API Metrics
 
@@ -870,22 +889,9 @@ Environment Variable: WATCHTOWER_HTTP_API_HEALTH
 
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#health-probes) for details"
 
-### HTTP API Full
-
-Enables all HTTP API endpoints. Individual endpoints can still be disabled with their respective configuration option.
-
-```text
-            Argument: --http-api-full
-Environment Variable: WATCHTOWER_HTTP_API_FULL
-                Type: Boolean
-             Default: false
-```
-
-!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http-api-full) for details"
-
 ### HTTP API History
 
-Enables the scan history API endpoint (`/v1/history`), which returns historical scan results from an in-memory ring buffer (up to 500 entries).
+Enables the scan history API endpoint (`/v1/history`).
 
 ```text
             Argument: --http-api-history
@@ -894,11 +900,14 @@ Environment Variable: WATCHTOWER_HTTP_API_HISTORY
              Default: false
 ```
 
+!!! Note
+    Returns historical scan results from an in-memory ring buffer (up to 500 entries).
+
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_history) for details"
 
 ### HTTP API Images
 
-Enables the images API endpoint (`/v1/images`), which returns the current image identity and digest for every image tracked by Watchtower.
+Enables the images API endpoint (`/v1/images`).
 
 ```text
             Argument: --http-api-images
@@ -907,11 +916,14 @@ Environment Variable: WATCHTOWER_HTTP_API_IMAGES
              Default: false
 ```
 
+!!! Note
+    Returns the current image identity and digest for every image tracked by Watchtower.
+
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_images) for details"
 
 ### HTTP API Config
 
-Enables the config API endpoint (`/v1/config`), which returns the active Watchtower configuration settings.
+Enables the config API endpoint (`/v1/config`).
 
 ```text
             Argument: --http-api-config
@@ -920,11 +932,14 @@ Environment Variable: WATCHTOWER_HTTP_API_CONFIG
              Default: false
 ```
 
+!!! Note
+    Returns the active Watchtower configuration settings.
+
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_config) for details"
 
 ### HTTP API Events
 
-Enables the real-time events API endpoint (`/v1/events`), which streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.
+Enables the real-time events API endpoint (`/v1/events`).
 
 ```text
             Argument: --http-api-events
@@ -932,6 +947,9 @@ Environment Variable: WATCHTOWER_HTTP_API_EVENTS
                 Type: Boolean
              Default: false
 ```
+
+!!! Note
+    Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.
 
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http_api_events) for details"
 
@@ -963,8 +981,7 @@ Environment Variable: WATCHTOWER_HTTP_API_PORT
 
 ### HTTP API Rate Limit
 
-Sets the maximum number of API requests allowed per minute per IP address for the HTTP API.
-This helps protect against brute-force attacks while allowing normal API usage.
+Sets the maximum number of API requests allowed per minute per IP address.
 
 ```text
             Argument: --http-api-rate-limit
@@ -974,10 +991,84 @@ Environment Variable: WATCHTOWER_HTTP_API_RATE_LIMIT
 ```
 
 !!! Note
-    Rate limiting is enforced per client IP address and applies to all HTTP API endpoints
-    (`/v1/update`, `/v1/metrics`, `/v1/containers`). When the limit is exceeded, the client receives
-    HTTP 429 (Too Many Requests). The sliding window algorithm smooths out bursts by considering
-    request history across window boundaries.
+    When the limit is exceeded, the client receives HTTP 429 (Too Many Requests).
+
+### HTTP API TLS Certificate
+
+Path to the TLS certificate file for the HTTP API.
+
+```text
+            Argument: --http-api-tls-cert
+Environment Variable: WATCHTOWER_HTTP_API_TLS_CERT
+                Type: String
+             Default: empty (HTTP)
+```
+
+!!! Important
+    When both `--http-api-tls-cert` and `--http-api-tls-key` are provided, the server uses HTTPS.
+
+### HTTP API TLS Key
+
+Path to the TLS private key file for the HTTP API.
+
+```text
+            Argument: --http-api-tls-key
+Environment Variable: WATCHTOWER_HTTP_API_TLS_KEY
+                Type: String
+             Default: empty (HTTP)
+```
+
+!!! Important
+    When both `--http-api-tls-cert` and `--http-api-tls-key` are provided, the server uses HTTPS.
+
+!!! Note "See the [HTTP API Host documentation](../../advanced-features/http-api/index.md#http_api_host) for details"
+
+### HTTP API Trusted Proxies
+
+Comma-separated list of trusted proxy IP addresses or CIDR ranges for reverse proxy support.
+When set, enables proxy header processing for client IP and scheme detection.
+
+```text
+            Argument: --http-api-trusted-proxies
+Environment Variable: WATCHTOWER_HTTP_API_TRUSTED_PROXIES
+                Type: String Array
+             Default: (unset)
+```
+
+!!! Important
+    Required for correct client IP detection and rate limiting behind a reverse proxy (Traefik, Caddy, Nginx, etc.).
+
+### HTTP API Proxy Header
+
+Header to read the real client IP from when behind a reverse proxy.
+
+```text
+            Argument: --http-api-proxy-header
+Environment Variable: WATCHTOWER_HTTP_API_PROXY_HEADER
+                Type: String
+             Default: X-Forwarded-For
+```
+
+!!! Note
+    Only used when `--http-api-trusted-proxies` is set.
+
+    Common values: `X-Forwarded-For` (Traefik, Caddy), `X-Real-IP` (Nginx), `CF-Connecting-IP` (Cloudflare).
+
+### HTTP API CORS Origins
+
+Comma-separated list of allowed CORS origins for cross-origin requests.
+Use this to restrict which origins can access the API.
+
+```text
+            Argument: --http-api-cors-origins
+Environment Variable: WATCHTOWER_HTTP_API_CORS_ORIGINS
+                Type: String Array
+             Default: * (all origins)
+```
+
+!!! Note
+    Only set this in production to restrict cross-origin requests.
+    Leave unset (defaults to `*`) for development or same-origin setups.
 
 ## Notifications
 

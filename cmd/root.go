@@ -578,6 +578,11 @@ func run(command *cobra.Command, args []string) {
 	enableConfigAPI, _ := command.PersistentFlags().GetBool("http-api-config")
 	enableEventsAPI, _ := command.PersistentFlags().GetBool("http-api-events")
 	enableFullAPI, _ := command.PersistentFlags().GetBool("http-api-full")
+	tlsCertPath, _ := command.PersistentFlags().GetString("http-api-tls-cert")
+	tlsKeyPath, _ := command.PersistentFlags().GetString("http-api-tls-key")
+	trustedProxies, _ := command.PersistentFlags().GetStringSlice("http-api-trusted-proxies")
+	proxyHeader, _ := command.PersistentFlags().GetString("http-api-proxy-header")
+	corsOrigins, _ := command.PersistentFlags().GetStringSlice("http-api-cors-origins")
 	unblockHTTPAPI, _ := command.PersistentFlags().GetBool("http-api-periodic-polls")
 	noStartupMessage, _ := command.PersistentFlags().GetBool("no-startup-message")
 	apiToken, _ := command.PersistentFlags().GetString("http-api-token")
@@ -649,6 +654,11 @@ func run(command *cobra.Command, args []string) {
 		EnableConfigAPI:     enableConfigAPI,
 		EnableEventsAPI:     enableEventsAPI,
 		EnableFullAPI:       enableFullAPI,
+		TLSCertPath:         tlsCertPath,
+		TLSKeyPath:          tlsKeyPath,
+		CORSAllowedOrigins:  corsOrigins,
+		TrustedProxies:      trustedProxies,
+		ProxyHeader:         proxyHeader,
 		UnblockHTTPAPI:      unblockHTTPAPI,
 		NoStartupMessage:    noStartupMessage,
 		APIToken:            apiToken,
@@ -884,6 +894,10 @@ func runMain(cfg types.RunConfig) int {
 			EnableConfigAPI:             cfg.EnableConfigAPI,
 			EnableEventsAPI:             cfg.EnableEventsAPI,
 			EnableFullAPI:               cfg.EnableFullAPI,
+			TLSCertPath:                 cfg.TLSCertPath,
+			TLSKeyPath:                  cfg.TLSKeyPath,
+			TrustedProxies:              cfg.TrustedProxies,
+			ProxyHeader:                 cfg.ProxyHeader,
 			UnblockHTTPAPI:              cfg.UnblockHTTPAPI,
 			NoStartupMessage:            cfg.NoStartupMessage,
 			Filter:                      cfg.Filter,

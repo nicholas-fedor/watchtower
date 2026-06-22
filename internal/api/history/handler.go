@@ -3,7 +3,6 @@ package history
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -15,6 +14,9 @@ import (
 // errInvalidTimeParameter is returned when a time parameter cannot be parsed.
 var errInvalidTimeParameter = errors.New("invalid time parameter")
 
+// errNoTimeParameter is returned when a time parameter is empty.
+var errNoTimeParameter = errors.New("no time parameter provided")
+
 // Handler serves the /v1/history endpoint.
 type Handler struct {
 	Path    string
@@ -22,6 +24,10 @@ type Handler struct {
 }
 
 // New creates a new history handler backed by the given function.
+//
+// Parameters:
+//   - getHist: Function that returns scan history entries, optionally filtered
+//     by time range and limited to N entries.
 func New(getHist func(*time.Time, *time.Time, int) []metrics.HistoryEntry) *Handler {
 	return &Handler{
 		Path:    "/v1/history",
@@ -92,34 +98,4 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	}
 
 	return nil
-}
-
-func parseTimeParam(value string) (*time.Time, error) {
-	var noTime *time.Time
-	if value == "" {
-		return noTime, errNoTimeParameter
-	}
-
-	t, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errInvalidTimeParameter, err)
-	}
-
-	return &t, nil
-}
-
-// errNoTimeParameter is returned when no time parameter is provided.
-var errNoTimeParameter = errors.New("no time parameter provided")
-
-func parseLimit(value string) (int, error) {
-	if value == "" {
-		return 0, nil
-	}
-
-	limit, err := strconv.Atoi(value)
-	if err != nil || limit < 0 {
-		return 0, fmt.Errorf("expected non-negative integer: %w", err)
-	}
-
-	return limit, nil
 }

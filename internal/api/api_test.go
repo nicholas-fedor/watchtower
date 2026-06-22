@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"io"
 	"net/http"
@@ -191,7 +190,7 @@ func Test_registerHealthChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := New(testLogger(), 60)
+			app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
 			client := tt.clientSetup(t)
 
 			registerHealthChecks(t.Context(), app, client)
@@ -224,12 +223,11 @@ func Test_registerHealthChecks(t *testing.T) {
 	}
 }
 
-func Test_newKeyAuthMiddleware(t *testing.T) {
-	validHash := sha256.Sum256([]byte("valid-token"))
-	handler := newKeyAuthMiddleware(validHash)
+func Test_newAPIAuthMiddleware(t *testing.T) {
+	handler := newAPIAuthMiddleware("valid-token")
 	require.NotNil(t, handler)
 
-	app := New(testLogger(), 60)
+	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
 	app.Get("/test", handler, func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
@@ -318,8 +316,8 @@ func Test_validateAndRegisterRoutes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := New(testLogger(), 60)
-			auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+			app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+			auth := newAPIAuthMiddleware("test")
 
 			err := validateAndRegisterRoutes(app, auth, tt.opts)
 
@@ -371,8 +369,8 @@ func Test_registerRoutes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := New(testLogger(), 60)
-			auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+			app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+			auth := newAPIAuthMiddleware("test")
 
 			var updateFn func(ctx context.Context, f types.Filter, p types.UpdateParams) *metrics.Metric
 			if tt.enableUpdateAPI {
@@ -416,8 +414,8 @@ func Test_registerRoutes(t *testing.T) {
 }
 
 func Test_registerUpdateRoute(t *testing.T) {
-	app := New(testLogger(), 60)
-	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+	auth := newAPIAuthMiddleware("test")
 
 	opts := Options{
 		EnableUpdateAPI: true,
@@ -446,8 +444,8 @@ func Test_registerUpdateRoute(t *testing.T) {
 }
 
 func Test_registerMetricsRoute(t *testing.T) {
-	app := New(testLogger(), 60)
-	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+	auth := newAPIAuthMiddleware("test")
 
 	opts := Options{
 		EnableMetricsAPI: true,
@@ -471,8 +469,8 @@ func Test_registerMetricsRoute(t *testing.T) {
 }
 
 func Test_registerContainersRoute(t *testing.T) {
-	app := New(testLogger(), 60)
-	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+	auth := newAPIAuthMiddleware("test")
 	mockClient := containermocks.NewMockClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
@@ -499,8 +497,8 @@ func Test_registerContainersRoute(t *testing.T) {
 }
 
 func Test_registerHistoryRoute(t *testing.T) {
-	app := New(testLogger(), 60)
-	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+	auth := newAPIAuthMiddleware("test")
 
 	opts := Options{
 		EnableHistoryAPI: true,
@@ -524,8 +522,8 @@ func Test_registerHistoryRoute(t *testing.T) {
 }
 
 func Test_registerImagesRoute(t *testing.T) {
-	app := New(testLogger(), 60)
-	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+	auth := newAPIAuthMiddleware("test")
 	mockClient := containermocks.NewMockClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
@@ -552,8 +550,8 @@ func Test_registerImagesRoute(t *testing.T) {
 }
 
 func Test_registerConfigRoute(t *testing.T) {
-	app := New(testLogger(), 60)
-	auth := newKeyAuthMiddleware(sha256.Sum256([]byte("test")))
+	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
+	auth := newAPIAuthMiddleware("test")
 
 	opts := Options{
 		EnableConfigAPI: true,

@@ -14,6 +14,7 @@ type logrusWriter struct {
 	logger *logrus.Logger
 }
 
+// Write implements io.Writer, writing each line to the logrus logger at Info level.
 func (w *logrusWriter) Write(bytes []byte) (int, error) {
 	msg := string(bytes)
 	if len(msg) > 0 && msg[len(msg)-1] == '\n' {

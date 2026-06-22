@@ -3,8 +3,6 @@ package update
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -15,8 +13,6 @@ import (
 )
 
 // Handler triggers container update scans via HTTP.
-//
-// It holds the update function, endpoint path, and concurrency lock for the /v1/update endpoint.
 type Handler struct {
 	fn   func(ctx context.Context, images, containers []string) *metrics.Metric
 	Path string
@@ -35,12 +31,12 @@ const (
 	retryAfterSeconds = "30"
 )
 
-// New creates a new Handler instance.
+// New creates a new Handler.
 //
 // Parameters:
-//   - updateFn: Function to execute container updates, accepting a context,
-//     a list of image names, a list of container name patterns, and returning metrics.
-//   - updateLock: Optional lock channel for synchronizing updates; if nil, a
+//   - updateFn: Function that executes container updates, accepting a context,
+//     image names, container name patterns, and returning metrics.
+//   - updateLock: Optional lock channel for synchronizing updates. If nil, a
 //     new channel is created.
 func New(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool) *Handler {
 	var hLock chan bool
@@ -62,9 +58,8 @@ func New(updateFn func(ctx context.Context, images, containers []string) *metric
 	}
 }
 
-// Handle processes HTTP update requests. It extracts image and container targets
-// from query parameters, acquires the concurrency lock, and dispatches to either
-// async or sync execution.
+// Handle processes an HTTP update request, extracting image and container
+// targets from query parameters and dispatching to async or sync execution.
 //
 //	@Summary		Trigger container update scan
 //	@Description	Scans watched containers for image updates and applies them. Supports both full scans and targeted updates filtered by image name or container name. Container patterns support Go
@@ -151,33 +146,6 @@ func (h *Handler) extractContainers(c fiber.Ctx) []string {
 	}
 
 	return containers
-}
-
-// ContainerFilter creates a filter function that matches containers by name
-// pattern using Go regex syntax. Invalid regex patterns are treated as literal
-// strings for exact matching.
-func ContainerFilter(patterns []string) func(string, bool) bool {
-	compiled := make([]*regexp.Regexp, 0, len(patterns))
-	exact := make([]string, 0, len(patterns))
-
-	for _, p := range patterns {
-		re, err := regexp.Compile("^" + p + "$")
-		if err == nil {
-			compiled = append(compiled, re)
-		} else {
-			exact = append(exact, p)
-		}
-	}
-
-	return func(name string, _ bool) bool {
-		for _, re := range compiled {
-			if re.MatchString(name) {
-				return true
-			}
-		}
-
-		return slices.Contains(exact, name)
-	}
 }
 
 // acquireLock attempts to acquire the update lock.

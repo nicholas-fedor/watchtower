@@ -353,7 +353,7 @@ func FilterByScope(scope string, baseFilter types.Filter) types.Filter {
 // Returns:
 //   - types.Filter: Filter function matching images and applying base filter.
 func FilterByImage(images []string, baseFilter types.Filter) types.Filter {
-	if images == nil {
+	if len(images) == 0 {
 		return baseFilter // No images specified, apply base filter only.
 	}
 

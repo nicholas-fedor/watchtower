@@ -56,4 +56,14 @@ type RunConfig struct {
 	APIRateLimit int
 	// NoStartupMessage suppresses startup messages if true, set via the --no-startup-message flag.
 	NoStartupMessage bool
+	// TLSCertPath is the path to the TLS certificate file, set via the --http-api-tls-cert flag.
+	TLSCertPath string
+	// TLSKeyPath is the path to the TLS key file, set via the --http-api-tls-key flag.
+	TLSKeyPath string
+	// CORSAllowedOrigins is a list of allowed CORS origins for cross-origin requests, set via the --http-api-cors-origins flag.
+	CORSAllowedOrigins []string
+	// TrustedProxies is a list of trusted proxy IPs/CIDRs for reverse proxy support, set via the --http-api-trusted-proxies flag.
+	TrustedProxies []string
+	// ProxyHeader is the header to use for real client IP behind a reverse proxy, set via the --http-api-proxy-header flag.
+	ProxyHeader string
 }

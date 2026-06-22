@@ -45,6 +45,9 @@ type Handler struct {
 }
 
 // New creates a new config handler backed by the given function.
+//
+// Parameters:
+//   - getConfig: Function that returns the current Watchtower configuration.
 func New(getConfig GetFunc) *Handler {
 	return &Handler{
 		getConfig: getConfig,

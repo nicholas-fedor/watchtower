@@ -56,12 +56,13 @@ info:
 paths:
   /livez:
     get:
-      description: Always returns 200 OK when the server is running.
+      description: Returns 200 OK if the Watchtower HTTP server is running. Used by
+        orchestrators (e.g., Kubernetes) to determine if the process is alive.
       produces:
-      - application/json
+      - text/plain
       responses:
         "200":
-          description: Server is alive
+          description: OK
           schema:
             type: string
       summary: Liveness probe
@@ -69,13 +70,14 @@ paths:
       - health
   /readyz:
     get:
-      description: Verifies Docker client connectivity. Returns 200 OK if connected,
-        503 otherwise.
+      description: Returns 200 OK if the Watchtower HTTP server is running and the
+        Docker client is connected and responsive. Used by orchestrators to determine
+        if the service is ready to accept
       produces:
-      - application/json
+      - text/plain
       responses:
         "200":
-          description: Server is ready
+          description: OK
           schema:
             type: string
         "503":
@@ -87,12 +89,14 @@ paths:
       - health
   /startupz:
     get:
-      description: Always returns 200 OK once the server has started.
+      description: Returns 200 OK if the Watchtower HTTP server has started. Used
+        by orchestrators (e.g., Kubernetes) to determine if the process has finished
+        startup.
       produces:
-      - application/json
+      - text/plain
       responses:
         "200":
-          description: Server has started
+          description: OK
           schema:
             type: string
       summary: Startup probe
@@ -213,11 +217,6 @@ paths:
     get:
       description: Streams Watchtower operational events (scan started/completed,
         update started/completed/failed) via Server-Sent Events.
-      parameters:
-      - description: Resume from event ID
-        in: query
-        name: last_event_id
-        type: string
       produces:
       - text/event-stream
       responses:

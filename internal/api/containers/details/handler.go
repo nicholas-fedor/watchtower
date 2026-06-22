@@ -49,6 +49,9 @@ type Handler struct {
 }
 
 // New creates a new container details handler backed by the given function.
+//
+// Parameters:
+//   - getDetails: Function that returns detailed container information.
 func New(getDetails GetFunc) *Handler {
 	return &Handler{
 		getDetails: getDetails,
@@ -102,7 +105,19 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	return nil
 }
 
-// GetContainerDetails fetches detailed information for all watched containers.
+// GetContainerDetails fetches detailed information for all watched containers,
+// optionally filtered by container name or image name.
+//
+// Parameters:
+//   - ctx: Context for the Docker API call.
+//   - client: Docker client.
+//   - filter: Container filter function.
+//   - nameFilter: Exact container name to filter by, or empty for no filter.
+//   - imageFilter: Exact image name to filter by, or empty for no filter.
+//
+// Returns:
+//   - []ContainerDetails: Detailed information for each matching container.
+//   - error: Non-nil if listing containers fails.
 func GetContainerDetails(ctx context.Context, client container.Client, filter types.Filter, nameFilter, imageFilter string) ([]ContainerDetails, error) {
 	list, err := listContainers(ctx, client, filter)
 	if err != nil {

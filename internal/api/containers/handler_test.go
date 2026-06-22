@@ -1,4 +1,4 @@
-package images
+package containers
 
 import (
 	"context"
@@ -13,36 +13,54 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	h := New(func(_ context.Context) ([]ImageStatus, error) { return nil, nil })
-	require.NotNil(t, h)
-	assert.Equal(t, "/v1/images", h.Path)
+	tests := []struct {
+		name string
+		list ListFunc
+	}{
+		{
+			name: "with list function",
+			list: func(_ context.Context) ([]Status, error) { return nil, nil },
+		},
+		{
+			name: "with nil list function",
+			list: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(tt.list)
+			require.NotNil(t, h)
+			assert.Equal(t, "/v1/containers", h.Path)
+		})
+	}
 }
 
 func TestHandler_Handle(t *testing.T) {
 	tests := []struct {
 		name       string
-		listFunc   func(ctx context.Context) ([]ImageStatus, error)
+		listFunc   ListFunc
 		wantStatus int
 	}{
 		{
 			name: "successful list returns 200",
-			listFunc: func(_ context.Context) ([]ImageStatus, error) {
-				return []ImageStatus{
-					{Name: "nginx:latest", ImageID: "sha256:abc", Digest: "sha256:def", Containers: 2},
+			listFunc: func(_ context.Context) ([]Status, error) {
+				return []Status{
+					{Name: "container1", Image: "nginx:latest", ImageID: "sha256:abc", Digest: "sha256:def"},
 				}, nil
 			},
 			wantStatus: http.StatusOK,
 		},
 		{
 			name: "empty list returns 200",
-			listFunc: func(_ context.Context) ([]ImageStatus, error) {
-				return []ImageStatus{}, nil
+			listFunc: func(_ context.Context) ([]Status, error) {
+				return []Status{}, nil
 			},
 			wantStatus: http.StatusOK,
 		},
 		{
 			name: "list error returns 500",
-			listFunc: func(_ context.Context) ([]ImageStatus, error) {
+			listFunc: func(_ context.Context) ([]Status, error) {
 				return nil, errors.New("docker error")
 			},
 			wantStatus: http.StatusInternalServerError,
@@ -53,9 +71,9 @@ func TestHandler_Handle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(tt.listFunc)
 			app := fiber.New(fiber.Config{})
-			app.Get("/v1/images", h.Handle)
+			app.Get("/v1/containers", h.Handle)
 
-			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/images", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/containers", nil)
 			resp, err := app.Test(req)
 			require.NoError(t, err)
 

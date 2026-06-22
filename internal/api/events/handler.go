@@ -33,7 +33,7 @@ func NewHandler(b *Broadcaster) *Handler {
 //	@Description	Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.
 //	@Tags			events
 //	@Produce		text/event-stream
-//	@Success		200				{string}	string	"Event stream"
+//	@Success		200	{string}	string	"Event stream"
 //	@Router			/v1/events [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{

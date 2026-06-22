@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -31,70 +29,6 @@ type Status struct {
 // ListFunc returns the current status of all watched containers.
 type ListFunc func(ctx context.Context) ([]Status, error)
 
-// Handler serves the /v1/containers endpoint.
-type Handler struct {
-	list ListFunc
-	Path string
-}
-
-// New creates a new containers Handler backed by the given list function.
-func New(list ListFunc) *Handler {
-	return &Handler{
-		list: list,
-		Path: "/v1/containers",
-	}
-}
-
-// Handle responds with the JSON status of every watched container.
-//
-//	@Summary		List watched container statuses
-//	@Description	Returns the current image identity and digest for every watched container. Optionally filter by container name or image name.
-//	@Tags			containers
-//	@Accept			json
-//	@Produce		json
-//	@Param			name	query		string					false	"Filter by container name (exact match)"
-//	@Param			image	query		string					false	"Filter by image name (exact match)"
-//	@Success		200		{object}	map[string]interface{}	"Container statuses with count and timestamp"
-//	@Failure		500		{string}	string					"Failed to list containers"
-//	@Router			/v1/containers [get]
-func (h *Handler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-	}).Debug("Received HTTP API containers request")
-
-	statuses, err := h.list(c.Context())
-	if err != nil {
-		logrus.WithError(err).Error("Failed to list containers for API")
-
-		sendErr := c.Status(fiber.StatusInternalServerError).SendString("failed to list containers")
-		if sendErr != nil {
-			return fmt.Errorf("failed to send error response: %w", sendErr)
-		}
-
-		return fiber.ErrInternalServerError
-	}
-
-	nameFilter := c.Query("name")
-	imageFilter := c.Query("image")
-
-	if nameFilter != "" || imageFilter != "" {
-		statuses = filterStatuses(statuses, nameFilter, imageFilter)
-	}
-
-	err = c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"containers":  statuses,
-		"count":       len(statuses),
-		"timestamp":   time.Now().UTC().Format(time.RFC3339),
-		"api_version": "v1",
-	})
-	if err != nil {
-		return fmt.Errorf("failed to send JSON response: %w", err)
-	}
-
-	return nil
-}
-
 // filterStatuses filters a slice of statuses by name and image query parameters.
 func filterStatuses(statuses []Status, name, image string) []Status {
 	var filtered []Status
@@ -116,6 +50,15 @@ func filterStatuses(statuses []Status, name, image string) []Status {
 
 // ListContainerStatuses fetches all containers from the client and transforms
 // them into API status objects with image identity information.
+//
+// Parameters:
+//   - ctx: Context for the Docker API call.
+//   - client: Docker client.
+//   - filter: Container filter function.
+//
+// Returns:
+//   - []Status: Status for each watched container.
+//   - error: Non-nil if listing containers fails.
 func ListContainerStatuses(ctx context.Context, client container.Client, filter types.Filter) ([]Status, error) {
 	list, err := listContainers(ctx, client, filter)
 	if err != nil {
