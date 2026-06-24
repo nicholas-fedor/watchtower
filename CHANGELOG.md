@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/setup-python action to v6.3.0 by @renovate[bot] in [#1848](https://github.com/nicholas-fedor/watchtower/pull/1848)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.8 by @renovate[bot] in [#1847](https://github.com/nicholas-fedor/watchtower/pull/1847)
+- Update actions/setup-go action to v6.5.0 by @renovate[bot] in [#1845](https://github.com/nicholas-fedor/watchtower/pull/1845)
+- Update module github.com/pelletier/go-toml/v2 to v2.4.2 by @renovate[bot] in [#1844](https://github.com/nicholas-fedor/watchtower/pull/1844)
 - Update module github.com/onsi/gomega to v1.42.1 by @renovate[bot] in [#1842](https://github.com/nicholas-fedor/watchtower/pull/1842)
 - Update actions/cache action to v6 by @renovate[bot] in [#1840](https://github.com/nicholas-fedor/watchtower/pull/1840)
 - Update module github.com/onsi/ginkgo/v2 to v2.32.0 by @renovate[bot] in [#1838](https://github.com/nicholas-fedor/watchtower/pull/1838)
