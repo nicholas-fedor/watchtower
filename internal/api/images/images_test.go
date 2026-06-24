@@ -8,25 +8,25 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	containermocks "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestListImageStatuses(t *testing.T) {
 	tests := []struct {
 		name    string
-		client  func(t *testing.T) *containermocks.MockClient
+		client  func(t *testing.T) *mockContainer.MockClient
 		filter  types.Filter
 		wantErr bool
 		wantLen int
 	}{
 		{
 			name: "successful list with single image",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
 				container.EXPECT().ImageInfo().Return(nil)
@@ -40,16 +40,16 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "multiple containers same image",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
+				c := mockContainer.NewMockClient(t)
 
-				container1 := typemocks.NewMockContainer(t)
+				container1 := mockTypes.NewMockContainer(t)
 				container1.EXPECT().ImageName().Return("nginx:latest")
 				container1.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
 				container1.EXPECT().ImageInfo().Return(nil)
 
-				container2 := typemocks.NewMockContainer(t)
+				container2 := mockTypes.NewMockContainer(t)
 				container2.EXPECT().ImageName().Return("nginx:latest")
 				container2.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
 
@@ -63,9 +63,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "client error returns wrapped error",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
+				c := mockContainer.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c

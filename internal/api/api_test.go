@@ -18,10 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	containermocks "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 var testMetrics = metrics.Default()
@@ -33,9 +33,9 @@ func testLogger() *logrus.Logger {
 	return l
 }
 
-func makeListContainersMock(t *testing.T) *containermocks.MockClient {
+func makeListContainersMock(t *testing.T) *mockContainer.MockClient {
 	t.Helper()
-	mc := containermocks.NewMockClient(t)
+	mc := mockContainer.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil).Maybe()
 	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
@@ -296,8 +296,8 @@ func Test_registerHealthChecks(t *testing.T) {
 			clientSetup: func(t *testing.T) container.Client {
 				t.Helper()
 
-				mc := containermocks.NewMockClient(t)
-				c := typemocks.NewMockContainer(t)
+				mc := mockContainer.NewMockClient(t)
+				c := mockTypes.NewMockContainer(t)
 				c.EXPECT().Name().Return("test").Maybe()
 				c.EXPECT().ImageName().Return("img").Maybe()
 				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc")).Maybe()
@@ -314,7 +314,7 @@ func Test_registerHealthChecks(t *testing.T) {
 			clientSetup: func(t *testing.T) container.Client {
 				t.Helper()
 
-				mc := containermocks.NewMockClient(t)
+				mc := mockContainer.NewMockClient(t)
 				mc.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("fail"))
 
 				return mc
@@ -527,7 +527,7 @@ func Test_registerRoutes(t *testing.T) {
 				EnableImagesAPI:             tt.enableImagesAPI,
 				EnableConfigAPI:             tt.enableConfigAPI,
 				EnableEventsAPI:             tt.enableEventsAPI,
-				Client:                      containermocks.NewMockClient(t),
+				Client:                      mockContainer.NewMockClient(t),
 				Filter:                      makeFilter(t),
 			}
 
@@ -607,7 +607,7 @@ func Test_registerMetricsRoute(t *testing.T) {
 func Test_registerContainersRoute(t *testing.T) {
 	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
 	auth := newAPIAuthMiddleware("test")
-	mockClient := containermocks.NewMockClient(t)
+	mockClient := mockContainer.NewMockClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
 	opts := Options{
@@ -660,7 +660,7 @@ func Test_registerHistoryRoute(t *testing.T) {
 func Test_registerImagesRoute(t *testing.T) {
 	app := New(testLogger(), 60, ProxyConfig{}, CORSConfig{})
 	auth := newAPIAuthMiddleware("test")
-	mockClient := containermocks.NewMockClient(t)
+	mockClient := mockContainer.NewMockClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
 	opts := Options{

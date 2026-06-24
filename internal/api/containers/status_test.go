@@ -9,15 +9,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	containermocks "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestListContainerStatuses(t *testing.T) {
 	tests := []struct {
 		name    string
-		client  func(t *testing.T) *containermocks.MockClient
+		client  func(t *testing.T) *mockContainer.MockClient
 		filter  types.Filter
 		wantErr bool
 		errMsg  string
@@ -25,10 +25,10 @@ func TestListContainerStatuses(t *testing.T) {
 	}{
 		{
 			name: "successful list with containers",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("test-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -43,10 +43,10 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "successful list without filter",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("test-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -61,9 +61,9 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "client error returns wrapped error",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
+				c := mockContainer.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c
@@ -74,9 +74,9 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "empty container list",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
+				c := mockContainer.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
 
 				return c
@@ -87,10 +87,10 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "non-nil filter is passed through to ListContainers",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("filtered-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
@@ -127,14 +127,14 @@ func TestListContainerStatuses(t *testing.T) {
 func Test_containerToStatus(t *testing.T) {
 	tests := []struct {
 		name      string
-		container func(t *testing.T) *typemocks.MockContainer
+		container func(t *testing.T) *mockTypes.MockContainer
 		want      Status
 	}{
 		{
 			name: "container without image info",
-			container: func(t *testing.T) *typemocks.MockContainer {
+			container: func(t *testing.T) *mockTypes.MockContainer {
 				t.Helper()
-				c := typemocks.NewMockContainer(t)
+				c := mockTypes.NewMockContainer(t)
 				c.EXPECT().Name().Return("my-container")
 				c.EXPECT().ImageName().Return("nginx:latest")
 				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -151,9 +151,9 @@ func Test_containerToStatus(t *testing.T) {
 		},
 		{
 			name: "container with image info but no repo digests",
-			container: func(t *testing.T) *typemocks.MockContainer {
+			container: func(t *testing.T) *mockTypes.MockContainer {
 				t.Helper()
-				c := typemocks.NewMockContainer(t)
+				c := mockTypes.NewMockContainer(t)
 				c.EXPECT().Name().Return("my-container")
 				c.EXPECT().ImageName().Return("nginx:latest")
 				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -172,9 +172,9 @@ func Test_containerToStatus(t *testing.T) {
 		},
 		{
 			name: "container with valid repo digest",
-			container: func(t *testing.T) *typemocks.MockContainer {
+			container: func(t *testing.T) *mockTypes.MockContainer {
 				t.Helper()
-				c := typemocks.NewMockContainer(t)
+				c := mockTypes.NewMockContainer(t)
 				c.EXPECT().Name().Return("my-container")
 				c.EXPECT().ImageName().Return("nginx:latest")
 				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))

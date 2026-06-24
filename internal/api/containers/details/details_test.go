@@ -8,25 +8,25 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	containermocks "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestGetContainerDetails(t *testing.T) {
 	tests := []struct {
 		name    string
-		client  func(t *testing.T) *containermocks.MockClient
+		client  func(t *testing.T) *mockContainer.MockClient
 		filter  types.Filter
 		wantErr bool
 		wantLen int
 	}{
 		{
 			name: "successful list with container",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("test-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -48,9 +48,9 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "client error returns wrapped error",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
+				c := mockContainer.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c

@@ -12,15 +12,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	containermocks "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestCheckForUpdates(t *testing.T) {
 	tests := []struct {
 		name      string
-		client    func(t *testing.T) *containermocks.MockClient
+		client    func(t *testing.T) *mockContainer.MockClient
 		images    []string
 		names     []string
 		wantErr   bool
@@ -30,10 +30,10 @@ func TestCheckForUpdates(t *testing.T) {
 	}{
 		{
 			name: "single container with update available",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("my-app")
 				container.EXPECT().ImageName().Return("nginx:1.25")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
@@ -49,10 +49,10 @@ func TestCheckForUpdates(t *testing.T) {
 		},
 		{
 			name: "single container no update available",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("my-app")
 				container.EXPECT().ImageName().Return("nginx:1.25")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
@@ -68,16 +68,16 @@ func TestCheckForUpdates(t *testing.T) {
 		},
 		{
 			name: "filter by image name excludes non-matching",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container1 := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container1 := mockTypes.NewMockContainer(t)
 				container1.EXPECT().Name().Return("app1").Maybe()
 				container1.EXPECT().ImageName().Return("nginx:latest").Maybe()
 				container1.EXPECT().ImageID().Return(types.ImageID("sha256:abc")).Maybe()
 				container1.EXPECT().ImageInfo().Return(nil).Maybe()
 
-				container2 := typemocks.NewMockContainer(t)
+				container2 := mockTypes.NewMockContainer(t)
 				container2.EXPECT().Name().Return("app2").Maybe()
 				container2.EXPECT().ImageName().Return("redis:latest").Maybe()
 				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container1, container2}, nil)
@@ -91,16 +91,16 @@ func TestCheckForUpdates(t *testing.T) {
 		},
 		{
 			name: "filter by container name excludes non-matching",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
-				container1 := typemocks.NewMockContainer(t)
+				c := mockContainer.NewMockClient(t)
+				container1 := mockTypes.NewMockContainer(t)
 				container1.EXPECT().Name().Return("app1").Maybe()
 				container1.EXPECT().ImageName().Return("nginx:latest").Maybe()
 				container1.EXPECT().ImageID().Return(types.ImageID("sha256:abc")).Maybe()
 				container1.EXPECT().ImageInfo().Return(nil).Maybe()
 
-				container2 := typemocks.NewMockContainer(t)
+				container2 := mockTypes.NewMockContainer(t)
 				container2.EXPECT().Name().Return("app2").Maybe()
 				container2.EXPECT().ImageName().Return("redis:latest").Maybe()
 				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container1, container2}, nil)
@@ -114,9 +114,9 @@ func TestCheckForUpdates(t *testing.T) {
 		},
 		{
 			name: "empty container list",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
+				c := mockContainer.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
 
 				return c
@@ -125,9 +125,9 @@ func TestCheckForUpdates(t *testing.T) {
 		},
 		{
 			name: "list error returns wrapped error",
-			client: func(t *testing.T) *containermocks.MockClient {
+			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
-				c := containermocks.NewMockClient(t)
+				c := mockContainer.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c
@@ -163,8 +163,8 @@ func TestCheckForUpdates(t *testing.T) {
 }
 
 func TestCheckForUpdates_DigestExtraction(t *testing.T) {
-	client := containermocks.NewMockClient(t)
-	container := typemocks.NewMockContainer(t)
+	client := mockContainer.NewMockClient(t)
+	container := mockTypes.NewMockContainer(t)
 	container.EXPECT().Name().Return("my-app")
 	container.EXPECT().ImageName().Return("nginx:latest")
 	container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
@@ -182,8 +182,8 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 }
 
 func TestCheckForUpdates_IsContainerStaleError(t *testing.T) {
-	client := containermocks.NewMockClient(t)
-	container := typemocks.NewMockContainer(t)
+	client := mockContainer.NewMockClient(t)
+	container := mockTypes.NewMockContainer(t)
 	container.EXPECT().Name().Return("my-app")
 	container.EXPECT().ImageName().Return("nginx:latest")
 	container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))

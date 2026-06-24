@@ -19,7 +19,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/events"
 	"github.com/nicholas-fedor/watchtower/internal/api/mocks"
-	containermocks "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -33,9 +33,9 @@ func testLogger() *logrus.Logger {
 	return l
 }
 
-func makeListContainersMock(t *testing.T) *containermocks.MockClient {
+func makeListContainersMock(t *testing.T) *mockContainer.MockClient {
 	t.Helper()
-	mc := containermocks.NewMockClient(t)
+	mc := mockContainer.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil).Maybe()
 	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
@@ -87,7 +87,7 @@ func TestIntegration_HealthProbes_ViaFullSetup(t *testing.T) {
 }
 
 func TestIntegration_HealthProbes_CustomRoute(t *testing.T) {
-	mc := containermocks.NewMockClient(t)
+	mc := mockContainer.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
 
 	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
