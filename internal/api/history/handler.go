@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
 // Handler serves the /v1/history endpoint.

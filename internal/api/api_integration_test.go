@@ -19,8 +19,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/events"
 	"github.com/nicholas-fedor/watchtower/internal/api/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

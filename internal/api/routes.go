@@ -19,8 +19,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/images"
 	"github.com/nicholas-fedor/watchtower/internal/api/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/api/update"
+	mt "github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	mt "github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

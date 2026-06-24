@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/pkg/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
 func TestNew(t *testing.T) {

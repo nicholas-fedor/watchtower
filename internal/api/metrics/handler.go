@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
 // Handler serves the /v1/metrics endpoint.

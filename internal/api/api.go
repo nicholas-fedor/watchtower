@@ -14,8 +14,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/events"
 	_ "github.com/nicholas-fedor/watchtower/internal/api/swagger"
+	mt "github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	mt "github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

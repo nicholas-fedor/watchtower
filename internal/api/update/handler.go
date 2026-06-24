@@ -9,7 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
 // Handler triggers container update scans via HTTP.

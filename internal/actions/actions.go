@@ -8,8 +8,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
