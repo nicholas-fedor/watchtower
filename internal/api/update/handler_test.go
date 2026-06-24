@@ -330,14 +330,20 @@ func TestExtractImages_Unit(t *testing.T) {
 			wantLen: 0,
 		},
 		{
-			name:    "empty image value returns one empty part",
+			name:    "empty image value is filtered out",
 			query:   "image=",
-			wantLen: 1,
+			wantLen: 0,
 		},
 		{
-			name:    "only commas produces empty parts",
+			name:    "only commas are filtered out",
 			query:   "image=,,,",
-			wantLen: 4,
+			wantLen: 0,
+		},
+		{
+			name:      "whitespace is trimmed",
+			query:     "image=%20nginx:latest%20",
+			wantLen:   1,
+			wantFirst: "nginx:latest",
 		},
 		{
 			name:      "image with registry path",
@@ -416,6 +422,16 @@ func TestExtractContainers_Unit(t *testing.T) {
 		{
 			name:    "empty query",
 			query:   "",
+			wantLen: 0,
+		},
+		{
+			name:    "empty container value is filtered out",
+			query:   "container=",
+			wantLen: 0,
+		},
+		{
+			name:    "only commas are filtered out",
+			query:   "container=,,,",
 			wantLen: 0,
 		},
 	}

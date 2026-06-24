@@ -6,17 +6,17 @@ checks) require Bearer token authentication.
 
 ## Endpoints
 
-| Method | Path             | Auth | Description                                         |
-|--------|------------------|------|-----------------------------------------------------|
-| GET    | `/livez`         | No   | Health check — always returns 200 when running      |
-| GET    | `/readyz`        | No   | Health check — verifies Docker client connectivity  |
-| GET    | `/startupz`      | No   | Health check — always returns 200 once started      |
-| POST   | `/v1/check`      | Yes  | Check containers for available updates              |
-| GET    | `/v1/containers` | Yes  | List watched container statuses                     |
-| POST   | `/v1/update`     | Yes  | Trigger container update scan                       |
-| GET    | `/v1/metrics`    | Yes  | Prometheus exposition format metrics                |
-| GET    | `/v1/status`     | Yes  | Last scan summary                                   |
-| GET    | `/swagger/*`     | No   | Swagger UI documentation                            |
+| Method | Path             | Auth | Description                                        |
+|--------|------------------|------|----------------------------------------------------|
+| GET    | `/livez`         | No   | Health check — always returns 200 when running     |
+| GET    | `/readyz`        | No   | Health check — verifies Docker client connectivity |
+| GET    | `/startupz`      | No   | Health check — always returns 200 once started     |
+| POST   | `/v1/check`      | Yes  | Check containers for available updates             |
+| GET    | `/v1/containers` | Yes  | List watched container statuses                    |
+| POST   | `/v1/update`     | Yes  | Trigger container update scan                      |
+| GET    | `/v1/metrics`    | Yes  | Prometheus exposition format metrics               |
+| GET    | `/v1/status`     | Yes  | Last scan summary                                  |
+| GET    | `/swagger/*`     | No   | Swagger UI documentation                           |
 
 ## Authentication
 

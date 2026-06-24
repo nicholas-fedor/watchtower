@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -219,16 +220,23 @@ func (m *Metrics) Shutdown() {
 	})
 }
 
-// GetLastScan returns the most recent scan metric, or nil if no scan has
-// completed yet.
+// GetLastScan returns a copy of the most recent scan metric, or nil if no scan
+// has completed yet. The returned copy is safe to modify by the caller without
+// affecting the internal metrics state.
 //
 // Returns:
-//   - *Metric: Last scan metric, or nil.
+//   - *Metric: Copy of the last scan metric, or nil.
 func (m *Metrics) GetLastScan() *Metric {
 	m.lastMetricMu.RLock()
 	defer m.lastMetricMu.RUnlock()
 
-	return m.lastMetric
+	if m.lastMetric == nil {
+		return nil
+	}
+
+	metricCopy := *m.lastMetric
+
+	return &metricCopy
 }
 
 // historyBufferSize defines the maximum number of scan history entries
@@ -270,6 +278,7 @@ func (m *Metrics) RecordHistory(metric *Metric) {
 
 // GetHistory returns a copy of the history entries, optionally filtered
 // by since/until timestamps and limited to the most recent N entries.
+// The returned slice is sorted by timestamp in ascending order.
 func (m *Metrics) GetHistory(since, until *time.Time, limit int) []HistoryEntry {
 	m.historyMu.RLock()
 	defer m.historyMu.RUnlock()
@@ -287,6 +296,10 @@ func (m *Metrics) GetHistory(since, until *time.Time, limit int) []HistoryEntry 
 
 		result = append(result, entry)
 	}
+
+	slices.SortFunc(result, func(a, b HistoryEntry) int {
+		return a.Timestamp.Compare(b.Timestamp)
+	})
 
 	if limit > 0 && limit < len(result) {
 		result = result[len(result)-limit:]

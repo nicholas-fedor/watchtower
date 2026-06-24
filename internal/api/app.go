@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/gofiber/fiber/v3/middleware/timeout"
 	"github.com/sirupsen/logrus"
 )
 
@@ -30,6 +31,11 @@ const (
 	// to complete. This covers the full lifecycle: waiting for the lock,
 	// performing the update scan, and returning results.
 	updateHandlerTimeout = 10 * time.Minute
+
+	// handlerTimeout defines the maximum duration for non-update handlers to
+	// complete. This prevents slow Docker API calls from blocking connections
+	// indefinitely.
+	handlerTimeout = 30 * time.Second
 
 	// defaultRateLimitPerMinute is the fallback rate limit when a
 	// non-positive value is provided.
@@ -170,4 +176,15 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 	})
 
 	return app
+}
+
+// TimeoutMiddleware returns a Fiber middleware that enforces a per-request
+// timeout for all wrapped handlers. This prevents slow Docker API calls from
+// blocking connections indefinitely.
+func TimeoutMiddleware() fiber.Handler {
+	return timeout.New(func(c fiber.Ctx) error {
+		return c.Next()
+	}, timeout.Config{
+		Timeout: handlerTimeout,
+	})
 }

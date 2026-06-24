@@ -34,10 +34,18 @@ func NewBroadcaster() *Broadcaster {
 }
 
 // Subscribe registers a new subscriber and returns a channel for receiving events.
+// Returns nil if the maximum number of subscribers has been reached.
 func (b *Broadcaster) Subscribe() <-chan Event {
 	subCh := make(chan Event, subscriberChannelSize)
 
 	b.mu.Lock()
+	if len(b.subscribers) >= maxSubscribers {
+		b.mu.Unlock()
+		close(subCh)
+
+		return nil
+	}
+
 	b.subscribers = append(b.subscribers, subCh)
 	b.mu.Unlock()
 
@@ -45,7 +53,9 @@ func (b *Broadcaster) Subscribe() <-chan Event {
 }
 
 // Unsubscribe removes a subscriber channel and closes it.
-func (b *Broadcaster) Unsubscribe(ch <-chan Event) {
+// Returns true if the subscriber was found and removed, false if it was not found
+// (which may indicate it was already unsubscribed).
+func (b *Broadcaster) Unsubscribe(ch <-chan Event) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -55,9 +65,11 @@ func (b *Broadcaster) Unsubscribe(ch <-chan Event) {
 
 			close(sub)
 
-			return
+			return true
 		}
 	}
+
+	return false
 }
 
 // Publish sends an event to all registered subscribers.

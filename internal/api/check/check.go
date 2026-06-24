@@ -93,14 +93,19 @@ func CheckForUpdates(
 			Timestamp: now,
 		}
 
-		if info := c.ImageInfo(); info != nil && len(info.RepoDigests) > 0 {
+		info := c.ImageInfo()
+		if info != nil && len(info.RepoDigests) > 0 {
 			_, digest, found := strings.Cut(info.RepoDigests[0], "@")
 			if found {
 				result.Digest = digest
 			}
 		}
 
-		stale, latestID, err := client.IsContainerStale(ctx, c, types.UpdateParams{})
+		stale, latestID, err := client.IsContainerStale(
+			ctx,
+			c,
+			types.UpdateParams{},
+		)
 		if err != nil {
 			result.Error = err.Error()
 

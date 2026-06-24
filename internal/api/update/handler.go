@@ -106,6 +106,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 // extractImages parses the "image" query parameters into a slice of image
 // strings. It supports comma-separated values within a single query parameter
 // and multiple "image" parameters (e.g., ?image=a&image=b or ?image=a,b).
+// Empty values are filtered out.
 func (h *Handler) extractImages(c fiber.Ctx) []string {
 	var images []string
 
@@ -113,8 +114,13 @@ func (h *Handler) extractImages(c fiber.Ctx) []string {
 	values := queryArgs.PeekMulti("image")
 
 	for _, v := range values {
-		parts := strings.Split(string(v), ",")
-		images = append(images, parts...)
+		parts := strings.SplitSeq(string(v), ",")
+		for p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				images = append(images, trimmed)
+			}
+		}
 	}
 
 	if len(images) > 0 {
@@ -128,6 +134,7 @@ func (h *Handler) extractImages(c fiber.Ctx) []string {
 
 // extractContainers parses the "container" query parameters into a slice of
 // container name patterns. Supports comma-separated values and repeated params.
+// Empty values are filtered out.
 func (h *Handler) extractContainers(c fiber.Ctx) []string {
 	var containers []string
 
@@ -135,8 +142,13 @@ func (h *Handler) extractContainers(c fiber.Ctx) []string {
 	values := queryArgs.PeekMulti("container")
 
 	for _, v := range values {
-		parts := strings.Split(string(v), ",")
-		containers = append(containers, parts...)
+		parts := strings.SplitSeq(string(v), ",")
+		for p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				containers = append(containers, trimmed)
+			}
+		}
 	}
 
 	if len(containers) > 0 {
@@ -219,6 +231,9 @@ func (h *Handler) handleSync(c fiber.Ctx, images, containers []string, lockToken
 	defer h.releaseLock(lockToken)
 
 	metric, duration := h.executeUpdate(c.Context(), images, containers)
+	if metric == nil {
+		return fiber.ErrInternalServerError
+	}
 
 	err := c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"summary": fiber.Map{

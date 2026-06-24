@@ -11,12 +11,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 )
 
-// errInvalidTimeParameter is returned when a time parameter cannot be parsed.
-var errInvalidTimeParameter = errors.New("invalid time parameter")
-
-// errNoTimeParameter is returned when a time parameter is empty.
-var errNoTimeParameter = errors.New("no time parameter provided")
-
 // Handler serves the /v1/history endpoint.
 type Handler struct {
 	Path    string

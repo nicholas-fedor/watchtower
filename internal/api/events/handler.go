@@ -41,9 +41,22 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		"path":   c.Path(),
 	}).Debug("New SSE subscriber connected")
 
+	if h.Broadcaster == nil {
+		return fiber.ErrServiceUnavailable
+	}
+
 	ctx := c.Context()
 
 	subCh := h.Broadcaster.Subscribe()
+	if subCh == nil {
+		sendErr := c.Status(fiber.StatusServiceUnavailable).SendString("maximum number of subscribers reached")
+		if sendErr != nil {
+			return fmt.Errorf("failed to send subscriber limit response: %w", sendErr)
+		}
+
+		return fiber.ErrServiceUnavailable
+	}
+
 	defer h.Broadcaster.Unsubscribe(subCh)
 
 	return sse.New(sse.Config{

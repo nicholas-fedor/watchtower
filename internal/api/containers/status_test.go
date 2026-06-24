@@ -248,3 +248,77 @@ func Test_extractDigest(t *testing.T) {
 		})
 	}
 }
+
+func Test_filterStatuses(t *testing.T) {
+	tests := []struct {
+		name        string
+		statuses    []Status
+		nameFilter  string
+		imageFilter string
+		wantLen     int
+	}{
+		{
+			name: "no filters returns all",
+			statuses: []Status{
+				{Name: "app1", Image: "nginx:latest"},
+				{Name: "app2", Image: "redis:7"},
+			},
+			nameFilter:  "",
+			imageFilter: "",
+			wantLen:     2,
+		},
+		{
+			name: "filter by name",
+			statuses: []Status{
+				{Name: "app1", Image: "nginx:latest"},
+				{Name: "app2", Image: "redis:7"},
+			},
+			nameFilter:  "app1",
+			imageFilter: "",
+			wantLen:     1,
+		},
+		{
+			name: "filter by image",
+			statuses: []Status{
+				{Name: "app1", Image: "nginx:latest"},
+				{Name: "app2", Image: "redis:7"},
+			},
+			nameFilter:  "",
+			imageFilter: "redis:7",
+			wantLen:     1,
+		},
+		{
+			name: "filter by both name and image",
+			statuses: []Status{
+				{Name: "app1", Image: "nginx:latest"},
+				{Name: "app2", Image: "redis:7"},
+			},
+			nameFilter:  "app1",
+			imageFilter: "nginx:latest",
+			wantLen:     1,
+		},
+		{
+			name: "no match returns empty",
+			statuses: []Status{
+				{Name: "app1", Image: "nginx:latest"},
+			},
+			nameFilter:  "nonexistent",
+			imageFilter: "",
+			wantLen:     0,
+		},
+		{
+			name:        "empty statuses returns empty",
+			statuses:    []Status{},
+			nameFilter:  "",
+			imageFilter: "",
+			wantLen:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterStatuses(tt.statuses, tt.nameFilter, tt.imageFilter)
+			assert.Len(t, got, tt.wantLen)
+		})
+	}
+}

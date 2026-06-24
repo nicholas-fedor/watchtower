@@ -1,11 +1,15 @@
 package api
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -52,4 +56,48 @@ func TestNew(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTimeoutMiddleware(t *testing.T) {
+	handler := TimeoutMiddleware()
+	require.NotNil(t, handler)
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/test", handler, func(c fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestTimeoutMiddleware_Timeout(t *testing.T) {
+	handler := TimeoutMiddleware()
+	require.NotNil(t, handler)
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/test", handler, func(c fiber.Ctx) error {
+		time.Sleep(2 * time.Hour)
+
+		return c.SendString("should not reach")
+	})
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test", nil)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		// Expected: context deadline exceeded from timeout
+		assert.Contains(t, err.Error(), "timeout")
+
+		return
+	}
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusRequestTimeout, resp.StatusCode)
 }

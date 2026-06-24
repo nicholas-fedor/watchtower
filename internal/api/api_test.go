@@ -33,8 +33,40 @@ func testLogger() *logrus.Logger {
 	return l
 }
 
+func makeListContainersMock(t *testing.T) *containermocks.MockClient {
+	t.Helper()
+	mc := containermocks.NewMockClient(t)
+	mc.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil).Maybe()
+	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
+
+	return mc
+}
+
 func makeFilter(_ *testing.T) types.Filter {
 	return func(_ types.FilterableContainer) bool { return true }
+}
+
+func runServerAndShutdown(t *testing.T, opts Options) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+	case <-time.After(ShutdownGracePeriod + 2*time.Second):
+		t.Fatal("server did not shut down within expected time")
+	}
 }
 
 func TestGetAPIAddr(t *testing.T) {
@@ -138,6 +170,110 @@ func TestSetupAndStartAPI(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
+	opts := Options{
+		Token:         "test-token",
+		EnableFullAPI: true,
+		RateLimit:     60,
+		Client:        makeListContainersMock(t),
+		Filter:        makeFilter(t),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+		UnblockHTTPAPI: true,
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+	case <-time.After(ShutdownGracePeriod + 2*time.Second):
+		t.Fatal("server did not shut down within expected time")
+	}
+}
+
+func TestSetupAndStartAPI_NoAPIs(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	err := SetupAndStartAPI(ctx, Options{Token: "test"})
+	assert.NoError(t, err)
+}
+
+func TestSetupAndStartAPI_MetricsOnly(t *testing.T) {
+	opts := Options{
+		Token:            "test-token",
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+	}
+
+	runServerAndShutdown(t, opts)
+}
+
+func TestSetupAndStartAPI_ContainersOnly(t *testing.T) {
+	opts := Options{
+		Token:               "test-token",
+		EnableContainersAPI: true,
+		RateLimit:           60,
+		Client:              makeListContainersMock(t),
+		Filter:              makeFilter(t),
+	}
+
+	runServerAndShutdown(t, opts)
+}
+
+func TestSetupAndStartAPI_CheckOnly(t *testing.T) {
+	opts := Options{
+		Token:          "test-token",
+		EnableCheckAPI: true,
+		RateLimit:      60,
+		Client:         makeListContainersMock(t),
+		Filter:         makeFilter(t),
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+	}
+
+	runServerAndShutdown(t, opts)
+}
+
+func TestSetupAndStartAPI_AllAPIs(t *testing.T) {
+	opts := Options{
+		Token:               "test-token",
+		EnableUpdateAPI:     true,
+		EnableMetricsAPI:    true,
+		EnableContainersAPI: true,
+		EnableCheckAPI:      true,
+		EnableHistoryAPI:    true,
+		EnableImagesAPI:     true,
+		EnableConfigAPI:     true,
+		EnableEventsAPI:     true,
+		RateLimit:           60,
+		Client:              makeListContainersMock(t),
+		Filter:              makeFilter(t),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+		UnblockHTTPAPI: true,
+	}
+
+	runServerAndShutdown(t, opts)
 }
 
 func Test_registerHealthChecks(t *testing.T) {

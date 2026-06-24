@@ -149,7 +149,7 @@ func registerMetricsRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	app.Get(handler.Path, auth, handler.Handle)
 
 	statusHandler := metrics.NewStatusHandler(opts.DefaultMetrics().GetLastScan)
-	app.Get(statusHandler.Path, auth, statusHandler.Handle)
+	app.Get(statusHandler.Path, auth, TimeoutMiddleware(), statusHandler.Handle)
 }
 
 // registerContainersRoute registers the GET /v1/containers endpoint.
@@ -162,7 +162,7 @@ func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	handler := containers.New(func(ctx context.Context) ([]containers.Status, error) {
 		return containers.ListContainerStatuses(ctx, opts.Client, opts.Filter)
 	})
-	app.Get(handler.Path, auth, handler.Handle)
+	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }
 
 // registerCheckRoute registers the POST /v1/check endpoint.
@@ -175,7 +175,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	handler := check.New(func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
 		return check.CheckForUpdates(ctx, opts.Client, opts.Filter, images, names)
 	})
-	app.Post(handler.Path, auth, handler.Handle)
+	app.Post(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }
 
 // registerHistoryRoute registers the GET /v1/history endpoint.
@@ -186,7 +186,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 //   - opts: API configuration options.
 func registerHistoryRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	handler := history.New(opts.DefaultMetrics().GetHistory)
-	app.Get(handler.Path, auth, handler.Handle)
+	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }
 
 // registerImagesRoute registers the GET /v1/images endpoint.
@@ -199,7 +199,7 @@ func registerImagesRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	handler := images.New(func(ctx context.Context) ([]images.ImageStatus, error) {
 		return images.ListImageStatuses(ctx, opts.Client, opts.Filter)
 	})
-	app.Get(handler.Path, auth, handler.Handle)
+	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }
 
 // registerConfigRoute registers the GET /v1/config endpoint.
@@ -237,7 +237,7 @@ func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts Opt
 	handler := details.New(func(ctx context.Context, name, image string) ([]details.ContainerDetails, error) {
 		return details.GetContainerDetails(ctx, opts.Client, opts.Filter, name, image)
 	})
-	app.Get(handler.Path, auth, handler.Handle)
+	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }
 
 // registerEventsRoute registers the GET /v1/events SSE endpoint.
@@ -248,7 +248,12 @@ func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts Opt
 //   - auth: Authentication middleware handler (unused).
 //   - opts: API configuration options.
 func registerEventsRoute(app *fiber.App, _ fiber.Handler, opts Options) {
-	handler := events.NewHandler(opts.EventBroadcaster)
+	broadcaster := opts.EventBroadcaster
+	if broadcaster == nil {
+		broadcaster = events.NewBroadcaster()
+	}
+
+	handler := events.NewHandler(broadcaster)
 	app.Get(handler.Path, handler.Handle)
 }
 

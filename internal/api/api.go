@@ -191,6 +191,8 @@ func SetupAndStartAPI(ctx context.Context, opts Options) error {
 // Returns:
 //   - error: Non-nil if server shutdown fails.
 func runServer(ctx context.Context, app *fiber.App, address string, noStartupMessage bool, tlsCertPath, tlsKeyPath string) error {
+	listenErrCh := make(chan error, 1)
+
 	go func() {
 		var err error
 		if tlsCertPath != "" && tlsKeyPath != "" {
@@ -207,11 +209,17 @@ func runServer(ctx context.Context, app *fiber.App, address string, noStartupMes
 
 		if err != nil {
 			logrus.WithError(err).WithField("addr", address).
-				Debug("HTTP server encountered an error")
+				Error("HTTP server failed to start")
+
+			listenErrCh <- err
 		}
 	}()
 
-	<-ctx.Done()
+	select {
+	case err := <-listenErrCh:
+		return fmt.Errorf("failed to start HTTP server: %w", err)
+	case <-ctx.Done():
+	}
 
 	err := app.ShutdownWithTimeout(ShutdownGracePeriod)
 	if err != nil && !errors.Is(err, context.Canceled) {

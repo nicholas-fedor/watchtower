@@ -107,6 +107,21 @@ func TestUnsubscribeNonExistent(t *testing.T) {
 	b := NewBroadcaster()
 
 	ch := make(chan Event)
-	b.Unsubscribe(ch)
+	found := b.Unsubscribe(ch)
+	assert.False(t, found, "unsubscribing non-existent channel should return false")
+	assert.Equal(t, 0, b.SubscriberCount())
+}
+
+func TestUnsubscribeIdempotent(t *testing.T) {
+	b := NewBroadcaster()
+
+	ch := b.Subscribe()
+	assert.Equal(t, 1, b.SubscriberCount())
+
+	found1 := b.Unsubscribe(ch)
+	assert.True(t, found1, "first unsubscribe should return true")
+
+	found2 := b.Unsubscribe(ch)
+	assert.False(t, found2, "second unsubscribe should return false")
 	assert.Equal(t, 0, b.SubscriberCount())
 }
