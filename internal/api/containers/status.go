@@ -107,19 +107,16 @@ func containerToStatus(c types.Container) Status {
 }
 
 func extractDigest(repoDigests []string, containerName string) string {
-	if len(repoDigests) == 0 {
-		return ""
-	}
+	for _, repoDigest := range repoDigests {
+		if _, digest, found := strings.Cut(repoDigest, "@"); found {
+			return digest
+		}
 
-	_, digest, found := strings.Cut(repoDigests[0], "@")
-	if found {
-		return digest
+		logrus.WithFields(logrus.Fields{
+			"container": containerName,
+			"digest":    repoDigest,
+		}).Debug("RepoDigest in unexpected format, missing @ separator")
 	}
-
-	logrus.WithFields(logrus.Fields{
-		"container": containerName,
-		"digest":    repoDigests[0],
-	}).Debug("RepoDigest in unexpected format, missing @ separator")
 
 	return ""
 }

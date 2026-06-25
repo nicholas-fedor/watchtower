@@ -179,12 +179,13 @@ type Client interface {
 	// Returns:
 	//   - bool: True if image is stale, false otherwise.
 	//   - types.ImageID: Latest image ID.
+	//   - string: Latest registry manifest digest (empty if unavailable).
 	//   - error: Non-nil if check fails, nil on success.
 	IsContainerStale(
 		ctx context.Context,
 		container types.Container,
 		params types.UpdateParams,
-	) (bool, types.ImageID, error)
+	) (bool, types.ImageID, string, error)
 
 	// ExecuteCommand runs a command inside a container and returns whether
 	// to skip updates based on the result.
@@ -921,11 +922,11 @@ func (c *client) IsContainerStale(
 	ctx context.Context,
 	container types.Container,
 	params types.UpdateParams,
-) (bool, types.ImageID, error) {
+) (bool, types.ImageID, string, error) {
 	// Use image client to perform staleness check.
 	imgClient := newImageClient(c.api)
 
-	stale, newestImage, err := imgClient.IsContainerStale(
+	stale, newestImage, latestDigest, err := imgClient.IsContainerStale(
 		ctx,
 		container,
 		params,
@@ -945,7 +946,7 @@ func (c *client) IsContainerStale(
 		}).Debug("Checked container staleness")
 	}
 
-	return stale, newestImage, err
+	return stale, newestImage, latestDigest, err
 }
 
 // ExecuteCommand runs a command inside a container and evaluates its result.

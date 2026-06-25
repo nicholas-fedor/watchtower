@@ -40,6 +40,10 @@ const (
 	// defaultRateLimitPerMinute is the fallback rate limit when a
 	// non-positive value is provided.
 	defaultRateLimitPerMinute = 60
+
+	// corsMaxAge is the maximum duration (in seconds) that browsers may cache
+	// CORS preflight results.
+	corsMaxAge = 3600
 )
 
 // ShutdownGracePeriod defines the maximum duration allowed for the server to
@@ -109,9 +113,7 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 
 	// Configure CORS
 	corsOrigins := corsCfg.AllowedOrigins
-	if len(corsOrigins) == 0 {
-		corsOrigins = []string{"*"}
-	}
+	enableCORS := len(corsOrigins) > 0
 
 	corsMethods := corsCfg.AllowedMethods
 	if len(corsMethods) == 0 {
@@ -123,14 +125,22 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 		corsHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	}
 
-	app.Use(
+	middlewares := []any{
 		recover.New(),
 		helmet.New(),
-		cors.New(cors.Config{
-			AllowOrigins: corsOrigins,
-			AllowMethods: corsMethods,
-			AllowHeaders: corsHeaders,
-		}),
+	}
+
+	if enableCORS {
+		middlewares = append(middlewares, cors.New(cors.Config{
+			AllowOrigins:     corsOrigins,
+			AllowMethods:     corsMethods,
+			AllowHeaders:     corsHeaders,
+			AllowCredentials: false,
+			MaxAge:           corsMaxAge,
+		}))
+	}
+
+	middlewares = append(middlewares,
 		requestid.New(),
 		logger.New(logger.Config{
 			Stream: &logrusWriter{logger: logrusLogger},
@@ -151,6 +161,8 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 			},
 		}),
 	)
+
+	app.Use(middlewares...)
 
 	app.Hooks().OnListen(func(data fiber.ListenData) error {
 		logrus.WithField("addr", data.Host+":"+data.Port).

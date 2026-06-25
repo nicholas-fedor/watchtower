@@ -366,7 +366,7 @@ var _ = ginkgo.Describe("the client", func() {
 
 				c := &client{api: mockClient}
 
-				_, _, err := c.IsContainerStale(
+				_, _, _, err := c.IsContainerStale(
 					ctx,
 					container,
 					types.UpdateParams{NoPull: true},
@@ -418,7 +418,7 @@ var _ = ginkgo.Describe("the client", func() {
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 
-				stale, latestID, err := c.IsContainerStale(
+				stale, latestID, _, err := c.IsContainerStale(
 					context.Background(),
 					container,
 					types.UpdateParams{NoPull: true},
@@ -460,7 +460,7 @@ var _ = ginkgo.Describe("the client", func() {
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 
-				stale, latestID, err := c.IsContainerStale(
+				stale, latestID, _, err := c.IsContainerStale(
 					context.Background(),
 					container,
 					types.UpdateParams{NoPull: true},
@@ -471,6 +471,121 @@ var _ = ginkgo.Describe("the client", func() {
 				gomega.Eventually(logbuf).
 					Should(gbytes.Say(`msg="Skipping image pull due to no-pull setting - checking local image only"`))
 				gomega.Eventually(logbuf).Should(gbytes.Say(`msg="Found new image"`))
+			})
+		})
+		ginkgo.When("a newer local image exists with a repo digest", func() {
+			ginkgo.It("should return the latest digest from RepoDigests", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				newImageID := "sha256:" + util.GenerateRandomSHA256()
+				newDigest := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/test-image:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID:          newImageID,
+							RepoDigests: []string{"test-image:latest@" + newDigest},
+						}),
+					),
+				)
+
+				c := &client{api: mockClient}
+
+				stale, latestID, latestDigest, err := c.IsContainerStale(
+					context.Background(),
+					container,
+					types.UpdateParams{NoPull: true},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeTrue())
+				gomega.Expect(string(latestID)).To(gomega.Equal(newImageID))
+				gomega.Expect(latestDigest).To(gomega.Equal(newDigest))
+			})
+		})
+		ginkgo.When("a newer local image exists with empty RepoDigests", func() {
+			ginkgo.It("should return an empty latest digest", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				newImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/test-image:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID:          newImageID,
+							RepoDigests: []string{},
+						}),
+					),
+				)
+
+				c := &client{api: mockClient}
+
+				stale, latestID, latestDigest, err := c.IsContainerStale(
+					context.Background(),
+					container,
+					types.UpdateParams{NoPull: true},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeTrue())
+				gomega.Expect(string(latestID)).To(gomega.Equal(newImageID))
+				gomega.Expect(latestDigest).To(gomega.BeEmpty())
+			})
+		})
+		ginkgo.When("a newer local image exists with malformed RepoDigests", func() {
+			ginkgo.It("should return an empty latest digest when no @ separator", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				newImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/test-image:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID:          newImageID,
+							RepoDigests: []string{"malformed-digest-no-at-separator"},
+						}),
+					),
+				)
+
+				c := &client{api: mockClient}
+
+				stale, latestID, latestDigest, err := c.IsContainerStale(
+					context.Background(),
+					container,
+					types.UpdateParams{NoPull: true},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeTrue())
+				gomega.Expect(string(latestID)).To(gomega.Equal(newImageID))
+				gomega.Expect(latestDigest).To(gomega.BeEmpty())
 			})
 		})
 		ginkgo.When("image inspection fails", func() {
@@ -502,7 +617,7 @@ var _ = ginkgo.Describe("the client", func() {
 				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
 				defer resetLogrus()
 
-				stale, latestID, err := c.IsContainerStale(
+				stale, latestID, _, err := c.IsContainerStale(
 					context.Background(),
 					container,
 					types.UpdateParams{NoPull: true},
@@ -513,6 +628,48 @@ var _ = ginkgo.Describe("the client", func() {
 				gomega.Eventually(logbuf).
 					Should(gbytes.Say(`msg="Skipping image pull due to no-pull setting - checking local image only"`))
 				gomega.Eventually(logbuf).Should(gbytes.Say(`msg="Failed to inspect latest image"`))
+			})
+		})
+	})
+	ginkgo.When("pulling and checking for updates", func() {
+		ginkgo.When("a newer image is available with a repo digest", func() {
+			ginkgo.It("should return the latest digest after pulling", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				newImageID := "sha256:" + util.GenerateRandomSHA256()
+				newDigest := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("test-image:latest"),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+
+				mockServer.AllowUnhandledRequests = true
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/test-image:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID:          newImageID,
+							RepoDigests: []string{"test-image:latest@" + newDigest},
+						}),
+					),
+				)
+
+				c := &client{api: mockClient}
+
+				stale, latestID, latestDigest, err := c.IsContainerStale(
+					context.Background(),
+					container,
+					types.UpdateParams{},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeTrue())
+				gomega.Expect(string(latestID)).To(gomega.Equal(newImageID))
+				gomega.Expect(latestDigest).To(gomega.Equal(newDigest))
 			})
 		})
 	})

@@ -59,13 +59,14 @@ type imageClient struct {
 // Returns:
 //   - bool: True if image is stale, false otherwise.
 //   - types.ImageID: Latest image ID (or current if not pulled).
+//   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if pull or inspection fails or cooldown defers the update.
 func (c imageClient) IsContainerStale(
 	ctx context.Context,
 	sourceContainer types.Container,
 	params types.UpdateParams,
 	warnOnHeadFailed WarningStrategy,
-) (bool, types.ImageID, error) {
+) (bool, types.ImageID, string, error) {
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"image":     sourceContainer.ImageName(),
@@ -80,16 +81,15 @@ func (c imageClient) IsContainerStale(
 	if err != nil {
 		if errors.Is(err, ErrImageCooldown) {
 			clog.WithError(err).Debug("Cooldown active - pull skipped")
-			// Return original error to preserve cooldown metadata for progress reporting.
-			return false, sourceContainer.ImageID(), err
+
+			return false, sourceContainer.ImageID(), "", err
 		}
 
 		clog.WithError(err).Debug("Failed to pull image")
 
-		return false, sourceContainer.ImageID(), err
+		return false, sourceContainer.ImageID(), "", err
 	}
 
-	// Check for a newer image.
 	return c.HasNewImage(ctx, sourceContainer)
 }
 
@@ -104,11 +104,12 @@ func (c imageClient) IsContainerStale(
 // Returns:
 //   - bool: True if a newer image exists, false if current is latest.
 //   - types.ImageID: Latest image ID.
+//   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if inspection fails, nil on success.
 func (c imageClient) HasNewImage(
 	ctx context.Context,
 	sourceContainer types.Container,
-) (bool, types.ImageID, error) {
+) (bool, types.ImageID, string, error) {
 	clog := logrus.WithFields(logrus.Fields{
 		"container": sourceContainer.Name(),
 		"image":     sourceContainer.ImageName(),
@@ -122,7 +123,7 @@ func (c imageClient) HasNewImage(
 	if err != nil {
 		clog.WithError(err).Debug("Failed to inspect latest image")
 
-		return false, currentImageID, fmt.Errorf(
+		return false, currentImageID, "", fmt.Errorf(
 			"%w: %s: %w",
 			errInspectImageFailed,
 			sourceContainer.ImageName(),
@@ -135,13 +136,22 @@ func (c imageClient) HasNewImage(
 	if newImageID == currentImageID {
 		clog.Debug("No new image found")
 
-		return false, currentImageID, nil
+		return false, currentImageID, "", nil
 	}
 
-	// Log full image name and ID
+	// Extract digest from RepoDigests.
+	var latestDigest string
+
+	if len(newImageInfo.RepoDigests) > 0 {
+		_, digest, found := strings.Cut(newImageInfo.RepoDigests[0], "@")
+		if found {
+			latestDigest = digest
+		}
+	}
+
 	clog.WithField("new_id", newImageID.ShortID()).Info("Found new image")
 
-	return true, newImageID, nil
+	return true, newImageID, latestDigest, nil
 }
 
 // PullImage fetches the latest image for a container.
@@ -493,16 +503,16 @@ func (c imageClient) checkLocalImageStaleness(
 	ctx context.Context,
 	sourceContainer types.Container,
 	clog *logrus.Entry,
-) (bool, types.ImageID, error) {
+) (bool, types.ImageID, string, error) {
 	clog.Debug("Skipping image pull due to no-pull setting - checking local image only")
 	clog.WithField("current_image_id", sourceContainer.ImageID()).
 		Debug("Current container image ID")
 
-	stale, latestID, err := c.HasNewImage(ctx, sourceContainer)
+	stale, latestID, latestDigest, err := c.HasNewImage(ctx, sourceContainer)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to check local image")
 
-		return false, sourceContainer.ImageID(), err
+		return false, sourceContainer.ImageID(), "", err
 	}
 
 	clog.WithFields(logrus.Fields{
@@ -510,5 +520,5 @@ func (c imageClient) checkLocalImageStaleness(
 		"latest_image_id": latestID,
 	}).Debug("Local image check result")
 
-	return stale, latestID, nil
+	return stale, latestID, latestDigest, nil
 }

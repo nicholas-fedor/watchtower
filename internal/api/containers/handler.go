@@ -52,7 +52,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}
 
-		return fiber.ErrInternalServerError
+		return nil
 	}
 
 	nameFilter := c.Query("name")

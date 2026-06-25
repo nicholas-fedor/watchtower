@@ -89,32 +89,50 @@ func TestHandler_Handle_WithFilters(t *testing.T) {
 		name       string
 		query      string
 		wantStatus int
+		wantImages []string
+		wantNames  []string
 	}{
 		{
 			name:       "with image filter",
 			query:      "?image=nginx",
 			wantStatus: http.StatusOK,
+			wantImages: []string{"nginx"},
 		},
 		{
 			name:       "with name filter",
-			query:      "?name=my-container",
+			query:      "?container=my-container",
 			wantStatus: http.StatusOK,
+			wantNames:  []string{"my-container"},
 		},
 		{
 			name:       "with multiple filters",
-			query:      "?image=nginx&name=my-container",
+			query:      "?image=nginx&container=my-container",
 			wantStatus: http.StatusOK,
+			wantImages: []string{"nginx"},
+			wantNames:  []string{"my-container"},
 		},
 		{
 			name:       "with comma-separated filters",
-			query:      "?name=container1,container2",
+			query:      "?container=container1,container2",
 			wantStatus: http.StatusOK,
+			wantNames:  []string{"container1", "container2"},
+		},
+		{
+			name:       "with comma-separated image filter",
+			query:      "?image=nginx,redis",
+			wantStatus: http.StatusOK,
+			wantImages: []string{"nginx", "redis"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var capturedImages, capturedNames []string
+
 			h := New(func(ctx context.Context, images, names []string) ([]ContainerCheck, error) {
+				capturedImages = images
+				capturedNames = names
+
 				return []ContainerCheck{}, nil
 			})
 			app := fiber.New(fiber.Config{})
@@ -127,6 +145,14 @@ func TestHandler_Handle_WithFilters(t *testing.T) {
 			defer resp.Body.Close()
 
 			assert.Equal(t, tt.wantStatus, resp.StatusCode)
+
+			if tt.wantImages != nil {
+				assert.Equal(t, tt.wantImages, capturedImages)
+			}
+
+			if tt.wantNames != nil {
+				assert.Equal(t, tt.wantNames, capturedNames)
+			}
 		})
 	}
 }

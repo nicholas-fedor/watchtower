@@ -2,9 +2,14 @@ package update
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,7 +18,8 @@ import (
 
 // FuzzExtractImages fuzzes the core image-name parsing logic used by extractImages.
 // It tests that splitting comma-separated image names never panics and produces
-// deterministic results.
+// deterministic results. The fuzz target invokes the real extractImages method
+// on a constructed Handler with a real fiber.Ctx.
 func FuzzExtractImages(f *testing.F) {
 	f.Add("nginx:latest")
 	f.Add("nginx:latest,redis:7")
@@ -26,29 +32,34 @@ func FuzzExtractImages(f *testing.F) {
 	f.Add("registry.com/org/image:v1.2.3")
 
 	f.Fuzz(func(t *testing.T, raw string) {
-		// This mirrors the core logic in extractImages:
-		// strings.Split on comma-separated values
-		parts := strings.Split(raw, ",")
+		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+			return &metrics.Metric{}
+		}, nil)
 
-		// Invariant: result should never be nil
-		if parts == nil {
-			t.Error("strings.Split returned nil")
+		app := fiber.New(fiber.Config{})
+		app.Post("/test", func(c fiber.Ctx) error {
+			images := h.extractImages(c)
+
+			if len(raw) > 0 && !strings.Contains(raw, ",") && len(images) != 1 {
+				t.Errorf("non-empty input %q produced %d images, want 1", raw, len(images))
+			}
+
+			if raw == "" && len(images) != 0 {
+				t.Errorf("empty input produced %d images, want 0", len(images))
+			}
+
+			return nil
+		})
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test?image="+url.QueryEscape(raw), nil)
+
+		resp, err := app.Test(req)
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("request failed: %v", err)
 		}
 
-		// Invariant: for non-empty input, at least one part is returned
-		if len(raw) > 0 && len(parts) == 0 {
-			t.Errorf("non-empty input %q produced zero parts", raw)
-		}
-
-		// Invariant: empty input produces exactly one part (the empty string)
-		if raw == "" && len(parts) != 1 {
-			t.Errorf("empty input produced %d parts, want 1", len(parts))
-		}
-
-		// Invariant: number of parts equals number of commas + 1
-		expectedParts := strings.Count(raw, ",") + 1
-		if len(parts) != expectedParts {
-			t.Errorf("input %q: got %d parts, want %d", raw, len(parts), expectedParts)
+		if resp != nil {
+			defer resp.Body.Close()
 		}
 	})
 }

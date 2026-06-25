@@ -2,9 +2,12 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/extractors"
+	"github.com/gofiber/fiber/v3/middleware/keyauth"
 	"github.com/gofiber/fiber/v3/middleware/timeout"
 
 	swaggo "github.com/gofiber/contrib/v3/swaggo"
@@ -84,7 +87,7 @@ func registerRoutes(app *fiber.App, auth fiber.Handler, opts Options) {
 	}
 
 	if opts.EnableEventsAPI {
-		registerEventsRoute(app, auth, opts)
+		registerEventsRoute(app, opts)
 	}
 
 	if opts.EnableSwaggerAPI {
@@ -123,7 +126,7 @@ func registerUpdateRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 		opts.DefaultMetrics().RegisterScan(metric)
 
 		return metric
-	}, opts.UpdateLock)
+	}, opts.UpdateLock, context.Background())
 
 	app.Post(handler.Path, auth, timeout.New(handler.Handle, timeout.Config{
 		Timeout: updateHandlerTimeout,
@@ -241,20 +244,40 @@ func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts Opt
 }
 
 // registerEventsRoute registers the GET /v1/events SSE endpoint.
-// Events are not authenticated to allow standard EventSource API usage.
+// Events support both header-based auth (for programmatic clients) and
+// query-parameter auth (for browser EventSource API which cannot set custom headers).
 //
 // Parameters:
 //   - app: Fiber application.
-//   - auth: Authentication middleware handler (unused).
 //   - opts: API configuration options.
-func registerEventsRoute(app *fiber.App, _ fiber.Handler, opts Options) {
+func registerEventsRoute(app *fiber.App, opts Options) {
 	broadcaster := opts.EventBroadcaster
 	if broadcaster == nil {
 		broadcaster = events.NewBroadcaster()
 	}
 
 	handler := events.NewHandler(broadcaster)
-	app.Get(handler.Path, handler.Handle)
+
+	eventsToken := opts.EventsToken
+
+	eventsAuth := keyauth.New(keyauth.Config{
+		Validator: func(_ fiber.Ctx, key string) (bool, error) {
+			if subtle.ConstantTimeCompare([]byte(key), []byte(eventsToken)) == 1 {
+				return true, nil
+			}
+
+			return false, keyauth.ErrMissingOrMalformedAPIKey
+		},
+		Extractor: extractors.Chain(
+			extractors.FromAuthHeader("Bearer"),
+			extractors.FromQuery("access_token"),
+		),
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
+		},
+	})
+
+	app.Get(handler.Path, eventsAuth, handler.Handle)
 }
 
 // registerHealthChecks registers the health check endpoints on the given Fiber app.

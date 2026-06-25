@@ -56,7 +56,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}
 
-		return fiber.ErrBadRequest
+		return nil
 	}
 
 	until, untilErr := parseTimeParam(c.Query("until"))
@@ -66,7 +66,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}
 
-		return fiber.ErrBadRequest
+		return nil
 	}
 
 	limit, err := parseLimit(c.Query("limit"))
@@ -76,7 +76,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}
 
-		return fiber.ErrBadRequest
+		return nil
 	}
 
 	entries := h.getHist(since, until, limit)

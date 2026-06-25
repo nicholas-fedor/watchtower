@@ -36,10 +36,24 @@ func NewHandler(b *Broadcaster) *Handler {
 //	@Success		200	{string}	string	"Event stream"
 //	@Router			/v1/events [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
+	origin := c.Get("Origin")
+
+	host := c.Host()
+	if origin != "" && !isOriginAllowed(origin, host) {
+		logrus.WithFields(logrus.Fields{
+			"origin": origin,
+			"host":   host,
+			"ip":     c.IP(),
+		}).Warn("Rejected SSE connection from disallowed origin")
+
+		return fiber.ErrForbidden
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
-	}).Debug("New SSE subscriber connected")
+		"ip":     c.IP(),
+	}).Info("New SSE subscriber connected")
 
 	if h.Broadcaster == nil {
 		return fiber.ErrServiceUnavailable
@@ -54,7 +68,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			return fmt.Errorf("failed to send subscriber limit response: %w", sendErr)
 		}
 
-		return fiber.ErrServiceUnavailable
+		return nil
 	}
 
 	defer h.Broadcaster.Unsubscribe(subCh)
@@ -91,4 +105,30 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			}
 		},
 	})(c)
+}
+
+// isOriginAllowed checks if the given origin is allowed to connect to the SSE endpoint.
+// An origin is allowed if it matches the request host (same-origin) or if it's
+// the explicit literal "null" (used by sandboxed iframes and privacy contexts).
+//
+// Parameters:
+//   - origin: The Origin header value.
+//   - host: The request host (from c.Host()).
+//
+// Returns:
+//   - bool: True if the origin is allowed.
+func isOriginAllowed(origin, host string) bool {
+	if origin == "" {
+		return true
+	}
+
+	if origin == "null" {
+		return true
+	}
+
+	if origin == host {
+		return true
+	}
+
+	return false
 }

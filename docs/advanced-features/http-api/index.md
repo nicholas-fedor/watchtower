@@ -9,22 +9,22 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 ## Endpoints
 
-|              **Name**              | **Method** |   **Endpoint**   | **Auth** |                           **Parameters**                            |                           **Description**                            |
-|:----------------------------------:|:----------:|:----------------:|:--------:|:-------------------------------------------------------------------:|:--------------------------------------------------------------------:|
-|     [Update](#http_api_update)     |   `POST`   |   `/v1/update`   |   Yes    | [`image`](#image-parameter-usage), [`container`](#container-parameter-usage), [`async`](#asynchronous-updates) | Triggers container updates and returns JSON results of the operation |
-| [Check](#http_api_check)           |   `POST`   |   `/v1/check`    |   Yes    | [`image`](#image-parameter-usage), [`container`](#container-parameter-usage)   | Checks containers for available updates without pulling or restarting |
-| [Containers](#http_api_containers) |   `GET`    | `/v1/containers` |   Yes    | [`name`](#name-parameter-usage), [`image`](#image-parameter-usage)   | Lists watched containers and their current running image digests   |
-| [Container Details](#http_api_container_details) | `GET` | `/v1/containers/details` | Yes | [`name`](#name-parameter-usage), [`image`](#image-parameter-usage) | Returns detailed information about each watched container including running state and configuration flags |
-| [History](#http_api_history)       |   `GET`    |   `/v1/history`  |   Yes    | [`since`](#since-parameter-usage), [`until`](#until-parameter-usage), [`limit`](#limit-parameter-usage) | Returns historical scan results from the in-memory ring buffer (up to 500 entries) |
-| [Images](#http_api_images)         |   `GET`    |   `/v1/images`   |   Yes    | [`name`](#name-parameter-usage), [`id`](#id-parameter-usage)         | Lists tracked images with their current digests and container counts |
-| [Config](#http_api_config)         |   `GET`    |   `/v1/config`   |   Yes    |                                                                     | Returns the active Watchtower configuration settings                |
-| [Events](#http_api_events)         |   `GET`    |   `/v1/events`   |   No     |                                                                     | Streams real-time operational events via Server-Sent Events         |
-| [Status](#http_api_status)         |   `GET`    |   `/v1/status`   |   Yes    |                                                                     | Returns the summary of the most recent scan                         |
-| [Metrics](../metrics-api/index.md) |   `GET`    |  `/v1/metrics`   |   Yes    |                                                                     |  Exposes Prometheus-compatible metrics for monitoring and alerting   |
-| [Swagger](#http-api-swagger)       |   `GET`    |   `/swagger/*`   |   No     |                                                                     |  Interactive API documentation via Swagger UI                       |
-| Liveness                           |   `GET`    |   `/livez`       |   No     |                                                                     | Returns `200 OK` when the server is running                         |
-| Readiness                          |   `GET`    |   `/readyz`      |   No     |                                                                     | Returns `200 OK` when Docker client is connected, `503` otherwise   |
-| Startup                            |   `GET`    |   `/startupz`    |   No     |                                                                     | Returns `200 OK` once the server has started                        |
+|                     **Name**                     | **Method** |       **Endpoint**       | **Auth** |                                                 **Parameters**                                                 |                                              **Description**                                              |
+|:------------------------------------------------:|:----------:|:------------------------:|:--------:|:--------------------------------------------------------------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------:|
+|            [Update](#http_api_update)            |   `POST`   |       `/v1/update`       |   Yes    | [`image`](#image-parameter-usage), [`container`](#container-parameter-usage), [`async`](#asynchronous-updates) |                   Triggers container updates and returns JSON results of the operation                    |
+|             [Check](#http_api_check)             |   `POST`   |       `/v1/check`        |   Yes    |                  [`image`](#image-parameter-usage), [`container`](#container-parameter-usage)                  |                   Checks containers for available updates without pulling or restarting                   |
+|        [Containers](#http_api_containers)        |   `GET`    |     `/v1/containers`     |   Yes    |                       [`name`](#name-parameter-usage), [`image`](#image-parameter-usage)                       |                     Lists watched containers and their current running image digests                      |
+| [Container Details](#http_api_container_details) |   `GET`    | `/v1/containers/details` |   Yes    |                       [`name`](#name-parameter-usage), [`image`](#image-parameter-usage)                       | Returns detailed information about each watched container including running state and configuration flags |
+|           [History](#http_api_history)           |   `GET`    |      `/v1/history`       |   Yes    |    [`since`](#since-parameter-usage), [`until`](#until-parameter-usage), [`limit`](#limit-parameter-usage)     |            Returns historical scan results from the in-memory ring buffer (up to 500 entries)             |
+|            [Images](#http_api_images)            |   `GET`    |       `/v1/images`       |   Yes    |                          [`name`](#name-parameter-usage), [`id`](#id-parameter-usage)                          |                   Lists tracked images with their current digests and container counts                    |
+|            [Config](#http_api_config)            |   `GET`    |       `/v1/config`       |   Yes    |                                                                                                                |                           Returns the active Watchtower configuration settings                            |
+|            [Events](#http_api_events)            |   `GET`    |       `/v1/events`       |   Yes    |                                                                                                                |                        Streams real-time operational events via Server-Sent Events                        |
+|            [Status](#http_api_status)            |   `GET`    |       `/v1/status`       |   Yes    |                                                                                                                |                                Returns the summary of the most recent scan                                |
+|        [Metrics](../metrics-api/index.md)        |   `GET`    |      `/v1/metrics`       |   Yes    |                                                                                                                |                     Exposes Prometheus-compatible metrics for monitoring and alerting                     |
+|           [Swagger](#http-api-swagger)           |   `GET`    |       `/swagger/*`       |    No    |                                                                                                                |                               Interactive API documentation via Swagger UI                                |
+|                     Liveness                     |   `GET`    |         `/livez`         |    No    |                                                                                                                |                                Returns `200 OK` when the server is running                                |
+|                    Readiness                     |   `GET`    |        `/readyz`         |    No    |                                                                                                                |                     Returns `200 OK` when Docker client is connected, `503` otherwise                     |
+|                     Startup                      |   `GET`    |       `/startupz`        |    No    |                                                                                                                |                               Returns `200 OK` once the server has started                                |
 
 !!! Note
     Endpoints enforce HTTP method restrictions using method-based routing.
@@ -193,7 +193,7 @@ The client should wait at least 30 seconds (as indicated by the `Retry-After` he
 Watchtower uses token-based, header authentication for the HTTP API.
 
 - This should be set using the [HTTP API Token](../../configuration/arguments/index.md#http_api_token) configuration option.
-- All authenticated HTTP API endpoints (`/v1/update`, `/v1/check`, `/v1/containers`, `/v1/status`, `/v1/metrics`) require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
+- All authenticated HTTP API endpoints (`/v1/update`, `/v1/check`, `/v1/containers`, `/v1/containers/details`, `/v1/history`, `/v1/images`, `/v1/config`, `/v1/status`, `/v1/metrics`, `/v1/events`) require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
 - Invalid token attempts are logged with the client IP address.
 - Health probe endpoints (`/livez`, `/readyz`, `/startupz`) do not require authentication.
 
@@ -309,7 +309,7 @@ You can specify exact container names or Go regex patterns to match containers.
 For example, to update only containers with names starting with `web-`:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?container=^web-.*
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?container=^web-.*"
 ```
 
 ##### Multiple Container Patterns
@@ -765,27 +765,37 @@ To enable this endpoint, use the `--http-api-events` CLI argument or the `WATCHT
 
 It streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events (SSE).
 
-#### Usage
+#### Authentication
 
-The events endpoint uses Server-Sent Events and does not require authentication (browser `EventSource` API cannot send custom headers).
+The events endpoint requires authentication via the `--http-api-events-token` flag (or the `WATCHTOWER_HTTP_API_EVENTS_TOKEN` environment variable).
 
-```javascript
-const eventSource = new EventSource('http://localhost:8080/v1/events');
+This token can be provided in two formats:
 
-eventSource.addEventListener('scan_started', (e) => {
-    console.log('Scan started:', JSON.parse(e.data));
-});
+- **Header-based auth** — For programmatic clients using `curl`, `fetch`, etc.:
 
-eventSource.addEventListener('scan_completed', (e) => {
-    console.log('Scan completed:', JSON.parse(e.data));
-});
-```
+  ```bash
+  curl -N -H "Authorization: Bearer my-events-token" "http://localhost:8080/v1/events"
+  ```
 
-With `curl`:
+- **Query-parameter auth** — For browser `EventSource` API, which cannot send custom headers:
 
-```bash
-curl -N "http://localhost:8080/v1/events"
-```
+  ```javascript
+  const eventSource = new EventSource('http://localhost:8080/v1/events?access_token=my-events-token');
+
+  eventSource.addEventListener('scan_started', (e) => {
+      console.log('Scan started:', JSON.parse(e.data));
+  });
+
+  eventSource.addEventListener('scan_completed', (e) => {
+      console.log('Scan completed:', JSON.parse(e.data));
+  });
+  ```
+
+  ```bash
+  curl -N "http://localhost:8080/v1/events?access_token=my-events-token"
+  ```
+
+The events endpoint uses a separate token from the main API token to limit blast radius, since query parameters may appear in access logs, browser history, and proxy logs.
 
 #### Event Format
 
@@ -801,17 +811,5 @@ data: {"type":"scan_completed","timestamp":"2025-01-20T11:30:45Z","data":{"scann
 | Status Code | Description                                    |
 |:-----------:|:-----------------------------------------------|
 |     200     | Event stream established                       |
-
-### HTTP API Full
-
-To enable all HTTP API endpoints at once, use the `--http-api-full` CLI argument or the `WATCHTOWER_HTTP_API_FULL` environment variable.
-
-This enables update, check, metrics, containers, history, images, config, events, and health probes. Individual endpoints can still be disabled with their respective `--http-api-*=false` flags.
-
-#### Example
-
-```bash
---http-api-full --http-api-update=false
-```
-
-This enables all endpoints except update.
+|     401     | Invalid or missing authentication token        |
+|     403     | Origin not allowed                              |

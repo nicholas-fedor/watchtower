@@ -38,7 +38,7 @@ func TestGetContainerDetails(t *testing.T) {
 				container.EXPECT().IsStale().Return(false)
 				container.EXPECT().Scope().Return("", true)
 				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
 
 				return c
 			},

@@ -101,7 +101,7 @@ func CheckForUpdates(
 			}
 		}
 
-		stale, latestID, err := client.IsContainerStale(
+		stale, latestID, latestDigest, err := client.IsContainerStale(
 			ctx,
 			c,
 			types.UpdateParams{},
@@ -116,6 +116,7 @@ func CheckForUpdates(
 		} else {
 			result.UpdateAvailable = stale
 			result.LatestImageID = string(latestID)
+			result.LatestDigest = latestDigest
 		}
 
 		results = append(results, result)

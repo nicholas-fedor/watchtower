@@ -271,7 +271,7 @@ func Update(
 			stale = false
 			newestImage = sourceContainer.ImageID()
 		} else {
-			stale, newestImage, err = client.IsContainerStale(
+			stale, newestImage, _, err = client.IsContainerStale(
 				ctx,
 				sourceContainer,
 				config,

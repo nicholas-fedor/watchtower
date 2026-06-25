@@ -10,6 +10,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// normalizeHost strips IPv6 brackets and zone identifiers for ParseIP.
+func normalizeHost(host string) string {
+	host = strings.TrimPrefix(host, "[")
+
+	host = strings.TrimSuffix(host, "]")
+	if i := strings.Index(host, "%"); i >= 0 {
+		host = host[:i]
+	}
+
+	return host
+}
+
 // FuzzGetAPIAddr fuzzes the GetAPIAddr function which formats host:port strings.
 // It tests that the function never panics and produces valid output for any
 // combination of host and port strings, including IPv4, IPv6, hostnames,
@@ -43,7 +55,8 @@ func FuzzGetAPIAddr(f *testing.F) {
 		}
 
 		// Invariant 3: IPv6 addresses should be wrapped in brackets
-		if strings.Contains(host, ":") && net.ParseIP(host) != nil {
+		normalized := normalizeHost(host)
+		if strings.Contains(host, ":") && net.ParseIP(normalized) != nil {
 			if !strings.HasPrefix(result, "[") {
 				t.Errorf("IPv6 address %q not wrapped in brackets: %q", host, result)
 			}

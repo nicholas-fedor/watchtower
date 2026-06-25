@@ -17,6 +17,7 @@ type Handler struct {
 	fn   func(ctx context.Context, images, containers []string) *metrics.Metric
 	Path string
 	lock chan bool
+	ctx  context.Context //nolint:containedctx // application-lifetime context owned by Handler
 }
 
 // lockResult holds the outcome of an acquireLock attempt.
@@ -38,7 +39,9 @@ const (
 //     image names, container name patterns, and returning metrics.
 //   - updateLock: Optional lock channel for synchronizing updates. If nil, a
 //     new channel is created.
-func New(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool) *Handler {
+//   - ctx: Optional application-lifetime context for background work.
+//     If nil, context.Background is used.
+func New(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool, ctx ...context.Context) *Handler {
 	var hLock chan bool
 	if updateLock != nil {
 		hLock = updateLock
@@ -51,10 +54,18 @@ func New(updateFn func(ctx context.Context, images, containers []string) *metric
 		logrus.Debug("Initialized new update lock channel")
 	}
 
+	var bgCtx context.Context
+	if len(ctx) > 0 && ctx[0] != nil {
+		bgCtx = ctx[0]
+	} else {
+		bgCtx = context.Background()
+	}
+
 	return &Handler{
 		fn:   updateFn,
 		Path: "/v1/update",
 		lock: hLock,
+		ctx:  bgCtx,
 	}
 }
 
@@ -215,7 +226,7 @@ func (h *Handler) send429Response(c fiber.Ctx) {
 func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToken bool) error {
 	logrus.Info("Handling async update request - spawning async update")
 
-	go h.executeUpdateAsync(c.Context(), images, containers, lockToken)
+	go h.executeUpdateAsync(h.ctx, images, containers, lockToken)
 
 	err := c.SendStatus(fiber.StatusAccepted)
 	if err != nil {

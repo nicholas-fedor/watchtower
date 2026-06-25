@@ -365,16 +365,16 @@ func (client MockClient) IsContainerStale(
 	ctx context.Context,
 	container types.Container,
 	_ types.UpdateParams,
-) (bool, types.ImageID, error) {
+) (bool, types.ImageID, string, error) {
 	client.TestData.IsContainerStaleCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
-		return false, "", err
+		return false, "", "", err
 	}
 
 	// Return configured error if set (for testing error conditions)
 	if client.TestData.IsContainerStaleError != nil {
-		return false, "", client.TestData.IsContainerStaleError
+		return false, "", "", client.TestData.IsContainerStaleError
 	}
 
 	stale, found := client.TestData.Staleness[container.Name()]
@@ -382,7 +382,7 @@ func (client MockClient) IsContainerStale(
 		stale = true // Default to stale if not specified.
 	}
 
-	return stale, "", nil
+	return stale, "", "", nil
 }
 
 // WarnOnHeadPullFailed always returns true for the mock client.

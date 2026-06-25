@@ -62,8 +62,8 @@ func New(getConfig GetFunc) *Handler {
 //	@Tags			config
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	ConfigData	"Current configuration"
-//	@Failure		500	{string}	string		"Failed to get configuration"
+//	@Success		200	{object}	map[string]interface{}	"Config object with timestamp and api_version"
+//	@Failure		500	{string}	string					"Failed to get configuration"
 //	@Router			/v1/config [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
@@ -80,7 +80,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}
 
-		return fiber.ErrInternalServerError
+		return nil
 	}
 
 	err = c.Status(fiber.StatusOK).JSON(fiber.Map{

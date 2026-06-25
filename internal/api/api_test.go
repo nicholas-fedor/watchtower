@@ -82,7 +82,7 @@ func TestGetAPIAddr(t *testing.T) {
 		{name: "IPv6 full", host: "2001:db8::1", port: "8080", want: "[2001:db8::1]:8080"},
 		{name: "empty host", host: "", port: "8080", want: ":8080"},
 		{name: "hostname", host: "myhost.example.com", port: "9090", want: "myhost.example.com:9090"},
-		{name: "IPv6 zone", host: "fe80::1%eth0", port: "8080", want: "fe80::1%eth0:8080"},
+		{name: "IPv6 zone", host: "fe80::1%eth0", port: "8080", want: "[fe80::1%eth0]:8080"},
 	}
 
 	for _, tt := range tests {
@@ -175,6 +175,7 @@ func TestSetupAndStartAPI(t *testing.T) {
 func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 	opts := Options{
 		Token:         "test-token",
+		EventsToken:   "events-token",
 		EnableFullAPI: true,
 		RateLimit:     60,
 		Client:        makeListContainersMock(t),
@@ -254,6 +255,7 @@ func TestSetupAndStartAPI_CheckOnly(t *testing.T) {
 func TestSetupAndStartAPI_AllAPIs(t *testing.T) {
 	opts := Options{
 		Token:               "test-token",
+		EventsToken:         "events-token",
 		EnableUpdateAPI:     true,
 		EnableMetricsAPI:    true,
 		EnableContainersAPI: true,
@@ -840,7 +842,9 @@ func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 	cancel()
 
 	select {
-	case <-errCh:
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("server did not shut down")
 	}

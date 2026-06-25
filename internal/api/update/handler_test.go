@@ -620,6 +620,8 @@ func Test_handleAsync(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
+	<-lock
+
 	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
@@ -637,9 +639,12 @@ func Test_handleAsync(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
 
-	select {
-	case <-lock:
-	default:
-		t.Error("lock should be released after async update")
-	}
+	require.Eventually(t, func() bool {
+		select {
+		case <-lock:
+			return true
+		default:
+			return false
+		}
+	}, 2*time.Second, 10*time.Millisecond, "lock should be released after async update")
 }

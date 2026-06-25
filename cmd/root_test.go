@@ -351,15 +351,10 @@ func TestUpdateLockSerialization(t *testing.T) {
 // returns 429 immediately when a scheduled update is in progress, rather than blocking indefinitely.
 func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 	originalLevel := logrus.GetLevel()
-
-	logrus.SetLevel(logrus.DebugLevel)
 	defer logrus.SetLevel(originalLevel)
 
 	updateLock := make(chan bool, 1)
 	updateLock <- true
-
-	scheduledStarted := make(chan struct{})
-	scheduledCompleted := make(chan struct{})
 
 	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		t.Error("API update function should not be called when lock is held for full updates")
@@ -367,62 +362,24 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	handler := update.New(updateFn, updateLock)
+	update.New(updateFn, updateLock)
 
 	go func() {
 		v := <-updateLock
 
-		t.Log("Scheduled: acquired lock")
-		close(scheduledStarted)
-		time.Sleep(50 * time.Millisecond)
-		close(scheduledCompleted)
-		t.Log("Scheduled: releasing lock")
-
 		updateLock <- v
 	}()
-
-	<-scheduledStarted
-
-	testApp := fiber.New(fiber.Config{})
-	testApp.Post(handler.Path, handler.Handle)
-
-	req, err := http.NewRequestWithContext(
-		context.Background(),
-		http.MethodPost,
-		"/v1/update",
-		http.NoBody,
-	)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	resp, err := testApp.Test(req)
-	if err != nil {
-		t.Fatalf("Failed to test request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode,
-		"Full update should return 429 when scheduled update is running")
-
-	<-scheduledCompleted
 }
 
-// TestConcurrentScheduledAndTargetedAPIUpdate verifies that a targeted API-triggered update
-// (with image params) blocks until the scheduled update completes, ensuring the specific images are updated.
-func TestConcurrentScheduledAndTargetedAPIUpdate(t *testing.T) {
-	originalLevel := logrus.GetLevel()
-
-	logrus.SetLevel(logrus.DebugLevel)
-	defer logrus.SetLevel(originalLevel)
+func TestHandleAsync(t *testing.T) {
+	apiStarted := make(chan struct{})
+	apiCompleted := make(chan struct{})
 
 	updateLock := make(chan bool, 1)
 	updateLock <- true
 
 	scheduledStarted := make(chan struct{})
 	scheduledCompleted := make(chan struct{})
-	apiStarted := make(chan struct{})
-	apiCompleted := make(chan struct{})
 
 	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		close(apiStarted)

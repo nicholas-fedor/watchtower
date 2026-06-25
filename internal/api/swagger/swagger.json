@@ -152,9 +152,10 @@
                 "summary": "Get current configuration",
                 "responses": {
                     "200": {
-                        "description": "Current configuration",
+                        "description": "Config object with timestamp and api_version",
                         "schema": {
-                            "$ref": "#/definitions/config.ConfigData"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "500": {
@@ -480,57 +481,6 @@
                             "type": "string"
                         }
                     }
-                }
-            }
-        }
-    },
-    "definitions": {
-        "config.ConfigData": {
-            "type": "object",
-            "properties": {
-                "cleanup": {
-                    "description": "Cleanup indicates whether old images are removed after updating.",
-                    "type": "boolean"
-                },
-                "filter_desc": {
-                    "description": "FilterDesc is a human-readable description of the applied filter.",
-                    "type": "string"
-                },
-                "include_restarting": {
-                    "description": "IncludeRestarting indicates whether restarting containers are included.",
-                    "type": "boolean"
-                },
-                "include_stopped": {
-                    "description": "IncludeStopped indicates whether stopped containers are included.",
-                    "type": "boolean"
-                },
-                "label_enable": {
-                    "description": "LabelEnable indicates whether label-based enabling is active.",
-                    "type": "boolean"
-                },
-                "lifecycle_hooks": {
-                    "description": "LifecycleHooks indicates whether lifecycle hooks are enabled.",
-                    "type": "boolean"
-                },
-                "monitor_only": {
-                    "description": "MonitorOnly indicates whether Watchtower is in monitor-only mode.",
-                    "type": "boolean"
-                },
-                "no_pull": {
-                    "description": "NoPull indicates whether image pulling is disabled.",
-                    "type": "boolean"
-                },
-                "no_restart": {
-                    "description": "NoRestart indicates whether container restarting is disabled.",
-                    "type": "boolean"
-                },
-                "rolling_restart": {
-                    "description": "RollingRestart indicates whether containers are restarted one at a time.",
-                    "type": "boolean"
-                },
-                "scope": {
-                    "description": "Scope is the monitoring scope.",
-                    "type": "string"
                 }
             }
         }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -26,6 +25,12 @@ var (
 	errMissingFilterByImage = errors.New("FilterByImage must be provided when EnableUpdateAPI is set")
 	// errMissingDefaultMetrics indicates DefaultMetrics was not provided.
 	errMissingDefaultMetrics = errors.New("DefaultMetrics must be provided when EnableUpdateAPI is set")
+	// errMissingAPIToken indicates the API token is empty or unset.
+	errMissingAPIToken = errors.New("API token is empty or unset")
+	// errMissingEventsAPIToken indicates events token is not set when events API is enabled.
+	errMissingEventsAPIToken = errors.New("--http-api-events-token is required when --http-api-events is enabled")
+	// errMissingTLSConfig indicates only one of TLS cert/key was provided.
+	errMissingTLSConfig = errors.New("TLS requires both --api-tls-cert and --api-tls-key to be set")
 )
 
 // Server defines the interface for Watchtower's HTTP API server.
@@ -42,6 +47,7 @@ type Options struct {
 	Host                        string
 	Port                        string
 	Token                       string
+	EventsToken                 string
 	RateLimit                   int
 	EnableUpdateAPI             bool
 	EnableMetricsAPI            bool
@@ -97,7 +103,9 @@ type Options struct {
 //   - string: Formatted address string.
 func GetAPIAddr(host, port string) string {
 	address := host + ":" + port
-	if strings.Contains(host, ":") && net.ParseIP(host) != nil {
+
+	bracketed := strings.Contains(host, ":") && !strings.HasPrefix(host, "[")
+	if bracketed {
 		address = "[" + host + "]:" + port
 	}
 
@@ -146,8 +154,23 @@ func SetupAndStartAPI(ctx context.Context, opts Options) error {
 
 	address := GetAPIAddr(opts.Host, opts.Port)
 
-	if opts.Token == "" {
-		logrus.WithField("addr", address).Fatal("API token is empty or unset")
+	shouldRequireToken := opts.EnableUpdateAPI ||
+		opts.EnableMetricsAPI ||
+		opts.EnableContainersAPI ||
+		opts.EnableCheckAPI ||
+		opts.EnableSwaggerAPI ||
+		opts.EnableHistoryAPI ||
+		opts.EnableImagesAPI ||
+		opts.EnableConfigAPI
+
+	shouldRequireEventsToken := opts.EnableEventsAPI
+
+	if shouldRequireToken && opts.Token == "" {
+		return errMissingAPIToken
+	}
+
+	if shouldRequireEventsToken && opts.EventsToken == "" {
+		return errMissingEventsAPIToken
 	}
 
 	app := New(logrus.StandardLogger(), opts.RateLimit, ProxyConfig{
@@ -173,6 +196,10 @@ func SetupAndStartAPI(ctx context.Context, opts Options) error {
 	}
 
 	tlsCertPath, tlsKeyPath := opts.TLSCertPath, opts.TLSKeyPath
+
+	if (tlsCertPath == "") != (tlsKeyPath == "") {
+		return errMissingTLSConfig
+	}
 
 	return runServer(ctx, app, address, opts.NoStartupMessage, tlsCertPath, tlsKeyPath)
 }

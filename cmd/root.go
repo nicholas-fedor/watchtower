@@ -586,6 +586,7 @@ func run(command *cobra.Command, args []string) {
 	unblockHTTPAPI, _ := command.PersistentFlags().GetBool("http-api-periodic-polls")
 	noStartupMessage, _ := command.PersistentFlags().GetBool("no-startup-message")
 	apiToken, _ := command.PersistentFlags().GetString("http-api-token")
+	apiEventsToken, _ := command.PersistentFlags().GetString("http-api-events-token")
 	healthCheck, _ := command.PersistentFlags().GetBool("health-check")
 
 	// Get the HTTP API host and port, falling back to "8080" for port if not specified.
@@ -662,6 +663,7 @@ func run(command *cobra.Command, args []string) {
 		UnblockHTTPAPI:      unblockHTTPAPI,
 		NoStartupMessage:    noStartupMessage,
 		APIToken:            apiToken,
+		APIEventsToken:      apiEventsToken,
 		APIHost:             apiHost,
 		APIPort:             apiPort,
 		APIRateLimit:        apiRateLimit,
@@ -882,6 +884,7 @@ func runMain(cfg types.RunConfig) int {
 			Host:                        cfg.APIHost,
 			Port:                        cfg.APIPort,
 			Token:                       cfg.APIToken,
+			EventsToken:                 cfg.APIEventsToken,
 			RateLimit:                   cfg.APIRateLimit,
 			EnableUpdateAPI:             cfg.EnableUpdateAPI,
 			EnableCheckAPI:              cfg.EnableCheckAPI,
@@ -896,6 +899,7 @@ func runMain(cfg types.RunConfig) int {
 			EnableFullAPI:               cfg.EnableFullAPI,
 			TLSCertPath:                 cfg.TLSCertPath,
 			TLSKeyPath:                  cfg.TLSKeyPath,
+			CORSAllowedOrigins:          cfg.CORSAllowedOrigins,
 			TrustedProxies:              cfg.TrustedProxies,
 			ProxyHeader:                 cfg.ProxyHeader,
 			UnblockHTTPAPI:              cfg.UnblockHTTPAPI,

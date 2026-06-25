@@ -20,8 +20,7 @@ checks) require Bearer token authentication.
 
 ## Authentication
 
-All `/v1/` endpoints (except `/v1/metrics` which is often scraped by Prometheus)
-require a Bearer token in the `Authorization` header. The token is configured via
+All `/v1/` endpoints require a Bearer token in the `Authorization` header. The token is configured via
 the `--api-token` flag or `WATCHTOWER_API_TOKEN` environment variable.
 
 ## Query Parameters

@@ -339,7 +339,7 @@ func TestIntegration_GetAPIAddr(t *testing.T) {
 		{name: "IPv6 full", host: "2001:db8::1", port: "8080", want: "[2001:db8::1]:8080"},
 		{name: "empty host", host: "", port: "8080", want: ":8080"},
 		{name: "hostname", host: "myhost.example.com", port: "9090", want: "myhost.example.com:9090"},
-		{name: "IPv6 zone", host: "fe80::1%eth0", port: "8080", want: "fe80::1%eth0:8080"},
+		{name: "IPv6 zone", host: "fe80::1%eth0", port: "8080", want: "[fe80::1%eth0]:8080"},
 	}
 
 	for _, tt := range tests {
@@ -398,6 +398,7 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			opts := api.Options{
 				Token:               "test-token",
+				EventsToken:         "events-token",
 				EnableUpdateAPI:     c.enableUpdateAPI,
 				EnableMetricsAPI:    c.enableMetricsAPI,
 				EnableContainersAPI: c.enableContainersAPI,
@@ -466,6 +467,7 @@ func TestIntegration_ConfigAPI(t *testing.T) {
 func TestIntegration_EventsAPI(t *testing.T) {
 	runServerAndShutdown(t, api.Options{
 		Token:            "test-token",
+		EventsToken:      "events-token",
 		EnableEventsAPI:  true,
 		RateLimit:        60,
 		EventBroadcaster: NewEventsBroadcasterHelper(),

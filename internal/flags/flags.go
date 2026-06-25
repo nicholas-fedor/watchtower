@@ -228,11 +228,6 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"Restart containers one at a time")
 
 	flags.BoolP(
-		"http-api-full",
-		"",
-		envBool("WATCHTOWER_HTTP_API_FULL"),
-		"Enables all HTTP API endpoints ")
-	flags.BoolP(
 		"http-api-update",
 		"",
 		envBool("WATCHTOWER_HTTP_API_UPDATE"),
@@ -302,6 +297,12 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		envString("WATCHTOWER_HTTP_API_TOKEN"),
 		"Sets an authentication token to HTTP API requests.")
 
+	flags.StringP(
+		"http-api-events-token",
+		"",
+		envString("WATCHTOWER_HTTP_API_EVENTS_TOKEN"),
+		"Sets an authentication token for the events SSE endpoint. This is required when --http-api-events is enabled. Supports query parameter (for browser EventSource) and header-based auth.")
+
 	flags.BoolP(
 		"http-api-periodic-polls",
 		"",
@@ -349,7 +350,7 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		filterEmptyStrings(
 			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_HTTP_API_CORS_ORIGINS"), -1),
 		),
-		"Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). Defaults to '*' (all origins) if unset")
+		"Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). If unset, CORS is disabled and only same-origin requests are allowed.")
 
 	// https://no-color.org/
 	flags.BoolP(
@@ -1145,6 +1146,7 @@ func GetSecretsFromFiles(rootCmd *cobra.Command) {
 		"notification-gotify-token",
 		"notification-url",
 		"http-api-token",
+		"http-api-events-token",
 	}
 
 	// Process each secret flag.

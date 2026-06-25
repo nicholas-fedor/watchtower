@@ -48,6 +48,8 @@ type RunConfig struct {
 	UnblockHTTPAPI bool
 	// APIToken is the authentication token for HTTP API access, set via the --http-api-token flag.
 	APIToken string
+	// APIEventsToken is the authentication token for the events SSE endpoint, set via the --http-api-events-token flag.
+	APIEventsToken string
 	// APIHost is the host to bind the HTTP API to, set via the --http-api-host flag (defaults to empty string).
 	APIHost string
 	// APIPort is the port for the HTTP API server, set via the --http-api-port flag (defaults to "8080").

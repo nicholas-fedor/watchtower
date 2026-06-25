@@ -131,5 +131,11 @@ func FuzzContainerToStatus(f *testing.F) {
 				t.Errorf("Digest = %q, want empty (no @ in repoDigest)", status.Digest)
 			}
 		}
+
+		if !hasInfo || repoDigest == "" {
+			if status.Digest != "" {
+				t.Errorf("Digest = %q, want empty when hasInfo=%v repoDigest=%q", status.Digest, hasInfo, repoDigest)
+			}
+		}
 	})
 }

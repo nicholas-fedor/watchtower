@@ -51,6 +51,7 @@ Certain flags support referencing a file, using its contents as the value, to se
 | Flag                                   | Environment Variable                            | Deprecated |
 |----------------------------------------|-------------------------------------------------|------------|
 | `--http-api-token`                     | `WATCHTOWER_HTTP_API_TOKEN`                     | No         |
+| `--http-api-events-token`              | `WATCHTOWER_HTTP_API_EVENTS_TOKEN`              | No         |
 | `--notification-email-server-password` | `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD` | Yes        |
 | `--notification-gotify-token`          | `WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN`          | Yes        |
 | `--notification-msteams-hook`          | `WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL`      | Yes        |
@@ -796,21 +797,7 @@ Environment Variable: WATCHTOWER_HTTP_API_UPDATE
 
 !!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md) for details"
 
-### HTTP API Full
-
-Enables all HTTP API endpoints at once.
-
-```text
-            Argument: --http-api-full
-Environment Variable: WATCHTOWER_HTTP_API_FULL
-                Type: Boolean
-             Default: false
-```
-
-!!! Note
-    Individual endpoints can still be disabled with their respective flags.
-
-!!! Note "See the [HTTP API documentation](../../advanced-features/http-api/index.md#http-api-full) for details"
+### HTTP API Token
 
 Sets an authentication token for HTTP API requests.
 
@@ -823,6 +810,26 @@ Environment Variable: WATCHTOWER_HTTP_API_TOKEN
 
 !!! Note
     Supports file path for Docker Secrets (e.g., `/run/secrets/http_api_token`).
+
+### HTTP API Events Token
+
+Sets an authentication token with read-only permissions specifically for the events SSE endpoint (`/v1/events`).
+
+```text
+            Argument: --http-api-events-token
+Environment Variable: WATCHTOWER_HTTP_API_EVENTS_TOKEN
+                Type: String
+             Default: None
+```
+
+This is a separate token from `--http-api-token` to limit blast radius, since events tokens may appear in URLs (query parameters) where they can be logged.
+
+The token can be provided via the `Authorization` header (for programmatic clients) or as the `access_token` query parameter (for browser `EventSource` which cannot set custom headers).
+
+!!! Important "This is **required** when `--http-api-events` is enabled."
+
+!!! Note
+    Supports file path for Docker Secrets (e.g., `/run/secrets/http_api_events_token`).
 
 ### HTTP API Metrics
 
@@ -1063,12 +1070,12 @@ Use this to restrict which origins can access the API.
             Argument: --http-api-cors-origins
 Environment Variable: WATCHTOWER_HTTP_API_CORS_ORIGINS
                 Type: String Array
-             Default: * (all origins)
+             Default: Unset (same-origin only)
 ```
 
 !!! Note
-    Only set this in production to restrict cross-origin requests.
-    Leave unset (defaults to `*`) for development or same-origin setups.
+    When unset, CORS is disabled and only same-origin requests are allowed.
+    Set this to permit specific cross-origin origins.
 
 ## Notifications
 

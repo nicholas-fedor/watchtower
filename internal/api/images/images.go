@@ -64,7 +64,7 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 		imageName := c.ImageName()
 		imageID := string(c.ImageID())
 
-		key := imageName
+		key := imageID + "|" + imageName
 		if existing, ok := imageMap[key]; ok {
 			existing.Containers++
 
@@ -78,8 +78,7 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 		}
 
 		if info := c.ImageInfo(); info != nil && len(info.RepoDigests) > 0 {
-			_, digest, found := strings.Cut(info.RepoDigests[0], "@")
-			if found {
+			if _, digest, found := strings.Cut(info.RepoDigests[0], "@"); found {
 				status.Digest = digest
 			}
 		}
