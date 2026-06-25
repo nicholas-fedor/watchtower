@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/tools to v0.47.0 by @renovate[bot] in [#1853](https://github.com/nicholas-fedor/watchtower/pull/1853)
 - Update nicholas-fedor/actionlint-action action to v1.0.14 by @renovate[bot] in [#1849](https://github.com/nicholas-fedor/watchtower/pull/1849)
 - Update actions/setup-python action to v6.3.0 by @renovate[bot] in [#1848](https://github.com/nicholas-fedor/watchtower/pull/1848)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.8 by @renovate[bot] in [#1847](https://github.com/nicholas-fedor/watchtower/pull/1847)
