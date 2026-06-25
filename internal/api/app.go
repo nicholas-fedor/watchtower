@@ -155,7 +155,7 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 			LimiterMiddleware: limiter.SlidingWindow{},
 			KeyGenerator:      func(c fiber.Ctx) string { return c.IP() },
 			LimitReached: func(c fiber.Ctx) error {
-				logrus.WithField("ip", c.IP()).Warn("Rate limit exceeded")
+				logrusLogger.WithField("ip", c.IP()).Warn("Rate limit exceeded")
 
 				return c.SendStatus(fiber.StatusTooManyRequests)
 			},
@@ -165,23 +165,23 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 	app.Use(middlewares...)
 
 	app.Hooks().OnListen(func(data fiber.ListenData) error {
-		logrus.WithField("addr", data.Host+":"+data.Port).
+		logrusLogger.WithField("addr", data.Host+":"+data.Port).
 			Info("Starting HTTP API server")
 
 		return nil
 	})
 
 	app.Hooks().OnPreShutdown(func() error {
-		logrus.Info("Initiating HTTP API shutdown")
+		logrusLogger.Info("Initiating HTTP API shutdown")
 
 		return nil
 	})
 
 	app.Hooks().OnPostShutdown(func(err error) error {
 		if err != nil {
-			logrus.WithError(err).Warn("HTTP server shut down with error")
+			logrusLogger.WithError(err).Warn("HTTP server shut down with error")
 		} else {
-			logrus.Info("HTTP server shut down successfully")
+			logrusLogger.Info("HTTP server shut down successfully")
 		}
 
 		return nil
