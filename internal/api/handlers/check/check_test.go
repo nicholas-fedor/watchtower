@@ -143,7 +143,7 @@ func TestCheckForUpdates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := tt.client(t)
-			results, err := CheckForUpdates(t.Context(), client, nil, tt.images, tt.names)
+			results, err := CheckForUpdates(t.Context(), client, nil, tt.images, tt.names, types.UpdateParams{})
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -188,7 +188,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID("sha256:abc"), "", nil)
 
-	results, err := CheckForUpdates(t.Context(), client, nil, nil, nil)
+	results, err := CheckForUpdates(t.Context(), client, nil, nil, nil, types.UpdateParams{})
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "sha256:digest123", results[0].Digest)
@@ -205,7 +205,7 @@ func TestCheckForUpdates_IsContainerStaleError(t *testing.T) {
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
 
-	results, err := CheckForUpdates(t.Context(), client, nil, nil, nil)
+	results, err := CheckForUpdates(t.Context(), client, nil, nil, nil, types.UpdateParams{})
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "registry unavailable", results[0].Error)

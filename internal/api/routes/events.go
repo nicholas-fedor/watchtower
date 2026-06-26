@@ -17,7 +17,7 @@ func registerEventsRoute(app *fiber.App, opts config.Options) {
 		broadcaster = events.NewBroadcaster()
 	}
 
-	handler := events.NewHandler(broadcaster)
+	handler := events.NewHandler(broadcaster, opts.CORSAllowedOrigins)
 
 	eventsToken := opts.EventsToken
 

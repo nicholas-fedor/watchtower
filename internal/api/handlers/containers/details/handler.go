@@ -114,18 +114,19 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 //   - filter: Container filter function.
 //   - nameFilter: Exact container name to filter by, or empty for no filter.
 //   - imageFilter: Exact image name to filter by, or empty for no filter.
+//   - params: Update parameters supplying MonitorOnly, NoPull and LabelPrecedence
+//     globals for computing per-container effective flags.
 //
 // Returns:
 //   - []ContainerDetails: Detailed information for each matching container.
 //   - error: Non-nil if listing containers fails.
-func GetContainerDetails(ctx context.Context, client container.Client, filter types.Filter, nameFilter, imageFilter string) ([]ContainerDetails, error) {
+func GetContainerDetails(ctx context.Context, client container.Client, filter types.Filter, nameFilter, imageFilter string, params types.UpdateParams) ([]ContainerDetails, error) {
 	list, err := listContainers(ctx, client, filter)
 	if err != nil {
 		return nil, err
 	}
 
 	details := make([]ContainerDetails, 0, len(list))
-	params := types.UpdateParams{}
 
 	for _, c := range list {
 		if nameFilter != "" && c.Name() != nameFilter {

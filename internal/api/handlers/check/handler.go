@@ -29,7 +29,8 @@ func New(check CheckFunc) *Handler {
 // the check function, and returns JSON results.
 //
 //	@Summary		Check for available container updates
-//	@Description	Checks each watched container for available image updates without pulling or restarting. Returns per-container update availability.
+//	@Description	Checks each watched container for available updates by querying the registry for the latest digest
+//
 //	@Tags			check
 //	@Accept			json
 //	@Produce		json

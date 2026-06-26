@@ -15,15 +15,17 @@ const sseRetryInterval = 5 * time.Second
 
 // Handler serves the /v1/events endpoint with Server-Sent Events.
 type Handler struct {
-	Path        string
-	Broadcaster *Broadcaster
+	Path           string
+	Broadcaster    *Broadcaster
+	AllowedOrigins []string // Allowed CORS origins (for cross-origin SSE in addition to same-origin).
 }
 
 // NewHandler creates a new events handler backed by the given broadcaster.
-func NewHandler(b *Broadcaster) *Handler {
+func NewHandler(b *Broadcaster, allowedOrigins []string) *Handler {
 	return &Handler{
-		Path:        "/v1/events",
-		Broadcaster: b,
+		Path:           "/v1/events",
+		Broadcaster:    b,
+		AllowedOrigins: allowedOrigins,
 	}
 }
 
@@ -44,7 +46,7 @@ func (h *Handler) Handle() fiber.Handler {
 			origin := c.Get("Origin")
 
 			host := c.Host()
-			if origin != "" && !isOriginAllowed(origin, host) {
+			if origin != "" && !isOriginAllowed(origin, host, h.AllowedOrigins) {
 				logrus.WithFields(logrus.Fields{
 					"origin": origin,
 					"host":   host,
@@ -105,27 +107,34 @@ func (h *Handler) Handle() fiber.Handler {
 	})
 }
 
-// isOriginAllowed checks if the given origin is allowed to connect to the SSE endpoint.
-// An origin is allowed if it matches the request host (same-origin) or if it's
-// the explicit literal "null" (used by sandboxed iframes and privacy contexts).
+// isOriginAllowed reports whether origin is allowed for the SSE endpoint.
+//
+// Same-origin (with/without scheme), "null", and origins in allowedOrigins (or "*")
+// are permitted.
 //
 // Parameters:
 //   - origin: The Origin header value.
 //   - host: The request host (from c.Host()).
+//   - allowedOrigins: CORS allowed origins from config.
 //
 // Returns:
 //   - bool: True if the origin is allowed.
-func isOriginAllowed(origin, host string) bool {
-	if origin == "" {
+func isOriginAllowed(origin, host string, allowedOrigins []string) bool {
+	if origin == "" || origin == "null" {
 		return true
 	}
 
-	if origin == "null" {
+	// Same-origin (host may lack scheme, origins from browser include it)
+	if origin == host ||
+		origin == "http://"+host ||
+		origin == "https://"+host {
 		return true
 	}
 
-	if origin == host {
-		return true
+	for _, allowed := range allowedOrigins {
+		if allowed == "*" || allowed == origin {
+			return true
+		}
 	}
 
 	return false

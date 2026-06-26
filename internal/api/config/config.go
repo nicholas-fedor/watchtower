@@ -78,6 +78,8 @@ type Options struct {
 	IncludeRestarting           bool
 	LifecycleHooks              bool
 	LabelEnable                 bool
+	LabelPrecedence             bool
+	CooldownDelay               time.Duration
 	SkipSelfUpdate              bool
 	Client                      container.Client
 	Notifier                    types.Notifier

@@ -12,7 +12,7 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 |                     **Name**                     | **Method** |       **Endpoint**       | **Auth** |                                                 **Parameters**                                                 |                                              **Description**                                              |
 |:------------------------------------------------:|:----------:|:------------------------:|:--------:|:--------------------------------------------------------------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------:|
 |            [Update](#http_api_update)            |   `POST`   |       `/v1/update`       |   Yes    | [`image`](#image-parameter-usage), [`container`](#container-parameter-usage), [`async`](#asynchronous-updates) |                   Triggers container updates and returns JSON results of the operation                    |
-|             [Check](#http_api_check)             |   `POST`   |       `/v1/check`        |   Yes    |                  [`image`](#image-parameter-usage), [`container`](#container-parameter-usage)                  |                   Checks containers for available updates without pulling or restarting                   |
+|             [Check](#http_api_check)             |   `POST`   |       `/v1/check`        |   Yes    |                  [`image`](#image-parameter-usage), [`container`](#container-parameter-usage)                  | Checks containers for available updates via registry digest query (HEAD + fallback); no restarts |
 |        [Containers](#http_api_containers)        |   `GET`    |     `/v1/containers`     |   Yes    |                       [`name`](#name-parameter-usage), [`image`](#image-parameter-usage)                       |                     Lists watched containers and their current running image digests                      |
 | [Container Details](#http_api_container_details) |   `GET`    | `/v1/containers/details` |   Yes    |                       [`name`](#name-parameter-usage), [`image`](#image-parameter-usage)                       | Returns detailed information about each watched container including running state and configuration flags |
 |           [History](#http_api_history)           |   `GET`    |      `/v1/history`       |   Yes    |    [`since`](#since-parameter-usage), [`until`](#until-parameter-usage), [`limit`](#limit-parameter-usage)     |            Returns historical scan results from the in-memory ring buffer (up to 500 entries)             |
@@ -370,7 +370,7 @@ services:
 
 To enable this read-only endpoint, use the [HTTP API Check](../../configuration/arguments/index.md#http-api-check) configuration option.
 
-It checks each watched container for available image updates without pulling or restarting, so an external orchestrator can determine what would change before triggering an update.
+It checks each watched container for available image updates by querying the registry for the latest digest (HEAD with GET fallback unless no-pull). It does not restart containers (layers may be pulled on newer digest if no-pull is inactive).
 
 #### Response Format
 

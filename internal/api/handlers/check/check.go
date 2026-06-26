@@ -51,10 +51,9 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 	return results
 }
 
-// CheckForUpdates iterates all watched containers and checks each for updates,
-// comparing the current image against the registry. The images and names
-// parameters act as filters — if non-empty, only containers matching at least
-// one pattern are checked.
+// CheckForUpdates checks all watched containers for available image updates.
+// It queries the registry for the latest digest (HEAD with GET fallback) unless
+// no-pull is active for the container. Images and names act as filters.
 //
 // Parameters:
 //   - ctx: Context for the Docker API call.
@@ -62,6 +61,7 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 //   - filter: Container filter function.
 //   - images: Image name filters. Empty means no image filtering.
 //   - names: Container name filters. Empty means no name filtering.
+//   - params: Update parameters (MonitorOnly, NoPull, LabelPrecedence, CooldownDelay).
 //
 // Returns:
 //   - []ContainerCheck: Update availability for each matching container.
@@ -72,6 +72,7 @@ func CheckForUpdates(
 	filter types.Filter,
 	images []string,
 	names []string,
+	params types.UpdateParams,
 ) ([]ContainerCheck, error) {
 	containers, err := listContainers(ctx, client, filter)
 	if err != nil {
@@ -104,7 +105,7 @@ func CheckForUpdates(
 		stale, latestID, latestDigest, err := client.IsContainerStale(
 			ctx,
 			c,
-			types.UpdateParams{},
+			params,
 		)
 		if err != nil {
 			result.Error = err.Error()
@@ -115,8 +116,18 @@ func CheckForUpdates(
 			}).Debug("Failed to check container for updates")
 		} else {
 			result.UpdateAvailable = stale
+
 			result.LatestImageID = string(latestID)
-			result.LatestDigest = latestDigest
+			if latestDigest != "" {
+				result.LatestDigest = latestDigest
+			} else {
+				// latestDigest empty on match/local-only; use current (confirmed by registry
+				// query in IsContainerStale when remote was not disabled).
+				result.LatestDigest = result.Digest
+				if result.LatestImageID == "" {
+					result.LatestImageID = result.ImageID
+				}
+			}
 		}
 
 		results = append(results, result)

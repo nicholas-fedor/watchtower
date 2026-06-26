@@ -14,14 +14,18 @@ import (
 
 func TestNewHandler(t *testing.T) {
 	b := NewBroadcaster()
-	h := NewHandler(b)
+	h := NewHandler(b, nil)
 	require.NotNil(t, h)
 	assert.Equal(t, "/v1/events", h.Path)
+	assert.Nil(t, h.AllowedOrigins)
+
+	h2 := NewHandler(b, []string{"https://example.com"})
+	assert.Equal(t, []string{"https://example.com"}, h2.AllowedOrigins)
 }
 
 func TestHandler_Handle_Connects(t *testing.T) {
 	b := NewBroadcaster()
-	h := NewHandler(b)
+	h := NewHandler(b, nil)
 
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/events", h.Handle())
@@ -54,7 +58,7 @@ func TestHandler_Handle_MaxSubscribers(t *testing.T) {
 }
 
 func TestHandler_Handle_NilBroadcaster(t *testing.T) {
-	h := NewHandler(nil)
+	h := NewHandler(nil, nil)
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/events", h.Handle())
 
@@ -77,7 +81,7 @@ func TestHandler_Handle_NilBroadcaster(t *testing.T) {
 
 func TestHandler_Handle_ReceivesEvent(t *testing.T) {
 	b := NewBroadcaster()
-	h := NewHandler(b)
+	h := NewHandler(b, nil)
 
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/events", h.Handle())
@@ -95,4 +99,32 @@ func TestHandler_Handle_ReceivesEvent(t *testing.T) {
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+}
+
+func TestIsOriginAllowed(t *testing.T) {
+	cases := []struct {
+		name    string
+		origin  string
+		host    string
+		allowed []string
+		want    bool
+	}{
+		{"empty origin", "", "example.com:8080", nil, true},
+		{"null origin", "null", "example.com:8080", nil, true},
+		{"same origin no scheme", "example.com:8080", "example.com:8080", nil, true},
+		{"same origin http", "http://example.com:8080", "example.com:8080", nil, true},
+		{"same origin https", "https://example.com:8080", "example.com:8080", nil, true},
+		{"different origin no cors", "https://evil.com", "example.com:8080", nil, false},
+		{"explicit cors match", "https://app.example.com", "example.com:8080", []string{"https://app.example.com"}, true},
+		{"cors wildcard", "https://anything", "example.com:8080", []string{"*"}, true},
+		{"cors list no match", "https://other.com", "example.com:8080", []string{"https://app.example.com"}, false},
+		{"cors plus same origin", "http://example.com:8080", "example.com:8080", []string{"https://app.example.com"}, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isOriginAllowed(tc.origin, tc.host, tc.allowed)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }

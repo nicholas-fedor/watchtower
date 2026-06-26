@@ -63,7 +63,7 @@ func TestGetContainerDetails(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := tt.client(t)
-			details, err := GetContainerDetails(t.Context(), client, tt.filter, "", "")
+			details, err := GetContainerDetails(t.Context(), client, tt.filter, "", "", types.UpdateParams{})
 
 			if tt.wantErr {
 				require.Error(t, err)

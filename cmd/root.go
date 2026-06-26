@@ -920,6 +920,8 @@ func runMain(cfg types.RunConfig) int {
 			IncludeRestarting:           includeRestarting,
 			LifecycleHooks:              lifecycleHooks,
 			LabelEnable:                 enableLabel,
+			LabelPrecedence:             labelPrecedence,
+			CooldownDelay:               cooldownDelay,
 			SkipSelfUpdate:              skipSelfUpdate,
 			Client:                      client,
 			Notifier:                    notifier,
