@@ -193,7 +193,8 @@ The client should wait at least 30 seconds (as indicated by the `Retry-After` he
 Watchtower uses token-based, header authentication for the HTTP API.
 
 - This should be set using the [HTTP API Token](../../configuration/arguments/index.md#http_api_token) configuration option.
-- All authenticated HTTP API endpoints (`/v1/update`, `/v1/check`, `/v1/containers`, `/v1/containers/details`, `/v1/history`, `/v1/images`, `/v1/config`, `/v1/status`, `/v1/metrics`, `/v1/events`) require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
+- All authenticated HTTP API endpoints (`/v1/update`, `/v1/check`, `/v1/containers`, `/v1/containers/details`, `/v1/history`, `/v1/images`, `/v1/config`, `/v1/status`, `/v1/metrics`) require an `Authorization: Bearer <token>` header with the predefined HTTP API token value.
+- The `/v1/events` endpoint requires a separate events access token. See [HTTP API Events Token](../../configuration/arguments/index.md#http-api-events-token).
 - Invalid token attempts are logged with the client IP address.
 - Health probe endpoints (`/livez`, `/readyz`, `/startupz`) do not require authentication.
 
