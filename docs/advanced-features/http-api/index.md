@@ -32,11 +32,11 @@ Watchtower has an [optional](../../configuration/arguments/index.md#http_api_mod
 
 ### HTTP API Swagger
 
-To enable the Swagger UI, use the `--http-api-swagger` CLI argument or the `WATCHTOWER_HTTP_API_SWAGGER` environment variable.
+To enable the Swagger UI, use the [HTTP API Swagger](../../configuration/arguments/index.md#http-api-swagger) configuration option.
 
 ### HTTP API Update
 
-To enable this mode, use the `--http-api-update` CLI argument or the `WATCHTOWER_HTTP_API_UPDATE` environment variable.
+To enable this mode, use the [HTTP API Mode](../../configuration/arguments/index.md#http-api-mode) configuration option.
 
 #### Response Format
 
@@ -239,7 +239,7 @@ Watchtower defaults to listening on all interfaces on port 8080.
 Use the [HTTP API Host](../../configuration/arguments/index.md#http_api_host) configuration option to bind to a specific host interface.
 
 - This must be a valid IP address (IPv4 or IPv6).
-- If not specified, Watchtower listens on all interfaces on the port specified by `--http-api-port`.
+- If not specified, Watchtower listens on all interfaces on the port specified by [HTTP API Port](../../configuration/arguments/index.md#http_api_port).
 
 ##### HTTP API Port
 
@@ -361,14 +361,14 @@ services:
 ```
 
 !!! Note
-    Both `--http-api-update` and `--http-api-metrics` can be enabled simultaneously to provide both update triggering and monitoring capabilities.
+    Both [HTTP API Mode](../../configuration/arguments/index.md#http-api-mode) and [HTTP API Metrics](../../configuration/arguments/index.md#http-api-metrics) can be enabled simultaneously to provide both update triggering and monitoring capabilities.
 
 !!! Warning
     Enabling the HTTP API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation. See [Updating Watchtower](../../getting-started/updating-watchtower/index.md#port-configuration-limitation) for more details.
 
 ### HTTP API Check
 
-To enable this read-only endpoint, use the `--http-api-check` CLI argument or the `WATCHTOWER_HTTP_API_CHECK` environment variable.
+To enable this read-only endpoint, use the [HTTP API Check](../../configuration/arguments/index.md#http-api-check) configuration option.
 
 It checks each watched container for available image updates without pulling or restarting, so an external orchestrator can determine what would change before triggering an update.
 
@@ -425,7 +425,7 @@ curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/check?contain
 
 ### HTTP API Containers
 
-To enable this read-only endpoint, use the `--http-api-containers` CLI argument or the `WATCHTOWER_HTTP_API_CONTAINERS` environment variable.
+To enable this read-only endpoint, use the [HTTP API Containers](../../configuration/arguments/index.md#http-api-containers) configuration option.
 
 It lists the containers Watchtower watches along with their current image identity, so an external orchestrator can compare what is actually running against a registry without pulling any image layers.
 
@@ -455,7 +455,7 @@ The `/v1/containers` endpoint returns a JSON array of watched containers:
 - `digest`: Registry manifest digest the image was pulled from (from the image's `RepoDigests`), directly comparable to a registry's `Docker-Content-Digest`. Empty for locally-built images with no registry reference.
 
 !!! Note
-    `--http-api-containers` can be enabled alongside `--http-api-update` and `--http-api-metrics`.
+    [HTTP API Containers](../../configuration/arguments/index.md#http-api-containers) can be enabled alongside [HTTP API Mode](../../configuration/arguments/index.md#http-api-mode) and [HTTP API Metrics](../../configuration/arguments/index.md#http-api-metrics).
 
 #### Name Parameter Usage
 
@@ -475,7 +475,7 @@ curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/containers?image=ngin
 
 ### HTTP API Status
 
-To enable this read-only endpoint, use the `--http-api-metrics` CLI argument or the `WATCHTOWER_HTTP_API_METRICS` environment variable (the status endpoint is enabled alongside metrics).
+To enable this read-only endpoint, use the [HTTP API Metrics](../../configuration/arguments/index.md#http-api-metrics) configuration option (the status endpoint is enabled alongside metrics).
 
 It returns a summary of the most recent Watchtower scan, including counts of scanned, updated, failed, restarted, and skipped containers.
 
@@ -517,7 +517,7 @@ If no scan has been performed yet, the endpoint returns HTTP 204 (No Content).
 
 ### HTTP API Container Details
 
-To enable this read-only endpoint, use the `--http-api-containers` CLI argument or the `WATCHTOWER_HTTP_API_CONTAINERS` environment variable (container details are enabled alongside the containers endpoint).
+To enable this read-only endpoint, use the [HTTP API Containers](../../configuration/arguments/index.md#http-api-containers) configuration option (container details are enabled alongside the containers endpoint).
 
 It returns detailed information about each watched container, including running state, image identity, and configuration flags.
 
@@ -586,7 +586,7 @@ curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/containers/details?im
 
 ### HTTP API History
 
-To enable this read-only endpoint, use the `--http-api-history` CLI argument or the `WATCHTOWER_HTTP_API_HISTORY` environment variable.
+To enable this read-only endpoint, use the [HTTP API History](../../configuration/arguments/index.md#http-api-history) configuration option.
 
 It returns historical scan results from an in-memory ring buffer (up to 500 entries).
 
@@ -657,7 +657,7 @@ curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/history?since=2025-01
 
 ### HTTP API Images
 
-To enable this read-only endpoint, use the `--http-api-images` CLI argument or the `WATCHTOWER_HTTP_API_IMAGES` environment variable.
+To enable this read-only endpoint, use the [HTTP API Images](../../configuration/arguments/index.md#http-api-images) configuration option.
 
 It lists the images tracked by Watchtower along with their current digests and container counts.
 
@@ -712,7 +712,7 @@ curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/images?id=sha256:1111
 
 ### HTTP API Config
 
-To enable this read-only endpoint, use the `--http-api-config` CLI argument or the `WATCHTOWER_HTTP_API_CONFIG` environment variable.
+To enable this read-only endpoint, use the [HTTP API Config](../../configuration/arguments/index.md#http-api-config) configuration option.
 
 It returns the active Watchtower configuration settings. Sensitive values (notification URLs, tokens) are redacted.
 
@@ -762,13 +762,13 @@ The `/v1/config` endpoint returns the current configuration:
 
 ### HTTP API Events
 
-To enable this endpoint, use the `--http-api-events` CLI argument or the `WATCHTOWER_HTTP_API_EVENTS` environment variable.
+To enable this endpoint, use the [HTTP API Events](../../configuration/arguments/index.md#http-api-events) configuration option.
 
 It streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events (SSE).
 
 #### Authentication
 
-The events endpoint requires authentication via the `--http-api-events-token` flag (or the `WATCHTOWER_HTTP_API_EVENTS_TOKEN` environment variable).
+The events endpoint requires authentication via the [HTTP API Events Token](../../configuration/arguments/index.md#http-api-events-token) configuration option.
 
 This token can be provided in two formats:
 
@@ -809,8 +809,8 @@ data: {"type":"scan_completed","timestamp":"2025-01-20T11:30:45Z","data":{"scann
 
 #### HTTP Status Codes
 
-| Status Code | Description                                    |
-|:-----------:|:-----------------------------------------------|
-|     200     | Event stream established                       |
-|     401     | Invalid or missing authentication token        |
-|     403     | Origin not allowed                              |
+| Status Code | Description                             |
+|:-----------:|:----------------------------------------|
+|     200     | Event stream established                |
+|     401     | Invalid or missing authentication token |
+|     403     | Origin not allowed                      |
