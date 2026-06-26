@@ -19,6 +19,31 @@ type Event struct {
 	Data      any       `json:"data"`
 }
 
+// ScanCompletedData carries details about a scan that has finished.
+type ScanCompletedData struct {
+	Scanned int `json:"scanned"`
+	Updated int `json:"updated"`
+	Failed  int `json:"failed"`
+}
+
+// ScanFailedData carries details about a scan that encountered an error.
+type ScanFailedData struct {
+	Error string `json:"error"`
+}
+
+// ImageCleanupData carries details about images cleaned up after a scan.
+type ImageCleanupData struct {
+	Images []ImageCleanupEntry `json:"images"`
+}
+
+// ImageCleanupEntry represents a single cleaned-up image in an event.
+type ImageCleanupEntry struct {
+	ImageID       string `json:"image_id"`
+	ImageName     string `json:"image_name"`
+	ContainerID   string `json:"container_id"`
+	ContainerName string `json:"container_name"`
+}
+
 // Broadcaster manages SSE subscriber registration and event distribution.
 type Broadcaster struct {
 	mu          sync.RWMutex

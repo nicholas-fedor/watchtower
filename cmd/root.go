@@ -703,6 +703,10 @@ func runMain(cfg types.RunConfig) int {
 	// Ensure the Docker client is fully initialized before proceeding.
 	awaitDockerClient()
 
+	// Initialize the event broadcaster for SSE subscribers.
+	// Declared before runUpdatesWithNotifications so the closure can capture it.
+	eventsBroadcaster := events.NewBroadcaster()
+
 	// runUpdatesWithNotifications performs container updates and sends notifications about the results.
 	//
 	// It executes the update action with configured parameters, batches notifications, and returns a metric
@@ -742,6 +746,7 @@ func runMain(cfg types.RunConfig) int {
 			SkipSelfUpdate:               params.SkipSelfUpdate,        // Skip Watchtower self-update
 			EphemeralSelfUpdate:          ephemeralSelfUpdate,          // Use ephemeral container for self-update
 			CooldownDelay:                cooldownDelay,                // Minimum time since image creation before allowing updates
+			EventBroadcaster:             eventsBroadcaster,            // Broadcaster for SSE event streaming
 		}
 
 		metric := actions.RunUpdatesWithNotifications(ctx, actionParams)
@@ -770,9 +775,6 @@ func runMain(cfg types.RunConfig) int {
 	// Initialize a lock channel to prevent concurrent updates.
 	updateLock := make(chan bool, 1)
 	updateLock <- true
-
-	// Initialize the event broadcaster for SSE subscribers.
-	eventsBroadcaster := events.NewBroadcaster()
 
 	// Handle one-time update mode, executing updates and registering metrics.
 	if cfg.RunOnce {
