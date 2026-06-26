@@ -1,0 +1,25 @@
+package routes
+
+import (
+	"context"
+
+	"github.com/gofiber/fiber/v3"
+
+	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers/details"
+)
+
+func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+	handler := containers.New(func(ctx context.Context) ([]containers.Status, error) {
+		return containers.ListContainerStatuses(ctx, opts.Client, opts.Filter)
+	})
+	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
+}
+
+func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+	handler := details.New(func(ctx context.Context, name, image string) ([]details.ContainerDetails, error) {
+		return details.GetContainerDetails(ctx, opts.Client, opts.Filter, name, image)
+	})
+	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
+}

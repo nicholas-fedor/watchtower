@@ -182,7 +182,8 @@ func (m *Metrics) Register(metric *Metric) {
 	}
 }
 
-// Default initializes or returns the singleton Metrics handler. It panics on registration failure, such as duplicate registration against the default registry.
+// Default initializes or returns the singleton Metrics handler.
+// It panics on registration failure, such as duplicate registration against the default registry.
 //
 // Returns:
 //   - *Metrics: Metrics handler with Prometheus metrics and goroutine.

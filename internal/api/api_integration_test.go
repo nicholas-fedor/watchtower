@@ -17,8 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
-	"github.com/nicholas-fedor/watchtower/internal/api/events"
-	"github.com/nicholas-fedor/watchtower/internal/api/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
+	mockAPI "github.com/nicholas-fedor/watchtower/internal/api/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -49,7 +50,7 @@ func makeFilter(_ *testing.T) types.Filter {
 // NewEventsBroadcasterHelper creates an event broadcaster for integration tests.
 func NewEventsBroadcasterHelper() *events.Broadcaster { return events.NewBroadcaster() }
 
-func runServerAndShutdown(t *testing.T, opts api.Options) {
+func runServerAndShutdown(t *testing.T, opts config.Options) {
 	t.Helper()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -77,7 +78,7 @@ func runServerAndShutdown(t *testing.T, opts api.Options) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_HealthProbes_ViaFullSetup(t *testing.T) {
-	opts := api.Options{
+	opts := config.Options{
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
@@ -117,12 +118,12 @@ func TestIntegration_SetupAndStartAPI_NoAPIs(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	err := api.SetupAndStartAPI(ctx, api.Options{Token: "test"})
+	err := api.SetupAndStartAPI(ctx, config.Options{Token: "test"})
 	assert.NoError(t, err)
 }
 
 func TestIntegration_SetupAndStartAPI_MetricsOnly(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
@@ -131,7 +132,7 @@ func TestIntegration_SetupAndStartAPI_MetricsOnly(t *testing.T) {
 }
 
 func TestIntegration_SetupAndStartAPI_ContainersOnly(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:               "test-token",
 		EnableContainersAPI: true,
 		RateLimit:           60,
@@ -141,7 +142,7 @@ func TestIntegration_SetupAndStartAPI_ContainersOnly(t *testing.T) {
 }
 
 func TestIntegration_SetupAndStartAPI_AllAPIs(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:               "test-token",
 		EnableUpdateAPI:     true,
 		EnableMetricsAPI:    true,
@@ -164,12 +165,12 @@ func TestIntegration_SetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		opts   api.Options
+		opts   config.Options
 		errMsg string
 	}{
 		{
 			name: "nil RunUpdatesWithNotifications",
-			opts: api.Options{
+			opts: config.Options{
 				Token:                       "test",
 				EnableUpdateAPI:             true,
 				RunUpdatesWithNotifications: nil,
@@ -180,7 +181,7 @@ func TestIntegration_SetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 		},
 		{
 			name: "nil FilterByImage",
-			opts: api.Options{
+			opts: config.Options{
 				Token:           "test",
 				EnableUpdateAPI: true,
 				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
@@ -193,7 +194,7 @@ func TestIntegration_SetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 		},
 		{
 			name: "nil DefaultMetrics",
-			opts: api.Options{
+			opts: config.Options{
 				Token:           "test",
 				EnableUpdateAPI: true,
 				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
@@ -224,7 +225,7 @@ func TestIntegration_GracefulShutdown_MetricsAPI(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		errCh <- api.SetupAndStartAPI(ctx, api.Options{
+		errCh <- api.SetupAndStartAPI(ctx, config.Options{
 			Token:            "test-token",
 			EnableMetricsAPI: true,
 			RateLimit:        60,
@@ -248,7 +249,7 @@ func TestIntegration_GracefulShutdown_AllAPIs(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		errCh <- api.SetupAndStartAPI(ctx, api.Options{
+		errCh <- api.SetupAndStartAPI(ctx, config.Options{
 			Token:               "test-token",
 			EnableUpdateAPI:     true,
 			EnableMetricsAPI:    true,
@@ -282,7 +283,7 @@ func TestIntegration_GracefulShutdownTiming(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- api.SetupAndStartAPI(ctx, api.Options{
+		errCh <- api.SetupAndStartAPI(ctx, config.Options{
 			Token:               "test-token",
 			EnableUpdateAPI:     true,
 			EnableMetricsAPI:    true,
@@ -316,7 +317,7 @@ func TestIntegration_GracefulShutdownTiming(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_ServerInterface(t *testing.T) {
-	mockServer := mocks.NewMockServer(t)
+	mockServer := mockAPI.NewMockServer(t)
 	mockServer.EXPECT().Listen(mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockServer.EXPECT().ShutdownWithTimeout(mock.Anything).Return(nil).Maybe()
 	assert.NotNil(t, mockServer)
@@ -396,7 +397,7 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 
 	for _, c := range combinations {
 		t.Run(c.name, func(t *testing.T) {
-			opts := api.Options{
+			opts := config.Options{
 				Token:               "test-token",
 				EventsToken:         "events-token",
 				EnableUpdateAPI:     c.enableUpdateAPI,
@@ -426,7 +427,7 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_HistoryAPI(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:            "test-token",
 		EnableHistoryAPI: true,
 		RateLimit:        60,
@@ -439,7 +440,7 @@ func TestIntegration_HistoryAPI(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_ImagesAPI(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:           "test-token",
 		EnableImagesAPI: true,
 		RateLimit:       60,
@@ -453,7 +454,7 @@ func TestIntegration_ImagesAPI(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_ConfigAPI(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:           "test-token",
 		EnableConfigAPI: true,
 		RateLimit:       60,
@@ -465,7 +466,7 @@ func TestIntegration_ConfigAPI(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_EventsAPI(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:            "test-token",
 		EventsToken:      "events-token",
 		EnableEventsAPI:  true,
@@ -479,7 +480,7 @@ func TestIntegration_EventsAPI(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_ContainerDetailsAPI(t *testing.T) {
-	runServerAndShutdown(t, api.Options{
+	runServerAndShutdown(t, config.Options{
 		Token:               "test-token",
 		EnableContainersAPI: true,
 		RateLimit:           60,

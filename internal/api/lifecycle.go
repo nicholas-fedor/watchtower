@@ -9,28 +9,9 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/events"
-	_ "github.com/nicholas-fedor/watchtower/internal/api/swagger"
-	mt "github.com/nicholas-fedor/watchtower/internal/metrics"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-)
-
-var (
-	// errMissingRunUpdatesWithNotifications indicates RunUpdatesWithNotifications was not provided.
-	errMissingRunUpdatesWithNotifications = errors.New("RunUpdatesWithNotifications must be provided when EnableUpdateAPI is set")
-	// errMissingFilterByImage indicates FilterByImage was not provided.
-	errMissingFilterByImage = errors.New("FilterByImage must be provided when EnableUpdateAPI is set")
-	// errMissingDefaultMetrics indicates DefaultMetrics was not provided.
-	errMissingDefaultMetrics = errors.New("DefaultMetrics must be provided when EnableUpdateAPI is set")
-	// errMissingAPIToken indicates the API token is empty or unset.
-	errMissingAPIToken = errors.New("API token is empty or unset")
-	// errMissingEventsAPIToken indicates events token is not set when events API is enabled.
-	errMissingEventsAPIToken = errors.New("--http-api-events-token is required when --http-api-events is enabled")
-	// errMissingTLSConfig indicates only one of TLS cert/key was provided.
-	errMissingTLSConfig = errors.New("TLS requires both --api-tls-cert and --api-tls-key to be set")
+	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 )
 
 // Server defines the interface for Watchtower's HTTP API server.
@@ -41,56 +22,6 @@ type Server interface {
 
 // Compile-time check that *fiber.App implements Server.
 var _ Server = (*fiber.App)(nil)
-
-// Options holds all configuration for SetupAndStartAPI.
-type Options struct {
-	Host                        string
-	Port                        string
-	Token                       string
-	EventsToken                 string
-	RateLimit                   int
-	EnableUpdateAPI             bool
-	EnableMetricsAPI            bool
-	EnableContainersAPI         bool
-	EnableCheckAPI              bool
-	EnableSwaggerAPI            bool
-	EnableHealthAPI             bool
-	EnableHistoryAPI            bool
-	EnableImagesAPI             bool
-	EnableConfigAPI             bool
-	EnableEventsAPI             bool
-	EnableFullAPI               bool
-	UnblockHTTPAPI              bool
-	NoStartupMessage            bool
-	TLSCertPath                 string
-	TLSKeyPath                  string
-	CORSAllowedOrigins          []string
-	TrustedProxies              []string
-	ProxyHeader                 string
-	Filter                      types.Filter
-	Command                     *cobra.Command
-	FilterDesc                  string
-	UpdateLock                  chan bool
-	Cleanup                     bool
-	MonitorOnly                 bool
-	NoPull                      bool
-	NoRestart                   bool
-	RollingRestart              bool
-	IncludeStopped              bool
-	IncludeRestarting           bool
-	LifecycleHooks              bool
-	LabelEnable                 bool
-	SkipSelfUpdate              bool
-	Client                      container.Client
-	Notifier                    types.Notifier
-	Scope                       string
-	Version                     string
-	RunUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *mt.Metric
-	FilterByImage               func([]string, types.Filter) types.Filter
-	DefaultMetrics              func() *mt.Metrics
-	WriteStartupMessage         func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
-	EventBroadcaster            *events.Broadcaster
-}
 
 // GetAPIAddr formats the API address string from host and port, bracketing
 // IPv6 addresses as needed.
@@ -125,7 +56,7 @@ func GetAPIAddr(host, port string) string {
 //
 // Returns:
 //   - error: Non-nil if route registration or server startup fails.
-func SetupAndStartAPI(ctx context.Context, opts Options) error {
+func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 	if opts.EnableFullAPI {
 		opts.EnableUpdateAPI = true
 		opts.EnableCheckAPI = true
@@ -166,11 +97,11 @@ func SetupAndStartAPI(ctx context.Context, opts Options) error {
 	shouldRequireEventsToken := opts.EnableEventsAPI
 
 	if shouldRequireToken && opts.Token == "" {
-		return errMissingAPIToken
+		return config.ErrMissingAPIToken
 	}
 
 	if shouldRequireEventsToken && opts.EventsToken == "" {
-		return errMissingEventsAPIToken
+		return config.ErrMissingEventsAPIToken
 	}
 
 	app := New(logrus.StandardLogger(), opts.RateLimit, ProxyConfig{
@@ -180,15 +111,11 @@ func SetupAndStartAPI(ctx context.Context, opts Options) error {
 		AllowedOrigins: opts.CORSAllowedOrigins,
 	})
 
-	authMiddleware := newAPIAuthMiddleware(opts.Token)
+	authMiddleware := NewAPIAuthMiddleware(opts.Token)
 
-	if opts.EnableHealthAPI {
-		registerHealthChecks(ctx, app, opts.Client)
-	}
-
-	err := validateAndRegisterRoutes(app, authMiddleware, opts)
+	err := routes.ValidateAndRegister(app, authMiddleware, opts)
 	if err != nil {
-		return err
+		return fmt.Errorf("route registration failed: %w", err)
 	}
 
 	if opts.SkipSelfUpdate {
@@ -198,7 +125,7 @@ func SetupAndStartAPI(ctx context.Context, opts Options) error {
 	tlsCertPath, tlsKeyPath := opts.TLSCertPath, opts.TLSKeyPath
 
 	if (tlsCertPath == "") != (tlsKeyPath == "") {
-		return errMissingTLSConfig
+		return config.ErrMissingTLSConfig
 	}
 
 	return runServer(ctx, app, address, opts.NoStartupMessage, tlsCertPath, tlsKeyPath)
@@ -253,29 +180,6 @@ func runServer(ctx context.Context, app *fiber.App, address string, noStartupMes
 		logrus.WithError(err).Debug("Failed to shut down HTTP server")
 
 		return fmt.Errorf("server shutdown failed: %w", err)
-	}
-
-	return nil
-}
-
-// validateUpdateOptions validates that all required update options are set.
-//
-// Parameters:
-//   - opts: API configuration options to validate.
-//
-// Returns:
-//   - error: Non-nil if any required option is missing.
-func validateUpdateOptions(opts Options) error {
-	if opts.RunUpdatesWithNotifications == nil {
-		return errMissingRunUpdatesWithNotifications
-	}
-
-	if opts.FilterByImage == nil {
-		return errMissingFilterByImage
-	}
-
-	if opts.DefaultMetrics == nil {
-		return errMissingDefaultMetrics
 	}
 
 	return nil

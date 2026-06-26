@@ -26,7 +26,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
-	"github.com/nicholas-fedor/watchtower/internal/api/update"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"

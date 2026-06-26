@@ -28,6 +28,8 @@ func NewHandler(b *Broadcaster) *Handler {
 }
 
 // Handle streams Watchtower events to the client using Server-Sent Events.
+// It returns a fiber.Handler that must be registered directly as a route
+// handler so the SSE middleware can manage the response lifecycle.
 //
 //	@Summary		Real-time events stream
 //	@Description	Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.
@@ -35,47 +37,45 @@ func NewHandler(b *Broadcaster) *Handler {
 //	@Produce		text/event-stream
 //	@Success		200	{string}	string	"Event stream"
 //	@Router			/v1/events [get]
-func (h *Handler) Handle(c fiber.Ctx) error {
-	origin := c.Get("Origin")
-
-	host := c.Host()
-	if origin != "" && !isOriginAllowed(origin, host) {
-		logrus.WithFields(logrus.Fields{
-			"origin": origin,
-			"host":   host,
-			"ip":     c.IP(),
-		}).Warn("Rejected SSE connection from disallowed origin")
-
-		return fiber.ErrForbidden
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"ip":     c.IP(),
-	}).Info("New SSE subscriber connected")
-
-	if h.Broadcaster == nil {
-		return fiber.ErrServiceUnavailable
-	}
-
-	ctx := c.Context()
-
-	subCh := h.Broadcaster.Subscribe()
-	if subCh == nil {
-		sendErr := c.Status(fiber.StatusServiceUnavailable).SendString("maximum number of subscribers reached")
-		if sendErr != nil {
-			return fmt.Errorf("failed to send subscriber limit response: %w", sendErr)
-		}
-
-		return nil
-	}
-
-	defer h.Broadcaster.Unsubscribe(subCh)
-
+func (h *Handler) Handle() fiber.Handler {
 	return sse.New(sse.Config{
 		Retry: sseRetryInterval,
-		Handler: func(_ fiber.Ctx, stream *sse.Stream) error {
+		Handler: func(c fiber.Ctx, stream *sse.Stream) error {
+			origin := c.Get("Origin")
+
+			host := c.Host()
+			if origin != "" && !isOriginAllowed(origin, host) {
+				logrus.WithFields(logrus.Fields{
+					"origin": origin,
+					"host":   host,
+					"ip":     c.IP(),
+				}).Warn("Rejected SSE connection from disallowed origin")
+
+				return fiber.ErrForbidden
+			}
+
+			logrus.WithFields(logrus.Fields{
+				"method": c.Method(),
+				"path":   c.Path(),
+				"ip":     c.IP(),
+			}).Info("New SSE subscriber connected")
+
+			if h.Broadcaster == nil {
+				return fiber.ErrServiceUnavailable
+			}
+
+			subCh := h.Broadcaster.Subscribe()
+			if subCh == nil {
+				sendErr := c.Status(fiber.StatusServiceUnavailable).SendString("maximum number of subscribers reached")
+				if sendErr != nil {
+					return fmt.Errorf("failed to send subscriber limit response: %w", sendErr)
+				}
+
+				return nil
+			}
+
+			defer h.Broadcaster.Unsubscribe(subCh)
+
 			for {
 				select {
 				case event, ok := <-subCh:
@@ -99,12 +99,10 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 					}
 				case <-stream.Done():
 					return stream.Err()
-				case <-ctx.Done():
-					return nil
 				}
 			}
 		},
-	})(c)
+	})
 }
 
 // isOriginAllowed checks if the given origin is allowed to connect to the SSE endpoint.

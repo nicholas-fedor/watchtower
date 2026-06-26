@@ -22,15 +22,25 @@
 //	GET  /v1/events              Real-time events via SSE (no auth)
 //	GET  /swagger/*              Swagger UI (requires --http-api-swagger)
 //
-// Health probes (/livez, /readyz, /startupz) are registered unconditionally
-// and require no authentication. All /v1/* endpoints except /v1/events require
-// Bearer token authentication.
+// Health probes (/livez, /readyz, /startupz) are enabled via
+// EnableHealthAPI and require no authentication. All /v1/* endpoints except
+// /v1/events require Bearer token authentication.
 //
 // Key components:
-//   - New: Creates a Fiber application with the configured middleware stack.
-//   - newAPIAuthMiddleware: Bearer token authentication.
-//   - registerHealthChecks: Registers liveness, readiness, and startup probes.
-//   - SetupAndStartAPI: Orchestrates endpoint registration and server lifecycle.
+//   - New: Creates a Fiber application with the configured middleware stack (fiber.go).
+//   - NewAPIAuthMiddleware: Bearer token authentication (auth.go).
+//   - routes.ValidateAndRegister: Validates options and registers enabled endpoints.
+//   - SetupAndStartAPI: Orchestrates endpoint registration and server lifecycle (lifecycle.go).
+//   - config.ValidateUpdateOptions: Validates required update API dependencies (config/).
+//   - config.TimeoutMiddleware: Per-request timeout enforcement (config/).
+//
+// File organization:
+//   - config/: Shared configuration types, validation, and sentinel errors.
+//   - lifecycle.go: Server startup, shutdown, and address formatting.
+//   - fiber.go: Fiber app factory, configuration types, and middleware stack.
+//   - middleware.go: logrusWriter adapter for Fiber logger.
+//   - auth.go: Token authentication middleware.
+//   - routes/: Per-endpoint registration including health checks.
 //
 // Security features:
 //   - Token hashing: Tokens are hashed with SHA-256 at initialization.

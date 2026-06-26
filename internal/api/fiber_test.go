@@ -12,6 +12,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/api/config"
 )
 
 func TestNew(t *testing.T) {
@@ -66,7 +68,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestTimeoutMiddleware(t *testing.T) {
-	handler := TimeoutMiddleware()
+	handler := config.TimeoutMiddleware()
 	require.NotNil(t, handler)
 
 	app := fiber.New(fiber.Config{})

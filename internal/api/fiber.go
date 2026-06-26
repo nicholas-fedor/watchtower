@@ -11,7 +11,6 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
-	"github.com/gofiber/fiber/v3/middleware/timeout"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,16 +25,6 @@ const (
 	// idleTimeout defines the maximum amount of time to wait for the next
 	// request when keep-alives are enabled.
 	idleTimeout = 30 * time.Second
-
-	// updateHandlerTimeout defines the maximum duration for the update handler
-	// to complete. This covers the full lifecycle: waiting for the lock,
-	// performing the update scan, and returning results.
-	updateHandlerTimeout = 10 * time.Minute
-
-	// handlerTimeout defines the maximum duration for non-update handlers to
-	// complete. This prevents slow Docker API calls from blocking connections
-	// indefinitely.
-	handlerTimeout = 30 * time.Second
 
 	// defaultRateLimitPerMinute is the fallback rate limit when a
 	// non-positive value is provided.
@@ -95,7 +84,6 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 		CaseSensitive: true,
 	}
 
-	// Configure reverse proxy support
 	if len(proxyCfg.TrustedProxies) > 0 {
 		fiberCfg.TrustProxy = true
 
@@ -109,9 +97,8 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 		}
 	}
 
-	app := fiber.New(fiberCfg)
+	apiServer := fiber.New(fiberCfg)
 
-	// Configure CORS
 	corsOrigins := corsCfg.AllowedOrigins
 	enableCORS := len(corsOrigins) > 0
 
@@ -162,22 +149,22 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 		}),
 	)
 
-	app.Use(middlewares...)
+	apiServer.Use(middlewares...)
 
-	app.Hooks().OnListen(func(data fiber.ListenData) error {
+	apiServer.Hooks().OnListen(func(data fiber.ListenData) error {
 		logrusLogger.WithField("addr", data.Host+":"+data.Port).
 			Info("Starting HTTP API server")
 
 		return nil
 	})
 
-	app.Hooks().OnPreShutdown(func() error {
+	apiServer.Hooks().OnPreShutdown(func() error {
 		logrusLogger.Info("Initiating HTTP API shutdown")
 
 		return nil
 	})
 
-	app.Hooks().OnPostShutdown(func(err error) error {
+	apiServer.Hooks().OnPostShutdown(func(err error) error {
 		if err != nil {
 			logrusLogger.WithError(err).Warn("HTTP server shut down with error")
 		} else {
@@ -187,16 +174,5 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 		return nil
 	})
 
-	return app
-}
-
-// TimeoutMiddleware returns a Fiber middleware that enforces a per-request
-// timeout for all wrapped handlers. This prevents slow Docker API calls from
-// blocking connections indefinitely.
-func TimeoutMiddleware() fiber.Handler {
-	return timeout.New(func(c fiber.Ctx) error {
-		return c.Next()
-	}, timeout.Config{
-		Timeout: handlerTimeout,
-	})
+	return apiServer
 }

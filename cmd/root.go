@@ -17,7 +17,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
-	"github.com/nicholas-fedor/watchtower/internal/api/events"
+	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -880,7 +881,7 @@ func runMain(cfg types.RunConfig) int {
 
 	err = api.SetupAndStartAPI(
 		ctx,
-		api.Options{
+		config.Options{
 			Host:                        cfg.APIHost,
 			Port:                        cfg.APIPort,
 			Token:                       cfg.APIToken,
