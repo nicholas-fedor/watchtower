@@ -3,6 +3,7 @@ package events
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -17,7 +18,7 @@ const sseRetryInterval = 5 * time.Second
 type Handler struct {
 	Path           string
 	Broadcaster    *Broadcaster
-	AllowedOrigins []string // Allowed CORS origins (for cross-origin SSE in addition to same-origin).
+	AllowedOrigins []string
 }
 
 // NewHandler creates a new events handler backed by the given broadcaster.
@@ -66,43 +67,45 @@ func (h *Handler) Handle() fiber.Handler {
 				return fiber.ErrServiceUnavailable
 			}
 
-			subCh := h.Broadcaster.Subscribe()
-			if subCh == nil {
-				sendErr := c.Status(fiber.StatusServiceUnavailable).SendString("maximum number of subscribers reached")
-				if sendErr != nil {
-					return fmt.Errorf("failed to send subscriber limit response: %w", sendErr)
+		subCh, done := h.Broadcaster.SubscribeWithDone()
+		if subCh == nil {
+			sendErr := c.Status(fiber.StatusServiceUnavailable).SendString("maximum number of subscribers reached")
+			if sendErr != nil {
+				return fmt.Errorf("failed to send subscriber limit response: %w", sendErr)
+			}
+
+			return nil
+		}
+
+		defer h.Broadcaster.Unsubscribe(subCh)
+
+		for {
+			select {
+			case event, ok := <-subCh:
+				if !ok {
+					return nil
 				}
 
+				data, err := json.Marshal(event)
+				if err != nil {
+					logrus.WithError(err).Warn("Failed to marshal event")
+
+					continue
+				}
+
+				err = stream.Event(sse.Event{
+					Name: event.Type,
+					Data: string(data),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to send SSE event: %w", err)
+				}
+			case <-done:
 				return nil
+			case <-stream.Done():
+				return stream.Err()
 			}
-
-			defer h.Broadcaster.Unsubscribe(subCh)
-
-			for {
-				select {
-				case event, ok := <-subCh:
-					if !ok {
-						return nil
-					}
-
-					data, err := json.Marshal(event)
-					if err != nil {
-						logrus.WithError(err).Warn("Failed to marshal event")
-
-						continue
-					}
-
-					err = stream.Event(sse.Event{
-						Name: event.Type,
-						Data: string(data),
-					})
-					if err != nil {
-						return fmt.Errorf("failed to send SSE event: %w", err)
-					}
-				case <-stream.Done():
-					return stream.Err()
-				}
-			}
+		}
 		},
 	})
 }
@@ -124,7 +127,13 @@ func isOriginAllowed(origin, host string, allowedOrigins []string) bool {
 		return true
 	}
 
-	// Same-origin (host may lack scheme, origins from browser include it)
+	// Parse the origin to extract just the host (scheme + host + port).
+	originURL, err := url.Parse(origin)
+	if err == nil && originURL.Host == host {
+		return true
+	}
+
+	// Fallback to exact string comparison if URL parsing fails.
 	if origin == host ||
 		origin == "http://"+host ||
 		origin == "https://"+host {

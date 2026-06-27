@@ -125,3 +125,39 @@ func TestUnsubscribeIdempotent(t *testing.T) {
 	assert.False(t, found2, "second unsubscribe should return false")
 	assert.Equal(t, 0, b.SubscriberCount())
 }
+
+func TestSubscribeWithDone(t *testing.T) {
+	b := NewBroadcaster()
+
+	ch, done := b.SubscribeWithDone()
+	require.NotNil(t, ch)
+	require.NotNil(t, done)
+	assert.Equal(t, 1, b.SubscriberCount())
+
+	b.Unsubscribe(ch)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("done channel should be closed after unsubscribe")
+	}
+}
+
+func TestPublishIgnoresUnsubscribed(t *testing.T) {
+	b := NewBroadcaster()
+
+	ch1 := b.Subscribe()
+	ch2 := b.Subscribe()
+
+	b.Unsubscribe(ch1)
+
+	for range subscriberChannelSize + 5 {
+		b.Publish(Event{Type: "test", Timestamp: time.Now().UTC()})
+	}
+
+	select {
+	case <-ch2:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("ch2 should have received events")
+	}
+}

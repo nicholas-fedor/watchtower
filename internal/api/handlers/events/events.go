@@ -44,17 +44,24 @@ type ImageCleanupEntry struct {
 	ContainerName string `json:"container_name"`
 }
 
+// subscriber represents a single SSE subscriber with an event channel and a
+// done channel that is closed when the subscriber is unsubscribed.
+type subscriber struct {
+	ch   chan Event
+	done chan struct{}
+}
+
 // Broadcaster manages SSE subscriber registration and event distribution.
 type Broadcaster struct {
 	mu          sync.RWMutex
-	subscribers []chan Event
+	subscribers []*subscriber
 }
 
 // NewBroadcaster creates a new event broadcaster for distributing Watchtower
 // operational events to SSE subscribers.
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
-		subscribers: make([]chan Event, 0, maxSubscribers),
+		subscribers: make([]*subscriber, 0, maxSubscribers),
 	}
 }
 
@@ -62,50 +69,79 @@ func NewBroadcaster() *Broadcaster {
 // Returns nil if the maximum number of subscribers has been reached.
 func (b *Broadcaster) Subscribe() <-chan Event {
 	subCh := make(chan Event, subscriberChannelSize)
+	done := make(chan struct{})
 
 	b.mu.Lock()
 	if len(b.subscribers) >= maxSubscribers {
 		b.mu.Unlock()
 		close(subCh)
+		close(done)
 
 		return nil
 	}
 
-	b.subscribers = append(b.subscribers, subCh)
+	b.subscribers = append(b.subscribers, &subscriber{ch: subCh, done: done})
 	b.mu.Unlock()
 
 	return subCh
 }
 
-// Unsubscribe removes a subscriber channel and closes it.
-// Returns true if the subscriber was found and removed, false if it was not found
-// (which may indicate it was already unsubscribed).
+// SubscribeWithDone registers a new subscriber and returns both the event channel
+// and a done channel. The done channel is closed when the subscriber is unsubscribed,
+// allowing the receiver to detect unsubscription even if no more events are sent.
+// Returns nil, nil if the maximum number of subscribers has been reached.
+func (b *Broadcaster) SubscribeWithDone() (<-chan Event, <-chan struct{}) {
+	subCh := make(chan Event, subscriberChannelSize)
+	done := make(chan struct{})
+
+	b.mu.Lock()
+	if len(b.subscribers) >= maxSubscribers {
+		b.mu.Unlock()
+		close(subCh)
+		close(done)
+
+		return nil, nil
+	}
+
+	b.subscribers = append(b.subscribers, &subscriber{ch: subCh, done: done})
+	b.mu.Unlock()
+
+	return subCh, done
+}
+
+// Unsubscribe removes a subscriber and signals its goroutine to stop by closing
+// the done channel. Returns true if the subscriber was found and removed, false
+// if it was not found (which may indicate it was already unsubscribed).
 func (b *Broadcaster) Unsubscribe(ch <-chan Event) bool {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	for i, sub := range b.subscribers {
-		if sub == ch {
+		if sub.ch == ch {
 			b.subscribers = append(b.subscribers[:i], b.subscribers[i+1:]...)
+			b.mu.Unlock()
 
-			close(sub)
+			close(sub.done)
 
 			return true
 		}
 	}
 
+	b.mu.Unlock()
+
 	return false
 }
 
 // Publish sends an event to all registered subscribers.
-// Subscribers that are full (backpressure) have their event dropped.
+// Subscribers that are full (backpressure) or have been unsubscribed have their
+// event dropped.
 func (b *Broadcaster) Publish(event Event) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	for _, ch := range b.subscribers {
+	for _, sub := range b.subscribers {
 		select {
-		case ch <- event:
+		case sub.ch <- event:
+		case <-sub.done:
 		default:
 		}
 	}
