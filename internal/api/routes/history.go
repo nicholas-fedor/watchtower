@@ -8,6 +8,10 @@ import (
 )
 
 func registerHistoryRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+	if opts.DefaultMetrics == nil {
+		return
+	}
+
 	handler := history.New(opts.DefaultMetrics().GetHistory)
 	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
 }

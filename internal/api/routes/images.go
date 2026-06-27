@@ -10,6 +10,10 @@ import (
 )
 
 func registerImagesRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+	if opts.Client == nil {
+		return
+	}
+
 	handler := images.New(func(ctx context.Context) ([]images.ImageStatus, error) {
 		return images.ListImageStatuses(ctx, opts.Client, opts.Filter)
 	})

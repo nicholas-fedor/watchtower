@@ -19,12 +19,13 @@
 //	GET  /v1/history             Historical scan results (requires auth)
 //	GET  /v1/images              Tracked images with digests (requires auth)
 //	GET  /v1/config              Active configuration settings (requires auth)
-//	GET  /v1/events              Real-time events via SSE (no auth)
+//	GET  /v1/events              Real-time events via SSE (requires events token)
 //	GET  /swagger/*              Swagger UI (requires --http-api-swagger)
 //
 // Health probes (/livez, /readyz, /startupz) are enabled via
-// EnableHealthAPI and require no authentication. All /v1/* endpoints except
-// /v1/events require Bearer token authentication.
+// EnableHealthAPI and require no authentication.
+// All /v1/* endpoints except /v1/events require Bearer token authentication.
+// /v1/events requires a separate events token (via --http-api-events-token).
 //
 // Key components:
 //   - New: Creates a Fiber application with the configured middleware stack (fiber.go).

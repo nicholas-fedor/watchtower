@@ -11,14 +11,12 @@ import (
 )
 
 func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
-	checkParams := types.UpdateParams{
-		MonitorOnly:     opts.MonitorOnly,
-		NoPull:          opts.NoPull,
-		LabelPrecedence: opts.LabelPrecedence,
-		CooldownDelay:   opts.CooldownDelay,
+	if opts.Client == nil {
+		return
 	}
+
 	handler := check.New(func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
-		return check.CheckForUpdates(ctx, opts.Client, opts.Filter, images, names, checkParams)
+		return check.CheckForUpdates(ctx, opts.Client, opts.Filter, images, names, types.UpdateParams{})
 	})
 	app.Post(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
 }

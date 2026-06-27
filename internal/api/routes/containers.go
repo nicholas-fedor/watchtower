@@ -12,6 +12,10 @@ import (
 )
 
 func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+	if opts.Client == nil {
+		return
+	}
+
 	handler := containers.New(func(ctx context.Context) ([]containers.Status, error) {
 		return containers.ListContainerStatuses(ctx, opts.Client, opts.Filter)
 	})
@@ -19,6 +23,10 @@ func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts config.Opt
 }
 
 func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+	if opts.Client == nil {
+		return
+	}
+
 	detailsParams := types.UpdateParams{
 		MonitorOnly:     opts.MonitorOnly,
 		NoPull:          opts.NoPull,

@@ -25,5 +25,5 @@ func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts apiconfig.Opti
 			Scope:             opts.Scope,
 		}, nil
 	})
-	app.Get(handler.Path, auth, handler.Handle)
+	app.Get(handler.Path, auth, apiconfig.TimeoutMiddleware(), handler.Handle)
 }
