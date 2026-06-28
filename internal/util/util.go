@@ -261,7 +261,7 @@ func FilterEmpty(parts []string) []string {
 // Returns:
 //   - string: Normalized name without leading "/".
 func NormalizeContainerName(name string) string {
-	return strings.TrimPrefix(name, "/")
+	return strings.TrimLeft(name, "/")
 }
 
 // ParseDuration parses a duration string with extended unit support.

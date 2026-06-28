@@ -343,7 +343,7 @@ func TestNormalizeContainerName_MultipleLeadingSlashes(t *testing.T) {
 	t.Parallel()
 
 	result := NormalizeContainerName("//test-container")
-	assert.Equal(t, "/test-container", result)
+	assert.Equal(t, "test-container", result)
 }
 
 // TestNormalizeContainerName_SlashInMiddle verifies that NormalizeContainerName only removes leading slashes.

@@ -121,9 +121,18 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 //   - []ContainerDetails: Detailed information for each matching container.
 //   - error: Non-nil if listing containers fails.
 func GetContainerDetails(ctx context.Context, client container.Client, filter types.Filter, nameFilter, imageFilter string, params types.UpdateParams) ([]ContainerDetails, error) {
-	list, err := listContainers(ctx, client, filter)
+	var list []types.Container
+
+	var err error
+
+	if filter != nil {
+		list, err = client.ListContainers(ctx, filter)
+	} else {
+		list, err = client.ListContainers(ctx)
+	}
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
 	details := make([]ContainerDetails, 0, len(list))
@@ -164,23 +173,4 @@ func GetContainerDetails(ctx context.Context, client container.Client, filter ty
 	}
 
 	return details, nil
-}
-
-func listContainers(ctx context.Context, client container.Client, filter types.Filter) ([]types.Container, error) {
-	var (
-		list []types.Container
-		err  error
-	)
-
-	if filter != nil {
-		list, err = client.ListContainers(ctx, filter)
-	} else {
-		list, err = client.ListContainers(ctx)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list containers for details: %w", err)
-	}
-
-	return list, nil
 }

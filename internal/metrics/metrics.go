@@ -15,6 +15,8 @@ import (
 
 var metrics *Metrics
 
+var metricsOnce sync.Once
+
 // Metric holds data points from a Watchtower scan.
 type Metric struct {
 	Scanned   int // Number of containers scanned.
@@ -188,16 +190,14 @@ func (m *Metrics) Register(metric *Metric) {
 // Returns:
 //   - *Metrics: Metrics handler with Prometheus metrics and goroutine.
 func Default() *Metrics {
-	if metrics != nil {
-		return metrics
-	}
+	metricsOnce.Do(func() {
+		var err error
 
-	var err error
-
-	metrics, err = NewWithRegistry(prometheus.DefaultRegisterer)
-	if err != nil {
-		panic(err)
-	}
+		metrics, err = NewWithRegistry(prometheus.DefaultRegisterer)
+		if err != nil {
+			panic(err)
+		}
+	})
 
 	return metrics
 }

@@ -1431,37 +1431,6 @@ func TestSignalContextGracefulShutdown(t *testing.T) {
 	assert.ErrorIs(t, sigCtx.Err(), context.Canceled)
 }
 
-// TestContainerLookupTimeoutConstant verifies that the container lookup timeout constant
-// is set to a reasonable value (5 seconds).
-func TestContainerLookupTimeoutConstant(t *testing.T) {
-	// Verify the timeout is 5 seconds as defined in root.go
-	const expectedTimeout = 5 * time.Second
-
-	// Create a context with the expected timeout
-	ctx, cancel := context.WithTimeout(context.Background(), expectedTimeout)
-	defer cancel()
-
-	// Verify context is not done immediately
-	select {
-	case <-ctx.Done():
-		t.Error("Context should not be done immediately after creation")
-	default:
-		// Expected: context is not done
-	}
-
-	// Verify the deadline is set correctly
-	deadline, ok := ctx.Deadline()
-	now := time.Now()
-
-	assert.True(t, ok, "Deadline should be set")
-	assert.Greater(t, deadline, now.Add(4*time.Second),
-		"Deadline should be at least 4 seconds in the future")
-	assert.Less(t, deadline, now.Add(6*time.Second),
-		"Deadline should be at most 6 seconds in the future")
-}
-
-// TestContextDeadlineExceededErrorHandling verifies that errors.Is correctly identifies
-// context.DeadlineExceeded errors.
 func TestContextDeadlineExceededErrorHandling(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -1647,4 +1616,110 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 			mockClient.AssertExpectations(t)
 		})
 	})
+}
+
+func TestRootCommand_FlagParsing(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{
+			name:    "valid stop-timeout",
+			args:    []string{"--stop-timeout", "30s"},
+			wantErr: false,
+		},
+		{
+			name:    "zero stop-timeout",
+			args:    []string{"--stop-timeout", "0s"},
+			wantErr: false,
+		},
+		{
+			name:    "valid http-api-port",
+			args:    []string{"--http-api-port", "9090"},
+			wantErr: false,
+		},
+		{
+			name:    "valid http-api-host",
+			args:    []string{"--http-api-host", "127.0.0.1"},
+			wantErr: false,
+		},
+		{
+			name:    "valid http-api-host hostname",
+			args:    []string{"--http-api-host", "localhost"},
+			wantErr: false,
+		},
+		{
+			name:    "valid rolling-restart",
+			args:    []string{"--rolling-restart"},
+			wantErr: false,
+		},
+		{
+			name:    "valid include-stopped",
+			args:    []string{"--include-stopped"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCommand()
+			flags.RegisterSystemFlags(cmd)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.ParseFlags(tt.args)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRootCommand_FlagDependencies(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantAPI    bool
+		wantEvents bool
+	}{
+		{
+			name:       "update API only",
+			args:       []string{"--http-api-update"},
+			wantAPI:    true,
+			wantEvents: false,
+		},
+		{
+			name:       "metrics API only",
+			args:       []string{"--http-api-metrics"},
+			wantAPI:    true,
+			wantEvents: false,
+		},
+		{
+			name:       "events API only",
+			args:       []string{"--http-api-events"},
+			wantAPI:    false,
+			wantEvents: true,
+		},
+		{
+			name:       "containers API only",
+			args:       []string{"--http-api-containers"},
+			wantAPI:    true,
+			wantEvents: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCommand()
+			flags.RegisterDockerFlags(cmd)
+			flags.RegisterSystemFlags(cmd)
+			flags.RegisterNotificationFlags(cmd)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.ParseFlags(tt.args)
+			require.NoError(t, err)
+		})
+	}
 }

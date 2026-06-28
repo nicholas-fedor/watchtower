@@ -101,6 +101,114 @@ func TestHandler_Handle_ReceivesEvent(t *testing.T) {
 	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
 }
 
+func TestHandler_Handle_ReceivesPublishedEvent(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, nil)
+
+	subCh, _ := b.SubscribeWithDone()
+	assert.NotNil(t, subCh)
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/events", nil)
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 2 * time.Second,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+
+	event := Event{Type: "test-event", Data: map[string]string{"key": "value"}}
+	b.Publish(event)
+
+	select {
+	case received := <-subCh:
+		assert.Equal(t, "test-event", received.Type)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("did not receive event within timeout")
+	}
+
+	b.Unsubscribe(subCh)
+}
+
+func TestHandler_Handle_RejectsDisallowedOrigin(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, []string{"https://allowed.com"})
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Origin", "https://evil.com")
+	req.Header.Set("Host", "example.com:8080")
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+}
+
+func TestHandler_Handle_AllowsSameOrigin(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, nil)
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Origin", "http://example.com:8080")
+	req.Header.Set("Host", "example.com:8080")
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
+func TestHandler_Handle_AllowsCORSMatch(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, []string{"https://app.example.com"})
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Origin", "https://app.example.com")
+	req.Header.Set("Host", "example.com:8080")
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+}
+
 func TestIsOriginAllowed(t *testing.T) {
 	cases := []struct {
 		name    string

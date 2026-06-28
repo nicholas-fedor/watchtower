@@ -2,6 +2,7 @@ package containers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -82,4 +83,116 @@ func TestHandler_Handle(t *testing.T) {
 			assert.Equal(t, tt.wantStatus, resp.StatusCode)
 		})
 	}
+}
+
+func TestHandler_Handle_FilterByName(t *testing.T) {
+	statuses := []Status{
+		{Name: "nginx-proxy", Image: "nginx:latest", ImageID: "sha256:abc", Digest: "sha256:def"},
+		{Name: "redis-cache", Image: "redis:7", ImageID: "sha256:123", Digest: "sha256:456"},
+	}
+
+	h := New(func(_ context.Context) ([]Status, error) { return statuses, nil })
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/containers", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/containers?name=nginx-proxy", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var result map[string]any
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+
+	containers := result["containers"].([]any)
+	assert.Len(t, containers, 1)
+
+	first := containers[0].(map[string]any)
+	assert.Equal(t, "nginx-proxy", first["name"])
+}
+
+func TestHandler_Handle_FilterByImage(t *testing.T) {
+	statuses := []Status{
+		{Name: "nginx-proxy", Image: "nginx:latest", ImageID: "sha256:abc", Digest: "sha256:def"},
+		{Name: "redis-cache", Image: "redis:7", ImageID: "sha256:123", Digest: "sha256:456"},
+	}
+
+	h := New(func(_ context.Context) ([]Status, error) { return statuses, nil })
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/containers", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/containers?image=redis:7", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var result map[string]any
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+
+	containers := result["containers"].([]any)
+	assert.Len(t, containers, 1)
+
+	first := containers[0].(map[string]any)
+	assert.Equal(t, "redis-cache", first["name"])
+}
+
+func TestHandler_Handle_FilterByNameAndImage(t *testing.T) {
+	statuses := []Status{
+		{Name: "nginx-proxy", Image: "nginx:latest", ImageID: "sha256:abc", Digest: "sha256:def"},
+		{Name: "redis-cache", Image: "redis:7", ImageID: "sha256:123", Digest: "sha256:456"},
+		{Name: "mysql-db", Image: "mysql:8.0", ImageID: "sha256:789", Digest: "sha256:012"},
+	}
+
+	h := New(func(_ context.Context) ([]Status, error) { return statuses, nil })
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/containers", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/containers?name=redis-cache&image=mysql:8.0", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var result map[string]any
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+
+	assert.InDelta(t, float64(0), result["count"], 0.001, "no container should match both name AND image simultaneously")
+}
+
+func TestHandler_Handle_NoMatchFilter(t *testing.T) {
+	statuses := []Status{
+		{Name: "nginx-proxy", Image: "nginx:latest", ImageID: "sha256:abc", Digest: "sha256:def"},
+	}
+
+	h := New(func(_ context.Context) ([]Status, error) { return statuses, nil })
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/containers", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/containers?name=nonexistent", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var result map[string]any
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+
+	assert.InDelta(t, float64(0), result["count"], 0.001)
 }

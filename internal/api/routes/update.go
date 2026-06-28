@@ -17,8 +17,8 @@ const (
 	updateHandlerTimeout = 10 * time.Minute
 )
 
-func registerUpdateRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
-	handler := update.New(func(ctx context.Context, images, containers []string) *mt.Metric {
+func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) {
+	handler := update.New(func(updateCtx context.Context, images, containers []string) *mt.Metric {
 		params := types.UpdateParams{
 			Cleanup:        opts.Cleanup,
 			RunOnce:        false,
@@ -33,11 +33,11 @@ func registerUpdateRoute(app *fiber.App, auth fiber.Handler, opts config.Options
 			return imageFilter(c) && containerFilter(c.Name(), true)
 		}
 
-		metric := opts.RunUpdatesWithNotifications(ctx, combinedFilter, params)
+		metric := opts.RunUpdatesWithNotifications(updateCtx, combinedFilter, params)
 		opts.DefaultMetrics().RegisterScan(metric)
 
 		return metric
-	}, opts.UpdateLock, context.Background())
+	}, opts.UpdateLock, ctx)
 
 	app.Post(handler.Path, auth, timeout.New(handler.Handle, timeout.Config{
 		Timeout: updateHandlerTimeout,

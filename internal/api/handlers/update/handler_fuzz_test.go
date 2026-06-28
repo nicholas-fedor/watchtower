@@ -16,11 +16,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
-// FuzzExtractImages fuzzes the core image-name parsing logic used by extractImages.
-// It tests that splitting comma-separated image names never panics and produces
-// deterministic results. The fuzz target invokes the real extractImages method
-// on a constructed Handler with a real fiber.Ctx.
-func FuzzExtractImages(f *testing.F) {
+// FuzzExtractImagesHandler fuzzes the image-name parsing logic through the
+// Handler struct with arbitrary query parameter values.
+func FuzzExtractImagesHandler(f *testing.F) {
 	f.Add("nginx:latest")
 	f.Add("nginx:latest,redis:7")
 	f.Add("nginx:latest,redis:7,postgres:16")
@@ -52,6 +50,50 @@ func FuzzExtractImages(f *testing.F) {
 		})
 
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test?image="+url.QueryEscape(raw), nil)
+
+		resp, err := app.Test(req)
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("request failed: %v", err)
+		}
+
+		if resp != nil {
+			defer resp.Body.Close()
+		}
+	})
+}
+
+// FuzzExtractContainersHandler fuzzes the container-name parsing logic through
+// the Handler struct with arbitrary query parameter values.
+func FuzzExtractContainersHandler(f *testing.F) {
+	f.Add("web,api,db")
+	f.Add("my-container")
+	f.Add("")
+	f.Add("web,,api")
+	f.Add(",web,")
+	f.Add("container-with-dashes")
+	f.Add(strings.Repeat("a,", 50))
+
+	f.Fuzz(func(t *testing.T, raw string) {
+		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+			return &metrics.Metric{}
+		}, nil)
+
+		app := fiber.New(fiber.Config{})
+		app.Post("/test", func(c fiber.Ctx) error {
+			containers := h.extractContainers(c)
+
+			if len(raw) > 0 && !strings.Contains(raw, ",") && len(containers) != 1 {
+				t.Errorf("non-empty input %q produced %d containers, want 1", raw, len(containers))
+			}
+
+			if raw == "" && len(containers) != 0 {
+				t.Errorf("empty input produced %d containers, want 0", len(containers))
+			}
+
+			return nil
+		})
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test?container="+url.QueryEscape(raw), nil)
 
 		resp, err := app.Test(req)
 		if err != nil && !errors.Is(err, context.DeadlineExceeded) {

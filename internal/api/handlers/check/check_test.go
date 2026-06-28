@@ -39,7 +39,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container.EXPECT().ImageName().Return("nginx:1.25")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
 				c.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 					Return(true, types.ImageID("sha256:def"), "", nil)
 
@@ -58,7 +58,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container.EXPECT().ImageName().Return("nginx:1.25")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
 				c.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 					Return(false, types.ImageID("sha256:abc"), "", nil)
 
@@ -81,7 +81,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container2 := mockTypes.NewMockContainer(t)
 				container2.EXPECT().Name().Return("app2").Maybe()
 				container2.EXPECT().ImageName().Return("redis:latest").Maybe()
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container1, container2}, nil)
+				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container1, container2}, nil)
 				c.EXPECT().IsContainerStale(mock.Anything, container1, mock.Anything).
 					Return(false, types.ImageID("sha256:abc"), "", nil)
 
@@ -105,7 +105,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container2 := mockTypes.NewMockContainer(t)
 				container2.EXPECT().Name().Return("app2").Maybe()
 				container2.EXPECT().ImageName().Return("redis:latest").Maybe()
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container1, container2}, nil)
+				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container1, container2}, nil)
 				c.EXPECT().IsContainerStale(mock.Anything, container1, mock.Anything).
 					Return(false, types.ImageID("sha256:abc"), "", nil)
 
@@ -120,7 +120,7 @@ func TestCheckForUpdates(t *testing.T) {
 			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
 				c := mockContainer.NewMockClient(t)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
+				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil)
 
 				return c
 			},
@@ -131,7 +131,7 @@ func TestCheckForUpdates(t *testing.T) {
 			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
 				c := mockContainer.NewMockClient(t)
-				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
+				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c
 			},
@@ -184,7 +184,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 
 	info := &image.InspectResponse{RepoDigests: []string{"nginx@sha256:digest123"}}
 	container.EXPECT().ImageInfo().Return(info)
-	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID("sha256:abc"), "", nil)
 
@@ -201,7 +201,7 @@ func TestCheckForUpdates_IsContainerStaleError(t *testing.T) {
 	container.EXPECT().ImageName().Return("nginx:latest")
 	container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 	container.EXPECT().ImageInfo().Return(nil)
-	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
 
@@ -279,6 +279,93 @@ func TestExtractFilterParams(t *testing.T) {
 			defer resp.Body.Close()
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
+		})
+	}
+}
+
+func TestMatchesFilters(t *testing.T) {
+	container := mockTypes.NewMockContainer(t)
+	container.EXPECT().Name().Return("my-app").Maybe()
+	container.EXPECT().ImageName().Return("nginx:latest").Maybe()
+
+	tests := []struct {
+		name      string
+		images    []string
+		names     []string
+		wantMatch bool
+	}{
+		{
+			name:      "no filters matches all",
+			images:    nil,
+			names:     nil,
+			wantMatch: true,
+		},
+		{
+			name:      "empty slices matches all",
+			images:    []string{},
+			names:     []string{},
+			wantMatch: true,
+		},
+		{
+			name:      "image match",
+			images:    []string{"nginx:latest"},
+			names:     nil,
+			wantMatch: true,
+		},
+		{
+			name:      "image no match",
+			images:    []string{"redis:7"},
+			names:     nil,
+			wantMatch: false,
+		},
+		{
+			name:      "name match",
+			images:    nil,
+			names:     []string{"my-app"},
+			wantMatch: true,
+		},
+		{
+			name:      "name no match",
+			images:    nil,
+			names:     []string{"other-app"},
+			wantMatch: false,
+		},
+		{
+			name:      "both filters, image matches",
+			images:    []string{"nginx:latest"},
+			names:     []string{"other-app"},
+			wantMatch: true,
+		},
+		{
+			name:      "both filters, name matches",
+			images:    []string{"redis:7"},
+			names:     []string{"my-app"},
+			wantMatch: true,
+		},
+		{
+			name:      "both filters, neither matches",
+			images:    []string{"redis:7"},
+			names:     []string{"other-app"},
+			wantMatch: false,
+		},
+		{
+			name:      "multiple images, second matches",
+			images:    []string{"redis:7", "nginx:latest"},
+			names:     nil,
+			wantMatch: true,
+		},
+		{
+			name:      "multiple names, first matches",
+			images:    nil,
+			names:     []string{"my-app", "other-app"},
+			wantMatch: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := matchesFilters(container, tt.images, tt.names)
+			assert.Equal(t, tt.wantMatch, got)
 		})
 	}
 }

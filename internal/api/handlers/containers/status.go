@@ -60,24 +60,9 @@ func filterStatuses(statuses []Status, name, image string) []Status {
 //   - []Status: Status for each watched container.
 //   - error: Non-nil if listing containers fails.
 func ListContainerStatuses(ctx context.Context, client container.Client, filter types.Filter) ([]Status, error) {
-	list, err := listContainers(ctx, client, filter)
-	if err != nil {
-		return nil, err
-	}
+	var list []types.Container
 
-	statuses := make([]Status, 0, len(list))
-	for _, c := range list {
-		statuses = append(statuses, containerToStatus(c))
-	}
-
-	return statuses, nil
-}
-
-func listContainers(ctx context.Context, client container.Client, filter types.Filter) ([]types.Container, error) {
-	var (
-		list []types.Container
-		err  error
-	)
+	var err error
 
 	if filter != nil {
 		list, err = client.ListContainers(ctx, filter)
@@ -89,7 +74,12 @@ func listContainers(ctx context.Context, client container.Client, filter types.F
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	return list, nil
+	statuses := make([]Status, 0, len(list))
+	for _, c := range list {
+		statuses = append(statuses, containerToStatus(c))
+	}
+
+	return statuses, nil
 }
 
 func containerToStatus(c types.Container) Status {

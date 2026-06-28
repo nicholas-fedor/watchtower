@@ -13,12 +13,12 @@ import (
 // NewAPIAuthMiddleware returns a Fiber middleware that validates Bearer token
 // authentication using constant-time SHA-256 comparison.
 func NewAPIAuthMiddleware(token string) fiber.Handler {
+	expectedHash := sha256.Sum256([]byte(token))
+
 	return func(c fiber.Ctx) error {
 		if token == "" {
 			return c.Status(fiber.StatusUnauthorized).SendString("API token not configured")
 		}
-
-		expectedHash := sha256.Sum256([]byte(token))
 
 		extracted, err := extractors.FromAuthHeader("Bearer").Extract(c)
 		if err != nil {

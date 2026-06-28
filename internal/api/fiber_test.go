@@ -16,6 +16,153 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 )
 
+func TestNew_ProxyConfig(t *testing.T) {
+	app := New(
+		logrus.New(),
+		60,
+		ProxyConfig{
+			TrustedProxies: []string{"127.0.0.1"},
+			ProxyHeader:    "X-Real-IP",
+		},
+		CORSConfig{},
+	)
+	assert.NotNil(t, app)
+
+	app2 := New(
+		logrus.New(),
+		60,
+		ProxyConfig{
+			TrustedProxies: []string{"10.0.0.0/8"},
+		},
+		CORSConfig{},
+	)
+	assert.NotNil(t, app2)
+}
+
+func TestNew_CORSConfig(t *testing.T) {
+	app := New(
+		logrus.New(),
+		60,
+		ProxyConfig{},
+		CORSConfig{
+			AllowedOrigins: []string{"https://example.com"},
+		},
+	)
+	assert.NotNil(t, app)
+
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodOptions,
+		"/test",
+		nil,
+	)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	allowOrigin := resp.Header.Get("Access-Control-Allow-Origin")
+	assert.Contains(t, allowOrigin, "https://example.com")
+}
+
+func TestNew_CORSWildcard(t *testing.T) {
+	app := New(
+		logrus.New(),
+		60,
+		ProxyConfig{},
+		CORSConfig{
+			AllowedOrigins: []string{"*"},
+		},
+	)
+	assert.NotNil(t, app)
+
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodOptions,
+		"/test",
+		nil,
+	)
+	req.Header.Set("Origin", "https://any-origin.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	allowOrigin := resp.Header.Get("Access-Control-Allow-Origin")
+	assert.Equal(t, "*", allowOrigin)
+
+	allowMethods := resp.Header.Get("Access-Control-Allow-Methods")
+	assert.Contains(t, allowMethods, "GET")
+	assert.Contains(t, allowMethods, "POST")
+}
+
+func TestNew_CORSCustomMethodsHeaders(t *testing.T) {
+	app := New(
+		logrus.New(),
+		60,
+		ProxyConfig{},
+		CORSConfig{
+			AllowedOrigins: []string{"https://example.com"},
+			AllowedMethods: []string{"GET", "POST"},
+			AllowedHeaders: []string{"Content-Type", "X-Custom-Header"},
+		},
+	)
+	assert.NotNil(t, app)
+
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodOptions,
+		"/test",
+		nil,
+	)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "X-Custom-Header")
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	allowMethods := resp.Header.Get("Access-Control-Allow-Methods")
+	assert.Contains(t, allowMethods, "GET")
+	assert.Contains(t, allowMethods, "POST")
+
+	allowHeaders := resp.Header.Get("Access-Control-Allow-Headers")
+	assert.Contains(t, allowHeaders, "X-Custom-Header")
+}
+
+func TestNew_NoCORSWhenNoOrigins(t *testing.T) {
+	app := New(
+		logrus.New(),
+		60,
+		ProxyConfig{},
+		CORSConfig{},
+	)
+	assert.NotNil(t, app)
+
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodGet,
+		"/test",
+		nil,
+	)
+	req.Header.Set("Origin", "https://example.com")
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	allowOrigin := resp.Header.Get("Access-Control-Allow-Origin")
+	assert.Empty(t, allowOrigin, "no CORS header should be set when no origins configured")
+}
+
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name               string

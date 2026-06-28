@@ -68,3 +68,147 @@ func TestHandler_HandleWithInvalidLimit(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+func TestHandler_HandleWithValidTimeRange(t *testing.T) {
+	entries := []metrics.HistoryEntry{
+		{Scanned: 3, Updated: 1, Failed: 0, Restarted: 0, Skipped: 2},
+	}
+
+	var (
+		gotSince, gotUntil *time.Time
+		gotLimit           int
+	)
+
+	h := New(func(since, until *time.Time, limit int) []metrics.HistoryEntry {
+		gotSince = since
+		gotUntil = until
+		gotLimit = limit
+
+		return entries
+	})
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/history", h.Handle)
+
+	sinceStr := "2024-01-01T00:00:00Z"
+	untilStr := "2024-06-01T00:00:00Z"
+
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodGet,
+		"/v1/history?since="+sinceStr+"&until="+untilStr+"&limit=10",
+		nil,
+	)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.NotNil(t, gotSince)
+	assert.NotNil(t, gotUntil)
+	assert.Equal(t, 10, gotLimit)
+}
+
+func TestHandler_HandleWithInvalidUntil(t *testing.T) {
+	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/history", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/history?until=not-a-date", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestHandler_HandleWithNegativeLimit(t *testing.T) {
+	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/history", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/history?limit=-5", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestHandler_Handle_WithTimezoneOffset(t *testing.T) {
+	var capturedSince *time.Time
+
+	h := New(func(since, _ *time.Time, _ int) []metrics.HistoryEntry {
+		capturedSince = since
+
+		return nil
+	})
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/history", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/history?since=2024-06-15T12:30:45%2B05:30", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	require.NotNil(t, capturedSince)
+
+	_, offset := capturedSince.Zone()
+	assert.Equal(t, 5*3600+30*60, offset, "should preserve timezone offset (+05:30)")
+}
+
+func TestHandler_Handle_WithFractionalSeconds(t *testing.T) {
+	var capturedUntil *time.Time
+
+	h := New(func(_, until *time.Time, _ int) []metrics.HistoryEntry {
+		capturedUntil = until
+
+		return nil
+	})
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/history", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/history?until=2024-06-15T12:30:45.123Z", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	require.NotNil(t, capturedUntil)
+	assert.Equal(t, 123000000, capturedUntil.Nanosecond(), "should preserve fractional seconds")
+}
+
+func TestHandler_Handle_NegativeTimezone(t *testing.T) {
+	var capturedSince *time.Time
+
+	h := New(func(since, _ *time.Time, _ int) []metrics.HistoryEntry {
+		capturedSince = since
+
+		return nil
+	})
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/history", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/history?since=2024-06-15T12:30:45-08:00", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	require.NotNil(t, capturedSince)
+
+	_, offset := capturedSince.Zone()
+	assert.Equal(t, -8*3600, offset, "should preserve negative timezone offset")
+}

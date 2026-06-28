@@ -74,9 +74,9 @@ func CheckForUpdates(
 	names []string,
 	params types.UpdateParams,
 ) ([]ContainerCheck, error) {
-	containers, err := listContainers(ctx, client, filter)
+	containers, err := client.ListContainers(ctx, filter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
 	results := make([]ContainerCheck, 0, len(containers))
@@ -121,8 +121,6 @@ func CheckForUpdates(
 			if latestDigest != "" {
 				result.LatestDigest = latestDigest
 			} else {
-				// latestDigest empty on match/local-only; use current (confirmed by registry
-				// query in IsContainerStale when remote was not disabled).
 				result.LatestDigest = result.Digest
 				if result.LatestImageID == "" {
 					result.LatestImageID = result.ImageID
@@ -134,25 +132,6 @@ func CheckForUpdates(
 	}
 
 	return results, nil
-}
-
-func listContainers(ctx context.Context, client container.Client, filter types.Filter) ([]types.Container, error) {
-	var (
-		list []types.Container
-		err  error
-	)
-
-	if filter != nil {
-		list, err = client.ListContainers(ctx, filter)
-	} else {
-		list, err = client.ListContainers(ctx)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list containers for check: %w", err)
-	}
-
-	return list, nil
 }
 
 func matchesFilters(c types.Container, images, names []string) bool {

@@ -26,7 +26,7 @@ func TestRegisterUpdateRoute(t *testing.T) {
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 	}
 
-	registerUpdateRoute(app, auth, opts)
+	registerUpdateRoute(context.Background(), app, auth, opts)
 
 	routes := app.GetRoutes()
 	found := false

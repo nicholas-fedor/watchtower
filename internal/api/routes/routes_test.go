@@ -152,7 +152,7 @@ func TestValidateAndRegister(t *testing.T) {
 			app := testApp()
 			auth := testAuthMiddleware()
 
-			err := ValidateAndRegister(app, auth, tt.opts)
+			err := ValidateAndRegister(context.Background(), app, auth, tt.opts)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -228,7 +228,7 @@ func TestRegister(t *testing.T) {
 				Filter:                      makeFilter(t),
 			}
 
-			Register(app, auth, opts)
+			Register(context.Background(), app, auth, opts)
 
 			routes := app.GetRoutes()
 			apiCount := 0

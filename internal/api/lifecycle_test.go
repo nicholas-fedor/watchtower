@@ -320,3 +320,169 @@ func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 		t.Fatal("server did not shut down")
 	}
 }
+
+func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	tests := []struct {
+		name    string
+		opts    config.Options
+		wantErr string
+	}{
+		{
+			name: "missing RunUpdatesWithNotifications",
+			opts: config.Options{
+				Token:                       "test-token",
+				EnableUpdateAPI:             true,
+				RunUpdatesWithNotifications: nil,
+				FilterByImage:               func(_ []string, f types.Filter) types.Filter { return f },
+				DefaultMetrics:              func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "RunUpdatesWithNotifications must be provided",
+		},
+		{
+			name: "missing FilterByImage",
+			opts: config.Options{
+				Token:           "test-token",
+				EnableUpdateAPI: true,
+				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+					return &metrics.Metric{}
+				},
+				FilterByImage:  nil,
+				DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "FilterByImage must be provided",
+		},
+		{
+			name: "missing DefaultMetrics",
+			opts: config.Options{
+				Token:           "test-token",
+				EnableUpdateAPI: true,
+				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+					return &metrics.Metric{}
+				},
+				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+				DefaultMetrics: nil,
+			},
+			wantErr: "DefaultMetrics must be provided",
+		},
+		{
+			name: "missing TLS key",
+			opts: config.Options{
+				Token:            "test-token",
+				EnableMetricsAPI: true,
+				TLSCertPath:      "/path/to/cert.pem",
+				TLSKeyPath:       "",
+				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "TLS requires both",
+		},
+		{
+			name: "missing TLS cert",
+			opts: config.Options{
+				Token:            "test-token",
+				EnableMetricsAPI: true,
+				TLSCertPath:      "",
+				TLSKeyPath:       "/path/to/key.pem",
+				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "TLS requires both",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			err := SetupAndStartAPI(ctx, tt.opts)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestSetupAndStartAPI_FullAPIEnablesAll(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := config.Options{
+		Token:          "test-token",
+		EventsToken:    "events-token",
+		EnableFullAPI:  true,
+		RateLimit:      60,
+		Client:         makeListContainersMock(t),
+		Filter:         makeFilter(t),
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		UnblockHTTPAPI: true,
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+	case <-time.After(ShutdownGracePeriod + 2*time.Second):
+		t.Fatal("server did not shut down within expected time")
+	}
+}
+
+func TestGetAPIAddr_IPv6(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		port     string
+		expected string
+	}{
+		{
+			name:     "IPv4",
+			host:     "127.0.0.1",
+			port:     "8080",
+			expected: "127.0.0.1:8080",
+		},
+		{
+			name:     "hostname",
+			host:     "localhost",
+			port:     "8080",
+			expected: "localhost:8080",
+		},
+		{
+			name:     "IPv6 loopback",
+			host:     "::1",
+			port:     "8080",
+			expected: "[::1]:8080",
+		},
+		{
+			name:     "IPv6 full",
+			host:     "2001:db8::1",
+			port:     "8080",
+			expected: "[2001:db8::1]:8080",
+		},
+		{
+			name:     "IPv6 already bracketed",
+			host:     "[::1]",
+			port:     "8080",
+			expected: "[::1]:8080",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetAPIAddr(tt.host, tt.port)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}

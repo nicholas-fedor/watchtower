@@ -33,6 +33,10 @@ var _ Server = (*fiber.App)(nil)
 // Returns:
 //   - string: Formatted address string.
 func GetAPIAddr(host, port string) string {
+	if port == "" {
+		return host
+	}
+
 	address := host + ":" + port
 
 	bracketed := strings.Contains(host, ":") && !strings.HasPrefix(host, "[")
@@ -113,7 +117,7 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 
 	authMiddleware := NewAPIAuthMiddleware(opts.Token)
 
-	err := routes.ValidateAndRegister(app, authMiddleware, opts)
+	err := routes.ValidateAndRegister(ctx, app, authMiddleware, opts)
 	if err != nil {
 		return fmt.Errorf("route registration failed: %w", err)
 	}

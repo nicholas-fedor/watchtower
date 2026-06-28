@@ -53,9 +53,18 @@ func filterImages(statuses []ImageStatus, name, imageID string) []ImageStatus {
 //   - []ImageStatus: Status for each tracked image.
 //   - error: Non-nil if listing containers fails.
 func ListImageStatuses(ctx context.Context, client container.Client, filter types.Filter) ([]ImageStatus, error) {
-	list, err := listContainers(ctx, client, filter)
+	var list []types.Container
+
+	var err error
+
+	if filter != nil {
+		list, err = client.ListContainers(ctx, filter)
+	} else {
+		list, err = client.ListContainers(ctx)
+	}
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
 	imageMap := make(map[string]*ImageStatus)
@@ -92,23 +101,4 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 	}
 
 	return statuses, nil
-}
-
-func listContainers(ctx context.Context, client container.Client, filter types.Filter) ([]types.Container, error) {
-	var (
-		list []types.Container
-		err  error
-	)
-
-	if filter != nil {
-		list, err = client.ListContainers(ctx, filter)
-	} else {
-		list, err = client.ListContainers(ctx)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list containers for images: %w", err)
-	}
-
-	return list, nil
 }

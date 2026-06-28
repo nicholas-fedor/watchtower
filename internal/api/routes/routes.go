@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gofiber/fiber/v3"
@@ -11,7 +12,7 @@ import (
 	_ "github.com/nicholas-fedor/watchtower/internal/api/swagger"
 )
 
-func ValidateAndRegister(app *fiber.App, auth fiber.Handler, opts config.Options) error {
+func ValidateAndRegister(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) error {
 	if opts.EnableUpdateAPI {
 		err := config.ValidateUpdateOptions(opts)
 		if err != nil {
@@ -19,18 +20,18 @@ func ValidateAndRegister(app *fiber.App, auth fiber.Handler, opts config.Options
 		}
 	}
 
-	Register(app, auth, opts)
+	Register(ctx, app, auth, opts)
 
 	return nil
 }
 
-func Register(app *fiber.App, auth fiber.Handler, opts config.Options) {
+func Register(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) {
 	if opts.EnableHealthAPI {
 		registerHealthRoute(app, opts)
 	}
 
 	if opts.EnableUpdateAPI {
-		registerUpdateRoute(app, auth, opts)
+		registerUpdateRoute(ctx, app, auth, opts)
 	}
 
 	if opts.EnableMetricsAPI {

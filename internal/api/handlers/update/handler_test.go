@@ -648,3 +648,82 @@ func Test_handleAsync(t *testing.T) {
 		}
 	}, 2*time.Second, 10*time.Millisecond, "lock should be released after async update")
 }
+
+func Test_handleSync_NilMetric(t *testing.T) {
+	lock := make(chan bool, 1)
+	lock <- true
+
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		return nil
+	}, lock)
+
+	app := fiber.New(fiber.Config{})
+	app.Post("/v1/update", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+}
+
+func Test_acquireLock_ContextCancelled(t *testing.T) {
+	lock := make(chan bool, 1)
+	lock <- true
+
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		return &metrics.Metric{}
+	}, lock)
+
+	app := fiber.New(fiber.Config{})
+
+	var handlerCalled atomic.Bool
+
+	app.Post("/v1/update", func(c fiber.Ctx) error {
+		handlerCalled.Store(true)
+
+		return h.Handle(c)
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/v1/update?image=nginx", nil)
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 2 * time.Second,
+	})
+	if err == nil {
+		defer resp.Body.Close()
+	}
+
+	assert.True(t, handlerCalled.Load(), "handler should have been called")
+}
+
+func Test_acquireLock_FullUpdateBusy(t *testing.T) {
+	lock := make(chan bool, 1)
+
+	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		return &metrics.Metric{}
+	}, lock)
+
+	app := fiber.New(fiber.Config{})
+	app.Post("/v1/update", h.Handle)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+
+	retryAfter := resp.Header.Get("Retry-After")
+	assert.Equal(t, "30", retryAfter)
+}

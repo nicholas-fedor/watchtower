@@ -127,13 +127,13 @@ func isOriginAllowed(origin, host string, allowedOrigins []string) bool {
 		return true
 	}
 
-	// Parse the origin to extract just the host (scheme + host + port).
 	originURL, err := url.Parse(origin)
 	if err == nil && originURL.Host == host {
 		return true
 	}
 
-	// Fallback to exact string comparison if URL parsing fails.
+	// Fallback for origins that url.Parse handles incorrectly (e.g. bare
+	// host:port without a scheme).
 	if origin == host ||
 		origin == "http://"+host ||
 		origin == "https://"+host {
