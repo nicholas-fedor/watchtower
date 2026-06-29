@@ -117,14 +117,12 @@ func CheckForUpdates(
 		} else {
 			result.UpdateAvailable = stale
 
-			result.LatestImageID = string(latestID)
 			if latestDigest != "" {
 				result.LatestDigest = latestDigest
-			} else {
-				result.LatestDigest = result.Digest
-				if result.LatestImageID == "" {
-					result.LatestImageID = result.ImageID
-				}
+			}
+
+			if latestID != "" {
+				result.LatestImageID = string(latestID)
 			}
 		}
 

@@ -38,12 +38,17 @@ func FuzzExtractImagesHandler(f *testing.F) {
 		app.Post("/test", func(c fiber.Ctx) error {
 			images := h.extractImages(c)
 
-			if len(raw) > 0 && !strings.Contains(raw, ",") && len(images) != 1 {
-				t.Errorf("non-empty input %q produced %d images, want 1", raw, len(images))
+			trimmed := strings.TrimSpace(raw)
+			if trimmed == "" {
+				if len(images) != 0 {
+					t.Errorf("whitespace-only input %q produced %d images, want 0", raw, len(images))
+				}
+
+				return nil
 			}
 
-			if raw == "" && len(images) != 0 {
-				t.Errorf("empty input produced %d images, want 0", len(images))
+			if !strings.Contains(trimmed, ",") && len(images) != 1 {
+				t.Errorf("non-empty input %q produced %d images, want 1", raw, len(images))
 			}
 
 			return nil
@@ -82,12 +87,17 @@ func FuzzExtractContainersHandler(f *testing.F) {
 		app.Post("/test", func(c fiber.Ctx) error {
 			containers := h.extractContainers(c)
 
-			if len(raw) > 0 && !strings.Contains(raw, ",") && len(containers) != 1 {
-				t.Errorf("non-empty input %q produced %d containers, want 1", raw, len(containers))
+			trimmed := strings.TrimSpace(raw)
+			if trimmed == "" {
+				if len(containers) != 0 {
+					t.Errorf("whitespace-only input %q produced %d containers, want 0", raw, len(containers))
+				}
+
+				return nil
 			}
 
-			if raw == "" && len(containers) != 0 {
-				t.Errorf("empty input produced %d containers, want 0", len(containers))
+			if !strings.Contains(trimmed, ",") && len(containers) != 1 {
+				t.Errorf("non-empty input %q produced %d containers, want 1", raw, len(containers))
 			}
 
 			return nil

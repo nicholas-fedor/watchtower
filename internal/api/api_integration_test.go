@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -357,13 +358,20 @@ func TestIntegration_GetAPIAddr(t *testing.T) {
 func TestIntegration_ConcurrentRequests(t *testing.T) {
 	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
 
+	var wg sync.WaitGroup
 	for range 10 {
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/nonexistent", nil)
-		resp, err := app.Test(req)
-		require.NoError(t, err)
-		resp.Body.Close()
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		wg.Go(func() {
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/nonexistent", nil)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			defer resp.Body.Close()
+
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		})
 	}
+
+	wg.Wait()
 }
 
 // ---------------------------------------------------------------------------
@@ -431,6 +439,8 @@ func TestIntegration_HistoryAPI(t *testing.T) {
 		Token:            "test-token",
 		EnableHistoryAPI: true,
 		RateLimit:        60,
+		Client:           makeListContainersMock(t),
+		Filter:           makeFilter(t),
 		DefaultMetrics:   func() *metrics.Metrics { return helperMetrics },
 	})
 }

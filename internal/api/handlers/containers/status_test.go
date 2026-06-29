@@ -33,7 +33,7 @@ func TestListContainerStatuses(t *testing.T) {
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
 				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
 
 				return c
 			},

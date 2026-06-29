@@ -136,7 +136,16 @@ func (c imageClient) HasNewImage(
 	if newImageID == currentImageID {
 		clog.Debug("No new image found")
 
-		return false, currentImageID, "", nil
+		var latestDigest string
+
+		if len(newImageInfo.RepoDigests) > 0 {
+			_, digest, found := strings.Cut(newImageInfo.RepoDigests[0], "@")
+			if found {
+				latestDigest = digest
+			}
+		}
+
+		return false, currentImageID, latestDigest, nil
 	}
 
 	// Extract digest from RepoDigests.

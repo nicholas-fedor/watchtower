@@ -1,6 +1,7 @@
 package api
 
 import (
+	"slices"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -118,11 +119,19 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 	}
 
 	if enableCORS {
+		allowCredentials := true
+
+		allowedOrigins := corsOrigins
+		if slices.Contains(allowedOrigins, "*") {
+			allowedOrigins = nil
+			allowCredentials = false
+		}
+
 		middlewares = append(middlewares, cors.New(cors.Config{
-			AllowOrigins:     corsOrigins,
+			AllowOrigins:     allowedOrigins,
 			AllowMethods:     corsMethods,
 			AllowHeaders:     corsHeaders,
-			AllowCredentials: false,
+			AllowCredentials: allowCredentials,
 			MaxAge:           corsMaxAge,
 		}))
 	}

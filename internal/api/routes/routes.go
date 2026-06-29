@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gofiber/fiber/v3"
@@ -12,12 +13,46 @@ import (
 	_ "github.com/nicholas-fedor/watchtower/internal/api/swagger"
 )
 
+var (
+	// errMissingClientForCheckAPI is returned when the check API is enabled
+	// but no Docker client is configured.
+	errMissingClientForCheckAPI = errors.New("check API is enabled but no Docker client is configured")
+
+	// errMissingClientForContainersAPI is returned when the containers API
+	// is enabled but no Docker client is configured.
+	errMissingClientForContainersAPI = errors.New("containers API is enabled but no Docker client is configured")
+
+	// errMissingClientForHistoryAPI is returned when the history API is enabled
+	// but no Docker client is configured.
+	errMissingClientForHistoryAPI = errors.New("history API is enabled but no Docker client is configured")
+
+	// errMissingClientForImagesAPI is returned when the images API is enabled
+	// but no Docker client is configured.
+	errMissingClientForImagesAPI = errors.New("images API is enabled but no Docker client is configured")
+)
+
 func ValidateAndRegister(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) error {
 	if opts.EnableUpdateAPI {
 		err := config.ValidateUpdateOptions(opts)
 		if err != nil {
 			return fmt.Errorf("update options validation failed: %w", err)
 		}
+	}
+
+	if opts.EnableCheckAPI && opts.Client == nil {
+		return errMissingClientForCheckAPI
+	}
+
+	if opts.EnableContainersAPI && opts.Client == nil {
+		return errMissingClientForContainersAPI
+	}
+
+	if opts.EnableHistoryAPI && opts.Client == nil {
+		return errMissingClientForHistoryAPI
+	}
+
+	if opts.EnableImagesAPI && opts.Client == nil {
+		return errMissingClientForImagesAPI
 	}
 
 	Register(ctx, app, auth, opts)

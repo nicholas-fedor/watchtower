@@ -1,10 +1,12 @@
 package metrics
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // FuzzGetHistory verifies that GetHistory never panics and correctly filters
@@ -61,8 +63,8 @@ func FuzzGetHistory(f *testing.F) {
 	})
 }
 
-// FuzzMetric JSON verifies that Metric struct can be safely marshaled
-// with arbitrary integer values.
+// FuzzMetricJSON verifies that Metric struct can be safely round-tripped
+// through encoding/json with arbitrary integer values.
 func FuzzMetricJSON(f *testing.F) {
 	f.Add(0, 0, 0, 0, 0)
 	f.Add(100, 50, 1, 2, 97)
@@ -77,6 +79,16 @@ func FuzzMetricJSON(f *testing.F) {
 			Skipped:   skipped,
 		}
 
-		assert.NotNil(t, m)
+		data, err := json.Marshal(m)
+		require.NoError(t, err)
+
+		var unmarshaled Metric
+		require.NoError(t, json.Unmarshal(data, &unmarshaled))
+
+		assert.Equal(t, m.Scanned, unmarshaled.Scanned)
+		assert.Equal(t, m.Updated, unmarshaled.Updated)
+		assert.Equal(t, m.Failed, unmarshaled.Failed)
+		assert.Equal(t, m.Restarted, unmarshaled.Restarted)
+		assert.Equal(t, m.Skipped, unmarshaled.Skipped)
 	})
 }

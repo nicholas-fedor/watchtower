@@ -16,7 +16,14 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 	}
 
 	handler := check.New(func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
-		return check.CheckForUpdates(ctx, opts.Client, opts.Filter, images, names, types.UpdateParams{})
+		params := types.UpdateParams{
+			MonitorOnly:     opts.MonitorOnly,
+			NoPull:          opts.NoPull,
+			LabelPrecedence: opts.LabelPrecedence,
+			CooldownDelay:   opts.CooldownDelay,
+		}
+
+		return check.CheckForUpdates(ctx, opts.Client, opts.Filter, images, names, params)
 	})
 	app.Post(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
 }

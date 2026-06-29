@@ -362,13 +362,34 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	update.New(updateFn, updateLock)
+	handler := update.New(updateFn, updateLock)
 
 	go func() {
 		v := <-updateLock
 
+		time.Sleep(50 * time.Millisecond)
+
 		updateLock <- v
 	}()
+
+	testApp := fiber.New(fiber.Config{})
+	testApp.Post(handler.Path, handler.Handle)
+
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		"/v1/update",
+		http.NoBody,
+	)
+	require.NoError(t, err)
+
+	resp, err := testApp.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode,
+		"full API update should be rejected with 429 while scheduled update holds the lock")
 }
 
 func TestHandleAsync(t *testing.T) {
@@ -396,7 +417,20 @@ func TestHandleAsync(t *testing.T) {
 
 		t.Log("Scheduled: acquired lock")
 		close(scheduledStarted)
-		time.Sleep(50 * time.Millisecond)
+
+		// Hold the lock for a window to simulate a running scheduled update.
+		// Block until either the API update goroutine starts (which would
+		// indicate a locking bug) or the window elapses.
+		select {
+		case <-apiStarted:
+			t.Error("Targeted API update should not have started while scheduled update is running")
+
+			updateLock <- v
+
+			return
+		case <-time.After(50 * time.Millisecond):
+		}
+
 		close(scheduledCompleted)
 		t.Log("Scheduled: releasing lock")
 
@@ -429,12 +463,6 @@ func TestHandleAsync(t *testing.T) {
 		}
 		defer resp.Body.Close()
 	}()
-
-	select {
-	case <-apiStarted:
-		t.Error("Targeted API update should not have started while scheduled update is running")
-	default:
-	}
 
 	<-scheduledCompleted
 
@@ -1720,6 +1748,9 @@ func TestRootCommand_FlagDependencies(t *testing.T) {
 
 			err := cmd.ParseFlags(tt.args)
 			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantEvents, cmd.Flags().Changed("http-api-events"),
+				"events flag dependency mismatch")
 		})
 	}
 }

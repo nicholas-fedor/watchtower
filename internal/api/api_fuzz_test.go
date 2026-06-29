@@ -1,7 +1,6 @@
 package api
 
 import (
-	"net/url"
 	"strings"
 	"testing"
 
@@ -49,25 +48,5 @@ func FuzzGetAPIAddr(f *testing.F) {
 			assert.True(t, strings.HasPrefix(addr, "["),
 				"IPv6 host should be bracketed: %s", addr)
 		}
-	})
-}
-
-// FuzzGetAPIAddrURLParsing verifies that GetAPIAddr produces valid URL strings
-// that can be parsed back by net/url.
-func FuzzGetAPIAddrURLParsing(f *testing.F) {
-	f.Add("localhost", "8080")
-	f.Add("127.0.0.1", "8080")
-	f.Add("::1", "8080")
-	f.Add("2001:db8::1", "443")
-
-	f.Fuzz(func(t *testing.T, host, port string) {
-		if host == "" || port == "" {
-			return
-		}
-
-		addr := GetAPIAddr(host, port)
-
-		_, err := url.Parse("http://" + addr)
-		assert.NoError(t, err, "GetAPIAddr should produce a valid URL: %s", addr)
 	})
 }

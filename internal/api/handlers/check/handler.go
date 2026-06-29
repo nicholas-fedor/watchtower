@@ -26,7 +26,8 @@ func New(check CheckFunc) *Handler {
 }
 
 // Handle processes HTTP check requests. It extracts filter parameters, runs
-// the check function, and returns JSON results.
+// the check function, and returns JSON results. If no check function is
+// configured, it returns a 500 response.
 //
 //	@Summary		Check for available container updates
 //	@Description	Checks each watched container for available updates by querying the registry for the latest digest
@@ -40,6 +41,17 @@ func New(check CheckFunc) *Handler {
 //	@Failure		500			{string}	string					"Failed to check for updates"
 //	@Router			/v1/check [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
+	if h.check == nil {
+		logrus.Warn("Received HTTP API check request but no check function is configured")
+
+		sendErr := c.Status(fiber.StatusInternalServerError).SendString("check function is not configured")
+		if sendErr != nil {
+			return fmt.Errorf("failed to send error response: %w", sendErr)
+		}
+
+		return nil
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),

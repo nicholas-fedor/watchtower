@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -240,6 +241,7 @@ func TestSetupAndStartAPI_AllAPIs(t *testing.T) {
 		RateLimit:           60,
 		Client:              makeListContainersMock(t),
 		Filter:              makeFilter(t),
+		EventBroadcaster:    events.NewBroadcaster(),
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
 		},

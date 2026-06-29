@@ -2,33 +2,47 @@
 
 Watchtower exposes an HTTP API for triggering container updates, listing container
 status, checking for updates, and exposing metrics. All endpoints (except health
-checks) require Bearer token authentication.
+checks) require authentication via a Bearer token or (on the events endpoint) an
+events token.
 
 ## Endpoints
 
-| Method | Path             | Auth | Description                                        |
-|--------|------------------|------|----------------------------------------------------|
-| GET    | `/livez`         | No   | Health check — always returns 200 when running     |
-| GET    | `/readyz`        | No   | Health check — verifies Docker client connectivity |
-| GET    | `/startupz`      | No   | Health check — always returns 200 once started     |
-| POST   | `/v1/check`      | Yes  | Check containers for available updates             |
-| GET    | `/v1/containers` | Yes  | List watched container statuses                    |
-| POST   | `/v1/update`     | Yes  | Trigger container update scan                      |
-| GET    | `/v1/metrics`    | Yes  | Prometheus exposition format metrics               |
-| GET    | `/v1/status`     | Yes  | Last scan summary                                  |
-| GET    | `/swagger/*`     | No   | Swagger UI documentation                           |
+| Method | Path                    | Auth | Description                                                   |
+|--------|-------------------------|------|---------------------------------------------------------------|
+| GET    | `/livez`                | No   | Health check — always returns 200 when running                |
+| GET    | `/readyz`               | No   | Health check — verifies Docker client connectivity            |
+| GET    | `/startupz`             | No   | Health check — always returns 200 once started                |
+| POST   | `/v1/check`             | Yes  | Check containers for available updates via registry digest     |
+| GET    | `/v1/containers`        | Yes  | List watched container statuses                               |
+| GET    | `/v1/containers/details`| Yes  | Detailed container information including config flags         |
+| GET    | `/v1/history`           | Yes  | Historical scan results from the in-memory ring buffer        |
+| GET    | `/v1/images`            | Yes  | Tracked images with digests and container counts              |
+| GET    | `/v1/config`            | Yes  | Active Watchtower configuration settings                      |
+| GET    | `/v1/events`            | Yes  | Real-time operational events via SSE (`scan_started`, `scan_failed`, `image_cleanup`, `scan_completed`) |
+| POST   | `/v1/update`            | Yes  | Trigger container update scan                                 |
+| GET    | `/v1/status`            | Yes  | Last scan summary                                             |
+| GET    | `/v1/metrics`           | Yes  | Prometheus exposition format metrics                          |
+| GET    | `/swagger/*`            | No   | Swagger UI documentation                                      |
 
 ## Authentication
 
-All `/v1/` endpoints require a Bearer token in the `Authorization` header. The token is configured via
-the `--api-token` flag or `WATCHTOWER_API_TOKEN` environment variable.
+All `/v1/` endpoints require authentication. By default, a Bearer token is
+provided via the `Authorization` header, configured through
+`--http-api-token` or the `WATCHTOWER_HTTP_API_TOKEN` environment variable:
+
+    curl -H "Authorization: Bearer $TOKEN" localhost:8080/v1/containers
+
+The `/v1/events` SSE stream uses a separate token
+(`--http-api-events-token` / `WATCHTOWER_HTTP_API_EVENTS_TOKEN`) and accepts
+it via either the `Authorization: Bearer` header or the `access_token` query
+parameter (for browser `EventSource` connections that cannot set headers).
 
 ## Query Parameters
 
 ### `/v1/update`
 
-- `image` — Comma-separated image names to filter (repeatable). Supports Go regex
-  patterns (e.g., `^nginx-.*`).
+- `image` — Comma-separated image names or Go regex patterns to filter (repeatable).
+  Supports Go regex syntax (e.g., `^nginx-.*`).
 - `container` — Comma-separated container name patterns to filter (repeatable).
   Supports Go regex patterns (e.g., `^web-.*`).
 - `async` — When `true`, runs the update asynchronously and returns `202 Accepted`.
@@ -42,6 +56,22 @@ the `--api-token` flag or `WATCHTOWER_API_TOKEN` environment variable.
 
 - `name` — Filter by container name (exact match).
 - `image` — Filter by image name (exact match).
+
+### `/v1/containers/details`
+
+- `name` — Filter by container name (exact match).
+- `image` — Filter by image name (exact match).
+
+### `/v1/history`
+
+- `since` — Include entries at or after this RFC3339 timestamp.
+- `until` — Include entries at or before this RFC3339 timestamp.
+- `limit` — Maximum number of entries to return (default: all).
+
+### `/v1/images`
+
+- `name` — Filter by image name (exact match).
+- `id` — Filter by image ID (sha256 digest).
 
 ## Swagger / OpenAPI
 

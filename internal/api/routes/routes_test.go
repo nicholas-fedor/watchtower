@@ -180,7 +180,7 @@ func TestRegister(t *testing.T) {
 		wantCount           int
 	}{
 		{name: "only update", enableUpdateAPI: true, wantCount: 1},
-		{name: "only metrics", enableMetricsAPI: true, wantCount: 1},
+		{name: "only metrics", enableMetricsAPI: true, wantCount: 2},
 		{name: "only containers", enableContainersAPI: true, wantCount: 2},
 		{name: "only history", enableHistoryAPI: true, wantCount: 1},
 		{name: "only images", enableImagesAPI: true, wantCount: 1},
@@ -195,7 +195,7 @@ func TestRegister(t *testing.T) {
 			enableImagesAPI:     true,
 			enableConfigAPI:     true,
 			enableEventsAPI:     true,
-			wantCount:           8,
+			wantCount:           9,
 		},
 		{name: "none", wantCount: 0},
 	}
@@ -234,7 +234,8 @@ func TestRegister(t *testing.T) {
 			apiCount := 0
 
 			for _, r := range routes {
-				if r.Path == "/v1/update" || r.Path == "/v1/metrics" || r.Path == "/v1/containers" || r.Path == "/v1/containers/details" || r.Path == "/v1/history" || r.Path == "/v1/images" ||
+				if r.Path == "/v1/update" || r.Path == "/v1/metrics" || r.Path == "/v1/status" || r.Path == "/v1/containers" || r.Path == "/v1/containers/details" || r.Path == "/v1/history" ||
+					r.Path == "/v1/images" ||
 					r.Path == "/v1/config" ||
 					r.Path == "/v1/events" {
 					apiCount++

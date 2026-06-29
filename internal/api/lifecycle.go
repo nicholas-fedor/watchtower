@@ -149,6 +149,11 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 // Returns:
 //   - error: Non-nil if server shutdown fails.
 func runServer(ctx context.Context, app *fiber.App, address string, noStartupMessage bool, tlsCertPath, tlsKeyPath string) error {
+	//nolint:nilerr // Intentionally return nil: skip socket binding when context is already canceled.
+	if ctx.Err() != nil {
+		return nil
+	}
+
 	listenErrCh := make(chan error, 1)
 
 	go func() {
@@ -177,14 +182,13 @@ func runServer(ctx context.Context, app *fiber.App, address string, noStartupMes
 	case err := <-listenErrCh:
 		return fmt.Errorf("failed to start HTTP server: %w", err)
 	case <-ctx.Done():
+		err := app.ShutdownWithTimeout(ShutdownGracePeriod)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			logrus.WithError(err).Debug("Failed to shut down HTTP server")
+
+			return fmt.Errorf("server shutdown failed: %w", err)
+		}
+
+		return nil
 	}
-
-	err := app.ShutdownWithTimeout(ShutdownGracePeriod)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		logrus.WithError(err).Debug("Failed to shut down HTTP server")
-
-		return fmt.Errorf("server shutdown failed: %w", err)
-	}
-
-	return nil
 }

@@ -19,11 +19,11 @@ var metricsOnce sync.Once
 
 // Metric holds data points from a Watchtower scan.
 type Metric struct {
-	Scanned   int // Number of containers scanned.
-	Updated   int // Number of containers updated (excludes stale).
-	Failed    int // Number of containers failed.
-	Restarted int // Number of containers restarted due to linked dependencies.
-	Skipped   int // Number of containers skipped during the scan.
+	Scanned   int `json:"scanned"`
+	Updated   int `json:"updated"`
+	Failed    int `json:"failed"`
+	Restarted int `json:"restarted"`
+	Skipped   int `json:"skipped"`
 }
 
 // Metrics handles processing and exposing scan metrics.
@@ -111,7 +111,7 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 
 	// Register the metrics with the provided registry.
 	// If a metric is already registered, return an error to avoid duplicate collectors.
-	metricsList := []prometheus.Collector{
+	collectors := []prometheus.Collector{
 		metrics.scanned,
 		metrics.updated,
 		metrics.failed,
@@ -122,8 +122,9 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		metrics.skippedScans,
 		metrics.dropped,
 	}
-	for _, m := range metricsList {
-		err := registry.Register(m)
+
+	for _, c := range collectors {
+		err := registry.Register(c)
 		if err != nil {
 			alreadyRegisteredError := &prometheus.AlreadyRegisteredError{}
 			if errors.As(err, &alreadyRegisteredError) {

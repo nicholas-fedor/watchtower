@@ -38,7 +38,7 @@ func NewStreamer(url, token string) EventStream {
 	return &streamer{url: url, token: token}
 }
 
-// Events reads from the SSE endpoint and forwards each chunk to the logger.
+// Events reads from the SSE endpoint and prints payloads to stdout.
 func (s *streamer) Events(ctx context.Context) error {
 	resp, err := s.connect(ctx)
 	if err != nil {
@@ -51,7 +51,7 @@ func (s *streamer) Events(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("Connected (status %d). Waiting for events...\n", resp.StatusCode)
+	fmt.Printf("Connected (status %d). Waiting for events...\n", resp.StatusCode)
 
 	return s.readStream(ctx, resp.Body)
 }
@@ -96,14 +96,14 @@ func (s *streamer) validateStatus(resp *http.Response) error {
 	)
 }
 
-// readStream copies response body chunks to the logger until EOF or cancel.
+// readStream copies response body chunks to stdout until EOF or cancel.
 func (s *streamer) readStream(ctx context.Context, body io.Reader) error {
 	buf := make([]byte, readBufSize)
 
 	for {
 		n, readErr := body.Read(buf)
 		if n > 0 {
-			log.Printf("%s", string(buf[:n]))
+			fmt.Printf("%s", string(buf[:n]))
 		}
 
 		if readErr == nil {
@@ -122,12 +122,12 @@ func (s *streamer) readStream(ctx context.Context, body io.Reader) error {
 	}
 }
 
-// parseFlags returns the address and token from CLI flags.
+// parseFlags returns the events endpoint URL and token from CLI flags.
 func parseFlags() (string, string) {
 	addr := flag.String(
 		"addr",
-		"localhost:3000",
-		"Watchtower API address",
+		"http://localhost:3000/v1/events",
+		"Watchtower events endpoint URL (e.g. http://localhost:3000/v1/events)",
 	)
 	token := flag.String(
 		"token",
@@ -166,12 +166,9 @@ func run(stream EventStream) error {
 }
 
 func main() {
-	addr, token := parseFlags()
+	url, token := parseFlags()
 
-	stream := NewStreamer(
-		fmt.Sprintf("http://%s/v1/events", addr),
-		token,
-	)
+	stream := NewStreamer(url, token)
 
 	err := run(stream)
 	if err != nil {

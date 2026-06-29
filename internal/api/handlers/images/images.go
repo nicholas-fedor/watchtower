@@ -87,9 +87,7 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 		}
 
 		if info := c.ImageInfo(); info != nil && len(info.RepoDigests) > 0 {
-			if _, digest, found := strings.Cut(info.RepoDigests[0], "@"); found {
-				status.Digest = digest
-			}
+			status.Digest = extractDigestForImage(info.RepoDigests, imageName)
 		}
 
 		imageMap[key] = status
@@ -101,4 +99,23 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 	}
 
 	return statuses, nil
+}
+
+// extractDigestForImage returns the manifest digest whose repository name
+// matches imageName, or an empty string if none match.
+func extractDigestForImage(repoDigests []string, imageName string) string {
+	for _, repoDigest := range repoDigests {
+		repo, _, found := strings.Cut(repoDigest, "@")
+		if !found {
+			continue
+		}
+
+		if repo == imageName {
+			_, digest, _ := strings.Cut(repoDigest, "@")
+
+			return digest
+		}
+	}
+
+	return ""
 }

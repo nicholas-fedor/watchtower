@@ -49,7 +49,18 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		"path":   c.Path(),
 	}).Debug("Received HTTP API history request")
 
-	since, sinceErr := parseTimeParam(c.Query("since"))
+	sinceRaw := c.Query("since")
+
+	if sinceRaw == "" && c.Request().URI().QueryArgs().Has("since") {
+		sendErr := c.Status(fiber.StatusBadRequest).SendString("invalid 'since' parameter: empty value")
+		if sendErr != nil {
+			return fmt.Errorf("failed to send error response: %w", sendErr)
+		}
+
+		return nil
+	}
+
+	since, sinceErr := parseTimeParam(sinceRaw)
 	if sinceErr != nil && !errors.Is(sinceErr, errNoTimeParameter) {
 		sendErr := c.Status(fiber.StatusBadRequest).SendString("invalid 'since' parameter: " + sinceErr.Error())
 		if sendErr != nil {
@@ -59,9 +70,28 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		return nil
 	}
 
-	until, untilErr := parseTimeParam(c.Query("until"))
+	untilRaw := c.Query("until")
+	if untilRaw == "" && c.Request().URI().QueryArgs().Has("until") {
+		sendErr := c.Status(fiber.StatusBadRequest).SendString("invalid 'until' parameter: empty value")
+		if sendErr != nil {
+			return fmt.Errorf("failed to send error response: %w", sendErr)
+		}
+
+		return nil
+	}
+
+	until, untilErr := parseTimeParam(untilRaw)
 	if untilErr != nil && !errors.Is(untilErr, errNoTimeParameter) {
 		sendErr := c.Status(fiber.StatusBadRequest).SendString("invalid 'until' parameter: " + untilErr.Error())
+		if sendErr != nil {
+			return fmt.Errorf("failed to send error response: %w", sendErr)
+		}
+
+		return nil
+	}
+
+	if since != nil && until != nil && since.After(*until) {
+		sendErr := c.Status(fiber.StatusBadRequest).SendString("invalid time range: 'since' must not be after 'until'")
 		if sendErr != nil {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}
