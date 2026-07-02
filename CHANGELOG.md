@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update github/codeql-action action to v4.36.3 by @renovate[bot] in [#1874](https://github.com/nicholas-fedor/watchtower/pull/1874)
+- Update docker/setup-qemu-action action to v4.2.0 by @renovate[bot] in [#1872](https://github.com/nicholas-fedor/watchtower/pull/1872)
+
+## [1.19.0] - 2026-06-30
+
 ### Added
 
 - Add Greite as a contributor for code, test, and doc by @allcontributors[bot] in [#1800](https://github.com/nicholas-fedor/watchtower/pull/1800)
@@ -3207,7 +3214,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.19.0...HEAD)
+- [1.19.0](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...v1.19.0)
 - [1.18.1](https://github.com/nicholas-fedor/watchtower/compare/v1.18.0...v1.18.1)
 - [1.18.0](https://github.com/nicholas-fedor/watchtower/compare/v1.17.2...v1.18.0)
 - [1.17.2](https://github.com/nicholas-fedor/watchtower/compare/v1.17.1...v1.17.2)
