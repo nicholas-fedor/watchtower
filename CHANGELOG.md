@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update docker/login-action action to v4.4.0 by @renovate[bot] in [#1883](https://github.com/nicholas-fedor/watchtower/pull/1883)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.12 by @renovate[bot] in [#1882](https://github.com/nicholas-fedor/watchtower/pull/1882)
 - Update docker/setup-buildx-action action to v4.2.0 by @renovate[bot] in [#1881](https://github.com/nicholas-fedor/watchtower/pull/1881)
 - Update docker/login-action action to v4.3.0 by @renovate[bot] in [#1878](https://github.com/nicholas-fedor/watchtower/pull/1878)
 - Update nicholas-fedor/actionlint-action action to v1.0.16 by @renovate[bot] in [#1877](https://github.com/nicholas-fedor/watchtower/pull/1877)
