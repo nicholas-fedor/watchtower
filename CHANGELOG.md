@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update cimg/go:1.26.4 docker digest to 66a357f by @renovate[bot] in [#1897](https://github.com/nicholas-fedor/watchtower/pull/1897)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.15 by @renovate[bot] in [#1893](https://github.com/nicholas-fedor/watchtower/pull/1893)
 - Update module github.com/pelletier/go-toml/v2 to v2.4.3 by @renovate[bot] in [#1890](https://github.com/nicholas-fedor/watchtower/pull/1890)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.14 by @renovate[bot] in [#1889](https://github.com/nicholas-fedor/watchtower/pull/1889)
