@@ -265,33 +265,6 @@ func handleBearerAuth(
 ) (string, string, bool, string, error) {
 	logrus.WithFields(fields).Debug("Entering Bearer auth path")
 
-	var challengeHost string
-
-	// Parse the WWW-Authenticate header.
-	scope, realm, service, err := ProcessChallenge(wwwAuthHeader, container.ImageName())
-	logrus.WithFields(fields).
-		WithField("realm", realm).
-		WithField("service", service).
-		WithField("scope", scope).
-		WithField("err", err).
-		Debug("Processed challenge header")
-
-	switch {
-	case err != nil:
-		logrus.WithError(err).WithFields(fields).Debug("Failed to process challenge header")
-		// Proceed with token retrieval, as challengeHost is optional.
-	case realm != "":
-		challengeHost = extractChallengeHost(realm, fields)
-		if challengeHost != "" {
-			logrus.WithFields(fields).
-				WithField("challenge_host", challengeHost).
-				Debug("Extracted challenge host")
-		}
-	default:
-		logrus.WithFields(fields).Debug("Empty realm in challenge header")
-	}
-
-	// Fetch the bearer token.
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to parse image name")
@@ -299,10 +272,24 @@ func handleBearerAuth(
 		return "", "", redirected, redirectHost, fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
-	token, err := GetBearerHeader(
+	authURL, err := GetAuthURL(strings.ToLower(wwwAuthHeader), normalizedRef)
+	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to construct bearer auth URL")
+
+		return "", "", redirected, redirectHost, fmt.Errorf("%w: %w", errFailedDecodeResponse, err)
+	}
+
+	challengeHost := authURL.Host
+	if challengeHost != "" {
+		logrus.WithFields(fields).
+			WithField("challenge_host", challengeHost).
+			Debug("Extracted challenge host")
+	}
+
+	token, err := getBearerHeader(
 		ctx,
-		strings.ToLower(wwwAuthHeader),
-		normalizedRef,
+		authURL,
+		container.ImageName(),
 		registryAuth,
 		client,
 	)
@@ -619,11 +606,22 @@ func GetBearerHeader(
 		return "", err
 	}
 
+	return getBearerHeader(ctx, authURL, imageRef.Name(), registryAuth, client)
+}
+
+func getBearerHeader(
+	ctx context.Context,
+	authURL *url.URL,
+	imageName string,
+	registryAuth string,
+	client Client,
+) (string, error) {
+
 	// Build the token request with context.
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, authURL.String(), nil)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
-			"image": imageRef.Name(),
+			"image": imageName,
 			"url":   authURL.String(),
 		}).Debug("Failed to create bearer token request")
 
@@ -633,12 +631,12 @@ func GetBearerHeader(
 	// Add Basic auth header if credentials are provided.
 	if registryAuth != "" {
 		logrus.WithFields(logrus.Fields{
-			"image": imageRef.Name(),
+			"image": imageName,
 		}).Debug("Found credentials")
 
 		if logrus.GetLevel() == logrus.TraceLevel {
 			logrus.WithFields(logrus.Fields{
-				"image":        imageRef.Name(),
+				"image":        imageName,
 				"registryAuth": registryAuth,
 			}).Trace("Using credentials")
 		}
@@ -646,7 +644,7 @@ func GetBearerHeader(
 		r.Header.Add("Authorization", "Basic "+registryAuth)
 	} else {
 		logrus.WithFields(logrus.Fields{
-			"image": imageRef.Name(),
+			"image": imageName,
 		}).Debug("No credentials found")
 	}
 
@@ -656,7 +654,7 @@ func GetBearerHeader(
 	authResponse, err := client.Do(r)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
-			"image": imageRef.Name(),
+			"image": imageName,
 			"url":   authURL.String(),
 		}).Debug("Failed to execute bearer token request")
 
@@ -672,14 +670,14 @@ func GetBearerHeader(
 	err = json.Unmarshal(body, tokenResponse)
 	if err != nil {
 		logrus.WithError(err).
-			WithField("image", imageRef.Name()).
+			WithField("image", imageName).
 			Debug("Failed to unmarshal bearer token response")
 
 		return "", fmt.Errorf("%w: %w", errFailedUnmarshalBearerResponse, err)
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"image": imageRef.Name(),
+		"image": imageName,
 	}).Debug("Retrieved bearer token")
 
 	return "Bearer " + tokenResponse.Token, nil
