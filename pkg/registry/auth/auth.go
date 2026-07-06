@@ -73,7 +73,8 @@ var (
 	// errFailedParseImageName indicates a failure to parse the container image name into a normalized reference.
 	errFailedParseImageName = errors.New("failed to parse image name")
 	// errFailedDecodeResponse indicates a failure to decode the token response from the registry.
-	errFailedDecodeResponse = errors.New("failed to decode response")
+	errFailedDecodeResponse         = errors.New("failed to decode response")
+	errFailedConstructBearerAuthURL = errors.New("failed to construct bearer auth url")
 	// errFailedParseImageReference indicates a failure to parse an image reference into a normalized form.
 	errFailedParseImageReference = errors.New("failed to parse image reference")
 )
@@ -276,7 +277,7 @@ func handleBearerAuth(
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to construct bearer auth URL")
 
-		return "", "", redirected, redirectHost, fmt.Errorf("%w: %w", errFailedDecodeResponse, err)
+		return "", "", redirected, redirectHost, fmt.Errorf("%w: %w", errFailedConstructBearerAuthURL, err)
 	}
 
 	challengeHost := authURL.Host
