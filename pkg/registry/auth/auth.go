@@ -489,6 +489,7 @@ func GetToken(
 // ProcessChallenge parses the WWW-Authenticate header to extract authentication details.
 //
 // It supports Bearer authentication, extracting the realm, service, and optional scope for token requests.
+// If a registry omits service, the service is derived from the realm host.
 //
 // Parameters:
 //   - wwwAuthHeader: The WWW-Authenticate header value (e.g., 'Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:linuxserver/nginx:pull"').
@@ -498,7 +499,7 @@ func GetToken(
 //   - string: The scope for the token request (e.g., "repository:linuxserver/nginx:pull"), or empty if not provided.
 //   - string: The realm URL for the token request (e.g., "https://ghcr.io/token").
 //   - string: The service identifier (e.g., "ghcr.io").
-//   - error: Non-nil if parsing fails critically (missing realm or service), nil otherwise.
+//   - error: Non-nil if parsing fails critically (missing realm or derivable service), nil otherwise.
 func ProcessChallenge(wwwAuthHeader, image string) (string, string, string, error) {
 	fields := logrus.Fields{
 		"image":     image,
@@ -524,11 +525,19 @@ func ProcessChallenge(wwwAuthHeader, image string) (string, string, string, erro
 		}
 	}
 
-	realm, realmOK := values["realm"]
-	service, serviceOK := values["service"]
+	realm := values["realm"]
+	service := values["service"]
 	scope := values["scope"] // Scope is optional
+	if service == "" && realm != "" {
+		service = extractChallengeHost(realm, fields)
+		if service != "" {
+			logrus.WithFields(fields).
+				WithField("service", service).
+				Debug("Derived challenge service from realm")
+		}
+	}
 
-	if !realmOK || !serviceOK {
+	if realm == "" || service == "" {
 		logrus.WithFields(fields).Warn("Missing required challenge header values: realm or service")
 
 		return "", "", "", fmt.Errorf(
@@ -724,6 +733,19 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 	// 4. This ensures we always use the correct ghcr.io token endpoint for lscr.io images
 	if registryAddress == LSCRRegistry {
 		values["realm"] = "https://ghcr.io/token"
+	}
+
+	if values["service"] == "" && values["realm"] != "" {
+		values["service"] = extractChallengeHost(values["realm"], logrus.Fields{
+			"image":     imageRef.Name(),
+			"challenge": challenge,
+		})
+		if values["service"] != "" {
+			logrus.WithFields(logrus.Fields{
+				"image":   imageRef.Name(),
+				"service": values["service"],
+			}).Debug("Derived challenge service from realm")
+		}
 	}
 
 	logrus.WithFields(logrus.Fields{
