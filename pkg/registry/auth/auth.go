@@ -616,8 +616,39 @@ func getBearerHeader(
 	registryAuth string,
 	client Client,
 ) (string, error) {
+	r, err := newBearerRequest(ctx, authURL, imageName)
+	if err != nil {
+		return "", err
+	}
 
-	// Build the token request with context.
+	addBasicAuth(r, imageName, registryAuth)
+	logrus.WithField("url", r.URL.String()).Debug("Sending bearer token request")
+
+	authResponse, err := client.Do(r)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"image": imageName,
+			"url":   authURL.String(),
+		}).Debug("Failed to execute bearer token request")
+
+		return "", fmt.Errorf("%w: %w", errFailedExecuteBearerRequest, err)
+	}
+
+	defer authResponse.Body.Close()
+
+	token, err := readBearerToken(authResponse.Body, imageName)
+	if err != nil {
+		return "", err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"image": imageName,
+	}).Debug("Retrieved bearer token")
+
+	return "Bearer " + token, nil
+}
+
+func newBearerRequest(ctx context.Context, authURL *url.URL, imageName string) (*http.Request, error) {
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, authURL.String(), nil)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
@@ -625,10 +656,13 @@ func getBearerHeader(
 			"url":   authURL.String(),
 		}).Debug("Failed to create bearer token request")
 
-		return "", fmt.Errorf("%w: %w", errFailedCreateBearerRequest, err)
+		return nil, fmt.Errorf("%w: %w", errFailedCreateBearerRequest, err)
 	}
 
-	// Add Basic auth header if credentials are provided.
+	return r, nil
+}
+
+func addBasicAuth(r *http.Request, imageName string, registryAuth string) {
 	if registryAuth != "" {
 		logrus.WithFields(logrus.Fields{
 			"image": imageName,
@@ -647,27 +681,13 @@ func getBearerHeader(
 			"image": imageName,
 		}).Debug("No credentials found")
 	}
+}
 
-	// Execute the token request.
-	logrus.WithField("url", r.URL.String()).Debug("Sending bearer token request")
-
-	authResponse, err := client.Do(r)
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"image": imageName,
-			"url":   authURL.String(),
-		}).Debug("Failed to execute bearer token request")
-
-		return "", fmt.Errorf("%w: %w", errFailedExecuteBearerRequest, err)
-	}
-
-	defer authResponse.Body.Close()
-
-	// Read and parse the response body into a token structure.
-	body, _ := io.ReadAll(authResponse.Body)
+func readBearerToken(body io.Reader, imageName string) (string, error) {
+	b, _ := io.ReadAll(body)
 	tokenResponse := &types.TokenResponse{}
 
-	err = json.Unmarshal(body, tokenResponse)
+	err := json.Unmarshal(b, tokenResponse)
 	if err != nil {
 		logrus.WithError(err).
 			WithField("image", imageName).
@@ -676,11 +696,7 @@ func getBearerHeader(
 		return "", fmt.Errorf("%w: %w", errFailedUnmarshalBearerResponse, err)
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"image": imageName,
-	}).Debug("Retrieved bearer token")
-
-	return "Bearer " + tokenResponse.Token, nil
+	return tokenResponse.Token, nil
 }
 
 // GetAuthURL constructs an authentication URL from challenge instructions.
