@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update step-security/harden-runner action to v2.20.0 by @renovate[bot] in [#1903](https://github.com/nicholas-fedor/watchtower/pull/1903)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.16 by @renovate[bot] in [#1902](https://github.com/nicholas-fedor/watchtower/pull/1902)
+- Update module golang.org/x/text to v0.39.0 by @renovate[bot] in [#1898](https://github.com/nicholas-fedor/watchtower/pull/1898)
 - Update cimg/go:1.26.4 docker digest to 66a357f by @renovate[bot] in [#1897](https://github.com/nicholas-fedor/watchtower/pull/1897)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.15 by @renovate[bot] in [#1893](https://github.com/nicholas-fedor/watchtower/pull/1893)
 - Update module github.com/pelletier/go-toml/v2 to v2.4.3 by @renovate[bot] in [#1890](https://github.com/nicholas-fedor/watchtower/pull/1890)
