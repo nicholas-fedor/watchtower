@@ -33,8 +33,23 @@ func makeFilter(_ *testing.T) types.Filter {
 	return func(_ types.FilterableContainer) bool { return true }
 }
 
+// withTestListenAddr sets Host/Port so tests bind an ephemeral local port.
+func withTestListenAddr(opts config.Options) config.Options {
+	if opts.Host == "" {
+		opts.Host = "127.0.0.1"
+	}
+
+	if opts.Port == "" {
+		opts.Port = "0"
+	}
+
+	return opts
+}
+
 func runServerAndShutdown(t *testing.T, opts config.Options) {
 	t.Helper()
+
+	opts = withTestListenAddr(opts)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -44,7 +59,21 @@ func runServerAndShutdown(t *testing.T, opts config.Options) {
 		errCh <- SetupAndStartAPI(ctx, opts)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	// Wait for SetupAndStartAPI to return (non-blocking modes) or give the
+	// server time to bind (blocking modes still run in this goroutine path).
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+		// Non-blocking: server is still running under GracefulContext; cancel it.
+		cancel()
+		time.Sleep(50 * time.Millisecond)
+
+		return
+	case <-time.After(500 * time.Millisecond):
+		// Blocking mode: still inside SetupAndStartAPI.
+	}
+
 	cancel()
 
 	select {
@@ -141,7 +170,7 @@ func TestSetupAndStartAPI(t *testing.T) {
 func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := config.Options{
+	opts := withTestListenAddr(config.Options{
 		Token:         "test-token",
 		EventsToken:   "events-token",
 		EnableFullAPI: true,
@@ -154,7 +183,7 @@ func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 		UnblockHTTPAPI: true,
-	}
+	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -164,16 +193,16 @@ func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 		errCh <- SetupAndStartAPI(ctx, opts)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
-	cancel()
-
+	// UnblockHTTPAPI=true → non-blocking; should return after bind.
 	select {
 	case err := <-errCh:
-		assert.True(t, err == nil || errors.Is(err, context.Canceled),
-			"unexpected error: %v", err)
-	case <-time.After(ShutdownGracePeriod + 2*time.Second):
-		t.Fatal("server did not shut down within expected time")
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking full API setup did not return")
 	}
+
+	cancel()
+	time.Sleep(50 * time.Millisecond)
 }
 
 func TestSetupAndStartAPI_NoAPIs(t *testing.T) {
@@ -256,12 +285,12 @@ func TestSetupAndStartAPI_AllAPIs(t *testing.T) {
 func TestIntegration_HealthLiveness_And_Startup(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := config.Options{
+	opts := withTestListenAddr(config.Options{
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
 		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
-	}
+	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	errCh := make(chan error, 1)
@@ -270,21 +299,21 @@ func TestIntegration_HealthLiveness_And_Startup(t *testing.T) {
 		errCh <- SetupAndStartAPI(ctx, opts)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
-	cancel()
-
 	select {
 	case err := <-errCh:
-		assert.True(t, err == nil || errors.Is(err, context.Canceled))
-	case <-time.After(5 * time.Second):
-		t.Fatal("server did not shut down")
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking setup did not return")
 	}
+
+	cancel()
+	time.Sleep(50 * time.Millisecond)
 }
 
 func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 	var startupCalled atomic.Int32
 
-	opts := config.Options{
+	opts := withTestListenAddr(config.Options{
 		Token:           "test-token",
 		EnableUpdateAPI: true,
 		UnblockHTTPAPI:  false,
@@ -299,7 +328,7 @@ func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 		WriteStartupMessage: func(_ *cobra.Command, _ time.Time, _, _ string, _ container.Client, _ types.Notifier, _ string, _ *bool) {
 			startupCalled.Add(1)
 		},
-	}
+	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	errCh := make(chan error, 1)
@@ -308,9 +337,11 @@ func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 		errCh <- SetupAndStartAPI(ctx, opts)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
-
-	assert.Positive(t, startupCalled.Load(), "WriteStartupMessage should be called when UnblockHTTPAPI is false")
+	// Blocking mode: wait for bind + startup message without expecting return.
+	require.Eventually(t, func() bool {
+		return startupCalled.Load() > 0
+	}, 2*time.Second, 20*time.Millisecond,
+		"WriteStartupMessage should be called when UnblockHTTPAPI is false")
 
 	cancel()
 
@@ -318,7 +349,7 @@ func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 	case err := <-errCh:
 		assert.True(t, err == nil || errors.Is(err, context.Canceled),
 			"unexpected error: %v", err)
-	case <-time.After(5 * time.Second):
+	case <-time.After(ShutdownGracePeriod + 2*time.Second):
 		t.Fatal("server did not shut down")
 	}
 }
@@ -407,7 +438,7 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 func TestSetupAndStartAPI_FullAPIEnablesAll(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := config.Options{
+	opts := withTestListenAddr(config.Options{
 		Token:          "test-token",
 		EventsToken:    "events-token",
 		EnableFullAPI:  true,
@@ -420,7 +451,7 @@ func TestSetupAndStartAPI_FullAPIEnablesAll(t *testing.T) {
 			return &metrics.Metric{}
 		},
 		UnblockHTTPAPI: true,
-	}
+	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -430,16 +461,143 @@ func TestSetupAndStartAPI_FullAPIEnablesAll(t *testing.T) {
 		errCh <- SetupAndStartAPI(ctx, opts)
 	}()
 
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking full API setup did not return")
+	}
+
+	cancel()
 	time.Sleep(50 * time.Millisecond)
+}
+
+func TestRunServer_NonBlockingReturnsAfterBind(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:            "test-token",
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+		// Update API off → non-blocking regardless of UnblockHTTPAPI.
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "non-blocking SetupAndStartAPI should return after bind")
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking SetupAndStartAPI did not return after bind")
+	}
+
+	// Server must still be running until ctx is canceled (GracefulContext).
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+}
+
+func TestRunServer_BlockingUntilCancel(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:           "test-token",
+		EnableUpdateAPI: true,
+		UnblockHTTPAPI:  false,
+		RateLimit:       60,
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+		WriteStartupMessage: func(_ *cobra.Command, _ time.Time, _, _ string, _ container.Client, _ types.Notifier, _ string, _ *bool) {
+		},
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("blocking SetupAndStartAPI returned early: %v", err)
+	case <-time.After(300 * time.Millisecond):
+		// Expected: still blocked while server runs.
+	}
+
 	cancel()
 
 	select {
-	case err := <-errCh:
+	case err := <-done:
 		assert.True(t, err == nil || errors.Is(err, context.Canceled),
 			"unexpected error: %v", err)
 	case <-time.After(ShutdownGracePeriod + 2*time.Second):
-		t.Fatal("server did not shut down within expected time")
+		t.Fatal("blocking SetupAndStartAPI did not return after cancel")
 	}
+}
+
+func TestRunServer_UnblockWithUpdateAPI_NonBlocking(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:           "test-token",
+		EnableUpdateAPI: true,
+		UnblockHTTPAPI:  true,
+		RateLimit:       60,
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "update API with UnblockHTTPAPI should return after bind")
+	case <-time.After(2 * time.Second):
+		t.Fatal("SetupAndStartAPI did not return in non-blocking update mode")
+	}
+
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+}
+
+func TestRunServer_BindFailure(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := config.Options{
+		Host:             "127.0.0.1",
+		Port:             "99999", // invalid port
+		Token:            "test-token",
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	err := SetupAndStartAPI(ctx, opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to start HTTP server")
 }
 
 func TestGetAPIAddr_IPv6(t *testing.T) {

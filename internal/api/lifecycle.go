@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -49,10 +52,12 @@ func GetAPIAddr(host, port string) string {
 
 // SetupAndStartAPI configures and launches the HTTP API.
 //
-// It creates a Fiber application with the middleware stack, registers health
-// checks, registers the configured endpoints, and starts the server in a
-// background goroutine. The server runs until ctx is canceled, then
-// gracefully shuts down.
+// It creates a Fiber application with the middleware stack, registers the
+// configured endpoints, and starts the server. When the update API is enabled
+// and UnblockHTTPAPI is false (API-only mode), this call blocks until ctx is
+// canceled. Otherwise the server runs in the background and this function
+// returns after the listen socket is bound so scheduled updates can run
+// concurrently.
 //
 // Parameters:
 //   - ctx: Context for server lifecycle management.
@@ -108,12 +113,15 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		return config.ErrMissingEventsAPIToken
 	}
 
-	app := New(logrus.StandardLogger(), opts.RateLimit, ProxyConfig{
-		TrustedProxies: opts.TrustedProxies,
-		ProxyHeader:    opts.ProxyHeader,
-	}, CORSConfig{
-		AllowedOrigins: opts.CORSAllowedOrigins,
-	})
+	app := New(
+		logrus.StandardLogger(),
+		opts.RateLimit,
+		ProxyConfig{
+			TrustedProxies: opts.TrustedProxies,
+			ProxyHeader:    opts.ProxyHeader,
+		}, CORSConfig{
+			AllowedOrigins: opts.CORSAllowedOrigins,
+		})
 
 	authMiddleware := NewAPIAuthMiddleware(opts.Token)
 
@@ -132,11 +140,38 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		return config.ErrMissingTLSConfig
 	}
 
-	return runServer(ctx, app, address, opts.NoStartupMessage, tlsCertPath, tlsKeyPath)
+	// Block only in API-only update mode.
+	block := opts.EnableUpdateAPI && !opts.UnblockHTTPAPI
+
+	return runServer(
+		ctx,
+		app,
+		address,
+		opts.NoStartupMessage,
+		tlsCertPath,
+		tlsKeyPath,
+		block,
+	)
 }
 
-// runServer starts the Fiber app in a background goroutine and blocks until
-// ctx is canceled, then gracefully shuts down.
+// isCleanServerStop reports whether err is an expected result of a graceful
+// shutdown (or a nil error after Listen returns cleanly).
+func isCleanServerStop(err error) bool {
+	if err == nil {
+		return true
+	}
+
+	return errors.Is(err, http.ErrServerClosed) ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
+
+// runServer starts the Fiber app and either blocks until shutdown or returns
+// after a successful bind.
+//
+// Fiber's GracefulContext shuts the server down when ctx is canceled.
+// ListenerAddrFunc signals that the listen socket is bound so callers can
+// distinguish bind success from hang/failure.
 //
 // Parameters:
 //   - ctx: Context for server lifecycle management.
@@ -145,50 +180,95 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 //   - noStartupMessage: Whether to suppress the startup message.
 //   - tlsCertPath: Path to TLS certificate file, or empty for HTTP.
 //   - tlsKeyPath: Path to TLS key file, or empty for HTTP.
+//   - block: When true, wait until the server stops; when false, return after bind.
 //
 // Returns:
-//   - error: Non-nil if server shutdown fails.
-func runServer(ctx context.Context, app *fiber.App, address string, noStartupMessage bool, tlsCertPath, tlsKeyPath string) error {
+//   - error: Non-nil if the server fails to start or exits with an unexpected error while blocking.
+func runServer(
+	ctx context.Context,
+	app *fiber.App,
+	address string,
+	noStartupMessage bool,
+	tlsCertPath, tlsKeyPath string,
+	block bool,
+) error {
 	//nolint:nilerr // Intentionally return nil: skip socket binding when context is already canceled.
 	if ctx.Err() != nil {
 		return nil
 	}
 
-	listenErrCh := make(chan error, 1)
+	readyCh := make(chan struct{})
+
+	var readyOnce sync.Once
+
+	listenDone := make(chan error, 1)
+
+	listenCfg := fiber.ListenConfig{
+		DisableStartupMessage: noStartupMessage,
+		GracefulContext:       ctx,
+		ShutdownTimeout:       ShutdownGracePeriod,
+		ListenerAddrFunc: func(_ net.Addr) {
+			readyOnce.Do(func() {
+				close(readyCh)
+			})
+		},
+	}
+
+	if tlsCertPath != "" && tlsKeyPath != "" {
+		listenCfg.CertFile = tlsCertPath
+		listenCfg.CertKeyFile = tlsKeyPath
+	}
 
 	go func() {
-		var err error
-		if tlsCertPath != "" && tlsKeyPath != "" {
-			err = app.Listen(address, fiber.ListenConfig{
-				DisableStartupMessage: noStartupMessage,
-				CertFile:              tlsCertPath,
-				CertKeyFile:           tlsKeyPath,
-			})
-		} else {
-			err = app.Listen(address, fiber.ListenConfig{
-				DisableStartupMessage: noStartupMessage,
-			})
-		}
-
-		if err != nil {
-			logrus.WithError(err).WithField("addr", address).
-				Error("HTTP server failed to start")
-
-			listenErrCh <- err
-		}
+		listenDone <- app.Listen(address, listenCfg)
 	}()
 
 	select {
-	case err := <-listenErrCh:
-		return fmt.Errorf("failed to start HTTP server: %w", err)
-	case <-ctx.Done():
-		err := app.ShutdownWithTimeout(ShutdownGracePeriod)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			logrus.WithError(err).Debug("Failed to shut down HTTP server")
+	case <-readyCh:
+		// Socket bound successfully.
+	case err := <-listenDone:
+		if !isCleanServerStop(err) {
+			logrus.WithError(err).WithField("addr", address).
+				Error("HTTP server failed to start")
 
-			return fmt.Errorf("server shutdown failed: %w", err)
+			return fmt.Errorf("failed to start HTTP server: %w", err)
 		}
 
 		return nil
+	case <-ctx.Done():
+		// Canceled before bind completed; wait briefly for Listen to exit.
+		select {
+		case err := <-listenDone:
+			if !isCleanServerStop(err) {
+				return fmt.Errorf("failed to start HTTP server: %w", err)
+			}
+
+			return nil
+		case <-time.After(ShutdownGracePeriod + time.Second):
+			return nil
+		}
 	}
+
+	if !block {
+		go func() {
+			err := <-listenDone
+			if !isCleanServerStop(err) {
+				logrus.WithError(err).WithField("addr", address).
+					Error("HTTP server stopped unexpectedly")
+			}
+		}()
+
+		return nil
+	}
+
+	// Blocking mode: wait until GracefulContext cancels and Listen returns.
+	err := <-listenDone
+	if !isCleanServerStop(err) {
+		logrus.WithError(err).WithField("addr", address).
+			Error("HTTP server failed")
+
+		return fmt.Errorf("HTTP server failed: %w", err)
+	}
+
+	return nil
 }

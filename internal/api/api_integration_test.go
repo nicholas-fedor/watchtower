@@ -51,8 +51,22 @@ func makeFilter(_ *testing.T) types.Filter {
 // NewEventsBroadcasterHelper creates an event broadcaster for integration tests.
 func NewEventsBroadcasterHelper() *events.Broadcaster { return events.NewBroadcaster() }
 
+func withTestListenAddr(opts config.Options) config.Options {
+	if opts.Host == "" {
+		opts.Host = "127.0.0.1"
+	}
+
+	if opts.Port == "" {
+		opts.Port = "0"
+	}
+
+	return opts
+}
+
 func runServerAndShutdown(t *testing.T, opts config.Options) {
 	t.Helper()
+
+	opts = withTestListenAddr(opts)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -62,7 +76,18 @@ func runServerAndShutdown(t *testing.T, opts config.Options) {
 		errCh <- api.SetupAndStartAPI(ctx, opts)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+		cancel()
+		time.Sleep(50 * time.Millisecond)
+
+		return
+	case <-time.After(500 * time.Millisecond):
+		// Blocking mode still inside SetupAndStartAPI.
+	}
+
 	cancel()
 
 	select {
