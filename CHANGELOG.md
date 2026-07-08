@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update star history chart by @nicholas-fedor in [#1907](https://github.com/nicholas-fedor/watchtower/pull/1907)
+
 ### Chores
 
 - Update golang:alpine docker digest to 9097beb by @renovate[bot] in [#1906](https://github.com/nicholas-fedor/watchtower/pull/1906)
