@@ -565,19 +565,23 @@ func run(command *cobra.Command, args []string) {
 		scope,
 	)
 
-	// Get flags controlling execution mode and HTTP API behavior.
+	// Get flags controlling execution mode.
 	runOnce, _ := command.PersistentFlags().GetBool("run-once")
 	updateOnStart, _ := command.PersistentFlags().GetBool("update-on-start")
-	enableUpdateAPI, _ := command.PersistentFlags().GetBool("http-api-update")
+	noStartupMessage, _ := command.PersistentFlags().GetBool("no-startup-message")
+	healthCheck, _ := command.PersistentFlags().GetBool("health-check")
+
+	// Get flags controlling HTTP API behavior.
 	enableCheckAPI, _ := command.PersistentFlags().GetBool("http-api-check")
-	enableMetricsAPI, _ := command.PersistentFlags().GetBool("http-api-metrics")
+	enableConfigAPI, _ := command.PersistentFlags().GetBool("http-api-config")
 	enableContainersAPI, _ := command.PersistentFlags().GetBool("http-api-containers")
-	enableSwaggerAPI, _ := command.PersistentFlags().GetBool("http-api-swagger")
+	enableEventsAPI, _ := command.PersistentFlags().GetBool("http-api-events")
 	enableHealthAPI, _ := command.PersistentFlags().GetBool("http-api-health")
 	enableHistoryAPI, _ := command.PersistentFlags().GetBool("http-api-history")
 	enableImagesAPI, _ := command.PersistentFlags().GetBool("http-api-images")
-	enableConfigAPI, _ := command.PersistentFlags().GetBool("http-api-config")
-	enableEventsAPI, _ := command.PersistentFlags().GetBool("http-api-events")
+	enableMetricsAPI, _ := command.PersistentFlags().GetBool("http-api-metrics")
+	enableSwaggerAPI, _ := command.PersistentFlags().GetBool("http-api-swagger")
+	enableUpdateAPI, _ := command.PersistentFlags().GetBool("http-api-update")
 	enableFullAPI, _ := command.PersistentFlags().GetBool("http-api-full")
 	tlsCertPath, _ := command.PersistentFlags().GetString("http-api-tls-cert")
 	tlsKeyPath, _ := command.PersistentFlags().GetString("http-api-tls-key")
@@ -585,10 +589,8 @@ func run(command *cobra.Command, args []string) {
 	proxyHeader, _ := command.PersistentFlags().GetString("http-api-proxy-header")
 	corsOrigins, _ := command.PersistentFlags().GetStringSlice("http-api-cors-origins")
 	unblockHTTPAPI, _ := command.PersistentFlags().GetBool("http-api-periodic-polls")
-	noStartupMessage, _ := command.PersistentFlags().GetBool("no-startup-message")
 	apiToken, _ := command.PersistentFlags().GetString("http-api-token")
 	apiEventsToken, _ := command.PersistentFlags().GetString("http-api-events-token")
-	healthCheck, _ := command.PersistentFlags().GetBool("health-check")
 
 	// Get the HTTP API host and port, falling back to "8080" for port if not specified.
 	flagsSet := command.PersistentFlags()
@@ -645,16 +647,16 @@ func run(command *cobra.Command, args []string) {
 		FilterDesc:          filterDesc,
 		RunOnce:             runOnce,
 		UpdateOnStart:       updateOnStart,
-		EnableUpdateAPI:     enableUpdateAPI,
 		EnableCheckAPI:      enableCheckAPI,
-		EnableMetricsAPI:    enableMetricsAPI,
+		EnableConfigAPI:     enableConfigAPI,
 		EnableContainersAPI: enableContainersAPI,
-		EnableSwaggerAPI:    enableSwaggerAPI,
+		EnableEventsAPI:     enableEventsAPI,
 		EnableHealthAPI:     enableHealthAPI,
 		EnableHistoryAPI:    enableHistoryAPI,
 		EnableImagesAPI:     enableImagesAPI,
-		EnableConfigAPI:     enableConfigAPI,
-		EnableEventsAPI:     enableEventsAPI,
+		EnableMetricsAPI:    enableMetricsAPI,
+		EnableSwaggerAPI:    enableSwaggerAPI,
+		EnableUpdateAPI:     enableUpdateAPI,
 		EnableFullAPI:       enableFullAPI,
 		TLSCertPath:         tlsCertPath,
 		TLSKeyPath:          tlsKeyPath,
@@ -889,16 +891,16 @@ func runMain(cfg types.RunConfig) int {
 			Token:                       cfg.APIToken,
 			EventsToken:                 cfg.APIEventsToken,
 			RateLimit:                   cfg.APIRateLimit,
-			EnableUpdateAPI:             cfg.EnableUpdateAPI,
 			EnableCheckAPI:              cfg.EnableCheckAPI,
-			EnableMetricsAPI:            cfg.EnableMetricsAPI,
+			EnableConfigAPI:             cfg.EnableConfigAPI,
 			EnableContainersAPI:         cfg.EnableContainersAPI,
-			EnableSwaggerAPI:            cfg.EnableSwaggerAPI,
+			EnableEventsAPI:             cfg.EnableEventsAPI,
 			EnableHealthAPI:             cfg.EnableHealthAPI,
 			EnableHistoryAPI:            cfg.EnableHistoryAPI,
 			EnableImagesAPI:             cfg.EnableImagesAPI,
-			EnableConfigAPI:             cfg.EnableConfigAPI,
-			EnableEventsAPI:             cfg.EnableEventsAPI,
+			EnableMetricsAPI:            cfg.EnableMetricsAPI,
+			EnableSwaggerAPI:            cfg.EnableSwaggerAPI,
+			EnableUpdateAPI:             cfg.EnableUpdateAPI,
 			EnableFullAPI:               cfg.EnableFullAPI,
 			TLSCertPath:                 cfg.TLSCertPath,
 			TLSKeyPath:                  cfg.TLSKeyPath,

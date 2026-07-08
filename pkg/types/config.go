@@ -22,26 +22,26 @@ type RunConfig struct {
 	RunOnce bool
 	// UpdateOnStart enables an immediate update check on startup, then continues with periodic updates, set via the --update-on-start flag.
 	UpdateOnStart bool
-	// EnableUpdateAPI enables the HTTP update API endpoint, set via the --http-api-update flag.
-	EnableUpdateAPI bool
 	// EnableCheckAPI enables the read-only check API endpoint, set via the --http-api-check flag.
 	EnableCheckAPI bool
-	// EnableMetricsAPI enables the HTTP metrics API endpoint, set via the --http-api-metrics flag.
-	EnableMetricsAPI bool
+	// EnableConfigAPI enables the config API endpoint, set via the --http-api-config flag.
+	EnableConfigAPI bool
 	// EnableContainersAPI enables the read-only containers API endpoint, set via the --http-api-containers flag.
 	EnableContainersAPI bool
-	// EnableSwaggerAPI enables the Swagger UI endpoint, set via the --http-api-swagger flag.
-	EnableSwaggerAPI bool
+	// EnableEventsAPI enables the real-time events API endpoint, set via the --http-api-events flag.
+	EnableEventsAPI bool
 	// EnableHealthAPI enables the health probe endpoints, set via the --http-api-health flag.
 	EnableHealthAPI bool
 	// EnableHistoryAPI enables the scan history API endpoint, set via the --http-api-history flag.
 	EnableHistoryAPI bool
 	// EnableImagesAPI enables the images API endpoint, set via the --http-api-images flag.
 	EnableImagesAPI bool
-	// EnableConfigAPI enables the config API endpoint, set via the --http-api-config flag.
-	EnableConfigAPI bool
-	// EnableEventsAPI enables the real-time events API endpoint, set via the --http-api-events flag.
-	EnableEventsAPI bool
+	// EnableMetricsAPI enables the HTTP metrics API endpoint, set via the --http-api-metrics flag.
+	EnableMetricsAPI bool
+	// EnableSwaggerAPI enables the Swagger UI endpoint, set via the --http-api-swagger flag.
+	EnableSwaggerAPI bool
+	// EnableUpdateAPI enables the HTTP update API endpoint, set via the --http-api-update flag.
+	EnableUpdateAPI bool
 	// EnableFullAPI enables all HTTP API endpoints, set via the --http-api-full flag.
 	EnableFullAPI bool
 	// UnblockHTTPAPI allows periodic polling alongside the HTTP API, set via the --http-api-periodic-polls flag.

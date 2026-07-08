@@ -18,6 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:godox
+// TODO: Remove and/or update unit testing of deprecated configuration options just before v2 Release.
+
 var errSetFailed = errors.New("set failed")
 
 // newTestCommand creates a new cobra.Command with default flags registered for testing.
@@ -648,23 +651,10 @@ func TestSetupLogging(t *testing.T) {
 // TestFlagsArePresentInDocumentation verifies that all flags are documented.
 // It checks documentation files for flag and environment variable mentions.
 func TestFlagsArePresentInDocumentation(t *testing.T) {
-	//nolint:godox
-	// TODO: Remove legacy flags from ignoredEnvs/ignoredFlags when legacy notification types are removed.
-	// Legacy notifications are ignored due to soft deprecation.
-	ignoredEnvs := map[string]string{
-		"WATCHTOWER_NOTIFICATION_SLACK_ICON_EMOJI": "legacy",
-		"WATCHTOWER_NOTIFICATION_SLACK_ICON_URL":   "legacy",
-		"DOCKER_CERT_PATH":                         "new feature",
-		"WATCHTOWER_NOTIFICATION_TEMPLATE_FILE":    "new feature",
-	}
+	ignoredEnvs := map[string]string{}
 
 	ignoredFlags := map[string]string{
-		"notification-gotify-url":       "legacy",
-		"notification-slack-icon-emoji": "legacy",
-		"notification-slack-icon-url":   "legacy",
-		"cert-path":                     "new feature",
-		"notification-template-file":    "new feature",
-		"self-update-orchestrator":      "internal",
+		"self-update-orchestrator": "internal",
 	}
 
 	cmd := new(cobra.Command)
@@ -677,10 +667,17 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 	flags := cmd.PersistentFlags()
 
 	docFiles := []string{
-		"../../docs/configuration/arguments/index.md",
-		"../../docs/advanced-features/lifecycle-hooks/index.md",
-		"../../docs/notifications/overview/index.md",
-		"../../docs/notifications/templates/index.md",
+		"../../docs/configuration/container-selection/index.md",
+		"../../docs/configuration/docker-connection/index.md",
+		"../../docs/configuration/http-api/index.md",
+		"../../docs/configuration/image-cooldown/index.md",
+		"../../docs/configuration/introduction/index.md",
+		"../../docs/configuration/lifecycle-hooks/index.md",
+		"../../docs/configuration/logging-and-output/index.md",
+		"../../docs/configuration/notifications/index.md",
+		"../../docs/configuration/registry-and-authentication/index.md",
+		"../../docs/configuration/scheduling/index.md",
+		"../../docs/configuration/update-behavior/index.md",
 	}
 	allDocs := ""
 

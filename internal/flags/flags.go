@@ -463,13 +463,10 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 func RegisterNotificationFlags(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
 
-	flags.StringSliceP(
-		"notifications",
-		"n",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATIONS"), -1),
-		),
-		"Notification types to send [legacy types (email, slack, msteams, gotify) are deprecated. Use a Shoutrrr URL instead]",
+	flags.StringArray(
+		"notification-url",
+		filterEmptyStrings(splitNotificationValues(envString("WATCHTOWER_NOTIFICATION_URL"))),
+		"The shoutrrr URL to send notifications to",
 	)
 
 	flags.String(
@@ -490,10 +487,59 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		envString("WATCHTOWER_NOTIFICATIONS_HOSTNAME"),
 		"Custom hostname for notification titles")
 
+	flags.String(
+		"notification-template",
+		envString("WATCHTOWER_NOTIFICATION_TEMPLATE"),
+		"The shoutrrr text/template for the messages")
+
+	flags.String(
+		"notification-template-file",
+		envString("WATCHTOWER_NOTIFICATION_TEMPLATE_FILE"),
+		"Path to a file containing the Shoutrrr text/template for the messages")
+
+	flags.Bool("notification-report",
+		envBool("WATCHTOWER_NOTIFICATION_REPORT"),
+		"Use the session report as the notification template data")
+
+	flags.StringP(
+		"notification-title-tag",
+		"",
+		envString("WATCHTOWER_NOTIFICATION_TITLE_TAG"),
+		"Title prefix tag for notifications")
+
+	flags.Bool("notification-skip-title",
+		envBool("WATCHTOWER_NOTIFICATION_SKIP_TITLE"),
+		"Do not pass the title param to notifications")
+
+	flags.String(
+		"warn-on-head-failure",
+		envString("WATCHTOWER_WARN_ON_HEAD_FAILURE"),
+		"When to warn about HEAD pull requests failing. Possible values: always, auto or never")
+
+	flags.Bool(
+		"notification-log-stdout",
+		envBool("WATCHTOWER_NOTIFICATION_LOG_STDOUT"),
+		"Write notification logs to stdout instead of logging (to stderr)")
+
+	flags.BoolP(
+		"notification-split-by-container",
+		"",
+		envBool("WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER"),
+		"Send separate notifications for each updated container instead of grouping them")
+
 	//nolint:godox
 	// TODO: Remove legacy notification flags below for the v2 release.
 	// They are kept for backwards compatibility but are deprecated.
 	// Use --notification-url instead.
+
+	flags.StringSliceP(
+		"notifications",
+		"n",
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATIONS"), -1),
+		),
+		"Notification types to send [legacy types (email, slack, msteams, gotify) are deprecated. Use a Shoutrrr URL instead]",
+	)
 
 	flags.StringP(
 		"notification-email-from",
@@ -605,52 +651,6 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		"Controls whether watchtower verifies the Gotify server's certificate chain and host name. Should only be used for testing.",
 	)
 
-	flags.String(
-		"notification-template",
-		envString("WATCHTOWER_NOTIFICATION_TEMPLATE"),
-		"The shoutrrr text/template for the messages")
-
-	flags.String(
-		"notification-template-file",
-		envString("WATCHTOWER_NOTIFICATION_TEMPLATE_FILE"),
-		"Path to a file containing the Shoutrrr text/template for the messages")
-
-	flags.StringArray(
-		"notification-url",
-		filterEmptyStrings(splitNotificationValues(envString("WATCHTOWER_NOTIFICATION_URL"))),
-		"The shoutrrr URL to send notifications to",
-	)
-
-	flags.Bool("notification-report",
-		envBool("WATCHTOWER_NOTIFICATION_REPORT"),
-		"Use the session report as the notification template data")
-
-	flags.StringP(
-		"notification-title-tag",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_TITLE_TAG"),
-		"Title prefix tag for notifications")
-
-	flags.Bool("notification-skip-title",
-		envBool("WATCHTOWER_NOTIFICATION_SKIP_TITLE"),
-		"Do not pass the title param to notifications")
-
-	flags.String(
-		"warn-on-head-failure",
-		envString("WATCHTOWER_WARN_ON_HEAD_FAILURE"),
-		"When to warn about HEAD pull requests failing. Possible values: always, auto or never")
-
-	flags.Bool(
-		"notification-log-stdout",
-		envBool("WATCHTOWER_NOTIFICATION_LOG_STDOUT"),
-		"Write notification logs to stdout instead of logging (to stderr)")
-
-	flags.BoolP(
-		"notification-split-by-container",
-		"",
-		envBool("WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER"),
-		"Send separate notifications for each updated container instead of grouping them")
-
 	//nolint:godox
 	// TODO: Remove just before v2 Release.
 	// Mark legacy notification flags as deprecated.
@@ -674,6 +674,7 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 	markFlagDeprecated(flags, "notification-gotify-url", "Use --notification-url with a gotify:// URL.")
 	markFlagDeprecated(flags, "notification-gotify-token", "Use --notification-url with a gotify:// URL.")
 	markFlagDeprecated(flags, "notification-gotify-tls-skip-verify", "Use --notification-url with a gotify:// URL.")
+	markFlagDeprecated(flags, "notifications", "Use --notification-url with the appropriate Shoutrrr URL scheme instead.")
 }
 
 // markFlagDeprecated marks a pflag as deprecated with a migration hint.
@@ -921,6 +922,8 @@ func splitNotificationValues(value string) []string {
 // SetDefaults sets default environment variable values.
 //
 // It configures fallback values for unset flags.
+//
+//nolint:godox
 func SetDefaults() {
 	viper.AutomaticEnv()
 	viper.SetDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -930,11 +933,16 @@ func SetDefaults() {
 	viper.SetDefault("WATCHTOWER_HTTP_API_HOST", "")
 	viper.SetDefault("WATCHTOWER_HTTP_API_PORT", "8080")
 	viper.SetDefault("WATCHTOWER_HTTP_API_RATE_LIMIT", defaultAPIRateLimitPerMinute)
+	// TODO: Remove just before v2 Release.
 	viper.SetDefault("WATCHTOWER_NOTIFICATIONS", []string{})
 	viper.SetDefault("WATCHTOWER_NOTIFICATIONS_LEVEL", "info")
+	// TODO: Remove just before v2 Release.
 	viper.SetDefault("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT", defaultEmailServerPort)
+	// TODO: Remove just before v2 Release.
 	viper.SetDefault("WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG", "")
+	// TODO: Remove just before v2 Release.
 	viper.SetDefault("WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER", "watchtower")
+	// TODO: Remove just before v2 Release.
 	viper.SetDefault("WATCHTOWER_LOG_LEVEL", "info")
 	viper.SetDefault("WATCHTOWER_LOG_FORMAT", "auto")
 	viper.SetDefault("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS", false)
@@ -1137,12 +1145,18 @@ func setEnvOptBool(env string, opt bool) error {
 //
 // Parameters:
 //   - rootCmd: Root Cobra command.
+//
+//nolint:godox
 func GetSecretsFromFiles(rootCmd *cobra.Command) {
 	flags := rootCmd.PersistentFlags()
 	secrets := []string{
+		// TODO: Remove just before v2 Release.
 		"notification-email-server-password",
+		// TODO: Remove just before v2 Release.
 		"notification-slack-hook-url",
+		// TODO: Remove just before v2 Release.
 		"notification-msteams-hook",
+		// TODO: Remove just before v2 Release.
 		"notification-gotify-token",
 		"notification-url",
 		"http-api-token",
