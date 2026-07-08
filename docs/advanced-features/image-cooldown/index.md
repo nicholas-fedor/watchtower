@@ -23,45 +23,68 @@ This also helps to avoid downloading a potentially malicious image.
 
 ### Global Configuration
 
-Set the cooldown delay for all monitored containers using the `--cooldown-delay` flag or the `WATCHTOWER_COOLDOWN_DELAY` environment variable.
-
-=== "Command Line Flag"
-
-    ```bash
-    --cooldown-delay 24h
-    ```
-
-=== "Environment Variable"
-
-    ```dockerfile
-    WATCHTOWER_COOLDOWN_DELAY=24h
-    ```
+Set the cooldown delay for all monitored containers using the [`cooldown-delay`](../../configuration/image-cooldown/index.md#cooldown_delay) configuration option.
 
 === "Docker Compose"
 
     ```yaml title="docker-compose.yml"
     services:
-      watchtower:
-        image: nickfedor/watchtower
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-        environment:
-          - WATCHTOWER_COOLDOWN_DELAY=24h
+        watchtower:
+            image: nickfedor/watchtower
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+            environment:
+                - WATCHTOWER_COOLDOWN_DELAY=24h
+    ```
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        --restart unless-stopped \
+        nickfedor/watchtower \
+        --cooldown-delay 24h
+    ```
+
+=== "Dockerfile"
+
+    ```dockerfile
+    ...
+    WATCHTOWER_COOLDOWN_DELAY=24h
+    ...
     ```
 
 ### Per-Container Label
 
-Individual containers can override the global cooldown using the `com.centurylinklabs.watchtower.cooldown-delay` label. When set, the label value takes precedence over the global configuration.
+Individual containers can override the global cooldown using the `com.centurylinklabs.watchtower.cooldown-delay` label.
+When set, the label value takes precedence over the global configuration.
 
-```dockerfile title="Dockerfile"
-LABEL com.centurylinklabs.watchtower.cooldown-delay="48h"
-```
+=== "Docker Compose"
 
-```bash title="docker run"
-docker run -d \
-  --label=com.centurylinklabs.watchtower.cooldown-delay="48h" \
-  someimage
-```
+    ```yaml
+    services:
+        nginx:
+            image: nginx
+            labels:
+                com.centurylinklabs.watchtower.cooldown-delay: "48h"
+            ...
+    ```
+
+=== "Docker CLI"
+
+    ```bash title="docker run"
+    docker run -d \
+    --label=com.centurylinklabs.watchtower.cooldown-delay="48h" \
+    nginx
+    ```
+
+=== "Dockerfile"
+
+    ```dockerfile title="Dockerfile"
+    LABEL com.centurylinklabs.watchtower.cooldown-delay="48h"
+    ```
 
 Setting the label to `"0"` disables cooldown for that container, even when a global cooldown is configured.
 
@@ -72,7 +95,10 @@ LABEL com.centurylinklabs.watchtower.cooldown-delay="0"
 !!! Note "If a container's cooldown label cannot be parsed as a valid duration, Watchtower falls back to the global cooldown value and logs a warning."
 
 !!! Warning "No-Pull Precedence"
-    When `--no-pull` is enabled globally (or the `com.centurylinklabs.watchtower.no-pull` label is set on a container), Watchtower does not fetch new images from the registry. Because no new images are pulled, the cooldown check is skipped entirely. This takes precedence over any cooldown configuration — including per-container labels. If you rely on cooldown as a supply-chain defense, ensure that no-pull mode is not inadvertently enabled.
+    When the [`no-pull`](../../configuration/update-behavior/index.md#disable_image_pulling) configuration option  is enabled globally (or the `com.centurylinklabs.watchtower.no-pull` label is set on a container), Watchtower does not fetch new images from the registry.
+    Because no new images are pulled, the cooldown check is skipped entirely.
+    This takes precedence over any cooldown configuration — including per-container labels.
+    If you rely on cooldown as a supply-chain defense, ensure that no-pull mode is not inadvertently enabled.
 
 ### Duration Format
 
@@ -149,7 +175,7 @@ Units can be combined:
 
 ### Image Age Determination
 
-When Watchtower detects that a container's running image differs from the latest available image, it retrieves the image creation timestamp from the registry before deciding whether to update. The process follows the [OCI Distribution Spec](https://github.com/opencontainers/distribution-spec) API:
+When Watchtower detects that a container's running image differs from the latest available image, it retrieves the image creation timestamp from the registry before deciding whether to update. The process follows the [OCI Distribution Spec](https://github.com/opencontainers/distribution-spec){target="_blank" rel="noopener noreferrer"} API:
 
 ```mermaid
 flowchart TD
@@ -286,7 +312,7 @@ Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls,
 GHCR.io does not publish explicit pull rate limits and currently provides free storage and bandwidth for container images.
 Observed limits are in the range of tens of thousands of requests per minute, which is well beyond what Watchtower's cooldown feature would generate under any realistic deployment.
 
-#### Summary
+#### Per-Registry Impact Summary
 
 | Registry                        | Pull Limit                  | Cooldown Impact                                                     |
 |---------------------------------|-----------------------------|---------------------------------------------------------------------|
@@ -297,7 +323,7 @@ Observed limits are in the range of tens of thousands of requests per minute, wh
 
 ### Monitor-Only Containers
 
-Cooldown is not evaluated for containers running in monitor-only mode (`--monitor-only` or the `com.centurylinklabs.watchtower.monitor-only` label).
+Cooldown is not evaluated for containers running in [`monitor-only`](../../configuration/update-behavior/index.md#monitor_only) mode.
 Since monitor-only containers are never updated, the cooldown check is skipped to avoid unnecessary registry API calls.
 
 ### Rolling Restarts
@@ -308,7 +334,8 @@ This means containers may update at different times even when using the same ima
 
 ## Notifications
 
-Watchtower reports the cooldown status in its notifications. The output varies depending on the outcome:
+Watchtower reports the cooldown status in its notifications.
+The output varies depending on the outcome:
 
 === "Image age exceeds cooldown"
 

@@ -1,11 +1,11 @@
 # Linked Containers
 
-Watchtower's linked containers feature ensures that interdependent containers are updated in the correct order to maintain application stability.
-This feature automatically detects container dependencies through various mechanisms and uses topological sorting to determine the optimal update sequence.
-
 ## Overview
 
-When containers have dependencies on each other (such as a web application depending on a database), updating them in the wrong order can cause service disruptions.
+Watchtower, by default, ensures that interdependent containers are updated in the correct order to maintain application stability.
+It automatically detects container dependencies through various mechanisms and uses topological sorting to determine the optimal update sequence.
+
+When containers depend-upon each other (such as a web application depending on a database), updating them in the wrong order can cause service disruptions.
 
 Watchtower addresses this by:
 
@@ -59,7 +59,7 @@ The `com.docker.compose.depends_on` label is automatically set by Docker Compose
 
 <!-- markdownlint-disable MD046 -->
 !!! Important "Docker Compose depends_on Restart Behavior"
-    Docker Compose's [`depends_on`](https://docs.docker.com/reference/compose-file/services/#depends_on) has a `restart` attribute in the long-form syntax:
+    Docker Compose's [`depends_on`](https://docs.docker.com/reference/compose-file/services/#depends_on){target="_blank" rel="noopener noreferrer"} has a `restart` attribute in the long-form syntax:
 
     ```yaml
     services:

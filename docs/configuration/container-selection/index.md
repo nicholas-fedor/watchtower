@@ -1,468 +1,155 @@
 # Container Selection
 
-## Overview
-
-By default, Watchtower monitors and updates all running containers on the connected Docker daemon.
-This behavior can be customized through a combination of configuration options and container labels to control exactly which containers are managed and how.
-
-Container selection works through a **filter chain**: a series of criteria applied in sequence.
-A container is monitored only if it passes every filter in the chain. The filters are evaluated in the following order:
-
-| # | Filter                                                    | Description                                                                                                                      |
-|---|-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Old Watchtower container exclusion                        | Watchtower containers renamed with a `watchtower-old-` prefix during self-updates are always excluded.                           |
-| 2 | [Disabled label check](#enabledisable_labels)             | Containers with the Docker label `com.centurylinklabs.watchtower.enable=false` are excluded.                                     |
-| 3 | [Scope filter](#monitoring_scopes)                        | Only containers matching the configured scope are included (default: `"none"`).                                                  |
-| 4 | [Enable label filter](#enabledisable_labels)              | If [label enable](../arguments/index.md#enable_label_filter) is set, only containers with the enable label present are included. |
-| 5 | [Image skip patterns](#exclude_specific_images)           | Containers whose image matches a [skip pattern](../arguments/index.md#skip_specific_images) are excluded.                        |
-| 6 | [Monitored image name patterns](#monitor_specific_images) | If set, only containers whose image matches a [monitored pattern](../arguments/index.md#monitor_specific_images) are included.   |
-| 7 | [Disabled container names](#exclude_specific_containers)  | Containers whose name matches a [disable pattern](../arguments/index.md#disable_specific_containers) are excluded.               |
-| 8 | [Container name arguments](#container_name_filtering)     | If positional name arguments are provided, only containers matching at least one are included.                                   |
-
-!!! Note
-    - If an image name pattern is configured, then Watchtower will exclusively manage only the respective container(s).
-    - If a container name is provided as an argument, then Watchtower will exclusively manage only the specified container(s).
-
-!!! Note "All criteria must be satisfied"
-    A container must pass **every** filter in the chain to be monitored. If any single filter rejects it, the container is excluded.
-
-## Management Modes
-
-Watchtower supports two management modes for containers:
-
-- **Full Management** (default): Watchtower checks for updates, pulls new images, recreates containers, and runs lifecycle hooks.
-- [**Monitor Only Mode**](../arguments/index.md#monitor_only): Watchtower checks for updates, sends notifications, and runs lifecycle hooks, but does **not** recreate containers.
-
-## Container State Filtering
-
-By default, Watchtower only processes containers in the `running` state.
-
-Two configuration options extend this to include additional states:
-
-| Option                                                                               | Environment Variable            | Effect                                        |
-|--------------------------------------------------------------------------------------|---------------------------------|-----------------------------------------------|
-| [Include Stopped Containers](../arguments/index.md#include_stopped_containers)       | `WATCHTOWER_INCLUDE_STOPPED`    | Include `created` and `exited` containers     |
-| [Include Restarting Containers](../arguments/index.md#include_restarting_containers) | `WATCHTOWER_INCLUDE_RESTARTING` | Include `restarting` containers (Docker only) |
-
-!!! Note "Podman compatibility"
-    The `restarting` state is not available on Podman and is automatically excluded when Podman is detected.
-
-## Enable/Disable Labels
-
-The `com.centurylinklabs.watchtower.enable` label controls whether Watchtower manages a container.
-
-!!! Note "This label is set on the container you want to manage, not on the Watchtower instance."
-
-### Default Behavior
-
-When [label enable](../arguments/index.md#enable_label_filter) is **not** set:
-
-- Containers **without** the label are **monitored**
-- Containers with `enable=true` are **monitored**
-- Containers with `enable=false` are **excluded**
-
-### With Label Enable
-
-When [label enable](../arguments/index.md#enable_label_filter) is set:
-
-- Containers with `enable=true` are **monitored**
-- Containers with `enable=false` are **excluded**
-- Containers **without** the label are **excluded**
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      someimage:
-        labels:
-          - "com.centurylinklabs.watchtower.enable=true"
-    ```
-=== "Docker CLI"
-    ```bash
-    docker run -d --label=com.centurylinklabs.watchtower.enable=true someimage
-    ```
-=== "Dockerfile"
-    ```dockerfile
-    LABEL com.centurylinklabs.watchtower.enable="true"
-    ```
-<!-- markdownlint-restore -->
-
-To exclude a container, set the label to `false`:
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      someimage:
-        labels:
-          - "com.centurylinklabs.watchtower.enable=false"
-    ```
-=== "Docker CLI"
-    ```bash
-    docker run -d --label=com.centurylinklabs.watchtower.enable=false someimage
-    ```
-=== "Dockerfile"
-    ```dockerfile
-    LABEL com.centurylinklabs.watchtower.enable="false"
-    ```
-<!-- markdownlint-restore -->
-
-## Monitor-Only Mode
-
-Individual containers can be set to [monitor-only mode](../arguments/index.md#monitor_only), where Watchtower checks for updates and sends notifications but does not recreate the container.
-
-Set the `com.centurylinklabs.watchtower.monitor-only` label to `true` on the container:
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      someimage:
-        labels:
-          - "com.centurylinklabs.watchtower.monitor-only=true"
-    ```
-=== "Docker CLI"
-    ```bash
-    docker run -d --label=com.centurylinklabs.watchtower.monitor-only=true someimage
-    ```
-=== "Dockerfile"
-    ```dockerfile
-    LABEL com.centurylinklabs.watchtower.monitor-only="true"
-    ```
-<!-- markdownlint-restore -->
-
-!!! Note
-    The per-container label has the same effect as the global [monitor-only](../arguments/index.md#monitor_only) option, but applies only to that specific container.
-
-    When combined with [label precedence](../arguments/index.md#label_precedence), the container label overrides the global option. Without label precedence, the container is monitor-only if **either** the label or the global option is set.
-
-## Container Name Filtering
-
-Watchtower can filter containers based on their container name using [Go regex pattern matching](#regex_pattern_matching).
-
-### Include Specific Containers
-
-Pass container names as positional arguments to Watchtower.
-When provided, only containers matching at least one name are monitored.
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      watchtower:
-        image: nickfedor/watchtower:latest
-        command: nginx redis
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```
-=== "Docker CLI"
-    ```bash
-    docker run -d \
-      --name watchtower \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      nickfedor/watchtower \
-      nginx redis
-    ```
-<!-- markdownlint-restore -->
-
-### Exclude Specific Containers
-
-Use the [disable containers](../arguments/index.md#disable_specific_containers) option to exclude containers by name. This supports comma- or space-separated values and regex patterns.
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      watchtower:
-        image: nickfedor/watchtower:latest
-        environment:
-          - WATCHTOWER_DISABLE_CONTAINERS=container1,container2
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```
-=== "Docker CLI (Env Vars)"
-    ```bash
-    docker run -d \
-      -e WATCHTOWER_DISABLE_CONTAINERS="container1,container2" \
-      nickfedor/watchtower
-    ```
-=== "Docker CLI (Flags)"
-    ```bash
-    docker run -d \
-      nickfedor/watchtower \
-      --disable-containers container1,container2
-    ```
-<!-- markdownlint-restore -->
-
-## Image Name Filtering
-
-Watchtower can filter containers based on their image name using [Go regex pattern matching](#regex_pattern_matching).
-
-Image name patterns match against the **full image name including its tag** (e.g., `nginx:latest`, `docker.io/library/nginx:1.25`).
-
-!!! Note "If no tag is specified in the image reference, `:latest` is assumed."
-
-### Monitor Specific Images
-
-Use the [monitor image names](../arguments/index.md#monitor_specific_images) option to restrict monitoring to containers whose image matches at least one pattern.
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      watchtower:
-        image: nickfedor/watchtower:latest
-        environment:
-          - WATCHTOWER_MONITOR_IMAGE_NAMES=nginx:.*,redis:7.*
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```
-=== "Docker CLI (Env Vars)"
-    ```bash
-    docker run -d \
-      -e WATCHTOWER_MONITOR_IMAGE_NAMES="nginx:.*,redis:7.*" \
-      nickfedor/watchtower
-    ```
-=== "Docker CLI (Flags)"
-    ```bash
-    docker run -d \
-      nickfedor/watchtower \
-      --monitor-image-names "nginx:.*,redis:7.*"
-    ```
-<!-- markdownlint-restore -->
-
-### Exclude Specific Images
-
-Use the [skip image names](../arguments/index.md#skip_specific_images) option to exclude containers whose image matches at least one pattern.
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      watchtower:
-        image: nickfedor/watchtower:latest
-        environment:
-          - WATCHTOWER_SKIP_IMAGE_NAMES=postgres:.*,mcr.microsoft.com/*
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```
-=== "Docker CLI (Env Vars)"
-    ```bash
-    docker run -d \
-      -e WATCHTOWER_SKIP_IMAGE_NAMES="postgres:.*,mcr.microsoft.com/*" \
-      nickfedor/watchtower
-    ```
-=== "Docker CLI (Flags)"
-    ```bash
-    docker run -d \
-      nickfedor/watchtower \
-      --skip-image-names "postgres:.*,mcr.microsoft.com/*"
-    ```
-<!-- markdownlint-restore -->
-
-## Monitoring Scopes
-
-Scopes allow multiple Watchtower instances to run on the same Docker host without interfering with each other.
-Each instance manages only the containers within its scope.
-
-1. Use the [scope filter](../arguments/index.md#scope_filter) option to define a scope.
-2. Then, use the `com.centurylinklabs.watchtower.scope` label on containers to assign them to that scope.
-
-<!-- markdownlint-disable -->
-=== "Docker Compose"
-    ```yaml
-    services:
-      # Scoped Application
-      app-production:
-        image: myapp:latest
-        labels:
-          - "com.centurylinklabs.watchtower.scope=production"
-
-      # Scoped Watchtower watching "production" scope
-      watchtower-production:
-        image: nickfedor/watchtower:latest
-        environment:
-          - WATCHTOWER_SCOPE=production
-        labels:
-          - "com.centurylinklabs.watchtower.scope=production"
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-    ```
-=== "Docker CLI"
-    ```bash
-    docker run -d \
-      --name watchtower-production \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      nickfedor/watchtower \
-      --scope production
-    ```
-<!-- markdownlint-restore -->
-
-!!! Note
-    - Without a [scope filter](../arguments/index.md#scope_filter), Watchtower defaults to scope `"none"` and manages only **unscoped** containers (those without a `com.centurylinklabs.watchtower.scope` label, or with it set to `"none"` or `""`).
-    - Containers with a non-empty scope label (e.g., `scope=production`) are **not** monitored by an unscoped Watchtower instance.
-    - Set the scope filter to `none` to explicitly manage only unscoped containers (same as the default behavior).
-    - Two instances cannot share the same scope.
-    - An unscoped instance coexists with scoped instances.
-
-    See [Running Multiple Instances](../../advanced-features/running-multiple-instances/index.md) for a complete guide.
-
-## Regex Pattern Matching
-
-Container name and image name filters support regular expressions using [Go regex syntax](https://pkg.go.dev/regexp/syntax){target="_blank" rel="noopener noreferrer"}.
-
-!!! Important "Patterns are anchored to match the **full** name"
-    Patterns are automatically anchored with `^...$`, meaning they must match the entire container or image name. Use `.*` for wildcard matching instead of bare `*`.
-
-### Container Name Patterns
-
-Container names are normalized before matching (the leading `/` stripped). Both positional arguments and the [disable containers](../arguments/index.md#disable_specific_containers) option support regex.
-
-| Pattern           | Matches                                  |
-|-------------------|------------------------------------------|
-| `container.*`     | "container1", "container-abc"            |
-| `.*-dev`          | "web-dev", "api-dev", "db-dev"           |
-| `.*`              | Any container name                       |
-| `nginx\|redis`    | Either "nginx" or "redis"                |
-| `db-.*\|cache-.*` | Any name starting with "db-" or "cache-" |
-
-### Image Name Patterns
-
-Image name patterns match against the full `name:tag` string. Use `.*` to match any tag.
-
-| Pattern                 | Matches                            |
-|-------------------------|------------------------------------|
-| `nginx:latest`          | Only `nginx:latest`                |
-| `nginx:.*`              | `nginx` with any tag               |
-| `docker\.io/library/.*` | Any official Docker Hub image      |
-| `.*\.azurecr\.io/.*`    | Any Azure Container Registry image |
-
-### Examples
-
-Exclude all containers starting with a prefix:
-
-```bash
-docker run -d -e WATCHTOWER_DISABLE_CONTAINERS="web-.*" nickfedor/watchtower
+## Include Stopped Containers
+
+Includes created and exited containers in monitoring and updates.
+
+```text
+            Argument: --include-stopped, -S
+Environment Variable: WATCHTOWER_INCLUDE_STOPPED
+                Type: Boolean
+             Default: false
 ```
 
-Include only containers matching specific patterns:
+## Revive Stopped Containers
 
-```bash
-docker run -d nickfedor/watchtower "db-.*" "cache-.*"
+Restarts stopped containers after their images are updated.
+
+```text
+            Argument: --revive-stopped
+Environment Variable: WATCHTOWER_REVIVE_STOPPED
+                Type: Boolean
+             Default: false
 ```
 
-Monitor only containers using nginx or redis images with any tag:
+!!! Note
+    Requires `--include-stopped`.
 
-```bash
-docker run -d -e WATCHTOWER_MONITOR_IMAGE_NAMES="nginx:.*,redis:.*" nickfedor/watchtower
+## Include Restarting Containers
+
+Includes containers in the restarting state for monitoring and updates.
+
+```text
+            Argument: --include-restarting
+Environment Variable: WATCHTOWER_INCLUDE_RESTARTING
+                Type: Boolean
+             Default: false
 ```
+
+## Enable Label Filter
+
+Restricts monitoring to containers with the `com.centurylinklabs.watchtower.enable` label set to `true` when the `--label-enable` flag is specified.
+Without `--label-enable`, containers with this label set to `false` are excluded, while others are monitored by default.
+
+```text
+            Argument: --label-enable
+Environment Variable: WATCHTOWER_LABEL_ENABLE
+                Type: Boolean
+             Default: false
+```
+
+!!! Note
+    When `--label-enable` is unset, containers without the `com.centurylinklabs.watchtower.enable` label or with it set to `true` are monitored, and those with `false` are excluded.
+
+    When `--label-enable` is set, only containers with `true` are monitored, ignoring those with `false` or no label.
+
+## Disable Specific Containers
+
+Excludes containers by container name from monitoring, even if they have the enable label set to `true`.
+
+```text
+            Argument: --disable-containers, -x
+Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
+                Type: Comma- or space-separated string list
+             Default: None
+```
+
+!!! Note
+    Regex patterns are supported. See [Regex Pattern Matching](../../getting-started/container-selection/index.md#regex_pattern_matching) for details.
+
+## Monitor Specific Images
+
+Restricts monitoring to containers whose image name matches one of the supplied image name patterns, even if other selection criteria would include them.
+
+```text
+            Argument: --monitor-image-names
+Environment Variable: WATCHTOWER_MONITOR_IMAGE_NAMES
+                Type: Comma or space-separated string list
+             Default: None
+```
+
+!!! Note
+    Image name patterns include the tag (for example `nginx:latest`).
+    Regex patterns are supported and anchored to the **full** image name.
+    See [Regex Pattern Matching](../../getting-started/container-selection/index.md#regex_pattern_matching)
+    for details.
+
+## Skip Specific Images
+
+Excludes containers by image name pattern from monitoring, even if they have the enable label set to `true`.
+
+```text
+            Argument: --skip-image-names
+Environment Variable: WATCHTOWER_SKIP_IMAGE_NAMES
+                Type: Comma or space-separated string list
+             Default: None
+```
+
+!!! Note
+    Image name patterns include the tag (for example `nginx:latest`).
+    Regex patterns are supported and anchored to the **full** image name.
+    See [Regex Pattern Matching](../../getting-started/container-selection/index.md#regex_pattern_matching)
+    for details.
+
+## Scope Filter
+
+Monitors containers with a `com.centurylinklabs.watchtower.scope` label matching the specified value, enabling multiple Watchtower instances.
+
+```text
+            Argument: --scope
+Environment Variable: WATCHTOWER_SCOPE
+                Type: String
+             Default: None
+```
+
+!!! Note
+    Set to `none` to ignore scoped containers.
+    Without this flag, Watchtower monitors all containers regardless of scope.
+
+    For self-updates, ensure all Watchtower containers share the same `com.centurylinklabs.watchtower.scope` label to guarantee cleanup of renamed containers and old images.
+    Mismatched labels may prevent detection, leaving resources running.
+
+    See [Running Multiple Instances](../../advanced-features/running-multiple-instances/index.md).
 
 ## Label Precedence
 
-By default, when a container-level label (e.g., `com.centurylinklabs.watchtower.monitor-only`) and a global option (e.g., [monitor-only](../arguments/index.md#monitor_only)) are both set, the container uses the **combined** effect (either triggers the behavior).
+Allows container labels (e.g., `com.centurylinklabs.watchtower.monitor-only`, `com.centurylinklabs.watchtower.no-pull`) to override corresponding flags.
 
-With [label precedence](../arguments/index.md#label_precedence), container labels **override** the global options. This allows per-container control even when global options are set.
-
-| [Label Precedence](../arguments/index.md#label_precedence) | Container Label | Global Option | Result            |
-|------------------------------------------------------------|-----------------|---------------|-------------------|
-| false (default)                                            | not set         | false         | false             |
-| false (default)                                            | not set         | true          | true              |
-| false (default)                                            | true            | false         | true              |
-| false (default)                                            | true            | true          | true              |
-| true                                                       | not set         | any           | global flag value |
-| true                                                       | true            | false         | true              |
-| true                                                       | false           | true          | false             |
-
-This applies to the `monitor-only` and `no-pull` settings.
-
-## Complete Configuration Reference
-
-### CLI Flags and Environment Variables
-
-| Flag                          | Environment Variable               | Type     | Default | Description                           |
-|-------------------------------|------------------------------------|----------|---------|---------------------------------------|
-| *(positional args)*           | N/A                                | []string | []      | Container names/patterns to include   |
-| `--disable-containers` / `-x` | `WATCHTOWER_DISABLE_CONTAINERS`    | []string | []      | Container names/patterns to exclude   |
-| `--monitor-image-names`       | `WATCHTOWER_MONITOR_IMAGE_NAMES`   | []string | []      | Image name patterns to monitor        |
-| `--skip-image-names`          | `WATCHTOWER_SKIP_IMAGE_NAMES`      | []string | []      | Image name patterns to exclude        |
-| `--label-enable` / `-e`       | `WATCHTOWER_LABEL_ENABLE`          | bool     | false   | Require enable label on containers    |
-| `--scope`                     | `WATCHTOWER_SCOPE`                 | string   | ""      | Monitoring scope                      |
-| `--include-stopped` / `-S`    | `WATCHTOWER_INCLUDE_STOPPED`       | bool     | false   | Include created and exited containers |
-| `--include-restarting`        | `WATCHTOWER_INCLUDE_RESTARTING`    | bool     | false   | Include restarting containers         |
-| `--label-take-precedence`     | `WATCHTOWER_LABEL_TAKE_PRECEDENCE` | bool     | false   | Labels override global flags          |
-
-### Container Labels
-
-| Label                                           | Values                | Effect                            |
-|-------------------------------------------------|-----------------------|-----------------------------------|
-| `com.centurylinklabs.watchtower.enable`         | true / false          | Enable or disable management      |
-| `com.centurylinklabs.watchtower.monitor-only`   | true / false          | Monitor without updating          |
-| `com.centurylinklabs.watchtower.no-pull`        | true / false          | Skip image pulls                  |
-| `com.centurylinklabs.watchtower.scope`          | any string            | Assign to a monitoring scope      |
-| `com.centurylinklabs.watchtower.depends-on`     | comma-separated names | Declare container dependencies    |
-| `com.centurylinklabs.watchtower.cooldown-delay` | duration string       | Minimum image age before updating |
-
-## Common Patterns
-
-### Run Multiple Watchtower Instances
-
-Run one instance for production containers and another for development:
-
-```yaml
-services:
-  watchtower-prod:
-    image: nickfedor/watchtower:latest
-    command: --scope production --interval 300
-    labels:
-      - "com.centurylinklabs.watchtower.scope=production"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-  watchtower-dev:
-    image: nickfedor/watchtower:latest
-    command: --scope development --interval 30
-    labels:
-      - "com.centurylinklabs.watchtower.scope=development"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+```text
+            Argument: --label-take-precedence
+Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
+                Type: Boolean
+             Default: false
 ```
 
-### Exclude System Containers
+## Use Docker Compose Depends-On
 
-Exclude Watchtower itself and other infrastructure containers:
+Enables or disables processing of the Docker Compose [`depends_on`](https://docs.docker.com/reference/compose-file/services/#depends_on){target="_blank" rel="noopener noreferrer"} configuration for determining container update order.
 
-```bash
-docker run -d \
-  -e WATCHTOWER_DISABLE_CONTAINERS="watchtower,traefik,portainer" \
-  nickfedor/watchtower
+```text
+            Argument: --use-compose-depends-on
+Environment Variable: WATCHTOWER_USE_COMPOSE_DEPENDS_ON
+                Type: Boolean
+             Default: true
 ```
 
-### Monitor Only Specific Image Registries
+- By default, Watchtower automatically detects and respects Docker Compose service dependencies.
+- When this feature is disabled, only the Watchtower `depends-on` label, Docker links, and network mode are used.
 
-Monitor only images from your private registry:
+!!! Note
+    Disabling this is useful when you want to prevent Watchtower from automatically using Docker Compose dependencies but still use explicit Watchtower labels or Docker links for ordering.
+    For more information on Watchtower's handling of linked containers, please reference the [Linked Containers documentation](../../advanced-features/linked-containers/index.md).
 
-```bash
-docker run -d \
-  -e WATCHTOWER_MONITOR_IMAGE_NAMES="registry.example.com/.*" \
-  nickfedor/watchtower
-```
-
-### Selective Monitoring with Enable Label
-
-Use [label enable](../arguments/index.md#enable_label_filter) to explicitly opt containers into management:
-
-```bash
-# Start Watchtower with label filtering
-docker run -d \
-  -e WATCHTOWER_LABEL_ENABLE=true \
-  nickfedor/watchtower
-```
-
-```yaml
-# Only this container will be monitored
-services:
-  myapp:
-    image: myapp:latest
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-```
+!!! Warning
+    Rolling restarts are not supported when any container has linked dependencies (including Docker Compose `depends_on`, Watchtower `depends-on` labels, Docker links, or network mode dependencies).
+    When [`rolling-restart`](../../configuration/update-behavior/index.md#rolling_restart) is enabled, the [`use-compose-depends-on`](../../configuration/container-selection/index.md#use_docker_compose_depends-on) configuration option controls whether Docker Compose `depends_on` labels are included in the dependency validation check.
