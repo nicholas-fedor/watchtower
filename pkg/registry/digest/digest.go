@@ -216,25 +216,31 @@ func BuildManifestURL(
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+
 	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
 	scheme := "https"
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
 		scheme = "http"
 	}
 
-	// Build the initial manifest URL based on the container's image name and tag.
-	manifestURL, err := manifest.BuildManifestURL(container, scheme)
+	// Build the canonical manifest URL.
+	manifestURLStr, err := manifest.BuildManifestURL(container, scheme)
 	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+
 		return "", "", nil, fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
 	}
 
-	// Parse the initial manifest URL to extract the original host.
-	parsedURL, err := url.Parse(manifestURL)
-	if err != nil {
+	parsedURL, parseErr := url.Parse(manifestURLStr)
+	if parseErr != nil {
 		return "", "", nil, fmt.Errorf(
 			"%w: failed to parse manifest URL: %w",
 			errFailedBuildManifestURL,
-			err,
+			parseErr,
 		)
 	}
 
@@ -259,14 +265,14 @@ func BuildManifestURL(
 	// 4. Digest extraction succeeds from the 200 OK response
 	if parsedURL.Host == "lscr.io" {
 		parsedURL.Host = "ghcr.io"
-		manifestURL = parsedURL.String()
+		manifestURLStr = parsedURL.String()
 	}
 
 	if parsedURL.Host == "" {
 		return "", "", nil, fmt.Errorf(
 			"%w: manifest URL has no host: %s",
 			errFailedBuildManifestURL,
-			manifestURL,
+			manifestURLStr,
 		)
 	}
 
@@ -283,10 +289,10 @@ func BuildManifestURL(
 			parsedURL.Host = hostOverride
 		}
 
-		manifestURL = parsedURL.String()
+		manifestURLStr = parsedURL.String()
 	}
 
-	return manifestURL, originalHost, parsedURL, nil
+	return manifestURLStr, originalHost, parsedURL, nil
 }
 
 // fetchDigest retrieves an image digest using the specified HTTP method.
@@ -330,17 +336,18 @@ func fetchDigest(
 	// Create an authentication client for registry requests.
 	client := auth.NewAuthClient()
 
-	// Build initial manifest URL to get canonical host
-	_, originalHost, _, err := BuildManifestURL(container, "")
+	// Build the canonical manifest URL and apply lscr.io/host-override handling.
+	manifestURL, originalHost, _, err := BuildManifestURL(container, "")
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
 
-		return "", err
+		return "", fmt.Errorf("failed to build manifest URL: %w", err)
 	}
 
 	logrus.WithFields(fields).
 		WithField("original_host", originalHost).
-		Debug("Extracted original host from manifest URL")
+		WithField("manifest_url", manifestURL).
+		Debug("Built manifest URL for container")
 
 	// If no endpoints specified, use a single empty endpoint (canonical host).
 	if len(endpoints) == 0 {

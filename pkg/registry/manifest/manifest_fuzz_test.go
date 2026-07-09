@@ -47,6 +47,30 @@ func FuzzBuildManifestURL(f *testing.F) {
 	f.Add(strings.Repeat("a", 1000) + ":tag")                   // Very long image name
 	f.Add("registry.com/" + strings.Repeat("a", 1000) + ":tag") // Very long repo path
 
+	// Seed with additional edge cases for robustness
+	f.Add("")                                                      // Empty string
+	f.Add("@")                                                     // Single @
+	f.Add("image@")                                                // Trailing @
+	f.Add("image@sha256:")                                         // Empty digest
+	f.Add("registry/image@sha256:")                                // Empty digest with registry
+	f.Add("image@@sha256:abc")                                     // Multiple @
+	f.Add("image@sha256:abc@def")                                  // Multiple @ in digest
+	f.Add("registry.com/image@sha256:" + strings.Repeat("a", 64))  // Long digest
+	f.Add("registry.com/image@sha512:" + strings.Repeat("a", 128)) // SHA512 digest
+	f.Add("\t")                                                    // Tab character
+	f.Add("\n")                                                    // Newline character
+	f.Add(" ")                                                     // Space
+	f.Add("image:tag\nwith:newline")                               // Newline in tag
+	f.Add("image/with/ multiple /spaces")                          // Spaces in path
+	f.Add("registry.com:5000")                                     // Registry with port, no image
+	f.Add("registry.com:5000/")                                    // Registry with port and trailing slash
+	f.Add("docker.io/library")                                     // Docker Hub library without image
+	f.Add(strings.Repeat("a", 10000))                              // Very long single word
+	f.Add("a" + strings.Repeat("/a", 100) + ":tag")                // Very deep path
+	f.Add("registry.com/image:" + strings.Repeat("v", 100))        // Very long tag
+	f.Add("image:tag-with-many-dashes-and_underscores-123")        // Complex tag
+	f.Add("registry.com/image-name.with.dots:tag-name.with.dots")  // Dots in name and tag
+
 	f.Fuzz(func(_ *testing.T, imageRef string) {
 		// Create a mock container with the fuzzed image reference
 		mock := createMockContainerForFuzz(imageRef)
