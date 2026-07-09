@@ -572,17 +572,12 @@ func run(command *cobra.Command, args []string) {
 	healthCheck, _ := command.PersistentFlags().GetBool("health-check")
 
 	// Get flags controlling HTTP API behavior.
-	enableCheckAPI, _ := command.PersistentFlags().GetBool("http-api-check")
-	enableConfigAPI, _ := command.PersistentFlags().GetBool("http-api-config")
-	enableContainersAPI, _ := command.PersistentFlags().GetBool("http-api-containers")
-	enableEventsAPI, _ := command.PersistentFlags().GetBool("http-api-events")
-	enableHealthAPI, _ := command.PersistentFlags().GetBool("http-api-health")
-	enableHistoryAPI, _ := command.PersistentFlags().GetBool("http-api-history")
-	enableImagesAPI, _ := command.PersistentFlags().GetBool("http-api-images")
-	enableMetricsAPI, _ := command.PersistentFlags().GetBool("http-api-metrics")
-	enableSwaggerAPI, _ := command.PersistentFlags().GetBool("http-api-swagger")
-	enableUpdateAPI, _ := command.PersistentFlags().GetBool("http-api-update")
-	enableFullAPI, _ := command.PersistentFlags().GetBool("http-api-full")
+	apiEndpoints, _ := command.PersistentFlags().GetStringSlice("http-api-endpoints")
+	// TODO: Remove legacy HTTP API enable flags when dropping them in v2.
+	//nolint:godox
+	legacyUpdateAPI, _ := command.PersistentFlags().GetBool("http-api-update")
+	legacyMetricsAPI, _ := command.PersistentFlags().GetBool("http-api-metrics")
+	legacyContainersAPI, _ := command.PersistentFlags().GetBool("http-api-containers")
 	tlsCertPath, _ := command.PersistentFlags().GetString("http-api-tls-cert")
 	tlsKeyPath, _ := command.PersistentFlags().GetString("http-api-tls-key")
 	trustedProxies, _ := command.PersistentFlags().GetStringSlice("http-api-trusted-proxies")
@@ -591,6 +586,20 @@ func run(command *cobra.Command, args []string) {
 	unblockHTTPAPI, _ := command.PersistentFlags().GetBool("http-api-periodic-polls")
 	apiToken, _ := command.PersistentFlags().GetString("http-api-token")
 	apiEventsToken, _ := command.PersistentFlags().GetString("http-api-events-token")
+
+	endpointSet, err := config.ResolveEndpoints(
+		apiEndpoints,
+		legacyUpdateAPI,
+		legacyMetricsAPI,
+		legacyContainersAPI,
+	)
+	if err != nil {
+		logrus.WithError(err).Fatal("Invalid HTTP API endpoint configuration")
+	}
+
+	enableHealthAPI, enableUpdateAPI, enableMetricsAPI, enableContainersAPI,
+		enableCheckAPI, enableHistoryAPI, enableImagesAPI, enableConfigAPI,
+		enableEventsAPI, enableSwaggerAPI := config.ApplyEndpointsToBools(endpointSet)
 
 	// Get the HTTP API host and port, falling back to "8080" for port if not specified.
 	flagsSet := command.PersistentFlags()
@@ -657,7 +666,6 @@ func run(command *cobra.Command, args []string) {
 		EnableMetricsAPI:    enableMetricsAPI,
 		EnableSwaggerAPI:    enableSwaggerAPI,
 		EnableUpdateAPI:     enableUpdateAPI,
-		EnableFullAPI:       enableFullAPI,
 		TLSCertPath:         tlsCertPath,
 		TLSKeyPath:          tlsKeyPath,
 		CORSAllowedOrigins:  corsOrigins,
@@ -901,7 +909,6 @@ func runMain(cfg types.RunConfig) int {
 			EnableMetricsAPI:            cfg.EnableMetricsAPI,
 			EnableSwaggerAPI:            cfg.EnableSwaggerAPI,
 			EnableUpdateAPI:             cfg.EnableUpdateAPI,
-			EnableFullAPI:               cfg.EnableFullAPI,
 			TLSCertPath:                 cfg.TLSCertPath,
 			TLSKeyPath:                  cfg.TLSKeyPath,
 			CORSAllowedOrigins:          cfg.CORSAllowedOrigins,

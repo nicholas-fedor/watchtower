@@ -66,19 +66,6 @@ func GetAPIAddr(host, port string) string {
 // Returns:
 //   - error: Non-nil if route registration or server startup fails.
 func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
-	if opts.EnableFullAPI {
-		opts.EnableUpdateAPI = true
-		opts.EnableCheckAPI = true
-		opts.EnableMetricsAPI = true
-		opts.EnableContainersAPI = true
-		opts.EnableSwaggerAPI = true
-		opts.EnableHealthAPI = true
-		opts.EnableHistoryAPI = true
-		opts.EnableImagesAPI = true
-		opts.EnableConfigAPI = true
-		opts.EnableEventsAPI = true
-	}
-
 	if !opts.EnableUpdateAPI &&
 		!opts.EnableMetricsAPI &&
 		!opts.EnableContainersAPI &&
@@ -98,7 +85,6 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		opts.EnableMetricsAPI ||
 		opts.EnableContainersAPI ||
 		opts.EnableCheckAPI ||
-		opts.EnableSwaggerAPI ||
 		opts.EnableHistoryAPI ||
 		opts.EnableImagesAPI ||
 		opts.EnableConfigAPI

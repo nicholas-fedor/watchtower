@@ -1,5 +1,12 @@
 # HTTP API
 
+## Deprecation Notice
+
+!!! Warning "Watchtower v2 Legacy HTTP API Configuration Deprecation"
+    Endpoint-specific configuration options will be removed with the release of Watchtower v2.
+
+    Use the [`HTTP API Endpoints`](#http_api_endpoints) configuration option instead.
+
 ## HTTP API Host
 
 Sets the host interface for binding the HTTP API.
@@ -55,171 +62,75 @@ This is a separate token from the [`http-api-token`](#http_api_token) in order t
 
 The token can be provided via the `Authorization` header (for programmatic clients) or as the `access_token` query parameter (for browser `EventSource` which cannot set custom headers).
 
-!!! Important "This is **required** when the [`http-api-events`](#http_api_events) endpoint is enabled."
+!!! Important "This is **required** when the `events` endpoint is enabled via [`http-api-endpoints`](#http_api_endpoints)."
 
 !!! Note
     Supports file path for Docker Secrets (e.g., `/run/secrets/http_api_events_token`).
 
-## HTTP API Full
-
-Enables all of Watchtower's HTTP API endpoints.
-
-```text
-            Argument: --http-api-full
-Environment Variable: WATCHTOWER_HTTP_API_FULL
-                Type: Boolean
-             Default: false
-```
-
-!!! Note
-    -  This requires both the [`HTTP API Token`](#http_api_token) and [`HTTP API Events Token`](#http_api_events_token) to be configured.
-
 ## HTTP API Endpoints
 
-### HTTP API Check
-
-Enables a read-only endpoint that checks containers for available updates without pulling or restarting.
+Selects which HTTP API endpoints to enable.
 
 ```text
-            Argument: --http-api-check
-Environment Variable: WATCHTOWER_HTTP_API_CHECK
-                Type: Boolean
-             Default: false
+            Argument: --http-api-endpoints
+Environment Variable: WATCHTOWER_HTTP_API_ENDPOINTS
+                Type: String (comma or space separated list)
+             Default: empty (HTTP API disabled)
 ```
 
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/check/index.md) for details"
+Valid names (case-insensitive):
 
-### HTTP API Config
+| Name | Routes | Auth |
+|------|--------|------|
+| [`health`](../../http-api/endpoints/health/index.md) | `/livez`, `/readyz`, `/startupz` | None |
+| [`update`](../../http-api/endpoints/update/index.md) | `POST /v1/update` | [`http-api-token`](#http_api_token) |
+| [`metrics`](../../http-api/endpoints/metrics/index.md) | `GET /v1/metrics`, [`GET /v1/status`](../../http-api/endpoints/status/index.md) | [`http-api-token`](#http_api_token) |
+| [`containers`](../../http-api/endpoints/containers/index.md) | `GET /v1/containers`, [`/v1/containers/details`](../../http-api/endpoints/container-details/index.md) | [`http-api-token`](#http_api_token) |
+| [`check`](../../http-api/endpoints/check/index.md) | `POST /v1/check` | [`http-api-token`](#http_api_token) |
+| [`history`](../../http-api/endpoints/history/index.md) | `GET /v1/history` | [`http-api-token`](#http_api_token) |
+| [`images`](../../http-api/endpoints/images/index.md) | `GET /v1/images` | [`http-api-token`](#http_api_token) |
+| [`config`](../../http-api/endpoints/config/index.md) | `GET /v1/config` | [`http-api-token`](#http_api_token) |
+| [`events`](../../http-api/endpoints/events/index.md) | `GET /v1/events` | [`http-api-events-token`](#http_api_events_token) |
+| [`swagger`](../../http-api/endpoints/swagger/index.md) | `GET /swagger/*` | None |
 
-Enables the config API endpoint (`/v1/config`).
+!!! Warning
+    The `all` value enables every endpoint and **MUST** be the only value.
 
-```text
-            Argument: --http-api-config
-Environment Variable: WATCHTOWER_HTTP_API_CONFIG
-                Type: Boolean
-             Default: false
-```
+!!! Note "Defining multiple endpoints"
+    - The CLI flag can be specified multiple times.
+    - Defining the environment variable multiple times will not work (only the last value is used).
+    - For environment variables, use a single comma- or space-separated value, or a YAML array.
 
-!!! Note
-    Returns the active Watchtower configuration settings.
+Examples:
 
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/config/index.md) for details"
+```bash
+# Metrics and health probes
+WATCHTOWER_HTTP_API_ENDPOINTS=health,metrics
+WATCHTOWER_HTTP_API_TOKEN=...
 
-### HTTP API Containers
+# Full surface
+WATCHTOWER_HTTP_API_ENDPOINTS=all
+WATCHTOWER_HTTP_API_TOKEN=...
+WATCHTOWER_HTTP_API_EVENTS_TOKEN=...
 
-Enables a read-only endpoint that lists watched containers and their current running image digests.
-
-```text
-            Argument: --http-api-containers
-Environment Variable: WATCHTOWER_HTTP_API_CONTAINERS
-                Type: Boolean
-             Default: false
-```
-
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/containers/index.md) for details"
-
-### HTTP API Events
-
-Enables the real-time events API endpoint (`/v1/events`).
-
-```text
-            Argument: --http-api-events
-Environment Variable: WATCHTOWER_HTTP_API_EVENTS
-                Type: Boolean
-             Default: false
+# Update API only (API-only mode unless periodic polls are also enabled)
+WATCHTOWER_HTTP_API_ENDPOINTS=update
+WATCHTOWER_HTTP_API_TOKEN=...
 ```
 
 !!! Note
-    Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.
+    - Health is **not** added automatically; include `health` when you need probes.
+    - Protected `/v1/*` endpoints (not health or swagger) require [`http-api-token`](#http_api_token).
+    - Enabling `events` requires [`http-api-events-token`](#http_api_events_token).
+    - See per-endpoint docs under [HTTP API](../../http-api/overview/index.md).
 
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/events/index.md) for details"
+!!! Warning "Invalid values stop startup"
+    Watchtower exits on startup if:
 
-### HTTP API Health
+    - An endpoint name is not in the table above
+    - `all` is combined with any other name
 
-Enables the health probe endpoints (`/livez`, `/readyz`, `/startupz`).
-
-```text
-            Argument: --http-api-health
-Environment Variable: WATCHTOWER_HTTP_API_HEALTH
-                Type: Boolean
-             Default: false
-```
-
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/health/index.md) for details"
-
-### HTTP API History
-
-Enables the scan history API endpoint (`/v1/history`).
-
-```text
-            Argument: --http-api-history
-Environment Variable: WATCHTOWER_HTTP_API_HISTORY
-                Type: Boolean
-             Default: false
-```
-
-!!! Note
-    Returns historical scan results from an in-memory ring buffer (up to 500 entries).
-
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/history/index.md) for details"
-
-### HTTP API Images
-
-Enables the images API endpoint (`/v1/images`).
-
-```text
-            Argument: --http-api-images
-Environment Variable: WATCHTOWER_HTTP_API_IMAGES
-                Type: Boolean
-             Default: false
-```
-
-!!! Note
-    Returns the current image identity and digest for every image tracked by Watchtower.
-
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/images/index.md) for details"
-
-### HTTP API Metrics
-
-Enables a Prometheus metrics endpoint via HTTP.
-
-```text
-            Argument: --http-api-metrics
-Environment Variable: WATCHTOWER_HTTP_API_METRICS
-                Type: Boolean
-             Default: false
-```
-
-!!! Note "See the [Metrics API documentation](../../http-api/endpoints/metrics/index.md) for details"
-
-### HTTP API Swagger
-
-Enables the Swagger UI endpoint for interactive API documentation.
-
-```text
-            Argument: --http-api-swagger
-Environment Variable: WATCHTOWER_HTTP_API_SWAGGER
-                Type: Boolean
-             Default: false
-```
-
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/swagger/index.md) for details"
-
-### HTTP API Update
-
-Runs Watchtower in HTTP API mode, allowing updates only via HTTP requests.
-
-```text
-            Argument: --http-api-update
-Environment Variable: WATCHTOWER_HTTP_API_UPDATE
-                Type: Boolean
-             Default: false
-```
-
-!!! Note
-    Supports tag-specific filtering (e.g., `image=foo/bar:1.0`).
-
-!!! Note "See the [HTTP API documentation](../../http-api/endpoints/update/index.md) for details"
+    The error message includes the invalid value and the list of valid names.
 
 ## HTTP API Rate Limit
 
@@ -315,3 +226,58 @@ Environment Variable: WATCHTOWER_HTTP_API_CORS_ORIGINS
 !!! Note
     When unset, CORS is disabled and only same-origin requests are allowed.
     Set this to permit specific cross-origin origins.
+
+## Deprecated Configuration Options
+
+/// details | The following legacy configuration options are deprecated and will be removed with the release of Watchtower v2.
+    type: warning
+
+!!! Warning
+    - Legacy flags still work alone or together with [`http-api-endpoints`](#http_api_endpoints); values are **unioned** and **deduplicated**.
+    - Multiple legacy options combine (for example `http-api-update` + `http-api-metrics` → `update,metrics`).
+    - Example mix: `WATCHTOWER_HTTP_API_ENDPOINTS=health,check` with `WATCHTOWER_HTTP_API_UPDATE=true` → `health,check,update`.
+    - Prefer migrating fully to the allowlist; legacy flags will be removed in Watchtower v2.
+
+### HTTP API Update
+
+Runs Watchtower in HTTP API mode, so that image updates must be triggered by a request.
+
+```text
+            Argument: --http-api-update
+Environment Variable: WATCHTOWER_HTTP_API_UPDATE
+                Type: Boolean
+             Default: false
+```
+
+!!! Deprecated
+    Add `update` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
+
+### HTTP API Metrics
+
+Runs Watchtower with the Prometheus metrics API enabled.
+
+```text
+            Argument: --http-api-metrics
+Environment Variable: WATCHTOWER_HTTP_API_METRICS
+                Type: Boolean
+             Default: false
+```
+
+!!! Deprecated
+    Add `metrics` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
+
+### HTTP API Containers
+
+Runs Watchtower with the read-only containers API enabled.
+
+```text
+            Argument: --http-api-containers
+Environment Variable: WATCHTOWER_HTTP_API_CONTAINERS
+                Type: Boolean
+             Default: false
+```
+
+!!! Deprecated
+    Add `containers` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
+
+///

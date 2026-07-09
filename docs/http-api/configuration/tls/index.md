@@ -83,7 +83,7 @@ Mount the certificate directory into the container, enable the metrics API (prov
             environment:
                 - WATCHTOWER_HTTP_API_TOKEN=your-secure-token
                 # Enables the /v1/metrics endpoint (used in Step 4)
-                - WATCHTOWER_HTTP_API_METRICS=true
+                - WATCHTOWER_HTTP_API_ENDPOINTS=metrics
                 - WATCHTOWER_HTTP_API_TLS_CERT=/certs/watchtower.crt
                 - WATCHTOWER_HTTP_API_TLS_KEY=/certs/watchtower.key
             ports:
@@ -99,7 +99,7 @@ Mount the certificate directory into the container, enable the metrics API (prov
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /opt/watchtower/certs:/certs:ro \
         -e WATCHTOWER_HTTP_API_TOKEN=your-secure-token \
-        -e WATCHTOWER_HTTP_API_METRICS=true \
+        -e WATCHTOWER_HTTP_API_ENDPOINTS=metrics \
         -e WATCHTOWER_HTTP_API_TLS_CERT=/certs/watchtower.crt \
         -e WATCHTOWER_HTTP_API_TLS_KEY=/certs/watchtower.key \
         -p 8080:8080 \

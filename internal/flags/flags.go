@@ -227,11 +227,24 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		envBool("WATCHTOWER_ROLLING_RESTART"),
 		"Restart containers one at a time")
 
+	flags.StringSliceP(
+		"http-api-endpoints",
+		"",
+		filterEmptyStrings(
+			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_HTTP_API_ENDPOINTS"), -1),
+		),
+		"HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger), or \"all\". Comma- or space-separated. Empty disables the HTTP API.")
+
+	//nolint:godox
+	// TODO: Remove legacy HTTP API enable flags below for the v2 release.
+	// They are kept for backwards compatibility but are deprecated.
+	// Use --http-api-endpoints instead.
+
 	flags.BoolP(
 		"http-api-update",
 		"",
 		envBool("WATCHTOWER_HTTP_API_UPDATE"),
-		"Runs Watchtower in HTTP API mode, so that image updates must to be triggered by a request")
+		"Runs Watchtower in HTTP API mode, so that image updates must be triggered by a request")
 	flags.BoolP(
 		"http-api-metrics",
 		"",
@@ -242,41 +255,15 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"",
 		envBool("WATCHTOWER_HTTP_API_CONTAINERS"),
 		"Runs Watchtower with the read-only containers API enabled, exposing each watched container's current image digest")
-	flags.BoolP(
-		"http-api-check",
-		"",
-		envBool("WATCHTOWER_HTTP_API_CHECK"),
-		"Runs Watchtower with the read-only check API enabled, allowing checking for available updates without triggering them")
-	flags.BoolP(
-		"http-api-swagger",
-		"",
-		envBool("WATCHTOWER_HTTP_API_SWAGGER"),
-		"Runs Watchtower with the Swagger UI enabled for API documentation")
-	flags.BoolP(
-		"http-api-health",
-		"",
-		envBool("WATCHTOWER_HTTP_API_HEALTH"),
-		"Runs Watchtower with the health probe endpoints enabled (/livez, /readyz, /startupz)")
-	flags.BoolP(
-		"http-api-history",
-		"",
-		envBool("WATCHTOWER_HTTP_API_HISTORY"),
-		"Runs Watchtower with the scan history API enabled, exposing GET /v1/history")
-	flags.BoolP(
-		"http-api-images",
-		"",
-		envBool("WATCHTOWER_HTTP_API_IMAGES"),
-		"Runs Watchtower with the images API enabled, exposing GET /v1/images")
-	flags.BoolP(
-		"http-api-config",
-		"",
-		envBool("WATCHTOWER_HTTP_API_CONFIG"),
-		"Runs Watchtower with the config API enabled, exposing GET /v1/config")
-	flags.BoolP(
-		"http-api-events",
-		"",
-		envBool("WATCHTOWER_HTTP_API_EVENTS"),
-		"Runs Watchtower with the real-time events API enabled, exposing GET /v1/events")
+
+	//nolint:godox
+	// TODO: Remove just before v2 Release.
+	// Mark legacy HTTP API enable flags as deprecated.
+	// These flags are still functional but will be removed in the v2 release.
+	// Users should migrate to --http-api-endpoints instead.
+	markFlagDeprecated(flags, "http-api-update", "Use --http-api-endpoints=update (or include update in the list).")
+	markFlagDeprecated(flags, "http-api-metrics", "Use --http-api-endpoints=metrics.")
+	markFlagDeprecated(flags, "http-api-containers", "Use --http-api-endpoints=containers.")
 
 	flags.StringP(
 		"http-api-host",
@@ -295,13 +282,13 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"http-api-token",
 		"",
 		envString("WATCHTOWER_HTTP_API_TOKEN"),
-		"Sets an authentication token to HTTP API requests.")
+		"Sets an authentication token for HTTP API requests (required when any non-health endpoint is enabled)")
 
 	flags.StringP(
 		"http-api-events-token",
 		"",
 		envString("WATCHTOWER_HTTP_API_EVENTS_TOKEN"),
-		"Sets an authentication token for the events SSE endpoint. This is required when --http-api-events is enabled. Supports query parameter (for browser EventSource) and header-based auth.")
+		"Sets an authentication token for the events SSE endpoint. Required when the events endpoint is enabled. Supports Bearer header and query parameter access_token (for browser EventSource)")
 
 	flags.BoolP(
 		"http-api-periodic-polls",

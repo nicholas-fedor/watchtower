@@ -1705,36 +1705,31 @@ func TestRootCommand_FlagParsing(t *testing.T) {
 	}
 }
 
-func TestRootCommand_FlagDependencies(t *testing.T) {
+func TestRootCommand_HTTPAPIEndpointsFlag(t *testing.T) {
 	tests := []struct {
-		name       string
-		args       []string
-		wantAPI    bool
-		wantEvents bool
+		name string
+		args []string
+		want []string
 	}{
 		{
-			name:       "update API only",
-			args:       []string{"--http-api-update"},
-			wantAPI:    true,
-			wantEvents: false,
+			name: "endpoints all",
+			args: []string{"--http-api-endpoints=all"},
+			want: []string{"all"},
 		},
 		{
-			name:       "metrics API only",
-			args:       []string{"--http-api-metrics"},
-			wantAPI:    true,
-			wantEvents: false,
+			name: "endpoints list comma",
+			args: []string{"--http-api-endpoints=health,metrics"},
+			want: []string{"health", "metrics"},
 		},
 		{
-			name:       "events API only",
-			args:       []string{"--http-api-events"},
-			wantAPI:    false,
-			wantEvents: true,
+			name: "endpoints repeated flags",
+			args: []string{"--http-api-endpoints=health", "--http-api-endpoints=metrics"},
+			want: []string{"health", "metrics"},
 		},
 		{
-			name:       "containers API only",
-			args:       []string{"--http-api-containers"},
-			wantAPI:    true,
-			wantEvents: false,
+			name: "legacy update still registered",
+			args: []string{"--http-api-update"},
+			want: []string{},
 		},
 	}
 
@@ -1749,8 +1744,19 @@ func TestRootCommand_FlagDependencies(t *testing.T) {
 			err := cmd.ParseFlags(tt.args)
 			require.NoError(t, err)
 
-			assert.Equal(t, tt.wantEvents, cmd.Flags().Changed("http-api-events"),
-				"events flag dependency mismatch")
+			got, err := cmd.Flags().GetStringSlice("http-api-endpoints")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+
+			// Branch-only endpoint booleans must not be registered.
+			assert.Nil(t, cmd.Flags().Lookup("http-api-events"))
+			assert.Nil(t, cmd.Flags().Lookup("http-api-check"))
+			assert.Nil(t, cmd.Flags().Lookup("http-api-full"))
+
+			// Main legacy flags remain for deprecation.
+			assert.NotNil(t, cmd.Flags().Lookup("http-api-update"))
+			assert.NotNil(t, cmd.Flags().Lookup("http-api-metrics"))
+			assert.NotNil(t, cmd.Flags().Lookup("http-api-containers"))
 		})
 	}
 }

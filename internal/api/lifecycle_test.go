@@ -170,13 +170,15 @@ func TestSetupAndStartAPI(t *testing.T) {
 func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 	testMetrics := metrics.Default()
 
+	fullSet, err := config.ParseAPIEndpoints([]string{"all"})
+	require.NoError(t, err)
+
 	opts := withTestListenAddr(config.Options{
-		Token:         "test-token",
-		EventsToken:   "events-token",
-		EnableFullAPI: true,
-		RateLimit:     60,
-		Client:        makeListContainersMock(t),
-		Filter:        makeFilter(t),
+		Token:       "test-token",
+		EventsToken: "events-token",
+		RateLimit:   60,
+		Client:      makeListContainersMock(t),
+		Filter:      makeFilter(t),
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
 		},
@@ -184,6 +186,7 @@ func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 		UnblockHTTPAPI: true,
 	})
+	config.ApplyEndpoints(&opts, fullSet)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -435,13 +438,15 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 	}
 }
 
-func TestSetupAndStartAPI_FullAPIEnablesAll(t *testing.T) {
+func TestSetupAndStartAPI_AllEndpointsEnableAll(t *testing.T) {
 	testMetrics := metrics.Default()
+
+	fullSet, err := config.ParseAPIEndpoints([]string{"all"})
+	require.NoError(t, err)
 
 	opts := withTestListenAddr(config.Options{
 		Token:          "test-token",
 		EventsToken:    "events-token",
-		EnableFullAPI:  true,
 		RateLimit:      60,
 		Client:         makeListContainersMock(t),
 		Filter:         makeFilter(t),
@@ -452,6 +457,18 @@ func TestSetupAndStartAPI_FullAPIEnablesAll(t *testing.T) {
 		},
 		UnblockHTTPAPI: true,
 	})
+	config.ApplyEndpoints(&opts, fullSet)
+
+	require.True(t, opts.EnableUpdateAPI)
+	require.True(t, opts.EnableMetricsAPI)
+	require.True(t, opts.EnableContainersAPI)
+	require.True(t, opts.EnableCheckAPI)
+	require.True(t, opts.EnableHealthAPI)
+	require.True(t, opts.EnableHistoryAPI)
+	require.True(t, opts.EnableImagesAPI)
+	require.True(t, opts.EnableConfigAPI)
+	require.True(t, opts.EnableEventsAPI)
+	require.True(t, opts.EnableSwaggerAPI)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()

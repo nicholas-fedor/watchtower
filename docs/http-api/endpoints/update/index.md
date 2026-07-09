@@ -2,7 +2,7 @@
 
 ## Overview
 
-To enable this mode, use the [HTTP API Update](../../../configuration/http-api/index.md#http_api_update) configuration option.
+Include `update` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this mode.
 
 ## Parameters
 
@@ -274,8 +274,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WATCHTOWER_HTTP_API_TOKEN=mytoken
-      - WATCHTOWER_HTTP_API_UPDATE=mytoken
-      - WATCHTOWER_HTTP_API_METRICS=mytoken
+      - WATCHTOWER_HTTP_API_ENDPOINTS=update,metrics
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     ports:
@@ -284,7 +283,7 @@ services:
 ```
 
 !!! Note
-    Both the [HTTP API Update](../../../configuration/http-api/index.md#http_api_update) and the [HTTP API Metrics](../../../configuration/http-api/index.md#http_api_metrics) endpoints can be enabled simultaneously to provide both update triggering and monitoring capabilities.
+    Enable multiple endpoints in one allowlist (for example `update,metrics`) via [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints).
 
 !!! Warning
     Enabling the HTTP API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation. See [Updating Watchtower](../../../getting-started/updating-watchtower/index.md#port_configuration_limitation) for more details.

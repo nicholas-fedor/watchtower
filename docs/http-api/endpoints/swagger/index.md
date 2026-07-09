@@ -4,7 +4,7 @@
 
 The `/swagger/` endpoint serves an interactive, browser-based Swagger UI that renders the Watchtower HTTP API specification.
 
-To enable the Swagger UI, use the [HTTP API Swagger](../../../configuration/http-api/index.md#http_api_swagger) configuration option or enable all endpoints at once with the [`http-api-full`](../../../configuration/http-api/index.md#http_api_full) configuration option.
+To enable the Swagger UI, include `swagger` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) (for example `WATCHTOWER_HTTP_API_ENDPOINTS=swagger` or `all`).
 
 ## Endpoint
 
@@ -63,7 +63,8 @@ Enable the endpoint and start Watchtower:
                 volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
                 environment:
-                    - WATCHTOWER_HTTP_API_SWAGGER=true
+                    - WATCHTOWER_HTTP_API_ENDPOINTS=swagger
+                    - WATCHTOWER_HTTP_API_TOKEN=your-secure-token
                 ports:
                     - "8080:8080"
                 restart: unless-stopped
@@ -75,7 +76,8 @@ Enable the endpoint and start Watchtower:
         docker run -d \
             --name watchtower \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -e WATCHTOWER_HTTP_API_SWAGGER=true \
+            -e WATCHTOWER_HTTP_API_ENDPOINTS=swagger \
+            -e WATCHTOWER_HTTP_API_TOKEN=your-secure-token \
             -p 8080:8080 \
             --restart unless-stopped \
             nickfedor/watchtower
@@ -99,7 +101,8 @@ Enable the endpoint and start Watchtower:
                     - /var/run/docker.sock:/var/run/docker.sock
                     - /opt/watchtower/certs:/certs:ro
                 environment:
-                    - WATCHTOWER_HTTP_API_SWAGGER=true
+                    - WATCHTOWER_HTTP_API_ENDPOINTS=swagger
+                    - WATCHTOWER_HTTP_API_TOKEN=your-secure-token
                     - WATCHTOWER_HTTP_API_TLS_CERT=/certs/watchtower.crt
                     - WATCHTOWER_HTTP_API_TLS_KEY=/certs/watchtower.key
                 ports:
@@ -114,7 +117,8 @@ Enable the endpoint and start Watchtower:
             --name watchtower \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /opt/watchtower/certs:/certs:ro \
-            -e WATCHTOWER_HTTP_API_SWAGGER=true \
+            -e WATCHTOWER_HTTP_API_ENDPOINTS=swagger \
+            -e WATCHTOWER_HTTP_API_TOKEN=your-secure-token \
             -e WATCHTOWER_HTTP_API_TLS_CERT=/certs/watchtower.crt \
             -e WATCHTOWER_HTTP_API_TLS_KEY=/certs/watchtower.key \
             -p 8080:8080 \
@@ -130,22 +134,23 @@ Enable the endpoint and start Watchtower:
 
 ### Interacting with Authenticated Endpoints
 
-Swagger UI supports an [API Key](https://swagger.io/docs/specification/authentication/api-keys/){target="_blank" rel="noopener noreferrer"} security scheme named `BearerAuth`.
+The Swagger UI page itself does **not** require authentication.
 
-To authenticate:
+**Try it out** against protected `/v1/*` routes currently fails without a token in the request, and the generated OpenAPI spec does not yet define a security scheme, so Swagger UI does not show a working **Authorize** control for injecting `Authorization: Bearer <token>`.
 
-1. Click the **Authorize** button at the top-right of the page.
-2. Enter the token you configured via `--http-api-token` (or the `WATCHTOWER_HTTP_API_TOKEN` environment variable).
-3. Click **Authorize**, then **Close**.
+Until that is available, call protected endpoints with `curl` or another client:
 
-The token is sent with every subsequent request as a `Bearer` token in the `Authorization` header, matching the scheme required by the protected `/v1/*` endpoints.
+```bash
+curl -X POST -H "Authorization: Bearer $WATCHTOWER_HTTP_API_TOKEN" \
+  "http://localhost:8080/v1/check"
+```
 
-For the events SSE stream (`/v1/events`), supply the events token you configured via `--http-api-events-token`.
-The UI sends this as a standard `Authorization: Bearer` header, which the endpoint accepts.
+For the events stream, use the events token (header or `access_token` query parameter) (See [Events](../events/index.md)).
 
 ### Query parameters
 
 Swagger UI exposes any `@Param` query parameters documented in the spec.
+
 For example, the `/v1/update` endpoint accepts the following documented query parameters:
 
 | Parameter   | Type      | Required | Description                                                        |
@@ -158,7 +163,7 @@ For example, the `/v1/update` endpoint accepts the following documented query pa
 
 Swagger UI's **Try it out** button issues a real HTTP request from your browser directly to the Watchtower server.
 Because Swagger UI is served from the same origin, no CORS preflight is required when both are accessed from the same host and port (the default setup).
-When the UI is served from a different origin, ensure the `--http-api-cors-origins` setting allows the browser origin.
+When the UI is served from a different origin, ensure the [`http-api-cors-origins`](../../../configuration/http-api/index.md#http_api_cors_origins) configuration option allows the browser origin.
 
 !!! Note
     The "Try it out" feature uses the browser's `fetch` API.
@@ -173,7 +178,7 @@ Common issues and their resolutions:
 
 | HTTP Status | Cause                                                                 | Resolution                                                                                                                          |
 |:-----------:|:----------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------|
-|    `404`    | The endpoint may not be enabled                                       | Enable the endpoint using the [`http-api-swagger`](../../../configuration/http-api/index.md#http_api_swagger) configuration option. |
+|    `404`    | The endpoint may not be enabled                                       | Include `swagger` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints). |
 |    `404`    | Requested a path outside `/swagger/*`, e.g. `/swagger` (no wildcard). | Navigate to `/swagger/index.html`.                                                                                                  |
 |    `405`    | HTTP method other than `GET` used against `/swagger/*`.               | Use `GET` only. `POST`, `PUT`, and `DELETE` are not supported on this path.                                                         |
 

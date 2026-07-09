@@ -57,7 +57,6 @@ type Options struct {
 	EnableImagesAPI             bool
 	EnableConfigAPI             bool
 	EnableEventsAPI             bool
-	EnableFullAPI               bool
 	UnblockHTTPAPI              bool
 	NoStartupMessage            bool
 	TLSCertPath                 string

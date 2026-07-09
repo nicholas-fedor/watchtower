@@ -102,7 +102,7 @@ Tokens can be provided to Watchtower using Docker Secrets, environment variables
                 environment:
                     - WATCHTOWER_HTTP_API_TOKEN=/run/secrets/http_api_token
                     # Enable an endpoint that requires authentication
-                    - WATCHTOWER_HTTP_API_METRICS=true
+                    - WATCHTOWER_HTTP_API_ENDPOINTS=metrics
                 ports:
                     - "8080:8080"
                 restart: unless-stopped
@@ -123,7 +123,7 @@ Tokens can be provided to Watchtower using Docker Secrets, environment variables
                 environment:
                     - WATCHTOWER_HTTP_API_TOKEN=your-secure-token
                     # Enable an endpoint that requires authentication
-                    - WATCHTOWER_HTTP_API_METRICS=true
+                    - WATCHTOWER_HTTP_API_ENDPOINTS=metrics
                 ports:
                     - "8080:8080"
                 restart: unless-stopped
@@ -138,7 +138,7 @@ Tokens can be provided to Watchtower using Docker Secrets, environment variables
             --name watchtower \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -e WATCHTOWER_HTTP_API_TOKEN=your-secure-token \
-            -e WATCHTOWER_HTTP_API_METRICS=true \
+            -e WATCHTOWER_HTTP_API_ENDPOINTS=metrics \
             -p 8080:8080 \
             --restart unless-stopped \
             nickfedor/watchtower
@@ -154,15 +154,14 @@ Tokens can be provided to Watchtower using Docker Secrets, environment variables
             --restart unless-stopped \
             nickfedor/watchtower \
             --http-api-token=your-secure-token \
-            --http-api-metrics
+            --http-api-endpoints=metrics
         ```
 
 ## Unauthenticated Endpoints
 
-The following endpoints do not require authentication:
+The following endpoints do not require authentication when enabled:
 
 - [Health probes](../../endpoints/health/index.md): `/livez`, `/readyz`, `/startupz`
-- [Swagger UI](../../endpoints/swagger/index.md)
 
 ## Best Practices
 

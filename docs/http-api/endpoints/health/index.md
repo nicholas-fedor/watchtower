@@ -2,7 +2,7 @@
 
 ## Overview
 
-Watchtower provides three health probe endpoints that can be enabled using the [HTTP API Health](../../../configuration/http-api/index.md#http_api_health) configuration option.
+Watchtower provides three health probe endpoints. Include `health` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable them.
 
 ## Endpoints
 

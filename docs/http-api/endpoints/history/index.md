@@ -3,7 +3,7 @@
 ## Overview
 
 The `/v1/history` endpoint returns historical scan results from an in-memory ring buffer (up to 500 entries).
-To enable this read-only endpoint, use the [HTTP API History](../../../configuration/http-api/index.md#http_api_history) configuration option.
+Include `history` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this read-only endpoint.
 
 ## Parameters
 

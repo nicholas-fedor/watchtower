@@ -3,7 +3,7 @@
 ## Overview
 
 The `/v1/events` endpoint streams Watchtower operational events via Server-Sent Events (SSE).
-Use the [HTTP API Events](../../../configuration/http-api/index.md#http_api_events) configuration option to enable this endpoint.
+Include `events` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this endpoint.
 
 ## Authentication
 

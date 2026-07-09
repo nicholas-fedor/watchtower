@@ -3,7 +3,7 @@
 ## Overview
 
 The `/v1/status` endpoint returns a summary of the most recent Watchtower scan, including counts of scanned, updated, failed, restarted, and skipped containers.
-To enable it, use the [HTTP API Metrics](../../../configuration/http-api/index.md#http_api_metrics) configuration option (the status endpoint is enabled alongside metrics).
+Include `metrics` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable it (the status endpoint is enabled alongside metrics).
 
 ## Response Format
 

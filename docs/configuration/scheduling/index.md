@@ -86,4 +86,5 @@ Environment Variable: WATCHTOWER_HTTP_API_PERIODIC_POLLS
 ```
 
 !!! Note
-    Requires the [`http-api-update`](../http-api/index.md#http_api_update) configuration option to be enabled.
+    - Requires the [`update`](../../http-api/endpoints/update/index.md) endpoint to be enabled via the [`http-api-endpoints`](../http-api/index.md#http_api_endpoints) configuration option.
+    - The deprecated [`http-api-update`](../http-api/index.md#http_api_update) configuration option still works until Watchtower v2. (See [Deprecated Configuration Options](../http-api/index.md#deprecated_configuration_options)).

@@ -4,7 +4,7 @@
 
 The `v1/check` endpoint enables checking monitored containers for available image updates by querying the registry for the latest digest.
 
-It can be enabled by using the [HTTP API Check](../../../configuration/http-api/index.md#http_api_check) configuration option.
+Include `check` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this endpoint.
 
 ## Parameters
 

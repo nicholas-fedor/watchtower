@@ -5,7 +5,7 @@
 The `v1/config` endpoint returns the active Watchtower configuration settings.
 Sensitive values (notification URLs, tokens) are redacted.
 
-Use the [HTTP API Config](../../../configuration/http-api/index.md#http_api_config) configuration option to enable this endpoint.
+Include `config` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this endpoint.
 
 ## Response Format
 

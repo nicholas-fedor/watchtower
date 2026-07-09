@@ -4,10 +4,10 @@
 
 The `/v1/metrics` endpoint provides Prometheus-compatible metrics.
 
-To use this feature, you must set an [API token](../../../configuration/http-api/index.md#http_api_token) and [enable the metrics API](../../../configuration/http-api/index.md#http_api_metrics), as well as creating a port mapping for your container for port `8080`.
+To use this feature, set an [API token](../../../configuration/http-api/index.md#http_api_token), include `metrics` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints), and map container port `8080`.
 
 !!! Note
-    You can enable both the metrics API and the update API simultaneously by using both the [`http-api-metrics`](../../../configuration/http-api/index.md#http_api_metrics) and [`http-api-update`](../../../configuration/http-api/index.md#http_api_update) configuration options.
+    Enable multiple endpoints in one allowlist (for example `metrics,update`) via [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints).
 
 !!! Warning
     Enabling the metrics API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation.

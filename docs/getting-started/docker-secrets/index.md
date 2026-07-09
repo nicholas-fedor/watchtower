@@ -51,7 +51,7 @@ Provide the [HTTP API Token](../../configuration/http-api/index.md#http_api_toke
             environment:
                 - WATCHTOWER_HTTP_API_TOKEN=/run/secrets/api_token
                 # Enable an endpoint that requires the token
-                - WATCHTOWER_HTTP_API_METRICS=true
+                - WATCHTOWER_HTTP_API_ENDPOINTS=metrics
             ports:
                 - "8080:8080"
             restart: unless-stopped
@@ -69,7 +69,7 @@ Provide the [HTTP API Token](../../configuration/http-api/index.md#http_api_toke
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v $(pwd)/secrets/api_token.txt:/run/secrets/api_token:ro \
         -e WATCHTOWER_HTTP_API_TOKEN=/run/secrets/api_token \
-        -e WATCHTOWER_HTTP_API_METRICS=true \
+        -e WATCHTOWER_HTTP_API_ENDPOINTS=metrics \
         -p 8080:8080 \
         --restart unless-stopped \
         nickfedor/watchtower
@@ -91,7 +91,7 @@ Provide the [HTTP API Events Token](../../configuration/http-api/index.md#http_a
                 - events_token
             environment:
                 - WATCHTOWER_HTTP_API_EVENTS_TOKEN=/run/secrets/events_token
-                - WATCHTOWER_HTTP_API_EVENTS=true
+                - WATCHTOWER_HTTP_API_ENDPOINTS=events
             ports:
                 - "8080:8080"
             restart: unless-stopped
@@ -109,7 +109,7 @@ Provide the [HTTP API Events Token](../../configuration/http-api/index.md#http_a
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v $(pwd)/secrets/events_token.txt:/run/secrets/events_token:ro \
         -e WATCHTOWER_HTTP_API_EVENTS_TOKEN=/run/secrets/events_token \
-        -e WATCHTOWER_HTTP_API_EVENTS=true \
+        -e WATCHTOWER_HTTP_API_ENDPOINTS=events \
         -p 8080:8080 \
         --restart unless-stopped \
         nickfedor/watchtower
