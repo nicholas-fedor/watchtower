@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to e2ebcbe by @renovate[bot] in [#1922](https://github.com/nicholas-fedor/watchtower/pull/1922)
 - Update module golang.org/x/tools to v0.48.0 by @renovate[bot] in [#1920](https://github.com/nicholas-fedor/watchtower/pull/1920)
 - Update module golang.org/x/net to v0.57.0 by @renovate[bot] in [#1917](https://github.com/nicholas-fedor/watchtower/pull/1917)
 - Update golang:alpine docker digest to 0178a64 by @renovate[bot] in [#1916](https://github.com/nicholas-fedor/watchtower/pull/1916)
