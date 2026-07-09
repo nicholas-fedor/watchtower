@@ -70,6 +70,8 @@ func New(getDetails GetFunc) *Handler {
 //	@Param			image	query		string					false	"Filter by image name (exact match)"
 //	@Success		200		{object}	map[string]interface{}	"Container details with count and timestamp"
 //	@Failure		500		{string}	string					"Failed to get container details"
+//	@Failure		401		{string}	string					"Missing or invalid API token"
+//	@Security		BearerAuth
 //	@Router			/v1/containers/details [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{

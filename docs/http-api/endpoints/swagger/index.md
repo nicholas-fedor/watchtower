@@ -10,21 +10,20 @@ To enable the Swagger UI, include `swagger` in [`http-api-endpoints`](../../../c
 
 | **Name**  | **Method** | **Endpoint** | **Auth** | **Description**                                                |
 |:---------:|:----------:|:------------:|:--------:|:---------------------------------------------------------------|
-| Swagger   |   `GET`    | `/swagger/*` |    No    | Interactive API documentation rendered via Swagger UI          |
+| Swagger   |   `GET`    | `/swagger/*` |   No     | Interactive API documentation rendered via Swagger UI          |
 
 The endpoint is mounted as a wildcard route (`/swagger/`) so that all Swagger UI assets are served under this prefix.
 Accessing `/swagger/index.html` returns the main documentation page and sub-paths serve the static assets the UI needs.
 
 ## Security
 
-The Swagger UI endpoint does not require authentication.
-The UI must be accessible to browsers without a Bearer token in order to render, and the
-request-building it enables is only useful if the caller can already authenticate to the protected `/v1/*` endpoints separately.
+The Swagger UI page does not require authentication to access.
 
-That said, the same security guidance that applies to the rest of the HTTP API applies
-here as well:
+Calling protected APIs via **Try it out** still requires the [`http-api-token`](../../../configuration/http-api/index.md#http_api_token) (or events token for `/v1/events`) through Swagger UI’s **Authorize** control. That is the same protection as any other client.
 
-- Never expose the HTTP API (including the Swagger UI) directly to the Internet.
+The same guidance that applies to the rest of the HTTP API applies here as well:
+
+- Never expose the HTTP API (including the Swagger UI) directly to the Internet — the UI documents every route surface.
 - Always use TLS.
 - Only enable the endpoints you actually need.
 
@@ -134,18 +133,41 @@ Enable the endpoint and start Watchtower:
 
 ### Interacting with Authenticated Endpoints
 
-The Swagger UI page itself does **not** require authentication.
+### Try it out (call protected APIs from the UI)
 
-**Try it out** against protected `/v1/*` routes currently fails without a token in the request, and the generated OpenAPI spec does not yet define a security scheme, so Swagger UI does not show a working **Authorize** control for injecting `Authorization: Bearer <token>`.
+1. Open `http://<host>:<port>/swagger/index.html` (or `https://` when TLS is enabled).
+2. Click **Authorize** at the top-right of Swagger UI.
+3. Under **BearerAuth**, paste the HTTP API token **only** (do not type the word `Bearer`. Swagger UI places the value in the `Authorization` header).
+4. For `/v1/events`, under **EventsToken**, paste the events token only (auth works in Try it out, but the stream itself will not — see below).
+5. Click **Authorize**, then **Close**.
+6. Use **Try it out** on an operation (except the events stream).
 
-Until that is available, call protected endpoints with `curl` or another client:
+Authorization for Try it out is persisted across page reloads when using Swagger UI’s persist-authorization setting.
 
-```bash
-curl -X POST -H "Authorization: Bearer $WATCHTOWER_HTTP_API_TOKEN" \
-  "http://localhost:8080/v1/check"
-```
+Programmatic clients should still use `Authorization: Bearer <token>` (or the events token header/query form); see [Authentication](../../configuration/authentication/index.md).
 
-For the events stream, use the events token (header or `access_token` query parameter) (See [Events](../events/index.md)).
+!!! Warning "Events SSE is not supported in Swagger UI"
+    **Try it out** on [`/v1/events`](../events/index.md) will authenticate, then hang on a permanent **Loading** spinner. That is a Swagger UI limitation, not a Watchtower bug.
+
+    Swagger UI uses the browser `fetch` API and waits for a finished HTTP body. An SSE response is an open stream of `text/event-stream` events with no single “complete” body, so the UI never finishes rendering.
+
+    Use one of these instead:
+
+    ```bash
+    # curl (keep the connection open with -N)
+    curl -N -H "Authorization: Bearer $WATCHTOWER_HTTP_API_EVENTS_TOKEN" \
+      "http://localhost:8080/v1/events"
+    ```
+
+    ```javascript
+    // Browser EventSource (query token; EventSource cannot set Authorization headers)
+    const es = new EventSource(
+      "http://localhost:8080/v1/events?access_token=" + encodeURIComponent(eventsToken)
+    );
+    es.onmessage = (e) => console.log(e.data);
+    ```
+
+    Full details: [Events](../events/index.md).
 
 ### Query parameters
 
@@ -165,10 +187,8 @@ Swagger UI's **Try it out** button issues a real HTTP request from your browser 
 Because Swagger UI is served from the same origin, no CORS preflight is required when both are accessed from the same host and port (the default setup).
 When the UI is served from a different origin, ensure the [`http-api-cors-origins`](../../../configuration/http-api/index.md#http_api_cors_origins) configuration option allows the browser origin.
 
-!!! Note
-    The "Try it out" feature uses the browser's `fetch` API.
-    Requests to the [`/v1/events`](../../endpoints/events/index.md) SSE stream will not stream correctly through Swagger UI because browsers cannot reuse `fetch` connections as `EventSource`.
-    Use a dedicated SSE client or `curl` for event streams.
+JSON endpoints (`/v1/config`, `/v1/containers`, `/v1/check`, etc.) work well with Try it out.
+The events SSE stream does not (see the warning above).
 
 ## Troubleshooting
 

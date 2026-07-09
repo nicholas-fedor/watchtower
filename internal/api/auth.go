@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/extractors"
@@ -10,8 +11,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// NewAPIAuthMiddleware returns a Fiber middleware that validates Bearer token
-// authentication using constant-time SHA-256 comparison.
+// NewAPIAuthMiddleware returns a Fiber middleware that validates the HTTP API
+// token using constant-time SHA-256 comparison.
+//
+// Accepted credentials (first match wins):
+//   - Authorization: Bearer <token>
+//   - Authorization: <token> (raw value; Swagger UI apiKey style)
+//   - Cookie access_token=<token>
 func NewAPIAuthMiddleware(token string) fiber.Handler {
 	expectedHash := sha256.Sum256([]byte(token))
 
@@ -20,23 +26,70 @@ func NewAPIAuthMiddleware(token string) fiber.Handler {
 			return c.Status(fiber.StatusUnauthorized).SendString("API token not configured")
 		}
 
-		extracted, err := extractors.FromAuthHeader("Bearer").Extract(c)
-		if err != nil {
-			extracted, err = extractors.FromCookie("access_token").Extract(c)
-			if err != nil {
-				logrus.WithField("ip", c.IP()).Warn("Missing or malformed API key")
-
-				return c.Status(fiber.StatusUnauthorized).SendString(keyauth.ErrMissingOrMalformedAPIKey.Error())
-			}
-		}
-
-		providedHash := sha256.Sum256([]byte(extracted))
-		if subtle.ConstantTimeCompare(expectedHash[:], providedHash[:]) != 1 {
-			logrus.WithField("ip", c.IP()).Warn("Invalid token attempt")
-
+		if !tokenMatches(c, expectedHash) {
 			return c.Status(fiber.StatusUnauthorized).SendString(keyauth.ErrMissingOrMalformedAPIKey.Error())
 		}
 
 		return c.Next()
 	}
+}
+
+// tokenMatches reports whether the request carries a valid API token.
+func tokenMatches(c fiber.Ctx, expectedHash [sha256.Size]byte) bool {
+	provided, ok := extractAPIToken(c)
+	if !ok {
+		logrus.WithField("ip", c.IP()).Warn("Missing or malformed API key")
+
+		return false
+	}
+
+	if !tokenHashMatches(expectedHash, provided) {
+		logrus.WithField("ip", c.IP()).Warn("Invalid token attempt")
+
+		return false
+	}
+
+	return true
+}
+
+// extractAPIToken returns the API token from the request.
+//
+// Order:
+//  1. Authorization Bearer scheme (RFC-style)
+//  2. Raw Authorization header value (optional "Bearer " prefix stripped), for
+//     Swagger UI apiKey security which places the typed value into Authorization
+//  3. access_token cookie
+func extractAPIToken(c fiber.Ctx) (string, bool) {
+	token, err := extractors.FromAuthHeader("Bearer").Extract(c)
+	if err == nil && token != "" {
+		return token, true
+	}
+
+	raw := strings.TrimSpace(c.Get(fiber.HeaderAuthorization))
+	if raw != "" {
+		const bearerPrefix = "bearer "
+
+		if len(raw) > len(bearerPrefix) && strings.EqualFold(raw[:len(bearerPrefix)], bearerPrefix) {
+			raw = strings.TrimSpace(raw[len(bearerPrefix):])
+		}
+
+		if raw != "" {
+			return raw, true
+		}
+	}
+
+	token, err = extractors.FromCookie("access_token").Extract(c)
+	if err == nil && token != "" {
+		return token, true
+	}
+
+	return "", false
+}
+
+// tokenHashMatches compares a provided secret to the precomputed SHA-256 of the
+// configured token using constant-time comparison.
+func tokenHashMatches(expectedHash [sha256.Size]byte, provided string) bool {
+	providedHash := sha256.Sum256([]byte(provided))
+
+	return subtle.ConstantTimeCompare(expectedHash[:], providedHash[:]) == 1
 }

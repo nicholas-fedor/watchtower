@@ -11,7 +11,6 @@ info:
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-  termsOfService: https://github.com/nicholas-fedor/watchtower
   title: Watchtower HTTP API
   version: "1.0"
 paths:
@@ -67,8 +66,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Checks each watched container for available image updates without
-        pulling or restarting. Returns per-container update availability.
+      description: Checks each watched container for available updates by querying
+        the registry for the latest digest
       parameters:
       - description: Filter by image name (comma-separated, repeatable)
         in: query
@@ -86,10 +85,16 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
         "500":
           description: Failed to check for updates
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Check for available container updates
       tags:
       - check
@@ -107,10 +112,16 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
         "500":
           description: Failed to get configuration
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Get current configuration
       tags:
       - config
@@ -137,10 +148,16 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
         "500":
           description: Failed to list containers
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: List watched container statuses
       tags:
       - containers
@@ -168,24 +185,38 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
         "500":
           description: Failed to get container details
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Detailed container status
       tags:
       - containers
   /v1/events:
     get:
-      description: Streams Watchtower operational events (scan started/completed,
-        update started/completed/failed) via Server-Sent Events.
+      description: |-
+        Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events (SSE).
+
+        **SSE is not supported by "Try it out"**.
       produces:
       - text/event-stream
       responses:
         "200":
-          description: Event stream
+          description: Event stream (SSE)
           schema:
             type: string
+        "401":
+          description: Missing or invalid events token
+          schema:
+            type: string
+      security:
+      - EventsToken: []
       summary: Real-time events stream
       tags:
       - events
@@ -221,6 +252,12 @@ paths:
           description: Invalid query parameter
           schema:
             type: string
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
       summary: Scan history
       tags:
       - history
@@ -247,10 +284,16 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
         "500":
           description: Failed to list images
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: List tracked images
       tags:
       - images
@@ -264,6 +307,12 @@ paths:
           description: Prometheus exposition format metrics
           schema:
             type: string
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
       summary: Prometheus metrics
       tags:
       - metrics
@@ -283,6 +332,12 @@ paths:
             type: object
         "204":
           description: No Content
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
       summary: Last scan status
       tags:
       - metrics
@@ -319,6 +374,10 @@ paths:
           description: Asynchronous update accepted
           schema:
             type: string
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
         "429":
           description: Another update is already running
           headers:
@@ -331,6 +390,8 @@ paths:
           description: Request cancelled while waiting for lock
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Trigger container update scan
       tags:
       - update
@@ -339,23 +400,18 @@ produces:
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: 'Paste the HTTP API token only (WATCHTOWER_HTTP_API_TOKEN). Swagger
+      UI sends it as the Authorization header value. curl clients should use "Authorization:
+      Bearer <token>".'
+    in: header
+    name: Authorization
+    type: apiKey
+  EventsToken:
+    description: Paste the events API token only (WATCHTOWER_HTTP_API_EVENTS_TOKEN).
+      Swagger UI sends it as the Authorization header value.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
-tags:
-- description: Standardized liveness, readiness, and startup probes
-  name: health
-- description: Trigger and manage container image updates
-  name: update
-- description: Prometheus metrics and scan status
-  name: metrics
-- description: Watched container image identity and update availability
-  name: containers
-- description: Check for available container updates without applying them
-  name: check
-- description: Historical scan results from the in-memory ring buffer
-  name: history
-- description: Tracked images with digests and container counts
-  name: images
-- description: Active Watchtower configuration settings
-  name: config
-- description: Real-time operational events via Server-Sent Events
-  name: events

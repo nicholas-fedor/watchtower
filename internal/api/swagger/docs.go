@@ -15,7 +15,6 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "https://github.com/nicholas-fedor/watchtower",
         "contact": {
             "name": "Nicholas Fedor",
             "url": "https://github.com/nicholas-fedor/watchtower"
@@ -97,7 +96,12 @@ const docTemplate = `{
         },
         "/v1/check": {
             "post": {
-                "description": "Checks each watched container for available image updates without pulling or restarting. Returns per-container update availability.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Checks each watched container for available updates by querying the registry for the latest digest",
                 "consumes": [
                     "application/json"
                 ],
@@ -130,6 +134,12 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Failed to check for updates",
                         "schema": {
@@ -141,6 +151,11 @@ const docTemplate = `{
         },
         "/v1/config": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns the active Watchtower configuration settings. Sensitive values (notification URLs, tokens) are redacted.",
                 "consumes": [
                     "application/json"
@@ -160,6 +175,12 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Failed to get configuration",
                         "schema": {
@@ -171,6 +192,11 @@ const docTemplate = `{
         },
         "/v1/containers": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns the current image identity and digest for every watched container. Optionally filter by container name or image name.",
                 "consumes": [
                     "application/json"
@@ -204,6 +230,12 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Failed to list containers",
                         "schema": {
@@ -215,6 +247,11 @@ const docTemplate = `{
         },
         "/v1/containers/details": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns detailed information about each watched container, including running state, image identity, and configuration flags. Optionally filter by container name or image name.",
                 "consumes": [
                     "application/json"
@@ -248,6 +285,12 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Failed to get container details",
                         "schema": {
@@ -259,7 +302,12 @@ const docTemplate = `{
         },
         "/v1/events": {
             "get": {
-                "description": "Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.",
+                "security": [
+                    {
+                        "EventsToken": []
+                    }
+                ],
+                "description": "Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events (SSE).\n\n**SSE is not supported by \"Try it out\"**.",
                 "produces": [
                     "text/event-stream"
                 ],
@@ -269,7 +317,13 @@ const docTemplate = `{
                 "summary": "Real-time events stream",
                 "responses": {
                     "200": {
-                        "description": "Event stream",
+                        "description": "Event stream (SSE)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid events token",
                         "schema": {
                             "type": "string"
                         }
@@ -279,6 +333,11 @@ const docTemplate = `{
         },
         "/v1/history": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns historical scan results from the in-memory ring buffer (up to 500 entries). Optionally filter by time range and limit the number of results.",
                 "consumes": [
                     "application/json"
@@ -323,12 +382,23 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/v1/images": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns the current image identity and digest for every image tracked by Watchtower. Optionally filter by image name or image ID.",
                 "consumes": [
                     "application/json"
@@ -362,6 +432,12 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Failed to list images",
                         "schema": {
@@ -373,6 +449,11 @@ const docTemplate = `{
         },
         "/v1/metrics": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns Watchtower scan metrics in Prometheus exposition format.",
                 "produces": [
                     "text/plain"
@@ -387,12 +468,23 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/v1/status": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Returns the summary of the most recent Watchtower scan, including counts of scanned, updated, failed, restarted, and skipped containers.",
                 "consumes": [
                     "application/json"
@@ -414,12 +506,23 @@ const docTemplate = `{
                     },
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/v1/update": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Scans watched containers for image updates and applies them. Supports both full scans and targeted updates filtered by image name or container name. Container patterns support Go",
                 "consumes": [
                     "application/json"
@@ -465,6 +568,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "429": {
                         "description": "Another update is already running",
                         "schema": {
@@ -487,44 +596,20 @@ const docTemplate = `{
             }
         }
     },
-    "tags": [
-        {
-            "description": "Standardized liveness, readiness, and startup probes",
-            "name": "health"
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Paste the HTTP API token only (WATCHTOWER_HTTP_API_TOKEN). Swagger UI sends it as the Authorization header value. curl clients should use \"Authorization: Bearer \u003ctoken\u003e\".",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         },
-        {
-            "description": "Trigger and manage container image updates",
-            "name": "update"
-        },
-        {
-            "description": "Prometheus metrics and scan status",
-            "name": "metrics"
-        },
-        {
-            "description": "Watched container image identity and update availability",
-            "name": "containers"
-        },
-        {
-            "description": "Check for available container updates without applying them",
-            "name": "check"
-        },
-        {
-            "description": "Historical scan results from the in-memory ring buffer",
-            "name": "history"
-        },
-        {
-            "description": "Tracked images with digests and container counts",
-            "name": "images"
-        },
-        {
-            "description": "Active Watchtower configuration settings",
-            "name": "config"
-        },
-        {
-            "description": "Real-time operational events via Server-Sent Events",
-            "name": "events"
+        "EventsToken": {
+            "description": "Paste the events API token only (WATCHTOWER_HTTP_API_EVENTS_TOKEN). Swagger UI sends it as the Authorization header value.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
-    ]
+    }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it.

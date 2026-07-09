@@ -36,6 +36,8 @@ func New(list ListFunc) *Handler {
 //	@Param			image	query		string					false	"Filter by image name (exact match)"
 //	@Success		200		{object}	map[string]interface{}	"Container statuses with count and timestamp"
 //	@Failure		500		{string}	string					"Failed to list containers"
+//	@Failure		401		{string}	string					"Missing or invalid API token"
+//	@Security		BearerAuth
 //	@Router			/v1/containers [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{

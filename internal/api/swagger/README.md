@@ -22,7 +22,7 @@ events token.
 | POST   | `/v1/update`            | Yes  | Trigger container update scan                                 |
 | GET    | `/v1/status`            | Yes  | Last scan summary                                             |
 | GET    | `/v1/metrics`           | Yes  | Prometheus exposition format metrics                          |
-| GET    | `/swagger/*`            | No   | Swagger UI documentation                                      |
+| GET    | `/swagger/*`            | No   | Swagger UI documentation (Try it out still needs Authorize for /v1/*) |
 
 ## Authentication
 

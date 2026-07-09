@@ -162,6 +162,7 @@ Tokens can be provided to Watchtower using Docker Secrets, environment variables
 The following endpoints do not require authentication when enabled:
 
 - [Health probes](../../endpoints/health/index.md): `/livez`, `/readyz`, `/startupz`
+- [Swagger UI](../../endpoints/swagger/index.md): `/swagger/*` ("Try it out" functionality still requires authorization)
 
 ## Best Practices
 

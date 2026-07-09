@@ -7,8 +7,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	swaggo "github.com/gofiber/contrib/v3/swaggo"
-
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	_ "github.com/nicholas-fedor/watchtower/internal/api/swagger"
 )
@@ -31,7 +29,22 @@ var (
 	errMissingClientForImagesAPI = errors.New("images API is enabled but no Docker client is configured")
 )
 
-func ValidateAndRegister(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) error {
+// ValidateAndRegister validates options and registers enabled routes.
+//
+// Parameters:
+//   - ctx: Request context for long-lived handlers.
+//   - app: Fiber application.
+//   - auth: Middleware for protected /v1/* routes (Bearer/raw token/cookie).
+//   - opts: API configuration options.
+//
+// Returns:
+//   - error: Non-nil if validation fails.
+func ValidateAndRegister(
+	ctx context.Context,
+	app *fiber.App,
+	auth fiber.Handler,
+	opts config.Options,
+) error {
 	if opts.EnableUpdateAPI {
 		err := config.ValidateUpdateOptions(opts)
 		if err != nil {
@@ -60,7 +73,19 @@ func ValidateAndRegister(ctx context.Context, app *fiber.App, auth fiber.Handler
 	return nil
 }
 
-func Register(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) {
+// Register mounts enabled HTTP API routes on the Fiber app.
+//
+// Parameters:
+//   - ctx: Request context for long-lived handlers.
+//   - app: Fiber application.
+//   - auth: Middleware for protected /v1/* routes.
+//   - opts: API configuration options.
+func Register(
+	ctx context.Context,
+	app *fiber.App,
+	auth fiber.Handler,
+	opts config.Options,
+) {
 	if opts.EnableHealthAPI {
 		registerHealthRoute(app, opts)
 	}
@@ -99,6 +124,6 @@ func Register(ctx context.Context, app *fiber.App, auth fiber.Handler, opts conf
 	}
 
 	if opts.EnableSwaggerAPI {
-		app.Get("/swagger/*", swaggo.HandlerDefault)
+		registerSwaggerRoute(app, opts)
 	}
 }

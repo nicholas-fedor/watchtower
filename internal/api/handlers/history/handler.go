@@ -42,6 +42,8 @@ func New(getHist func(*time.Time, *time.Time, int) []metrics.HistoryEntry) *Hand
 //	@Param			limit	query		int						false	"Maximum number of entries to return (default: all)"
 //	@Success		200		{object}	map[string]interface{}	"History entries with count and timestamp"
 //	@Failure		400		{string}	string					"Invalid query parameter"
+//	@Failure		401		{string}	string					"Missing or invalid API token"
+//	@Security		BearerAuth
 //	@Router			/v1/history [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{

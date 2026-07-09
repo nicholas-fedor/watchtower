@@ -37,6 +37,12 @@ func TestNewAPIAuthMiddleware(t *testing.T) {
 			wantStatus: fiber.StatusOK,
 		},
 		{
+			name:       "raw authorization token returns 200",
+			token:      testToken,
+			authHeader: testToken,
+			wantStatus: fiber.StatusOK,
+		},
+		{
 			name:       "invalid bearer token returns 401",
 			token:      testToken,
 			authHeader: "Bearer wrong-token",
@@ -63,7 +69,7 @@ func TestNewAPIAuthMiddleware(t *testing.T) {
 			wantBody:   keyauth.ErrMissingOrMalformedAPIKey.Error(),
 		},
 		{
-			name:       "malformed auth header returns 401",
+			name:       "non-bearer scheme falls through to raw value and fails",
 			token:      testToken,
 			authHeader: "NotBearer " + testToken,
 			wantStatus: fiber.StatusUnauthorized,

@@ -120,7 +120,7 @@ WATCHTOWER_HTTP_API_TOKEN=...
 
 !!! Note
     - Health is **not** added automatically; include `health` when you need probes.
-    - Protected `/v1/*` endpoints (not health or swagger) require [`http-api-token`](#http_api_token).
+    - Protected `/v1/*` endpoints require [`http-api-token`](#http_api_token).
     - Enabling `events` requires [`http-api-events-token`](#http_api_events_token).
     - See per-endpoint docs under [HTTP API](../../http-api/overview/index.md).
 

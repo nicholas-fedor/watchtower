@@ -10,6 +10,14 @@
 // @schemes			http https
 // @accept				json
 // @produce			json
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
+// @description				Paste the HTTP API token only (WATCHTOWER_HTTP_API_TOKEN). Swagger UI sends it as the Authorization header value. curl clients should use "Authorization: Bearer <token>".
+// @securityDefinitions.apikey	EventsToken
+// @in							header
+// @name						Authorization
+// @description				Paste the events API token only (WATCHTOWER_HTTP_API_EVENTS_TOKEN). Swagger UI sends it as the Authorization header value.
 // @tag.name			health
 // @tag.description	Standardized liveness, readiness, and startup probes
 // @tag.name			update

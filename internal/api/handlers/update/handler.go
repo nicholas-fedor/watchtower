@@ -88,6 +88,8 @@ func New(updateFn func(ctx context.Context, images, containers []string) *metric
 //	@Failure		429			{string}	string					"Another update is already running"
 //	@Header			429			{string}	Retry-After				"Seconds to wait before retrying"
 //	@Failure		503			{string}	string					"Request cancelled while waiting for lock"
+//	@Failure		401			{string}	string					"Missing or invalid API token"
+//	@Security		BearerAuth
 //	@Router			/v1/update [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{

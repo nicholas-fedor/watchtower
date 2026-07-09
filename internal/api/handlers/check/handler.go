@@ -39,6 +39,8 @@ func New(check CheckFunc) *Handler {
 //	@Param			container	query		string					false	"Filter by container name (comma-separated, repeatable)"
 //	@Success		200			{object}	map[string]interface{}	"Container update availability results"
 //	@Failure		500			{string}	string					"Failed to check for updates"
+//	@Failure		401			{string}	string					"Missing or invalid API token"
+//	@Security		BearerAuth
 //	@Router			/v1/check [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	if h.check == nil {

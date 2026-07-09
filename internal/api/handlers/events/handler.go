@@ -35,10 +35,14 @@ func NewHandler(b *Broadcaster, allowedOrigins []string) *Handler {
 // handler so the SSE middleware can manage the response lifecycle.
 //
 //	@Summary		Real-time events stream
-//	@Description	Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events.
+//	@Description	Streams Watchtower operational events (scan started/completed, update started/completed/failed) via Server-Sent Events (SSE).
+//	@Description
+//	@Description	**SSE is not supported by "Try it out"**.
 //	@Tags			events
 //	@Produce		text/event-stream
-//	@Success		200	{string}	string	"Event stream"
+//	@Success		200	{string}	string	"Event stream (SSE)"
+//	@Failure		401	{string}	string	"Missing or invalid events token"
+//	@Security		EventsToken
 //	@Router			/v1/events [get]
 func (h *Handler) Handle() fiber.Handler {
 	return sse.New(sse.Config{

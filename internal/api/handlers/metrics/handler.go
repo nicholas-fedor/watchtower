@@ -37,6 +37,8 @@ func New() *Handler {
 //	@Tags			metrics
 //	@Produce		plain
 //	@Success		200	{string}	string	"Prometheus exposition format metrics"
+//	@Failure		401	{string}	string	"Missing or invalid API token"
+//	@Security		BearerAuth
 //	@Router			/v1/metrics [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	return adaptor.HTTPHandler(promhttp.Handler())(c)
@@ -70,6 +72,8 @@ func NewStatusHandler(getLast func() *metrics.Metric) *StatusHandler {
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}	"Scan summary with counts and timestamp"
 //	@Success		204
+//	@Failure		401	{string}	string	"Missing or invalid API token"
+//	@Security		BearerAuth
 //	@Router			/v1/status [get]
 func (h *StatusHandler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
