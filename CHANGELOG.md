@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/cache action to v6.1.0 by @renovate[bot] in [#1859](https://github.com/nicholas-fedor/watchtower/pull/1859)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.9 by @renovate[bot] in [#1858](https://github.com/nicholas-fedor/watchtower/pull/1858)
+- Update module github.com/docker/cli to v29.6.1+incompatible by @renovate[bot] in [#1856](https://github.com/nicholas-fedor/watchtower/pull/1856)
+- Update actions/attest-build-provenance action to v4.1.1 by @renovate[bot] in [#1855](https://github.com/nicholas-fedor/watchtower/pull/1855)
 - Update module golang.org/x/tools to v0.47.0 by @renovate[bot] in [#1853](https://github.com/nicholas-fedor/watchtower/pull/1853)
 - Update nicholas-fedor/actionlint-action action to v1.0.14 by @renovate[bot] in [#1849](https://github.com/nicholas-fedor/watchtower/pull/1849)
 - Update actions/setup-python action to v6.3.0 by @renovate[bot] in [#1848](https://github.com/nicholas-fedor/watchtower/pull/1848)
