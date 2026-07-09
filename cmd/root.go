@@ -932,6 +932,8 @@ func runMain(cfg types.RunConfig) int {
 			LabelPrecedence:             labelPrecedence,
 			CooldownDelay:               cooldownDelay,
 			SkipSelfUpdate:              skipSelfUpdate,
+			ReviveStopped:               reviveStopped,
+			UseComposeDependsOn:         useComposeDependsOn,
 			Client:                      client,
 			Notifier:                    notifier,
 			Scope:                       scope,

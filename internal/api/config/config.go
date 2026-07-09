@@ -80,6 +80,8 @@ type Options struct {
 	LabelPrecedence             bool
 	CooldownDelay               time.Duration
 	SkipSelfUpdate              bool
+	ReviveStopped               bool
+	UseComposeDependsOn         bool
 	Client                      container.Client
 	Notifier                    types.Notifier
 	Scope                       string
@@ -89,6 +91,32 @@ type Options struct {
 	DefaultMetrics              func() *mt.Metrics
 	WriteStartupMessage         func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
 	EventBroadcaster            *events.Broadcaster
+}
+
+// BuildUpdateParams constructs UpdateParams for HTTP-triggered updates from
+// the resolved CLI/API options. Fields match those used by scheduled and
+// run-once paths so HTTP updates honor the same operational flags.
+//
+// Parameters:
+//   - opts: API configuration options.
+//
+// Returns:
+//   - types.UpdateParams: Parameters for the update pipeline.
+func BuildUpdateParams(opts Options) types.UpdateParams {
+	return types.UpdateParams{
+		Cleanup:             opts.Cleanup,
+		NoRestart:           opts.NoRestart,
+		ReviveStopped:       opts.ReviveStopped,
+		MonitorOnly:         opts.MonitorOnly,
+		NoPull:              opts.NoPull,
+		LifecycleHooks:      opts.LifecycleHooks,
+		RollingRestart:      opts.RollingRestart,
+		LabelPrecedence:     opts.LabelPrecedence,
+		RunOnce:             false,
+		UseComposeDependsOn: opts.UseComposeDependsOn,
+		SkipSelfUpdate:      opts.SkipSelfUpdate,
+		CooldownDelay:       opts.CooldownDelay,
+	}
 }
 
 // ValidateUpdateOptions validates that all required update options are set.

@@ -19,12 +19,7 @@ const (
 
 func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) {
 	handler := update.New(func(updateCtx context.Context, images, containers []string) *mt.Metric {
-		params := types.UpdateParams{
-			Cleanup:        opts.Cleanup,
-			RunOnce:        false,
-			MonitorOnly:    opts.MonitorOnly,
-			SkipSelfUpdate: opts.SkipSelfUpdate,
-		}
+		params := config.BuildUpdateParams(opts)
 
 		imageFilter := opts.FilterByImage(images, opts.Filter)
 

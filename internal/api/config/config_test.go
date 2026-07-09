@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -77,6 +78,39 @@ func TestValidateUpdateOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildUpdateParams(t *testing.T) {
+	t.Parallel()
+
+	opts := Options{
+		Cleanup:             true,
+		NoRestart:           true,
+		ReviveStopped:       true,
+		MonitorOnly:         true,
+		NoPull:              true,
+		LifecycleHooks:      true,
+		RollingRestart:      true,
+		LabelPrecedence:     true,
+		UseComposeDependsOn: true,
+		SkipSelfUpdate:      true,
+		CooldownDelay:       24 * time.Hour,
+	}
+
+	params := BuildUpdateParams(opts)
+
+	assert.True(t, params.Cleanup)
+	assert.True(t, params.NoRestart)
+	assert.True(t, params.ReviveStopped)
+	assert.True(t, params.MonitorOnly)
+	assert.True(t, params.NoPull)
+	assert.True(t, params.LifecycleHooks)
+	assert.True(t, params.RollingRestart)
+	assert.True(t, params.LabelPrecedence)
+	assert.True(t, params.UseComposeDependsOn)
+	assert.True(t, params.SkipSelfUpdate)
+	assert.Equal(t, 24*time.Hour, params.CooldownDelay)
+	assert.False(t, params.RunOnce, "HTTP updates are never run-once")
 }
 
 func TestErrSentinelValues(t *testing.T) {
