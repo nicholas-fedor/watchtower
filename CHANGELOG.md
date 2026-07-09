@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:alpine docker digest to 0178a64 by @renovate[bot] in [#1916](https://github.com/nicholas-fedor/watchtower/pull/1916)
 - Update module golang.org/x/mod to v0.38.0 by @renovate[bot] in [#1914](https://github.com/nicholas-fedor/watchtower/pull/1914)
 - Update github/codeql-action action to v4.37.0 by @renovate[bot] in [#1913](https://github.com/nicholas-fedor/watchtower/pull/1913)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.17 by @renovate[bot] in [#1911](https://github.com/nicholas-fedor/watchtower/pull/1911)
