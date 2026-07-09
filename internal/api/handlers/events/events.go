@@ -19,6 +19,24 @@ type Event struct {
 	Data      any       `json:"data"`
 }
 
+// ScanStartedData carries redacted scan policy flags for SSE subscribers.
+// It intentionally omits filter functions, container IDs, and other internal
+// fields from types.UpdateParams.
+type ScanStartedData struct {
+	Cleanup             bool `json:"cleanup"`
+	NoRestart           bool `json:"no_restart"`
+	MonitorOnly         bool `json:"monitor_only"`
+	LifecycleHooks      bool `json:"lifecycle_hooks"`
+	RollingRestart      bool `json:"rolling_restart"`
+	LabelPrecedence     bool `json:"label_precedence"`
+	NoPull              bool `json:"no_pull"`
+	RunOnce             bool `json:"run_once"`
+	UseComposeDependsOn bool `json:"use_compose_depends_on"`
+	SkipSelfUpdate      bool `json:"skip_self_update"`
+	EphemeralSelfUpdate bool `json:"ephemeral_self_update"`
+	ReviveStopped       bool `json:"revive_stopped"`
+}
+
 // ScanCompletedData carries details about a scan that has finished.
 type ScanCompletedData struct {
 	Scanned int `json:"scanned"`

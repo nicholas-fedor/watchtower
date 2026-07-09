@@ -23,8 +23,9 @@ var (
 	ErrMissingRunUpdatesWithNotifications = errors.New("RunUpdatesWithNotifications must be provided when EnableUpdateAPI is set")
 	// ErrMissingFilterByImage indicates FilterByImage was not provided.
 	ErrMissingFilterByImage = errors.New("FilterByImage must be provided when EnableUpdateAPI is set")
-	// ErrMissingDefaultMetrics indicates DefaultMetrics was not provided.
-	ErrMissingDefaultMetrics = errors.New("DefaultMetrics must be provided when EnableUpdateAPI is set")
+	// ErrMissingDefaultMetrics indicates DefaultMetrics was not provided when
+	// an endpoint that requires the metrics store is enabled.
+	ErrMissingDefaultMetrics = errors.New("DefaultMetrics must be provided when update, metrics, or history API is enabled")
 	// ErrMissingAPIToken indicates the API token is empty or unset.
 	ErrMissingAPIToken = errors.New("API token is empty or unset")
 	// ErrMissingEventsAPIToken indicates events token is not set when events API is enabled.

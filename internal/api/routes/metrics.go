@@ -8,6 +8,10 @@ import (
 )
 
 func registerMetricsRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+	if opts.DefaultMetrics == nil {
+		return
+	}
+
 	handler := metrics.New()
 	app.Get(handler.Path, auth, handler.Handle)
 

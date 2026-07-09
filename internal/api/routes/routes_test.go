@@ -135,13 +135,39 @@ func TestValidateAndRegister(t *testing.T) {
 			errMsg:  "FilterByImage must be provided",
 		},
 		{
-			name: "missing DefaultMetrics",
+			name: "missing DefaultMetrics for update",
 			opts: func() config.Options {
 				o := baseOpts()
 				o.DefaultMetrics = nil
 
 				return o
 			}(),
+			wantErr: true,
+			errMsg:  "DefaultMetrics must be provided",
+		},
+		{
+			name: "history without client is valid",
+			opts: config.Options{
+				EnableHistoryAPI: true,
+				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: false,
+		},
+		{
+			name: "history without DefaultMetrics fails",
+			opts: config.Options{
+				EnableHistoryAPI: true,
+				DefaultMetrics:   nil,
+			},
+			wantErr: true,
+			errMsg:  "DefaultMetrics must be provided",
+		},
+		{
+			name: "metrics without DefaultMetrics fails",
+			opts: config.Options{
+				EnableMetricsAPI: true,
+				DefaultMetrics:   nil,
+			},
 			wantErr: true,
 			errMsg:  "DefaultMetrics must be provided",
 		},

@@ -20,10 +20,6 @@ var (
 	// is enabled but no Docker client is configured.
 	errMissingClientForContainersAPI = errors.New("containers API is enabled but no Docker client is configured")
 
-	// errMissingClientForHistoryAPI is returned when the history API is enabled
-	// but no Docker client is configured.
-	errMissingClientForHistoryAPI = errors.New("history API is enabled but no Docker client is configured")
-
 	// errMissingClientForImagesAPI is returned when the images API is enabled
 	// but no Docker client is configured.
 	errMissingClientForImagesAPI = errors.New("images API is enabled but no Docker client is configured")
@@ -52,16 +48,17 @@ func ValidateAndRegister(
 		}
 	}
 
+	// Metrics and history read the in-memory metrics store.
+	if (opts.EnableMetricsAPI || opts.EnableHistoryAPI) && opts.DefaultMetrics == nil {
+		return config.ErrMissingDefaultMetrics
+	}
+
 	if opts.EnableCheckAPI && opts.Client == nil {
 		return errMissingClientForCheckAPI
 	}
 
 	if opts.EnableContainersAPI && opts.Client == nil {
 		return errMissingClientForContainersAPI
-	}
-
-	if opts.EnableHistoryAPI && opts.Client == nil {
-		return errMissingClientForHistoryAPI
 	}
 
 	if opts.EnableImagesAPI && opts.Client == nil {
