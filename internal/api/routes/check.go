@@ -7,6 +7,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -23,7 +24,13 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 			CooldownDelay:   opts.CooldownDelay,
 		}
 
-		return check.CheckForUpdates(ctx, opts.Client, opts.Filter, images, names, params)
+		imageFilter := opts.FilterByImage(images, opts.Filter)
+		containerFilter := update.ContainerFilter(names)
+		combinedFilter := func(c types.FilterableContainer) bool {
+			return imageFilter(c) && containerFilter(c.Name(), true)
+		}
+
+		return check.CheckForUpdates(ctx, opts.Client, combinedFilter, params)
 	})
 	app.Post(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
 }

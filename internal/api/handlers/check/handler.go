@@ -35,8 +35,8 @@ func New(check CheckFunc) *Handler {
 //	@Tags			check
 //	@Accept			json
 //	@Produce		json
-//	@Param			image		query		string					false	"Filter by image name (comma-separated, repeatable)"
-//	@Param			container	query		string					false	"Filter by container name (comma-separated, repeatable)"
+//	@Param			image		query		string					false	"Image names to check (comma-separated, repeatable). When combined with container, only containers matching both are checked."
+//	@Param			container	query		string					false	"Container names to check (comma-separated, repeatable). When combined with image, only containers matching both are checked."
 //	@Success		200			{object}	map[string]interface{}	"Container update availability results"
 //	@Failure		500			{string}	string					"Failed to check for updates"
 //	@Failure		401			{string}	string					"Missing or invalid API token"

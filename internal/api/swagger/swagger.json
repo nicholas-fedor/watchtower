@@ -113,13 +113,13 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Filter by image name (comma-separated, repeatable)",
+                        "description": "Image names to check (comma-separated, repeatable). When combined with container, only containers matching both are checked.",
                         "name": "image",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Filter by container name (comma-separated, repeatable)",
+                        "description": "Container names to check (comma-separated, repeatable). When combined with image, only containers matching both are checked.",
                         "name": "container",
                         "in": "query"
                     }

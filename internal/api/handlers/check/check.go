@@ -3,7 +3,6 @@ package check
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -52,15 +51,15 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 }
 
 // CheckForUpdates checks all watched containers for available image updates.
+//
 // It queries the registry for the latest digest (HEAD with GET fallback) unless
-// no-pull is active for the container. Images and names act as filters.
+// no-pull is active for the container. The provided filter determines which
+// containers are included. nil or a pass-through filter includes all.
 //
 // Parameters:
 //   - ctx: Context for the Docker API call.
 //   - client: Docker client.
-//   - filter: Container filter function.
-//   - images: Image name filters. Empty means no image filtering.
-//   - names: Container name filters. Empty means no name filtering.
+//   - filter: Combined container filter (general + image + name constraints).
 //   - params: Update parameters (MonitorOnly, NoPull, LabelPrecedence, CooldownDelay).
 //
 // Returns:
@@ -70,8 +69,6 @@ func CheckForUpdates(
 	ctx context.Context,
 	client container.Client,
 	filter types.Filter,
-	images []string,
-	names []string,
 	params types.UpdateParams,
 ) ([]ContainerCheck, error) {
 	containers, err := client.ListContainers(ctx, filter)
@@ -83,7 +80,7 @@ func CheckForUpdates(
 	now := time.Now().UTC()
 
 	for _, c := range containers {
-		if !matchesFilters(c, images, names) {
+		if filter != nil && !filter(c) {
 			continue
 		}
 
@@ -130,16 +127,4 @@ func CheckForUpdates(
 	}
 
 	return results, nil
-}
-
-func matchesFilters(c types.Container, images, names []string) bool {
-	if len(images) == 0 && len(names) == 0 {
-		return true
-	}
-
-	if slices.Contains(images, c.ImageName()) {
-		return true
-	}
-
-	return slices.Contains(names, c.Name())
 }
