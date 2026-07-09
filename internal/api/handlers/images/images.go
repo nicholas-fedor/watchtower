@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/distribution/reference"
+
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -73,7 +75,14 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 		imageName := c.ImageName()
 		imageID := string(c.ImageID())
 
-		key := imageID + "|" + imageName
+		normalizedName := imageName
+
+		ref, parseErr := reference.ParseNormalizedNamed(imageName)
+		if parseErr == nil {
+			normalizedName = ref.Name()
+		}
+
+		key := imageID + "|" + normalizedName
 		if existing, ok := imageMap[key]; ok {
 			existing.Containers++
 
@@ -87,7 +96,10 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 		}
 
 		if info := c.ImageInfo(); info != nil && len(info.RepoDigests) > 0 {
-			status.Digest = extractDigestForImage(info.RepoDigests, imageName)
+			_, digest, found := strings.Cut(info.RepoDigests[0], "@")
+			if found {
+				status.Digest = digest
+			}
 		}
 
 		imageMap[key] = status
@@ -99,23 +111,4 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 	}
 
 	return statuses, nil
-}
-
-// extractDigestForImage returns the manifest digest whose repository name
-// matches imageName, or an empty string if none match.
-func extractDigestForImage(repoDigests []string, imageName string) string {
-	for _, repoDigest := range repoDigests {
-		repo, _, found := strings.Cut(repoDigest, "@")
-		if !found {
-			continue
-		}
-
-		if repo == imageName {
-			_, digest, _ := strings.Cut(repoDigest, "@")
-
-			return digest
-		}
-	}
-
-	return ""
 }

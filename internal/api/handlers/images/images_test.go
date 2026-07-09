@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/moby/moby/api/types/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,7 @@ func TestListImageStatuses(t *testing.T) {
 		client  func(t *testing.T) *mockContainer.MockClient
 		filter  types.Filter
 		wantErr bool
-		wantLen int
+		want    []ImageStatus
 	}{
 		{
 			name: "successful list with single image",
@@ -34,9 +35,10 @@ func TestListImageStatuses(t *testing.T) {
 
 				return c
 			},
-			filter:  nil,
-			wantErr: false,
-			wantLen: 1,
+			filter: nil,
+			want: []ImageStatus{
+				{Name: "nginx:latest", ImageID: "sha256:abc123", Containers: 1},
+			},
 		},
 		{
 			name: "multiple containers same image",
@@ -57,9 +59,90 @@ func TestListImageStatuses(t *testing.T) {
 
 				return c
 			},
-			filter:  nil,
-			wantErr: false,
-			wantLen: 1,
+			filter: nil,
+			want: []ImageStatus{
+				{Name: "nginx:latest", ImageID: "sha256:abc123", Containers: 2},
+			},
+		},
+		{
+			name: "digest extracted from canonical repo digest",
+			client: func(t *testing.T) *mockContainer.MockClient {
+				t.Helper()
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
+				container.EXPECT().ImageName().Return("nginx:latest")
+				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
+				container.EXPECT().ImageInfo().Return(&image.InspectResponse{
+					RepoDigests: []string{"docker.io/library/nginx@sha256:digest123"},
+				})
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+
+				return c
+			},
+			filter: nil,
+			want: []ImageStatus{
+				{Name: "nginx:latest", ImageID: "sha256:abc123", Digest: "sha256:digest123", Containers: 1},
+			},
+		},
+		{
+			name: "digest extracted from short name repo digest",
+			client: func(t *testing.T) *mockContainer.MockClient {
+				t.Helper()
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
+				container.EXPECT().ImageName().Return("myapp:1.0")
+				container.EXPECT().ImageID().Return(types.ImageID("sha256:def456"))
+				container.EXPECT().ImageInfo().Return(&image.InspectResponse{
+					RepoDigests: []string{"myapp@sha256:shortname"},
+				})
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+
+				return c
+			},
+			filter: nil,
+			want: []ImageStatus{
+				{Name: "myapp:1.0", ImageID: "sha256:def456", Digest: "sha256:shortname", Containers: 1},
+			},
+		},
+		{
+			name: "digest extracted from private registry",
+			client: func(t *testing.T) *mockContainer.MockClient {
+				t.Helper()
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
+				container.EXPECT().ImageName().Return("registry.example.com/team/app:v2")
+				container.EXPECT().ImageID().Return(types.ImageID("sha256:ghi789"))
+				container.EXPECT().ImageInfo().Return(&image.InspectResponse{
+					RepoDigests: []string{"registry.example.com/team/app@sha256:privreg"},
+				})
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+
+				return c
+			},
+			filter: nil,
+			want: []ImageStatus{
+				{Name: "registry.example.com/team/app:v2", ImageID: "sha256:ghi789", Digest: "sha256:privreg", Containers: 1},
+			},
+		},
+		{
+			name: "multiple digests uses first",
+			client: func(t *testing.T) *mockContainer.MockClient {
+				t.Helper()
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
+				container.EXPECT().ImageName().Return("nginx:latest")
+				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
+				container.EXPECT().ImageInfo().Return(&image.InspectResponse{
+					RepoDigests: []string{"docker.io/library/nginx@sha256:first", "nginx@sha256:second"},
+				})
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+
+				return c
+			},
+			filter: nil,
+			want: []ImageStatus{
+				{Name: "nginx:latest", ImageID: "sha256:abc123", Digest: "sha256:first", Containers: 1},
+			},
 		},
 		{
 			name: "client error returns wrapped error",
@@ -84,7 +167,14 @@ func TestListImageStatuses(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Len(t, statuses, tt.wantLen)
+				assert.Len(t, statuses, len(tt.want))
+
+				for i, want := range tt.want {
+					assert.Equal(t, want.Name, statuses[i].Name)
+					assert.Equal(t, want.ImageID, statuses[i].ImageID)
+					assert.Equal(t, want.Digest, statuses[i].Digest)
+					assert.Equal(t, want.Containers, statuses[i].Containers)
+				}
 			}
 		})
 	}
