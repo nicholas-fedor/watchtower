@@ -61,4 +61,16 @@
 //  5. compress    — response compression
 //  6. limiter     — per-IP rate limiting (sliding window)
 //  7. auth        — Bearer token authentication (per-route)
+//
+// API server timeout behavior:
+//
+//   - ReadTimeout is set to 10s. It bounds reading the full request including
+//     body. Required for clean Fiber shutdown.
+//   - IdleTimeout is set to 30s. It bounds the wait for the next request on
+//     keep-alive connections. SSE sends stream comments every 5 seconds, so
+//     idle timeout does not fire on quiet event streams.
+//   - WriteTimeout is left at zero. A global write deadline conflicts with
+//     long-lived routes. SSE idles between events, and the update handler
+//     can run up to 10 minutes under its own per-route timeout middleware.
+//     Route-specific timeouts bound each handler instead.
 package api
