@@ -158,7 +158,7 @@ func TestHandler_Handle_RejectsDisallowedOrigin(t *testing.T) {
 
 	defer resp.Body.Close()
 
-	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
 }
 
 func TestHandler_Handle_AllowsSameOrigin(t *testing.T) {
@@ -171,9 +171,7 @@ func TestHandler_Handle_AllowsSameOrigin(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
 
-	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/events", nil)
-	req.Header.Set("Origin", "http://example.com:8080")
-	req.Header.Set("Host", "example.com:8080")
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "http://example.com:8080/v1/events", nil)
 
 	resp, err := app.Test(req, fiber.TestConfig{
 		Timeout: 500 * time.Millisecond,
@@ -219,10 +217,15 @@ func TestIsOriginAllowed(t *testing.T) {
 	}{
 		{"empty origin", "", "example.com:8080", nil, true},
 		{"null origin", "null", "example.com:8080", nil, true},
+		{"null in allowed list", "null", "example.com:8080", []string{"null"}, true},
 		{"same origin no scheme", "example.com:8080", "example.com:8080", nil, true},
 		{"same origin http", "http://example.com:8080", "example.com:8080", nil, true},
 		{"same origin https", "https://example.com:8080", "example.com:8080", nil, true},
 		{"different origin no cors", "https://evil.com", "example.com:8080", nil, false},
+		{"subdomain is different origin", "https://www.example.com", "example.com:8080", nil, false},
+		{"port mismatch same host", "https://example.com:8443", "example.com:8080", nil, false},
+		{"credentials preserved in origin", "https://user:pass@example.com", "example.com:8080", []string{"https://user:pass@example.com"}, true},
+		{"non-http origin not allowed", "file:///etc/passwd", "example.com:8080", nil, false},
 		{"explicit cors match", "https://app.example.com", "example.com:8080", []string{"https://app.example.com"}, true},
 		{"cors wildcard", "https://anything", "example.com:8080", []string{"*"}, true},
 		{"cors list no match", "https://other.com", "example.com:8080", []string{"https://app.example.com"}, false},
@@ -235,4 +238,101 @@ func TestIsOriginAllowed(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestHandler_Handle_AllowsNullOrigin(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, nil)
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "http://example.com:8080/v1/events", nil)
+	req.Header.Set("Origin", "null")
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+}
+
+func TestHandler_Handle_AllowsWildcardCORS(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, []string{"*"})
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "http://example.com:8080/v1/events", nil)
+	req.Header.Set("Origin", "https://anything.com")
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+}
+
+func TestHandler_Handle_MaxSubscribersHTTP(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, nil)
+
+	for range maxSubscribers {
+		require.NotNil(t, b.Subscribe(), "pre-fill subscriber")
+	}
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "http://example.com:8080/v1/events", nil)
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusServiceUnavailable, resp.StatusCode)
+}
+
+func TestHandler_Handle_OriginCheckPrecedence(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, nil)
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "http://example.com:8080/v1/events", nil)
+	req.Header.Set("Origin", "https://evil.com")
+
+	resp, err := app.Test(req, fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusForbidden, resp.StatusCode)
 }
