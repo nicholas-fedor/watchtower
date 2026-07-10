@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/common to v0.70.0 by @renovate[bot] in [#1928](https://github.com/nicholas-fedor/watchtower/pull/1928)
+- Update github.com/google/pprof digest to b9395ee by @renovate[bot] in [#1926](https://github.com/nicholas-fedor/watchtower/pull/1926)
 - Update github.com/google/pprof digest to 301c45c by @renovate[bot] in [#1924](https://github.com/nicholas-fedor/watchtower/pull/1924)
 - Update github.com/google/pprof digest to e2ebcbe by @renovate[bot] in [#1922](https://github.com/nicholas-fedor/watchtower/pull/1922)
 - Update module golang.org/x/tools to v0.48.0 by @renovate[bot] in [#1920](https://github.com/nicholas-fedor/watchtower/pull/1920)
