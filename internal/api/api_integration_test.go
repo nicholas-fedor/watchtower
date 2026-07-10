@@ -21,6 +21,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	mockAPI "github.com/nicholas-fedor/watchtower/internal/api/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -522,6 +523,71 @@ func TestIntegration_ContainerDetailsAPI(t *testing.T) {
 		Client:              makeListContainersMock(t),
 		Filter:              makeFilter(t),
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Check during update
+// ---------------------------------------------------------------------------
+
+func TestIntegration_CheckDuringUpdate(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	mc := mockContainer.NewMockClient(t)
+	mc.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil).Maybe()
+	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
+
+	updateDone := make(chan struct{})
+
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
+
+	opts := config.Options{
+		Token:           "test-token",
+		EnableUpdateAPI: true,
+		EnableCheckAPI:  true,
+		UnblockHTTPAPI:  true,
+		Client:          mc,
+		Filter:          makeFilter(t),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			<-updateDone
+
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+	}
+
+	authMiddleware := api.NewAPIAuthMiddleware(opts.Token)
+
+	err := routes.ValidateAndRegister(t.Context(), app, authMiddleware, opts)
+	require.NoError(t, err)
+
+	// Fire check while update is blocked on updateDone.
+	checkDone := make(chan int, 1)
+
+	go func() {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/check", nil)
+		req.Header.Set("Authorization", "Bearer test-token")
+
+		resp, err := app.Test(req)
+		if err != nil {
+			checkDone <- 0
+
+			return
+		}
+		defer resp.Body.Close()
+
+		checkDone <- resp.StatusCode
+	}()
+
+	// Give the check request time to reach the handler while update is blocked.
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify check completes successfully (200) without waiting for the update.
+	code := <-checkDone
+	assert.Equal(t, http.StatusOK, code, "check should return 200 while update is in progress")
+
+	// Release the update so shutdown is clean.
+	close(updateDone)
 }
 
 // ---------------------------------------------------------------------------
