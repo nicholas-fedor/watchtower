@@ -70,7 +70,7 @@ func TestReadinessHandler_Handle_NilClient(t *testing.T) {
 
 func TestReadinessHandler_Handle_HealthyClient(t *testing.T) {
 	client := mockContainer.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything).Return(nil, nil)
+	client.EXPECT().Ping(mock.Anything).Return(nil)
 
 	h := NewReadinessHandler(client)
 	app := fiber.New(fiber.Config{})
@@ -87,7 +87,7 @@ func TestReadinessHandler_Handle_HealthyClient(t *testing.T) {
 
 func TestReadinessHandler_Handle_UnhealthyClient(t *testing.T) {
 	client := mockContainer.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
+	client.EXPECT().Ping(mock.Anything).Return(errors.New("connection refused"))
 
 	h := NewReadinessHandler(client)
 	app := fiber.New(fiber.Config{})

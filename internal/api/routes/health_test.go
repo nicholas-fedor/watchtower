@@ -13,8 +13,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestRegisterHealthRoute(t *testing.T) {
@@ -38,12 +36,7 @@ func TestRegisterHealthRoute(t *testing.T) {
 				t.Helper()
 
 				mc := mockContainer.NewMockClient(t)
-				c := mockTypes.NewMockContainer(t)
-				c.EXPECT().Name().Return("test").Maybe()
-				c.EXPECT().ImageName().Return("img").Maybe()
-				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc")).Maybe()
-				c.EXPECT().ImageInfo().Return(nil).Maybe()
-				mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{c}, nil)
+				mc.EXPECT().Ping(mock.Anything).Return(nil)
 
 				return mc
 			},
@@ -56,7 +49,7 @@ func TestRegisterHealthRoute(t *testing.T) {
 				t.Helper()
 
 				mc := mockContainer.NewMockClient(t)
-				mc.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("fail"))
+				mc.EXPECT().Ping(mock.Anything).Return(errors.New("fail"))
 
 				return mc
 			},

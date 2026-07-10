@@ -13,6 +13,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	mockAPI "github.com/nicholas-fedor/watchtower/internal/api/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -602,4 +605,114 @@ func TestIntegration_TokenHashing(t *testing.T) {
 
 	differentHash := sha256.Sum256([]byte("different-token"))
 	assert.NotEqual(t, hash1, differentHash)
+}
+
+// ---------------------------------------------------------------------------
+// API + scheduling concurrency
+// ---------------------------------------------------------------------------
+
+func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	testCtx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	opts := withTestListenAddr(config.Options{
+		Token:            "test-token",
+		EnableUpdateAPI:  true,
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		Client:           makeListContainersMock(t),
+		Filter:           makeFilter(t),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+		UnblockHTTPAPI: true, // API must return so scheduling can proceed.
+	})
+
+	apiDone := make(chan error, 1)
+	go func() {
+		apiDone <- api.SetupAndStartAPI(testCtx, opts)
+	}()
+
+	select {
+	case err := <-apiDone:
+		require.NoError(t, err, "SetupAndStartAPI should return when UnblockHTTPAPI=true")
+	case <-time.After(5 * time.Second):
+		t.Fatal("SetupAndStartAPI did not return in non-blocking mode")
+	}
+
+	schedCtx, schedCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer schedCancel()
+
+	err := scheduling.RunUpgradesOnSchedule(
+		schedCtx,
+		&cobra.Command{},
+		func(_ types.FilterableContainer) bool { return true },
+		"test filter",
+		make(chan bool, 1),
+		false,
+		"@every 1h",
+		logging.WriteStartupMessage,
+		func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		nil,
+		"",
+		nil,
+		"",
+		false,
+		false,
+		false,
+		nil,
+		true,
+		false,
+	)
+	require.NoError(t, err, "RunUpgradesOnSchedule should run concurrently after SetupAndStartAPI returns")
+}
+
+// ---------------------------------------------------------------------------
+// HTTP update param propagation
+// ---------------------------------------------------------------------------
+
+func TestIntegration_UpdateHonorsReviveStoppedAndComposeDependsOn(t *testing.T) {
+	var captured types.UpdateParams
+
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
+
+	opts := config.Options{
+		Token:               "test-token",
+		EnableUpdateAPI:     true,
+		UnblockHTTPAPI:      true,
+		ReviveStopped:       true,
+		UseComposeDependsOn: true,
+		Client:              makeListContainersMock(t),
+		Filter:              makeFilter(t),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+			captured = params
+
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return helperMetrics },
+	}
+
+	authMiddleware := api.NewAPIAuthMiddleware(opts.Token)
+
+	err := routes.ValidateAndRegister(t.Context(), app, authMiddleware, opts)
+	require.NoError(t, err)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.True(t, captured.ReviveStopped, "HTTP update should propagate ReviveStopped")
+	assert.True(t, captured.UseComposeDependsOn, "HTTP update should propagate UseComposeDependsOn")
 }

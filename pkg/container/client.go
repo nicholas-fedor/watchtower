@@ -248,6 +248,15 @@ type Client interface {
 	//   - error: Non-nil if retrieval fails, nil on success.
 	GetInfo(ctx context.Context) (map[string]any, error)
 
+	// Ping verifies connectivity to the Docker daemon.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//
+	// Returns:
+	//   - error: Non-nil if the daemon is unreachable, nil on success.
+	Ping(ctx context.Context) error
+
 	// WaitForContainerHealthy waits for a container to become healthy or times out.
 	//
 	// The timeout parameter controls the maximum wait duration:
@@ -1143,6 +1152,22 @@ func (c *client) RemoveImageByID(
 //   - string: Docker API version (e.g., "1.44").
 func (c *client) GetVersion() string {
 	return strings.Trim(c.api.ClientVersion(), "\"")
+}
+
+// Ping verifies connectivity to the Docker daemon.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
+// Returns:
+//   - error: Non-nil if the daemon is unreachable, nil on success.
+func (c *client) Ping(ctx context.Context) error {
+	_, err := c.api.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
+	if err != nil {
+		return fmt.Errorf("ping failed: %w", err)
+	}
+
+	return nil
 }
 
 // GetInfo returns system information from the Docker daemon.

@@ -444,3 +444,8 @@ func (client MockClient) GetInfo(ctx context.Context) (map[string]any, error) {
 		"OSType":        "linux",
 	}, nil
 }
+
+// Ping returns nil to simulate a healthy Docker daemon.
+func (client MockClient) Ping(ctx context.Context) error {
+	return client.checkContextCancellation(ctx)
+}

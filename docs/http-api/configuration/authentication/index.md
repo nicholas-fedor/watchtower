@@ -47,6 +47,11 @@ Cookie: access_token=your-secure-token
     The cookie fallback exists primarily for browser-based or limited clients.
     The header `Authorization: Bearer` is the recommended method.
 
+!!! Warning "Cookie auth and CSRF"
+    When the [`http-api-cors-origins`](../../../configuration/http-api/index.md#http_api_cors_origins) is configured and credentials are allowed (for example, `Access-Control-Allow-Credentials: true`), the cookie fallback is vulnerable to cross-site request forgery (CSRF).
+    A browser on an attacker-controlled origin can issue authenticated POST requests to the API without the user's knowledge.
+    Prefer header-based `Authorization: Bearer` auth.
+
 ## HTTP API Events Token
 
 The [`/v1/events`](../../endpoints/events/index.md) endpoint uses a separate token set via the [HTTP API Events Token](../../../configuration/http-api/index.md#http_api_events_token) configuration option.

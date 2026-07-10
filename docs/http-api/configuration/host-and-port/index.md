@@ -14,6 +14,11 @@ Use the [HTTP API Host](../../../configuration/http-api/index.md#http_api_host) 
 - This must be a valid IP address (IPv4 or IPv6).
 - If not specified, Watchtower listens on all interfaces on the port specified by [HTTP API Port](../../../configuration/http-api/index.md#http_api_port).
 
+!!! Warning "Default bind risk"
+    When the host is unset, the HTTP API listens on all network interfaces (`0.0.0.0`).
+    This exposes the API to every reachable network.
+    Set [`http-api-host`](../../../configuration/http-api/index.md#http_api_host) to a loopback or firewall-restricted interface unless the API is protected by an outer network policy (reverse proxy, VPN, etc.).
+
 ### HTTP API Port
 
 The port can be changed using the [HTTP API Port](../../../configuration/http-api/index.md#http_api_port) configuration option.

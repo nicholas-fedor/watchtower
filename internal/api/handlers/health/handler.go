@@ -43,7 +43,7 @@ type ReadinessHandler struct {
 }
 
 // NewReadinessHandler creates a new readiness handler that checks Docker client
-// connectivity.
+// connectivity via Ping.
 //
 // Parameters:
 //   - client: Docker client for the readiness probe. May be nil, in which case
@@ -59,9 +59,7 @@ func NewReadinessHandler(client container.Client) *ReadinessHandler {
 			probeCtx, cancel := context.WithTimeout(ctx, readinessProbeTimeout)
 			defer cancel()
 
-			_, err := client.ListContainers(probeCtx)
-
-			return err == nil
+			return client.Ping(probeCtx) == nil
 		},
 	}
 }

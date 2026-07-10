@@ -62,6 +62,11 @@ This is a separate token from the [`http-api-token`](#http_api_token) in order t
 
 The token can be provided via the `Authorization` header (for programmatic clients) or as the `access_token` query parameter (for browser `EventSource` which cannot set custom headers).
 
+!!! Warning "Events token leakage risk"
+    When using the `access_token` query parameter (required for browser `EventSource`), the token appears in browser history, proxy logs, and access logs.
+    This is a lower exposure than the main API token, but you should still treat the events token as a secret and rotate it if it has been exposed.
+    Prefer header-based auth when possible.
+
 !!! Important "This is **required** when the `events` endpoint is enabled via [`http-api-endpoints`](#http_api_endpoints)."
 
 !!! Note
