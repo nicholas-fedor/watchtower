@@ -689,6 +689,39 @@ func withContainerImageName(matcher gomegaTypes.GomegaMatcher) gomegaTypes.Gomeg
 }
 
 // IsOutsideCooldown tests (white-box, early-out paths require no registry).
+var _ = ginkgo.Describe("extractImageDigest", func() {
+	ginkgo.When("RepoDigests is empty", func() {
+		ginkgo.It("returns an empty string", func() {
+			gomega.Expect(extractImageDigest(nil)).To(gomega.Equal(""))
+			gomega.Expect(extractImageDigest([]string{})).To(gomega.Equal(""))
+		})
+	})
+
+	ginkgo.When("RepoDigests contain no @ separator", func() {
+		ginkgo.It("returns an empty string", func() {
+			gomega.Expect(extractImageDigest([]string{
+				"malformed-without-at",
+				"sha256:abcdef",
+			})).To(gomega.Equal(""))
+		})
+	})
+
+	ginkgo.When("RepoDigests contain valid entries", func() {
+		ginkgo.It("returns the digest from the first matching entry", func() {
+			gomega.Expect(extractImageDigest([]string{
+				"nginx:latest@sha256:0123456789abcdef",
+			})).To(gomega.Equal("sha256:0123456789abcdef"))
+		})
+
+		ginkgo.It("skips malformed entries before the first valid one", func() {
+			gomega.Expect(extractImageDigest([]string{
+				"malformed-no-at",
+				"nginx:latest@sha256:0123456789abcdef",
+			})).To(gomega.Equal("sha256:0123456789abcdef"))
+		})
+	})
+})
+
 var _ = ginkgo.Describe("IsOutsideCooldown (cooldown gating before pull)", func() {
 	ginkgo.When("no cooldown delay is configured", func() {
 		ginkgo.It("returns true (safe to pull) with no registry calls", func() {

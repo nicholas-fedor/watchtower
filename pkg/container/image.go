@@ -136,31 +136,31 @@ func (c imageClient) HasNewImage(
 	if newImageID == currentImageID {
 		clog.Debug("No new image found")
 
-		var latestDigest string
-
-		if len(newImageInfo.RepoDigests) > 0 {
-			_, digest, found := strings.Cut(newImageInfo.RepoDigests[0], "@")
-			if found {
-				latestDigest = digest
-			}
-		}
-
-		return false, currentImageID, latestDigest, nil
-	}
-
-	// Extract digest from RepoDigests.
-	var latestDigest string
-
-	if len(newImageInfo.RepoDigests) > 0 {
-		_, digest, found := strings.Cut(newImageInfo.RepoDigests[0], "@")
-		if found {
-			latestDigest = digest
-		}
+		return false, currentImageID, extractImageDigest(newImageInfo.RepoDigests), nil
 	}
 
 	clog.WithField("new_id", newImageID.ShortID()).Info("Found new image")
 
-	return true, newImageID, latestDigest, nil
+	return true, newImageID, extractImageDigest(newImageInfo.RepoDigests), nil
+}
+
+// extractImageDigest extracts the manifest digest portion from RepoDigests.
+// It returns the digest string from the first RepoDigest that contains an "@"
+// separator, or an empty string if none do.
+//
+// Parameters:
+//   - repoDigests: Slice of RepoDigest strings, each in the format "name@sha256:...".
+//
+// Returns:
+//   - string: The extracted digest (e.g., "sha256:abc..."), or "" if unavailable.
+func extractImageDigest(repoDigests []string) string {
+	for _, repoDigest := range repoDigests {
+		if _, digest, found := strings.Cut(repoDigest, "@"); found {
+			return digest
+		}
+	}
+
+	return ""
 }
 
 // PullImage fetches the latest image for a container.
