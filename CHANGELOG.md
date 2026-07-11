@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.19 by @renovate[bot] in [#1931](https://github.com/nicholas-fedor/watchtower/pull/1931)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.18 by @renovate[bot] in [#1929](https://github.com/nicholas-fedor/watchtower/pull/1929)
 - Update module github.com/prometheus/common to v0.70.0 by @renovate[bot] in [#1928](https://github.com/nicholas-fedor/watchtower/pull/1928)
 - Update github.com/google/pprof digest to b9395ee by @renovate[bot] in [#1926](https://github.com/nicholas-fedor/watchtower/pull/1926)
 - Update github.com/google/pprof digest to 301c45c by @renovate[bot] in [#1924](https://github.com/nicholas-fedor/watchtower/pull/1924)
