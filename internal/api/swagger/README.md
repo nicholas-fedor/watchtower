@@ -7,44 +7,41 @@ events token.
 
 ## Endpoints
 
-| Method | Path                    | Auth | Description                                                   |
-|--------|-------------------------|------|---------------------------------------------------------------|
-| GET    | `/livez`                | No   | Health check — always returns 200 when running                |
-| GET    | `/readyz`               | No   | Health check — verifies Docker client connectivity            |
-| GET    | `/startupz`             | No   | Health check — always returns 200 once started                |
-| POST   | `/v1/check`             | Yes  | Check containers for available updates via registry digest     |
-| GET    | `/v1/containers`        | Yes  | List watched container statuses                               |
-| GET    | `/v1/containers/details`| Yes  | Detailed container information including config flags         |
-| GET    | `/v1/history`           | Yes  | Historical scan results from the in-memory ring buffer        |
-| GET    | `/v1/images`            | Yes  | Tracked images with digests and container counts              |
-| GET    | `/v1/config`            | Yes  | Active Watchtower configuration settings                      |
-| GET    | `/v1/events`            | Yes  | Real-time operational events via SSE (`scan_started`, `scan_failed`, `image_cleanup`, `scan_completed`) |
-| POST   | `/v1/update`            | Yes  | Trigger container update scan                                 |
-| GET    | `/v1/status`            | Yes  | Last scan summary                                             |
-| GET    | `/v1/metrics`           | Yes  | Prometheus exposition format metrics                          |
-| GET    | `/swagger/*`            | No   | Swagger UI documentation (Try it out still needs Authorize for /v1/*) |
+| Method | Path                     | Auth | Description                                                                                             |
+|--------|--------------------------|------|---------------------------------------------------------------------------------------------------------|
+| GET    | `/livez`                 | No   | Health check — always returns 200 when running                                                          |
+| GET    | `/readyz`                | No   | Health check — verifies Docker client connectivity                                                      |
+| GET    | `/startupz`              | No   | Health check — always returns 200 once started                                                          |
+| POST   | `/v1/check`              | Yes  | Check containers for available updates via registry digest                                              |
+| GET    | `/v1/containers`         | Yes  | List watched container statuses                                                                         |
+| GET    | `/v1/containers/details` | Yes  | Detailed container information including config flags                                                   |
+| GET    | `/v1/history`            | Yes  | Historical scan results from the in-memory ring buffer                                                  |
+| GET    | `/v1/images`             | Yes  | Tracked images with digests and container counts                                                        |
+| GET    | `/v1/config`             | Yes  | Active Watchtower configuration settings                                                                |
+| GET    | `/v1/events`             | Yes  | Real-time operational events via SSE (`scan_started`, `scan_failed`, `image_cleanup`, `scan_completed`) |
+| POST   | `/v1/update`             | Yes  | Trigger container update scan                                                                           |
+| GET    | `/v1/status`             | Yes  | Last scan summary                                                                                       |
+| GET    | `/v1/metrics`            | Yes  | Prometheus exposition format metrics                                                                    |
+| GET    | `/swagger/*`             | No   | Swagger UI documentation (Try it out still needs Authorize for /v1/*)                                   |
 
 ## Authentication
 
-All `/v1/` endpoints require authentication. By default, a Bearer token is
-provided via the `Authorization` header, configured through
-`--http-api-token` or the `WATCHTOWER_HTTP_API_TOKEN` environment variable:
+All `/v1/` endpoints require authentication.
 
-    curl -H "Authorization: Bearer $TOKEN" localhost:8080/v1/containers
+By default, a Bearer token is provided via the `Authorization` header, configured through the `http-api-token` configuration option:
 
-The `/v1/events` SSE stream uses a separate token
-(`--http-api-events-token` / `WATCHTOWER_HTTP_API_EVENTS_TOKEN`) and accepts
-it via either the `Authorization: Bearer` header or the `access_token` query
-parameter (for browser `EventSource` connections that cannot set headers).
+```bash
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/v1/containers
+```
+
+The `/v1/events` SSE stream uses a separate `http-api-events-token` token and accepts it via either the `Authorization: Bearer` header or the `access_token` query parameter (for browser `EventSource` connections that cannot set headers).
 
 ## Query Parameters
 
 ### `/v1/update`
 
-- `image` — Comma-separated image names or Go regex patterns to filter (repeatable).
-  Supports Go regex syntax (e.g., `^nginx-.*`).
-- `container` — Comma-separated container name patterns to filter (repeatable).
-  Supports Go regex patterns (e.g., `^web-.*`).
+- `image` — Comma-separated image names or Go regex patterns to filter (repeatable). Supports Go regex syntax (e.g., `^nginx-.*`).
+- `container` — Comma-separated container name patterns to filter (repeatable). Supports Go regex patterns (e.g., `^web-.*`).
 - `async` — When `true`, runs the update asynchronously and returns `202 Accepted`.
 
 ### `/v1/check`
@@ -75,9 +72,8 @@ parameter (for browser `EventSource` connections that cannot set headers).
 
 ## Swagger / OpenAPI
 
-The `internal/api/swagger/` package contains the generated OpenAPI 2.0 (Swagger)
-spec. It is produced from Go source annotations using
-[swaggo/swag](https://github.com/swaggo/swag).
+The `internal/api/swagger/` package contains the generated OpenAPI 2.0 (Swagger) spec.
+It is produced from Go source annotations using [swaggo/swag](https://github.com/swaggo/swag).
 
 ### Installing the swag CLI
 
@@ -85,8 +81,7 @@ spec. It is produced from Go source annotations using
 go install github.com/swaggo/swag/cmd/swag@latest
 ```
 
-Alternatively, download a pre-compiled binary from
-the [release page](https://github.com/swaggo/swag/releases) or use the Docker
+Alternatively, download a pre-compiled binary from the [release page](https://github.com/swaggo/swag/releases) or use the Docker
 image:
 
 ```bash
@@ -99,9 +94,8 @@ docker run --rm -v $(pwd):/code ghcr.io/swaggo/swag:latest
 go generate ./internal/api/swagger/
 ```
 
-This runs `swag init` against `main.go` and writes `docs.go`, `swagger.json`,
-and `swagger.yaml` into this directory. Always regenerate after changing any
-swag annotations on handler methods.
+This runs `swag init` against `main.go` and writes `docs.go`, `swagger.json`, and `swagger.yaml` into this directory.
+Always regenerate after changing any swag annotations on handler methods.
 
 ### Formatting Annotations
 
@@ -117,17 +111,17 @@ This project uses the following flags:
 swag fmt -g main.go -d .
 ```
 
-`swag fmt` requires a standard doc comment above each function with swag
-annotations so it can correctly indent the annotation lines with tabs.
+`swag fmt` requires a standard doc comment above each function with swag annotations so it can correctly indent the annotation lines with tabs.
 
 ### Annotation Format
 
-Handlers use `// @Name value` line annotations. Key rules:
+Handlers use `// @Name value` line annotations.
 
-- `@Description` must be a single complete sentence on one line (swaggo truncates
-  multi-line descriptions).
-- `@Success` / `@Failure` response schemas use inline types (`{string}`,
-  `{object}`) — swaggo cannot resolve cross-package types in annotations.
+Key rules:
+
+- `@Description` must be a single complete sentence on one line (swaggo truncates multi-line descriptions).
+- `@Success` / `@Failure` response schemas use inline types (`{string}` and `{object}`).
+  Swaggo cannot resolve cross-package types in annotations.
 - `@Tags` must not contain quoted strings; use separate `@Tag.name` and
   `@Tag.description` annotations in `main.go`.
 - `@Param` format: `@Param name in type required "description"`.

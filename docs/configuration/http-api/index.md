@@ -208,7 +208,7 @@ Environment Variable: WATCHTOWER_HTTP_API_PROXY_HEADER
 ```
 
 !!! Note
-    Only used when `--http-api-trusted-proxies` is set.
+    Only used when [`http-api-trusted-proxies`](#http_api_trusted_proxies) is set.
 
 Common values:
 

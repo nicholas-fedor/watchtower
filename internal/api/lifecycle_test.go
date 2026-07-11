@@ -170,9 +170,6 @@ func TestSetupAndStartAPI(t *testing.T) {
 func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	fullSet, err := config.ParseAPIEndpoints([]string{"all"})
-	require.NoError(t, err)
-
 	opts := withTestListenAddr(config.Options{
 		Token:       "test-token",
 		EventsToken: "events-token",
@@ -182,11 +179,20 @@ func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
-		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
-		UnblockHTTPAPI: true,
+		FilterByImage:       func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics:      func() *metrics.Metrics { return testMetrics },
+		UnblockHTTPAPI:      true,
+		EnableUpdateAPI:     true,
+		EnableMetricsAPI:    true,
+		EnableContainersAPI: true,
+		EnableCheckAPI:      true,
+		EnableHealthAPI:     true,
+		EnableHistoryAPI:    true,
+		EnableImagesAPI:     true,
+		EnableConfigAPI:     true,
+		EnableEventsAPI:     true,
+		EnableSwaggerAPI:    true,
 	})
-	config.ApplyEndpoints(&opts, fullSet)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -441,9 +447,6 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 func TestSetupAndStartAPI_AllEndpointsEnableAll(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	fullSet, err := config.ParseAPIEndpoints([]string{"all"})
-	require.NoError(t, err)
-
 	opts := withTestListenAddr(config.Options{
 		Token:          "test-token",
 		EventsToken:    "events-token",
@@ -455,9 +458,18 @@ func TestSetupAndStartAPI_AllEndpointsEnableAll(t *testing.T) {
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		UnblockHTTPAPI: true,
+		UnblockHTTPAPI:      true,
+		EnableUpdateAPI:     true,
+		EnableMetricsAPI:    true,
+		EnableContainersAPI: true,
+		EnableCheckAPI:      true,
+		EnableHealthAPI:     true,
+		EnableHistoryAPI:    true,
+		EnableImagesAPI:     true,
+		EnableConfigAPI:     true,
+		EnableEventsAPI:     true,
+		EnableSwaggerAPI:    true,
 	})
-	config.ApplyEndpoints(&opts, fullSet)
 
 	require.True(t, opts.EnableUpdateAPI)
 	require.True(t, opts.EnableMetricsAPI)

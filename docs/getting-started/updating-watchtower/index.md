@@ -10,7 +10,7 @@ If a new version of the `nickfedor/watchtower` image is pushed to the Docker Hub
 
 If a self-update is attempted when a port is mapped to a Watchtower container, then the new container will attempt to use the same port that is in use by the old container, which results in both containers being stopped.
 
-When Watchtower has a port configured (e.g., via `--http-api-port` or Docker port mappings), self-updates are automatically skipped to prevent port conflicts.
+When Watchtower has a port configured (e.g., via [`http-api-port`](./../../configuration/http-api/index.md#http_api_port) or Docker port mappings), self-updates are automatically skipped to prevent port conflicts.
 
 To use the [HTTP API](../../http-api/overview/index.md) with self-updates, consider one of the following approaches:
 

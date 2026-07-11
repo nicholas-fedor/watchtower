@@ -597,10 +597,6 @@ func run(command *cobra.Command, args []string) {
 		logrus.WithError(err).Fatal("Invalid HTTP API endpoint configuration")
 	}
 
-	enableHealthAPI, enableUpdateAPI, enableMetricsAPI, enableContainersAPI,
-		enableCheckAPI, enableHistoryAPI, enableImagesAPI, enableConfigAPI,
-		enableEventsAPI, enableSwaggerAPI := config.ApplyEndpointsToBools(endpointSet)
-
 	// Get the HTTP API host and port, falling back to "8080" for port if not specified.
 	flagsSet := command.PersistentFlags()
 
@@ -650,35 +646,28 @@ func run(command *cobra.Command, args []string) {
 
 	// Set configuration for core execution, encapsulating all operational parameters.
 	cfg := types.RunConfig{
-		Command:             command,
-		Names:               normalizedContainerNames,
-		Filter:              filter,
-		FilterDesc:          filterDesc,
-		RunOnce:             runOnce,
-		UpdateOnStart:       updateOnStart,
-		EnableCheckAPI:      enableCheckAPI,
-		EnableConfigAPI:     enableConfigAPI,
-		EnableContainersAPI: enableContainersAPI,
-		EnableEventsAPI:     enableEventsAPI,
-		EnableHealthAPI:     enableHealthAPI,
-		EnableHistoryAPI:    enableHistoryAPI,
-		EnableImagesAPI:     enableImagesAPI,
-		EnableMetricsAPI:    enableMetricsAPI,
-		EnableSwaggerAPI:    enableSwaggerAPI,
-		EnableUpdateAPI:     enableUpdateAPI,
-		TLSCertPath:         tlsCertPath,
-		TLSKeyPath:          tlsKeyPath,
-		CORSAllowedOrigins:  corsOrigins,
-		TrustedProxies:      trustedProxies,
-		ProxyHeader:         proxyHeader,
-		UnblockHTTPAPI:      unblockHTTPAPI,
-		NoStartupMessage:    noStartupMessage,
-		APIToken:            apiToken,
-		APIEventsToken:      apiEventsToken,
-		APIHost:             apiHost,
-		APIPort:             apiPort,
-		APIRateLimit:        apiRateLimit,
+		Command:            command,
+		Names:              normalizedContainerNames,
+		Filter:             filter,
+		FilterDesc:         filterDesc,
+		RunOnce:            runOnce,
+		UpdateOnStart:      updateOnStart,
+		TLSCertPath:        tlsCertPath,
+		TLSKeyPath:         tlsKeyPath,
+		CORSAllowedOrigins: corsOrigins,
+		TrustedProxies:     trustedProxies,
+		ProxyHeader:        proxyHeader,
+		UnblockHTTPAPI:     unblockHTTPAPI,
+		NoStartupMessage:   noStartupMessage,
+		APIToken:           apiToken,
+		APIEventsToken:     apiEventsToken,
+		APIHost:            apiHost,
+		APIPort:            apiPort,
+		APIRateLimit:       apiRateLimit,
 	}
+
+	// Set the HTTP API Endpoint configuration.
+	config.SetEndpointConfig(endpointSet, &cfg)
 
 	// Execute core logic and exit with the returned status code (0 for success, 1 for failure).
 	if exitCode := runMain(cfg); exitCode != 0 {

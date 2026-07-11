@@ -238,7 +238,7 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	//nolint:godox
 	// TODO: Remove legacy HTTP API enable flags below for the v2 release.
 	// They are kept for backwards compatibility but are deprecated.
-	// Use --http-api-endpoints instead.
+	// Use http-api-endpoints instead.
 
 	flags.BoolP(
 		"http-api-update",
@@ -260,10 +260,10 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	// TODO: Remove just before v2 Release.
 	// Mark legacy HTTP API enable flags as deprecated.
 	// These flags are still functional but will be removed in the v2 release.
-	// Users should migrate to --http-api-endpoints instead.
-	markFlagDeprecated(flags, "http-api-update", "Use --http-api-endpoints=update (or include update in the list).")
-	markFlagDeprecated(flags, "http-api-metrics", "Use --http-api-endpoints=metrics.")
-	markFlagDeprecated(flags, "http-api-containers", "Use --http-api-endpoints=containers.")
+	// Users should migrate to use the http-api-endpoints configuration option instead.
+	markFlagDeprecated(flags, "http-api-update", "Use the http-api-endpoints configuration option instead.")
+	markFlagDeprecated(flags, "http-api-metrics", "Use the http-api-endpoints configuration option instead.")
+	markFlagDeprecated(flags, "http-api-containers", "Use the http-api-endpoints configuration option instead.")
 
 	flags.StringP(
 		"http-api-host",
@@ -329,7 +329,7 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		"http-api-proxy-header",
 		"",
 		envString("WATCHTOWER_HTTP_API_PROXY_HEADER"),
-		"Header to use for real client IP when behind a reverse proxy (default: X-Forwarded-For). Only used when --http-api-trusted-proxies is set")
+		"Header to use for real client IP when behind a reverse proxy (default: X-Forwarded-For). Only used when http-api-trusted-proxies is set")
 
 	flags.StringSliceP(
 		"http-api-cors-origins",

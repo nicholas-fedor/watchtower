@@ -6,10 +6,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// Canonical HTTP API endpoint names for --http-api-endpoints.
+// Canonical HTTP API endpoint names corresponding to
+// valid values for the http-api-endpoints configuration option.
 const (
 	EndpointHealth     = "health"
 	EndpointUpdate     = "update"
@@ -37,46 +38,48 @@ var AllEndpointNames = []string{
 	EndpointSwagger,
 }
 
-// EndpointSet is the set of enabled HTTP API endpoint names.
-type EndpointSet map[string]struct{}
-
-// Has reports whether name is enabled.
-func (s EndpointSet) Has(name string) bool {
-	if s == nil {
-		return false
-	}
-
-	_, ok := s[name]
-
-	return ok
-}
-
-// Empty reports whether no endpoints are enabled.
-func (s EndpointSet) Empty() bool {
-	return len(s) == 0
-}
-
 var (
 	// ErrUnknownEndpoint is returned when an endpoint name is not recognized.
 	ErrUnknownEndpoint = errors.New("unknown HTTP API endpoint")
 	// ErrAllMustBeAlone is returned when "all" appears with other names.
-	ErrAllMustBeAlone = errors.New(`"all" must be the only value in --http-api-endpoints`)
+	ErrAllMustBeAlone = errors.New(`"all" must be the only value in http-api-endpoints`)
 )
+
+// EnabledEndpointsMap is the map of enabled HTTP API endpoints.
+type EnabledEndpointsMap map[string]struct{}
+
+// Contains returns whether or not the value is in the map of enabled endpoints.
+func (m EnabledEndpointsMap) Contains(name string) bool {
+	if m == nil {
+		return false
+	}
+
+	_, ok := m[name]
+
+	return ok
+}
+
+// Empty reports whether or not the map of enabled endpoints is empty.
+func (m EnabledEndpointsMap) Empty() bool {
+	return len(m) == 0
+}
 
 // ParseAPIEndpoints parses an endpoint allowlist.
 //
-// Values may already be split on commas or spaces by flag/env parsing. Each
-// entry is still trimmed and lowercased. The special value "all" (alone)
-// expands to every known endpoint. Duplicates are ignored. An empty list
-// yields an empty set.
+// Filter rules:
+//   - Values may already be split on commas or spaces by flag/env parsing
+//   - Each entry is still trimmed and lowercased
+//   - The special value "all" (alone) expands to every known endpoint
+//   - Duplicates are ignored
+//   - An empty list yields an empty set
 //
 // Parameters:
 //   - values: Endpoint names, or a single "all".
 //
 // Returns:
-//   - EndpointSet: Parsed set of endpoint names.
+//   - EndpointMap: Parsed map of endpoint names.
 //   - error: Non-nil if the value is invalid.
-func ParseAPIEndpoints(values []string) (EndpointSet, error) {
+func ParseAPIEndpoints(values []string) (EnabledEndpointsMap, error) {
 	names := make([]string, 0, len(values))
 
 	for _, part := range values {
@@ -95,7 +98,7 @@ func ParseAPIEndpoints(values []string) (EndpointSet, error) {
 	}
 
 	if len(names) == 0 {
-		return EndpointSet{}, nil
+		return EnabledEndpointsMap{}, nil
 	}
 
 	if slices.Contains(names, "all") {
@@ -106,77 +109,77 @@ func ParseAPIEndpoints(values []string) (EndpointSet, error) {
 		return allEndpoints(), nil
 	}
 
-	set := make(EndpointSet, len(names))
+	endpointMap := make(EnabledEndpointsMap, len(names))
 	valid := allEndpoints()
 
 	for _, name := range names {
-		if !valid.Has(name) {
+		if !valid.Contains(name) {
 			return nil, fmt.Errorf("%w: %q (valid: %s)", ErrUnknownEndpoint, name, FormatEndpoints(valid))
 		}
 
-		set[name] = struct{}{}
+		endpointMap[name] = struct{}{}
 	}
 
-	return set, nil
+	return endpointMap, nil
 }
 
-// EndpointsFromLegacyMainFlags builds an endpoint set from origin/main legacy
-// enable flags (update, metrics, containers only).
+// ParseLegacyOptions builds a map of endpoints from legacy
+// enable configuration options (update, metrics, containers).
 //
-// Deprecated: Prefer ParseAPIEndpoints with --http-api-endpoints. Legacy flags
+// Deprecated: Prefer ParseAPIEndpoints with http-api-endpoints. Legacy flags
 // will be removed in the v2 release.
 //
 // Parameters:
-//   - update: Whether --http-api-update is set.
-//   - metrics: Whether --http-api-metrics is set.
-//   - containers: Whether --http-api-containers is set.
+//   - update: Whether http-api-update is set.
+//   - metrics: Whether http-api-metrics is set.
+//   - containers: Whether http-api-containers is set.
 //
 // Returns:
-//   - EndpointSet: Mapped endpoint names.
+//   - EndpointMap: Mapped endpoint names.
 //
-// TODO: Remove EndpointsFromLegacyMainFlags when legacy HTTP API flags are removed in v2.
+// TODO: Remove ParseLegacyOptions when legacy HTTP API flags are removed in v2.
 //
 //nolint:godox
-func EndpointsFromLegacyMainFlags(update, metrics, containers bool) EndpointSet {
-	set := make(EndpointSet)
+func ParseLegacyOptions(update, metrics, containers bool) EnabledEndpointsMap {
+	endpointMap := make(EnabledEndpointsMap)
 
 	if update {
-		set[EndpointUpdate] = struct{}{}
+		endpointMap[EndpointUpdate] = struct{}{}
 	}
 
 	if metrics {
-		set[EndpointMetrics] = struct{}{}
+		endpointMap[EndpointMetrics] = struct{}{}
 	}
 
 	if containers {
-		set[EndpointContainers] = struct{}{}
+		endpointMap[EndpointContainers] = struct{}{}
 	}
 
-	return set
+	return endpointMap
 }
 
 // FormatEndpoints returns a stable comma-separated list of endpoint names
-// in AllEndpointNames order (only those present in set).
+// in AllEndpointNames order (only those present in the map).
 //
 // Parameters:
-//   - set: Endpoint set to format.
+//   - endpointMap: Endpoint map to format.
 //
 // Returns:
-//   - string: Comma-separated names, or empty if set is empty.
-func FormatEndpoints(set EndpointSet) string {
-	if set.Empty() {
+//   - string: Comma-separated names, or empty if map is empty.
+func FormatEndpoints(endpointMap EnabledEndpointsMap) string {
+	if endpointMap.Empty() {
 		return ""
 	}
 
-	parts := make([]string, 0, len(set))
+	parts := make([]string, 0, len(endpointMap))
 	for _, name := range AllEndpointNames {
-		if set.Has(name) {
+		if endpointMap.Contains(name) {
 			parts = append(parts, name)
 		}
 	}
 
 	// Include any unexpected keys for debugging (should not happen).
-	for name := range set {
+	for name := range endpointMap {
 		if !slices.Contains(AllEndpointNames, name) {
 			parts = append(parts, name)
 		}
@@ -185,34 +188,33 @@ func FormatEndpoints(set EndpointSet) string {
 	return strings.Join(parts, ",")
 }
 
-// ResolveEndpoints selects the active endpoint set from the canonical allowlist
-// and/or legacy main flags.
+// ResolveEndpoints selects the active endpoint map from the canonical allowlist
+// and/or legacy configuration options.
 //
 // Rules:
 //  1. Parse the allowlist when non-empty (unknown names fail; "all" expands fully).
 //  2. Union with any legacy update/metrics/containers flags (deduplicated).
 //  3. When legacy flags are used, log one deprecation warning with the final
 //     equivalent allowlist value.
-//  4. Empty allowlist and no legacy flags → empty set (API off).
+//  4. Empty allowlist and no legacy flags is equivalent to an empty map (API off).
 //
 // Parameters:
-//   - endpoints: Values of --http-api-endpoints / WATCHTOWER_HTTP_API_ENDPOINTS
-//     (already split on commas/spaces when set via flags).
-//   - legacyUpdate: Legacy --http-api-update.
-//   - legacyMetrics: Legacy --http-api-metrics.
-//   - legacyContainers: Legacy --http-api-containers.
+//   - endpoints: Values from http-api-endpoints.
+//   - legacyUpdate: Legacy http-api-update.
+//   - legacyMetrics: Legacy http-api-metrics.
+//   - legacyContainers: Legacy http-api-containers.
 //
 // Returns:
-//   - EndpointSet: Resolved enabled endpoints.
+//   - EndpointMap: Resolved enabled endpoints.
 //   - error: Non-nil if the allowlist contains invalid values.
 //
-// TODO: Drop legacy flag parameters when removing legacy HTTP API flags in v2.
+// TODO: Drop legacy parameters when removing legacy HTTP API configuration options in v2.
 //
 //nolint:godox
-func ResolveEndpoints(endpoints []string, legacyUpdate, legacyMetrics, legacyContainers bool) (EndpointSet, error) {
+func ResolveEndpoints(endpoints []string, legacyUpdate, legacyMetrics, legacyContainers bool) (EnabledEndpointsMap, error) {
 	legacyAny := legacyUpdate || legacyMetrics || legacyContainers
 
-	set := EndpointSet{}
+	enabledEndpointsMap := EnabledEndpointsMap{}
 
 	if len(endpoints) > 0 {
 		parsed, err := ParseAPIEndpoints(endpoints)
@@ -220,80 +222,55 @@ func ResolveEndpoints(endpoints []string, legacyUpdate, legacyMetrics, legacyCon
 			return nil, err
 		}
 
-		set = parsed
+		enabledEndpointsMap = parsed
 	}
 
 	if legacyAny {
-		legacySet := EndpointsFromLegacyMainFlags(legacyUpdate, legacyMetrics, legacyContainers)
-		for name := range legacySet {
-			if set == nil {
-				set = EndpointSet{}
+		legacyEndpointMap := ParseLegacyOptions(
+			legacyUpdate,
+			legacyMetrics,
+			legacyContainers,
+		)
+		for name := range legacyEndpointMap {
+			if enabledEndpointsMap == nil {
+				enabledEndpointsMap = EnabledEndpointsMap{}
 			}
 
-			set[name] = struct{}{}
+			enabledEndpointsMap[name] = struct{}{}
 		}
-
-		// Log when legacy flags/env are used (covers env defaults that may not
-		// surface pflag's Flag.Deprecated warning the same way as CLI usage).
-		logrus.WithField("http_api_endpoints", FormatEndpoints(set)).Warn(
-			"Deprecated: --http-api-update/--http-api-metrics/--http-api-containers are deprecated and will be removed in Watchtower v2; " +
-				"use --http-api-endpoints (or WATCHTOWER_HTTP_API_ENDPOINTS) instead. " +
-				"Equivalent: --http-api-endpoints=" + FormatEndpoints(set),
-		)
 	}
 
-	if set == nil {
-		return EndpointSet{}, nil
+	if enabledEndpointsMap == nil {
+		return EnabledEndpointsMap{}, nil
 	}
 
-	return set, nil
+	return enabledEndpointsMap, nil
 }
 
-// ApplyEndpoints sets Enable*API fields on opts from the endpoint set.
+// SetEndpointConfig populates the runtime configuration with the HTTP API
+// Endpoints parsed from the http-api-endpoints configuration option.
 //
 // Parameters:
-//   - opts: Options to update (modified in place).
-//   - set: Enabled endpoints.
-func ApplyEndpoints(opts *Options, set EndpointSet) {
-	opts.EnableHealthAPI = set.Has(EndpointHealth)
-	opts.EnableUpdateAPI = set.Has(EndpointUpdate)
-	opts.EnableMetricsAPI = set.Has(EndpointMetrics)
-	opts.EnableContainersAPI = set.Has(EndpointContainers)
-	opts.EnableCheckAPI = set.Has(EndpointCheck)
-	opts.EnableHistoryAPI = set.Has(EndpointHistory)
-	opts.EnableImagesAPI = set.Has(EndpointImages)
-	opts.EnableConfigAPI = set.Has(EndpointConfig)
-	opts.EnableEventsAPI = set.Has(EndpointEvents)
-	opts.EnableSwaggerAPI = set.Has(EndpointSwagger)
+//   - endpointMap: Enabled endpoints.
+//   - cfg: RunConfig to update.
+func SetEndpointConfig(endpointMap EnabledEndpointsMap, cfg *types.RunConfig) {
+	cfg.EnableHealthAPI = endpointMap.Contains(EndpointHealth)
+	cfg.EnableUpdateAPI = endpointMap.Contains(EndpointUpdate)
+	cfg.EnableMetricsAPI = endpointMap.Contains(EndpointMetrics)
+	cfg.EnableContainersAPI = endpointMap.Contains(EndpointContainers)
+	cfg.EnableCheckAPI = endpointMap.Contains(EndpointCheck)
+	cfg.EnableHistoryAPI = endpointMap.Contains(EndpointHistory)
+	cfg.EnableImagesAPI = endpointMap.Contains(EndpointImages)
+	cfg.EnableConfigAPI = endpointMap.Contains(EndpointConfig)
+	cfg.EnableEventsAPI = endpointMap.Contains(EndpointEvents)
+	cfg.EnableSwaggerAPI = endpointMap.Contains(EndpointSwagger)
 }
 
-// ApplyEndpointsToBools mirrors ApplyEndpoints for types that only carry
-// the Enable* bool fields (used from cmd).
-//
-// Parameters:
-//   - set: Enabled endpoints.
-//
-// Returns:
-//   - Ten booleans in order: health, update, metrics, containers, check,
-//     history, images, config, events, swagger.
-func ApplyEndpointsToBools(set EndpointSet) (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
-	return set.Has(EndpointHealth),
-		set.Has(EndpointUpdate),
-		set.Has(EndpointMetrics),
-		set.Has(EndpointContainers),
-		set.Has(EndpointCheck),
-		set.Has(EndpointHistory),
-		set.Has(EndpointImages),
-		set.Has(EndpointConfig),
-		set.Has(EndpointEvents),
-		set.Has(EndpointSwagger)
-}
-
-func allEndpoints() EndpointSet {
-	set := make(EndpointSet, len(AllEndpointNames))
+func allEndpoints() EnabledEndpointsMap {
+	endpointMap := make(EnabledEndpointsMap, len(AllEndpointNames))
 	for _, name := range AllEndpointNames {
-		set[name] = struct{}{}
+		endpointMap[name] = struct{}{}
 	}
 
-	return set
+	return endpointMap
 }

@@ -72,7 +72,7 @@ Environment Variable: WATCHTOWER_UPDATE_ON_START
 ```
 
 !!! Note
-    If used with `--run-once`, a warning is logged and `--run-once` takes precedence.
+    If used with [`run-once`](#run_once), a warning is logged and [`run-once`](#run_once) takes precedence.
 
 ## HTTP API Periodic Polls
 
