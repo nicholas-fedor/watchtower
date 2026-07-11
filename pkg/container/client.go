@@ -345,9 +345,7 @@ type client struct {
 	isPodman bool
 }
 
-// ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
-//
-// It controls container management and warning behaviors.
+// ClientOptions configures container management behavior for the Docker client.
 type ClientOptions struct {
 	RemoveVolumes           bool
 	IncludeStopped          bool
