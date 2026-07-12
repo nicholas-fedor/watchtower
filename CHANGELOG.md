@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update star history chart by @nicholas-fedor in [#1907](https://github.com/nicholas-fedor/watchtower/pull/1907)
+
+### Chores
+
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.19 by @renovate[bot] in [#1931](https://github.com/nicholas-fedor/watchtower/pull/1931)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.18 by @renovate[bot] in [#1929](https://github.com/nicholas-fedor/watchtower/pull/1929)
+- Update module github.com/prometheus/common to v0.70.0 by @renovate[bot] in [#1928](https://github.com/nicholas-fedor/watchtower/pull/1928)
+- Update github.com/google/pprof digest to b9395ee by @renovate[bot] in [#1926](https://github.com/nicholas-fedor/watchtower/pull/1926)
+- Update github.com/google/pprof digest to 301c45c by @renovate[bot] in [#1924](https://github.com/nicholas-fedor/watchtower/pull/1924)
+- Update github.com/google/pprof digest to e2ebcbe by @renovate[bot] in [#1922](https://github.com/nicholas-fedor/watchtower/pull/1922)
+- Update module golang.org/x/tools to v0.48.0 by @renovate[bot] in [#1920](https://github.com/nicholas-fedor/watchtower/pull/1920)
+- Update module golang.org/x/net to v0.57.0 by @renovate[bot] in [#1917](https://github.com/nicholas-fedor/watchtower/pull/1917)
+- Update golang:alpine docker digest to 0178a64 by @renovate[bot] in [#1916](https://github.com/nicholas-fedor/watchtower/pull/1916)
+- Update module golang.org/x/mod to v0.38.0 by @renovate[bot] in [#1914](https://github.com/nicholas-fedor/watchtower/pull/1914)
+- Update github/codeql-action action to v4.37.0 by @renovate[bot] in [#1913](https://github.com/nicholas-fedor/watchtower/pull/1913)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.17 by @renovate[bot] in [#1911](https://github.com/nicholas-fedor/watchtower/pull/1911)
+- Update cimg/go docker tag to v1.26.5 by @renovate[bot] in [#1910](https://github.com/nicholas-fedor/watchtower/pull/1910)
+- Update golang:alpine docker digest to 9097beb by @renovate[bot] in [#1906](https://github.com/nicholas-fedor/watchtower/pull/1906)
+- Update go module directive to v1.26.5 by @renovate[bot] in [#1904](https://github.com/nicholas-fedor/watchtower/pull/1904)
+- Update step-security/harden-runner action to v2.20.0 by @renovate[bot] in [#1903](https://github.com/nicholas-fedor/watchtower/pull/1903)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.16 by @renovate[bot] in [#1902](https://github.com/nicholas-fedor/watchtower/pull/1902)
+- Update module golang.org/x/text to v0.39.0 by @renovate[bot] in [#1898](https://github.com/nicholas-fedor/watchtower/pull/1898)
+- Update cimg/go:1.26.4 docker digest to 66a357f by @renovate[bot] in [#1897](https://github.com/nicholas-fedor/watchtower/pull/1897)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.15 by @renovate[bot] in [#1893](https://github.com/nicholas-fedor/watchtower/pull/1893)
+- Update module github.com/pelletier/go-toml/v2 to v2.4.3 by @renovate[bot] in [#1890](https://github.com/nicholas-fedor/watchtower/pull/1890)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.14 by @renovate[bot] in [#1889](https://github.com/nicholas-fedor/watchtower/pull/1889)
+- Update nicholas-fedor/actionlint-action action to v1.0.18 by @renovate[bot] in [#1888](https://github.com/nicholas-fedor/watchtower/pull/1888)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.13 by @renovate[bot] in [#1886](https://github.com/nicholas-fedor/watchtower/pull/1886)
+- Update nicholas-fedor/actionlint-action action to v1.0.17 by @renovate[bot] in [#1885](https://github.com/nicholas-fedor/watchtower/pull/1885)
+- Update docker/login-action action to v4.4.0 by @renovate[bot] in [#1883](https://github.com/nicholas-fedor/watchtower/pull/1883)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.12 by @renovate[bot] in [#1882](https://github.com/nicholas-fedor/watchtower/pull/1882)
+- Update docker/setup-buildx-action action to v4.2.0 by @renovate[bot] in [#1881](https://github.com/nicholas-fedor/watchtower/pull/1881)
+- Update docker/login-action action to v4.3.0 by @renovate[bot] in [#1878](https://github.com/nicholas-fedor/watchtower/pull/1878)
+- Update nicholas-fedor/actionlint-action action to v1.0.16 by @renovate[bot] in [#1877](https://github.com/nicholas-fedor/watchtower/pull/1877)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.11 by @renovate[bot] in [#1875](https://github.com/nicholas-fedor/watchtower/pull/1875)
+- Update github/codeql-action action to v4.36.3 by @renovate[bot] in [#1874](https://github.com/nicholas-fedor/watchtower/pull/1874)
+- Update docker/setup-qemu-action action to v4.2.0 by @renovate[bot] in [#1872](https://github.com/nicholas-fedor/watchtower/pull/1872)
+
+## [1.19.0] - 2026-06-30
+
 ### Added
 
 - Add Greite as a contributor for code, test, and doc by @allcontributors[bot] in [#1800](https://github.com/nicholas-fedor/watchtower/pull/1800)
@@ -15,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/procfs to v0.21.1 by @renovate[bot] in [#1870](https://github.com/nicholas-fedor/watchtower/pull/1870)
+- Update golangci/golangci-lint-action action to v9.3.0 by @renovate[bot] in [#1868](https://github.com/nicholas-fedor/watchtower/pull/1868)
+- Update goreleaser/goreleaser-action action to v7.2.3 by @renovate[bot] in [#1867](https://github.com/nicholas-fedor/watchtower/pull/1867)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.10 by @renovate[bot] in [#1864](https://github.com/nicholas-fedor/watchtower/pull/1864)
+- Update nicholas-fedor/actionlint-action action to v1.0.15 by @renovate[bot] in [#1863](https://github.com/nicholas-fedor/watchtower/pull/1863)
+- Update module github.com/prometheus/procfs to v0.21.0 by @renovate[bot] in [#1861](https://github.com/nicholas-fedor/watchtower/pull/1861)
 - Update actions/cache action to v6.1.0 by @renovate[bot] in [#1859](https://github.com/nicholas-fedor/watchtower/pull/1859)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.9 by @renovate[bot] in [#1858](https://github.com/nicholas-fedor/watchtower/pull/1858)
 - Update module github.com/docker/cli to v29.6.1+incompatible by @renovate[bot] in [#1856](https://github.com/nicholas-fedor/watchtower/pull/1856)
@@ -3201,7 +3249,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.19.0...HEAD)
+- [1.19.0](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...v1.19.0)
 - [1.18.1](https://github.com/nicholas-fedor/watchtower/compare/v1.18.0...v1.18.1)
 - [1.18.0](https://github.com/nicholas-fedor/watchtower/compare/v1.17.2...v1.18.0)
 - [1.17.2](https://github.com/nicholas-fedor/watchtower/compare/v1.17.1...v1.17.2)

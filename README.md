@@ -54,11 +54,11 @@ The full documentation is available at <https://watchtower.nickfedor.com/>.
 
 ## Star History
 
-<a href="https://www.star-history.com/#nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left">
+<a href="https://www.star-history.com/?type=timeline&logscale=&legend=top-left&repos=nicholas-fedor%2Fwatchtower">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=timeline&theme=dark&logscale&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=nicholas-fedor/watchtower&type=timeline&theme=dark&logscale&legend=top-left&sealed_token=psoQA5TipWC1du5poc_YGImqILCN0FiZccvjEEFxLhVS0YlPr7Ur79tUc-gAfaOoQuQBhG0uA4rkmJc_H2nWZPnnfs6Fq1Z9jeWvALffxz0H7YHaCRgcruDl9IAZfnk583p-dw8eADmTsMTnK6t8ANgDLXxFd3mM-R3Y_8_HYOe35IQc3FgUkdYQJG1_" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left&sealed_token=psoQA5TipWC1du5poc_YGImqILCN0FiZccvjEEFxLhVS0YlPr7Ur79tUc-gAfaOoQuQBhG0uA4rkmJc_H2nWZPnnfs6Fq1Z9jeWvALffxz0H7YHaCRgcruDl9IAZfnk583p-dw8eADmTsMTnK6t8ANgDLXxFd3mM-R3Y_8_HYOe35IQc3FgUkdYQJG1_" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=nicholas-fedor/watchtower&type=timeline&logscale&legend=top-left&sealed_token=psoQA5TipWC1du5poc_YGImqILCN0FiZccvjEEFxLhVS0YlPr7Ur79tUc-gAfaOoQuQBhG0uA4rkmJc_H2nWZPnnfs6Fq1Z9jeWvALffxz0H7YHaCRgcruDl9IAZfnk583p-dw8eADmTsMTnK6t8ANgDLXxFd3mM-R3Y_8_HYOe35IQc3FgUkdYQJG1_" />
  </picture>
 </a>
 <!-- markdownlint-restore -->
