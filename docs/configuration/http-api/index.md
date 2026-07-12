@@ -83,59 +83,33 @@ Environment Variable: WATCHTOWER_HTTP_API_ENDPOINTS
              Default: empty (HTTP API disabled)
 ```
 
+!!! Note "For more information, review the [HTTP API](../../http-api/overview/index.md) documentation"
+
 Valid names (case-insensitive):
 
-| Name | Routes | Auth |
-|------|--------|------|
-| [`health`](../../http-api/endpoints/health/index.md) | `/livez`, `/readyz`, `/startupz` | None |
-| [`update`](../../http-api/endpoints/update/index.md) | `POST /v1/update` | [`http-api-token`](#http_api_token) |
-| [`metrics`](../../http-api/endpoints/metrics/index.md) | `GET /v1/metrics`, [`GET /v1/status`](../../http-api/endpoints/status/index.md) | [`http-api-token`](#http_api_token) |
-| [`containers`](../../http-api/endpoints/containers/index.md) | `GET /v1/containers`, [`/v1/containers/details`](../../http-api/endpoints/container-details/index.md) | [`http-api-token`](#http_api_token) |
-| [`check`](../../http-api/endpoints/check/index.md) | `POST /v1/check` | [`http-api-token`](#http_api_token) |
-| [`history`](../../http-api/endpoints/history/index.md) | `GET /v1/history` | [`http-api-token`](#http_api_token) |
-| [`images`](../../http-api/endpoints/images/index.md) | `GET /v1/images` | [`http-api-token`](#http_api_token) |
-| [`config`](../../http-api/endpoints/config/index.md) | `GET /v1/config` | [`http-api-token`](#http_api_token) |
-| [`events`](../../http-api/endpoints/events/index.md) | `GET /v1/events` | [`http-api-events-token`](#http_api_events_token) |
-| [`swagger`](../../http-api/endpoints/swagger/index.md) | `GET /swagger/*` | None |
+| Name                                                         | Routes                                                                                                | Auth                                              |
+|--------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| [`health`](../../http-api/endpoints/health/index.md)         | `/livez`, `/readyz`, `/startupz`                                                                      | None                                              |
+| [`update`](../../http-api/endpoints/update/index.md)         | `POST /v1/update`                                                                                     | [`http-api-token`](#http_api_token)               |
+| [`metrics`](../../http-api/endpoints/metrics/index.md)       | `GET /v1/metrics`, [`GET /v1/status`](../../http-api/endpoints/status/index.md)                       | [`http-api-token`](#http_api_token)               |
+| [`containers`](../../http-api/endpoints/containers/index.md) | `GET /v1/containers`, [`/v1/containers/details`](../../http-api/endpoints/container-details/index.md) | [`http-api-token`](#http_api_token)               |
+| [`check`](../../http-api/endpoints/check/index.md)           | `POST /v1/check`                                                                                      | [`http-api-token`](#http_api_token)               |
+| [`history`](../../http-api/endpoints/history/index.md)       | `GET /v1/history`                                                                                     | [`http-api-token`](#http_api_token)               |
+| [`images`](../../http-api/endpoints/images/index.md)         | `GET /v1/images`                                                                                      | [`http-api-token`](#http_api_token)               |
+| [`config`](../../http-api/endpoints/config/index.md)         | `GET /v1/config`                                                                                      | [`http-api-token`](#http_api_token)               |
+| [`events`](../../http-api/endpoints/events/index.md)         | `GET /v1/events`                                                                                      | [`http-api-events-token`](#http_api_events_token) |
+| [`swagger`](../../http-api/endpoints/swagger/index.md)       | `GET /swagger/*`                                                                                      | None                                              |
 
 !!! Warning
-    The `all` value enables every endpoint and **MUST** be the only value.
+    - Protected `/v1/*` endpoints require configuring a [`http-api-token`](#http_api_token).
+    - Enabling `events` requires configuring a [`http-api-events-token`](#http_api_events_token).
+    - The `all` value enables every endpoint and **MUST** be the only value.
+    - Watchtower will exit on startup if an incorrect name is used or combined with `all`.
 
-!!! Note "Defining multiple endpoints"
+!!! Note "Flag and environment value usage"
     - The CLI flag can be specified multiple times.
     - Defining the environment variable multiple times will not work (only the last value is used).
     - For environment variables, use a single comma- or space-separated value, or a YAML array.
-
-Examples:
-
-```bash
-# Metrics and health probes
-WATCHTOWER_HTTP_API_ENDPOINTS=health,metrics
-WATCHTOWER_HTTP_API_TOKEN=...
-
-# Full surface
-WATCHTOWER_HTTP_API_ENDPOINTS=all
-WATCHTOWER_HTTP_API_TOKEN=...
-WATCHTOWER_HTTP_API_EVENTS_TOKEN=...
-
-# Update API only (API-only mode unless periodic polls are also enabled)
-WATCHTOWER_HTTP_API_ENDPOINTS=update
-WATCHTOWER_HTTP_API_TOKEN=...
-```
-
-!!! Note
-    - Health is **not** added automatically; include `health` when you need probes.
-    - Protected `/v1/*` endpoints require [`http-api-token`](#http_api_token).
-    - Enabling `events` requires [`http-api-events-token`](#http_api_events_token).
-    - See per-endpoint docs under [HTTP API](../../http-api/overview/index.md).
-
-!!! Warning "Invalid values stop startup"
-    Watchtower exits on startup if:
-
-    - An endpoint name is not in the table above
-    - `all` is combined with any other name
-
-    The error message includes the invalid value and the list of valid names.
 
 ## HTTP API Rate Limit
 
@@ -237,25 +211,21 @@ Environment Variable: WATCHTOWER_HTTP_API_CORS_ORIGINS
 /// details | The following legacy configuration options are deprecated and will be removed with the release of Watchtower v2.
     type: warning
 
-!!! Warning
-    - Legacy flags still work alone or together with [`http-api-endpoints`](#http_api_endpoints); values are **unioned** and **deduplicated**.
-    - Multiple legacy options combine (for example `http-api-update` + `http-api-metrics` → `update,metrics`).
-    - Example mix: `WATCHTOWER_HTTP_API_ENDPOINTS=health,check` with `WATCHTOWER_HTTP_API_UPDATE=true` → `health,check,update`.
-    - Prefer migrating fully to the allowlist; legacy flags will be removed in Watchtower v2.
+### HTTP API Containers
 
-### HTTP API Update
-
-Runs Watchtower in HTTP API mode, so that image updates must be triggered by a request.
+Runs Watchtower with the read-only containers API enabled.
 
 ```text
-            Argument: --http-api-update
-Environment Variable: WATCHTOWER_HTTP_API_UPDATE
+            Argument: --http-api-containers
+Environment Variable: WATCHTOWER_HTTP_API_CONTAINERS
                 Type: Boolean
              Default: false
 ```
 
 !!! Deprecated
-    Add `update` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
+    Add `containers` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
+
+    For example: `WATCHTOWER_HTTP_API_ENDPOINTS=containers`
 
 ### HTTP API Metrics
 
@@ -271,18 +241,22 @@ Environment Variable: WATCHTOWER_HTTP_API_METRICS
 !!! Deprecated
     Add `metrics` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
 
-### HTTP API Containers
+    For example: `WATCHTOWER_HTTP_API_ENDPOINTS=metrics`
 
-Runs Watchtower with the read-only containers API enabled.
+### HTTP API Update
+
+Runs Watchtower in HTTP API mode, so that image updates must be triggered by a request.
 
 ```text
-            Argument: --http-api-containers
-Environment Variable: WATCHTOWER_HTTP_API_CONTAINERS
+            Argument: --http-api-update
+Environment Variable: WATCHTOWER_HTTP_API_UPDATE
                 Type: Boolean
              Default: false
 ```
 
 !!! Deprecated
-    Add `containers` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
+    Add `update` to the  [`http-api-endpoints`](#http_api_endpoints) configuration instead.
+
+    For example: `WATCHTOWER_HTTP_API_ENDPOINTS=update`
 
 ///
