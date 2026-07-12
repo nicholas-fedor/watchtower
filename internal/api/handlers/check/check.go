@@ -92,11 +92,8 @@ func CheckForUpdates(
 		}
 
 		info := c.ImageInfo()
-		if info != nil && len(info.RepoDigests) > 0 {
-			_, digest, found := strings.Cut(info.RepoDigests[0], "@")
-			if found {
-				result.Digest = digest
-			}
+		if info != nil {
+			result.Digest = container.ExtractImageDigest(info.RepoDigests, c.ImageName())
 		}
 
 		stale, latestID, latestDigest, err := client.IsContainerStale(

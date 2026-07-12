@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -171,6 +172,34 @@ func TestValidateAndRegister(t *testing.T) {
 			wantErr: true,
 			errMsg:  "DefaultMetrics must be provided",
 		},
+		{
+			name: "check without FilterByImage fails",
+			opts: config.Options{
+				EnableCheckAPI: true,
+				FilterByImage:  nil,
+				Client:         mockContainer.NewMockClient(t),
+			},
+			wantErr: true,
+			errMsg:  "FilterByImage must be provided",
+		},
+		{
+			name: "check with FilterByImage is valid",
+			opts: config.Options{
+				EnableCheckAPI: true,
+				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+				Client:         mockContainer.NewMockClient(t),
+			},
+			wantErr: false,
+		},
+		{
+			name: "events without EventBroadcaster fails",
+			opts: config.Options{
+				EnableEventsAPI:  true,
+				EventBroadcaster: nil,
+			},
+			wantErr: true,
+			errMsg:  "EventBroadcaster must be provided",
+		},
 	}
 
 	for _, tt := range tests {
@@ -252,6 +281,9 @@ func TestRegister(t *testing.T) {
 				EnableEventsAPI:             tt.enableEventsAPI,
 				Client:                      mockContainer.NewMockClient(t),
 				Filter:                      makeFilter(t),
+			}
+			if tt.enableEventsAPI {
+				opts.EventBroadcaster = events.NewBroadcaster()
 			}
 
 			Register(context.Background(), app, auth, opts)

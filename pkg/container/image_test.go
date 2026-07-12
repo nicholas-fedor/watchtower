@@ -689,35 +689,69 @@ func withContainerImageName(matcher gomegaTypes.GomegaMatcher) gomegaTypes.Gomeg
 }
 
 // IsOutsideCooldown tests (white-box, early-out paths require no registry).
-var _ = ginkgo.Describe("extractImageDigest", func() {
+var _ = ginkgo.Describe("ExtractImageDigest", func() {
 	ginkgo.When("RepoDigests is empty", func() {
 		ginkgo.It("returns an empty string", func() {
-			gomega.Expect(extractImageDigest(nil)).To(gomega.Equal(""))
-			gomega.Expect(extractImageDigest([]string{})).To(gomega.Equal(""))
+			gomega.Expect(ExtractImageDigest(nil, "")).To(gomega.Equal(""))
+			gomega.Expect(ExtractImageDigest([]string{}, "")).To(gomega.Equal(""))
 		})
 	})
 
 	ginkgo.When("RepoDigests contain no @ separator", func() {
 		ginkgo.It("returns an empty string", func() {
-			gomega.Expect(extractImageDigest([]string{
+			gomega.Expect(ExtractImageDigest([]string{
 				"malformed-without-at",
 				"sha256:abcdef",
-			})).To(gomega.Equal(""))
+			}, "")).To(gomega.Equal(""))
 		})
 	})
 
 	ginkgo.When("RepoDigests contain valid entries", func() {
 		ginkgo.It("returns the digest from the first matching entry", func() {
-			gomega.Expect(extractImageDigest([]string{
+			gomega.Expect(ExtractImageDigest([]string{
 				"nginx:latest@sha256:0123456789abcdef",
-			})).To(gomega.Equal("sha256:0123456789abcdef"))
+			}, "")).To(gomega.Equal("sha256:0123456789abcdef"))
 		})
 
 		ginkgo.It("skips malformed entries before the first valid one", func() {
-			gomega.Expect(extractImageDigest([]string{
+			gomega.Expect(ExtractImageDigest([]string{
 				"malformed-no-at",
 				"nginx:latest@sha256:0123456789abcdef",
-			})).To(gomega.Equal("sha256:0123456789abcdef"))
+			}, "")).To(gomega.Equal("sha256:0123456789abcdef"))
+		})
+
+		ginkgo.It("prefers the RepoDigest matching the image name", func() {
+			gomega.Expect(ExtractImageDigest([]string{
+				"other.io/foo@sha256:aaa",
+				"docker.io/library/nginx@sha256:bbb",
+			}, "nginx:latest")).To(gomega.Equal("sha256:bbb"))
+		})
+
+		ginkgo.It("preserves the registry port when matching a tagged image name", func() {
+			gomega.Expect(ExtractImageDigest([]string{
+				"registry.example.com:5000/nginx@sha256:def456",
+				"docker.io/library/nginx@sha256:bbb",
+			}, "registry.example.com:5000/nginx:latest")).To(gomega.Equal("sha256:def456"))
+		})
+
+		ginkgo.It("matches the preferred RepoDigest when imageName is in digest form", func() {
+			gomega.Expect(ExtractImageDigest([]string{
+				"docker.io/library/nginx@sha256:bbb",
+				"other.io/foo@sha256:aaa",
+			}, "nginx@sha256:abc123")).To(gomega.Equal("sha256:bbb"))
+		})
+
+		ginkgo.It("falls back to the first valid digest when no name matches", func() {
+			gomega.Expect(ExtractImageDigest([]string{
+				"other.io/foo@sha256:aaa",
+				"other.io/bar@sha256:bbb",
+			}, "nginx:latest")).To(gomega.Equal("sha256:aaa"))
+		})
+
+		ginkgo.It("matches fully-qualified image names to short RepoDigest paths", func() {
+			gomega.Expect(ExtractImageDigest([]string{
+				"library/nginx@sha256:ccc",
+			}, "docker.io/library/nginx:latest")).To(gomega.Equal("sha256:ccc"))
 		})
 	})
 })

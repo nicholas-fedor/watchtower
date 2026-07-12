@@ -14,12 +14,7 @@ import (
 )
 
 func registerEventsRoute(app *fiber.App, opts config.Options) {
-	broadcaster := opts.EventBroadcaster
-	if broadcaster == nil {
-		broadcaster = events.NewBroadcaster()
-	}
-
-	handler := events.NewHandler(broadcaster, opts.CORSAllowedOrigins)
+	handler := events.NewHandler(opts.EventBroadcaster, opts.CORSAllowedOrigins)
 
 	eventsToken := opts.EventsToken
 	expectedHash := sha256.Sum256([]byte(eventsToken))

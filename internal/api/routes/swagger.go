@@ -3,7 +3,6 @@ package routes
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/swaggo/swag"
@@ -56,8 +55,12 @@ func swaggerDocMiddleware() fiber.Handler {
 }
 
 // rewriteSwaggerDocHost sets host and schemes on an OpenAPI 2.0 JSON document
-// from the incoming request (including trusted proxy headers when Fiber has
-// proxy support enabled).
+// from the incoming request.
+//
+// Scheme comes from Fiber's Protocol, which honors X-Forwarded-Proto only
+// when TrustedProxies is configured on the app.
+// When behind a TLS-terminating reverse proxy and TrustedProxies is unset,
+// c.Protocol() reports "http" and the rewritten spec will use http schemes.
 //
 // Parameters:
 //   - doc: Raw OpenAPI JSON string.
@@ -82,12 +85,6 @@ func rewriteSwaggerDocHost(doc string, c fiber.Ctx) (string, error) {
 	scheme := "http"
 	if c.Protocol() == "https" {
 		scheme = "https"
-	} else if proto := c.Get("X-Forwarded-Proto"); proto != "" {
-		// First value when multiple proxies append.
-		scheme = strings.ToLower(strings.TrimSpace(strings.Split(proto, ",")[0]))
-		if scheme != "https" {
-			scheme = "http"
-		}
 	}
 
 	spec["schemes"] = []string{scheme}

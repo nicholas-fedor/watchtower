@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 )
 
-// FuzzExtractDigest verifies that extractDigest never panics and correctly
+// FuzzExtractDigest verifies that ExtractImageDigest never panics and correctly
 // extracts digests from RepoDigests strings in various formats.
 func FuzzExtractDigest(f *testing.F) {
 	f.Add("nginx@sha256:abc123")
@@ -21,7 +23,7 @@ func FuzzExtractDigest(f *testing.F) {
 	f.Add("registry.example.com:5000/org/image@sha256:abcdef1234567890")
 
 	f.Fuzz(func(t *testing.T, repoDigest string) {
-		digest := extractDigest([]string{repoDigest}, "test-container")
+		digest := container.ExtractImageDigest([]string{repoDigest}, "nginx:latest")
 
 		if repoDigest == "" {
 			assert.Empty(t, digest, "empty input should return empty digest")
@@ -34,8 +36,8 @@ func FuzzExtractDigest(f *testing.F) {
 	})
 }
 
-// FuzzExtractDigestMultiple verifies that extractDigest correctly selects
-// the first valid digest from a list of RepoDigests.
+// FuzzExtractDigestMultiple verifies that ExtractImageDigest correctly selects
+// a valid digest from a list of RepoDigests.
 func FuzzExtractDigestMultiple(f *testing.F) {
 	f.Add("nginx@sha256:abc123")
 	f.Add("sha256:invalid,nginx@sha256:valid")
@@ -47,7 +49,7 @@ func FuzzExtractDigestMultiple(f *testing.F) {
 			digests = strings.Split(digestsStr, ",")
 		}
 
-		result := extractDigest(digests, "test-container")
+		result := container.ExtractImageDigest(digests, "nginx:latest")
 
 		assert.True(t, result == "" || strings.HasPrefix(result, "sha256:"),
 			"result should be empty or start with sha256:, got %q", result)

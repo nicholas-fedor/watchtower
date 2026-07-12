@@ -454,6 +454,10 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 				DefaultMetrics: func() *metrics.Metrics { return helperMetrics },
 				UnblockHTTPAPI: true,
 			}
+			if c.enableEventsAPI {
+				opts.EventBroadcaster = NewEventsBroadcasterHelper()
+			}
+
 			runServerAndShutdown(t, opts)
 		})
 	}

@@ -124,6 +124,7 @@ func TestErrSentinelValues(t *testing.T) {
 		{name: "ErrMissingDefaultMetrics", err: ErrMissingDefaultMetrics, msg: "DefaultMetrics must be provided"},
 		{name: "ErrMissingAPIToken", err: ErrMissingAPIToken, msg: "API token is empty or unset"},
 		{name: "ErrMissingEventsAPIToken", err: ErrMissingEventsAPIToken, msg: "events API token is required"},
+		{name: "ErrMissingEventBroadcaster", err: ErrMissingEventBroadcaster, msg: "EventBroadcaster must be provided"},
 		{name: "ErrMissingTLSConfig", err: ErrMissingTLSConfig, msg: "TLS requires both"},
 	}
 

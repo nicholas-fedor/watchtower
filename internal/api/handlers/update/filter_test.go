@@ -85,6 +85,30 @@ func TestContainerFilter(t *testing.T) {
 			inputName: "other",
 			wantMatch: false,
 		},
+		{
+			name:      "leading slash on pattern exact match",
+			patterns:  []string{"/mycontainer"},
+			inputName: "mycontainer",
+			wantMatch: true,
+		},
+		{
+			name:      "leading slash on name exact match",
+			patterns:  []string{"mycontainer"},
+			inputName: "/mycontainer",
+			wantMatch: true,
+		},
+		{
+			name:      "leading slash on regex pattern",
+			patterns:  []string{"/web-.*"},
+			inputName: "web-server",
+			wantMatch: true,
+		},
+		{
+			name:      "leading slash on both pattern and name",
+			patterns:  []string{"/web-.*"},
+			inputName: "/web-server",
+			wantMatch: true,
+		},
 	}
 
 	for _, tt := range tests {

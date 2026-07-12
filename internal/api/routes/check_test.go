@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -44,6 +45,7 @@ func TestRegisterCheckRoute(t *testing.T) {
 		opts := config.Options{
 			EnableCheckAPI: true,
 			Client:         mockClient,
+			FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 		}
 
 		registerCheckRoute(app, auth, opts)
@@ -70,7 +72,7 @@ func TestRegisterEventsRoute(t *testing.T) {
 		EnableEventsAPI:    true,
 		EventsToken:        "events-token",
 		CORSAllowedOrigins: []string{"https://example.com"},
-		EventBroadcaster:   nil,
+		EventBroadcaster:   events.NewBroadcaster(),
 	}
 
 	registerEventsRoute(app, opts)

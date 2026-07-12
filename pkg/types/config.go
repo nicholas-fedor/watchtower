@@ -62,4 +62,10 @@ type RunConfig struct {
 	TrustedProxies []string
 	// ProxyHeader is the header to use for real client IP behind a reverse proxy.
 	ProxyHeader string
+	// APIHostChanged reports whether http-api-host was explicitly configured.
+	APIHostChanged bool
+	// APIPortChanged reports whether http-api-port was explicitly configured.
+	APIPortChanged bool
+	// APIRateLimitChanged reports whether http-api-rate-limit was explicitly configured.
+	APIRateLimitChanged bool
 }

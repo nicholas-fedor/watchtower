@@ -1673,7 +1673,8 @@ func TestRootCommand_FlagParsing(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "valid http-api-host hostname",
+			// Hostnames parse as flag values but fail validateAPIHost at run time.
+			name:    "http-api-host hostname parses as flag",
 			args:    []string{"--http-api-host", "localhost"},
 			wantErr: false,
 		},
@@ -1759,4 +1760,53 @@ func TestRootCommand_HTTPAPIEndpointsFlag(t *testing.T) {
 			assert.NotNil(t, cmd.Flags().Lookup("http-api-containers"))
 		})
 	}
+}
+
+func TestValidateAPIHost(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		host    string
+		wantErr bool
+	}{
+		{name: "empty", host: "", wantErr: false},
+		{name: "ipv4", host: "127.0.0.1", wantErr: false},
+		{name: "ipv6", host: "::1", wantErr: false},
+		{name: "hostname", host: "localhost", wantErr: true},
+		{name: "dns name", host: "api.example.com", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateAPIHost(tt.host)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestAnyHTTPAPIConfig(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, anyHTTPAPIConfig(types.RunConfig{}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIToken: "secret"}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{TLSCertPath: "/cert.pem"}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIHostChanged: true}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIPortChanged: true}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIRateLimitChanged: true}))
+}
+
+func TestHTTPAPIEndpointsEnabled(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, httpAPIEndpointsEnabled(types.RunConfig{}))
+	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
+	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
 }

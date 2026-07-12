@@ -48,6 +48,10 @@ func ValidateAndRegister(
 		}
 	}
 
+	if opts.EnableCheckAPI && opts.FilterByImage == nil {
+		return config.ErrMissingFilterByImage
+	}
+
 	// Metrics and history read the in-memory metrics store.
 	if (opts.EnableMetricsAPI || opts.EnableHistoryAPI) && opts.DefaultMetrics == nil {
 		return config.ErrMissingDefaultMetrics
@@ -63,6 +67,10 @@ func ValidateAndRegister(
 
 	if opts.EnableImagesAPI && opts.Client == nil {
 		return errMissingClientForImagesAPI
+	}
+
+	if opts.EnableEventsAPI && opts.EventBroadcaster == nil {
+		return config.ErrMissingEventBroadcaster
 	}
 
 	Register(ctx, app, auth, opts)

@@ -38,7 +38,7 @@ func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler
 		Timeout: updateHandlerTimeout,
 	}))
 
-	if !opts.UnblockHTTPAPI {
+	if !opts.UnblockHTTPAPI && opts.WriteStartupMessage != nil {
 		opts.WriteStartupMessage(
 			opts.Command, time.Time{}, opts.FilterDesc, opts.Scope,
 			opts.Client, opts.Notifier, opts.Version, nil,

@@ -190,6 +190,20 @@ When the UI is served from a different origin, ensure the [`http-api-cors-origin
 JSON endpoints (`/v1/config`, `/v1/containers`, `/v1/check`, etc.) work well with Try it out.
 The events SSE stream does not (see the warning above).
 
+## Reverse Proxy and TLS Termination
+
+When Watchtower runs behind a TLS-terminating reverse proxy (Traefik, Caddy, Nginx, etc.), Swagger UI's **Try it out** generates request URLs from the OpenAPI spec `schemes` field.
+
+The spec `schemes` value is derived from `c.Protocol()`. Fiber v3 only trusts `X-Forwarded-Proto` from a client when that client IP is listed in [`http-api-trusted-proxies`](../../../configuration/http-api/index.md#http_api_trusted_proxies).
+If the proxy IP is not trusted, `c.Protocol()` reports `http` even though the external connection uses HTTPS, and Swagger UI will generate `http://` URLs.
+
+To ensure correct scheme detection:
+
+1. Set [`http-api-trusted-proxies`](../../../configuration/http-api/index.md#http_api_trusted_proxies) to include the proxy IP or CIDR range.
+2. Ensure [`http-api-proxy-header`](../../../configuration/http-api/index.md#http_api_proxy_header) matches the header your proxy uses (default: `X-Forwarded-For`).
+
+This is the same trusted-proxies configuration used for client IP detection and rate limiting, so it is not specific to Swagger.
+
 ## Troubleshooting
 
 The `/swagger/*` endpoint and Swagger UI return standard HTTP status codes.

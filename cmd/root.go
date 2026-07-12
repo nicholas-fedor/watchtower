@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -605,18 +606,21 @@ func run(command *cobra.Command, args []string) {
 		logrus.WithError(err).Fatal("Failed to get http-api-host flag")
 	}
 
-	// Validate APIHost: allow empty or valid IP
-	if apiHost != "" && net.ParseIP(apiHost) == nil {
-		logrus.Fatalf(
-			"invalid http-api-host '%s': must be empty or a valid IP address (IPv4 or IPv6)",
-			apiHost,
-		)
+	// Validate if the configuration option has been changed from the default value.
+	apiHostChanged := flagsSet.Lookup("http-api-host").Changed
+
+	err = validateAPIHost(apiHost)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 
 	apiPort, err := flagsSet.GetString("http-api-port")
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to get http-api-port flag")
 	}
+
+	// Validate if the configuration option has been changed from the default value.
+	apiPortChanged := flagsSet.Lookup("http-api-port").Changed
 
 	if apiPort == "" {
 		apiPort = "8080" // Default port if unset.
@@ -628,8 +632,12 @@ func run(command *cobra.Command, args []string) {
 		logrus.WithError(err).Fatal("Failed to get http-api-rate-limit flag")
 	}
 
+	// Validate if the configuration option has been changed from the default value.
+	apiRateLimitChanged := flagsSet.Lookup("http-api-rate-limit").Changed
+
+	// Set the API rate limit to the default value (60) if set to an invalid value.
 	if apiRateLimit <= 0 {
-		apiRateLimit = 60 // Default rate limit if invalid.
+		apiRateLimit = 60
 	}
 
 	// Handle health check mode as an early exit, preventing updates or API setup.
@@ -646,28 +654,38 @@ func run(command *cobra.Command, args []string) {
 
 	// Set configuration for core execution, encapsulating all operational parameters.
 	cfg := types.RunConfig{
-		Command:            command,
-		Names:              normalizedContainerNames,
-		Filter:             filter,
-		FilterDesc:         filterDesc,
-		RunOnce:            runOnce,
-		UpdateOnStart:      updateOnStart,
-		TLSCertPath:        tlsCertPath,
-		TLSKeyPath:         tlsKeyPath,
-		CORSAllowedOrigins: corsOrigins,
-		TrustedProxies:     trustedProxies,
-		ProxyHeader:        proxyHeader,
-		UnblockHTTPAPI:     unblockHTTPAPI,
-		NoStartupMessage:   noStartupMessage,
-		APIToken:           apiToken,
-		APIEventsToken:     apiEventsToken,
-		APIHost:            apiHost,
-		APIPort:            apiPort,
-		APIRateLimit:       apiRateLimit,
+		Command:             command,
+		Names:               normalizedContainerNames,
+		Filter:              filter,
+		FilterDesc:          filterDesc,
+		RunOnce:             runOnce,
+		UpdateOnStart:       updateOnStart,
+		TLSCertPath:         tlsCertPath,
+		TLSKeyPath:          tlsKeyPath,
+		CORSAllowedOrigins:  corsOrigins,
+		TrustedProxies:      trustedProxies,
+		ProxyHeader:         proxyHeader,
+		UnblockHTTPAPI:      unblockHTTPAPI,
+		NoStartupMessage:    noStartupMessage,
+		APIToken:            apiToken,
+		APIEventsToken:      apiEventsToken,
+		APIHost:             apiHost,
+		APIHostChanged:      apiHostChanged,
+		APIPort:             apiPort,
+		APIPortChanged:      apiPortChanged,
+		APIRateLimit:        apiRateLimit,
+		APIRateLimitChanged: apiRateLimitChanged,
 	}
 
 	// Set the HTTP API Endpoint configuration.
 	config.SetEndpointConfig(endpointSet, &cfg)
+
+	// Warn if HTTP API configuration options are set without an endpoint enabled.
+	if !httpAPIEndpointsEnabled(cfg) && anyHTTPAPIConfig(cfg) {
+		logrus.Warn(
+			"HTTP API configuration options are set, but no endpoints are enabled.",
+		)
+	}
 
 	// Execute core logic and exit with the returned status code (0 for success, 1 for failure).
 	if exitCode := runMain(cfg); exitCode != 0 {
@@ -932,6 +950,12 @@ func runMain(cfg types.RunConfig) int {
 			DefaultMetrics:              metrics.Default,
 			WriteStartupMessage:         logging.WriteStartupMessage,
 			EventBroadcaster:            eventsBroadcaster,
+			OnUnexpectedServerStop: func(listenErr error) {
+				logrus.WithError(listenErr).Error(
+					"Canceling process context after unexpected HTTP server stop",
+				)
+				stop()
+			},
 		},
 	)
 	if err != nil {
@@ -1000,4 +1024,57 @@ func awaitDockerClient() {
 		"Sleeping for a second to ensure the docker api client has been properly initialized.",
 	)
 	sleepFunc(1 * time.Second)
+}
+
+// errInvalidAPIHost indicates http-api-host is neither empty nor a valid IP.
+var errInvalidAPIHost = errors.New(
+	"invalid http-api-host: must be empty or a valid IP address (IPv4 or IPv6)",
+)
+
+// validateAPIHost ensures http-api-host is empty (all interfaces) or a valid IP.
+//
+// Parameters:
+//   - host: Value of the http-api-host flag.
+//
+// Returns:
+//   - error: Non-nil when host is a non-empty non-IP string (e.g. a hostname).
+func validateAPIHost(host string) error {
+	if host == "" {
+		return nil
+	}
+
+	if net.ParseIP(host) == nil {
+		return fmt.Errorf("%w: %q", errInvalidAPIHost, host)
+	}
+
+	return nil
+}
+
+// anyHTTPAPIConfig reports whether any HTTP API-related settings are present
+// without enabled endpoints, so operators can be warned about a no-op config.
+func anyHTTPAPIConfig(cfg types.RunConfig) bool {
+	return cfg.APIToken != "" ||
+		cfg.APIEventsToken != "" ||
+		cfg.TLSCertPath != "" ||
+		cfg.TLSKeyPath != "" ||
+		len(cfg.CORSAllowedOrigins) > 0 ||
+		len(cfg.TrustedProxies) > 0 ||
+		cfg.ProxyHeader != "" ||
+		cfg.APIHostChanged ||
+		cfg.APIPortChanged ||
+		cfg.APIRateLimitChanged
+}
+
+// httpAPIEndpointsEnabled reports whether any HTTP API endpoint is enabled.
+func httpAPIEndpointsEnabled(cfg types.RunConfig) bool {
+	return cfg.EnableUpdateAPI ||
+		cfg.EnableMetricsAPI ||
+		cfg.EnableContainersAPI ||
+		cfg.EnableCheckAPI ||
+		cfg.EnableSwaggerAPI ||
+		cfg.EnableHealthAPI ||
+		cfg.EnableHistoryAPI ||
+		cfg.EnableImagesAPI ||
+		cfg.EnableConfigAPI ||
+		cfg.EnableEventsAPI
 }

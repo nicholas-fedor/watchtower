@@ -3,9 +3,6 @@ package containers
 import (
 	"context"
 	"fmt"
-	"strings"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -90,23 +87,8 @@ func containerToStatus(c types.Container) Status {
 	}
 
 	if info := c.ImageInfo(); info != nil {
-		status.Digest = extractDigest(info.RepoDigests, c.Name())
+		status.Digest = container.ExtractImageDigest(info.RepoDigests, c.ImageName())
 	}
 
 	return status
-}
-
-func extractDigest(repoDigests []string, containerName string) string {
-	for _, repoDigest := range repoDigests {
-		if _, digest, found := strings.Cut(repoDigest, "@"); found {
-			return digest
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"container": containerName,
-			"digest":    repoDigest,
-		}).Debug("RepoDigest in unexpected format, missing @ separator")
-	}
-
-	return ""
 }

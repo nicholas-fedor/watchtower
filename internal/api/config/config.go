@@ -21,8 +21,9 @@ import (
 var (
 	// ErrMissingRunUpdatesWithNotifications indicates RunUpdatesWithNotifications was not provided.
 	ErrMissingRunUpdatesWithNotifications = errors.New("RunUpdatesWithNotifications must be provided when EnableUpdateAPI is set")
-	// ErrMissingFilterByImage indicates FilterByImage was not provided.
-	ErrMissingFilterByImage = errors.New("FilterByImage must be provided when EnableUpdateAPI is set")
+	// ErrMissingFilterByImage indicates FilterByImage was not provided when an
+	// endpoint that builds image-scoped filters is enabled.
+	ErrMissingFilterByImage = errors.New("FilterByImage must be provided when update or check API is enabled")
 	// ErrMissingDefaultMetrics indicates DefaultMetrics was not provided when
 	// an endpoint that requires the metrics store is enabled.
 	ErrMissingDefaultMetrics = errors.New("DefaultMetrics must be provided when update, metrics, or history API is enabled")
@@ -30,6 +31,8 @@ var (
 	ErrMissingAPIToken = errors.New("API token is empty or unset")
 	// ErrMissingEventsAPIToken indicates events token is not set when events API is enabled.
 	ErrMissingEventsAPIToken = errors.New("events API token is required when events API is enabled")
+	// ErrMissingEventBroadcaster indicates EventBroadcaster was not provided when events API is enabled.
+	ErrMissingEventBroadcaster = errors.New("EventBroadcaster must be provided when events API is enabled")
 	// ErrMissingTLSConfig indicates only one of TLS cert/key was provided.
 	ErrMissingTLSConfig = errors.New("TLS requires both TLS Cert Path and TLS Key Path to be set")
 )
@@ -92,6 +95,10 @@ type Options struct {
 	DefaultMetrics              func() *mt.Metrics
 	WriteStartupMessage         func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
 	EventBroadcaster            *events.Broadcaster
+	// OnUnexpectedServerStop is invoked when the HTTP server exits with an
+	// unexpected error while running in non-blocking mode. Callers typically
+	// cancel the process context so scheduling shuts down with the API.
+	OnUnexpectedServerStop func(error)
 }
 
 // BuildUpdateParams constructs UpdateParams for HTTP-triggered updates from

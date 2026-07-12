@@ -202,47 +202,6 @@ func Test_containerToStatus(t *testing.T) {
 	}
 }
 
-func Test_extractDigest(t *testing.T) {
-	tests := []struct {
-		name        string
-		repoDigests []string
-		want        string
-	}{
-		{
-			name:        "empty repo digests",
-			repoDigests: []string{},
-			want:        "",
-		},
-		{
-			name:        "nil repo digests",
-			repoDigests: nil,
-			want:        "",
-		},
-		{
-			name:        "valid digest with @ separator",
-			repoDigests: []string{"nginx@sha256:abc123def456"},
-			want:        "sha256:abc123def456",
-		},
-		{
-			name:        "digest without @ separator returns empty",
-			repoDigests: []string{"invalid-digest-format"},
-			want:        "",
-		},
-		{
-			name:        "multiple digests uses first",
-			repoDigests: []string{"nginx@sha256:first", "nginx@sha256:second"},
-			want:        "sha256:first",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractDigest(tt.repoDigests, "")
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func Test_filterStatuses(t *testing.T) {
 	tests := []struct {
 		name        string

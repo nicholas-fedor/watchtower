@@ -1160,7 +1160,11 @@ func (c *client) GetVersion() string {
 // Returns:
 //   - error: Non-nil if the daemon is unreachable, nil on success.
 func (c *client) Ping(ctx context.Context) error {
-	_, err := c.api.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
+	_, err := c.api.Ping(
+		ctx,
+		// Version renegotiation is not necessary.
+		dockerClient.PingOptions{NegotiateAPIVersion: false},
+	)
 	if err != nil {
 		return fmt.Errorf("ping failed: %w", err)
 	}

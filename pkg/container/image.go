@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -119,7 +120,10 @@ func (c imageClient) HasNewImage(
 	clog.Debug("Inspecting latest image")
 
 	// Inspect the latest image by name.
-	newImageInfo, err := c.api.ImageInspect(ctx, sourceContainer.ImageName())
+	newImageInfo, err := c.api.ImageInspect(
+		ctx,
+		sourceContainer.ImageName(),
+	)
 	if err != nil {
 		clog.WithError(err).Debug("Failed to inspect latest image")
 
@@ -136,31 +140,80 @@ func (c imageClient) HasNewImage(
 	if newImageID == currentImageID {
 		clog.Debug("No new image found")
 
-		return false, currentImageID, extractImageDigest(newImageInfo.RepoDigests), nil
+		return false,
+			currentImageID,
+			ExtractImageDigest(
+				newImageInfo.RepoDigests,
+				sourceContainer.ImageName(),
+			),
+			nil
 	}
 
 	clog.WithField("new_id", newImageID.ShortID()).Info("Found new image")
 
-	return true, newImageID, extractImageDigest(newImageInfo.RepoDigests), nil
+	return true,
+		newImageID,
+		ExtractImageDigest(
+			newImageInfo.RepoDigests,
+			sourceContainer.ImageName(),
+		),
+		nil
 }
 
-// extractImageDigest extracts the manifest digest portion from RepoDigests.
-// It returns the digest string from the first RepoDigest that contains an "@"
-// separator, or an empty string if none do.
+// ExtractImageDigest extracts the manifest digest portion from RepoDigests.
+//
+// When imageName is non-empty, it prefers a RepoDigest whose name portion
+// matches the image repository (tag stripped). Otherwise it returns the digest
+// from the first RepoDigest that contains an "@" separator.
 //
 // Parameters:
 //   - repoDigests: Slice of RepoDigest strings, each in the format "name@sha256:...".
+//   - imageName: Optional container image name used to prefer a matching RepoDigest.
 //
 // Returns:
 //   - string: The extracted digest (e.g., "sha256:abc..."), or "" if unavailable.
-func extractImageDigest(repoDigests []string) string {
-	for _, repoDigest := range repoDigests {
-		if _, digest, found := strings.Cut(repoDigest, "@"); found {
-			return digest
+func ExtractImageDigest(repoDigests []string, imageName string) string {
+	var preferred string
+
+	if imageName != "" {
+		// Strip any digest suffix so normalization operates on the base name.
+		namePart, _, found := strings.Cut(imageName, "@")
+		if found {
+			imageName = namePart
+		}
+
+		// Derive the canonical repository name for preferred-match comparison.
+		ref, err := reference.ParseNormalizedNamed(imageName)
+		if err == nil {
+			preferred = reference.TrimNamed(ref).Name()
 		}
 	}
 
-	return ""
+	var fallback string
+
+	for _, repoDigest := range repoDigests {
+		namePart, digest, found := strings.Cut(repoDigest, "@")
+		if !found || digest == "" {
+			continue
+		}
+
+		// Remember the first valid digest in case no preferred match is found.
+		if fallback == "" {
+			fallback = digest
+		}
+
+		if preferred != "" {
+			// Normalize the RepoDigest name and compare canonical repository names.
+			ref, err := reference.ParseNormalizedNamed(namePart)
+			if err == nil {
+				if reference.TrimNamed(ref).Name() == preferred {
+					return digest
+				}
+			}
+		}
+	}
+
+	return fallback
 }
 
 // PullImage fetches the latest image for a container.

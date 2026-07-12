@@ -137,6 +137,7 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		tlsCertPath,
 		tlsKeyPath,
 		block,
+		opts.OnUnexpectedServerStop,
 	)
 }
 
@@ -150,6 +151,23 @@ func isCleanServerStop(err error) bool {
 	return errors.Is(err, http.ErrServerClosed) ||
 		errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded)
+}
+
+// handleUnexpectedServerStop logs and forwards unexpected listen errors.
+//
+// Parameters:
+//   - err: Error returned by Listen.
+//   - addr: Address the server was listening on.
+//   - onUnexpectedStop: Optional callback invoked with the listen error.
+func handleUnexpectedServerStop(err error, addr string, onUnexpectedStop func(error)) {
+	if !isCleanServerStop(err) {
+		logrus.WithError(err).WithField("addr", addr).
+			Error("HTTP server stopped unexpectedly")
+
+		if onUnexpectedStop != nil {
+			onUnexpectedStop(err)
+		}
+	}
 }
 
 // runServer starts the Fiber app and either blocks until shutdown or returns
@@ -167,6 +185,7 @@ func isCleanServerStop(err error) bool {
 //   - tlsCertPath: Path to TLS certificate file, or empty for HTTP.
 //   - tlsKeyPath: Path to TLS key file, or empty for HTTP.
 //   - block: When true, wait until the server stops; when false, return after bind.
+//   - onUnexpectedStop: Optional callback when Listen exits unexpectedly in non-blocking mode.
 //
 // Returns:
 //   - error: Non-nil if the server fails to start or exits with an unexpected error while blocking.
@@ -177,6 +196,7 @@ func runServer(
 	noStartupMessage bool,
 	tlsCertPath, tlsKeyPath string,
 	block bool,
+	onUnexpectedStop func(error),
 ) error {
 	//nolint:nilerr // Intentionally return nil: skip socket binding when context is already canceled.
 	if ctx.Err() != nil {
@@ -237,11 +257,7 @@ func runServer(
 
 	if !block {
 		go func() {
-			err := <-listenDone
-			if !isCleanServerStop(err) {
-				logrus.WithError(err).WithField("addr", address).
-					Error("HTTP server stopped unexpectedly")
-			}
+			handleUnexpectedServerStop(<-listenDone, address, onUnexpectedStop)
 		}()
 
 		return nil

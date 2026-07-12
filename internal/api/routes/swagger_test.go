@@ -41,7 +41,7 @@ func TestRewriteSwaggerDocHost(t *testing.T) {
 	assert.Equal(t, "http", schemes[0])
 }
 
-func TestRewriteSwaggerDocHost_HTTPS(t *testing.T) {
+func TestRewriteSwaggerDocHost_UntrustedForwardedProtoIgnored(t *testing.T) {
 	t.Parallel()
 
 	app := fiber.New()
@@ -52,7 +52,7 @@ func TestRewriteSwaggerDocHost_HTTPS(t *testing.T) {
 	c.Request().Header.SetMethod(fiber.MethodGet)
 	c.Request().SetRequestURI("http://secure.example.com/swagger/doc.json")
 	c.Request().Header.SetHost("secure.example.com")
-	// TLS termination at a reverse proxy is reflected via X-Forwarded-Proto.
+	// Without TrustedProxies, Fiber does not treat this as a trusted protocol.
 	c.Request().Header.Set("X-Forwarded-Proto", "https")
 
 	doc := `{"swagger":"2.0","host":"localhost:8080","schemes":["http"]}`
@@ -63,7 +63,8 @@ func TestRewriteSwaggerDocHost_HTTPS(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(out), &spec))
 	assert.Equal(t, "secure.example.com", spec["host"])
 	schemes := spec["schemes"].([]any)
-	assert.Equal(t, "https", schemes[0])
+	// Scheme follows c.Protocol() only; untrusted X-Forwarded-Proto is ignored.
+	assert.Equal(t, "http", schemes[0])
 }
 
 func TestRegisterSwaggerRoute_PublicAccess(t *testing.T) {

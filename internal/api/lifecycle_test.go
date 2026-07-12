@@ -181,6 +181,7 @@ func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 		},
 		FilterByImage:       func(_ []string, f types.Filter) types.Filter { return f },
 		DefaultMetrics:      func() *metrics.Metrics { return testMetrics },
+		EventBroadcaster:    events.NewBroadcaster(),
 		UnblockHTTPAPI:      true,
 		EnableUpdateAPI:     true,
 		EnableMetricsAPI:    true,
@@ -256,6 +257,7 @@ func TestSetupAndStartAPI_CheckOnly(t *testing.T) {
 		RateLimit:      60,
 		Client:         makeListContainersMock(t),
 		Filter:         makeFilter(t),
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 	}
 
@@ -448,13 +450,14 @@ func TestSetupAndStartAPI_AllEndpointsEnableAll(t *testing.T) {
 	testMetrics := metrics.Default()
 
 	opts := withTestListenAddr(config.Options{
-		Token:          "test-token",
-		EventsToken:    "events-token",
-		RateLimit:      60,
-		Client:         makeListContainersMock(t),
-		Filter:         makeFilter(t),
-		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
-		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		Token:            "test-token",
+		EventsToken:      "events-token",
+		RateLimit:        60,
+		Client:           makeListContainersMock(t),
+		Filter:           makeFilter(t),
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+		FilterByImage:    func(_ []string, f types.Filter) types.Filter { return f },
+		EventBroadcaster: events.NewBroadcaster(),
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
 		},
@@ -627,6 +630,41 @@ func TestRunServer_BindFailure(t *testing.T) {
 	err := SetupAndStartAPI(ctx, opts)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to start HTTP server")
+}
+
+func TestRunServer_OnUnexpectedServerStopCallback(t *testing.T) {
+	t.Run("non_clean_stop_invokes_callback", func(t *testing.T) {
+		called := make(chan error, 1)
+		onStop := func(err error) {
+			called <- err
+		}
+
+		handleUnexpectedServerStop(errors.New("simulated listen failure"), "127.0.0.1:8080", onStop)
+
+		select {
+		case err := <-called:
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "simulated listen failure")
+		case <-time.After(time.Second):
+			t.Fatal("OnUnexpectedServerStop was not invoked")
+		}
+	})
+
+	t.Run("clean_stop_does_not_invoke_callback", func(t *testing.T) {
+		called := make(chan error, 1)
+		onStop := func(err error) {
+			called <- err
+		}
+
+		handleUnexpectedServerStop(nil, "127.0.0.1:8080", onStop)
+
+		select {
+		case <-called:
+			t.Fatal("OnUnexpectedServerStop should not be invoked on clean stop")
+		case <-time.After(100 * time.Millisecond):
+			// Expected: callback was not called.
+		}
+	})
 }
 
 func TestGetAPIAddr_IPv6(t *testing.T) {
