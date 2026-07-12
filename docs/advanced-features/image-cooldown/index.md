@@ -340,7 +340,7 @@ The output varies depending on the outcome:
 === "Image age exceeds cooldown"
 
     ```
-    nickfedor/watchtower:latest created more than 24 hours ago - proceeding with update
+    nickfedor/watchtower:latest created more than 24 hours ago - eligible for update
     ```
 
 === "Image within cooldown"

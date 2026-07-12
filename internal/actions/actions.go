@@ -438,7 +438,7 @@ func buildUpdateEntries(
 	if cooldownPassed && cooldownAge != "" {
 		entries = append(entries, &logrus.Entry{
 			Level:   logrus.InfoLevel,
-			Message: "Image age exceeds cooldown - proceeding with update",
+			Message: "Image age exceeds cooldown - eligible for update",
 			Data: logrus.Fields{
 				"image":     containerReport.ImageName(),
 				"image_age": cooldownAge,
@@ -1104,7 +1104,7 @@ func sendSplitNotifications(
 			if containerStatus.CooldownAge() != "" {
 				entry = &logrus.Entry{
 					Level:   logrus.InfoLevel,
-					Message: "Image is within cooldown period - deferring update",
+					Message: "Image is within cooldown period - not eligible for update",
 					Data: logrus.Fields{
 						"image":       report.ImageName(),
 						"image_age":   containerStatus.CooldownAge(),
@@ -1117,7 +1117,7 @@ func sendSplitNotifications(
 			} else {
 				entry = &logrus.Entry{
 					Level:   logrus.InfoLevel,
-					Message: "Image creation time unavailable - deferring update",
+					Message: "Image creation time unavailable - update check unavailable",
 					Data: logrus.Fields{
 						"image":    report.ImageName(),
 						"cooldown": containerStatus.CooldownDelay(),
