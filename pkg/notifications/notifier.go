@@ -113,25 +113,25 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 		switch notificationType {
 		case emailType:
 			clog.Warn(
-				"Legacy email notification type is deprecated. Use the notification-url configuration option instead.",
+				"Using deprecated legacy email notification configuration. Use the notification-url configuration option instead.",
 			)
 
 			legacyNotifier = newEmailNotifier(cmd)
 		case slackType:
 			clog.Warn(
-				"Legacy slack notification type is deprecated. Use the notification-url configuration option instead.",
+				"Using deprecated legacy slack notification configuration. Use the notification-url configuration option instead.",
 			)
 
 			legacyNotifier = newSlackNotifier(cmd)
 		case msTeamsType:
 			clog.Warn(
-				"Legacy msteams notification type is deprecated. Use the notification-url configuration option instead.",
+				"Using deprecated legacy msteams notification configuration. Use the notification-url configuration option instead.",
 			)
 
 			legacyNotifier = newMsTeamsNotifier(cmd)
 		case gotifyType:
 			clog.Warn(
-				"Legacy gotify notification type is deprecated. Use the notification-url configuration option instead.",
+				"Using deprecated legacy gotify notification configuration. Use the notification-url configuration option instead.",
 			)
 
 			legacyNotifier = newGotifyNotifier(cmd)
