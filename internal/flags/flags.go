@@ -525,7 +525,7 @@ func RegisterNotificationFlags(rootCmd *cobra.Command) {
 		filterEmptyStrings(
 			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATIONS"), -1),
 		),
-		"Notification types to send [legacy types (email, slack, msteams, gotify) are deprecated. Use a Shoutrrr URL instead]",
+		"Notification types to send [legacy types (email, slack, msteams, gotify).",
 	)
 
 	flags.StringP(

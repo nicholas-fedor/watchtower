@@ -521,6 +521,10 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Set up the notification system with types specified via flags (e.g., email, Slack).
 	notifier = notifications.NewNotifier(cmd)
 	notifier.AddLogHook()
+
+	// Log deprecated notification configuration options, if set.
+	notificationTypes, _ := cmd.Flags().GetStringSlice("notifications")
+	notifications.LogLegacyDeprecationWarnings(notificationTypes)
 }
 
 // run executes the main Watchtower logic based on parsed command-line flags.

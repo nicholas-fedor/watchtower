@@ -112,28 +112,12 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 
 		switch notificationType {
 		case emailType:
-			clog.Warn(
-				"Using deprecated legacy email notification configuration. Use the notification-url configuration option instead.",
-			)
-
 			legacyNotifier = newEmailNotifier(cmd)
 		case slackType:
-			clog.Warn(
-				"Using deprecated legacy slack notification configuration. Use the notification-url configuration option instead.",
-			)
-
 			legacyNotifier = newSlackNotifier(cmd)
 		case msTeamsType:
-			clog.Warn(
-				"Using deprecated legacy msteams notification configuration. Use the notification-url configuration option instead.",
-			)
-
 			legacyNotifier = newMsTeamsNotifier(cmd)
 		case gotifyType:
-			clog.Warn(
-				"Using deprecated legacy gotify notification configuration. Use the notification-url configuration option instead.",
-			)
-
 			legacyNotifier = newGotifyNotifier(cmd)
 		case shoutrrrType:
 			continue
@@ -296,5 +280,25 @@ func GetTemplateData(c *cobra.Command) StaticData {
 	return StaticData{
 		Host:  hostname,
 		Title: title,
+	}
+}
+
+// LogLegacyDeprecationWarnings logs deprecation warnings for legacy notification types.
+//
+// It iterates over the provided notification types and logs a warning for each
+// legacy type, advising users to migrate to the notification-url configuration option.
+//
+// Parameters:
+//   - notificationTypes: List of notification type strings to check.
+func LogLegacyDeprecationWarnings(notificationTypes []string) {
+	for _, notificationType := range notificationTypes {
+		switch notificationType {
+		case emailType, slackType, msTeamsType, gotifyType:
+			logrus.Warnf(
+				"Using deprecated legacy %s notification configuration. "+
+					"Use the notification-url configuration option instead.",
+				notificationType,
+			)
+		}
 	}
 }
