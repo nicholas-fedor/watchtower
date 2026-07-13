@@ -51,6 +51,8 @@ var commonTemplates = map[string]string{
     {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} creation time unavailable (cooldown: {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}}) - update check unavailable
 {{- else if eq $msg "Starting HTTP API server" -}}
     Starting HTTP API server at {{if (index $e.Data "tls")}}https{{else}}http{{end}}://{{index $e.Data "host"}}:{{index $e.Data "port"}}
+{{- else if eq $msg "Only checking containers in scope" -}}
+    Only checking containers in scope: {{index $e.Data "scope"}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

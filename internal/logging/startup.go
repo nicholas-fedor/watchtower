@@ -82,7 +82,8 @@ func WriteStartupMessage(
 
 	// Log filtering information, using structured logging for scope when set
 	if scope != "" {
-		startupLog.WithField("scope", scope).Info("Only checking containers in scope")
+		startupLog.WithField("scope", scope).
+			Info("Only checking containers in scope")
 	} else {
 		startupLog.Debug(filtering)
 	}
