@@ -4,6 +4,12 @@
 
 Include `update` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this mode.
 
+## Configuration
+
+| Setting | Flag | Environment Variable | Default |
+|:--------|:-----|:---------------------|:--------|
+| Update API timeout | [`--http-api-update-timeout`](../../../configuration/http-api/index.md#http_api_update_timeout) | `WATCHTOWER_HTTP_API_UPDATE_TIMEOUT` | `10m` |
+
 ## Parameters
 
 ### Image Name
@@ -71,6 +77,19 @@ Invalid regex patterns are treated as literal strings for exact matching.
 | `^web-.*`     | Any name starting with `web-`    |
 | `.*-prod$`    | Any name ending with `-prod`     |
 
+### Timeout
+
+The `timeout` parameter overrides the per-request timeout for this update.
+It accepts Go durations such as `30s`, `2m`, or `10m`.
+The value is capped by the configured update API timeout (`--http-api-update-timeout` / `WATCHTOWER_HTTP_API_UPDATE_TIMEOUT`, default `10m`).
+
+```bash
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?timeout=15m"
+```
+
+!!! Note
+    For synchronous updates, this bounds the time the HTTP response is held. For asynchronous updates (`?async=true`), this bounds how long the background update runs before being cancelled.
+
 ### Asynchronous Updates
 
 The `/v1/update` endpoint supports an `async` query parameter to trigger updates without waiting for completion. This is useful for CI environments or automation that needs to fire-and-forget without maintaining a long-lived connection.
@@ -104,7 +123,7 @@ The same concurrency behavior applies to async requests: full updates return 429
 |:-----------:|:------------------------------------------------------------------------------------------|
 |     202     | Update triggered successfully and running asynchronously                                  |
 |     401     | Invalid or missing authentication token                                                   |
-|     408     | Update handler timed out (exceeded 10-minute limit)                                       |
+|     408     | Update handler timed out (exceeded configured limit, default 10m)                         |
 |     429     | Another update is already in progress (full updates only) or the request was rate limited |
 |     500     | Internal server error during request processing                                           |
 |     503     | Client cancelled while waiting on update lock (targeted updates only)                     |
@@ -180,7 +199,7 @@ The `/v1/update` endpoint returns the following HTTP status codes:
 |     200     | Update completed successfully                                                             |
 |     202     | Update triggered successfully and running asynchronously (with `?async=true`)             |
 |     401     | Invalid or missing authentication token                                                   |
-|     408     | Update handler timed out (exceeded 10-minute limit)                                       |
+|     408     | Update handler timed out (exceeded configured limit, default 10m)                         |
 |     429     | Another update is already in progress (full updates only) or the request was rate limited |
 |     500     | Internal server error during request processing                                           |
 |     503     | Client cancelled while waiting on update lock (targeted updates only)                     |
@@ -248,10 +267,11 @@ Watchtower enforces two independent mechanisms that can each return HTTP 429 (To
 
 ### Update Handler Timeout
 
-- The `/v1/update` handler has a 10-minute timeout enforced by Fiber's timeout middleware.
+- The `/v1/update` handler has a timeout enforced by Fiber's timeout middleware. The default is 10 minutes.
 - The timeout covers the full lifecycle: waiting for the concurrency lock, performing the container update scan, and returning results.
 - When the timeout is exceeded, the handler returns HTTP 408 (Request Timeout) and the handler goroutine is abandoned.
 - The handler listens on `c.Context().Done()` for cooperative cancellation — targeted updates waiting for the lock will return HTTP 503 when the request context is cancelled.
+- You can override the timeout per request with the `?timeout=` query parameter, up to the configured maximum.
 
 ## Using the HTTP API and Periodic Updates
 

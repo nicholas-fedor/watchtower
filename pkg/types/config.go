@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 )
 
@@ -68,4 +70,12 @@ type RunConfig struct {
 	APIPortChanged bool
 	// APIRateLimitChanged reports whether http-api-rate-limit was explicitly configured.
 	APIRateLimitChanged bool
+	// CheckAPITimeout is the maximum duration for the /v1/check API endpoint.
+	CheckAPITimeout time.Duration
+	// CheckAPITimeoutChanged reports whether http-api-check-timeout was explicitly configured.
+	CheckAPITimeoutChanged bool
+	// UpdateAPITimeout is the maximum duration for the /v1/update API endpoint.
+	UpdateAPITimeout time.Duration
+	// UpdateAPITimeoutChanged reports whether http-api-update-timeout was explicitly configured.
+	UpdateAPITimeoutChanged bool
 }

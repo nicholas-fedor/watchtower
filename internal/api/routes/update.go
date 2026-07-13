@@ -13,12 +13,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-const (
-	updateHandlerTimeout = 10 * time.Minute
-)
-
 func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) {
-	handler := update.New(func(updateCtx context.Context, images, containers []string) *mt.Metric {
+	updateTimeout := opts.UpdateTimeout
+	if updateTimeout <= 0 {
+		updateTimeout = config.DefaultUpdateTimeout
+	}
+
+	handler := update.NewWithTimeout(func(updateCtx context.Context, images, containers []string) *mt.Metric {
 		params := config.BuildUpdateParams(opts)
 
 		imageFilter := opts.FilterByImage(images, opts.Filter)
@@ -32,10 +33,10 @@ func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler
 		opts.DefaultMetrics().RegisterScan(metric)
 
 		return metric
-	}, opts.UpdateLock, ctx)
+	}, opts.UpdateLock, updateTimeout, ctx)
 
 	app.Post(handler.Path, auth, timeout.New(handler.Handle, timeout.Config{
-		Timeout: updateHandlerTimeout,
+		Timeout: updateTimeout,
 	}))
 
 	if !opts.UnblockHTTPAPI && opts.WriteStartupMessage != nil {

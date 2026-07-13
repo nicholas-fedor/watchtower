@@ -42,6 +42,12 @@ const (
 	// complete. This prevents slow Docker API calls from blocking connections
 	// indefinitely.
 	HandlerTimeout = 30 * time.Second
+	// DefaultCheckTimeout defines the default maximum duration for the /v1/check
+	// API endpoint.
+	DefaultCheckTimeout = 5 * time.Minute
+	// DefaultUpdateTimeout defines the default maximum duration for the /v1/update
+	// API endpoint.
+	DefaultUpdateTimeout = 10 * time.Minute
 )
 
 // Options holds all configuration for SetupAndStartAPI.
@@ -99,6 +105,12 @@ type Options struct {
 	// unexpected error while running in non-blocking mode. Callers typically
 	// cancel the process context so scheduling shuts down with the API.
 	OnUnexpectedServerStop func(error)
+	// CheckTimeout is the maximum duration for the /v1/check API endpoint.
+	// If zero, DefaultCheckTimeout is used.
+	CheckTimeout time.Duration
+	// UpdateTimeout is the maximum duration for the /v1/update API endpoint.
+	// If zero, DefaultUpdateTimeout is used.
+	UpdateTimeout time.Duration
 }
 
 // BuildUpdateParams constructs UpdateParams for HTTP-triggered updates from

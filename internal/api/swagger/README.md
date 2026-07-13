@@ -40,14 +40,16 @@ The `/v1/events` SSE stream uses a separate `http-api-events-token` token and ac
 
 ### `/v1/update`
 
-- `image` — Comma-separated image names or Go regex patterns to filter (repeatable). Supports Go regex syntax (e.g., `^nginx-.*`).
-- `container` — Comma-separated container name patterns to filter (repeatable). Supports Go regex patterns (e.g., `^web-.*`).
+- `image` — Comma-separated image names to filter (repeatable).
+- `container` — Comma-separated container name patterns to filter (repeatable, supports Go regex).
 - `async` — When `true`, runs the update asynchronously and returns `202 Accepted`.
+- `timeout` — Per-request timeout override (e.g. `30s`, `2m`). Bounded by the configured update API timeout.
 
 ### `/v1/check`
 
 - `image` — Comma-separated image names to filter (repeatable).
 - `container` — Comma-separated container names to filter (repeatable).
+- `timeout` — Per-request timeout override (e.g. `30s`, `2m`). Bounded by the configured check API timeout.
 
 ### `/v1/containers`
 

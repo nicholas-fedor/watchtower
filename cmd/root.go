@@ -644,6 +644,20 @@ func run(command *cobra.Command, args []string) {
 		apiRateLimit = 60
 	}
 
+	checkAPITimeout, err := flagsSet.GetDuration("http-api-check-timeout")
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to get http-api-check-timeout flag")
+	}
+
+	checkAPITimeoutChanged := flagsSet.Lookup("http-api-check-timeout").Changed
+
+	updateAPITimeout, err := flagsSet.GetDuration("http-api-update-timeout")
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to get http-api-update-timeout flag")
+	}
+
+	updateAPITimeoutChanged := flagsSet.Lookup("http-api-update-timeout").Changed
+
 	// Handle health check mode as an early exit, preventing updates or API setup.
 	if healthCheck {
 		if os.Getpid() == 1 {
@@ -679,6 +693,10 @@ func run(command *cobra.Command, args []string) {
 		APIPortChanged:      apiPortChanged,
 		APIRateLimit:        apiRateLimit,
 		APIRateLimitChanged: apiRateLimitChanged,
+		CheckAPITimeout:     checkAPITimeout,
+		CheckAPITimeoutChanged: checkAPITimeoutChanged,
+		UpdateAPITimeout:     updateAPITimeout,
+		UpdateAPITimeoutChanged: updateAPITimeoutChanged,
 	}
 
 	// Set the HTTP API Endpoint configuration.
@@ -909,18 +927,20 @@ func runMain(cfg types.RunConfig) int {
 			Port:                        cfg.APIPort,
 			Token:                       cfg.APIToken,
 			EventsToken:                 cfg.APIEventsToken,
-			RateLimit:                   cfg.APIRateLimit,
-			EnableCheckAPI:              cfg.EnableCheckAPI,
-			EnableConfigAPI:             cfg.EnableConfigAPI,
-			EnableContainersAPI:         cfg.EnableContainersAPI,
-			EnableEventsAPI:             cfg.EnableEventsAPI,
-			EnableHealthAPI:             cfg.EnableHealthAPI,
-			EnableHistoryAPI:            cfg.EnableHistoryAPI,
-			EnableImagesAPI:             cfg.EnableImagesAPI,
-			EnableMetricsAPI:            cfg.EnableMetricsAPI,
-			EnableSwaggerAPI:            cfg.EnableSwaggerAPI,
-			EnableUpdateAPI:             cfg.EnableUpdateAPI,
-			TLSCertPath:                 cfg.TLSCertPath,
+		RateLimit:                   cfg.APIRateLimit,
+		EnableCheckAPI:              cfg.EnableCheckAPI,
+		EnableConfigAPI:             cfg.EnableConfigAPI,
+		EnableContainersAPI:         cfg.EnableContainersAPI,
+		EnableEventsAPI:             cfg.EnableEventsAPI,
+		EnableHealthAPI:             cfg.EnableHealthAPI,
+		EnableHistoryAPI:            cfg.EnableHistoryAPI,
+		EnableImagesAPI:             cfg.EnableImagesAPI,
+		EnableMetricsAPI:            cfg.EnableMetricsAPI,
+		EnableSwaggerAPI:            cfg.EnableSwaggerAPI,
+		EnableUpdateAPI:             cfg.EnableUpdateAPI,
+		CheckTimeout:                cfg.CheckAPITimeout,
+		UpdateTimeout:               cfg.UpdateAPITimeout,
+		TLSCertPath:                 cfg.TLSCertPath,
 			TLSKeyPath:                  cfg.TLSKeyPath,
 			CORSAllowedOrigins:          cfg.CORSAllowedOrigins,
 			TrustedProxies:              cfg.TrustedProxies,
@@ -1066,7 +1086,9 @@ func anyHTTPAPIConfig(cfg types.RunConfig) bool {
 		cfg.ProxyHeader != "" ||
 		cfg.APIHostChanged ||
 		cfg.APIPortChanged ||
-		cfg.APIRateLimitChanged
+		cfg.APIRateLimitChanged ||
+		cfg.CheckAPITimeoutChanged ||
+		cfg.UpdateAPITimeoutChanged
 }
 
 // httpAPIEndpointsEnabled reports whether any HTTP API endpoint is enabled.

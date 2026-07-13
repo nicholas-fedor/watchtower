@@ -6,6 +6,12 @@ The `v1/check` endpoint enables checking monitored containers for available imag
 
 Include `check` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this endpoint.
 
+## Configuration
+
+| Setting | Flag | Environment Variable | Default |
+|:--------|:-----|:---------------------|:--------|
+| Check API timeout | [`--http-api-check-timeout`](../../../configuration/http-api/index.md#http_api_check_timeout) | `WATCHTOWER_HTTP_API_CHECK_TIMEOUT` | `5m` |
+
 ## Parameters
 
 ### Image Name
@@ -22,6 +28,16 @@ The `container` parameter filters the check to only include specific containers 
 
 ```bash
 curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/check?container=nginx"
+```
+
+### Timeout
+
+The `timeout` parameter overrides the per-request timeout for this check.
+It accepts Go durations such as `30s`, `2m`, or `5m`.
+The value is capped by the configured check API timeout (`--http-api-check-timeout` / `WATCHTOWER_HTTP_API_CHECK_TIMEOUT`, default `5m`).
+
+```bash
+curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/check?timeout=2m"
 ```
 
 ## Response Format

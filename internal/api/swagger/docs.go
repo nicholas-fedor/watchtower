@@ -124,6 +124,12 @@ const docTemplate = `{
                         "description": "Container names to check (comma-separated, repeatable). When combined with image, only containers matching both are checked.",
                         "name": "container",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Per-request timeout override (e.g. 30s, 2m). Bounded by the configured check API timeout.",
+                        "name": "timeout",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -543,7 +549,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Comma-separated container name patterns to update (repeatable, supports Go regex)",
+                        "description": "Container name patterns to update (repeatable, supports Go regex)",
                         "name": "container",
                         "in": "query"
                     },
@@ -612,7 +618,7 @@ const docTemplate = `{
     }
 }`
 
-// SwaggerInfo holds exported Swagger Info so clients can modify it.
+// SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8080",

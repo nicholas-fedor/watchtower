@@ -339,6 +339,20 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		),
 		"Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). If unset, CORS is disabled and only same-origin requests are allowed.")
 
+	flags.DurationP(
+		"http-api-check-timeout",
+		"",
+		envDuration("WATCHTOWER_HTTP_API_CHECK_TIMEOUT"),
+		"Maximum duration for the /v1/check API endpoint (e.g. 30s, 2m, 5m). Default: 5m",
+	)
+
+	flags.DurationP(
+		"http-api-update-timeout",
+		"",
+		envDuration("WATCHTOWER_HTTP_API_UPDATE_TIMEOUT"),
+		"Maximum duration for the /v1/update API endpoint (e.g. 1m, 10m, 30m). Default: 10m",
+	)
+
 	// https://no-color.org/
 	flags.BoolP(
 		"no-color",

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.check)
+			h := New(tt.check, 5*time.Minute)
 			require.NotNil(t, h)
 			assert.Equal(t, "/v1/check", h.Path)
 		})
@@ -69,7 +70,7 @@ func TestHandler_Handle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.checkFunc)
+			h := New(tt.checkFunc, 5*time.Minute)
 			app := fiber.New(fiber.Config{})
 			app.Post("/v1/check", h.Handle)
 
@@ -134,7 +135,7 @@ func TestHandler_Handle_WithFilters(t *testing.T) {
 				capturedNames = names
 
 				return []ContainerCheck{}, nil
-			})
+			}, 5*time.Minute)
 			app := fiber.New(fiber.Config{})
 			app.Post("/v1/check", h.Handle)
 
@@ -155,4 +156,69 @@ func TestHandler_Handle_WithFilters(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandler_Handle_TimeoutOverride(t *testing.T) {
+	t.Run("valid timeout is applied", func(t *testing.T) {
+		var capturedCtx context.Context
+
+		h := New(func(ctx context.Context, _, _ []string) ([]ContainerCheck, error) {
+			capturedCtx = ctx
+
+			return []ContainerCheck{}, nil
+		}, 5*time.Minute)
+		app := fiber.New(fiber.Config{})
+		app.Post("/v1/check", h.Handle)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/check?timeout=2m", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.NotNil(t, capturedCtx)
+	})
+
+	t.Run("timeout exceeding max is clamped", func(t *testing.T) {
+		var capturedCtx context.Context
+
+		h := New(func(ctx context.Context, _, _ []string) ([]ContainerCheck, error) {
+			capturedCtx = ctx
+
+			return []ContainerCheck{}, nil
+		}, 2*time.Minute)
+		app := fiber.New(fiber.Config{})
+		app.Post("/v1/check", h.Handle)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/check?timeout=5m", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.NotNil(t, capturedCtx)
+	})
+
+	t.Run("invalid timeout is ignored", func(t *testing.T) {
+		var capturedCtx context.Context
+
+		h := New(func(ctx context.Context, _, _ []string) ([]ContainerCheck, error) {
+			capturedCtx = ctx
+
+			return []ContainerCheck{}, nil
+		}, 5*time.Minute)
+		app := fiber.New(fiber.Config{})
+		app.Post("/v1/check", h.Handle)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/check?timeout=bogus", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.NotNil(t, capturedCtx)
+	})
 }

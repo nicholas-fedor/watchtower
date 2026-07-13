@@ -79,6 +79,11 @@ paths:
         in: query
         name: container
         type: string
+      - description: Per-request timeout override (e.g. 30s, 2m). Bounded by the configured
+          check API timeout.
+        in: query
+        name: timeout
+        type: string
       produces:
       - application/json
       responses:
@@ -355,8 +360,7 @@ paths:
         in: query
         name: image
         type: string
-      - description: Comma-separated container name patterns to update (repeatable,
-          supports Go regex)
+      - description: Container name patterns to update (repeatable, supports Go regex)
         in: query
         name: container
         type: string

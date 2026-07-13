@@ -122,6 +122,12 @@
                         "description": "Container names to check (comma-separated, repeatable). When combined with image, only containers matching both are checked.",
                         "name": "container",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Per-request timeout override (e.g. 30s, 2m). Bounded by the configured check API timeout.",
+                        "name": "timeout",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -541,7 +547,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Comma-separated container name patterns to update (repeatable, supports Go regex)",
+                        "description": "Container name patterns to update (repeatable, supports Go regex)",
                         "name": "container",
                         "in": "query"
                     },

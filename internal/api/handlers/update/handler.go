@@ -14,10 +14,11 @@ import (
 
 // Handler triggers container update scans via HTTP.
 type Handler struct {
-	fn   func(ctx context.Context, images, containers []string) *metrics.Metric
-	Path string
-	lock chan bool
-	ctx  context.Context //nolint:containedctx // application-lifetime context owned by Handler
+	fn         func(ctx context.Context, images, containers []string) *metrics.Metric
+	Path       string
+	lock       chan bool
+	ctx        context.Context //nolint:containedctx // application-lifetime context owned by Handler
+	maxTimeout time.Duration
 }
 
 // lockResult holds the outcome of an acquireLock attempt.
@@ -42,6 +43,22 @@ const (
 //   - ctx: Optional application-lifetime context for background work.
 //     If nil, context.Background is used.
 func New(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool, ctx ...context.Context) *Handler {
+	return NewWithTimeout(updateFn, updateLock, 0, ctx...)
+}
+
+// NewWithTimeout creates a new Handler with a maximum per-request timeout.
+//
+// Parameters:
+//   - updateFn: Function that executes container updates, accepting a context,
+//     image names, container name patterns, and returning metrics.
+//   - updateLock: Optional lock channel for synchronizing updates. If nil, a
+//     new channel is created.
+//   - maxTimeout: Maximum allowed per-request timeout, used to bound the
+//     ?timeout= query parameter for both sync and async updates. If zero,
+//     no per-request timeout override is applied.
+//   - ctx: Optional application-lifetime context for background work.
+//     If nil, context.Background is used.
+func NewWithTimeout(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool, maxTimeout time.Duration, ctx ...context.Context) *Handler {
 	var hLock chan bool
 	if updateLock != nil {
 		hLock = updateLock
@@ -66,10 +83,11 @@ func New(updateFn func(ctx context.Context, images, containers []string) *metric
 	}
 
 	return &Handler{
-		fn:   updateFn,
-		Path: "/v1/update",
-		lock: hLock,
-		ctx:  bgCtx,
+		fn:         updateFn,
+		Path:       "/v1/update",
+		lock:       hLock,
+		ctx:        bgCtx,
+		maxTimeout: maxTimeout,
 	}
 }
 
@@ -105,6 +123,8 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	images := h.extractImages(c)
 	containers := h.extractContainers(c)
 
+	updateCtx := h.applyTimeout(c)
+
 	result := h.acquireLock(c, images, containers)
 	if result.RequestErr {
 		return fiber.ErrServiceUnavailable
@@ -115,10 +135,10 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	}
 
 	if c.Query("async") == "true" {
-		return h.handleAsync(c, images, containers, result.Token)
+		return h.handleAsync(c, images, containers, result.Token, updateCtx)
 	}
 
-	return h.handleSync(c, images, containers, result.Token)
+	return h.handleSync(c, images, containers, result.Token, updateCtx)
 }
 
 // extractImages parses the "image" query parameters into a slice of image
@@ -228,12 +248,33 @@ func (h *Handler) send429Response(c fiber.Ctx) {
 	}
 }
 
+// applyTimeout returns a context derived from the request context, optionally
+// wrapped with a per-request timeout from the ?timeout= query parameter.
+// The timeout is clamped to h.maxTimeout.
+func (h *Handler) applyTimeout(c fiber.Ctx) context.Context {
+	ctx := c.Context()
+	if timeoutStr := c.Query("timeout"); timeoutStr != "" {
+		if parsed, err := time.ParseDuration(timeoutStr); err == nil && parsed > 0 {
+			if parsed > h.maxTimeout {
+				parsed = h.maxTimeout
+			}
+
+			var cancel func()
+
+			ctx, cancel = context.WithTimeout(ctx, parsed)
+			_ = cancel // cancel is a no-op here; Fiber will cancel the parent context when the request ends
+		}
+	}
+
+	return ctx
+}
+
 // handleAsync processes an asynchronous update request by spawning a
 // goroutine and returning 202 Accepted.
-func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToken bool) error {
+func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToken bool, updateCtx context.Context) error {
 	logrus.WithField("notify", "no").Info("Handling async update request - spawning async update")
 
-	go h.executeUpdateAsync(h.ctx, images, containers, lockToken)
+	go h.executeUpdateAsync(updateCtx, images, containers, lockToken)
 
 	err := c.SendStatus(fiber.StatusAccepted)
 	if err != nil {
@@ -245,10 +286,10 @@ func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToke
 
 // handleSync processes a synchronous update request, returning the update
 // results as JSON.
-func (h *Handler) handleSync(c fiber.Ctx, images, containers []string, lockToken bool) error {
+func (h *Handler) handleSync(c fiber.Ctx, images, containers []string, lockToken bool, updateCtx context.Context) error {
 	defer h.releaseLock(lockToken)
 
-	metric, duration := h.executeUpdate(c.Context(), images, containers)
+	metric, duration := h.executeUpdate(updateCtx, images, containers)
 	if metric == nil {
 		return fiber.ErrInternalServerError
 	}

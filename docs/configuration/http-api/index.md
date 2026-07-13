@@ -125,6 +125,36 @@ Environment Variable: WATCHTOWER_HTTP_API_RATE_LIMIT
 !!! Note
     When the limit is exceeded, the client receives HTTP 429 (Too Many Requests).
 
+## HTTP API Check Timeout
+
+Sets the maximum duration for the `/v1/check` API endpoint.
+
+```text
+            Argument: --http-api-check-timeout
+Environment Variable: WATCHTOWER_HTTP_API_CHECK_TIMEOUT
+                Type: Duration
+             Default: 5m
+```
+
+!!! Note
+    The `/v1/check` endpoint queries registries for the latest image digest.
+    Increase this timeout if you see `context deadline exceeded` errors during checks.
+
+## HTTP API Update Timeout
+
+Sets the maximum duration for the `/v1/update` API endpoint.
+
+```text
+            Argument: --http-api-update-timeout
+Environment Variable: WATCHTOWER_HTTP_API_UPDATE_TIMEOUT
+                Type: Duration
+             Default: 10m
+```
+
+!!! Note
+    The `/v1/update` endpoint performs a full container update scan.
+    Increase this timeout if you see `context deadline exceeded` errors during updates.
+
 ## HTTP API TLS Certificate
 
 Path to the TLS certificate file for the HTTP API.

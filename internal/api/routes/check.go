@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/timeout"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
@@ -14,6 +15,11 @@ import (
 func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
 	if opts.Client == nil {
 		return
+	}
+
+	checkTimeout := opts.CheckTimeout
+	if checkTimeout <= 0 {
+		checkTimeout = config.DefaultCheckTimeout
 	}
 
 	handler := check.New(func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
@@ -31,6 +37,9 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 		}
 
 		return check.CheckForUpdates(ctx, opts.Client, combinedFilter, params)
-	})
-	app.Post(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
+	}, checkTimeout)
+
+	app.Post(handler.Path, auth, timeout.New(handler.Handle, timeout.Config{
+		Timeout: checkTimeout,
+	}))
 }
