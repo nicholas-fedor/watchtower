@@ -38,13 +38,19 @@ func NewAPIAuthMiddleware(token string) fiber.Handler {
 func tokenMatches(c fiber.Ctx, expectedHash [sha256.Size]byte) bool {
 	provided, ok := extractAPIToken(c)
 	if !ok {
-		logrus.WithField("ip", c.IP()).Warn("Missing or malformed API key")
+		logrus.WithFields(logrus.Fields{
+			"ip":     c.IP(),
+			"notify": "no",
+		}).Warn("Missing or malformed API key")
 
 		return false
 	}
 
 	if !tokenHashMatches(expectedHash, provided) {
-		logrus.WithField("ip", c.IP()).Warn("Invalid token attempt")
+		logrus.WithFields(logrus.Fields{
+			"ip":     c.IP(),
+			"notify": "no",
+		}).Warn("Invalid token attempt")
 
 		return false
 	}

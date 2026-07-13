@@ -43,13 +43,16 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Debug("Received HTTP API containers request")
 
 	statuses, err := h.list(c.Context())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to list containers for API")
+		logrus.WithError(err).WithField("notify", "no").
+			Error("Failed to list containers for API")
 
-		sendErr := c.Status(fiber.StatusInternalServerError).SendString("failed to list containers")
+		sendErr := c.Status(fiber.StatusInternalServerError).
+			SendString("failed to list containers")
 		if sendErr != nil {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}

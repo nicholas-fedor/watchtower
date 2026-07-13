@@ -49,6 +49,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Debug("Received HTTP API history request")
 
 	sinceRaw := c.Query("since")

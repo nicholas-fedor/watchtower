@@ -44,7 +44,9 @@ func New(check CheckFunc) *Handler {
 //	@Router			/v1/check [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	if h.check == nil {
-		logrus.Warn("Received HTTP API check request but no check function is configured")
+		logrus.WithFields(logrus.Fields{
+			"notify": "no",
+		}).Warn("Received HTTP API check request but no check function is configured")
 
 		sendErr := c.Status(fiber.StatusInternalServerError).SendString("check function is not configured")
 		if sendErr != nil {
@@ -57,6 +59,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Info("Received HTTP API check request")
 
 	images := extractFilterParams(c, "image")
@@ -64,9 +67,11 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 	results, err := h.check(c.Context(), images, containers)
 	if err != nil {
-		logrus.WithError(err).Error("Failed to check for updates")
+		logrus.WithError(err).WithField("notify", "no").
+			Error("Failed to check for updates")
 
-		sendErr := c.Status(fiber.StatusInternalServerError).SendString("failed to check for updates")
+		sendErr := c.Status(fiber.StatusInternalServerError).
+			SendString("failed to check for updates")
 		if sendErr != nil {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}

@@ -43,13 +43,16 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Debug("Received HTTP API images request")
 
 	statuses, err := h.list(c.Context())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to list images for API")
+		logrus.WithError(err).WithField("notify", "no").
+			Error("Failed to list images for API")
 
-		sendErr := c.Status(fiber.StatusInternalServerError).SendString("failed to list images")
+		sendErr := c.Status(fiber.StatusInternalServerError).
+			SendString("failed to list images")
 		if sendErr != nil {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}

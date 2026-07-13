@@ -21,7 +21,7 @@ func (w *logrusWriter) Write(bytes []byte) (int, error) {
 		msg = msg[:len(msg)-1]
 	}
 
-	w.logger.Info(msg)
+	w.logger.WithField("notify", "no").Info(msg)
 
 	return len(bytes), nil
 }

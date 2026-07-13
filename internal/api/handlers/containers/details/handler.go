@@ -77,6 +77,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Debug("Received HTTP API container details request")
 
 	nameFilter := c.Query("name")
@@ -84,9 +85,11 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 	details, err := h.getDetails(c.Context(), nameFilter, imageFilter)
 	if err != nil {
-		logrus.WithError(err).Error("Failed to get container details for API")
+		logrus.WithError(err).WithField("notify", "no").
+			Error("Failed to get container details for API")
 
-		sendErr := c.Status(fiber.StatusInternalServerError).SendString("failed to get container details")
+		sendErr := c.Status(fiber.StatusInternalServerError).
+			SendString("failed to get container details")
 		if sendErr != nil {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}

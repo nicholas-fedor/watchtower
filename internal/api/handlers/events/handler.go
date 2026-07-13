@@ -96,6 +96,7 @@ func (h *Handler) checkOrigin(c fiber.Ctx) bool {
 		"origin": origin,
 		"host":   host,
 		"ip":     c.IP(),
+		"notify": "no",
 	}).Warn("Rejected SSE connection from disallowed origin")
 
 	return false
@@ -110,6 +111,7 @@ func logSubscriberConnected(c fiber.Ctx) {
 		"method": c.Method(),
 		"path":   c.Path(),
 		"ip":     c.IP(),
+		"notify": "no",
 	}).Info("New SSE subscriber connected")
 }
 
@@ -171,7 +173,7 @@ func (h *Handler) dispatchEvents(stream *sse.Stream, subCh <-chan Event, done <-
 
 			data, err := json.Marshal(event)
 			if err != nil {
-				logrus.WithError(err).Warn("Failed to marshal event")
+				logrus.WithError(err).WithField("notify", "no").Warn("Failed to marshal event")
 
 				continue
 			}

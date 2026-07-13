@@ -79,6 +79,7 @@ func (h *StatusHandler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Debug("Received HTTP API status request")
 
 	last := h.getLast()

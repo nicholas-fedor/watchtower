@@ -71,13 +71,16 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Debug("Received HTTP API config request")
 
 	cfg, err := h.getConfig(c.Context())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to get config for API")
+		logrus.WithError(err).WithField("notify", "no").
+			Error("Failed to get config for API")
 
-		sendErr := c.Status(fiber.StatusInternalServerError).SendString("failed to get configuration")
+		sendErr := c.Status(fiber.StatusInternalServerError).
+			SendString("failed to get configuration")
 		if sendErr != nil {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}

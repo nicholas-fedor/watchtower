@@ -117,7 +117,8 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 	}
 
 	if opts.SkipSelfUpdate {
-		logrus.Warn("Skipping self-update to prevent port conflict: Watchtower container has host-bound ports")
+		logrus.WithField("notify", "no").
+			Warn("Skipping self-update to prevent port conflict: Watchtower container has host-bound ports")
 	}
 
 	tlsCertPath, tlsKeyPath := opts.TLSCertPath, opts.TLSKeyPath

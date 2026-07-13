@@ -107,6 +107,7 @@ func CheckForUpdates(
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"container": c.Name(),
 				"image":     c.ImageName(),
+				"notify":    "no",
 			}).Debug("Failed to check container for updates")
 		} else {
 			result.UpdateAvailable = stale

@@ -46,12 +46,16 @@ func New(updateFn func(ctx context.Context, images, containers []string) *metric
 	if updateLock != nil {
 		hLock = updateLock
 
-		logrus.WithField("source", "provided").Debug("Initialized update lock from provided channel")
+		logrus.WithFields(logrus.Fields{
+			"source": "provided",
+			"notify": "no",
+		}).Debug("Initialized update lock from provided channel")
 	} else {
 		hLock = make(chan bool, 1)
 		hLock <- true
 
-		logrus.Debug("Initialized new update lock channel")
+		logrus.WithField("notify", "no").
+			Debug("Initialized new update lock channel")
 	}
 
 	var bgCtx context.Context
@@ -81,7 +85,7 @@ func New(updateFn func(ctx context.Context, images, containers []string) *metric
 //	@Accept			json
 //	@Produce		json
 //	@Param			image		query		string					false	"Comma-separated image names to update (repeatable)"
-//	@Param			container	query		string					false	"Comma-separated container name patterns to update (repeatable, supports Go regex)"
+//	@Param			container	query		string					false	"Container name patterns to update (repeatable, supports Go regex)"
 //	@Param			async		query		string					false	"When 'true', runs update asynchronously and returns 202 Accepted"
 //	@Success		200			{object}	map[string]interface{}	"Synchronous update results with summary and timing"
 //	@Success		202			{string}	string					"Asynchronous update accepted"
@@ -95,6 +99,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	logrus.WithFields(logrus.Fields{
 		"method": c.Method(),
 		"path":   c.Path(),
+		"notify": "no",
 	}).Info("Received HTTP API update request")
 
 	images := h.extractImages(c)
@@ -137,9 +142,9 @@ func (h *Handler) extractImages(c fiber.Ctx) []string {
 	}
 
 	if len(images) > 0 {
-		logrus.WithField("images", images).Debug("Extracted images from query parameters")
+		logrus.WithField("images", images).WithField("notify", "no").Debug("Extracted images from query parameters")
 	} else {
-		logrus.Debug("No image query parameters provided")
+		logrus.WithField("notify", "no").Debug("No image query parameters provided")
 	}
 
 	return images
@@ -165,9 +170,9 @@ func (h *Handler) extractContainers(c fiber.Ctx) []string {
 	}
 
 	if len(containers) > 0 {
-		logrus.WithField("containers", containers).Debug("Extracted container patterns from query parameters")
+		logrus.WithField("containers", containers).WithField("notify", "no").Debug("Extracted container patterns from query parameters")
 	} else {
-		logrus.Debug("No container query parameters provided")
+		logrus.WithField("notify", "no").Debug("No container query parameters provided")
 	}
 
 	return containers
@@ -180,16 +185,16 @@ func (h *Handler) extractContainers(c fiber.Ctx) []string {
 // it attempts a non-blocking acquire and returns a 429 response if the lock
 // is held.
 func (h *Handler) acquireLock(c fiber.Ctx, images, containers []string) lockResult {
-	logrus.Debug("Handler: trying to acquire lock")
+	logrus.WithField("notify", "no").Debug("Handler: trying to acquire lock")
 
 	if len(images) > 0 || len(containers) > 0 {
 		select {
 		case token := <-h.lock:
-			logrus.Debug("Handler: acquired lock for targeted update")
+			logrus.WithField("notify", "no").Debug("Handler: acquired lock for targeted update")
 
 			return lockResult{Token: token, Acquired: true}
 		case <-c.Context().Done():
-			logrus.Debug("Handler: request cancelled while waiting for lock")
+			logrus.WithField("notify", "no").Debug("Handler: request cancelled while waiting for lock")
 
 			return lockResult{RequestErr: true}
 		}
@@ -197,11 +202,11 @@ func (h *Handler) acquireLock(c fiber.Ctx, images, containers []string) lockResu
 
 	select {
 	case token := <-h.lock:
-		logrus.Debug("Handler: acquired lock for full update")
+		logrus.WithField("notify", "no").Debug("Handler: acquired lock for full update")
 
 		return lockResult{Token: token, Acquired: true}
 	default:
-		logrus.Debug("Skipped update, another update already in progress")
+		logrus.WithField("notify", "no").Debug("Skipped update, another update already in progress")
 		h.send429Response(c)
 
 		return lockResult{}
@@ -219,14 +224,14 @@ func (h *Handler) send429Response(c fiber.Ctx) {
 		"timestamp":   time.Now().UTC().Format(time.RFC3339),
 	})
 	if err != nil {
-		logrus.WithError(err).Debug("Failed to send 429 response")
+		logrus.WithError(err).WithField("notify", "no").Debug("Failed to send 429 response")
 	}
 }
 
 // handleAsync processes an asynchronous update request by spawning a
 // goroutine and returning 202 Accepted.
 func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToken bool) error {
-	logrus.Info("Handling async update request - spawning async update")
+	logrus.WithField("notify", "no").Info("Handling async update request - spawning async update")
 
 	go h.executeUpdateAsync(h.ctx, images, containers, lockToken)
 
@@ -275,7 +280,7 @@ func (h *Handler) handleSync(c fiber.Ctx, images, containers []string, lockToken
 func (h *Handler) executeUpdateAsync(ctx context.Context, images, containers []string, lockToken bool) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			logrus.WithField("panic", rec).Error("Update goroutine panicked")
+			logrus.WithField("panic", rec).WithField("notify", "no").Error("Update goroutine panicked")
 		}
 
 		h.releaseLock(lockToken)
@@ -286,19 +291,19 @@ func (h *Handler) executeUpdateAsync(ctx context.Context, images, containers []s
 	h.fn(ctx, images, containers)
 
 	duration := time.Since(startTime)
-	logrus.WithField("duration", duration).Debug("Handler (async): update function completed")
+	logrus.WithField("duration", duration).WithField("notify", "no").Debug("Handler (async): update function completed")
 }
 
 // executeUpdate runs the update function and returns the metric along with
 // duration.
 func (h *Handler) executeUpdate(ctx context.Context, images, containers []string) (*metrics.Metric, time.Duration) {
-	logrus.Debug("Handler: executing update function")
+	logrus.WithField("notify", "no").Debug("Handler: executing update function")
 
 	startTime := time.Now()
 	metric := h.fn(ctx, images, containers)
 	duration := time.Since(startTime)
 
-	logrus.Debug("Handler: update function completed")
+	logrus.WithField("notify", "no").Debug("Handler: update function completed")
 
 	return metric, duration
 }
@@ -306,7 +311,7 @@ func (h *Handler) executeUpdate(ctx context.Context, images, containers []string
 // releaseLock returns the lock token to the channel, allowing another update
 // to proceed.
 func (h *Handler) releaseLock(token bool) {
-	logrus.Debug("Handler: releasing lock")
+	logrus.WithField("notify", "no").Debug("Handler: releasing lock")
 
 	h.lock <- token
 }
