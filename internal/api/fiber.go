@@ -161,7 +161,7 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 	apiServer.Use(middlewares...)
 
 	apiServer.Hooks().OnListen(func(data fiber.ListenData) error {
-		logrusLogger.WithField("addr", data.Host+":"+data.Port).
+		logrusLogger.WithFields(logrus.Fields{"host": data.Host, "port": data.Port, "tls": data.TLS}).
 			Info("Starting HTTP API server")
 
 		return nil
