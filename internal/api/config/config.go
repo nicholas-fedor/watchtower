@@ -52,55 +52,56 @@ const (
 
 // Options holds all configuration for SetupAndStartAPI.
 type Options struct {
-	Host                        string
-	Port                        string
-	Token                       string
-	EventsToken                 string
-	RateLimit                   int
-	EnableUpdateAPI             bool
-	EnableMetricsAPI            bool
-	EnableContainersAPI         bool
-	EnableCheckAPI              bool
-	EnableSwaggerAPI            bool
-	EnableHealthAPI             bool
-	EnableHistoryAPI            bool
-	EnableImagesAPI             bool
-	EnableConfigAPI             bool
-	EnableEventsAPI             bool
-	UnblockHTTPAPI              bool
-	NoStartupMessage            bool
-	TLSCertPath                 string
-	TLSKeyPath                  string
-	CORSAllowedOrigins          []string
-	TrustedProxies              []string
-	ProxyHeader                 string
-	Filter                      types.Filter
-	Command                     *cobra.Command
-	FilterDesc                  string
-	UpdateLock                  chan bool
-	Cleanup                     bool
-	MonitorOnly                 bool
-	NoPull                      bool
-	NoRestart                   bool
-	RollingRestart              bool
-	IncludeStopped              bool
-	IncludeRestarting           bool
-	LifecycleHooks              bool
-	LabelEnable                 bool
-	LabelPrecedence             bool
-	CooldownDelay               time.Duration
-	SkipSelfUpdate              bool
-	ReviveStopped               bool
-	UseComposeDependsOn         bool
-	Client                      container.Client
-	Notifier                    types.Notifier
-	Scope                       string
-	Version                     string
-	RunUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *mt.Metric
-	FilterByImage               func([]string, types.Filter) types.Filter
-	DefaultMetrics              func() *mt.Metrics
-	WriteStartupMessage         func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
-	EventBroadcaster            *events.Broadcaster
+	Host                         string
+	Port                         string
+	Token                        string
+	EventsToken                  string
+	RateLimit                    int
+	EnableUpdateAPI              bool
+	EnableMetricsAPI             bool
+	EnableContainersAPI          bool
+	EnableCheckAPI               bool
+	EnableSwaggerAPI             bool
+	EnableHealthAPI              bool
+	EnableHistoryAPI             bool
+	EnableImagesAPI              bool
+	EnableConfigAPI              bool
+	EnableEventsAPI              bool
+	UnblockHTTPAPI               bool
+	NoStartupMessage             bool
+	TLSCertPath                  string
+	TLSKeyPath                   string
+	CORSAllowedOrigins           []string
+	TrustedProxies               []string
+	ProxyHeader                  string
+	Filter                       types.Filter
+	Command                      *cobra.Command
+	FilterDesc                   string
+	UpdateLock                   chan bool
+	Cleanup                      bool
+	MonitorOnly                  bool
+	NoPull                       bool
+	NoRestart                    bool
+	RollingRestart               bool
+	IncludeStopped               bool
+	IncludeRestarting            bool
+	LifecycleHooks               bool
+	LabelEnable                  bool
+	LabelPrecedence              bool
+	CooldownDelay                time.Duration
+	SkipSelfUpdate               bool
+	ReviveStopped                bool
+	UseComposeDependsOn          bool
+	Client                       container.Client
+	Notifier                     types.Notifier
+	NotificationSplitByContainer bool
+	Scope                        string
+	Version                      string
+	RunUpdatesWithNotifications  func(context.Context, types.Filter, types.UpdateParams) *mt.Metric
+	FilterByImage                func([]string, types.Filter) types.Filter
+	DefaultMetrics               func() *mt.Metrics
+	WriteStartupMessage          func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool)
+	EventBroadcaster             *events.Broadcaster
 	// OnUnexpectedServerStop is invoked when the HTTP server exits with an
 	// unexpected error while running in non-blocking mode. Callers typically
 	// cancel the process context so scheduling shuts down with the API.

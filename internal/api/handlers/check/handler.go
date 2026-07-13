@@ -7,13 +7,17 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Handler serves the /v1/check endpoint.
 type Handler struct {
-	check      CheckFunc
-	Path       string
-	maxTimeout time.Duration
+	check            CheckFunc
+	Path             string
+	maxTimeout       time.Duration
+	notifier         types.Notifier
+	splitByContainer bool
 }
 
 // New creates a new check handler backed by the given check function.
@@ -21,11 +25,16 @@ type Handler struct {
 // Parameters:
 //   - check: Function that checks container update availability.
 //   - maxTimeout: Maximum allowed per-request timeout, used to bound the ?timeout= query parameter.
-func New(check CheckFunc, maxTimeout time.Duration) *Handler {
+//   - notifier: Optional notification system instance. When provided, notification batching is enabled
+//     during the check to prevent log entries from triggering immediate notifications.
+//   - splitByContainer: When true, notifications are split by container instead of being grouped.
+func New(check CheckFunc, maxTimeout time.Duration, notifier types.Notifier, splitByContainer bool) *Handler {
 	return &Handler{
-		check:      check,
-		Path:       "/v1/check",
-		maxTimeout: maxTimeout,
+		check:            check,
+		Path:             "/v1/check",
+		maxTimeout:       maxTimeout,
+		notifier:         notifier,
+		splitByContainer: splitByContainer,
 	}
 }
 
@@ -46,14 +55,15 @@ func New(check CheckFunc, maxTimeout time.Duration) *Handler {
 //	@Failure		500			{string}	string					"Failed to check for updates"
 //	@Failure		401			{string}	string					"Missing or invalid API token"
 //	@Security		BearerAuth
-//	@Router			/v1/check [post]
+//	@Router		/v1/check [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	if h.check == nil {
 		logrus.WithFields(logrus.Fields{
 			"notify": "no",
 		}).Warn("Received HTTP API check request but no check function is configured")
 
-		sendErr := c.Status(fiber.StatusInternalServerError).SendString("check function is not configured")
+		sendErr := c.Status(fiber.StatusInternalServerError).
+			SendString("check function is not configured")
 		if sendErr != nil {
 			return fmt.Errorf("failed to send error response: %w", sendErr)
 		}
@@ -72,7 +82,8 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 	ctx := c.Context()
 	if timeoutStr := c.Query("timeout"); timeoutStr != "" {
-		if parsed, err := time.ParseDuration(timeoutStr); err == nil && parsed > 0 {
+		parsed, err := time.ParseDuration(timeoutStr)
+		if err == nil && parsed > 0 {
 			if parsed > h.maxTimeout {
 				parsed = h.maxTimeout
 			}
@@ -82,6 +93,23 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			ctx, cancel = context.WithTimeout(ctx, parsed)
 			defer cancel()
 		}
+	}
+
+	// Suppress notifications during the check to prevent log entries from
+	// triggering immediate notifications. The notifier is reset after the check.
+	if h.notifier != nil {
+		h.notifier.StartNotification(true)
+
+		defer func() {
+			if h.splitByContainer {
+				sendSplitCheckNotifications(h.notifier)
+				h.notifier.StartNotification(true)
+			} else {
+				h.notifier.SendNotification(nil)
+			}
+
+			h.notifier.StartNotification(false)
+		}()
 	}
 
 	results, err := h.check(ctx, images, containers)
@@ -109,4 +137,32 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	}
 
 	return nil
+}
+
+// sendSplitCheckNotifications sends per-container notifications when
+// split-by-container is enabled for the check endpoint.
+// It groups queued log entries by container name and sends one notification
+// per container.
+func sendSplitCheckNotifications(notifier types.Notifier) {
+	entries := notifier.GetEntries()
+	if len(entries) == 0 {
+		return
+	}
+
+	byContainer := make(map[string][]*logrus.Entry)
+
+	for _, entry := range entries {
+		container, _ := entry.Data["container"].(string)
+		if container == "" {
+			container = "unknown"
+		}
+
+		byContainer[container] = append(byContainer[container], entry)
+	}
+
+	for _, containerEntries := range byContainer {
+		if len(containerEntries) > 0 {
+			notifier.SendFilteredEntries(containerEntries, nil)
+		}
+	}
 }

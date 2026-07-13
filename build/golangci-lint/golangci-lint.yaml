@@ -305,6 +305,7 @@ linters:
         text: "G117"
     paths:
       - ".*/mocks/.*"
+      - ".*/internal/api/swagger/.*"
     warn-unused: true
 
 # Issues Configuration

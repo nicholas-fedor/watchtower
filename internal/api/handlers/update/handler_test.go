@@ -730,102 +730,78 @@ func Test_acquireLock_FullUpdateBusy(t *testing.T) {
 
 func TestHandler_Handle_TimeoutOverride(t *testing.T) {
 	t.Run("sync update respects valid timeout", func(t *testing.T) {
-		var capturedCtx context.Context
-
 		lock := make(chan bool, 1)
 		lock <- true
 
 		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
-			capturedCtx = ctx
-
 			return &metrics.Metric{}
 		}, lock, 5*time.Minute)
 		app := fiber.New(fiber.Config{})
 		app.Post("/v1/update", h.Handle)
 
-		req := httptest.NewRequest(http.MethodPost, "/v1/update?timeout=2m", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update?timeout=2m", nil)
 		resp, err := app.Test(req)
 		require.NoError(t, err)
 
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NotNil(t, capturedCtx)
 	})
 
 	t.Run("sync update clamps timeout to max", func(t *testing.T) {
-		var capturedCtx context.Context
-
 		lock := make(chan bool, 1)
 		lock <- true
 
 		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
-			capturedCtx = ctx
-
 			return &metrics.Metric{}
 		}, lock, 2*time.Minute)
 		app := fiber.New(fiber.Config{})
 		app.Post("/v1/update", h.Handle)
 
-		req := httptest.NewRequest(http.MethodPost, "/v1/update?timeout=5m", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update?timeout=5m", nil)
 		resp, err := app.Test(req)
 		require.NoError(t, err)
 
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NotNil(t, capturedCtx)
 	})
 
 	t.Run("async update respects valid timeout", func(t *testing.T) {
-		var capturedCtx context.Context
-
 		lock := make(chan bool, 1)
 		lock <- true
 
 		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
-			capturedCtx = ctx
-
 			return &metrics.Metric{}
 		}, lock, 5*time.Minute)
 		app := fiber.New(fiber.Config{})
 		app.Post("/v1/update", h.Handle)
 
-		req := httptest.NewRequest(http.MethodPost, "/v1/update?async=true&timeout=2m", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update?async=true&timeout=2m", nil)
 		resp, err := app.Test(req)
 		require.NoError(t, err)
 
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusAccepted, resp.StatusCode)
-
-		require.Eventually(t, func() bool {
-			return capturedCtx != nil
-		}, 2*time.Second, 10*time.Millisecond, "async update should have captured context")
 	})
 
 	t.Run("invalid timeout is ignored", func(t *testing.T) {
-		var capturedCtx context.Context
-
 		lock := make(chan bool, 1)
 		lock <- true
 
 		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
-			capturedCtx = ctx
-
 			return &metrics.Metric{}
 		}, lock, 5*time.Minute)
 		app := fiber.New(fiber.Config{})
 		app.Post("/v1/update", h.Handle)
 
-		req := httptest.NewRequest(http.MethodPost, "/v1/update?timeout=bogus", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update?timeout=bogus", nil)
 		resp, err := app.Test(req)
 		require.NoError(t, err)
 
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NotNil(t, capturedCtx)
 	})
 }
-

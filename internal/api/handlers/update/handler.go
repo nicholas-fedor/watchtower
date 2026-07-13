@@ -254,15 +254,16 @@ func (h *Handler) send429Response(c fiber.Ctx) {
 func (h *Handler) applyTimeout(c fiber.Ctx) context.Context {
 	ctx := c.Context()
 	if timeoutStr := c.Query("timeout"); timeoutStr != "" {
-		if parsed, err := time.ParseDuration(timeoutStr); err == nil && parsed > 0 {
+		parsed, err := time.ParseDuration(timeoutStr)
+		if err == nil && parsed > 0 {
 			if parsed > h.maxTimeout {
 				parsed = h.maxTimeout
 			}
 
 			var cancel func()
 
-			ctx, cancel = context.WithTimeout(ctx, parsed)
-			_ = cancel // cancel is a no-op here; Fiber will cancel the parent context when the request ends
+			ctx, cancel = context.WithTimeout(ctx, parsed) //nolint:gosec
+			_ = cancel                                     // cancel is a no-op here; Fiber will cancel the parent context when the request ends
 		}
 	}
 
