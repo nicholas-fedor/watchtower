@@ -14,10 +14,10 @@
         <link rel="canonical" href="https://watchtower.nickfedor.com/dev/getting-started/updating-watchtower/">
       
       
-        <link rel="prev" href="../usage/">
+        <link rel="prev" href="../docker-secrets/">
       
       
-        <link rel="next" href="../../configuration/arguments/">
+        <link rel="next" href="../../configuration/introduction/">
       
       
         
@@ -292,7 +292,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../overview/" class="md-tabs__link">
+        <a href="../introduction/" class="md-tabs__link">
           
   
   
@@ -312,7 +312,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../configuration/arguments/" class="md-tabs__link">
+        <a href="../../configuration/introduction/" class="md-tabs__link">
           
   
   
@@ -332,7 +332,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../notifications/overview/" class="md-tabs__link">
+        <a href="../../notifications/introduction/" class="md-tabs__link">
           
   
   
@@ -352,7 +352,27 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../advanced-features/http-api/" class="md-tabs__link">
+        <a href="../../http-api/overview/" class="md-tabs__link">
+          
+  
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../advanced-features/ephemeral-self-updates/" class="md-tabs__link">
           
   
   
@@ -532,14 +552,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../overview/" class="md-nav__link">
+      <a href="../introduction/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Overview
+    Introduction
   
 
     
@@ -596,6 +616,62 @@
     
   
     Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-selection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docker-secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Secrets
   
 
     
@@ -676,10 +752,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#port_configuration_limitation" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Port Configuration Limitation
+        Overview
       
     </span>
   </a>
@@ -687,63 +763,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#ephemeral_self-updates" class="md-nav__link">
+  <a href="#port_configuration_limitation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Ephemeral Self-Updates
+        Port Configuration Limitation
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Ephemeral Self-Updates">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#how_it_works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How It Works
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#enabling_ephemeral_self-updates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enabling Ephemeral Self-Updates
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#differences_from_default_self-update" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Differences from Default Self-Update
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limitations
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -824,14 +850,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/arguments/" class="md-nav__link">
+      <a href="../../configuration/introduction/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Arguments
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/docker-connection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Connection
   
 
     
@@ -880,14 +934,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/private-registries/" class="md-nav__link">
+      <a href="../../configuration/scheduling/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Private Registries
+    Scheduling
   
 
     
@@ -908,14 +962,182 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/secure-connections/" class="md-nav__link">
+      <a href="../../configuration/registry-and-authentication/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Secure Connections
+    Registry and Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/image-cooldown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image Cooldown
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/update-behavior/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Update Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/lifecycle-hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/logging-and-output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging and Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notifications/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/http-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP API
   
 
     
@@ -997,14 +1219,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../notifications/overview/" class="md-nav__link">
+      <a href="../../notifications/introduction/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Configuration
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/general-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    General Settings
   
 
     
@@ -1074,6 +1324,326 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deprecations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/deprecations/deprecation-notice/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Notice
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/deprecations/migration-tool/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/deprecations/email/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/deprecations/gotify/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gotify
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/deprecations/slack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Slack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/deprecations/teams/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Teams
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notifications/guides/signal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1113,7 +1683,7 @@
   <span class="md-ellipsis">
     
   
-    Advanced Features
+    API
   
 
     
@@ -1126,6 +1696,639 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/configuration/host-and-port/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host and Port
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/configuration/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/configuration/tls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TLS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Endpoints
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Endpoints
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/check/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Check
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/container-details/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Details
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/swagger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swagger UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/update/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Update
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1142,14 +2345,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/http-api/" class="md-nav__link">
+      <a href="../../advanced-features/ephemeral-self-updates/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    HTTP API
+    Ephemeral Self-Updates
   
 
     
@@ -1254,14 +2457,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../advanced-features/metrics-api/" class="md-nav__link">
+      <a href="../../advanced-features/private-registries/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Metrics API
+    Private Registries
   
 
     
@@ -1366,6 +2569,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../advanced-features/secure-connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secure Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced-features/stop-signals/" class="md-nav__link">
         
   
@@ -1421,10 +2652,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#port_configuration_limitation" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Port Configuration Limitation
+        Overview
       
     </span>
   </a>
@@ -1432,63 +2663,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#ephemeral_self-updates" class="md-nav__link">
+  <a href="#port_configuration_limitation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Ephemeral Self-Updates
+        Port Configuration Limitation
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Ephemeral Self-Updates">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#how_it_works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How It Works
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#enabling_ephemeral_self-updates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enabling Ephemeral Self-Updates
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#differences_from_default_self-update" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Differences from Default Self-Update
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limitations
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1513,81 +2694,17 @@
 
 
 <h1 id="updating_watchtower">Updating Watchtower<a class="headerlink" href="#updating_watchtower" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>If Watchtower is monitoring the same Docker daemon under which the Watchtower container itself is running (i.e. if you volume-mounted <code>/var/run/docker.sock</code> into the Watchtower container) then it has the ability to update itself.</p>
 <p>If a new version of the <code>nickfedor/watchtower</code> image is pushed to the Docker Hub, your Watchtower will pull down the new image and restart itself automatically.</p>
 <h2 id="port_configuration_limitation">Port Configuration Limitation<a class="headerlink" href="#port_configuration_limitation" title="Permanent link">&para;</a></h2>
 <p>If a self-update is attempted when a port is mapped to a Watchtower container, then the new container will attempt to use the same port that is in use by the old container, which results in both containers being stopped.</p>
-<p>When Watchtower has a port configured (e.g., via <code>--http-api-port</code> or Docker port mappings), self-updates are automatically skipped to prevent port conflicts.</p>
-<p>To use the <a href="../../advanced-features/http-api/">HTTP API</a> or <a href="../../advanced-features/metrics-api/">Metrics API</a> with self-updates, consider one of the following approaches:</p>
+<p>When Watchtower has a port configured (e.g., via <a href="../../configuration/http-api/#http_api_port"><code>http-api-port</code></a> or Docker port mappings), self-updates are automatically skipped to prevent port conflicts.</p>
+<p>To use the <a href="../../http-api/overview/">HTTP API</a> with self-updates, consider one of the following approaches:</p>
 <ul>
 <li><strong>Remove port mappings</strong>: Avoid publishing ports to the host and access the API through the Docker network instead.</li>
-<li><strong>Use <code>--run-once</code></strong>: Run Watchtower once without scheduling, then restart manually when needed.</li>
-<li><strong>Disable HTTP API</strong>: Use only scheduled updates without the HTTP API if self-updates are required.</li>
-<li><strong>Ephemeral Self-Updates</strong>: Enable Watchtower to use a separate, short-lived container to orchestrate the self-update process.</li>
-</ul>
-<h2 id="ephemeral_self-updates">Ephemeral Self-Updates<a class="headerlink" href="#ephemeral_self-updates" title="Permanent link">&para;</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">This is an experimental feature</p>
-</div>
-<p>The ephemeral self-update mechanism is an alternative to the default rename-based approach. It uses a short-lived orchestrator container to perform the container replacement, providing a more atomic handoff between old and new Watchtower instances.</p>
-<h3 id="how_it_works">How It Works<a class="headerlink" href="#how_it_works" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Watchtower detects a new version of its own image is available and pulls it.</li>
-<li>A short-lived orchestrator container is created from the new Watchtower image with the <code>--self-update-orchestrator</code> internal flag.</li>
-<li>The orchestrator mounts the Docker socket and performs the following sequence:<ul>
-<li>Stops the old Watchtower container.</li>
-<li>Creates a new container from the new image with the same configuration.</li>
-<li>Starts the new Watchtower container.</li>
-<li>Verifies the new container is running.</li>
-<li>Removes the old container.</li>
-</ul>
-</li>
-<li>The orchestrator exits and is automatically removed.</li>
-</ol>
-<h3 id="enabling_ephemeral_self-updates">Enabling Ephemeral Self-Updates<a class="headerlink" href="#enabling_ephemeral_self-updates" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_EPHEMERAL_SELF_UPDATE</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span>nickfedor/watchtower
-</code></pre></div>
-<h3 id="differences_from_default_self-update">Differences from Default Self-Update<a class="headerlink" href="#differences_from_default_self-update" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Aspect</th>
-<th>Default (Rename)</th>
-<th>Ephemeral</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Mechanism</td>
-<td>Renames old container, creates new</td>
-<td>Orchestrator handles stop/create/start</td>
-</tr>
-<tr>
-<td>Port conflicts</td>
-<td>Skipped automatically</td>
-<td>Self-update not skipped when ports are configured</td>
-</tr>
-<tr>
-<td>Old container cleanup</td>
-<td>Deferred to next startup</td>
-<td>Immediate removal by orchestrator</td>
-</tr>
-<tr>
-<td>Failure recovery</td>
-<td>Old container persists (renamed)</td>
-<td>Old container preserved if new one fails</td>
-</tr>
-</tbody>
-</table>
-<h3 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h3>
-<ul>
-<li>The Docker socket must be mounted in the Watchtower container (required for both mechanisms).</li>
-<li>The orchestrator container is identified by the <code>com.centurylinklabs.watchtower.ephemeral-orchestrator</code> label. Orphaned orchestrators from crashes are cleaned up on Watchtower startup.</li>
+<li><strong>Use <a href="../../configuration/scheduling/#run_once"><code>run-once</code></a></strong>: Run Watchtower once without scheduling, then restart manually when needed.</li>
+<li><strong><a href="../../advanced-features/ephemeral-self-updates/">Ephemeral Self-Updates</a></strong>: Enable Watchtower to use a separate, short-lived container to orchestrate the self-update process.</li>
 </ul>
 
 
@@ -1611,7 +2728,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 31, 2026 19:57:36 UTC"><span class="timeago" datetime="2026-03-31T19:57:36+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 31, 2026 19:57:36 UTC">2026-03-31</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
   </span>
 
     
