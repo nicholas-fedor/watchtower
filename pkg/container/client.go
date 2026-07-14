@@ -187,6 +187,26 @@ type Client interface {
 		params types.UpdateParams,
 	) (bool, types.ImageID, string, error)
 
+	// CheckContainerUpdate reports whether a newer image is available without
+	// pulling image layers. When NoPull is active it inspects the local cache
+	// only; otherwise it compares registry digests. Cooldown is not applied.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to check.
+	//   - params: Update parameters (NoPull, LabelPrecedence).
+	//
+	// Returns:
+	//   - bool: True if an update is available, false otherwise.
+	//   - types.ImageID: Latest local image ID when known (empty for remote-only mismatch).
+	//   - string: Latest registry manifest digest (empty if unavailable).
+	//   - error: Non-nil if the check fails, nil on success.
+	CheckContainerUpdate(
+		ctx context.Context,
+		container types.Container,
+		params types.UpdateParams,
+	) (bool, types.ImageID, string, error)
+
 	// ExecuteCommand runs a command inside a container and returns whether
 	// to skip updates based on the result.
 	//
@@ -954,6 +974,48 @@ func (c *client) IsContainerStale(
 	}
 
 	return stale, newestImage, latestDigest, err
+}
+
+// CheckContainerUpdate reports whether a newer image is available without pulling.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - container: Container to check.
+//   - params: Update parameters (NoPull, LabelPrecedence).
+//
+// Returns:
+//   - bool: True if an update is available, false otherwise.
+//   - types.ImageID: Latest local image ID when known.
+//   - string: Latest registry manifest digest (empty if unavailable).
+//   - error: Non-nil if the check fails, nil on success.
+func (c *client) CheckContainerUpdate(
+	ctx context.Context,
+	container types.Container,
+	params types.UpdateParams,
+) (bool, types.ImageID, string, error) {
+	imgClient := newImageClient(c.api)
+
+	available, newestImage, latestDigest, err := imgClient.CheckContainerUpdate(
+		ctx,
+		container,
+		params,
+	)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		}).Debug("Failed to check container for updates")
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"container":        container.Name(),
+			"image":            container.ImageName(),
+			"update_available": available,
+			"latest_image_id":  newestImage,
+			"latest_digest":    latestDigest,
+		}).Debug("Checked container for updates")
+	}
+
+	return available, newestImage, latestDigest, err
 }
 
 // ExecuteCommand runs a command inside a container and evaluates its result.

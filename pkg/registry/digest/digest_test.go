@@ -159,6 +159,53 @@ func TestDigestsMatch(t *testing.T) {
 	}
 }
 
+func TestFormatDigest(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "empty", input: "", want: ""},
+		{name: "already prefixed", input: "sha256:abc", want: "sha256:abc"},
+		{name: "raw hash", input: "abcdef", want: "sha256:abcdef"},
+		{name: "other algorithm preserved", input: "sha512:deadbeef", want: "sha512:deadbeef"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, FormatDigest(tt.input))
+		})
+	}
+}
+
+func TestCompareDigestWithRemote(t *testing.T) {
+	const remoteHash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+	mc := mockTypes.NewMockContainer(t)
+	mc.On("Name").Return("outdated")
+	mc.On("HasImageInfo").Return(true)
+	mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+		RepoDigests: []string{
+			"registry.example.com/myapp@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Docker-Content-Digest", "sha256:"+remoteHash)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	parts := strings.SplitN(server.URL, "://", 2)
+	host := parts[len(parts)-1]
+	mc.On("ImageName").Return(host + "/myapp:latest")
+
+	match, remoteDigest, err := CompareDigestWithRemote(context.Background(), mc, "", server.URL)
+	require.NoError(t, err)
+	assert.False(t, match)
+	assert.Equal(t, "sha256:"+remoteHash, remoteDigest)
+}
+
 func TestCompareDigest(t *testing.T) {
 	tests := []struct {
 		name           string

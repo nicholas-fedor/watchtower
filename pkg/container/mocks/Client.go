@@ -40,6 +40,90 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+// CheckContainerUpdate provides a mock function for the type MockClient
+func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error) {
+	ret := _mock.Called(ctx, container, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckContainerUpdate")
+	}
+
+	var r0 bool
+	var r1 types.ImageID
+	var r2 string
+	var r3 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) (bool, types.ImageID, string, error)); ok {
+		return returnFunc(ctx, container, params)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) bool); ok {
+		r0 = returnFunc(ctx, container, params)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, types.UpdateParams) types.ImageID); ok {
+		r1 = returnFunc(ctx, container, params)
+	} else {
+		r1 = ret.Get(1).(types.ImageID)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, types.UpdateParams) string); ok {
+		r2 = returnFunc(ctx, container, params)
+	} else {
+		r2 = ret.Get(2).(string)
+	}
+	if returnFunc, ok := ret.Get(3).(func(context.Context, types.Container, types.UpdateParams) error); ok {
+		r3 = returnFunc(ctx, container, params)
+	} else {
+		r3 = ret.Error(3)
+	}
+	return r0, r1, r2, r3
+}
+
+// MockClient_CheckContainerUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckContainerUpdate'
+type MockClient_CheckContainerUpdate_Call struct {
+	*mock.Call
+}
+
+// CheckContainerUpdate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - container types.Container
+//   - params types.UpdateParams
+func (_e *MockClient_Expecter) CheckContainerUpdate(ctx any, container any, params any) *MockClient_CheckContainerUpdate_Call {
+	return &MockClient_CheckContainerUpdate_Call{Call: _e.mock.On("CheckContainerUpdate", ctx, container, params)}
+}
+
+func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context, container types.Container, params types.UpdateParams)) *MockClient_CheckContainerUpdate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.Container
+		if args[1] != nil {
+			arg1 = args[1].(types.Container)
+		}
+		var arg2 types.UpdateParams
+		if args[2] != nil {
+			arg2 = args[2].(types.UpdateParams)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_CheckContainerUpdate_Call) Return(b bool, imageID types.ImageID, s string, err error) *MockClient_CheckContainerUpdate_Call {
+	_c.Call.Return(b, imageID, s, err)
+	return _c
+}
+
+func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateContainer provides a mock function for the type MockClient
 func (_mock *MockClient) CreateContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
 	ret := _mock.Called(ctx, container)

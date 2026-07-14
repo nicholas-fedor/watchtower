@@ -17,6 +17,7 @@ import (
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
+	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -2912,5 +2913,69 @@ var _ = ginkgo.Describe("deduplicateByImageID", func() {
 		gomega.Expect(result[0].ContainerName).To(gomega.Equal("container-a"))
 		gomega.Expect(result[1].ImageID).To(gomega.Equal(types.ImageID("sha256:bbb")))
 		gomega.Expect(result[2].ImageID).To(gomega.Equal(types.ImageID("sha256:ccc")))
+	})
+})
+
+var _ = ginkgo.Describe("isPinned", func() {
+	// Valid 64-hex digest used by Docker/OCI references.
+	const fullDigest = "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+
+	ginkgo.DescribeTable("digest pin detection via shared helper",
+		func(image string, wantPinned bool) {
+			cont := mockActions.CreateMockContainer(
+				"id1",
+				"/name",
+				image,
+				time.Now(),
+			)
+			progress := session.Progress{}
+			params := types.UpdateParams{}
+
+			pinned, err := isPinned(cont, &progress, params)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pinned).To(gomega.Equal(wantPinned))
+
+			if wantPinned {
+				gomega.Expect(progress).To(gomega.HaveLen(1), "pinned containers are marked scanned")
+			} else {
+				gomega.Expect(progress).To(gomega.BeEmpty(), "unpinned containers are not scanned here")
+			}
+		},
+		ginkgo.Entry("tagged image", "nginx:latest", false),
+		ginkgo.Entry("repo@digest", "nginx@"+fullDigest, true),
+		ginkgo.Entry("tag and digest", "nginx:1.27@"+fullDigest, true),
+		ginkgo.Entry("registry/repo@digest", "registry.example.com/org/app@"+fullDigest, true),
+		ginkgo.Entry("bare content digest", fullDigest, true),
+	)
+
+	ginkgo.It("detects pin before parse fallback can replace the image name", func() {
+		// ImageName is a valid digest pin; even if parse were flaky, pin must win.
+		cont := mockActions.CreateMockContainer(
+			"pinned-id",
+			"/pinned-name",
+			"library/nginx@"+fullDigest,
+			time.Now(),
+		)
+		progress := session.Progress{}
+
+		pinned, err := isPinned(cont, &progress, types.UpdateParams{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(pinned).To(gomega.BeTrue())
+		gomega.Expect(progress).To(gomega.HaveLen(1))
+	})
+
+	ginkgo.It("returns error for unresolvable invalid image names", func() {
+		cont := mockActions.CreateMockContainer(
+			"InvalidContainer",
+			"/InvalidContainer",
+			":latest",
+			time.Now(),
+		)
+		progress := session.Progress{}
+
+		pinned, err := isPinned(cont, &progress, types.UpdateParams{})
+		gomega.Expect(err).To(gomega.HaveOccurred())
+		gomega.Expect(pinned).To(gomega.BeFalse())
+		gomega.Expect(progress).To(gomega.BeEmpty())
 	})
 })

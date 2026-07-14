@@ -101,7 +101,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Checks each watched container for available updates by querying the registry for the latest digest",
+                "description": "Checks each watched container for available updates by querying the registry for the latest digest without pulling image layers.",
                 "consumes": [
                     "application/json"
                 ],

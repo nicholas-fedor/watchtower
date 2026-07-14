@@ -30,6 +30,41 @@ const (
 	WarnAuto WarningStrategy = "auto"
 )
 
+// IsImagePinnedByDigest reports whether imageName is an immutable digest reference.
+//
+// It matches bare digests (sha256:...) and repository-qualified digests
+// (repo@sha256:...), consistent with Config.Image / ImageName() for digest-pinned
+// containers. Tag references such as nginx:latest are not pinned.
+//
+// This is the shared pin-detection primitive used by pull/check paths and by the
+// update flow after image-name resolution.
+//
+// Parameters:
+//   - imageName: Image name from ImageName() or Config.Image.
+//
+// Returns:
+//   - bool: True if the image is digest-pinned, false otherwise.
+func IsImagePinnedByDigest(imageName string) bool {
+	if imageName == "" {
+		return false
+	}
+
+	// Bare content digests used as image names.
+	if strings.HasPrefix(imageName, "sha256:") {
+		return true
+	}
+
+	ref, err := reference.ParseDockerRef(imageName)
+	if err != nil {
+		// Parse can fail on some edge forms; still treat explicit @sha256 as pinned.
+		return strings.Contains(imageName, "@sha256:")
+	}
+
+	_, digested := ref.(reference.Digested)
+
+	return digested
+}
+
 // WarningStrategy defines the policy for logging warnings when HEAD requests fail during image pulls.
 //
 // It allows configuration of verbosity:
@@ -92,6 +127,88 @@ func (c imageClient) IsContainerStale(
 	}
 
 	return c.HasNewImage(ctx, sourceContainer)
+}
+
+// CheckContainerUpdate reports whether a newer image is available without
+// downloading image layers.
+//
+// When NoPull is active it inspects the local Docker cache only. Otherwise it
+// compares the container's local digests against the registry (HEAD with GET
+// fallback). Cooldown is not applied; it remains an apply-time gate for updates.
+//
+// Parameters:
+//   - ctx: Context for operation control.
+//   - sourceContainer: Container to check.
+//   - params: Update parameters (NoPull, LabelPrecedence).
+//
+// Returns:
+//   - bool: True if an update is available, false otherwise.
+//   - types.ImageID: Latest local image ID when known (empty on remote-only mismatch).
+//   - string: Latest registry manifest digest (empty if unavailable).
+//   - error: Non-nil if the check fails, nil on success.
+func (c imageClient) CheckContainerUpdate(
+	ctx context.Context,
+	sourceContainer types.Container,
+	params types.UpdateParams,
+) (bool, types.ImageID, string, error) {
+	clog := logrus.WithFields(logrus.Fields{
+		"container": sourceContainer.Name(),
+		"image":     sourceContainer.ImageName(),
+	})
+
+	// Respect no-pull: monitor local image cache only.
+	if sourceContainer.IsNoPull(params) {
+		return c.checkLocalImageStaleness(ctx, sourceContainer, clog)
+	}
+
+	// Pinned digests cannot receive tag-based updates.
+	if IsImagePinnedByDigest(sourceContainer.ImageName()) {
+		clog.Debug("Skipping update check for pinned digest image")
+
+		return false, sourceContainer.ImageID(), "", nil
+	}
+
+	clog.Debug("Checking registry digests for update availability")
+
+	opts, err := registry.GetPullOptions(sourceContainer.ImageName())
+	if err != nil {
+		clog.WithError(err).Debug("Failed to load authentication credentials")
+
+		return false, sourceContainer.ImageID(), "", fmt.Errorf(
+			"%w: %s: %w",
+			errFailedToLoadPullOptions,
+			sourceContainer.ImageName(),
+			err,
+		)
+	}
+
+	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
+	endpoints := c.buildMirrorEndpoints(mirrorInfo)
+
+	match, remoteDigest, err := digest.CompareDigestWithRemote(
+		ctx,
+		sourceContainer,
+		opts.RegistryAuth,
+		endpoints...,
+	)
+	if err != nil {
+		clog.WithError(err).Debug("Failed to compare registry digests")
+
+		return false, sourceContainer.ImageID(), "", err
+	}
+
+	if match {
+		clog.WithField("latest_digest", remoteDigest).Debug("No update available")
+
+		return false, sourceContainer.ImageID(), remoteDigest, nil
+	}
+
+	clog.WithFields(logrus.Fields{
+		"new_id":        types.ImageID(remoteDigest).ShortID(),
+		"latest_digest": remoteDigest,
+	}).Info("Found new image")
+
+	return true, "", remoteDigest, nil
 }
 
 // HasNewImage checks if a newer image exists for the container.
@@ -242,9 +359,9 @@ func (c imageClient) PullImage(
 	}
 	clog := logrus.WithFields(fields)
 
-	// Skip pulling immutable sha256-pinned images.
-	if strings.HasPrefix(sourceContainer.ImageName(), "sha256:") {
-		clog.Debug("Skipping pull of pinned sha256 image")
+	// Skip pulling immutable digest-pinned images (bare sha256: or repo@sha256:).
+	if IsImagePinnedByDigest(sourceContainer.ImageName()) {
+		clog.Debug("Skipping pull of pinned digest image")
 
 		return errPinnedImage
 	}

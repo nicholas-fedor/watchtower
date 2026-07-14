@@ -74,6 +74,8 @@ var (
 	errInspectImageFailed = errors.New("failed to inspect image")
 	// errPullImageFailed indicates a failure to pull an image from the registry.
 	errPullImageFailed = errors.New("failed to pull image")
+	// errFailedToLoadPullOptions indicates pull options could not be resolved.
+	errFailedToLoadPullOptions = errors.New("failed to load pull options")
 	// ErrPullImageUnauthorized indicates an authentication failure during image pull.
 	ErrPullImageUnauthorized = errors.New("failed to pull image: authentication required")
 	// ErrPullImageNotFound indicates the image was not found in the registry.

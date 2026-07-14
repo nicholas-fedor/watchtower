@@ -43,7 +43,7 @@ func New(check CheckFunc, maxTimeout time.Duration, notifier types.Notifier, spl
 // configured, it returns a 500 response.
 //
 //	@Summary		Check for available container updates
-//	@Description	Checks each watched container for available updates by querying the registry for the latest digest
+//	@Description	Checks each watched container for available updates by querying the registry for the latest digest without pulling image layers.
 //
 //	@Tags			check
 //	@Accept			json

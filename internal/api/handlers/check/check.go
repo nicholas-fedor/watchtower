@@ -52,15 +52,18 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 
 // CheckForUpdates checks all watched containers for available image updates.
 //
-// It queries the registry for the latest digest (HEAD with GET fallback) unless
-// no-pull is active for the container. The provided filter determines which
-// containers are included. nil or a pass-through filter includes all.
+// It queries the registry for the latest digest (HEAD with GET fallback) without
+// pulling image layers.
+// If no-pull is configured, then only the local cache is used.
+// Configured image cooldown checks are not applied.
+// The provided filter determines which containers are included.
+// nil or a pass-through filter includes all.
 //
 // Parameters:
 //   - ctx: Context for the Docker API call.
 //   - client: Docker client.
 //   - filter: Combined container filter (general + image + name constraints).
-//   - params: Update parameters (MonitorOnly, NoPull, LabelPrecedence, CooldownDelay).
+//   - params: Update parameters (NoPull, LabelPrecedence).
 //
 // Returns:
 //   - []ContainerCheck: Update availability for each matching container.
@@ -93,10 +96,13 @@ func CheckForUpdates(
 
 		info := c.ImageInfo()
 		if info != nil {
-			result.Digest = container.ExtractImageDigest(info.RepoDigests, c.ImageName())
+			result.Digest = container.ExtractImageDigest(
+				info.RepoDigests,
+				c.ImageName(),
+			)
 		}
 
-		stale, latestID, latestDigest, err := client.IsContainerStale(
+		available, latestID, latestDigest, err := client.CheckContainerUpdate(
 			ctx,
 			c,
 			params,
@@ -110,7 +116,7 @@ func CheckForUpdates(
 				"notify":    "no",
 			}).Debug("Failed to check container for updates")
 		} else {
-			result.UpdateAvailable = stale
+			result.UpdateAvailable = available
 
 			if latestDigest != "" {
 				result.LatestDigest = latestDigest

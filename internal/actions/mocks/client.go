@@ -385,6 +385,15 @@ func (client MockClient) IsContainerStale(
 	return stale, "", "", nil
 }
 
+// CheckContainerUpdate reports update availability using the same staleness map as IsContainerStale.
+func (client MockClient) CheckContainerUpdate(
+	ctx context.Context,
+	container types.Container,
+	params types.UpdateParams,
+) (bool, types.ImageID, string, error) {
+	return client.IsContainerStale(ctx, container, params)
+}
+
 // WarnOnHeadPullFailed always returns true for the mock client.
 // It simulates a warning condition for HEAD pull failures in tests.
 func (client MockClient) WarnOnHeadPullFailed(_ types.Container) bool {

@@ -1015,16 +1015,24 @@ func getProject(c types.Container) string {
 	return ""
 }
 
-// parseReference parses a Docker image reference with logging.
-// Logs the parsing result or error, including image details and reference type.
+// parseReference validates a Docker image reference with logging.
+//
+// Parameters:
+//   - imageName: Image name to parse.
+//   - configImage: Config.Image value for log context.
+//   - fallbackImage: Fallback image name for log context.
+//   - cont: Container being processed (for log fields).
+//
+// Returns:
+//   - error: Non-nil if the image name cannot be parsed as a Docker reference.
 func parseReference(
 	imageName, configImage, fallbackImage string,
-	container types.Container,
-) (reference.Reference, error) {
+	cont types.Container,
+) error {
 	// Set up logging with container and image details.
 	clog := logrus.WithFields(
 		logrus.Fields{
-			"container": container.Name(),
+			"container": cont.Name(),
 			"image":     imageName,
 		})
 
@@ -1035,12 +1043,11 @@ func parseReference(
 			WithField("image_name", imageName).
 			Debug("Failed to parse image reference")
 
-		return nil,
-			fmt.Errorf(
-				"failed to parse image reference %s: %w",
-				imageName,
-				err,
-			)
+		return fmt.Errorf(
+			"failed to parse image reference %s: %w",
+			imageName,
+			err,
+		)
 	}
 
 	// Log successful parsing with reference type and context.
@@ -1052,41 +1059,40 @@ func parseReference(
 			"ref_type":       fmt.Sprintf("%T", normalizedRef),
 		}).Debug("Parsed image reference")
 
-	return normalizedRef, nil
+	return nil
 }
 
 // isPinned checks if a container's image is pinned by a digest reference.
 //
-// It selects a valid image name from ImageName(), Config.Image,
-// or a fallback (imageInfo.ID or container name),
-// parsing it to detect digest-based references (e.g., @sha256:...).
-// If pinned, it marks the container as scanned in the progress report
-// to skip updates, preserving immutability.
+// It resolves a usable image name from ImageName(), Config.Image, or a fallback,
+// then delegates pin detection to container.IsImagePinnedByDigest. Pin detection
+// runs before parse-fallback so a digest reference is not replaced by a non-pinned
+// fallback when ParseDockerRef fails. If pinned, it marks the container as scanned.
 //
 // Parameters:
-//   - container: The container to check for a pinned image.
+//   - cont: The container to check for a pinned image.
 //   - progress: The progress tracker to update for scanned or skipped containers.
 //   - params: Update parameters for monitor-only check.
 //
 // Returns:
 //   - bool: True if the image is pinned by digest, false otherwise.
-//   - error: Non-nil if no valid image reference can be parsed, nil on success.
+//   - error: Non-nil if no valid image reference can be resolved, nil on success.
 func isPinned(
-	container types.Container,
+	cont types.Container,
 	progress *session.Progress,
 	config types.UpdateParams,
 ) (bool, error) {
 	// Set up logging with container and image details for debugging.
 	clog := logrus.WithFields(
 		logrus.Fields{
-			"container": container.Name(),
-			"image":     container.ImageName(),
+			"container": cont.Name(),
+			"image":     cont.ImageName(),
 		})
 
 	// Get initial image name and configuration.
-	imageName := container.ImageName()
-	configImage := container.ContainerInfo().Config.Image
-	fallbackImage := getFallbackImage(container)
+	imageName := cont.ImageName()
+	configImage := cont.ContainerInfo().Config.Image
+	fallbackImage := getFallbackImage(cont)
 
 	// Check if ImageName is invalid and fall back to Config.Image or a derived name.
 	if isInvalidImageName(imageName) {
@@ -1115,45 +1121,60 @@ func isPinned(
 		return false, errInvalidImageReference
 	}
 
-	// Parse the selected image name to check for a digest-based reference.
-	normalizedRef, err := parseReference(
-		imageName,
-		configImage,
-		fallbackImage,
-		container,
-	)
-	if err != nil && imageName != fallbackImage {
-		// Retry parsing with the fallback image if the initial attempt failed.
-		clog.Debug("Retrying with fallback image")
-
-		normalizedRef, err = parseReference(
-			fallbackImage,
-			configImage,
-			fallbackImage,
-			container,
+	// Detect digests before parse-fallback. A repo@sha256 reference must stay
+	// pinned even when ParseDockerRef fails for unrelated reasons.
+	if container.IsImagePinnedByDigest(imageName) {
+		clog.WithField(
+			"is_digested",
+			true,
+		).Debug("Pinned image detected, marking as scanned")
+		progress.AddScanned(
+			cont,
+			cont.ImageID(),
+			config,
 		)
+
+		return true, nil
 	}
 
+	// Non-pinned names must still be parseable; retry with fallback when needed.
+	err := parseReference(imageName, configImage, fallbackImage, cont)
 	if err != nil {
+		if imageName != fallbackImage {
+			clog.Debug("Retrying with fallback image")
+
+			fallbackErr := parseReference(
+				fallbackImage,
+				configImage,
+				fallbackImage,
+				cont,
+			)
+			if fallbackErr != nil {
+				return false, err
+			}
+
+			// Fallback name might itself be digest-pinned (unlikely but consistent).
+			if container.IsImagePinnedByDigest(fallbackImage) {
+				clog.WithField(
+					"is_digested",
+					true,
+				).Debug("Pinned image detected via fallback, marking as scanned")
+				progress.AddScanned(
+					cont,
+					cont.ImageID(),
+					config,
+				)
+
+				return true, nil
+			}
+
+			return false, nil
+		}
+
 		return false, err
 	}
 
-	// Check if the parsed reference is digest-based (pinned).
-	_, isDigested := normalizedRef.(reference.Digested)
-	if isDigested {
-		// Mark the container as scanned to skip updates for pinned images.
-		clog.WithField(
-			"is_digested",
-			isDigested,
-		).Debug("Pinned image detected, marking as scanned")
-		progress.AddScanned(
-			container,
-			container.ImageID(),
-			config,
-		)
-	}
-
-	return isDigested, nil
+	return false, nil
 }
 
 // getFallbackImage derives a fallback image name from container info.

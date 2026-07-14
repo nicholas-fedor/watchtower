@@ -128,6 +128,38 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.Equal(int32(0)), "IsContainerStale should not be called")
 		})
 
+		ginkgo.It("should skip bare sha256-pinned containers and not call IsContainerStale", func() {
+			client = &mockActions.MockClient{
+				TestData: &mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainer(
+							"bare-digest-container",
+							"/bare-digest-container",
+							"sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+							time.Now(),
+						),
+					},
+					Staleness: map[string]bool{
+						"bare-digest-container": true,
+					},
+				},
+				Stopped: make(map[string]bool),
+			}
+			report, cleanupImageInfos, err := actions.Update(
+				context.Background(),
+				client,
+				config,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Scanned()).
+				To(gomega.HaveLen(1), "Bare digest container should be scanned")
+			gomega.Expect(report.Updated()).
+				To(gomega.BeEmpty(), "Bare digest container should not be updated")
+			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
+			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).
+				To(gomega.Equal(int32(0)), "IsContainerStale should not be called for bare digest pin")
+		})
+
 		ginkgo.It(
 			"should skip pinned containers with tag and digest and not collect image IDs",
 			func() {

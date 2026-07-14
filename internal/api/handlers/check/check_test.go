@@ -40,7 +40,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 				container.EXPECT().ImageInfo().Return(nil)
 				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
-				c.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+				c.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 					Return(true, types.ImageID("sha256:def"), "", nil)
 
 				return c
@@ -59,7 +59,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 				container.EXPECT().ImageInfo().Return(nil)
 				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
-				c.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+				c.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 					Return(false, types.ImageID("sha256:abc"), "", nil)
 
 				return c
@@ -82,7 +82,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container2.EXPECT().Name().Return("app2").Maybe()
 				container2.EXPECT().ImageName().Return("redis:latest").Maybe()
 				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container1, container2}, nil)
-				c.EXPECT().IsContainerStale(mock.Anything, container1, mock.Anything).
+				c.EXPECT().CheckContainerUpdate(mock.Anything, container1, mock.Anything).
 					Return(false, types.ImageID("sha256:abc"), "", nil)
 
 				return c
@@ -108,7 +108,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container2.EXPECT().Name().Return("app2").Maybe()
 				container2.EXPECT().ImageName().Return("redis:latest").Maybe()
 				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container1, container2}, nil)
-				c.EXPECT().IsContainerStale(mock.Anything, container1, mock.Anything).
+				c.EXPECT().CheckContainerUpdate(mock.Anything, container1, mock.Anything).
 					Return(false, types.ImageID("sha256:abc"), "", nil)
 
 				return c
@@ -142,7 +142,7 @@ func TestCheckForUpdates(t *testing.T) {
 				container3.EXPECT().ImageID().Return(types.ImageID("sha256:abc")).Maybe()
 				container3.EXPECT().ImageInfo().Return(nil).Maybe()
 				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container1, container2, container3}, nil)
-				c.EXPECT().IsContainerStale(mock.Anything, container1, mock.Anything).
+				c.EXPECT().CheckContainerUpdate(mock.Anything, container1, mock.Anything).
 					Return(false, types.ImageID("sha256:abc"), "", nil)
 
 				return c
@@ -223,7 +223,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	info := &image.InspectResponse{RepoDigests: []string{"nginx@sha256:digest123"}}
 	container.EXPECT().ImageInfo().Return(info)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
-	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID("sha256:abc"), "", nil)
 
 	results, err := CheckForUpdates(t.Context(), client, nil, types.UpdateParams{})
@@ -232,7 +232,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	assert.Equal(t, "sha256:digest123", results[0].Digest)
 }
 
-func TestCheckForUpdates_IsContainerStaleError(t *testing.T) {
+func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 	client := mockContainer.NewMockClient(t)
 	container := mockTypes.NewMockContainer(t)
 	container.EXPECT().Name().Return("my-app")
@@ -240,7 +240,7 @@ func TestCheckForUpdates_IsContainerStaleError(t *testing.T) {
 	container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 	container.EXPECT().ImageInfo().Return(nil)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
-	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
 
 	results, err := CheckForUpdates(t.Context(), client, nil, types.UpdateParams{})
@@ -258,7 +258,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 	container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 	container.EXPECT().ImageInfo().Return(nil)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
-	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.MatchedBy(func(p types.UpdateParams) bool {
+	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.MatchedBy(func(p types.UpdateParams) bool {
 		return p.MonitorOnly && p.NoPull && p.LabelPrecedence && p.CooldownDelay == 5*time.Minute
 	})).Return(true, types.ImageID("sha256:new"), "sha256:newdigest", nil)
 
@@ -291,9 +291,9 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 	container2.EXPECT().ImageInfo().Return(nil)
 
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container1, container2}, nil)
-	client.EXPECT().IsContainerStale(mock.Anything, container1, mock.Anything).
+	client.EXPECT().CheckContainerUpdate(mock.Anything, container1, mock.Anything).
 		Return(true, types.ImageID("sha256:new1"), "sha256:digest1", nil)
-	client.EXPECT().IsContainerStale(mock.Anything, container2, mock.Anything).
+	client.EXPECT().CheckContainerUpdate(mock.Anything, container2, mock.Anything).
 		Return(false, types.ImageID("sha256:def"), "", nil)
 
 	results, err := CheckForUpdates(t.Context(), client, nil, types.UpdateParams{})

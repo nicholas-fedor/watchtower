@@ -67,7 +67,7 @@ paths:
       consumes:
       - application/json
       description: Checks each watched container for available updates by querying
-        the registry for the latest digest
+        the registry for the latest digest without pulling image layers.
       parameters:
       - description: Image names to check (comma-separated, repeatable). When combined
           with container, only containers matching both are checked.

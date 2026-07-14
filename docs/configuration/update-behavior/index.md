@@ -120,6 +120,8 @@ Environment Variable: WATCHTOWER_NO_PULL
 !!! Note
     Can be set per container via the `com.centurylinklabs.watchtower.no-pull` label.
 
+    The HTTP API [`/v1/check`](../../http-api/endpoints/check/index.md) endpoint also respects no-pull and inspects the local cache only.
+
     See [Label Precedence](../container-selection/index.md#label_precedence).
 
 ## Ephemeral Self-Update
