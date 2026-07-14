@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Expand and reorganize http-api and metrics, improve logging, and restructure documentation by @nicholas-fedor in [#1939](https://github.com/nicholas-fedor/watchtower/pull/1939)
 - Update star history chart by @nicholas-fedor in [#1907](https://github.com/nicholas-fedor/watchtower/pull/1907)
 
 ### Chores
 
+- Update module github.com/gofiber/schema to v1.8.2 by @renovate[bot] in [#1941](https://github.com/nicholas-fedor/watchtower/pull/1941)
 - Update securego/gosec action to v2.28.0 by @renovate[bot] in [#1937](https://github.com/nicholas-fedor/watchtower/pull/1937)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.23 by @renovate[bot] in [#1935](https://github.com/nicholas-fedor/watchtower/pull/1935)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.21 by @renovate[bot] in [#1934](https://github.com/nicholas-fedor/watchtower/pull/1934)
