@@ -11,9 +11,9 @@ Parameters, such as container and image name filters, can be used to further fin
 
     The following options have been deprecated in favor of the unified [`http-api-endpoints`](../../configuration/http-api/index.md#http_api_endpoints) configuration option and will be removed with the v2.x.x release of Watchtower:
 
-    - [`http-api-update`](../../configuration/http-api/#http_api_update)
-    - [`http-api-containers`](../../configuration/http-api/#http_api_containers)
-    - [`http-api-metrics`](../../configuration/http-api/#http_api_metrics)
+    - [`http-api-update`](../../configuration/http-api/index.md#http_api_update)
+    - [`http-api-containers`](../../configuration/http-api/index.md#http_api_containers)
+    - [`http-api-metrics`](../../configuration/http-api/index.md#http_api_metrics)
 
 ## Endpoints
 
