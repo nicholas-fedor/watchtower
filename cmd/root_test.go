@@ -356,6 +356,9 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 	updateLock := make(chan bool, 1)
 	updateLock <- true
 
+	scheduledStarted := make(chan struct{})
+	scheduledDone := make(chan struct{})
+
 	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
 		t.Error("API update function should not be called when lock is held for full updates")
 
@@ -367,10 +370,15 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 	go func() {
 		v := <-updateLock
 
-		time.Sleep(50 * time.Millisecond)
+		close(scheduledStarted)
+
+		// Hold the lock until the API request has been asserted, then release.
+		<-scheduledDone
 
 		updateLock <- v
 	}()
+
+	<-scheduledStarted
 
 	testApp := fiber.New(fiber.Config{})
 	testApp.Post(handler.Path, handler.Handle)
@@ -390,6 +398,8 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 
 	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode,
 		"full API update should be rejected with 429 while scheduled update holds the lock")
+
+	close(scheduledDone)
 }
 
 func TestHandleAsync(t *testing.T) {
