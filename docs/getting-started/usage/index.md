@@ -1,7 +1,5 @@
 # Usage
 
-<!-- TODO: Continue editing this page, as it's in dire need of an overhaul -->
-
 ## Running Watchtower as a Docker Container
 
 Watchtower is released as a container image, which makes getting started as simple as pulling the `nickfedor/watchtower` image.
@@ -24,7 +22,7 @@ docker version
 [Docker CLI Command Reference](https://docs.docker.com/reference/cli/docker/version/){target="_blank" rel="noopener noreferrer"}
 
 Watchtower autonegotiates the API version by default.
-If the `DOCKER_API_VERSION` [variable](../../configuration/arguments/index.md#docker_api_version) is explicitly set, then Watchtower validates the version and falls back to autonegotiation on failure.
+If the `DOCKER_API_VERSION` [variable](../../configuration/docker-connection/index.md#docker_api_version) is explicitly set, then Watchtower validates the version and falls back to autonegotiation on failure.
 
 This version of Watchtower has been tested to support Docker v1.43 and higher.
 There is an increased probability of failures when using outdated versions of Docker.

@@ -3,7 +3,6 @@
 package logging
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -40,22 +39,8 @@ func WriteStartupMessage(
 	watchtowerVersion string,
 	updateOnStart *bool,
 ) {
-	// Retrieve flags controlling startup message behavior and API setup.
+	// Retrieve flags controlling startup message behavior.
 	noStartupMessage, _ := c.PersistentFlags().GetBool("no-startup-message")
-	enableUpdateAPI, _ := c.PersistentFlags().GetBool("http-api-update")
-
-	apiListenAddr, _ := c.PersistentFlags().GetString("http-api-host")
-
-	apiPort, _ := c.PersistentFlags().GetString("http-api-port")
-	if apiPort == "" {
-		apiPort = "8080"
-	}
-
-	if apiListenAddr == "" {
-		apiListenAddr = ":" + apiPort
-	} else {
-		apiListenAddr = apiListenAddr + ":" + apiPort
-	}
 
 	// If startup messages are suppressed, skip all logging
 	if noStartupMessage {
@@ -82,18 +67,14 @@ func WriteStartupMessage(
 
 	// Log filtering information, using structured logging for scope when set
 	if scope != "" {
-		startupLog.WithField("scope", scope).Info("Only checking containers in scope")
+		startupLog.WithField("scope", scope).
+			Info("Only checking containers in scope")
 	} else {
 		startupLog.Debug(filtering)
 	}
 
 	// Log scheduling or run mode information based on configuration.
 	LogScheduleInfo(startupLog, c, sched, updateOnStart)
-
-	// Report HTTP API status if enabled.
-	if enableUpdateAPI {
-		startupLog.Info(fmt.Sprintf("The HTTP API is enabled at %s.", apiListenAddr))
-	}
 
 	// Send batched notifications if not suppressed, ensuring startup info reaches users.
 	if !noStartupMessage && notifier != nil {

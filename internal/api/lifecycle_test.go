@@ -1,0 +1,715 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+func makeListContainersMock(t *testing.T) *mockContainer.MockClient {
+	t.Helper()
+	mc := mockContainer.NewMockClient(t)
+	mc.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil).Maybe()
+	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
+
+	return mc
+}
+
+func makeFilter(_ *testing.T) types.Filter {
+	return func(_ types.FilterableContainer) bool { return true }
+}
+
+// withTestListenAddr sets Host/Port so tests bind an ephemeral local port.
+func withTestListenAddr(opts config.Options) config.Options {
+	if opts.Host == "" {
+		opts.Host = "127.0.0.1"
+	}
+
+	if opts.Port == "" {
+		opts.Port = "0"
+	}
+
+	return opts
+}
+
+func runServerAndShutdown(t *testing.T, opts config.Options) {
+	t.Helper()
+
+	opts = withTestListenAddr(opts)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	// Wait for SetupAndStartAPI to return (non-blocking modes) or give the
+	// server time to bind (blocking modes still run in this goroutine path).
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+		// Non-blocking: server is still running under GracefulContext; cancel it.
+		cancel()
+		time.Sleep(50 * time.Millisecond)
+
+		return
+	case <-time.After(500 * time.Millisecond):
+		// Blocking mode: still inside SetupAndStartAPI.
+	}
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+	case <-time.After(ShutdownGracePeriod + 2*time.Second):
+		t.Fatal("server did not shut down within expected time")
+	}
+}
+
+func TestSetupAndStartAPI(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	tests := []struct {
+		name    string
+		opts    config.Options
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "no APIs enabled",
+			opts: config.Options{
+				Token: "test-token",
+			},
+			wantErr: false,
+		},
+		{
+			name: "nil RunUpdatesWithNotifications",
+			opts: config.Options{
+				Token:                       "test-token",
+				EnableUpdateAPI:             true,
+				RunUpdatesWithNotifications: nil,
+				FilterByImage:               func(_ []string, f types.Filter) types.Filter { return f },
+				DefaultMetrics:              func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: true,
+			errMsg:  "RunUpdatesWithNotifications must be provided",
+		},
+		{
+			name: "nil FilterByImage",
+			opts: config.Options{
+				Token:           "test-token",
+				EnableUpdateAPI: true,
+				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+					return &metrics.Metric{}
+				},
+				FilterByImage:  nil,
+				DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: true,
+			errMsg:  "FilterByImage must be provided",
+		},
+		{
+			name: "nil DefaultMetrics",
+			opts: config.Options{
+				Token:           "test-token",
+				EnableUpdateAPI: true,
+				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+					return &metrics.Metric{}
+				},
+				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+				DefaultMetrics: nil,
+			},
+			wantErr: true,
+			errMsg:  "DefaultMetrics must be provided",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			if tt.opts.Token == "" {
+				t.Skip("empty token causes logrus.Fatal")
+			}
+
+			err := SetupAndStartAPI(ctx, tt.opts)
+
+			if tt.wantErr {
+				require.Error(t, err)
+
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:       "test-token",
+		EventsToken: "events-token",
+		RateLimit:   60,
+		Client:      makeListContainersMock(t),
+		Filter:      makeFilter(t),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:       func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics:      func() *metrics.Metrics { return testMetrics },
+		EventBroadcaster:    events.NewBroadcaster(),
+		UnblockHTTPAPI:      true,
+		EnableUpdateAPI:     true,
+		EnableMetricsAPI:    true,
+		EnableContainersAPI: true,
+		EnableCheckAPI:      true,
+		EnableHealthAPI:     true,
+		EnableHistoryAPI:    true,
+		EnableImagesAPI:     true,
+		EnableConfigAPI:     true,
+		EnableEventsAPI:     true,
+		EnableSwaggerAPI:    true,
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	// UnblockHTTPAPI=true → non-blocking; should return after bind.
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking full API setup did not return")
+	}
+
+	cancel()
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestSetupAndStartAPI_NoAPIs(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	err := SetupAndStartAPI(ctx, config.Options{Token: "test"})
+	assert.NoError(t, err)
+}
+
+func TestSetupAndStartAPI_MetricsOnly(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := config.Options{
+		Token:            "test-token",
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+	}
+
+	runServerAndShutdown(t, opts)
+}
+
+func TestSetupAndStartAPI_ContainersOnly(t *testing.T) {
+	opts := config.Options{
+		Token:               "test-token",
+		EnableContainersAPI: true,
+		RateLimit:           60,
+		Client:              makeListContainersMock(t),
+		Filter:              makeFilter(t),
+	}
+
+	runServerAndShutdown(t, opts)
+}
+
+func TestSetupAndStartAPI_CheckOnly(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := config.Options{
+		Token:          "test-token",
+		EnableCheckAPI: true,
+		RateLimit:      60,
+		Client:         makeListContainersMock(t),
+		Filter:         makeFilter(t),
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+	}
+
+	runServerAndShutdown(t, opts)
+}
+
+func TestSetupAndStartAPI_AllAPIs(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := config.Options{
+		Token:               "test-token",
+		EventsToken:         "events-token",
+		EnableUpdateAPI:     true,
+		EnableMetricsAPI:    true,
+		EnableContainersAPI: true,
+		EnableCheckAPI:      true,
+		EnableHistoryAPI:    true,
+		EnableImagesAPI:     true,
+		EnableConfigAPI:     true,
+		EnableEventsAPI:     true,
+		RateLimit:           60,
+		Client:              makeListContainersMock(t),
+		Filter:              makeFilter(t),
+		EventBroadcaster:    events.NewBroadcaster(),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+		UnblockHTTPAPI: true,
+	}
+
+	runServerAndShutdown(t, opts)
+}
+
+func TestIntegration_HealthLiveness_And_Startup(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:            "test-token",
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking setup did not return")
+	}
+
+	cancel()
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
+	var startupCalled atomic.Int32
+
+	opts := withTestListenAddr(config.Options{
+		Token:           "test-token",
+		EnableUpdateAPI: true,
+		UnblockHTTPAPI:  false,
+		RateLimit:       60,
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage: func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics {
+			return &metrics.Metrics{}
+		},
+		WriteStartupMessage: func(_ *cobra.Command, _ time.Time, _, _ string, _ container.Client, _ types.Notifier, _ string, _ *bool) {
+			startupCalled.Add(1)
+		},
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	// Blocking mode: wait for bind + startup message without expecting return.
+	require.Eventually(t, func() bool {
+		return startupCalled.Load() > 0
+	}, 2*time.Second, 20*time.Millisecond,
+		"WriteStartupMessage should be called when UnblockHTTPAPI is false")
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+	case <-time.After(ShutdownGracePeriod + 2*time.Second):
+		t.Fatal("server did not shut down")
+	}
+}
+
+func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	tests := []struct {
+		name    string
+		opts    config.Options
+		wantErr string
+	}{
+		{
+			name: "missing RunUpdatesWithNotifications",
+			opts: config.Options{
+				Token:                       "test-token",
+				EnableUpdateAPI:             true,
+				RunUpdatesWithNotifications: nil,
+				FilterByImage:               func(_ []string, f types.Filter) types.Filter { return f },
+				DefaultMetrics:              func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "RunUpdatesWithNotifications must be provided",
+		},
+		{
+			name: "missing FilterByImage",
+			opts: config.Options{
+				Token:           "test-token",
+				EnableUpdateAPI: true,
+				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+					return &metrics.Metric{}
+				},
+				FilterByImage:  nil,
+				DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "FilterByImage must be provided",
+		},
+		{
+			name: "missing DefaultMetrics",
+			opts: config.Options{
+				Token:           "test-token",
+				EnableUpdateAPI: true,
+				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+					return &metrics.Metric{}
+				},
+				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+				DefaultMetrics: nil,
+			},
+			wantErr: "DefaultMetrics must be provided",
+		},
+		{
+			name: "missing TLS key",
+			opts: config.Options{
+				Token:            "test-token",
+				EnableMetricsAPI: true,
+				TLSCertPath:      "/path/to/cert.pem",
+				TLSKeyPath:       "",
+				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "TLS requires both",
+		},
+		{
+			name: "missing TLS cert",
+			opts: config.Options{
+				Token:            "test-token",
+				EnableMetricsAPI: true,
+				TLSCertPath:      "",
+				TLSKeyPath:       "/path/to/key.pem",
+				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr: "TLS requires both",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			err := SetupAndStartAPI(ctx, tt.opts)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestSetupAndStartAPI_AllEndpointsEnableAll(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:            "test-token",
+		EventsToken:      "events-token",
+		RateLimit:        60,
+		Client:           makeListContainersMock(t),
+		Filter:           makeFilter(t),
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+		FilterByImage:    func(_ []string, f types.Filter) types.Filter { return f },
+		EventBroadcaster: events.NewBroadcaster(),
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		UnblockHTTPAPI:      true,
+		EnableUpdateAPI:     true,
+		EnableMetricsAPI:    true,
+		EnableContainersAPI: true,
+		EnableCheckAPI:      true,
+		EnableHealthAPI:     true,
+		EnableHistoryAPI:    true,
+		EnableImagesAPI:     true,
+		EnableConfigAPI:     true,
+		EnableEventsAPI:     true,
+		EnableSwaggerAPI:    true,
+	})
+
+	require.True(t, opts.EnableUpdateAPI)
+	require.True(t, opts.EnableMetricsAPI)
+	require.True(t, opts.EnableContainersAPI)
+	require.True(t, opts.EnableCheckAPI)
+	require.True(t, opts.EnableHealthAPI)
+	require.True(t, opts.EnableHistoryAPI)
+	require.True(t, opts.EnableImagesAPI)
+	require.True(t, opts.EnableConfigAPI)
+	require.True(t, opts.EnableEventsAPI)
+	require.True(t, opts.EnableSwaggerAPI)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking full API setup did not return")
+	}
+
+	cancel()
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestRunServer_NonBlockingReturnsAfterBind(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:            "test-token",
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+		// Update API off → non-blocking regardless of UnblockHTTPAPI.
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "non-blocking SetupAndStartAPI should return after bind")
+	case <-time.After(2 * time.Second):
+		t.Fatal("non-blocking SetupAndStartAPI did not return after bind")
+	}
+
+	// Server must still be running until ctx is canceled (GracefulContext).
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+}
+
+func TestRunServer_BlockingUntilCancel(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:           "test-token",
+		EnableUpdateAPI: true,
+		UnblockHTTPAPI:  false,
+		RateLimit:       60,
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+		WriteStartupMessage: func(_ *cobra.Command, _ time.Time, _, _ string, _ container.Client, _ types.Notifier, _ string, _ *bool) {
+		},
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("blocking SetupAndStartAPI returned early: %v", err)
+	case <-time.After(300 * time.Millisecond):
+		// Expected: still blocked while server runs.
+	}
+
+	cancel()
+
+	select {
+	case err := <-done:
+		assert.True(t, err == nil || errors.Is(err, context.Canceled),
+			"unexpected error: %v", err)
+	case <-time.After(ShutdownGracePeriod + 2*time.Second):
+		t.Fatal("blocking SetupAndStartAPI did not return after cancel")
+	}
+}
+
+func TestRunServer_UnblockWithUpdateAPI_NonBlocking(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := withTestListenAddr(config.Options{
+		Token:           "test-token",
+		EnableUpdateAPI: true,
+		UnblockHTTPAPI:  true,
+		RateLimit:       60,
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			return &metrics.Metric{}
+		},
+		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- SetupAndStartAPI(ctx, opts)
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err, "update API with UnblockHTTPAPI should return after bind")
+	case <-time.After(2 * time.Second):
+		t.Fatal("SetupAndStartAPI did not return in non-blocking update mode")
+	}
+
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+}
+
+func TestRunServer_BindFailure(t *testing.T) {
+	testMetrics := metrics.Default()
+
+	opts := config.Options{
+		Host:             "127.0.0.1",
+		Port:             "99999", // invalid port
+		Token:            "test-token",
+		EnableMetricsAPI: true,
+		RateLimit:        60,
+		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	err := SetupAndStartAPI(ctx, opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to start HTTP server")
+}
+
+func TestRunServer_OnUnexpectedServerStopCallback(t *testing.T) {
+	t.Run("non_clean_stop_invokes_callback", func(t *testing.T) {
+		called := make(chan error, 1)
+		onStop := func(err error) {
+			called <- err
+		}
+
+		handleUnexpectedServerStop(errors.New("simulated listen failure"), "127.0.0.1:8080", onStop)
+
+		select {
+		case err := <-called:
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "simulated listen failure")
+		case <-time.After(time.Second):
+			t.Fatal("OnUnexpectedServerStop was not invoked")
+		}
+	})
+
+	t.Run("clean_stop_does_not_invoke_callback", func(t *testing.T) {
+		called := make(chan error, 1)
+		onStop := func(err error) {
+			called <- err
+		}
+
+		handleUnexpectedServerStop(nil, "127.0.0.1:8080", onStop)
+
+		select {
+		case <-called:
+			t.Fatal("OnUnexpectedServerStop should not be invoked on clean stop")
+		case <-time.After(100 * time.Millisecond):
+			// Expected: callback was not called.
+		}
+	})
+}
+
+func TestGetAPIAddr_IPv6(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		port     string
+		expected string
+	}{
+		{
+			name:     "IPv4",
+			host:     "127.0.0.1",
+			port:     "8080",
+			expected: "127.0.0.1:8080",
+		},
+		{
+			name:     "hostname",
+			host:     "localhost",
+			port:     "8080",
+			expected: "localhost:8080",
+		},
+		{
+			name:     "IPv6 loopback",
+			host:     "::1",
+			port:     "8080",
+			expected: "[::1]:8080",
+		},
+		{
+			name:     "IPv6 full",
+			host:     "2001:db8::1",
+			port:     "8080",
+			expected: "[2001:db8::1]:8080",
+		},
+		{
+			name:     "IPv6 already bracketed",
+			host:     "[::1]",
+			port:     "8080",
+			expected: "[::1]:8080",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetAPIAddr(tt.host, tt.port)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}

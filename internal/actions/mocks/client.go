@@ -56,7 +56,7 @@ type TestData struct {
 	StartOrder                   []string                              // Order in which containers were started.
 	SimulatedLatency             time.Duration                         // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
 	LastContainerChain           string                                // Last container chain passed to CreateEphemeralOrchestrator.
-	LastUpdateConfig             *dockerContainer.UpdateConfig          // Last UpdateContainer config received.
+	LastUpdateConfig             *dockerContainer.UpdateConfig         // Last UpdateContainer config received.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -365,16 +365,16 @@ func (client MockClient) IsContainerStale(
 	ctx context.Context,
 	container types.Container,
 	_ types.UpdateParams,
-) (bool, types.ImageID, error) {
+) (bool, types.ImageID, string, error) {
 	client.TestData.IsContainerStaleCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
-		return false, "", err
+		return false, "", "", err
 	}
 
 	// Return configured error if set (for testing error conditions)
 	if client.TestData.IsContainerStaleError != nil {
-		return false, "", client.TestData.IsContainerStaleError
+		return false, "", "", client.TestData.IsContainerStaleError
 	}
 
 	stale, found := client.TestData.Staleness[container.Name()]
@@ -382,7 +382,16 @@ func (client MockClient) IsContainerStale(
 		stale = true // Default to stale if not specified.
 	}
 
-	return stale, "", nil
+	return stale, "", "", nil
+}
+
+// CheckContainerUpdate reports update availability using the same staleness map as IsContainerStale.
+func (client MockClient) CheckContainerUpdate(
+	ctx context.Context,
+	container types.Container,
+	params types.UpdateParams,
+) (bool, types.ImageID, string, error) {
+	return client.IsContainerStale(ctx, container, params)
 }
 
 // WarnOnHeadPullFailed always returns true for the mock client.
@@ -443,4 +452,9 @@ func (client MockClient) GetInfo(ctx context.Context) (map[string]any, error) {
 		"ServerVersion": "1.50",
 		"OSType":        "linux",
 	}, nil
+}
+
+// Ping returns nil to simulate a healthy Docker daemon.
+func (client MockClient) Ping(ctx context.Context) error {
+	return client.checkContextCancellation(ctx)
 }

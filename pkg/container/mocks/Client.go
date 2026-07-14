@@ -40,6 +40,90 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 	return &MockClient_Expecter{mock: &_m.Mock}
 }
 
+// CheckContainerUpdate provides a mock function for the type MockClient
+func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error) {
+	ret := _mock.Called(ctx, container, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckContainerUpdate")
+	}
+
+	var r0 bool
+	var r1 types.ImageID
+	var r2 string
+	var r3 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) (bool, types.ImageID, string, error)); ok {
+		return returnFunc(ctx, container, params)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) bool); ok {
+		r0 = returnFunc(ctx, container, params)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, types.UpdateParams) types.ImageID); ok {
+		r1 = returnFunc(ctx, container, params)
+	} else {
+		r1 = ret.Get(1).(types.ImageID)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, types.UpdateParams) string); ok {
+		r2 = returnFunc(ctx, container, params)
+	} else {
+		r2 = ret.Get(2).(string)
+	}
+	if returnFunc, ok := ret.Get(3).(func(context.Context, types.Container, types.UpdateParams) error); ok {
+		r3 = returnFunc(ctx, container, params)
+	} else {
+		r3 = ret.Error(3)
+	}
+	return r0, r1, r2, r3
+}
+
+// MockClient_CheckContainerUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckContainerUpdate'
+type MockClient_CheckContainerUpdate_Call struct {
+	*mock.Call
+}
+
+// CheckContainerUpdate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - container types.Container
+//   - params types.UpdateParams
+func (_e *MockClient_Expecter) CheckContainerUpdate(ctx any, container any, params any) *MockClient_CheckContainerUpdate_Call {
+	return &MockClient_CheckContainerUpdate_Call{Call: _e.mock.On("CheckContainerUpdate", ctx, container, params)}
+}
+
+func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context, container types.Container, params types.UpdateParams)) *MockClient_CheckContainerUpdate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.Container
+		if args[1] != nil {
+			arg1 = args[1].(types.Container)
+		}
+		var arg2 types.UpdateParams
+		if args[2] != nil {
+			arg2 = args[2].(types.UpdateParams)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_CheckContainerUpdate_Call) Return(b bool, imageID types.ImageID, s string, err error) *MockClient_CheckContainerUpdate_Call {
+	_c.Call.Return(b, imageID, s, err)
+	return _c
+}
+
+func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateContainer provides a mock function for the type MockClient
 func (_mock *MockClient) CreateContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
 	ret := _mock.Called(ctx, container)
@@ -74,7 +158,7 @@ type MockClient_CreateContainer_Call struct {
 // CreateContainer is a helper method to define mock.On call
 //   - ctx context.Context
 //   - container types.Container
-func (_e *MockClient_Expecter) CreateContainer(ctx interface{}, container interface{}) *MockClient_CreateContainer_Call {
+func (_e *MockClient_Expecter) CreateContainer(ctx any, container any) *MockClient_CreateContainer_Call {
 	return &MockClient_CreateContainer_Call{Call: _e.mock.On("CreateContainer", ctx, container)}
 }
 
@@ -142,7 +226,7 @@ type MockClient_CreateEphemeralOrchestrator_Call struct {
 //   - sourceContainer types.Container
 //   - newImage string
 //   - containerChain string
-func (_e *MockClient_Expecter) CreateEphemeralOrchestrator(ctx interface{}, sourceContainer interface{}, newImage interface{}, containerChain interface{}) *MockClient_CreateEphemeralOrchestrator_Call {
+func (_e *MockClient_Expecter) CreateEphemeralOrchestrator(ctx any, sourceContainer any, newImage any, containerChain any) *MockClient_CreateEphemeralOrchestrator_Call {
 	return &MockClient_CreateEphemeralOrchestrator_Call{Call: _e.mock.On("CreateEphemeralOrchestrator", ctx, sourceContainer, newImage, containerChain)}
 }
 
@@ -222,7 +306,7 @@ type MockClient_ExecuteCommand_Call struct {
 //   - timeout int
 //   - uid int
 //   - gid int
-func (_e *MockClient_Expecter) ExecuteCommand(ctx interface{}, container interface{}, command interface{}, timeout interface{}, uid interface{}, gid interface{}) *MockClient_ExecuteCommand_Call {
+func (_e *MockClient_Expecter) ExecuteCommand(ctx any, container any, command any, timeout any, uid any, gid any) *MockClient_ExecuteCommand_Call {
 	return &MockClient_ExecuteCommand_Call{Call: _e.mock.On("ExecuteCommand", ctx, container, command, timeout, uid, gid)}
 }
 
@@ -310,7 +394,7 @@ type MockClient_GetContainer_Call struct {
 // GetContainer is a helper method to define mock.On call
 //   - ctx context.Context
 //   - containerID types.ContainerID
-func (_e *MockClient_Expecter) GetContainer(ctx interface{}, containerID interface{}) *MockClient_GetContainer_Call {
+func (_e *MockClient_Expecter) GetContainer(ctx any, containerID any) *MockClient_GetContainer_Call {
 	return &MockClient_GetContainer_Call{Call: _e.mock.On("GetContainer", ctx, containerID)}
 }
 
@@ -378,7 +462,7 @@ type MockClient_GetCurrentWatchtowerContainer_Call struct {
 // GetCurrentWatchtowerContainer is a helper method to define mock.On call
 //   - ctx context.Context
 //   - containerID types.ContainerID
-func (_e *MockClient_Expecter) GetCurrentWatchtowerContainer(ctx interface{}, containerID interface{}) *MockClient_GetCurrentWatchtowerContainer_Call {
+func (_e *MockClient_Expecter) GetCurrentWatchtowerContainer(ctx any, containerID any) *MockClient_GetCurrentWatchtowerContainer_Call {
 	return &MockClient_GetCurrentWatchtowerContainer_Call{Call: _e.mock.On("GetCurrentWatchtowerContainer", ctx, containerID)}
 }
 
@@ -445,7 +529,7 @@ type MockClient_GetInfo_Call struct {
 
 // GetInfo is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClient_Expecter) GetInfo(ctx interface{}) *MockClient_GetInfo_Call {
+func (_e *MockClient_Expecter) GetInfo(ctx any) *MockClient_GetInfo_Call {
 	return &MockClient_GetInfo_Call{Call: _e.mock.On("GetInfo", ctx)}
 }
 
@@ -517,7 +601,7 @@ func (_c *MockClient_GetVersion_Call) RunAndReturn(run func() string) *MockClien
 }
 
 // IsContainerStale provides a mock function for the type MockClient
-func (_mock *MockClient) IsContainerStale(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, error) {
+func (_mock *MockClient) IsContainerStale(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error) {
 	ret := _mock.Called(ctx, container, params)
 
 	if len(ret) == 0 {
@@ -526,8 +610,9 @@ func (_mock *MockClient) IsContainerStale(ctx context.Context, container types.C
 
 	var r0 bool
 	var r1 types.ImageID
-	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) (bool, types.ImageID, error)); ok {
+	var r2 string
+	var r3 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) (bool, types.ImageID, string, error)); ok {
 		return returnFunc(ctx, container, params)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) bool); ok {
@@ -540,12 +625,17 @@ func (_mock *MockClient) IsContainerStale(ctx context.Context, container types.C
 	} else {
 		r1 = ret.Get(1).(types.ImageID)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, types.UpdateParams) error); ok {
+	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, types.UpdateParams) string); ok {
 		r2 = returnFunc(ctx, container, params)
 	} else {
-		r2 = ret.Error(2)
+		r2 = ret.Get(2).(string)
 	}
-	return r0, r1, r2
+	if returnFunc, ok := ret.Get(3).(func(context.Context, types.Container, types.UpdateParams) error); ok {
+		r3 = returnFunc(ctx, container, params)
+	} else {
+		r3 = ret.Error(3)
+	}
+	return r0, r1, r2, r3
 }
 
 // MockClient_IsContainerStale_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsContainerStale'
@@ -557,7 +647,7 @@ type MockClient_IsContainerStale_Call struct {
 //   - ctx context.Context
 //   - container types.Container
 //   - params types.UpdateParams
-func (_e *MockClient_Expecter) IsContainerStale(ctx interface{}, container interface{}, params interface{}) *MockClient_IsContainerStale_Call {
+func (_e *MockClient_Expecter) IsContainerStale(ctx any, container any, params any) *MockClient_IsContainerStale_Call {
 	return &MockClient_IsContainerStale_Call{Call: _e.mock.On("IsContainerStale", ctx, container, params)}
 }
 
@@ -584,12 +674,12 @@ func (_c *MockClient_IsContainerStale_Call) Run(run func(ctx context.Context, co
 	return _c
 }
 
-func (_c *MockClient_IsContainerStale_Call) Return(b bool, imageID types.ImageID, err error) *MockClient_IsContainerStale_Call {
-	_c.Call.Return(b, imageID, err)
+func (_c *MockClient_IsContainerStale_Call) Return(b bool, imageID types.ImageID, s string, err error) *MockClient_IsContainerStale_Call {
+	_c.Call.Return(b, imageID, s, err)
 	return _c
 }
 
-func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, error)) *MockClient_IsContainerStale_Call {
+func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error)) *MockClient_IsContainerStale_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -636,9 +726,9 @@ type MockClient_ListContainers_Call struct {
 // ListContainers is a helper method to define mock.On call
 //   - ctx context.Context
 //   - filter ...types.Filter
-func (_e *MockClient_Expecter) ListContainers(ctx interface{}, filter ...interface{}) *MockClient_ListContainers_Call {
+func (_e *MockClient_Expecter) ListContainers(ctx any, filter ...any) *MockClient_ListContainers_Call {
 	return &MockClient_ListContainers_Call{Call: _e.mock.On("ListContainers",
-		append([]interface{}{ctx}, filter...)...)}
+		append([]any{ctx}, filter...)...)}
 }
 
 func (_c *MockClient_ListContainers_Call) Run(run func(ctx context.Context, filter ...types.Filter)) *MockClient_ListContainers_Call {
@@ -671,6 +761,57 @@ func (_c *MockClient_ListContainers_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// Ping provides a mock function for the type MockClient
+func (_mock *MockClient) Ping(ctx context.Context) error {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Ping")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_Ping_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Ping'
+type MockClient_Ping_Call struct {
+	*mock.Call
+}
+
+// Ping is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClient_Expecter) Ping(ctx any) *MockClient_Ping_Call {
+	return &MockClient_Ping_Call{Call: _e.mock.On("Ping", ctx)}
+}
+
+func (_c *MockClient_Ping_Call) Run(run func(ctx context.Context)) *MockClient_Ping_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_Ping_Call) Return(err error) *MockClient_Ping_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_Ping_Call) RunAndReturn(run func(ctx context.Context) error) *MockClient_Ping_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RemoveContainer provides a mock function for the type MockClient
 func (_mock *MockClient) RemoveContainer(ctx context.Context, container types.Container) error {
 	ret := _mock.Called(ctx, container)
@@ -696,7 +837,7 @@ type MockClient_RemoveContainer_Call struct {
 // RemoveContainer is a helper method to define mock.On call
 //   - ctx context.Context
 //   - container types.Container
-func (_e *MockClient_Expecter) RemoveContainer(ctx interface{}, container interface{}) *MockClient_RemoveContainer_Call {
+func (_e *MockClient_Expecter) RemoveContainer(ctx any, container any) *MockClient_RemoveContainer_Call {
 	return &MockClient_RemoveContainer_Call{Call: _e.mock.On("RemoveContainer", ctx, container)}
 }
 
@@ -754,7 +895,7 @@ type MockClient_RemoveImageByID_Call struct {
 //   - ctx context.Context
 //   - imageID types.ImageID
 //   - imageName string
-func (_e *MockClient_Expecter) RemoveImageByID(ctx interface{}, imageID interface{}, imageName interface{}) *MockClient_RemoveImageByID_Call {
+func (_e *MockClient_Expecter) RemoveImageByID(ctx any, imageID any, imageName any) *MockClient_RemoveImageByID_Call {
 	return &MockClient_RemoveImageByID_Call{Call: _e.mock.On("RemoveImageByID", ctx, imageID, imageName)}
 }
 
@@ -817,7 +958,7 @@ type MockClient_RenameContainer_Call struct {
 //   - ctx context.Context
 //   - container types.Container
 //   - newName string
-func (_e *MockClient_Expecter) RenameContainer(ctx interface{}, container interface{}, newName interface{}) *MockClient_RenameContainer_Call {
+func (_e *MockClient_Expecter) RenameContainer(ctx any, container any, newName any) *MockClient_RenameContainer_Call {
 	return &MockClient_RenameContainer_Call{Call: _e.mock.On("RenameContainer", ctx, container, newName)}
 }
 
@@ -888,7 +1029,7 @@ type MockClient_StartContainer_Call struct {
 // StartContainer is a helper method to define mock.On call
 //   - ctx context.Context
 //   - container types.Container
-func (_e *MockClient_Expecter) StartContainer(ctx interface{}, container interface{}) *MockClient_StartContainer_Call {
+func (_e *MockClient_Expecter) StartContainer(ctx any, container any) *MockClient_StartContainer_Call {
 	return &MockClient_StartContainer_Call{Call: _e.mock.On("StartContainer", ctx, container)}
 }
 
@@ -945,7 +1086,7 @@ type MockClient_StartContainerByID_Call struct {
 // StartContainerByID is a helper method to define mock.On call
 //   - ctx context.Context
 //   - containerID types.ContainerID
-func (_e *MockClient_Expecter) StartContainerByID(ctx interface{}, containerID interface{}) *MockClient_StartContainerByID_Call {
+func (_e *MockClient_Expecter) StartContainerByID(ctx any, containerID any) *MockClient_StartContainerByID_Call {
 	return &MockClient_StartContainerByID_Call{Call: _e.mock.On("StartContainerByID", ctx, containerID)}
 }
 
@@ -1003,7 +1144,7 @@ type MockClient_StopAndRemoveContainer_Call struct {
 //   - ctx context.Context
 //   - container types.Container
 //   - timeout time.Duration
-func (_e *MockClient_Expecter) StopAndRemoveContainer(ctx interface{}, container interface{}, timeout interface{}) *MockClient_StopAndRemoveContainer_Call {
+func (_e *MockClient_Expecter) StopAndRemoveContainer(ctx any, container any, timeout any) *MockClient_StopAndRemoveContainer_Call {
 	return &MockClient_StopAndRemoveContainer_Call{Call: _e.mock.On("StopAndRemoveContainer", ctx, container, timeout)}
 }
 
@@ -1066,7 +1207,7 @@ type MockClient_StopContainer_Call struct {
 //   - ctx context.Context
 //   - container types.Container
 //   - timeout time.Duration
-func (_e *MockClient_Expecter) StopContainer(ctx interface{}, container interface{}, timeout interface{}) *MockClient_StopContainer_Call {
+func (_e *MockClient_Expecter) StopContainer(ctx any, container any, timeout any) *MockClient_StopContainer_Call {
 	return &MockClient_StopContainer_Call{Call: _e.mock.On("StopContainer", ctx, container, timeout)}
 }
 
@@ -1129,7 +1270,7 @@ type MockClient_UpdateContainer_Call struct {
 //   - ctx context.Context
 //   - container1 types.Container
 //   - config container.UpdateConfig
-func (_e *MockClient_Expecter) UpdateContainer(ctx interface{}, container1 interface{}, config interface{}) *MockClient_UpdateContainer_Call {
+func (_e *MockClient_Expecter) UpdateContainer(ctx any, container1 any, config any) *MockClient_UpdateContainer_Call {
 	return &MockClient_UpdateContainer_Call{Call: _e.mock.On("UpdateContainer", ctx, container1, config)}
 }
 
@@ -1192,7 +1333,7 @@ type MockClient_WaitForContainerHealthy_Call struct {
 //   - ctx context.Context
 //   - containerID types.ContainerID
 //   - timeout time.Duration
-func (_e *MockClient_Expecter) WaitForContainerHealthy(ctx interface{}, containerID interface{}, timeout interface{}) *MockClient_WaitForContainerHealthy_Call {
+func (_e *MockClient_Expecter) WaitForContainerHealthy(ctx any, containerID any, timeout any) *MockClient_WaitForContainerHealthy_Call {
 	return &MockClient_WaitForContainerHealthy_Call{Call: _e.mock.On("WaitForContainerHealthy", ctx, containerID, timeout)}
 }
 
@@ -1253,7 +1394,7 @@ type MockClient_WarnOnHeadPullFailed_Call struct {
 
 // WarnOnHeadPullFailed is a helper method to define mock.On call
 //   - container1 types.Container
-func (_e *MockClient_Expecter) WarnOnHeadPullFailed(container1 interface{}) *MockClient_WarnOnHeadPullFailed_Call {
+func (_e *MockClient_Expecter) WarnOnHeadPullFailed(container1 any) *MockClient_WarnOnHeadPullFailed_Call {
 	return &MockClient_WarnOnHeadPullFailed_Call{Call: _e.mock.On("WarnOnHeadPullFailed", container1)}
 }
 

@@ -10,8 +10,8 @@ var commonTemplates = map[string]string{
 	// Handles messages: "Found new image" (new image available), "Stopping container" (stopping old container),
 	// "Started new container" (new container started), "Stopping linked container" (stopping linked container),
 	// "Started linked container" (linked container started), "Removing image" (image cleanup completed), "Container updated" (update completed),
-	// "Image is within cooldown period - deferring update" (image too new for update), "Image age exceeds cooldown - proceeding with update" (image old enough),
-	// "Image creation time unavailable - deferring update" (image age could not be determined from registry),
+	// "Image is within cooldown period - deferring update" (image too new for update), "Image age exceeds cooldown - eligible for update" (image old enough),
+	// "Image creation time unavailable - update check unavailable" (image age could not be determined from registry),
 	// "Detected multiple Watchtower instances - initiating cleanup" (multiple instances detected).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
@@ -43,12 +43,18 @@ var commonTemplates = map[string]string{
     Detected {{index $e.Data "count"}} Watchtower instances - initiating cleanup
 	{{- else if eq $msg "Successfully removed all excess Watchtower containers" -}}
     Successfully removed {{index $e.Data "removed_instances"}} old Watchtower container{{if ne (index $e.Data "removed_instances") 1}}s{{end}}
-{{- else if eq $msg "Image is within cooldown period - deferring update" -}}
+{{- else if eq $msg "Image is within cooldown period - not eligible for update" -}}
     {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created less than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - eligible in {{with (index $e.Data "eligible_in")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "eligible_at")}}{{RFC1123 .}}{{else}}unknown{{end}})
-{{- else if eq $msg "Image age exceeds cooldown - proceeding with update" -}}
-    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created more than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - proceeding with update
-{{- else if eq $msg "Image creation time unavailable - deferring update" -}}
-    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} creation time unavailable (cooldown: {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}}) - deferring update for safety
+{{- else if eq $msg "Image age exceeds cooldown - eligible for update" -}}
+    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} created more than {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}} ago - eligible for update
+{{- else if eq $msg "Image creation time unavailable - update check unavailable" -}}
+    {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} creation time unavailable (cooldown: {{with (index $e.Data "cooldown")}}{{.}}{{else}}unknown{{end}}) - update check unavailable
+{{- else if eq $msg "Starting HTTP API server" -}}
+    Starting HTTP API server at {{if (index $e.Data "tls")}}https{{else}}http{{end}}://{{index $e.Data "host"}}:{{index $e.Data "port"}}
+{{- else if eq $msg "HTTP API server is enabled" -}}
+    HTTP API server is available at {{if (index $e.Data "tls")}}https{{else}}http{{end}}://{{index $e.Data "host"}}:{{index $e.Data "port"}}
+{{- else if eq $msg "Only checking containers in scope" -}}
+    Only checking containers in scope: {{index $e.Data "scope"}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

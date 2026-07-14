@@ -179,12 +179,33 @@ type Client interface {
 	// Returns:
 	//   - bool: True if image is stale, false otherwise.
 	//   - types.ImageID: Latest image ID.
+	//   - string: Latest registry manifest digest (empty if unavailable).
 	//   - error: Non-nil if check fails, nil on success.
 	IsContainerStale(
 		ctx context.Context,
 		container types.Container,
 		params types.UpdateParams,
-	) (bool, types.ImageID, error)
+	) (bool, types.ImageID, string, error)
+
+	// CheckContainerUpdate reports whether a newer image is available without
+	// pulling image layers. When NoPull is active it inspects the local cache
+	// only; otherwise it compares registry digests. Cooldown is not applied.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container to check.
+	//   - params: Update parameters (NoPull, LabelPrecedence).
+	//
+	// Returns:
+	//   - bool: True if an update is available, false otherwise.
+	//   - types.ImageID: Latest local image ID when known (empty for remote-only mismatch).
+	//   - string: Latest registry manifest digest (empty if unavailable).
+	//   - error: Non-nil if the check fails, nil on success.
+	CheckContainerUpdate(
+		ctx context.Context,
+		container types.Container,
+		params types.UpdateParams,
+	) (bool, types.ImageID, string, error)
 
 	// ExecuteCommand runs a command inside a container and returns whether
 	// to skip updates based on the result.
@@ -246,6 +267,15 @@ type Client interface {
 	//   - map[string]any: System information.
 	//   - error: Non-nil if retrieval fails, nil on success.
 	GetInfo(ctx context.Context) (map[string]any, error)
+
+	// Ping verifies connectivity to the Docker daemon.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//
+	// Returns:
+	//   - error: Non-nil if the daemon is unreachable, nil on success.
+	Ping(ctx context.Context) error
 
 	// WaitForContainerHealthy waits for a container to become healthy or times out.
 	//
@@ -335,9 +365,7 @@ type client struct {
 	isPodman bool
 }
 
-// ClientOptions configures the behavior of the dockerClient wrapper around the Docker API.
-//
-// It controls container management and warning behaviors.
+// ClientOptions configures container management behavior for the Docker client.
 type ClientOptions struct {
 	RemoveVolumes           bool
 	IncludeStopped          bool
@@ -921,11 +949,11 @@ func (c *client) IsContainerStale(
 	ctx context.Context,
 	container types.Container,
 	params types.UpdateParams,
-) (bool, types.ImageID, error) {
+) (bool, types.ImageID, string, error) {
 	// Use image client to perform staleness check.
 	imgClient := newImageClient(c.api)
 
-	stale, newestImage, err := imgClient.IsContainerStale(
+	stale, newestImage, latestDigest, err := imgClient.IsContainerStale(
 		ctx,
 		container,
 		params,
@@ -945,7 +973,49 @@ func (c *client) IsContainerStale(
 		}).Debug("Checked container staleness")
 	}
 
-	return stale, newestImage, err
+	return stale, newestImage, latestDigest, err
+}
+
+// CheckContainerUpdate reports whether a newer image is available without pulling.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - container: Container to check.
+//   - params: Update parameters (NoPull, LabelPrecedence).
+//
+// Returns:
+//   - bool: True if an update is available, false otherwise.
+//   - types.ImageID: Latest local image ID when known.
+//   - string: Latest registry manifest digest (empty if unavailable).
+//   - error: Non-nil if the check fails, nil on success.
+func (c *client) CheckContainerUpdate(
+	ctx context.Context,
+	container types.Container,
+	params types.UpdateParams,
+) (bool, types.ImageID, string, error) {
+	imgClient := newImageClient(c.api)
+
+	available, newestImage, latestDigest, err := imgClient.CheckContainerUpdate(
+		ctx,
+		container,
+		params,
+	)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"container": container.Name(),
+			"image":     container.ImageName(),
+		}).Debug("Failed to check container for updates")
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"container":        container.Name(),
+			"image":            container.ImageName(),
+			"update_available": available,
+			"latest_image_id":  newestImage,
+			"latest_digest":    latestDigest,
+		}).Debug("Checked container for updates")
+	}
+
+	return available, newestImage, latestDigest, err
 }
 
 // ExecuteCommand runs a command inside a container and evaluates its result.
@@ -1142,6 +1212,26 @@ func (c *client) RemoveImageByID(
 //   - string: Docker API version (e.g., "1.44").
 func (c *client) GetVersion() string {
 	return strings.Trim(c.api.ClientVersion(), "\"")
+}
+
+// Ping verifies connectivity to the Docker daemon.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
+// Returns:
+//   - error: Non-nil if the daemon is unreachable, nil on success.
+func (c *client) Ping(ctx context.Context) error {
+	_, err := c.api.Ping(
+		ctx,
+		// Version renegotiation is not necessary.
+		dockerClient.PingOptions{NegotiateAPIVersion: false},
+	)
+	if err != nil {
+		return fmt.Errorf("ping failed: %w", err)
+	}
+
+	return nil
 }
 
 // GetInfo returns system information from the Docker daemon.

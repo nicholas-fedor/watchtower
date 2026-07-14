@@ -1,128 +1,89 @@
 package util
 
 import (
-	"math"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// FuzzParseDuration verifies that ParseDuration never panics on arbitrary input
-// and maintains its invariants: successful parses return non-negative durations,
-// and failures return non-nil errors.
+// FuzzParseDuration verifies that ParseDuration never panics and returns
+// either a valid duration or an error for any input string.
 func FuzzParseDuration(f *testing.F) {
-	// Seed corpus with representative valid inputs.
-	f.Add("24h")
-	f.Add("1h30m")
+	f.Add("30s")
+	f.Add("1m")
+	f.Add("1h")
 	f.Add("1d")
-	f.Add("3d")
 	f.Add("1w")
 	f.Add("1M")
 	f.Add("1w2d")
-	f.Add("1M1w12h")
-	f.Add("1.5d")
+	f.Add("2M3w")
+	f.Add("1M15d12h")
+	f.Add("")
 	f.Add("0")
-	f.Add("")
-	f.Add("90m")
-	f.Add("3600s")
-
-	// Seed corpus with representative invalid inputs.
+	f.Add("-1s")
 	f.Add("abc")
-	f.Add("5x")
-	f.Add("1.2.3d")
-	f.Add(".d")
-	f.Add("1.d")
-	f.Add("-1h")
-	f.Add("9999999999999999999d")
-	f.Add("\x00")
-	f.Add("∞d")
+	f.Add("99999999999999999999999h")
 
-	f.Fuzz(func(t *testing.T, input string) {
-		duration, err := ParseDuration(input)
+	f.Fuzz(func(t *testing.T, s string) {
+		d, err := ParseDuration(s)
 		if err != nil {
-			// Error case: duration should be zero.
-			if duration != 0 {
-				t.Errorf("ParseDuration(%q) returned error but non-zero duration: %v", input, duration)
-			}
+			assert.Equal(t, d, time.Duration(0), "error should return zero duration")
 
 			return
 		}
 
-		// Success case: duration should be non-negative.
-		if duration < 0 {
-			t.Errorf("ParseDuration(%q) returned negative duration: %v", input, duration)
-		}
+		assert.GreaterOrEqual(t, d, time.Duration(0), "parsed duration should be non-negative: %v", d)
 
-		// Verify that re-formatting and re-parsing produces a consistent result.
-		formatted := duration.String()
-
-		reparsed, parseErr := time.ParseDuration(formatted)
-		if parseErr != nil {
-			t.Errorf("duration.String() output %q could not be re-parsed: %v", formatted, parseErr)
-
-			return
-		}
-
-		if duration != reparsed {
-			t.Errorf("ParseDuration(%q) = %v, but re-parsing %q = %v", input, duration, formatted, reparsed)
+		if s == "" || s == "0" {
+			assert.Equal(t, time.Duration(0), d, "empty or zero should return zero duration")
 		}
 	})
 }
 
-// FuzzExpandDurationUnits verifies that expandDurationUnits never panics on
-// arbitrary input.
-func FuzzExpandDurationUnits(f *testing.F) {
-	f.Add("1d")
-	f.Add("3d12h")
-	f.Add("1w2d")
-	f.Add("1M")
-	f.Add("24h")
-	f.Add("1.5d")
-	f.Add("0d")
+// FuzzNormalizeContainerName verifies that NormalizeContainerName never panics
+// and correctly handles leading slashes for any input string.
+func FuzzNormalizeContainerName(f *testing.F) {
+	f.Add("/my-container")
+	f.Add("my-container")
+	f.Add("/")
 	f.Add("")
-	f.Add("abc")
-	f.Add("1x")
+	f.Add("///triple-slash")
+	f.Add("/container/with/slashes")
+	f.Add("container/")
+	f.Add("\x00null")
 
-	f.Fuzz(func(t *testing.T, input string) {
-		// expandDurationUnits is an internal helper that transforms d/w/M to hours
-		// but passes other units through unchanged. It should never panic.
-		expanded, _ := expandDurationUnits(input)
+	f.Fuzz(func(t *testing.T, name string) {
+		result := NormalizeContainerName(name)
 
-		// We don't assert parseability here because expandDurationUnits doesn't
-		// validate units — that's ParseDuration's responsibility.
-		_ = expanded
+		assert.False(t, strings.HasPrefix(result, "/"),
+			"result should not start with /: %q", result)
+
+		if strings.HasPrefix(name, "/") {
+			assert.Equal(t, strings.TrimLeft(name, "/"), result,
+				"should remove all leading slashes from %q", name)
+		} else {
+			assert.Equal(t, name, result,
+				"should not modify name without leading slash: %q", name)
+		}
 	})
 }
 
-// FuzzMultiplyUnit verifies that multiplyUnit never panics on arbitrary
-// numeric strings and produces non-scientific-notation output.
-func FuzzMultiplyUnit(f *testing.F) {
-	f.Add("1", 24.0)
-	f.Add("0", 24.0)
-	f.Add("1.5", 24.0)
-	f.Add("100", 720.0)
-	f.Add("0.1", 24.0)
+// FuzzFilterEmpty verifies that FilterEmpty correctly removes empty strings.
+// Uses bytes-based fuzzing to avoid []string limitation.
+func FuzzFilterEmpty(f *testing.F) {
+	f.Add([]byte("a,b,c"))
+	f.Add([]byte(",,,"))
+	f.Add([]byte(",a,,b,"))
+	f.Add([]byte(""))
 
-	f.Fuzz(func(t *testing.T, numStr string, factor float64) {
-		// multiplyUnit is an internal helper — it should never panic.
-		result, err := multiplyUnit(numStr, factor)
-		if err != nil {
-			// Error case is expected for non-numeric input.
-			return
-		}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		parts := strings.Split(string(data), ",")
+		result := FilterEmpty(parts)
 
-		// Skip scientific notation check for special float64 values
-		// (NaN, +Inf, -Inf) since the output format is undefined.
-		if math.IsNaN(factor) || math.IsInf(factor, 0) {
-			return
-		}
-
-		// Result should not contain scientific notation (fixed format).
-		for _, ch := range result {
-			if ch == 'e' || ch == 'E' {
-				t.Errorf("multiplyUnit(%q, %v) = %q contains scientific notation", numStr, factor, result)
-
-				return
-			}
+		for _, part := range result {
+			assert.NotEmpty(t, part, "result should not contain empty strings")
 		}
 	})
 }

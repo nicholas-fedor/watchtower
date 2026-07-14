@@ -26,20 +26,35 @@ Environment Variable: WATCHTOWER_NOTIFICATION_TEMPLATE_FILE
              Default: (empty)
 ```
 
-When both `--notification-template` and `--notification-template-file` are specified, the file-based template takes precedence over the inline template.
+When both the [`notification-template`](#notification_template) and [`notification-template-file`](#notification_template_file) configuration options are specified, the file-based template takes precedence over the inline template.
 
 #### Examples
 
 Create a template file named `custom-template.txt` with your desired template content, then mount it into the container and specify the path:
 
-```bash
-docker run -d \
-  --name watchtower \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /path/to/custom-template.txt:/custom-template.txt \
-  -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
-  nickfedor/watchtower:latest
-```
+=== "Docker Compose"
+
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                WATCHTOWER_NOTIFICATION_TEMPLATE_FILE: "/custom-template.txt"
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+                - /path/to/custom-template.txt:/custom-template.txt
+    ```
+
+=== "Docker CLI (Env Vars)"
+
+    ```bash
+    docker run -d \
+    --name watchtower \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /path/to/custom-template.txt:/custom-template.txt \
+    -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
+    nickfedor/watchtower:latest
+    ```
 
 ### Notification Report
 
@@ -52,11 +67,11 @@ Environment Variable: WATCHTOWER_NOTIFICATION_REPORT
              Default: false
 ```
 
-The template is a [Go template](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"} that processes either a list of [Logrus](https://pkg.go.dev/github.com/sirupsen/logrus?tab=doc#Entry){target="_blank" rel="noopener noreferrer"} log entries or a `notifications.Data` struct, depending on the `--notification-report` flag.
+The template is a [Go template](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"} that processes either a list of [Logrus](https://pkg.go.dev/github.com/sirupsen/logrus?tab=doc#Entry){target="_blank" rel="noopener noreferrer"} log entries or a `notifications.Data` struct, depending on the [`notification-report`](#notification_report) configuration option.
 
 ## Simple Templates
 
-Simple templates are used when `--notification-report` is not set, formatting individual log entries as they occur.
+Simple templates are used when the [`notification-report`](#notification_report) configuration option is not set, formatting individual log entries as they occur.
 
 ```go title="Default Simple Template"
 {{- range $i, $e := . -}}
@@ -120,7 +135,7 @@ Found new image: repo/image:latest (abcdef123456)
 
 ## Report Templates
 
-When `--notification-report` is set, the template processes a `notifications.Data` struct containing a session report and log entries.
+When the [`notification-report`](#notification_report) configuration option is set, the template processes a `notifications.Data` struct containing a session report and log entries.
 
 ```go title="Default Report Template"
 {{- if .Report -}}
@@ -156,6 +171,49 @@ Logs:
 
 ### Example Usage
 <!-- markdownlint-disable -->
+=== "Docker Compose"
+
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+            environment:
+                WATCHTOWER_NOTIFICATION_REPORT: "true"
+                WATCHTOWER_NOTIFICATION_URL: >
+                    discord://token@channel
+                    slack://watchtower@token-a/token-b/token-c
+                WATCHTOWER_NOTIFICATION_TEMPLATE: |
+                    {{- if .Report -}}
+                    {{- with .Report -}}
+                    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+                    {{- if ( or .Updated .Restarted .Failed ) -}}
+                        {{- range .Updated -}}
+                    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+                        {{- end -}}
+                        {{- range .Fresh -}}
+                    - {{.Name}} ({{.ImageName}}): {{.State}}
+                        {{- end -}}
+                        {{- range .Restarted -}}
+                    - {{.Name}} ({{.ImageName}}): {{.State}}
+                        {{- end -}}
+                        {{- range .Skipped -}}
+                    - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+                        {{- end -}}
+                        {{- range .Failed -}}
+                    - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+                        {{- end -}}
+                    {{- end -}}
+                    {{- end -}}
+                    {{- if .Entries -}}
+
+                    Logs:
+                    {{- end -}}
+                    {{- range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
+                    {{- end -}}
+    ```
+
 === "Docker CLI"
 
     ```bash
@@ -195,48 +253,6 @@ Logs:
       watchtower-image
     ```
 
-=== "Docker Compose"
-
-    ```yaml
-    services:
-      watchtower:
-        image: watchtower-image
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-        environment:
-          WATCHTOWER_NOTIFICATION_REPORT: "true"
-          WATCHTOWER_NOTIFICATION_URL: >
-            discord://token@channel
-            slack://watchtower@token-a/token-b/token-c
-          WATCHTOWER_NOTIFICATION_TEMPLATE: |
-            {{- if .Report -}}
-              {{- with .Report -}}
-            {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
-            {{- if ( or .Updated .Restarted .Failed ) -}}
-                {{- range .Updated -}}
-            - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
-                {{- end -}}
-                {{- range .Fresh -}}
-            - {{.Name}} ({{.ImageName}}): {{.State}}
-                {{- end -}}
-                {{- range .Restarted -}}
-            - {{.Name}} ({{.ImageName}}): {{.State}}
-                {{- end -}}
-                {{- range .Skipped -}}
-            - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-                {{- end -}}
-                {{- range .Failed -}}
-            - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-                {{- end -}}
-            {{- end -}}
-              {{- end -}}
-            {{- if .Entries -}}
-
-            Logs:
-            {{- end -}}
-            {{- range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
-            {{- end -}}
-    ```
 <!-- markdownlint-restore -->
 Example output for a session with one updated container, one restarted container, and one error log:
 

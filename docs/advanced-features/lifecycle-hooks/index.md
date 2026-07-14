@@ -1,6 +1,6 @@
 # Lifecycle Hooks
 
-Watchtower's lifecycle hooks are a feature that allows monitored containers to execute custom commands at specific points during the container update process. These hooks leverage Docker's [exec API](https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Exec) to run commands inside containers.
+Watchtower's lifecycle hooks are a feature that allows monitored containers to execute custom commands at specific points during the container update process. These hooks leverage Docker's [exec API](https://docs.docker.com/reference/api/engine/version/v1.55/#tag/Exec){target="_blank" rel="noopener noreferrer"} to run commands inside containers.
 
 ## Overview
 
@@ -170,13 +170,13 @@ Lifecycle hooks utilize Docker's exec API through the following sequence:
 
 Lifecycle hook commands receive container metadata via the `WT_CONTAINER` environment variable containing a JSON object with the following fields:
 
-| Field | Type | Description | Example |
-|-------|------|-------------|---------|
-| `name` | string | Container name (may include leading `/`) | `"/my-app"` or `"my-app"` |
-| `id` | string | Full container ID | `"abc123def456..."` |
-| `image_name` | string | Container image name with tag | `"nginx:latest"` |
-| `stop_signal` | string | Container's configured stop signal | `"SIGTERM"` |
-| `labels` | object | Watchtower-specific labels only | `{"com.centurylinklabs.watchtower.lifecycle.pre-update": "backup.sh"}` |
+| Field         | Type   | Description                              | Example                                                                |
+|---------------|--------|------------------------------------------|------------------------------------------------------------------------|
+| `name`        | string | Container name (may include leading `/`) | `"/my-app"` or `"my-app"`                                              |
+| `id`          | string | Full container ID                        | `"abc123def456..."`                                                    |
+| `image_name`  | string | Container image name with tag            | `"nginx:latest"`                                                       |
+| `stop_signal` | string | Container's configured stop signal       | `"SIGTERM"`                                                            |
+| `labels`      | object | Watchtower-specific labels only          | `{"com.centurylinklabs.watchtower.lifecycle.pre-update": "backup.sh"}` |
 
 !!! Note
     The `labels` object contains only Watchtower-specific labels (those starting with `com.centurylinklabs.watchtower.`) to keep the JSON payload small and focused on Watchtower configuration.
@@ -690,9 +690,9 @@ Hook execution results are evaluated based on exit codes, with different behavio
 
 There is a well-known issue with Synology devices sending warning notifications when containers are stopped by anything other than the Synology's Docker service. This can be problematic when using tools like Watchtower that stop and restart containers.
 
-The [examples/lifecycle-hooks/synology-stop](https://github.com/nicholas-fedor/watchtower/tree/main/examples/lifecycle-hooks/synology-stop) directory provides examples for implementing graceful shutdowns using Synology's DSM Web API. This includes both shell script and Go implementations that authenticate with DSM, stop containers gracefully, and handle session management.
+The [examples/lifecycle-hooks/synology-stop](https://github.com/nicholas-fedor/watchtower/tree/main/examples/lifecycle-hooks/synology-stop){target="_blank" rel="noopener noreferrer"} directory provides examples for implementing graceful shutdowns using Synology's DSM Web API. This includes both shell script and Go implementations that authenticate with DSM, stop containers gracefully, and handle session management.
 
-See the [synology-stop README](https://github.com/nicholas-fedor/watchtower/blob/main/examples/lifecycle-hooks/synology-stop/README.md) for detailed setup instructions, environment variables, and deployment examples using docker-compose.
+See the [synology-stop README](https://github.com/nicholas-fedor/watchtower/blob/main/examples/lifecycle-hooks/synology-stop/README.md){target="_blank" rel="noopener noreferrer"} for detailed setup instructions, environment variables, and deployment examples using docker-compose.
 
 ## Troubleshooting
 

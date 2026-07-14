@@ -69,7 +69,7 @@ type MockConvertibleNotifier_GetURL_Call struct {
 
 // GetURL is a helper method to define mock.On call
 //   - c *cobra.Command
-func (_e *MockConvertibleNotifier_Expecter) GetURL(c interface{}) *MockConvertibleNotifier_GetURL_Call {
+func (_e *MockConvertibleNotifier_Expecter) GetURL(c any) *MockConvertibleNotifier_GetURL_Call {
 	return &MockConvertibleNotifier_GetURL_Call{Call: _e.mock.On("GetURL", c)}
 }
 

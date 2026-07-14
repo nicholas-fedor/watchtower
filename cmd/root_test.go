@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/signal"
 	"sync"
@@ -16,6 +15,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -26,14 +26,14 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/internal/util"
-	"github.com/nicholas-fedor/watchtower/pkg/api/update"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -350,152 +350,143 @@ func TestUpdateLockSerialization(t *testing.T) {
 // TestConcurrentScheduledAndFullAPIUpdate verifies that a full API-triggered update (no image params)
 // returns 429 immediately when a scheduled update is in progress, rather than blocking indefinitely.
 func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// Enable debug logging to see lock acquisition logs
-		originalLevel := logrus.GetLevel()
+	originalLevel := logrus.GetLevel()
+	defer logrus.SetLevel(originalLevel)
 
-		logrus.SetLevel(logrus.DebugLevel)
-		defer logrus.SetLevel(originalLevel)
+	updateLock := make(chan bool, 1)
+	updateLock <- true
 
-		// Initialize the update lock channel with the same pattern as in runMain
-		updateLock := make(chan bool, 1)
-		updateLock <- true
+	scheduledStarted := make(chan struct{})
+	scheduledDone := make(chan struct{})
 
-		// Channels to signal when scheduled update starts and completes
-		scheduledStarted := make(chan struct{})
-		scheduledCompleted := make(chan struct{})
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
+		t.Error("API update function should not be called when lock is held for full updates")
 
-		// Mock update function for API handler - should NOT be called for full updates when locked
-		updateFn := func(_ []string) *metrics.Metric {
-			t.Error("API update function should not be called when lock is held for full updates")
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
 
-			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-		}
+	handler := update.New(updateFn, updateLock)
 
-		// Create the update handler with the shared lock
-		handler := update.New(updateFn, updateLock)
+	go func() {
+		v := <-updateLock
 
-		// Simulate scheduled update (longer duration)
-		go func() {
-			v := <-updateLock
+		close(scheduledStarted)
 
-			t.Log("Scheduled: acquired lock")
-			close(scheduledStarted)
-			synctest.Wait() // Simulate scheduled update work
-			close(scheduledCompleted)
-			t.Log("Scheduled: releasing lock")
+		// Hold the lock until the API request has been asserted, then release.
+		<-scheduledDone
+
+		updateLock <- v
+	}()
+
+	<-scheduledStarted
+
+	testApp := fiber.New(fiber.Config{})
+	testApp.Post(handler.Path, handler.Handle)
+
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		"/v1/update",
+		http.NoBody,
+	)
+	require.NoError(t, err)
+
+	resp, err := testApp.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode,
+		"full API update should be rejected with 429 while scheduled update holds the lock")
+
+	close(scheduledDone)
+}
+
+func TestHandleAsync(t *testing.T) {
+	apiStarted := make(chan struct{})
+	apiCompleted := make(chan struct{})
+
+	updateLock := make(chan bool, 1)
+	updateLock <- true
+
+	scheduledStarted := make(chan struct{})
+	scheduledCompleted := make(chan struct{})
+
+	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
+		close(apiStarted)
+		time.Sleep(50 * time.Millisecond)
+		close(apiCompleted)
+
+		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+	}
+
+	handler := update.New(updateFn, updateLock)
+
+	go func() {
+		v := <-updateLock
+
+		t.Log("Scheduled: acquired lock")
+		close(scheduledStarted)
+
+		// Hold the lock for a window to simulate a running scheduled update.
+		// Block until either the API update goroutine starts (which would
+		// indicate a locking bug) or the window elapses.
+		select {
+		case <-apiStarted:
+			t.Error("Targeted API update should not have started while scheduled update is running")
 
 			updateLock <- v
-		}()
 
-		// Wait for scheduled update to start
-		<-scheduledStarted
+			return
+		case <-time.After(50 * time.Millisecond):
+		}
 
-		// Simulate full API update request (no image params) - should get 429 immediately
-		w := httptest.NewRecorder()
+		close(scheduledCompleted)
+		t.Log("Scheduled: releasing lock")
+
+		updateLock <- v
+	}()
+
+	<-scheduledStarted
+
+	go func() {
+		testApp := fiber.New(fiber.Config{})
+		testApp.Post(handler.Path, handler.Handle)
 
 		req, err := http.NewRequestWithContext(
 			context.Background(),
 			http.MethodPost,
-			"/v1/update",
+			"/v1/update?image=myapp:latest",
 			http.NoBody,
 		)
 		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
+			t.Errorf("Failed to create request: %v", err)
+
+			return
 		}
 
-		handler.Handle(w, req)
+		resp, err := testApp.Test(req)
+		if err != nil {
+			t.Errorf("Failed to test request: %v", err)
 
-		// Should return 429 immediately without blocking
-		assert.Equal(t, http.StatusTooManyRequests, w.Code,
-			"Full update should return 429 when scheduled update is running")
-
-		// Wait for scheduled update to complete
-		<-scheduledCompleted
-	})
-}
-
-// TestConcurrentScheduledAndTargetedAPIUpdate verifies that a targeted API-triggered update
-// (with image params) blocks until the scheduled update completes, ensuring the specific images are updated.
-func TestConcurrentScheduledAndTargetedAPIUpdate(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// Enable debug logging to see lock acquisition logs
-		originalLevel := logrus.GetLevel()
-
-		logrus.SetLevel(logrus.DebugLevel)
-		defer logrus.SetLevel(originalLevel)
-
-		// Initialize the update lock channel with the same pattern as in runMain
-		updateLock := make(chan bool, 1)
-		updateLock <- true
-
-		// Channels to signal when each update type starts and completes
-		scheduledStarted := make(chan struct{})
-		scheduledCompleted := make(chan struct{})
-		apiStarted := make(chan struct{})
-		apiCompleted := make(chan struct{})
-
-		// Mock update function for API handler that signals start and completion
-		updateFn := func(_ []string) *metrics.Metric {
-			close(apiStarted)
-			synctest.Wait() // Simulate API update work
-			close(apiCompleted)
-
-			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
+			return
 		}
+		defer resp.Body.Close()
+	}()
 
-		// Create the update handler with the shared lock
-		handler := update.New(updateFn, updateLock)
+	<-scheduledCompleted
 
-		// Simulate scheduled update (longer duration)
-		go func() {
-			v := <-updateLock
+	select {
+	case <-apiStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for API update to start")
+	}
 
-			t.Log("Scheduled: acquired lock")
-			close(scheduledStarted)
-			synctest.Wait() // Simulate scheduled update work
-			close(scheduledCompleted)
-			t.Log("Scheduled: releasing lock")
-
-			updateLock <- v
-		}()
-
-		// Wait for scheduled update to start
-		<-scheduledStarted
-
-		// Simulate targeted API update request (with image params) - should block until lock is available
-		go func() {
-			req, err := http.NewRequestWithContext(
-				context.Background(),
-				http.MethodPost,
-				"/v1/update?image=myapp:latest",
-				http.NoBody,
-			)
-			if err != nil {
-				t.Errorf("Failed to create request: %v", err)
-
-				return
-			}
-
-			w := httptest.NewRecorder()
-			handler.Handle(w, req)
-		}()
-
-		// Verify API update has not started yet (should be blocked by lock)
-		select {
-		case <-apiStarted:
-			t.Error("Targeted API update should not have started while scheduled update is running")
-		default:
-			// Expected: API is blocked
-		}
-
-		// Wait for scheduled update to complete
-		<-scheduledCompleted
-
-		// Now targeted API update should start and complete
-		<-apiStarted
-		<-apiCompleted
-	})
+	select {
+	case <-apiCompleted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for API update to complete")
+	}
 }
 
 // TestUpdateOnStartTriggersImmediateUpdate verifies that the --update-on-start flag
@@ -1478,37 +1469,6 @@ func TestSignalContextGracefulShutdown(t *testing.T) {
 	assert.ErrorIs(t, sigCtx.Err(), context.Canceled)
 }
 
-// TestContainerLookupTimeoutConstant verifies that the container lookup timeout constant
-// is set to a reasonable value (5 seconds).
-func TestContainerLookupTimeoutConstant(t *testing.T) {
-	// Verify the timeout is 5 seconds as defined in root.go
-	const expectedTimeout = 5 * time.Second
-
-	// Create a context with the expected timeout
-	ctx, cancel := context.WithTimeout(context.Background(), expectedTimeout)
-	defer cancel()
-
-	// Verify context is not done immediately
-	select {
-	case <-ctx.Done():
-		t.Error("Context should not be done immediately after creation")
-	default:
-		// Expected: context is not done
-	}
-
-	// Verify the deadline is set correctly
-	deadline, ok := ctx.Deadline()
-	now := time.Now()
-
-	assert.True(t, ok, "Deadline should be set")
-	assert.Greater(t, deadline, now.Add(4*time.Second),
-		"Deadline should be at least 4 seconds in the future")
-	assert.Less(t, deadline, now.Add(6*time.Second),
-		"Deadline should be at most 6 seconds in the future")
-}
-
-// TestContextDeadlineExceededErrorHandling verifies that errors.Is correctly identifies
-// context.DeadlineExceeded errors.
 func TestContextDeadlineExceededErrorHandling(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -1694,4 +1654,169 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 			mockClient.AssertExpectations(t)
 		})
 	})
+}
+
+func TestRootCommand_FlagParsing(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{
+			name:    "valid stop-timeout",
+			args:    []string{"--stop-timeout", "30s"},
+			wantErr: false,
+		},
+		{
+			name:    "zero stop-timeout",
+			args:    []string{"--stop-timeout", "0s"},
+			wantErr: false,
+		},
+		{
+			name:    "valid http-api-port",
+			args:    []string{"--http-api-port", "9090"},
+			wantErr: false,
+		},
+		{
+			name:    "valid http-api-host",
+			args:    []string{"--http-api-host", "127.0.0.1"},
+			wantErr: false,
+		},
+		{
+			// Hostnames parse as flag values but fail validateAPIHost at run time.
+			name:    "http-api-host hostname parses as flag",
+			args:    []string{"--http-api-host", "localhost"},
+			wantErr: false,
+		},
+		{
+			name:    "valid rolling-restart",
+			args:    []string{"--rolling-restart"},
+			wantErr: false,
+		},
+		{
+			name:    "valid include-stopped",
+			args:    []string{"--include-stopped"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCommand()
+			flags.RegisterSystemFlags(cmd)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.ParseFlags(tt.args)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRootCommand_HTTPAPIEndpointsFlag(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "endpoints all",
+			args: []string{"--http-api-endpoints=all"},
+			want: []string{"all"},
+		},
+		{
+			name: "endpoints list comma",
+			args: []string{"--http-api-endpoints=health,metrics"},
+			want: []string{"health", "metrics"},
+		},
+		{
+			name: "endpoints repeated flags",
+			args: []string{"--http-api-endpoints=health", "--http-api-endpoints=metrics"},
+			want: []string{"health", "metrics"},
+		},
+		{
+			name: "legacy update still registered",
+			args: []string{"--http-api-update"},
+			want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCommand()
+			flags.RegisterDockerFlags(cmd)
+			flags.RegisterSystemFlags(cmd)
+			flags.RegisterNotificationFlags(cmd)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.ParseFlags(tt.args)
+			require.NoError(t, err)
+
+			got, err := cmd.Flags().GetStringSlice("http-api-endpoints")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+
+			// Branch-only endpoint booleans must not be registered.
+			assert.Nil(t, cmd.Flags().Lookup("http-api-events"))
+			assert.Nil(t, cmd.Flags().Lookup("http-api-check"))
+			assert.Nil(t, cmd.Flags().Lookup("http-api-full"))
+
+			// Main legacy flags remain for deprecation.
+			assert.NotNil(t, cmd.Flags().Lookup("http-api-update"))
+			assert.NotNil(t, cmd.Flags().Lookup("http-api-metrics"))
+			assert.NotNil(t, cmd.Flags().Lookup("http-api-containers"))
+		})
+	}
+}
+
+func TestValidateAPIHost(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		host    string
+		wantErr bool
+	}{
+		{name: "empty", host: "", wantErr: false},
+		{name: "ipv4", host: "127.0.0.1", wantErr: false},
+		{name: "ipv6", host: "::1", wantErr: false},
+		{name: "hostname", host: "localhost", wantErr: true},
+		{name: "dns name", host: "api.example.com", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateAPIHost(tt.host)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestAnyHTTPAPIConfig(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, anyHTTPAPIConfig(types.RunConfig{}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIToken: "secret"}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{TLSCertPath: "/cert.pem"}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIHostChanged: true}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIPortChanged: true}))
+	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIRateLimitChanged: true}))
+}
+
+func TestHTTPAPIEndpointsEnabled(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, httpAPIEndpointsEnabled(types.RunConfig{}))
+	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
+	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
 }

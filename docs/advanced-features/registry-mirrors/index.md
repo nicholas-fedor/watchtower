@@ -1,16 +1,19 @@
 # Registry Mirrors
 
-Registry mirrors provide alternative locations for pulling Docker images, useful when access to the default registry is slow, unreliable, or restricted by network policy. Watchtower uses these mirrors when checking whether containers need updates, ensuring it can detect new images even when the primary registry is unreachable.
+Registry mirrors provide alternative locations for pulling Docker images, useful when access to the default registry is slow, unreliable, or restricted by network policy.
+Watchtower uses these mirrors when checking whether containers need updates, ensuring it can detect new images even when the primary registry is unreachable.
 
 ## Overview
 
-When the Docker daemon is configured with registry mirrors, Watchtower automatically detects and uses them during its update checks. This means:
+When the Docker daemon is configured with registry mirrors, Watchtower automatically detects and uses them during its update checks.
+This means:
 
 - **Digest comparisons** — Watchtower fetches image manifests from mirrors before falling back to the canonical registry, so it can detect updates even when the primary registry is inaccessible.
 - **All registries supported** — Global mirrors apply to all image registries (Docker Hub, GHCR, private registries, etc.).
 
 !!! Note
-    Mirror support in Watchtower covers **digest comparison only** — determining whether a newer image exists. The actual image pull is handled by the Docker daemon, which already uses configured mirrors natively.
+    Mirror support in Watchtower covers **digest comparison only** — determining whether a newer image exists.
+    The actual image pull is handled by the Docker daemon, which already uses configured mirrors natively.
 
 ## Configuring Registry Mirrors
 
@@ -30,7 +33,8 @@ sudo systemctl restart docker
 
 ### Configuration Format
 
-Global mirrors apply to all image registries. Add them under the `registry-mirrors` key:
+Global mirrors apply to all image registries.
+Add them under the `registry-mirrors` key:
 
 ```json title="/etc/docker/daemon.json"
 {
@@ -57,7 +61,8 @@ When checking if a container's image has been updated, Watchtower resolves the m
 1. **Configured mirrors** — The global mirror list from the Docker daemon is tried first.
 2. **Canonical registry** — If all mirrors fail, Watchtower falls back to the original registry (e.g., `index.docker.io`).
 
-The first mirror to successfully respond with the image manifest wins. This means a fast, nearby mirror is preferred over a distant canonical registry.
+The first mirror to successfully respond with the image manifest wins.
+This means a fast, nearby mirror is preferred over a distant canonical registry.
 
 ## Configuration Examples
 
@@ -75,7 +80,8 @@ A single mirror used for all registries:
 
 ### Multiple Mirrors with Redundancy
 
-Mirrors are tried in the order listed. If the first is unreachable, the next is used:
+Mirrors are tried in the order listed.
+If the first is unreachable, the next is used:
 
 ```json title="/etc/docker/daemon.json"
 {
@@ -121,7 +127,8 @@ When using internal mirrors that may use self-signed certificates:
 
 ### Authentication Issues
 
-If a mirror requires authentication, configure credentials in the Docker daemon (e.g., `docker login`). Watchtower uses the same credentials for mirrors as for the canonical registry.
+If a mirror requires authentication, configure credentials in the Docker daemon (e.g., `docker login`).
+Watchtower uses the same credentials for mirrors as for the canonical registry.
 
 ### SSL/TLS Errors
 
@@ -134,9 +141,10 @@ For mirrors using self-signed or internal CA certificates, add them to the `inse
 ```
 
 !!! Warning
-    Insecure registries accept HTTPS with untrusted certificates. Only use this for internal mirrors under your control.
+    Insecure registries accept HTTPS with untrusted certificates.
+    Only use this for internal mirrors under your control.
 
 ## Related Features
 
-- [Private Registries](../../configuration/private-registries/index.md) — Authenticating with private image registries
-- [Secure Connections](../../configuration/secure-connections/index.md) — TLS and certificate configuration
+- [Private Registries](../../advanced-features/private-registries/index.md) — Authenticating with private image registries
+- [Secure Connections](../../advanced-features/secure-connections/index.md) — TLS and certificate configuration

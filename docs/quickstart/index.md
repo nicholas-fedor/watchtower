@@ -4,61 +4,66 @@ hide:
 ---
 # Quickstart
 
+## Prerequisites
+
+- Docker installed and running: <https://docs.docker.com/engine/install/>
+
 ## Overview
 
-Despite offering extensive configuration options, Watchtower's default settings are suitable for most deployments.
-If you need to modify the configuration, then review the available [documentation](../configuration/arguments/index.md).
+Watchtower is designed to run as a Docker container. It only requires access to the Docker host's Docker socket in order to interact with the Docker engine. By default, Watchtower will review the monitored containers for image updates. If a container has an updated image, then Watchtower will perform the update task by pulling the new image, stopping the old container, rebuilding the container with the new image, and starting the new container.
 
-## Docker CLI
+## Run Watchtower
 
-[Docker Run CLI Reference](https://docs.docker.com/reference/cli/docker/container/run/){target="_blank" rel="noopener noreferrer"}
+=== "Docker Compose"
 
-```bash title="Pull and run Watchtower"
-docker run -d \
-  --name watchtower \
-  --restart unless-stopped \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  nickfedor/watchtower
-```
+    [Docker Compose File Reference](https://docs.docker.com/reference/compose-file/){target="_blank" rel="noopener noreferrer"}
 
-## Docker Compose
+    1. Obtain the example Docker Compose file:
 
-[Docker Compose File Reference](https://docs.docker.com/reference/compose-file/){target="_blank" rel="noopener noreferrer"}
+        === "Copy"
 
-1. Obtain the example Docker Compose file:
+            ```yaml title="docker-compose.yaml"
+            services:
+                watchtower:
+                    image: nickfedor/watchtower:latest
+                    restart: unless-stopped
+                    volumes:
+                       - /var/run/docker.sock:/var/run/docker.sock
+            ```
 
-    === "Download via PowerShell (Windows)"
+        === "Download via PowerShell (Windows)"
 
-        ```powershell
-        iwr -Uri https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -OutFile docker-compose.yaml
-        ```
+            ```powershell
+            iwr -Uri https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -OutFile docker-compose.yaml
+            ```
 
-    === "Download via Bash (Linux)"
+        === "Download via Bash (Linux)"
+
+            ```bash
+            curl -L https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -o docker-compose.yaml
+            ```
+
+    2. Run the Compose file:
 
         ```bash
-        curl -L https://raw.githubusercontent.com/nicholas-fedor/watchtower/refs/heads/main/examples/default/docker-compose.yaml -o docker-compose.yaml
+        docker compose up -d
         ```
 
-    === "Copy"
+=== "Docker CLI"
 
-        ```yaml title="docker-compose.yaml"
-        services:
-          watchtower:
-            image: nickfedor/watchtower:latest
-            restart: unless-stopped
-            volumes:
-              - /var/run/docker.sock:/var/run/docker.sock
-        ```
+    [Docker Run CLI Reference](https://docs.docker.com/reference/cli/docker/container/run/){target="_blank" rel="noopener noreferrer"}
 
-2. Run the Compose file:
-
-    ```bash
-    docker compose up -d
+    ```bash title="Pull and run Watchtower"
+    docker run -d \
+    --name watchtower \
+    --restart unless-stopped \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    nickfedor/watchtower
     ```
 
 ## Expected Behavior
 
-When running Watchtower with its default settings:
+When running Watchtower with default settings:
 
 - It will monitor all running containers on the host
 - Every 24 hours, it will poll if the monitored containers have updated image digests

@@ -538,6 +538,9 @@ func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, repo
 // share the same image. This applies to grouped (non-split) notifications only.
 //
 // For "Found new image" entries, deduplication is based on (message, image name, new image ID).
+// When new_id is a short registry digest (check path) rather than a local image ID,
+// entries still dedupe by image + new_id so multiple containers on the same image
+// produce one notification in grouped mode.
 // For "Removing image" entries, deduplication is based on (message, image ID).
 // All other entries are kept as-is.
 //
@@ -572,9 +575,9 @@ func deduplicateEntries(entries []*logrus.Entry) []*logrus.Entry {
 			// Deduplicate by image ID.
 			imageID, _ := entry.Data["image_id"].(string)
 			key = dedupKey{message: entry.Message, data: imageID}
-		case "Image is within cooldown period - deferring update",
-			"Image age exceeds cooldown - proceeding with update",
-			"Image creation time unavailable - deferring update":
+		case "Image is within cooldown period - not eligible for update",
+			"Image age exceeds cooldown - eligible for update",
+			"Image creation time unavailable - update check unavailable":
 			// Deduplicate by image name — multiple containers may share the same image.
 			image, _ := entry.Data["image"].(string)
 			key = dedupKey{message: entry.Message, data: image}

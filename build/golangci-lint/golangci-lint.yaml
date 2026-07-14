@@ -229,8 +229,8 @@ linters:
           severity: warning
           disabled: false
           exclude:
-            - ".*pkg/api/metrics/.*"
-            - ".*pkg/metrics/.*"
+            - ".*internal/api/metrics/.*"
+            - ".*internal/metrics/.*"
     testifylint:
       enable-all: true
     varnamelen:
@@ -305,6 +305,7 @@ linters:
         text: "G117"
     paths:
       - ".*/mocks/.*"
+      - ".*/internal/api/swagger/.*"
     warn-unused: true
 
 # Issues Configuration

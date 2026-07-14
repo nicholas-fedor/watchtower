@@ -74,7 +74,39 @@ func NormalizeDigest(digest string) string {
 	return digest
 }
 
-// CompareDigest checks whether a container's current image digest matches the latest from its registry.
+// CompareDigest checks whether a container's current image digest matches the
+// latest from its registry.
+//
+// It is a convenience wrapper around CompareDigestWithRemote that discards the
+// remote digest.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - container: Container whose digest is being compared.
+//   - registryAuth: Base64-encoded auth string.
+//   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
+//
+// Returns:
+//   - bool: True if digests match (image is up-to-date), false otherwise.
+//   - error: Non-nil if operation fails, nil on success.
+func CompareDigest(
+	ctx context.Context,
+	container types.Container,
+	registryAuth string,
+	endpoints ...string,
+) (bool, error) {
+	match, _, err := CompareDigestWithRemote(
+		ctx,
+		container,
+		registryAuth,
+		endpoints...,
+	)
+
+	return match, err
+}
+
+// CompareDigestWithRemote checks whether a container's current image digest matches
+// the latest from its registry and returns the remote digest used for comparison.
 //
 // It first inspects the image to check if it's locally built (empty RepoDigests).
 // For local images, digest comparison against a remote registry is not possible,
@@ -92,13 +124,14 @@ func NormalizeDigest(digest string) string {
 //
 // Returns:
 //   - bool: True if digests match (image is up-to-date), false otherwise.
+//   - string: Remote registry digest in "sha256:..." form (empty when unavailable).
 //   - error: Non-nil if operation fails, nil on success.
-func CompareDigest(
+func CompareDigestWithRemote(
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 	endpoints ...string,
-) (bool, error) {
+) (bool, string, error) {
 	fields := logrus.Fields{
 		"container": container.Name(),
 		"image":     container.ImageName(),
@@ -108,7 +141,7 @@ func CompareDigest(
 	if !container.HasImageInfo() {
 		logrus.WithFields(fields).Debug("Container image info missing")
 
-		return false, errMissingImageInfo
+		return false, "", errMissingImageInfo
 	}
 
 	// Check if the container's image has no RepoDigests, which indicates a locally
@@ -125,7 +158,7 @@ func CompareDigest(
 		logrus.WithFields(fields).
 			Debug("Image with no registry reference detected (empty RepoDigests) - skipping digest comparison")
 
-		return true, nil
+		return true, "", nil
 	}
 
 	// Fetch the latest digest from the registry using a HEAD request for efficiency.
@@ -137,7 +170,7 @@ func CompareDigest(
 		endpoints...,
 	)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	// If HEAD request returned empty digest (due to missing Docker-Content-Digest header),
@@ -153,7 +186,7 @@ func CompareDigest(
 			endpoints...,
 		)
 		if err != nil {
-			return false, err
+			return false, "", err
 		}
 	}
 
@@ -166,7 +199,29 @@ func CompareDigest(
 		WithField("matches", matches).
 		Debug("Completed digest comparison")
 
-	return matches, nil
+	return matches, FormatDigest(remoteDigest), nil
+}
+
+// FormatDigest ensures a digest string uses the "sha256:..." form.
+//
+// Empty input is returned unchanged. Digests that already include a known
+// algorithm prefix are returned as-is; otherwise "sha256:" is prepended.
+//
+// Parameters:
+//   - digest: Digest string (raw hash or "sha256:...").
+//
+// Returns:
+//   - string: Digest with algorithm prefix when non-empty.
+func FormatDigest(digest string) string {
+	if digest == "" {
+		return ""
+	}
+
+	if strings.Contains(digest, ":") {
+		return digest
+	}
+
+	return "sha256:" + digest
 }
 
 // FetchDigest retrieves the digest of an image from its registry using a GET request.
@@ -216,25 +271,31 @@ func BuildManifestURL(
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
+	fields := logrus.Fields{
+		"container": container.Name(),
+		"image":     container.ImageName(),
+	}
+
 	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
 	scheme := "https"
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
 		scheme = "http"
 	}
 
-	// Build the initial manifest URL based on the container's image name and tag.
-	manifestURL, err := manifest.BuildManifestURL(container, scheme)
+	// Build the canonical manifest URL.
+	manifestURLStr, err := manifest.BuildManifestURL(container, scheme)
 	if err != nil {
+		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+
 		return "", "", nil, fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
 	}
 
-	// Parse the initial manifest URL to extract the original host.
-	parsedURL, err := url.Parse(manifestURL)
-	if err != nil {
+	parsedURL, parseErr := url.Parse(manifestURLStr)
+	if parseErr != nil {
 		return "", "", nil, fmt.Errorf(
 			"%w: failed to parse manifest URL: %w",
 			errFailedBuildManifestURL,
-			err,
+			parseErr,
 		)
 	}
 
@@ -259,14 +320,14 @@ func BuildManifestURL(
 	// 4. Digest extraction succeeds from the 200 OK response
 	if parsedURL.Host == "lscr.io" {
 		parsedURL.Host = "ghcr.io"
-		manifestURL = parsedURL.String()
+		manifestURLStr = parsedURL.String()
 	}
 
 	if parsedURL.Host == "" {
 		return "", "", nil, fmt.Errorf(
 			"%w: manifest URL has no host: %s",
 			errFailedBuildManifestURL,
-			manifestURL,
+			manifestURLStr,
 		)
 	}
 
@@ -283,10 +344,10 @@ func BuildManifestURL(
 			parsedURL.Host = hostOverride
 		}
 
-		manifestURL = parsedURL.String()
+		manifestURLStr = parsedURL.String()
 	}
 
-	return manifestURL, originalHost, parsedURL, nil
+	return manifestURLStr, originalHost, parsedURL, nil
 }
 
 // fetchDigest retrieves an image digest using the specified HTTP method.
@@ -330,17 +391,18 @@ func fetchDigest(
 	// Create an authentication client for registry requests.
 	client := auth.NewAuthClient()
 
-	// Build initial manifest URL to get canonical host
-	_, originalHost, _, err := BuildManifestURL(container, "")
+	// Build the canonical manifest URL and apply lscr.io/host-override handling.
+	manifestURL, originalHost, _, err := BuildManifestURL(container, "")
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
 
-		return "", err
+		return "", fmt.Errorf("failed to build manifest URL: %w", err)
 	}
 
 	logrus.WithFields(fields).
 		WithField("original_host", originalHost).
-		Debug("Extracted original host from manifest URL")
+		WithField("manifest_url", manifestURL).
+		Debug("Built manifest URL for container")
 
 	// If no endpoints specified, use a single empty endpoint (canonical host).
 	if len(endpoints) == 0 {

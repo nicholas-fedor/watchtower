@@ -58,7 +58,6 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Watchtower v1.0.0"))
 		gomega.Expect(output).To(gomega.ContainSubstring("Using no notifications"))
-		gomega.Expect(output).To(gomega.ContainSubstring("The HTTP API is enabled"))
 	})
 
 	ginkgo.It("should suppress startup messages when flag is set", func() {
