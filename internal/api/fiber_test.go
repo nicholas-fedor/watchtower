@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -25,6 +27,7 @@ func TestNew_ProxyConfig(t *testing.T) {
 			ProxyHeader:    "X-Real-IP",
 		},
 		CORSConfig{},
+		false,
 	)
 	assert.NotNil(t, app)
 
@@ -35,6 +38,7 @@ func TestNew_ProxyConfig(t *testing.T) {
 			TrustedProxies: []string{"10.0.0.0/8"},
 		},
 		CORSConfig{},
+		false,
 	)
 	assert.NotNil(t, app2)
 }
@@ -47,6 +51,7 @@ func TestNew_CORSConfig(t *testing.T) {
 		CORSConfig{
 			AllowedOrigins: []string{"https://example.com"},
 		},
+		false,
 	)
 	assert.NotNil(t, app)
 
@@ -76,6 +81,7 @@ func TestNew_CORSWildcard(t *testing.T) {
 		CORSConfig{
 			AllowedOrigins: []string{"*"},
 		},
+		false,
 	)
 	assert.NotNil(t, app)
 
@@ -111,6 +117,7 @@ func TestNew_CORSCustomMethodsHeaders(t *testing.T) {
 			AllowedMethods: []string{"GET", "POST"},
 			AllowedHeaders: []string{"Content-Type", "X-Custom-Header"},
 		},
+		false,
 	)
 	assert.NotNil(t, app)
 
@@ -143,6 +150,7 @@ func TestNew_NoCORSWhenNoOrigins(t *testing.T) {
 		60,
 		ProxyConfig{},
 		CORSConfig{},
+		false,
 	)
 	assert.NotNil(t, app)
 
@@ -203,6 +211,7 @@ func TestNew(t *testing.T) {
 				tt.rateLimitPerMinute,
 				ProxyConfig{},
 				CORSConfig{},
+				false,
 			)
 			if tt.wantNil {
 				assert.Nil(t, got)
@@ -269,4 +278,38 @@ func TestTimeoutMiddleware_Timeout(t *testing.T) {
 
 		assert.Equal(t, http.StatusRequestTimeout, resp.StatusCode)
 	})
+}
+
+func TestNew_OnListenHook(t *testing.T) {
+	var buf bytes.Buffer
+
+	logger := logrus.New()
+	logger.SetOutput(&buf)
+	logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true})
+	logger.SetLevel(logrus.DebugLevel)
+
+	app := New(logger, 60, ProxyConfig{}, CORSConfig{}, false)
+
+	app.Get("/test", func(c fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	go func() {
+		_ = app.Listen("127.0.0.1:0", fiber.ListenConfig{
+			DisableStartupMessage: true,
+		})
+	}()
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(buf.String(), "Starting HTTP API server")
+	}, 2*time.Second, 50*time.Millisecond)
+
+	output := buf.String()
+	assert.Contains(t, output, "Starting HTTP API server")
+	assert.Contains(t, output, "HTTP API server is enabled")
+	assert.Contains(t, output, "host=")
+	assert.Contains(t, output, "port=")
+	assert.Contains(t, output, "tls=")
+
+	_ = app.Shutdown()
 }

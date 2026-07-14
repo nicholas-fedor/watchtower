@@ -68,10 +68,17 @@ type CORSConfig struct {
 //     back to defaultRateLimitPerMinute (60).
 //   - proxyCfg: Reverse proxy configuration.
 //   - corsCfg: CORS middleware configuration.
+//   - noStartupMessage: When true, suppresses the HTTP API startup log entries.
 //
 // Returns:
 //   - *fiber.App: Configured Fiber application.
-func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConfig, corsCfg CORSConfig) *fiber.App {
+func New(
+	logrusLogger *logrus.Logger,
+	rateLimitPerMinute int,
+	proxyCfg ProxyConfig,
+	corsCfg CORSConfig,
+	noStartupMessage bool,
+) *fiber.App {
 	rateLimit := rateLimitPerMinute
 	if rateLimit <= 0 {
 		rateLimit = defaultRateLimitPerMinute
@@ -151,7 +158,8 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 			LimiterMiddleware: limiter.SlidingWindow{},
 			KeyGenerator:      func(c fiber.Ctx) string { return c.IP() },
 			LimitReached: func(c fiber.Ctx) error {
-				logrusLogger.WithField("ip", c.IP()).Warn("Rate limit exceeded")
+				logrusLogger.WithField("ip", c.IP()).
+					Warn("Rate limit exceeded")
 
 				return c.SendStatus(fiber.StatusTooManyRequests)
 			},
@@ -161,8 +169,21 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 	apiServer.Use(middlewares...)
 
 	apiServer.Hooks().OnListen(func(data fiber.ListenData) error {
-		logrusLogger.WithFields(logrus.Fields{"host": data.Host, "port": data.Port, "tls": data.TLS}).
-			Info("Starting HTTP API server")
+		if !noStartupMessage {
+			logrusLogger.WithFields(logrus.Fields{
+				"host": data.Host,
+				"port": data.Port,
+				"tls":  data.TLS,
+			}).
+				Debug("Starting HTTP API server")
+
+			logrusLogger.WithFields(logrus.Fields{
+				"host": data.Host,
+				"port": data.Port,
+				"tls":  data.TLS,
+			}).
+				Info("HTTP API server is enabled")
+		}
 
 		return nil
 	})
@@ -175,7 +196,8 @@ func New(logrusLogger *logrus.Logger, rateLimitPerMinute int, proxyCfg ProxyConf
 
 	apiServer.Hooks().OnPostShutdown(func(err error) error {
 		if err != nil {
-			logrusLogger.WithError(err).Warn("HTTP server shut down with error")
+			logrusLogger.WithError(err).
+				Warn("HTTP server shut down with error")
 		} else {
 			logrusLogger.Info("HTTP server shut down successfully")
 		}

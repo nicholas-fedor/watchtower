@@ -121,7 +121,7 @@ func TestIntegration_HealthProbes_CustomRoute(t *testing.T) {
 	mc := mockContainer.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
 
-	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{}, false)
 	app.Get("/health/custom", func(c fiber.Ctx) error {
 		_, err := mc.ListContainers(c.Context())
 		if err != nil {
@@ -385,7 +385,7 @@ func TestIntegration_GetAPIAddr(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIntegration_ConcurrentRequests(t *testing.T) {
-	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{}, false)
 
 	var wg sync.WaitGroup
 	for range 10 {
@@ -545,7 +545,7 @@ func TestIntegration_CheckDuringUpdate(t *testing.T) {
 
 	updateDone := make(chan struct{})
 
-	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{}, false)
 
 	opts := config.Options{
 		Token:           "test-token",
@@ -684,7 +684,7 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 func TestIntegration_UpdateHonorsReviveStoppedAndComposeDependsOn(t *testing.T) {
 	var captured types.UpdateParams
 
-	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{})
+	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{}, false)
 
 	opts := config.Options{
 		Token:               "test-token",

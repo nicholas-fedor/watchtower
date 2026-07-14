@@ -107,7 +107,7 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 			ProxyHeader:    opts.ProxyHeader,
 		}, CORSConfig{
 			AllowedOrigins: opts.CORSAllowedOrigins,
-		})
+		}, opts.NoStartupMessage)
 
 	authMiddleware := NewAPIAuthMiddleware(opts.Token)
 
@@ -134,7 +134,6 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		ctx,
 		app,
 		address,
-		opts.NoStartupMessage,
 		tlsCertPath,
 		tlsKeyPath,
 		block,
@@ -182,7 +181,6 @@ func handleUnexpectedServerStop(err error, addr string, onUnexpectedStop func(er
 //   - ctx: Context for server lifecycle management.
 //   - app: Fiber application to start.
 //   - address: Address to listen on.
-//   - noStartupMessage: Whether to suppress the startup message.
 //   - tlsCertPath: Path to TLS certificate file, or empty for HTTP.
 //   - tlsKeyPath: Path to TLS key file, or empty for HTTP.
 //   - block: When true, wait until the server stops; when false, return after bind.
@@ -194,7 +192,6 @@ func runServer(
 	ctx context.Context,
 	app *fiber.App,
 	address string,
-	noStartupMessage bool,
 	tlsCertPath, tlsKeyPath string,
 	block bool,
 	onUnexpectedStop func(error),
@@ -211,7 +208,7 @@ func runServer(
 	listenDone := make(chan error, 1)
 
 	listenCfg := fiber.ListenConfig{
-		DisableStartupMessage: noStartupMessage,
+		DisableStartupMessage: true,
 		GracefulContext:       ctx,
 		ShutdownTimeout:       ShutdownGracePeriod,
 		ListenerAddrFunc: func(_ net.Addr) {
