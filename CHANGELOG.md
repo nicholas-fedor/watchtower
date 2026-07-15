@@ -54,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update github/codeql-action action to v4.36.3 by @renovate[bot] in [#1874](https://github.com/nicholas-fedor/watchtower/pull/1874)
 - Update docker/setup-qemu-action action to v4.2.0 by @renovate[bot] in [#1872](https://github.com/nicholas-fedor/watchtower/pull/1872)
 
+### Fixed
+
+- Derive bearer service from realm by @llc1123 in [#1895](https://github.com/nicholas-fedor/watchtower/pull/1895)
+
+### New Contributors
+
+- @llc1123 made their first contribution in [#1895](https://github.com/nicholas-fedor/watchtower/pull/1895)
+
 ## [1.19.0] - 2026-06-30
 
 ### Added
