@@ -87,8 +87,8 @@ github.com/gofiber/fiber/v3 v3.4.0 h1:F0aND4vwZF7dR7cbvSwFQQEpBU902XHKWxrLsFBkVq
 github.com/gofiber/fiber/v3 v3.4.0/go.mod h1:nAhJfdxUIJJph2tPWPmqWf8QDIN2iiqQiQf3lENZpdk=
 github.com/gofiber/schema v1.8.2 h1:wq+LO2xEGlsqma/8Akp9PUebQ6vcsYmF0xYQ4F2ijvU=
 github.com/gofiber/schema v1.8.2/go.mod h1:iyAMJztdyky7Pk2U7bwUP3EHjzMqUNjZ/hglE0nYO/g=
-github.com/gofiber/utils/v2 v2.1.2 h1:/rfkCHvC3XWfOHR04c34KajAhbs5QxmF6cNeJKnkEBI=
-github.com/gofiber/utils/v2 v2.1.2/go.mod h1:DdOgEVwQTi8cou/AKWPqhXOR4fHGRVhA/rEWL3IXG7Q=
+github.com/gofiber/utils/v2 v2.2.0 h1:YSSmCzQponq/f9uSOg2HtXC5qK1Dmor0o6DqaQVz8GE=
+github.com/gofiber/utils/v2 v2.2.0/go.mod h1:Ieopk6sQh7rbhQ12aBNCJtJuG0gxAg0nz63sFCrrOmE=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0 h1:du0WGc8xSKq/++e0cglxhS/mXVqsR7+c7jLEi5Vqduw=
@@ -158,8 +158,8 @@ github.com/rogpeppe/go-internal v1.15.0/go.mod h1:DrUVZyrJU+txYW5/1kwtXQSMFio52Z
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sagikazarmark/locafero v0.12.0 h1:/NQhBAkUb4+fH1jivKHWusDYFjMOOKU88eegjfxfHb4=
 github.com/sagikazarmark/locafero v0.12.0/go.mod h1:sZh36u/YSZ918v0Io+U9ogLYQJ9tLLBmM4eneO6WwsI=
-github.com/shamaton/msgpack/v3 v3.1.2 h1:d5gWAIyMU4M0WgDjz6IFSCuXJUA2dFwRHBpDclE8CLw=
-github.com/shamaton/msgpack/v3 v3.1.2/go.mod h1:DcQG8jrdrQCIxr3HlMYkiXdMhK+KfN2CitkyzsQV4uc=
+github.com/shamaton/msgpack/v3 v3.2.0 h1:1q2Ms+MWmuRju+PuDMSFDB7p7621npeX4zprJN5Zck8=
+github.com/shamaton/msgpack/v3 v3.2.0/go.mod h1:sgBYvEiyz8JR1NC3yGRoPVME9xXovpnh3l/plW1nfRo=
 github.com/sirupsen/logrus v1.9.4 h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w=
 github.com/sirupsen/logrus v1.9.4/go.mod h1:ftWc9WdOfJ0a92nsE2jF5u5ZwH8Bv2zdeOC42RjbV2g=
 github.com/spf13/afero v1.15.0 h1:b/YBCLWAJdFWJTN9cLhiXXcD7mzKn9Dm86dNnfyQw1I=
