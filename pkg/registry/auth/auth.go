@@ -66,6 +66,8 @@ var (
 	errFailedExecuteChallengeRequest = errors.New("failed to execute challenge request")
 	// errFailedCreateBearerRequest indicates a failure to construct the HTTP request for a bearer token.
 	errFailedCreateBearerRequest = errors.New("failed to create bearer token request")
+	// errFailedConstructBearerAuthURL indicates a failure to construct the bearer authentication URL.
+	errFailedConstructBearerAuthURL = errors.New("failed to construct bearer auth url")
 	// errFailedExecuteBearerRequest indicates a failure to send or receive a response for the bearer token request.
 	errFailedExecuteBearerRequest = errors.New("failed to execute bearer token request")
 	// errFailedUnmarshalBearerResponse indicates a failure to parse the bearer token response JSON.
@@ -73,8 +75,7 @@ var (
 	// errFailedParseImageName indicates a failure to parse the container image name into a normalized reference.
 	errFailedParseImageName = errors.New("failed to parse image name")
 	// errFailedDecodeResponse indicates a failure to decode the token response from the registry.
-	errFailedDecodeResponse         = errors.New("failed to decode response")
-	errFailedConstructBearerAuthURL = errors.New("failed to construct bearer auth url")
+	errFailedDecodeResponse = errors.New("failed to decode response")
 	// errFailedParseImageReference indicates a failure to parse an image reference into a normalized form.
 	errFailedParseImageReference = errors.New("failed to parse image reference")
 )
@@ -516,6 +517,7 @@ func ProcessChallenge(wwwAuthHeader, image string) (string, string, string, erro
 	realm := values["realm"]
 	service := values["service"]
 	scope := values["scope"] // Scope is optional
+
 	if service == "" && realm != "" {
 		service = extractChallengeHost(realm, fields)
 		if service != "" {
@@ -663,7 +665,7 @@ func newBearerRequest(ctx context.Context, authURL *url.URL, imageName string) (
 	return r, nil
 }
 
-func addBasicAuth(r *http.Request, imageName string, registryAuth string) {
+func addBasicAuth(r *http.Request, imageName, registryAuth string) {
 	if registryAuth != "" {
 		logrus.WithFields(logrus.Fields{
 			"image": imageName,

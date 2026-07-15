@@ -1426,7 +1426,8 @@ var _ = ginkgo.Describe("the auth module", func() {
 			URL, err := auth.GetAuthURL(challenge, imageRef)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(URL.String()).To(gomega.Equal("https://asia-northeast1-docker.pkg.dev/v2/token?scope=repository%3Adrawith-production-500000%2Fdrawith%2Fartie-agent%3Apull&service=asia-northeast1-docker.pkg.dev"))
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("https://asia-northeast1-docker.pkg.dev/v2/token?scope=repository%3Adrawith-production-500000%2Fdrawith%2Fartie-agent%3Apull&service=asia-northeast1-docker.pkg.dev"))
 		})
 
 		ginkgo.When("deriving the auth scope from an image name", func() {
