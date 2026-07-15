@@ -1419,15 +1419,15 @@ var _ = ginkgo.Describe("the auth module", func() {
 		})
 
 		ginkgo.It("should derive service from realm when challenge omits service", func() {
-			challenge := `bearer realm="https://asia-northeast1-docker.pkg.dev/v2/token"`
-			imageRef, err := reference.ParseNormalizedNamed("asia-northeast1-docker.pkg.dev/drawith-production-500000/drawith/artie-agent:sha-317f106")
+			challenge := `bearer realm="https://registry.example.com/token"`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			URL, err := auth.GetAuthURL(challenge, imageRef)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(URL.String()).
-				To(gomega.Equal("https://asia-northeast1-docker.pkg.dev/v2/token?scope=repository%3Adrawith-production-500000%2Fdrawith%2Fartie-agent%3Apull&service=asia-northeast1-docker.pkg.dev"))
+				To(gomega.Equal("https://registry.example.com/token?scope=repository%3Atest%2Fimage%3Apull&service=registry.example.com"))
 		})
 
 		ginkgo.When("deriving the auth scope from an image name", func() {
