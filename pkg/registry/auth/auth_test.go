@@ -1430,6 +1430,53 @@ var _ = ginkgo.Describe("the auth module", func() {
 				To(gomega.Equal("https://registry.example.com/token?scope=repository%3Atest%2Fimage%3Apull&service=registry.example.com"))
 		})
 
+		ginkgo.It("should derive service from realm when service is explicitly empty", func() {
+			challenge := `bearer realm="https://registry.example.com/token",service=""`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("https://registry.example.com/token?scope=repository%3Atest%2Fimage%3Apull&service=registry.example.com"))
+		})
+
+		ginkgo.It("should derive service from realm host when realm includes a port", func() {
+			challenge := `bearer realm="http://localhost:5000/token"`
+			imageRef, err := reference.ParseNormalizedNamed("localhost:5000/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("http://localhost:5000/token?scope=repository%3Atest%2Fimage%3Apull&service=localhost%3A5000"))
+		})
+
+		ginkgo.It("should derive service from realm host when realm has a trailing slash", func() {
+			challenge := `bearer realm="https://registry.example.com/token/"`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("https://registry.example.com/token/?scope=repository%3Atest%2Fimage%3Apull&service=registry.example.com"))
+		})
+
+		ginkgo.It("should return an error when realm lacks a scheme and service is omitted", func() {
+			challenge := `bearer realm="registry.example.com/token"`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(URL).To(gomega.BeNil())
+		})
+
 		ginkgo.When("deriving the auth scope from an image name", func() {
 			// Test case: Ensures GetAuthURL prepends "library/" to official Docker Hub images,
 			// validating correct scope derivation for standard images.
