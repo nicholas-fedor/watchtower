@@ -991,6 +991,60 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(2))
 		})
 
+		ginkgo.It("should derive bearer service from realm when registry challenge omits service", func() {
+			defer ginkgo.GinkgoRecover()
+
+			server := ghttp.NewTLSServer()
+			server.RouteToHandler("GET", "/v2/", ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/v2/"),
+				ghttp.RespondWith(
+					http.StatusUnauthorized,
+					"",
+					http.Header{
+						"WWW-Authenticate": []string{
+							fmt.Sprintf(`Bearer realm="https://%s/token"`, server.Addr()),
+						},
+					},
+				),
+			))
+
+			server.RouteToHandler("GET", "/token", ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/token", "scope=repository%3Atest%2Fimage%3Apull&service="+url.QueryEscape(server.Addr())),
+				ghttp.RespondWith(http.StatusOK, `{"token": "mock-token"}`),
+			))
+			defer server.Close()
+
+			containerInstance := mockContainer{
+				id:        mockID,
+				name:      mockName,
+				imageName: server.Addr() + "/test/image:latest",
+			}
+			client := &testAuthClient{
+				client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					},
+				},
+			}
+
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+
+			token, challengeHost, redirected, redirectHost, err := auth.GetToken(
+				context.Background(),
+				containerInstance,
+				"",
+				client,
+				"",
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(token).To(gomega.Equal("Bearer mock-token"))
+			gomega.Expect(challengeHost).To(gomega.Equal(server.Addr()))
+			gomega.Expect(redirected).To(gomega.BeFalse())
+			gomega.Expect(redirectHost).To(gomega.Equal(""))
+			gomega.Expect(server.ReceivedRequests()).To(gomega.HaveLen(2))
+		})
 		// Test case: Verifies that GetToken returns redirect=true when the challenge request is redirected.
 		ginkgo.It("should return redirect=true when challenge request is redirected", func() {
 			defer ginkgo.GinkgoRecover()
@@ -1354,16 +1408,73 @@ var _ = ginkgo.Describe("the auth module", func() {
 		)
 
 		ginkgo.When("given an invalid challenge header", func() {
-			// Test case: Verifies GetAuthURL returns an error when the challenge header lacks
-			// required fields (e.g., service). Ensures robust error handling for malformed inputs.
 			ginkgo.It("should return an error", func() {
-				challenge := `bearer realm="https://ghcr.io/token"`
+				challenge := `bearer service="ghcr.io"`
 				imageRef, err := reference.ParseNormalizedNamed("nicholas-fedor/watchtower")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				URL, err := auth.GetAuthURL(challenge, imageRef)
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(URL).To(gomega.BeNil())
 			})
+		})
+
+		ginkgo.It("should derive service from realm when challenge omits service", func() {
+			challenge := `bearer realm="https://registry.example.com/token"`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("https://registry.example.com/token?scope=repository%3Atest%2Fimage%3Apull&service=registry.example.com"))
+		})
+
+		ginkgo.It("should derive service from realm when service is explicitly empty", func() {
+			challenge := `bearer realm="https://registry.example.com/token",service=""`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("https://registry.example.com/token?scope=repository%3Atest%2Fimage%3Apull&service=registry.example.com"))
+		})
+
+		ginkgo.It("should derive service from realm host when realm includes a port", func() {
+			challenge := `bearer realm="http://localhost:5000/token"`
+			imageRef, err := reference.ParseNormalizedNamed("localhost:5000/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("http://localhost:5000/token?scope=repository%3Atest%2Fimage%3Apull&service=localhost%3A5000"))
+		})
+
+		ginkgo.It("should derive service from realm host when realm has a trailing slash", func() {
+			challenge := `bearer realm="https://registry.example.com/token/"`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(URL.String()).
+				To(gomega.Equal("https://registry.example.com/token/?scope=repository%3Atest%2Fimage%3Apull&service=registry.example.com"))
+		})
+
+		ginkgo.It("should return an error when realm lacks a scheme and service is omitted", func() {
+			challenge := `bearer realm="registry.example.com/token"`
+			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			URL, err := auth.GetAuthURL(challenge, imageRef)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(URL).To(gomega.BeNil())
 		})
 
 		ginkgo.When("deriving the auth scope from an image name", func() {
