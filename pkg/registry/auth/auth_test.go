@@ -345,6 +345,7 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 		redirectScheme string
 		want           TokenResult
 		wantErr        bool
+		errContains    string
 	}{
 		{
 			name:         "valid registry auth returns token result",
@@ -409,6 +410,7 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 			redirectScheme: "http",
 			want:           TokenResult{},
 			wantErr:        true,
+			errContains:    "cross-origin redirect not allowed for basic auth",
 		},
 	}
 
@@ -417,6 +419,10 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 			got, err := handleBasicAuthChallenge(tt.registryAuth, tt.fields, tt.redirected, tt.redirectHost, tt.originalHost, tt.originalScheme, tt.redirectScheme)
 			if tt.wantErr {
 				assert.Error(t, err)
+
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
 
 				return
 			}
