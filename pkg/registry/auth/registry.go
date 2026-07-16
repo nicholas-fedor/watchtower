@@ -16,7 +16,8 @@ const ChallengeHeader = "WWW-Authenticate"
 const (
 	DockerRegistryDomain = "docker.io"       // Primary domain for Docker Hub image references.
 	DockerRegistryHost   = "index.docker.io" // Current Docker Hub registry API endpoint.
-	LSCRRegistry         = "lscr.io"         // LinuxServer's vanity domain - images are hosted on ghcr.io.
+	GitHubRegistryDomain = "ghcr.io"         // Canonical domain for GitHub Container Registry.
+	LSCRRegistryDomain   = "lscr.io"         // LinuxServer's vanity domain - images are hosted on ghcr.io.
 )
 
 // Errors for registry operations.
@@ -203,13 +204,13 @@ func GetRegistryAddress(imageRef string) (string, error) {
 
 	// lscr.io images are hosted on GitHub Container Registry (ghcr.io).
 	// Map here so all callers benefit, including GetChallengeURL and GetAuthURL.
-	if domain == LSCRRegistry {
+	if domain == LSCRRegistryDomain {
 		logrus.WithFields(logrus.Fields{
 			"image_ref": imageRef,
 			"address":   domain,
 		}).Debug("Mapped lscr.io to ghcr.io")
 
-		domain = "ghcr.io"
+		domain = GitHubRegistryDomain
 	}
 
 	logrus.WithFields(logrus.Fields{

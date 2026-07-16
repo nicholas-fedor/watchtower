@@ -300,8 +300,8 @@ func buildManifestURLForAge(
 	originalHost := parsedURL.Host
 
 	// Handle lscr.io → ghcr.io host swap.
-	if parsedURL.Host == "lscr.io" {
-		parsedURL.Host = "ghcr.io"
+	if parsedURL.Host == auth.LSCRRegistryDomain {
+		parsedURL.Host = auth.GitHubRegistryDomain
 		manifestURLStr = parsedURL.String()
 	}
 

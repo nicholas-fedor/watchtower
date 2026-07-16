@@ -125,7 +125,7 @@ func WarnOnAPIConsumption(container types.Container) bool {
 	}
 
 	// Check if the registry is known to support HEAD requests.
-	if containerHost == auth.DockerRegistryHost || containerHost == "ghcr.io" {
+	if containerHost == auth.DockerRegistryHost || containerHost == auth.GitHubRegistryDomain {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"host": containerHost,
 		}).Debug("Registry supports HEAD requests, warning on API consumption")

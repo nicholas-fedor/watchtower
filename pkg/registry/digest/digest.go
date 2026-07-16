@@ -295,7 +295,7 @@ func BuildManifestURL(
 		rawDomain := reference.Domain(normalizedRef)
 
 		canonicalHost, _ := auth.GetRegistryAddress(container.ImageName())
-		if rawDomain == auth.LSCRRegistry {
+		if rawDomain == auth.LSCRRegistryDomain {
 			originalHost = rawDomain
 		} else if canonicalHost != "" {
 			originalHost = canonicalHost
@@ -336,8 +336,8 @@ func BuildManifestURL(
 	// 2. Authentication tokens are obtained from ghcr.io using the redirected challenge
 	// 3. Manifest requests are made directly to ghcr.io (not lscr.io) to avoid 401/404 errors
 	// 4. Digest extraction succeeds from the 200 OK response
-	if parsedURL.Host == "lscr.io" {
-		parsedURL.Host = "ghcr.io"
+	if parsedURL.Host == auth.LSCRRegistryDomain {
+		parsedURL.Host = auth.GitHubRegistryDomain
 		manifestURLStr = parsedURL.String()
 	}
 
