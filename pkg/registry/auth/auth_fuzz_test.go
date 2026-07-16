@@ -60,6 +60,9 @@ func FuzzGetBearerToken(f *testing.F) {
 	)
 
 	f.Fuzz(func(t *testing.T, jsonData []byte) {
+		initTokenCache()
+		tokenCache.InvalidateAll()
+
 		// Attempt to unmarshal the JSON data into a TokenResponse struct
 		var tokenResponse types.TokenResponse
 

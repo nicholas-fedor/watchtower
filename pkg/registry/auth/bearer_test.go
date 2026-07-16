@@ -587,6 +587,7 @@ func Test_executeBearerTokenRequest_cacheHit(t *testing.T) {
 	mockClient := mockAuth.NewMockClient(t)
 
 	initTokenCache()
+	tokenCache.InvalidateAll()
 
 	cacheKey := authURL.String() + "|"
 	tokenCache.SetIfAbsent(cacheKey, tokenCacheEntry{
