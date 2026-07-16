@@ -109,31 +109,6 @@ func BenchmarkGetChallengeURL(b *testing.B) {
 	}
 }
 
-// BenchmarkProcessChallenge benchmarks the ProcessChallenge function which parses
-// the WWW-Authenticate header to extract realm, service, and scope.
-func BenchmarkProcessChallenge(b *testing.B) {
-	testChallenges := []string{
-		`Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/repo:pull"`,
-		`Bearer realm="https://registry-1.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull"`,
-		`Bearer realm="https://quay.io/token/v1",service="quay.io",scope="repository:redhat/ubi8:pull"`,
-	}
-
-	for b.Loop() {
-		for _, challenge := range testChallenges {
-			_, _, _, _ = ProcessChallenge(challenge, "test-image:latest")
-		}
-	}
-}
-
-// BenchmarkProcessChallengeComplexScope benchmarks ProcessChallenge with complex scope values.
-func BenchmarkProcessChallengeComplexScope(b *testing.B) {
-	challenge := `Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/very-long-repo-name-with-namespace:pull"`
-
-	for b.Loop() {
-		_, _, _, _ = ProcessChallenge(challenge, "test-image:latest")
-	}
-}
-
 // BenchmarkGetAuthURL benchmarks GetAuthURL which constructs the authentication URL.
 func BenchmarkGetAuthURL(b *testing.B) {
 	challenge := "bearer realm=\"https://ghcr.io/token\",service=\"ghcr.io\",scope=\"repository:user/repo:pull\""
@@ -199,9 +174,6 @@ func BenchmarkTokenFetchSimulation(b *testing.B) {
 	for b.Loop() {
 		// Simulate NewAuthClient
 		_ = &http.Client{}
-
-		// Simulate ProcessChallenge
-		_, _, _, _ = ProcessChallenge(challenge, "test-image:latest")
 
 		// Simulate string operations for URL construction
 		_ = strings.ToLower(challenge)

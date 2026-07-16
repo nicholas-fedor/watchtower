@@ -708,10 +708,10 @@ func UpdateImplicitRestart(
 // based on its staleness and update parameters.
 //
 // It checks multiple conditions:
-// - The container must be stale (outdated image)
-// - The container must not be monitor-only
-// - Watchtower containers are skipped in run-once mode
-// - Watchtower self-updates are skipped if SkipSelfUpdate is true
+//   - The container must be stale (outdated image)
+//   - The container must not be monitor-only
+//   - Watchtower containers are skipped in run-once mode
+//   - Watchtower self-updates are skipped if SkipSelfUpdate is true
 //
 // Parameters:
 //   - container: The container to check.
@@ -1857,8 +1857,8 @@ func restartStaleContainer(
 	}
 
 	// Start the new container based on restart settings:
-	// - Watchtower containers bypass the NoRestart check
-	// - All containers (including Watchtower) start only if they were running or ReviveStopped is enabled
+	//   - Watchtower containers bypass the NoRestart check
+	//   - All containers (including Watchtower) start only if they were running or ReviveStopped is enabled
 	if (!config.NoRestart || sourceContainer.IsWatchtower()) && (sourceContainer.IsRunning() || config.ReviveStopped) {
 		logrus.WithFields(fields).
 			Debug("Starting container with updated configuration")

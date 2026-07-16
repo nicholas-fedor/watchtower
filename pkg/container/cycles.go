@@ -16,23 +16,23 @@ import (
 //     through this node in future traversals.
 //
 // Cycle Detection Logic:
-// - When DFS visits a node, it marks it gray and adds it to the current path.
-// - For each neighbor:
-//   - If white: Recurse on it (continue exploration)
-//   - If gray: Cycle detected! Mark all nodes from the gray node to current node in the path as cyclic
-//   - If black: Already fully explored, no cycle through this edge
 //
-// - After exploring all neighbors, mark node black and remove from path (backtrack)
+//	When DFS visits a node, it marks it gray and adds it to the current path.
+//	For each neighbor:
+//		- If white: Recurse on it (continue exploration)
+//		- If gray: Cycle detected! Mark all nodes from the gray node to current node in the path as cyclic
+//		- If black: Already fully explored, no cycle through this edge
+//	After exploring all neighbors, mark node black and remove from path (backtrack)
 //
 // This algorithm efficiently detects all nodes involved in cycles in a single pass, with
 // Time Complexity: O(V + E) where V = vertices (containers), E = edges (dependencies)
 // Space Complexity: O(V) for color map, path stack, and recursion depth
 //
 // Data Structures:
-// - graph: Adjacency list mapping container names to their dependency lists (outgoing edges)
-// - colors: State map for three-color algorithm (0=white, 1=gray, 2=black)
-// - cycles: Result map marking containers involved in cycles (true = cyclic)
-// - path: Current DFS path for cycle reconstruction when back edges are found.
+//   - graph: Adjacency list mapping container names to their dependency lists (outgoing edges)
+//   - colors: State map for three-color algorithm (0=white, 1=gray, 2=black)
+//   - cycles: Result map marking containers involved in cycles (true = cyclic)
+//   - path: Current DFS path for cycle reconstruction when back edges are found.
 type cycleDetector struct {
 	graph  map[string][]string
 	colors map[string]int // 0: white, 1: gray, 2: black
@@ -126,25 +126,25 @@ func (cd *cycleDetector) dfs(node string) {
 // 4. Only containers present in the input list are included (missing dependencies ignored)
 //
 // DFS Traversal Strategy:
-// - Start DFS from each unvisited (white) node to ensure all components are explored
-// - The three-color algorithm detects cycles during traversal and marks all involved nodes
-// - Multiple DFS calls are needed because the graph may have disconnected components
+//   - Start DFS from each unvisited (white) node to ensure all components are explored
+//   - The three-color algorithm detects cycles during traversal and marks all involved nodes
+//   - Multiple DFS calls are needed because the graph may have disconnected components
 //
 // Implementation Rationale:
-// - Uses adjacency list representation for efficient neighbor iteration (O(1) per edge)
-// - Normalization ensures consistent handling of Docker Compose vs container names
-// - Returns all cyclic nodes rather than just detecting presence, enabling targeted handling
-// - Single pass through graph with O(V + E) complexity makes it suitable for large deployments
+//   - Uses adjacency list representation for efficient neighbor iteration (O(1) per edge)
+//   - Normalization ensures consistent handling of Docker Compose vs container names
+//   - Returns all cyclic nodes rather than just detecting presence, enabling targeted handling
+//   - Single pass through graph with O(V + E) complexity makes it suitable for large deployments
 //
 // Time Complexity: O(V + E) where V = containers, E = dependency links
 // Space Complexity: O(V + E) for graph storage and DFS recursion stack
 //
 // Edge Cases:
-// - Empty container list: Returns empty map
-// - No dependencies: Returns empty map (no cycles possible)
-// - Single container with self-dependency: Detected as cycle
-// - Multiple disconnected cycles: All detected and marked
-// - Missing dependency targets: Ignored (only analyze provided containers)
+//   - Empty container list: Returns empty map
+//   - No dependencies: Returns empty map (no cycles possible)
+//   - Single container with self-dependency: Detected as cycle
+//   - Multiple disconnected cycles: All detected and marked
+//   - Missing dependency targets: Ignored (only analyze provided containers)
 //
 // Parameters:
 //   - containers: List of containers to analyze for cycles. Should not be nil.

@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -58,7 +59,8 @@ func NormalizeDigest(digest string) string {
 	// List of prefixes to strip from the digest.
 	prefixes := []string{"sha256:"}
 	for _, prefix := range prefixes {
-		if after, ok := strings.CutPrefix(digest, prefix); ok {
+		after, ok := strings.CutPrefix(digest, prefix)
+		if ok {
 			// Trim the prefix to get the raw digest value.
 			normalized := after
 			logrus.WithFields(logrus.Fields{
@@ -205,7 +207,7 @@ func CompareDigestWithRemote(
 // FormatDigest ensures a digest string uses the "sha256:..." form.
 //
 // Empty input is returned unchanged. Digests that already include a known
-// algorithm prefix are returned as-is; otherwise "sha256:" is prepended.
+// algorithm prefix are returned as-is, otherwise "sha256:" is prepended.
 //
 // Parameters:
 //   - digest: Digest string (raw hash or "sha256:...").
@@ -282,6 +284,24 @@ func BuildManifestURL(
 		scheme = "http"
 	}
 
+	// Capture the original registry host from the image reference before any
+	// canonicalization or host remapping. For lscr.io images, preserve the
+	// original host so the redirect-detection logic can distinguish lscr.io
+	// from its ghcr.io target. For all other images use the canonical host.
+	originalHost := ""
+
+	normalizedRef, parseErr := reference.ParseNormalizedNamed(container.ImageName())
+	if parseErr == nil {
+		rawDomain := reference.Domain(normalizedRef)
+
+		canonicalHost, _ := auth.GetRegistryAddress(container.ImageName())
+		if rawDomain == "lscr.io" {
+			originalHost = rawDomain
+		} else if canonicalHost != "" {
+			originalHost = canonicalHost
+		}
+	}
+
 	// Build the canonical manifest URL.
 	manifestURLStr, err := manifest.BuildManifestURL(container, scheme)
 	if err != nil {
@@ -298,8 +318,6 @@ func BuildManifestURL(
 			parseErr,
 		)
 	}
-
-	originalHost := parsedURL.Host
 
 	// Special handling for lscr.io registry redirects:
 	// lscr.io (LinuxServer.io) images are hosted on GitHub Container Registry (ghcr.io)
@@ -333,7 +351,7 @@ func BuildManifestURL(
 
 	if hostOverride != "" {
 		// Parse hostOverride to support full endpoint URLs (with scheme) in addition to bare hosts.
-		// Mirrors from daemon.json may include schemes; mirrors the logic in GetChallengeURL.
+		// Mirrors from daemon.json may include schemes and mirrors the logic in GetChallengeURL.
 		overrideURL, parseErr := url.Parse(hostOverride)
 		if parseErr == nil && overrideURL.Host != "" {
 			parsedURL.Host = overrideURL.Host
@@ -426,7 +444,7 @@ func fetchDigest(
 		}
 
 		// Obtain an authentication token from the current endpoint.
-		token, challengeHost, redirected, redirectHost, err := auth.GetToken(
+		result, err := auth.GetToken(
 			ctx,
 			container,
 			registryAuth,
@@ -440,6 +458,11 @@ func fetchDigest(
 
 			continue
 		}
+
+		token := result.Token
+		challengeHost := result.ChallengeHost
+		redirected := result.Redirected
+		redirectHost := result.RedirectHost
 
 		if token == "" {
 			logrus.WithFields(fields).WithFields(epFields).

@@ -60,7 +60,7 @@ func EncodedAuth(imageName string) (string, error) {
 		credentials, err = EncodedConfigCredentials(imageName)
 	}
 
-	if err == nil {
+	if err == nil && credentials != "" {
 		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials")
 	}
 
@@ -155,8 +155,9 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 	credStore := CredentialsStore(*configFile)
 	credentials, _ := credStore.Get(server)
 
-	// Return empty string if no credentials are found.
-	if credentials == (dockerConfig.AuthConfig{}) {
+	// Return empty string if no credentials are found or if the store returned
+	// an AuthConfig with no username/password (e.g. native store miss or empty entry).
+	if credentials == (dockerConfig.AuthConfig{}) || credentials.Username == "" {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"server":      server,
 			"config_file": configFile.Filename,

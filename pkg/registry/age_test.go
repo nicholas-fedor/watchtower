@@ -562,7 +562,7 @@ func TestBuildManifestURLForAge(t *testing.T) {
 		gotURL, gotHost, _, err := buildManifestURLForAge(container, "")
 		require.NoError(t, err)
 
-		assert.Equal(t, "lscr.io", gotHost)
+		assert.Equal(t, "ghcr.io", gotHost)
 		assert.Contains(t, gotURL, "ghcr.io")
 		assert.Contains(t, gotURL, "/v2/owner/image/manifests/tag")
 	})
