@@ -68,6 +68,9 @@ func parseChallenge(header string) challengeValues {
 
 		key, val, ok := strings.Cut(trimmedPart, "=")
 		if ok {
+			key = strings.TrimSpace(key)
+			val = strings.TrimSpace(val)
+
 			switch strings.ToLower(key) {
 			case "realm":
 				values.realm = strings.Trim(val, `"`)

@@ -84,6 +84,16 @@ func Test_parseChallenge(t *testing.T) {
 			header: `bearer realm="https://example.com/token,alt",service="ghcr.io"`,
 			want:   challengeValues{realm: "https://example.com/token,alt", service: "ghcr.io", scope: ""},
 		},
+		{
+			name:   "whitespace around key and value is trimmed",
+			header: `bearer realm = "https://ghcr.io/token", service = "ghcr.io", scope = "repository:user/repo:pull"`,
+			want:   challengeValues{realm: "https://ghcr.io/token", service: "ghcr.io", scope: "repository:user/repo:pull"},
+		},
+		{
+			name:   "tabs around key and value are trimmed",
+			header: `bearer	realm	=	"https://ghcr.io/token",	service	=	"ghcr.io"`,
+			want:   challengeValues{realm: "https://ghcr.io/token", service: "ghcr.io", scope: ""},
+		},
 	}
 
 	for _, tt := range tests {
