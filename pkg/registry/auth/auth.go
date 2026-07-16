@@ -23,6 +23,7 @@ var (
 	errNoCredentials                 = errors.New("no credentials available")
 	errUnsupportedChallenge          = errors.New("unsupported challenge type from registry")
 	errUnexpectedStatus              = errors.New("unexpected status with empty WWW-Authenticate header")
+	errCrossOriginRedirect           = errors.New("cross-origin redirect not allowed for basic auth")
 )
 
 // TokenResult holds the result of a token acquisition operation.
@@ -187,20 +188,36 @@ func handleSuccessfulChallenge(redirected bool, redirectHost string) TokenResult
 //   - fields: Logging fields for context.
 //   - redirected: Whether the challenge request was redirected.
 //   - redirectHost: The final host after redirects.
+//   - originalHost: The original registry host the challenge request was sent to.
 //
 // Returns:
 //   - TokenResult: Result with Basic auth token.
-//   - error: Non-nil if no credentials are provided, nil on success.
+//   - error: Non-nil if no credentials are provided or a cross-origin redirect is detected, nil on success.
 func handleBasicAuthChallenge(
 	registryAuth string,
 	fields logrus.Fields,
 	redirected bool,
 	redirectHost string,
+	originalHost string,
 ) (TokenResult, error) {
 	if registryAuth == "" {
 		logrus.WithFields(fields).Debug("No credentials provided for Basic auth")
 
 		return TokenResult{}, fmt.Errorf("%w: basic auth required", errNoCredentials)
+	}
+
+	// Reject Basic auth when the challenge follows a cross-origin redirect to prevent
+	// credential forwarding to an unintended host.
+	if redirected &&
+		redirectHost != "" &&
+		originalHost != "" &&
+		!strings.EqualFold(redirectHost, originalHost) {
+		logrus.WithFields(fields).
+			WithField("original_host", originalHost).
+			WithField("redirect_host", redirectHost).
+			Debug("Cross-origin redirect detected; rejecting Basic auth challenge")
+
+		return TokenResult{}, fmt.Errorf("%w: %s -> %s", errCrossOriginRedirect, originalHost, redirectHost)
 	}
 
 	logrus.WithFields(fields).Debug("Using Basic auth")
@@ -239,6 +256,7 @@ func handleUnsupportedChallenge(challenge string, fields logrus.Fields) (TokenRe
 //   - client: Client for HTTP requests.
 //   - redirected: Whether the challenge request was redirected.
 //   - redirectHost: The final host after redirects.
+//   - originalHost: The original registry host the challenge request was sent to.
 //   - fields: Logging fields for context.
 //   - response: Parsed challenge response data.
 //
@@ -252,6 +270,7 @@ func processChallengeResponse(
 	client Client,
 	redirected bool,
 	redirectHost string,
+	originalHost string,
 	fields logrus.Fields,
 	response challengeResponse,
 ) (TokenResult, error) {
@@ -289,6 +308,7 @@ func processChallengeResponse(
 			fields,
 			redirected,
 			redirectHost,
+			originalHost,
 		)
 	}
 
@@ -506,6 +526,7 @@ func GetToken(
 		client,
 		redirected,
 		redirectHost,
+		challengeURL.Host,
 		fields,
 		challengeResponse,
 	)

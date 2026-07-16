@@ -306,6 +306,7 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 		fields       logrus.Fields
 		redirected   bool
 		redirectHost string
+		originalHost string
 		want         TokenResult
 		wantErr      bool
 	}{
@@ -315,6 +316,7 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 			fields:       logrus.Fields{},
 			redirected:   false,
 			redirectHost: "",
+			originalHost: "registry.example.com",
 			want: TokenResult{
 				Token:         "Basic dGVzdA==",
 				ChallengeHost: "",
@@ -329,14 +331,40 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 			fields:       logrus.Fields{},
 			redirected:   false,
 			redirectHost: "",
+			originalHost: "registry.example.com",
 			want:         TokenResult{},
 			wantErr:      true,
+		},
+		{
+			name:         "cross-origin redirect returns error",
+			registryAuth: "dGVzdA==",
+			fields:       logrus.Fields{},
+			redirected:   true,
+			redirectHost: "evil.example.com",
+			originalHost: "registry.example.com",
+			want:         TokenResult{},
+			wantErr:      true,
+		},
+		{
+			name:         "same-host redirect returns token result",
+			registryAuth: "dGVzdA==",
+			fields:       logrus.Fields{},
+			redirected:   true,
+			redirectHost: "registry.example.com",
+			originalHost: "registry.example.com",
+			want: TokenResult{
+				Token:         "Basic dGVzdA==",
+				ChallengeHost: "",
+				Redirected:    true,
+				RedirectHost:  "registry.example.com",
+			},
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := handleBasicAuthChallenge(tt.registryAuth, tt.fields, tt.redirected, tt.redirectHost)
+			got, err := handleBasicAuthChallenge(tt.registryAuth, tt.fields, tt.redirected, tt.redirectHost, tt.originalHost)
 			if tt.wantErr {
 				assert.Error(t, err)
 
@@ -384,6 +412,7 @@ func Test_processChallengeResponse(t *testing.T) {
 		name         string
 		response     challengeResponse
 		registryAuth string
+		originalHost string
 		setupMock    func(*mockAuth.MockClient)
 		want         TokenResult
 		wantErr      bool
@@ -396,6 +425,7 @@ func Test_processChallengeResponse(t *testing.T) {
 				wwwAuthHeader: `Bearer realm="https://challenge.test.com/token",service="challenge.test.com"`,
 			},
 			registryAuth: "",
+			originalHost: "challenge.test.com",
 			setupMock: func(mockClient *mockAuth.MockClient) {
 				mockClient.On("Do", mock.Anything).Return(&http.Response{
 					StatusCode: http.StatusOK,
@@ -417,6 +447,7 @@ func Test_processChallengeResponse(t *testing.T) {
 				wwwAuthHeader: "",
 			},
 			registryAuth: "",
+			originalHost: "",
 			setupMock:    func(*mockAuth.MockClient) {},
 			want: TokenResult{
 				Token:         "",
@@ -433,6 +464,7 @@ func Test_processChallengeResponse(t *testing.T) {
 				wwwAuthHeader: `Basic realm="test"`,
 			},
 			registryAuth: "dGVzdA==",
+			originalHost: "registry.example.com",
 			setupMock:    func(*mockAuth.MockClient) {},
 			want: TokenResult{
 				Token:         "Basic dGVzdA==",
@@ -441,6 +473,21 @@ func Test_processChallengeResponse(t *testing.T) {
 				RedirectHost:  "",
 			},
 			wantErr: false,
+		},
+		{
+			name: "cross-origin redirect with basic auth challenge returns error",
+			response: challengeResponse{
+				statusCode:    http.StatusUnauthorized,
+				wwwAuthHeader: `Basic realm="test"`,
+				redirected:    true,
+				redirectHost:  "evil.example.com",
+			},
+			registryAuth: "dGVzdA==",
+			originalHost: "registry.example.com",
+			setupMock:    func(*mockAuth.MockClient) {},
+			want:         TokenResult{},
+			wantErr:      true,
+			errContains:  "cross-origin redirect not allowed for basic auth",
 		},
 	}
 
@@ -459,7 +506,7 @@ func Test_processChallengeResponse(t *testing.T) {
 			fields := logrus.Fields{"image": "test/image"}
 			ctx := context.Background()
 
-			got, err := processChallengeResponse(ctx, mockContainer, tt.registryAuth, mockClient, false, "", fields, tt.response)
+			got, err := processChallengeResponse(ctx, mockContainer, tt.registryAuth, mockClient, tt.response.redirected, tt.response.redirectHost, tt.originalHost, fields, tt.response)
 			if tt.wantErr {
 				assert.Error(t, err)
 
