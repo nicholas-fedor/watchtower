@@ -506,7 +506,7 @@ func validateRequiredChallengeValues(values challengeValues, imageName, challeng
 //   - *url.URL: The auth URL with query parameters applied.
 func buildAuthQuery(authURL *url.URL, values challengeValues, imageRef reference.Named) *url.URL {
 	query := authURL.Query()
-	query.Add("service", values.service)
+	query.Set("service", values.service)
 
 	scopeImage := reference.Path(imageRef)
 
@@ -519,7 +519,7 @@ func buildAuthQuery(authURL *url.URL, values challengeValues, imageRef reference
 		"scope": scope,
 	}).Debug("Set auth token scope")
 
-	query.Add("scope", scope)
+	query.Set("scope", scope)
 	authURL.RawQuery = query.Encode()
 
 	return authURL

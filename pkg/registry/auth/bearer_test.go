@@ -361,7 +361,6 @@ func Test_validateRequiredChallengeValues(t *testing.T) {
 }
 
 func Test_buildAuthQuery(t *testing.T) {
-	authURL, _ := url.Parse("https://ghcr.io/token")
 	imageRef, _ := reference.ParseNormalizedNamed("ghcr.io/user/repo:latest")
 
 	tests := []struct {
@@ -373,7 +372,14 @@ func Test_buildAuthQuery(t *testing.T) {
 	}{
 		{
 			name:     "adds service and scope query params",
-			authURL:  authURL,
+			authURL:  mustParseURL("https://ghcr.io/token"),
+			values:   challengeValues{service: "ghcr.io", scope: ""},
+			imageRef: imageRef,
+			want:     "scope=repository%3Auser%2Frepo%3Apull&service=ghcr.io",
+		},
+		{
+			name:     "replaces existing service and scope query params",
+			authURL:  mustParseURL("https://ghcr.io/token?service=old&scope=old-scope"),
 			values:   challengeValues{service: "ghcr.io", scope: ""},
 			imageRef: imageRef,
 			want:     "scope=repository%3Auser%2Frepo%3Apull&service=ghcr.io",
@@ -387,6 +393,15 @@ func Test_buildAuthQuery(t *testing.T) {
 			assert.Equal(t, tt.want, got.RawQuery)
 		})
 	}
+}
+
+func mustParseURL(rawURL string) *url.URL {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		panic(err)
+	}
+
+	return parsed
 }
 
 func TestGetAuthURL(t *testing.T) {
