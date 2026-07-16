@@ -272,29 +272,61 @@ func Test_handleSuccessfulChallenge(t *testing.T) {
 }
 
 func Test_handleEmptyAuthHeader(t *testing.T) {
+	ctx := context.Background()
+	mockContainer := mockTypes.NewMockContainer(t)
+	mockClient := mockAuth.NewMockClient(t)
+
 	tests := []struct {
 		name         string
-		redirected   bool
-		redirectHost string
-		want         TokenResult
+		response     challengeResponse
+		registryAuth string
+		wantErr      error
 	}{
 		{
-			name:         "returns empty token result",
-			redirected:   false,
-			redirectHost: "",
-			want: TokenResult{
-				Token:         "",
-				ChallengeHost: "",
-				Redirected:    false,
-				RedirectHost:  "",
+			name: "401 without WWW-Authenticate returns no credentials error",
+			response: challengeResponse{
+				statusCode:    http.StatusUnauthorized,
+				wwwAuthHeader: "",
+				redirected:    false,
+				redirectHost:  "",
 			},
+			registryAuth: "",
+			wantErr:      errNoCredentials,
+		},
+		{
+			name: "non-200 without WWW-Authenticate returns unexpected status error",
+			response: challengeResponse{
+				statusCode:    http.StatusInternalServerError,
+				wwwAuthHeader: "",
+				redirected:    false,
+				redirectHost:  "",
+			},
+			registryAuth: "",
+			wantErr:      errUnexpectedStatus,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := handleSuccessfulChallenge(tt.redirected, tt.redirectHost)
-			assert.Equal(t, tt.want, got)
+			_, err := processChallengeResponse(
+				ctx,
+				mockContainer,
+				tt.registryAuth,
+				mockClient,
+				tt.response.redirected,
+				tt.response.redirectHost,
+				"",
+				logrus.Fields{},
+				tt.response,
+			)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+
+				return
+			}
+
+			t.Fatal("expected error")
 		})
 	}
 }
