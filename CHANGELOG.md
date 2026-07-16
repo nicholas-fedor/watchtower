@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/setup-go action to v7 by @renovate[bot] in [#1946](https://github.com/nicholas-fedor/watchtower/pull/1946)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.25 by @renovate[bot] in [#1948](https://github.com/nicholas-fedor/watchtower/pull/1948)
 - Update module github.com/mattn/go-isatty to v0.0.23 by @renovate[bot] in [#1947](https://github.com/nicholas-fedor/watchtower/pull/1947)
 - Update module github.com/gofiber/utils/v2 to v2.2.0 by @renovate[bot] in [#1944](https://github.com/nicholas-fedor/watchtower/pull/1944)
