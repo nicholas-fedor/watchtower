@@ -8,7 +8,7 @@ retract [v1.7.2, v1.7.9]
 require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v29.6.1+incompatible
+	github.com/docker/cli v29.6.2+incompatible
 	github.com/gofiber/contrib/v3/swaggo v1.0.8
 	github.com/gofiber/fiber/v3 v3.4.0
 	github.com/moby/docker-image-spec v1.3.1
