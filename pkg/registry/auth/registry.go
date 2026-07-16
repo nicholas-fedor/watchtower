@@ -13,7 +13,6 @@ import (
 // ChallengeHeader is the HTTP Header containing challenge instructions.
 const ChallengeHeader = "WWW-Authenticate"
 
-// Domains for Docker Hub, the default registry.
 const (
 	DockerRegistryDomain = "docker.io"       // Primary domain for Docker Hub image references.
 	DockerRegistryHost   = "index.docker.io" // Current Docker Hub registry API endpoint.

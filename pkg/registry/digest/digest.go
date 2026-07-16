@@ -295,7 +295,7 @@ func BuildManifestURL(
 		rawDomain := reference.Domain(normalizedRef)
 
 		canonicalHost, _ := auth.GetRegistryAddress(container.ImageName())
-		if rawDomain == "lscr.io" {
+		if rawDomain == auth.LSCRRegistry {
 			originalHost = rawDomain
 		} else if canonicalHost != "" {
 			originalHost = canonicalHost
