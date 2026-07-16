@@ -316,6 +316,8 @@ func Test_handleEmptyAuthHeader(t *testing.T) {
 				tt.response.redirected,
 				tt.response.redirectHost,
 				"",
+				"",
+				"",
 				logrus.Fields{},
 				tt.response,
 			)
@@ -333,14 +335,16 @@ func Test_handleEmptyAuthHeader(t *testing.T) {
 
 func Test_handleBasicAuthChallenge(t *testing.T) {
 	tests := []struct {
-		name         string
-		registryAuth string
-		fields       logrus.Fields
-		redirected   bool
-		redirectHost string
-		originalHost string
-		want         TokenResult
-		wantErr      bool
+		name           string
+		registryAuth   string
+		fields         logrus.Fields
+		redirected     bool
+		redirectHost   string
+		originalHost   string
+		originalScheme string
+		redirectScheme string
+		want           TokenResult
+		wantErr        bool
 	}{
 		{
 			name:         "valid registry auth returns token result",
@@ -378,12 +382,14 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 			wantErr:      true,
 		},
 		{
-			name:         "same-host redirect returns token result",
-			registryAuth: "dGVzdA==",
-			fields:       logrus.Fields{},
-			redirected:   true,
-			redirectHost: "registry.example.com",
-			originalHost: "registry.example.com",
+			name:           "same-host https redirect returns token result",
+			registryAuth:   "dGVzdA==",
+			fields:         logrus.Fields{},
+			redirected:     true,
+			redirectHost:   "registry.example.com",
+			originalHost:   "registry.example.com",
+			originalScheme: "https",
+			redirectScheme: "https",
 			want: TokenResult{
 				Token:         "Basic dGVzdA==",
 				ChallengeHost: "",
@@ -392,11 +398,23 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:           "same-host https to http downgrade returns error",
+			registryAuth:   "dGVzdA==",
+			fields:         logrus.Fields{},
+			redirected:     true,
+			redirectHost:   "registry.example.com",
+			originalHost:   "registry.example.com",
+			originalScheme: "https",
+			redirectScheme: "http",
+			want:           TokenResult{},
+			wantErr:        true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := handleBasicAuthChallenge(tt.registryAuth, tt.fields, tt.redirected, tt.redirectHost, tt.originalHost)
+			got, err := handleBasicAuthChallenge(tt.registryAuth, tt.fields, tt.redirected, tt.redirectHost, tt.originalHost, tt.originalScheme, tt.redirectScheme)
 			if tt.wantErr {
 				assert.Error(t, err)
 
@@ -441,14 +459,16 @@ func Test_handleUnsupportedChallenge(t *testing.T) {
 
 func Test_processChallengeResponse(t *testing.T) {
 	tests := []struct {
-		name         string
-		response     challengeResponse
-		registryAuth string
-		originalHost string
-		setupMock    func(*mockAuth.MockClient)
-		want         TokenResult
-		wantErr      bool
-		errContains  string
+		name           string
+		response       challengeResponse
+		registryAuth   string
+		originalHost   string
+		originalScheme string
+		redirectScheme string
+		setupMock      func(*mockAuth.MockClient)
+		want           TokenResult
+		wantErr        bool
+		errContains    string
 	}{
 		{
 			name: "401 with bearer challenge routes to bearer auth",
@@ -521,6 +541,23 @@ func Test_processChallengeResponse(t *testing.T) {
 			wantErr:      true,
 			errContains:  "cross-origin redirect not allowed for basic auth",
 		},
+		{
+			name: "same-host https to http downgrade with basic auth challenge returns error",
+			response: challengeResponse{
+				statusCode:    http.StatusUnauthorized,
+				wwwAuthHeader: `Basic realm="test"`,
+				redirected:    true,
+				redirectHost:  "registry.example.com",
+			},
+			registryAuth:   "dGVzdA==",
+			originalHost:   "registry.example.com",
+			originalScheme: "https",
+			redirectScheme: "http",
+			setupMock:      func(*mockAuth.MockClient) {},
+			want:           TokenResult{},
+			wantErr:        true,
+			errContains:    "cross-origin redirect not allowed for basic auth",
+		},
 	}
 
 	for _, tt := range tests {
@@ -538,7 +575,19 @@ func Test_processChallengeResponse(t *testing.T) {
 			fields := logrus.Fields{"image": "test/image"}
 			ctx := context.Background()
 
-			got, err := processChallengeResponse(ctx, mockContainer, tt.registryAuth, mockClient, tt.response.redirected, tt.response.redirectHost, tt.originalHost, fields, tt.response)
+			got, err := processChallengeResponse(
+				ctx,
+				mockContainer,
+				tt.registryAuth,
+				mockClient,
+				tt.response.redirected,
+				tt.response.redirectHost,
+				tt.originalHost,
+				tt.originalScheme,
+				tt.redirectScheme,
+				fields,
+				tt.response,
+			)
 			if tt.wantErr {
 				assert.Error(t, err)
 
