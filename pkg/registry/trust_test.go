@@ -69,14 +69,15 @@ func TestEncodedEnvAuth_PartialCredentials(t *testing.T) {
 	}
 }
 
-// TestEncodedConfigAuth_ReturnsErrorWhenFileNotPresent verifies that
-// EncodedConfigCredentials returns an error when the Docker config directory
+// TestEncodedConfigAuth_ReturnsEmptyCredentialsWhenFileNotPresent verifies that
+// EncodedConfigCredentials returns empty credentials when the Docker config directory
 // does not contain a valid config file.
-func TestEncodedConfigAuth_ReturnsErrorWhenFileNotPresent(t *testing.T) {
-	t.Setenv("DOCKER_CONFIG", "/dev/null/should-fail")
+func TestEncodedConfigAuth_ReturnsEmptyCredentialsWhenFileNotPresent(t *testing.T) {
+	t.Setenv("DOCKER_CONFIG", "/nonexistent/watchtower-test-path")
 
-	_, err := EncodedConfigCredentials("docker.io/library/nginx:latest")
-	require.Error(t, err)
+	credentials, err := EncodedConfigCredentials("docker.io/library/nginx:latest")
+	require.NoError(t, err)
+	assert.Empty(t, credentials)
 }
 
 // TestEncodedConfigCredentials_FileStoreNoUsername tests that EncodedConfigCredentials
